@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
- * A span widget on a board says where span history starts when its period begins earlier. The
- * floor is what the server reports, the span replay's recorded since. Only the sandboxed frame
- * is stood in for, since jsdom cannot run it.
+ * A span widget on a board says in its card footer where span history starts when its period
+ * begins earlier, clear of the plot. The floor is what the server reports, the span replay's
+ * recorded since. Only the sandboxed frame is stood in for, since jsdom cannot run it.
  * @see specs/lwql/stock-widgets-read-no-map.feature
  */
 
@@ -79,17 +79,18 @@ function renderCard({
   return door;
 }
 
+/** The card's footer line, "" when the card draws none. */
+const footerText = () => screen.queryByTestId("widget-card-footer")?.textContent ?? "";
+
 afterEach(cleanup);
 
 describe("given a widget that reads span_metrics", () => {
   describe("when its period starts before the recorded span floor", () => {
     /** @scenario "A span widget whose period starts before the span data says where it starts" */
-    it("shows the day span data starts from", async () => {
+    it("shows the day span data starts from in the card footer", async () => {
       renderCard({ sql: SPAN_SQL, from: "2026-10-10T08:30:00Z" });
 
-      expect(await screen.findByTestId("widget-span-floor-notice")).toHaveTextContent(
-        "Span data from 10 Oct 2026",
-      );
+      await waitFor(() => expect(footerText()).toContain("Span data from 10 Oct 2026"));
     });
   });
 
@@ -99,7 +100,7 @@ describe("given a widget that reads span_metrics", () => {
       const door = renderCard({ sql: SPAN_SQL, from: "2026-09-01T00:00:00Z" });
 
       await waitFor(() => expect(door.asked).toContain("analytics.lwql.spanDataFloor"));
-      expect(screen.queryByTestId("widget-span-floor-notice")).toBeNull();
+      expect(footerText()).not.toContain("Span data");
     });
   });
 
@@ -108,9 +109,7 @@ describe("given a widget that reads span_metrics", () => {
     it("says span history is still being rebuilt", async () => {
       renderCard({ sql: SPAN_SQL, from: null, rebuilding: true });
 
-      expect(await screen.findByTestId("widget-span-floor-notice")).toHaveTextContent(
-        "Span history is still being rebuilt",
-      );
+      await waitFor(() => expect(footerText()).toContain("Span history is still being rebuilt"));
     });
   });
 });
@@ -121,6 +120,6 @@ describe("given a widget that reads no span_metrics", () => {
 
     await screen.findByTestId("sandboxed-frame");
     expect(door.asked).not.toContain("analytics.lwql.spanDataFloor");
-    expect(screen.queryByTestId("widget-span-floor-notice")).toBeNull();
+    expect(footerText()).not.toContain("Span");
   });
 });

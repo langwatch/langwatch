@@ -76,9 +76,12 @@ describe("given a cost sum and its query's completeness report", () => {
 
   /** @scenario "Widget quality: a sum that misses prices reads as a lower bound" */
   it("puts the + on the cost totals of the cost widgets", () => {
-    for (const id of ["ck-status", "spend", "cost-verdict", "cost-waste"]) {
+    for (const id of ["spend", "cost-waste"]) {
       expect(code(id), id).toMatch(/usd\([^)]*\)\)? \+ plus\(/);
     }
+    // These can sum to 0 with unpriced spans, so they word the figure through costFigure.
+    expect(code("ck-status")).toContain("costFigure(main, num(row.cost))");
+    expect(code("cost-verdict")).toContain("costFigure(spend, cost)");
   });
 });
 
@@ -171,7 +174,19 @@ describe("given a chart over the board's period", () => {
 describe("given every built widget's stored code", () => {
   /** @scenario "Widget quality: a chart draws every bucket, a count as 0 and a measure as a gap" */
   it("imports the chart kit helpers it calls and defines every helper it calls", () => {
-    const helpers = ["bridge", "tipValue", "withBuckets", "latest", "plus", "pricedShare"];
+    const helpers = [
+      "bridge",
+      "tipValue",
+      "withBuckets",
+      "latest",
+      "plus",
+      "pricedShare",
+      "costText",
+      "costFigure",
+      "costParts",
+      "spentHint",
+      "markHover",
+    ];
     for (const { key, definition } of built) {
       for (const name of helpers) {
         if (!new RegExp(`[^.\\w]${name}\\(`).test(definition.code)) continue;

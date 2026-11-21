@@ -12,6 +12,7 @@ import {
   DATES,
   GAP_BRIDGE,
   NUMBERS,
+  SPENT_HINT,
   TRACE_LINK,
   TABLE,
   widgetCode,
@@ -36,6 +37,7 @@ export const KPIS_CODE = widgetCode({
   source: "traces",
   compactCallToAction: true,
   parts: [NUMBERS, COMPLETENESS, FIGURES],
+  components: SPENT_HINT,
   queries: ["outcomes", "spend", "checks"],
   body: `  const o = outcomes.data[0] || {};
   const s = spend.data[0] || {};
@@ -78,7 +80,7 @@ export const KPIS_CODE = widgetCode({
           {resolved > 0 ? (
             <Change now={perSuccess} before={perSuccessPrev} better="down" format={usd} />
           ) : (
-            <Hint>{usd(num(s.cost)) + plus(spend)} spent, nothing resolved yet</Hint>
+            <Hint>{spentHint(spend, num(s.cost))}</Hint>
           )}
         </Figure>
       </Figures>

@@ -50,6 +50,44 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And a cost of 12345 dollars shows as "$12.3K"
     # Evidence: unit test of the formatter and a board screenshot showing a cost
 
+  @unit
+  Scenario: AC214 Count axis whole numbers
+    Given a count chart whose largest value is 0, 1 or 2
+    Then every y-axis tick is a whole number
+    # Evidence: errors-by-day card, haven screenshot
+
+  @unit
+  Scenario: AC215 Partial cost: no span priced
+    Given a per-source cost row where no span has a cost
+    Then it shows "Not priced"
+    And never "$0.00+"
+    And a card whose figure has no priced span shows the cost setup view instead
+
+  @unit
+  Scenario: AC215b Partial cost: some spans priced at zero
+    Given at least one span is priced, every priced span is priced at 0, and some spans have no cost
+    Then the card figure or source row shows "$0.00, some spans not priced"
+    And never "$0.00+"
+
+  @unit
+  Scenario: AC215c Partial cost: the loops card cannot count priced spans
+    Given the "up-loops" card, whose sum is 0 and some of whose repeats have no cost
+    Then it shows "$0.00, some spans not priced"
+    And never "Not priced" or "$0.00+"
+
+  @unit
+  Scenario: AC215d Partial cost: a sum above 0 with some spans not priced
+    Given a cost card or a per-source cost row where at least one span is priced above 0 and some spans have no cost
+    Then it shows the sum marked "+"
+    And a sum with every span priced shows no "+"
+
+  @unit
+  Scenario: AC215e Partial cost: the evaluations source row keeps the dash for a null cost
+    Given the evaluations source row, whose unpriced count is a constant 0
+    When its cost sums to null, which may mean its spans are not priced
+    Then it shows "–"
+    And never "$0.00"
+
   @e2e @unimplemented
   Scenario: AC5 The board uses a wide screen
     Given a 1440px wide window
@@ -211,6 +249,11 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And with one empty widget, without Langy, or in a project that has received traces, the board offers no such button
     # A quiet period is not a setup step (AC13)
     # Evidence: a new project's board with the banner and Langy's drafted prompt
+
+  @unit
+  Scenario: AC217 Needs model
+    Given an evaluations widget whose query reads a model column no row carries
+    Then it reads "Choose a model in the evaluator's settings."
 
   @unit
   Scenario: AC14 Reviewer thumbs are named as reviewer thumbs
@@ -443,6 +486,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And it marks each prompt version and each newly used model in the period on the time axis
     # Decision: LangWatch records no deploys, so deploys are not marked
 
+  @integration
+  Scenario: AC216 Change markers
+    Given Errors per day, Wrong tool rate, Conversations resolved per day and Cost per document at 1280 px and at the narrowest card width, with markers 1 day apart
+    Then no marker label is drawn on the plot or past the right axis
+    And hovering a marker shows its readable name, never a raw id
+    And the "Span data from" note sits clear of the x-axis and the legend
+    # Evidence: haven screenshots at both widths
+
   @unit
   Scenario: AC61 Where my agent breaks: failing steps show the failures that reached the user
     Given the "up-where-fails" widget
@@ -497,7 +548,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then a trace has looped when it calls one tool 3 or more times with the same input
     And a trace has retried when a failed span is followed under the same parent by the same step, or by another model call
     And it shows those traces per bucket, their share of all traces, and the cost of the repeated calls
-    And that cost reads as a lower bound, marked "+", when a repeated span carries no cost
+    And that cost reads as a lower bound, marked "+", when its sum is above 0 and a repeated span carries no cost
 
   @unit
   Scenario: AC63 Where my agent breaks: tool error rate says how many tool errors the agent recovered
@@ -2238,7 +2289,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @unit
   Scenario: AC213 Diagnostics: a card shows what the server limited as one (i) line
     Given a card whose run answered SHARE_WINDOW_LIMITED, SOURCES_IGNORED or GRANULARITY_COARSENED
-    Then the card shows one (i) line holding the messages of those diagnostics
+    Then the card shows one (i) line holding the card wording for each of those diagnostics
+    And for SOURCES_IGNORED the line reads "This query counts every source, because its SQL does not read the sources setting." and contains no "{"
     And a card whose run was not limited shows no such line
     And the line names no project and counts none
     # Evidence: a haven browser screenshot of a limited card and of an unlimited one
@@ -2311,3 +2363,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 120-123: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate
   # AC 130-138: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: sections are branches in tree order, coloured by trunk; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board
+  # AC 214-217: "Widget UI fixes: whole-number count axes, partial cost words, change markers on hover, the Needs model line" (langwatch/tasks#1187, 2026-11-21) → Scenario: AC214 Count axis whole numbers; Scenario: AC215 Partial cost: no span priced; Scenario: AC215b Partial cost: some spans priced at zero; Scenario: AC215c Partial cost: the loops card cannot count priced spans; Scenario: AC215d Partial cost: a sum above 0 with some spans not priced; Scenario: AC215e Partial cost: the evaluations source row keeps the dash for a null cost; Scenario: AC216 Change markers; Scenario: AC217 Needs model

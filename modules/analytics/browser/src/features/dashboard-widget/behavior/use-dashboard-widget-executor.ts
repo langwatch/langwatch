@@ -24,19 +24,13 @@ import {
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { nowInstant } from "@langwatch/time";
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
 import { createLangWatchQLExecute } from "../../../behavior/lwql-execute.ts";
 import type { LangWatchQLParameterValue } from "../../../model/lwql-request-state.ts";
-
-/** The diagnostics that say the server limited a run, shown on the card as one (i) line. */
-const LIMIT_DIAGNOSTIC_CODES: readonly string[] = [
-  "SHARE_WINDOW_LIMITED",
-  "SOURCES_IGNORED",
-  "GRANULARITY_COARSENED",
-];
+import { widgetLimitNotes } from "../model/widget-limit-notes.ts";
 
 /** Widgets run against the last 24 hours at an hourly step — no toolbar. */
 const DEFAULT_GRANULARITY: LangWatchQLGranularityStep = 3600;
@@ -115,129 +109,108 @@ export function useDashboardWidgetExecutor(
     overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
   // By value, not by object: a caller that builds the ids afresh each render keeps one run.
   const { dashboardId, widgetId, templateId } = telemetryIdsOf(overrides);
-  const execute = useMemo(
-    () =>
-      createLangWatchQLExecute({
-        transport: {
-          mutate: (input, options) => utils.client.analytics.lwql.query.mutate(input, options),
-        },
-        projectId,
-      }),
-    [utils, projectId],
-  );
+  const execute = createLangWatchQLExecute({
+    transport: {
+      mutate: (input, options) => utils.client.analytics.lwql.query.mutate(input, options),
+    },
+    projectId,
+  });
   const [lastRuns, setLastRuns] = useState<Record<string, QueryLastRun>>({});
 
   // What the server limited, per statement: the (i) line a card shows (dashboards-v2 AC213).
   const [limitsBySql, setLimitsBySql] = useState<Record<string, readonly string[]>>({});
-  const noteLimits = useCallback(
-    ({ query, result }: { query: string; result: LangWatchQLQueryResult }) => {
-      const messages = result.diagnostics
-        .filter(({ code }) => LIMIT_DIAGNOSTIC_CODES.includes(code))
-        .map(({ message }) => message);
-      setLimitsBySql((prev) =>
-        prev[query]?.join() === messages.join() ? prev : { ...prev, [query]: messages },
-      );
-    },
-    [],
-  );
-  const limits = useMemo(() => [...new Set(Object.values(limitsBySql).flat())], [limitsBySql]);
+  const noteLimits = ({ query, result }: { query: string; result: LangWatchQLQueryResult }) => {
+    const messages = widgetLimitNotes(result.diagnostics);
+    setLimitsBySql((prev) =>
+      prev[query]?.join() === messages.join() ? prev : { ...prev, [query]: messages },
+    );
+  };
+  const limits = [...new Set(Object.values(limitsBySql).flat())];
 
-  const recordRun = useCallback((name: string, run: QueryLastRun) => {
+  const recordRun = (name: string, run: QueryLastRun) => {
     setLastRuns((prev) => ({ ...prev, [name]: run }));
-  }, []);
+  };
 
-  const runValidated = useCallback(
-    async (
-      query: Pick<DashboardWidgetQuery, "sql" | "sources" | "projects">,
-      params: Readonly<Record<string, LangWatchQLParameterValue>>,
-      signal?: AbortSignal,
-    ): Promise<ChartQueryResult> => {
-      const result = await execute(
-        {
-          sql: query.sql,
-          parameters: params,
-          timeWindow: pageWindow,
-          granularitySeconds,
-          // What the query stores; null asks the server for the default (dashboards-v2 AC200f).
-          sources: query.sources ?? null,
-          ...(query.projects ? { projects: query.projects } : {}),
-          telemetry: runTelemetryOf({ dashboardId, widgetId, templateId }),
-        },
-        // `execute` requires a signal; callers without one (e.g. `runStandalone`)
-        // get a fresh controller's signal, which simply never aborts.
-        { signal: signal ?? new AbortController().signal },
-      );
-      noteLimits({ query: query.sql, result });
-      return toChartQueryResult(result);
-    },
-    [execute, pageWindow, granularitySeconds, noteLimits, dashboardId, widgetId, templateId],
-  );
+  const runValidated = async (
+    query: Pick<DashboardWidgetQuery, "sql" | "sources" | "projects">,
+    params: Readonly<Record<string, LangWatchQLParameterValue>>,
+    signal?: AbortSignal,
+  ): Promise<ChartQueryResult> => {
+    const result = await execute(
+      {
+        sql: query.sql,
+        parameters: params,
+        timeWindow: pageWindow,
+        granularitySeconds,
+        // What the query stores; null asks the server for the default (dashboards-v2 AC200f).
+        sources: query.sources ?? null,
+        ...(query.projects ? { projects: query.projects } : {}),
+        telemetry: runTelemetryOf({ dashboardId, widgetId, templateId }),
+      },
+      // `execute` requires a signal; callers without one (e.g. `runStandalone`)
+      // get a fresh controller's signal, which simply never aborts.
+      { signal: signal ?? new AbortController().signal },
+    );
+    noteLimits({ query: query.sql, result });
+    return toChartQueryResult(result);
+  };
 
-  const executeQuery: ChartFrameExecuteQuery = useCallback(
-    async ({ queryName, params, signal }) => {
-      const query = queries.find((q) => q.name === queryName);
-      if (!query) {
-        const error: ChartQueryError = {
-          code: "dashboard_widget_query_not_found",
-          title: "Unknown query",
-          message: `This widget has no query named "${queryName}".`,
-        };
-        recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, error });
-        throw error;
-      }
-      const validation = validateDashboardWidgetQueryParams({ query, params });
-      if (!validation.ok) {
-        recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, error: validation.error });
-        throw validation.error;
-      }
-      try {
-        const result = await runValidated(query, validation.params, signal);
-        recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, result });
-        return result;
-      } catch (error) {
-        const shaped = toChartQueryError(error);
-        recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, error: shaped });
-        throw shaped;
-      }
-    },
-    [queries, recordRun, runValidated],
-  );
+  const executeQuery: ChartFrameExecuteQuery = async ({ queryName, params, signal }) => {
+    const query = queries.find((q) => q.name === queryName);
+    if (!query) {
+      const error: ChartQueryError = {
+        code: "dashboard_widget_query_not_found",
+        title: "Unknown query",
+        message: `This widget has no query named "${queryName}".`,
+      };
+      recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, error });
+      throw error;
+    }
+    const validation = validateDashboardWidgetQueryParams({ query, params });
+    if (!validation.ok) {
+      recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, error: validation.error });
+      throw validation.error;
+    }
+    try {
+      const result = await runValidated(query, validation.params, signal);
+      recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, result });
+      return result;
+    } catch (error) {
+      const shaped = toChartQueryError(error);
+      recordRun(queryName, { ranAt: nowInstant().epochMilliseconds, error: shaped });
+      throw shaped;
+    }
+  };
 
   /**
    * Fills every declared parameter from its default, so a required
    * parameter with no default simply fails validation — the same outcome
    * a disabled button would express, through the one validation path.
    */
-  const runStandalone = useCallback(
-    async (query: DashboardWidgetQuery) => {
-      const validation = validateDashboardWidgetQueryParams({
-        query,
-        params: {},
+  const runStandalone = async (query: DashboardWidgetQuery) => {
+    const validation = validateDashboardWidgetQueryParams({
+      query,
+      params: {},
+    });
+    if (!validation.ok) {
+      recordRun(query.name, { ranAt: nowInstant().epochMilliseconds, error: validation.error });
+      return;
+    }
+    try {
+      const result = await runValidated(query, validation.params);
+      recordRun(query.name, { ranAt: nowInstant().epochMilliseconds, result });
+    } catch (error) {
+      recordRun(query.name, {
+        ranAt: nowInstant().epochMilliseconds,
+        error: toChartQueryError(error),
       });
-      if (!validation.ok) {
-        recordRun(query.name, { ranAt: nowInstant().epochMilliseconds, error: validation.error });
-        return;
-      }
-      try {
-        const result = await runValidated(query, validation.params);
-        recordRun(query.name, { ranAt: nowInstant().epochMilliseconds, result });
-      } catch (error) {
-        recordRun(query.name, {
-          ranAt: nowInstant().epochMilliseconds,
-          error: toChartQueryError(error),
-        });
-      }
-    },
-    [recordRun, runValidated],
-  );
+    }
+  };
 
-  const params: Pick<ChartFrameDashboardContext, "timeWindow" | "granularitySeconds"> = useMemo(
-    () => ({
-      timeWindow: { start: pageWindow.start, end: pageWindow.end },
-      granularitySeconds,
-    }),
-    [pageWindow, granularitySeconds],
-  );
+  const params: Pick<ChartFrameDashboardContext, "timeWindow" | "granularitySeconds"> = {
+    timeWindow: { start: pageWindow.start, end: pageWindow.end },
+    granularitySeconds,
+  };
 
   return { executeQuery, runStandalone, params, lastRuns, limits };
 }

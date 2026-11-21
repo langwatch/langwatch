@@ -123,6 +123,22 @@ describe("widgetFace", () => {
     });
   });
 
+  /** @scenario "AC215 Partial cost: no span priced" */
+  it("names the cost, for its setup view, when no row has a price", () => {
+    const unpriced = report({
+      state: "missing",
+      fields: [{ field: "TotalCost", label: "total cost", present: 0 }],
+      unpriced: { count: 10, models: [] },
+    });
+    const records = recordQueryResult({ records: {}, queryName: "main", completeness: unpriced });
+
+    expect(widgetFace(records)).toEqual({
+      kind: "missing",
+      missing: { field: "TotalCost", label: "total cost" },
+      unit: "traces",
+    });
+  });
+
   it("is no traffic when the query found none", () => {
     const records = recordQueryResult({ records: {}, queryName: "main", completeness: NO_TRAFFIC });
 
