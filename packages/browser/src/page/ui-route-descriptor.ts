@@ -9,6 +9,7 @@ export type UiRedirectDescriptor = {
   readonly pinParams?: Readonly<Record<string, string>>;
   readonly renameParams?: Readonly<Record<string, string>>;
   readonly mapSegment?: Readonly<Record<string, string>>;
+  readonly dropDeeperPath?: boolean;
 };
 
 /** A route that renders a page, or a pathless layout route that wraps others. */

@@ -24,6 +24,7 @@ export function UiPrefixRedirect({
   pinParams,
   renameParams,
   mapSegment,
+  dropDeeperPath,
 }: {
   from: string;
   to: string;
@@ -39,19 +40,27 @@ export function UiPrefixRedirect({
    * to the destination.
    */
   mapSegment?: Record<string, string>;
+  /**
+   * With `mapSegment`, the path below the renamed segment is dropped, for a destination whose
+   * renamed pages have nothing below them: `/old/a/b` reaches `/new/a`.
+   */
+  dropDeeperPath?: boolean;
 }) {
   const location = useLocation();
   const params = useParams();
 
   const start = fillParams(from, params);
   const target = fillParams(to, params);
-  const suffix = location.pathname.startsWith(start) ? location.pathname.slice(start.length) : "";
+  // The router matches whatever the case, so `/Me/sessions` reached this row as `/me/sessions` did.
+  const isUnderStart = location.pathname.toLowerCase().startsWith(start.toLowerCase());
+  const suffix = isUnderStart ? location.pathname.slice(start.length) : "";
 
   let pathname = target + suffix;
   if (mapSegment) {
     const [first, ...deeper] = suffix.split("/").filter(Boolean);
     const renamed = first === void 0 ? void 0 : mapSegment[first.toLowerCase()];
-    pathname = renamed === void 0 ? target : [target, renamed, ...deeper].join("/");
+    const kept = dropDeeperPath ? [] : deeper;
+    pathname = renamed === void 0 ? target : [target, renamed, ...kept].join("/");
   }
 
   // Only a pinned or renamed param re-serializes the query; without one the

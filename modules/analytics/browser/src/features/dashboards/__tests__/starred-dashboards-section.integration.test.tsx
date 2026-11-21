@@ -40,11 +40,16 @@ const LATENCY = {
 
 /**
  * Keeps what is registered as PostHog does, and notes the projectId each event went out with.
- * Starts as the shell leaves it: the page's project ("proj-1") registered.
+ * Starts as the shell leaves it: `projectId` registered, "proj-1" (the page's) unless named.
  */
 class RegisteringUiAnalytics extends RecordingUiAnalytics {
-  registered: Readonly<Record<string, unknown>> = { projectId: "proj-1" };
+  registered: Readonly<Record<string, unknown>>;
   readonly sent: { action?: string; attributes?: unknown; projectId: unknown }[] = [];
+
+  constructor({ projectId = "proj-1" }: { projectId?: string } = {}) {
+    super();
+    this.registered = { projectId };
+  }
 
   override register(properties: Readonly<Record<string, unknown>>): void {
     this.registered = { ...this.registered, ...properties };
@@ -74,6 +79,7 @@ function renderSection({
   gate = Promise.resolve(),
   project,
   projectPermissions,
+  registeredProjectId,
   tracked,
 }: {
   stars: unknown[];
@@ -86,12 +92,15 @@ function renderSection({
   project?: StarredDashboardsProject;
   /** The member's grants in projects other than the page's, by project id. */
   projectPermissions?: Readonly<Record<string, readonly string[]>>;
+  /** The `projectId` the shell registered, when it is not the page's project in scope. */
+  registeredProjectId?: string;
   /** Records the product events the section sends. */
   tracked?: RecordingUiAnalytics;
 }) {
   const host = new StubAnalyticsHost({
     ...(permissions ? { permissions } : {}),
     ...(projectPermissions ? { projectPermissions } : {}),
+    ...(registeredProjectId ? { registeredProjectId } : {}),
   });
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall) => {
@@ -429,6 +438,7 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
       const { host, calls } = renderSection({
         stars: [{ kind: "board", dashboard: { ...LATENCY, projectId: "proj-shop" } }],
         project: SHOP,
+        projectPermissions: SHOP_MEMBER,
       });
 
       const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
@@ -496,6 +506,64 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
 
       await waitFor(() => expect(screen.queryByText(/^Dashboards/)).toBeNull());
       expect(screen.queryByText("Add dashboard")).toBeNull();
+    });
+  });
+
+  describe("given the member may view dashboards on the page's project but not in that project", () => {
+    /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's view grant" */
+    it("draws nothing and reads no pins there", async () => {
+      const { calls } = renderSection({
+        stars: [{ kind: "board", dashboard: { ...LATENCY, projectId: "proj-shop" } }],
+        permissions: VIEWER,
+        project: SHOP,
+        projectPermissions: { "proj-shop": [] },
+      });
+
+      await expect(
+        screen.findByRole("region", { name: "Dashboards · Shop" }, { timeout: 300 }),
+      ).rejects.toThrow("Unable to find");
+      expect(inputsTo(calls, "boards.listStarred")).toEqual([]);
+    });
+  });
+
+  describe("given the member may view dashboards in that project but not on the page's", () => {
+    /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's view grant" */
+    it("draws the section for that project", async () => {
+      renderSection({
+        stars: [{ kind: "board", dashboard: { ...LATENCY, projectId: "proj-shop" } }],
+        permissions: [],
+        project: SHOP,
+        projectPermissions: { "proj-shop": VIEWER },
+      });
+
+      const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
+      expect(await group.findByRole("link", { name: "Latency" })).toBeInTheDocument();
+    });
+  });
+
+  describe("given the shell registered a project other than the page's, then a board is made", () => {
+    /** @scenario "Events from the Dashboards section in Gateway or Coding agents are about the named project" */
+    it("puts back the project the shell registered, not the page's", async () => {
+      const user = userEvent.setup();
+      const tracked = new RegisteringUiAnalytics({ projectId: "proj-registered" });
+      const { host } = renderSection({
+        stars: [],
+        project: SHOP,
+        projectPermissions: SHOP_MEMBER,
+        registeredProjectId: "proj-registered",
+        tracked,
+      });
+
+      const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
+      await user.click(group.getByRole("button", { name: "New dashboard" }));
+      await waitFor(() => expect(host.navigations).toHaveLength(1));
+
+      await waitFor(() =>
+        expect(tracked.sent).toEqual([
+          { action: "created", attributes: { createdFrom: "blank" }, projectId: "proj-shop" },
+        ]),
+      );
+      expect(tracked.registered).toEqual({ projectId: "proj-registered" });
     });
   });
 

@@ -59,8 +59,19 @@ class AnalyticsHostInProject extends AnalyticsHostApi {
     return this.host.hasPermissionIn({ projectId, permission });
   }
 
+  /** Unsettled until this project's own grants land, so no screen reads their absence as a no. */
   isSettled(): boolean {
-    return this.host.isSettled();
+    if (!this.host.isSettled()) return false;
+    if (this.host.project()?.id === this.inProject.id) return true;
+    return this.host.isSettledIn({ projectId: this.inProject.id });
+  }
+
+  isSettledIn({ projectId }: { projectId: string }): boolean {
+    return this.host.isSettledIn({ projectId });
+  }
+
+  registeredProjectId(): string | undefined {
+    return this.host.registeredProjectId();
   }
 
   featureFlag(flag: AnalyticsReleaseFlag): boolean | undefined {
@@ -116,27 +127,27 @@ export function analyticsHostInProject({
 }
 
 /**
- * Each event goes out with `projectId` registered as this project, as the shell registers the
- * page's, and the page's is put back straight after: tracking is synchronous, so none slips by.
+ * Each event goes out with `projectId` registered as this project, and what the shell registered
+ * is put back straight after: tracking is synchronous, so none slips by.
  */
 class UiAnalyticsInProject extends UiAnalytics {
   private readonly analytics: UiAnalytics;
   private readonly projectId: string;
-  private readonly pageProjectId: string | undefined;
+  private readonly registeredProjectId: string | undefined;
 
   constructor({
     analytics,
     projectId,
-    pageProjectId,
+    registeredProjectId,
   }: {
     analytics: UiAnalytics;
     projectId: string;
-    pageProjectId: string | undefined;
+    registeredProjectId: string | undefined;
   }) {
     super();
     this.analytics = analytics;
     this.projectId = projectId;
-    this.pageProjectId = pageProjectId;
+    this.registeredProjectId = registeredProjectId;
   }
 
   track(event: UiAnalyticsEvent): void {
@@ -144,8 +155,11 @@ class UiAnalyticsInProject extends UiAnalytics {
     try {
       this.analytics.track(event);
     } finally {
-      if (this.pageProjectId) this.analytics.register({ projectId: this.pageProjectId });
-      else this.analytics.unregister("projectId");
+      if (this.registeredProjectId) {
+        this.analytics.register({ projectId: this.registeredProjectId });
+      } else {
+        this.analytics.unregister("projectId");
+      }
     }
   }
 
@@ -171,17 +185,17 @@ class UiAnalyticsInProject extends UiAnalytics {
 }
 
 /**
- * `analytics`, sending every event about `projectId`: a board made from Gateway or Coding
- * agents belongs to it, not to `pageProjectId`, the project the shell registered for the page.
+ * `analytics`, sending every event about `projectId`: a board made from Gateway or Coding agents
+ * belongs to it, not to `registeredProjectId`, the project the shell registered for the page.
  */
 export function uiAnalyticsInProject({
   analytics,
   projectId,
-  pageProjectId,
+  registeredProjectId,
 }: {
   analytics: UiAnalytics;
   projectId: string;
-  pageProjectId: string | undefined;
+  registeredProjectId: string | undefined;
 }): UiAnalytics {
-  return new UiAnalyticsInProject({ analytics, projectId, pageProjectId });
+  return new UiAnalyticsInProject({ analytics, projectId, registeredProjectId });
 }

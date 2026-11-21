@@ -17,7 +17,7 @@ import { useUiFlags } from "@langwatch/browser-host/feature-flag";
 import { useLentOperations } from "@langwatch/browser-host/lent";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { LangyAskToken, type LangyAsk } from "@langwatch/langy-client";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import {
   AnalyticsHostApi,
@@ -50,6 +50,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   private readonly langy: (() => Promise<LangyAsk>) | undefined;
   private readonly projectGrants: ReadonlyMap<string, ReadonlySet<string>>;
   private readonly askAbout: (projectId: string) => void;
+  private readonly registeredProjectId_: string | undefined;
 
   constructor({
     project_,
@@ -63,6 +64,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     langy,
     projectGrants,
     askAbout,
+    registeredProjectId_,
   }: {
     project_: AnalyticsHostProject | undefined;
     organizationId_: string | undefined;
@@ -75,6 +77,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     langy: (() => Promise<LangyAsk>) | undefined;
     projectGrants: ReadonlyMap<string, ReadonlySet<string>>;
     askAbout: (projectId: string) => void;
+    registeredProjectId_: string | undefined;
   }) {
     super();
     this.project_ = project_;
@@ -88,6 +91,7 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
     this.langy = langy;
     this.projectGrants = projectGrants;
     this.askAbout = askAbout;
+    this.registeredProjectId_ = registeredProjectId_;
   }
 
   project(): AnalyticsHostProject | undefined {
@@ -122,6 +126,16 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
 
   isSettled(): boolean {
     return this.session.isSettled();
+  }
+
+  isSettledIn({ projectId }: { projectId: string }): boolean {
+    if (this.projectGrants.has(projectId)) return true;
+    this.askAbout(projectId);
+    return false;
+  }
+
+  registeredProjectId(): string | undefined {
+    return this.registeredProjectId_;
   }
 
   featureFlag(flag: AnalyticsReleaseFlag): boolean | undefined {
@@ -170,6 +184,16 @@ class CapabilityAnalyticsHost extends AnalyticsHostApi {
   }
 }
 
+/** The grants that landed, by project, from the `[projectId, permissions][]` they landed as. */
+function grantsFrom({
+  landedKey,
+}: {
+  landedKey: string;
+}): ReadonlyMap<string, ReadonlySet<string>> {
+  const landed = JSON.parse(landedKey) as [string, string[]][];
+  return new Map(landed.map(([projectId, permissions]) => [projectId, new Set(permissions)]));
+}
+
 /**
  * The mount the declaration names: one provider above the routed tree, so a
  * peer's screen reading this port finds it too. Default-exported because
@@ -189,6 +213,8 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
   const scopeProjectName = scopeProject?.name;
   const scopeOrganizationName = session.snapshot().scope.organization?.name;
   const scopeProjectKind = scopeProject?.kind;
+  // As the shell's analytics identity registers it: the session's project, once signed in.
+  const registeredProjectId = session.snapshot().session.user ? scopeProjectId : void 0;
 
   const firstMessage = analyticsApi.project.getHasFirstMessage.useQuery(
     { projectId: scopeProjectId ?? "" },
@@ -204,18 +230,14 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
 
   // Only the projects a section asked about are read, never every project in the organization.
   const [askedProjectIds, setAskedProjectIds] = useState<readonly string[]>([]);
-  const askAbout = useCallback(
-    (askedProjectId: string) => {
-      if (askedProjectIds.includes(askedProjectId)) return;
-      // Deferred: a section asks while rendering, when setting this mount's state is refused.
-      queueMicrotask(() =>
-        setAskedProjectIds((asked) =>
-          asked.includes(askedProjectId) ? asked : [...asked, askedProjectId],
-        ),
-      );
-    },
-    [askedProjectIds],
-  );
+  // Reads no state, only updates it, so it is one function for the mount's life and the host
+  // stays the same object. Deferred: a section asks while rendering, when setting state is refused.
+  const askAbout = (askedProjectId: string) =>
+    queueMicrotask(() =>
+      setAskedProjectIds((asked) =>
+        asked.includes(askedProjectId) ? asked : [...asked, askedProjectId],
+      ),
+    );
   const standings = analyticsApi.useQueries((t) =>
     askedProjectIds.map((askedProjectId) =>
       t.authz.effectivePermissions(
@@ -228,66 +250,34 @@ export default function AnalyticsHostMount({ children }: { children?: ReactNode 
     const permissions = standings[index]?.data?.permissions;
     return permissions ? [[askedProjectId, permissions] as const] : [];
   });
-  // useQueries answers a new array every render, so the grants are keyed on what landed.
+  // useQueries answers a new array every render; a string of what landed is equal across renders
+  // that carry the same grants, so the compiler keeps the grants, and the host, the same object.
   const landedKey = JSON.stringify(landed);
-  const projectGrants = useMemo(
-    () =>
-      new Map(
-        landed.map(
-          ([askedProjectId, permissions]) => [askedProjectId, new Set(permissions)] as const,
-        ),
-      ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [landedKey],
-  );
+  const projectGrants = grantsFrom({ landedKey });
 
-  // Primitive dependencies only, so the host stays the SAME object across
-  // renders that carry the same reading.
-  const host = useMemo(
-    () =>
-      new CapabilityAnalyticsHost({
-        project_:
-          scopeProjectId !== void 0 && scopeProjectId === projectId
-            ? {
-                id: scopeProjectId,
-                slug: scopeProjectSlug ?? "",
-                name: scopeProjectName ?? "",
-                hasFirstMessage,
-                isPersonal,
-                ...(scopeProjectKind ? { kind: scopeProjectKind } : {}),
-              }
-            : void 0,
-        organizationId_: organizationId ?? void 0,
-        organizationName_: scopeOrganizationName,
-        session,
-        flags: { release_dashboards: dashboardsFlag, release_langy_enabled: langyFlag },
-        routeCapability: route,
-        navigationCapability: navigation,
-        feedback,
-        langy,
-        projectGrants,
-        askAbout,
-      }),
-    [
-      scopeProjectId,
-      scopeProjectSlug,
-      scopeProjectName,
-      scopeProjectKind,
-      hasFirstMessage,
-      isPersonal,
-      projectId,
-      organizationId,
-      scopeOrganizationName,
-      session,
-      dashboardsFlag,
-      langyFlag,
-      route,
-      navigation,
-      feedback,
-      langy,
-      projectGrants,
-      askAbout,
-    ],
-  );
+  const host = new CapabilityAnalyticsHost({
+    project_:
+      scopeProjectId !== void 0 && scopeProjectId === projectId
+        ? {
+            id: scopeProjectId,
+            slug: scopeProjectSlug ?? "",
+            name: scopeProjectName ?? "",
+            hasFirstMessage,
+            isPersonal,
+            ...(scopeProjectKind ? { kind: scopeProjectKind } : {}),
+          }
+        : void 0,
+    organizationId_: organizationId ?? void 0,
+    organizationName_: scopeOrganizationName,
+    session,
+    flags: { release_dashboards: dashboardsFlag, release_langy_enabled: langyFlag },
+    routeCapability: route,
+    navigationCapability: navigation,
+    feedback,
+    langy,
+    projectGrants,
+    askAbout,
+    registeredProjectId_: registeredProjectId,
+  });
   return <AnalyticsHostProvider value={host}>{children}</AnalyticsHostProvider>;
 }

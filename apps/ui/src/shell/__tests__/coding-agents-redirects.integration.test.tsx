@@ -207,6 +207,42 @@ describe("legacy /me redirects", () => {
     );
   });
 
+  describe("when an old address below a Coding agents page is cold-loaded", () => {
+    /** @scenario An old address below a Coding agents page lands on that page */
+    it.each([...codingAgentsSegments])(
+      "moves /me/%s/abc to that page, without the path below it",
+      async (segment) => {
+        const projectPages: RouteObject[] = uiRoutePatterns()
+          .filter((pattern) => pattern.startsWith("/:project/"))
+          .map((path) => ({ path, element: <div>project page</div> }));
+        const router = createMemoryRouter(
+          [
+            ...legacyRedirectRoutes,
+            ...projectPages,
+            { path: "/coding-agents/*", element: <div>coding agents</div> },
+          ],
+          { initialEntries: [`/me/${segment}/abc?range=7d#latest`] },
+        );
+        render(<RouterProvider router={router} />);
+
+        await waitFor(() => {
+          expect(addressOf(router)).toBe(`/coding-agents/${segment}?range=7d#latest`);
+        });
+      },
+    );
+  });
+
+  describe("when an old address is cold-loaded in another letter case", () => {
+    /** @scenario An old address in another letter case still moves */
+    it("lands on the same page as the lower-case address", async () => {
+      const router = renderRouterAt(["/Me/sessions?range=7d"]);
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/coding-agents/sessions?range=7d");
+      });
+    });
+  });
+
   describe("when the old budget request address is cold-loaded", () => {
     /** @scenario An old deep link keeps its sub-path, query and hash */
     it("keeps its nested page", async () => {

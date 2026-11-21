@@ -84,7 +84,7 @@ describe("uiAnalyticsInProject()", () => {
         const inProject = uiAnalyticsInProject({
           analytics,
           projectId: SHOP.id,
-          pageProjectId: PAGE.id,
+          registeredProjectId: PAGE.id,
         });
 
         inProject.track({ name: "dashboard", action: "created" });
@@ -103,7 +103,7 @@ describe("uiAnalyticsInProject()", () => {
         const inProject = uiAnalyticsInProject({
           analytics,
           projectId: SHOP.id,
-          pageProjectId: undefined,
+          registeredProjectId: undefined,
         });
 
         inProject.track({ name: "dashboard", action: "created" });

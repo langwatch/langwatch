@@ -33,6 +33,8 @@ export type StubAnalyticsHostOptions = {
   projectPermissions?: Readonly<Record<string, readonly string[]>>;
   /** Whether the grants have arrived; settled unless a test says otherwise. */
   settled?: boolean;
+  /** The `projectId` the shell registered; the project in scope's unless a test says otherwise. */
+  registeredProjectId?: string | undefined;
   /** A flag named here answers its value, `undefined` included; any other is off. */
   flags?: Readonly<Record<string, boolean | undefined>>;
   route?: AnalyticsRouteReading;
@@ -98,6 +100,16 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
 
   isSettled(): boolean {
     return this.options.settled ?? true;
+  }
+
+  isSettledIn(): boolean {
+    return this.options.settled ?? true;
+  }
+
+  registeredProjectId(): string | undefined {
+    return "registeredProjectId" in this.options
+      ? this.options.registeredProjectId
+      : this.project()?.id;
   }
 
   featureFlag(flag: string): boolean | undefined {

@@ -1,7 +1,6 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
 import type { StarredDashboardsProject } from "@langwatch/analytics-client";
-import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
@@ -11,7 +10,6 @@ import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
-import { navigationApi } from "../../behavior/navigation-api.ts";
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
 import { useLlmOpsProject, useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
@@ -338,9 +336,6 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
 /** The sidebars that may show the Dashboards section only with every product's flag on. */
 const DASHBOARDS_SECTION_FLAGGED_SURFACES: ReadonlySet<SidebarSurface> = new Set(["gateway", "me"]);
 
-/** Main's cadence: a role changed elsewhere reaches the section within a focus. */
-const GRANTS_STALE_TIME_MS = 30_000;
-
 /**
  * The Dashboards section analytics lends, for a member who can reach Dashboards: in LLM Ops,
  * and with `release_dashboards_in_every_product` in Gateway and Coding agents too.
@@ -367,7 +362,10 @@ function StarredDashboardsGroup({
   return <StarredDashboardsInProject project={{ id, slug, name }} />;
 }
 
-/** Released and granted per project: the section follows the one it works in, not the page's. */
+/**
+ * Released per project: the section follows the one it works in, not the page's. Analytics asks
+ * that project's view grant itself, so nothing is read there until Dashboards is released.
+ */
 function StarredDashboardsInProject({ project }: { project: StarredDashboardsProject }) {
   // LLM Ops only opens a project in the page's organization, so that organization targets it;
   // until it is known an organization rollout can only answer no, so the read waits for it.
@@ -377,15 +375,7 @@ function StarredDashboardsInProject({ project }: { project: StarredDashboardsPro
     organizationId,
     enabled: organizationId !== undefined,
   });
-  const standing = navigationApi.authz.effectivePermissions.useQuery(
-    { projectId: project.id },
-    { staleTime: GRANTS_STALE_TIME_MS },
-  );
-  const granted = standing.data?.permissions;
-  if (!released.enabled || !granted) return null;
-  if (!permissionSatisfiedBy({ granted: new Set(granted), requested: "analytics:view" })) {
-    return null;
-  }
+  if (!released.enabled) return null;
   return <StarredDashboards project={project} />;
 }
 

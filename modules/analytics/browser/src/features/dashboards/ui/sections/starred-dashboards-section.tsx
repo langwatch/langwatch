@@ -14,7 +14,7 @@ import { SidebarSectionLabel } from "@langwatch/design-system/app-shell";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Box, Link as ChakraLink, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { LayoutDashboard, Plus } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
   analyticsHostInProject,
@@ -47,7 +47,10 @@ export function StarredDashboardsSection({ project }: StarredDashboardsProps) {
   );
 }
 
-/** Scopes every read, write, grant and product event below to the project navigation named. */
+/**
+ * Scopes every read, write, grant and product event below to the project navigation named, and
+ * draws nothing for a member who may not view dashboards there. Asking starts the grant read.
+ */
 function InProject({
   project: { id, slug, name },
   children,
@@ -56,26 +59,19 @@ function InProject({
   children: ReactNode;
 }) {
   const host = useAnalyticsHost();
-  const pageProjectId = host.project()?.id;
   const services = useOptionalUiHostServices();
-  const scoped = useMemo(
-    () => analyticsHostInProject({ host, project: { id, slug, name } }),
-    [host, id, slug, name],
-  );
-  const scopedServices = useMemo(
-    () =>
-      services?.analytics
-        ? {
-            ...services,
-            analytics: uiAnalyticsInProject({
-              analytics: services.analytics,
-              projectId: id,
-              pageProjectId,
-            }),
-          }
-        : void 0,
-    [services, id, pageProjectId],
-  );
+  const scoped = analyticsHostInProject({ host, project: { id, slug, name } });
+  if (!scoped.hasPermission("analytics:view")) return null;
+  const scopedServices = services?.analytics
+    ? {
+        ...services,
+        analytics: uiAnalyticsInProject({
+          analytics: services.analytics,
+          projectId: id,
+          registeredProjectId: host.registeredProjectId(),
+        }),
+      }
+    : void 0;
   const section = <AnalyticsHostProvider value={scoped}>{children}</AnalyticsHostProvider>;
   if (!scopedServices) return section;
   return (

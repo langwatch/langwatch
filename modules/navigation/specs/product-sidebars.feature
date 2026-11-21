@@ -234,6 +234,7 @@ Feature: Product sidebars
     Then it offers no "+" and no "Add dashboard" item
     And a pinned dashboard's "⋮" menu offers only Unpin
     And with nothing pinned to "Shop" there is no such section
+    And until my grants in "Shop" arrive, the section's answers are not settled
 
   # An organization admin reaches teams they hold no membership row in, so their grants in
   # "Shop" come from their own standing there, not from the teams they belong to.
@@ -277,6 +278,7 @@ Feature: Product sidebars
     Then Coding agents shows no Dashboards section and no "+"
     And when Dashboards is released for "Shop" but not for the page's own project, the section shows
     And while the page's organization is still unknown, there is no section and the release flag is not asked
+    And while Dashboards is not released for "Shop", my grants there are not read
 
   # A `?ff_release_dashboards=on|off` link answers the flag in that browser, "Shop" included.
   # Retired in S6 by "Each product's sidebar lists its own boards" in modules/dashboard/specs/dashboards-organization-area.feature.
