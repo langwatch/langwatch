@@ -7,7 +7,6 @@ Feature: Dashboards telemetry: product events and query telemetry
   # Sources: langwatch/tasks#1003 (product events) and langwatch/tasks#1005 (query telemetry).
   # Every product event goes through useUiAnalytics() with the boundary "dashboards", so its
   # name reads "dashboards.<action>.<name>". Attributes never carry a raw id or any SQL.
-  # Except projectId as the event's project context, the same id the shell attaches to every event.
 
   # ---------------------------------------------------------------------------
   # Product events (#1003)

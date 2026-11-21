@@ -369,11 +369,13 @@ function StarredDashboardsGroup({
 
 /** Released and granted per project: the section follows the one it works in, not the page's. */
 function StarredDashboardsInProject({ project }: { project: StarredDashboardsProject }) {
-  // LLM Ops only opens a project in the page's organization, so that organization targets it.
+  // LLM Ops only opens a project in the page's organization, so that organization targets it;
+  // until it is known an organization rollout can only answer no, so the read waits for it.
   const organizationId = useNavigationHost().organization()?.id;
   const released = useFeatureFlag(FrontendFlags.release_dashboards, {
     projectId: project.id,
     organizationId,
+    enabled: organizationId !== undefined,
   });
   const standing = navigationApi.authz.effectivePermissions.useQuery(
     { projectId: project.id },

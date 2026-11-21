@@ -268,6 +268,7 @@ Feature: Product sidebars
     When Dashboards is released for the page's own project but not for "Shop"
     Then Coding agents shows no Dashboards section and no "+"
     And when Dashboards is released for "Shop" but not for the page's own project, the section shows
+    And while the page's organization is still unknown, there is no section and the release flag is not asked
 
   # A `?ff_release_dashboards=on|off` link answers the flag in that browser, "Shop" included.
   @integration

@@ -88,7 +88,11 @@ import {
   applyFeatureFlagOverridesFromSearch,
   clearAllFeatureFlagOverrides,
 } from "@langwatch/feature-flag-client";
-import type { NavigationProject, NavigationTeam } from "@langwatch/navigation-contract";
+import type {
+  NavigationOrganization,
+  NavigationProject,
+  NavigationTeam,
+} from "@langwatch/navigation-contract";
 
 import { WithStubNavigationHost } from "../../../testing.tsx";
 import { ProductSidebar } from "../product-sidebar.tsx";
@@ -107,6 +111,11 @@ const PERSONAL_TEAM: NavigationTeam = {
   name: "My workspace",
   isPersonal: true,
   projects: [PERSONAL],
+};
+const ORGANIZATION: NavigationOrganization = {
+  id: "organization-1",
+  name: "Demo organization",
+  teams: [],
 };
 
 /** Stands in for analytics' lent list, echoing the address it was told is open. */
@@ -150,6 +159,7 @@ function renderSidebar({
   rememberedProjectSlug,
   dashboardsFlagByProject = {},
   permissionsByProject = {},
+  organization = ORGANIZATION,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "governance" | "me" | "settings";
   pathname: string;
@@ -169,6 +179,8 @@ function renderSidebar({
   project?: NavigationProject;
   openableTeams?: readonly NavigationTeam[];
   rememberedProjectSlug?: string;
+  /** `null` while the page's organization has not arrived. */
+  organization?: NavigationOrganization | null;
 }) {
   declarations.current = analyticsLends;
   dashboardsRelease.byProject = dashboardsFlagByProject;
@@ -182,6 +194,7 @@ function renderSidebar({
         pathname,
         permissions,
         isLoading: organizationLoading,
+        ...(organization ? { organization } : {}),
         ...(openableTeams ? { openableTeams } : {}),
         ...(rememberedProjectSlug ? { rememberedProjectSlug } : {}),
         flags: {
@@ -474,6 +487,19 @@ describe("the Dashboards section with Dashboards in every product on", () => {
         expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
           "Pinned dashboards in Shop (project-shop)",
         );
+      });
+    });
+
+    describe("when the page's organization has not arrived", () => {
+      /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's release flag" */
+      it("draws no section until the release flag can be asked", async () => {
+        renderSidebar({
+          ...codingAgents,
+          organization: null,
+          dashboardsFlagByProject: { [SHOP.id]: true },
+        });
+
+        await expectNoSection();
       });
     });
 
