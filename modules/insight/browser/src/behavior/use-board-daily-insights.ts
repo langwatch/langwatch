@@ -38,6 +38,15 @@ const NEVER_DECIDED: InsightDailyRunSetting = {
 
 const RUN_NOT_STARTED = "Couldn't start the run";
 
+/**
+ * The deadline found no run to follow. A run the process held may have taken the request
+ * unseen (ADR-004), so this states what is unknown rather than a failure.
+ */
+const RUN_UNCONFIRMED = {
+  title: "Couldn't confirm the run started",
+  description: "If a run was already going, its insights will still arrive.",
+};
+
 /** No run reads a From LangWatch board yet, so its toast says so instead of a promise. */
 function turnedOnWords({
   kind,
@@ -93,8 +102,8 @@ function readRequestedRun({
 
 /**
  * One deadline, not a poll: the spinner ends at the run's expiry and one read gives the verdict
- * (ADR-004): a run opens; none or a failed read says it could not start; a late run or no answer
- * says nothing. A verdict owed dies with `cancelVerdict`.
+ * (ADR-004): a run opens; none or a failed read says the start is unconfirmed; a late run or no
+ * answer says nothing. A verdict owed dies with `cancelVerdict`.
  */
 function useRequestedRunDeadline({
   request,
@@ -195,12 +204,7 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
       settled: requestedSettledRun,
     });
   }, [hasRequestedRunShown, requestedConversationId, requestedSettledRun, endRunNow, host]);
-  const sayRunNotStarted = () => {
-    host.failed({
-      error: new Error("The requested run never showed"),
-      fallbackTitle: RUN_NOT_STARTED,
-    });
-  };
+  const sayRunUnconfirmed = () => host.informed(RUN_UNCONFIRMED);
   const { cancelVerdict } = useRequestedRunDeadline({
     request: runNowRequest.data,
     isAwaitingRun,
@@ -208,7 +212,7 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     onExpired: endRunNow,
     onFound: ({ conversationId, settled = null }) =>
       showRequestedRun({ host, conversationId, settled }),
-    onLost: sayRunNotStarted,
+    onLost: sayRunUnconfirmed,
   });
 
   const write = ({ next, send, done, fallbackTitle }: Write) => {

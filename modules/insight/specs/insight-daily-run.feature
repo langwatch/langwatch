@@ -1436,7 +1436,7 @@ Feature: The daily insights run
       When the deadline reads the board once more and that read shows the run
       Then the spinner ended when the deadline fired, before the read answered
       And the Langy panel opens on the run's conversation, or the member is told how it ended
-      And the member is not told the run could not be started
+      And the member is not told the run's start could not be confirmed
 
     @integration
     Scenario: The deadline read is replaced by a later hint's read
@@ -1461,12 +1461,23 @@ Feature: The daily insights run
       Then no failure, no notice and no Langy panel is shown
 
     @integration
-    Scenario: The deadline says the run could not be started when its last read finds none
+    Scenario: The deadline says the start is unconfirmed when its last read finds none
       Given a board that is on, and the member chose Run now
       And the board has read no run for as long as a run can last
       When the deadline reads the board once more and that read shows no run
-      Then the member is told once that the run could not be started
+      Then the member is told once that the run's start could not be confirmed
+      And that a run already going still delivers its insights
+      And no failure is shown
       And the dropdown offers Run now again
+
+    @integration
+    Scenario: A run that took the request unseen leaves the deadline unconfirmed, not failed
+      Given a board that is on, with a run already going that the board could not yet see
+      And the member chose Run now, so the request was dropped for that run
+      And that run has a conversation in Langy
+      When the deadline's read shows only that run, which started before the request and settled
+      Then the member is told once that the run's start could not be confirmed
+      And no failure is shown and no Langy panel opens
 
     @integration
     Scenario: The deadline does not move when the page's host is rebuilt
@@ -1501,12 +1512,12 @@ Feature: The daily insights run
       Given a board that is on, and the member chose Run now
       And the board has read no run for as long as a run can last
       When the deadline reads the board once more and that read fails
-      Then the member is told once that the run could not be started
+      Then the member is told once that the run's start could not be confirmed
       And the board reads no more
 
     @integration
     Scenario: A run that shows after the deadline gave up opens nothing and says nothing
-      Given the member was told a run they asked for could not be started
+      Given the member was told the start of a run they asked for could not be confirmed
       When a later read shows that run in flight, or settled with no conversation
       Then no Langy panel opens and the member is told nothing more
       And the dropdown shows the run as any run on the board

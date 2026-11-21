@@ -250,7 +250,7 @@ export function requestedRunOf({
 /** What the deadline's read shows of the request. */
 export type DeadlineRead =
   | { kind: "run"; run: NonNullable<ReturnType<typeof requestedRunOf>> }
-  /** No run for the request: it could not be started. */
+  /** No run for the request shows: whether one took it is unknown. */
   | { kind: "none" }
   /** Only a run that started after the deadline: it says nothing of the request. */
   | { kind: "unrelated" };

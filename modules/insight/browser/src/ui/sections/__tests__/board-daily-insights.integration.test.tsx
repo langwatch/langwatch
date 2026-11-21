@@ -69,6 +69,12 @@ type RanOverrides = Partial<LastRun>;
 type LangyQuery = Record<string, string>;
 type Notice = { title: string };
 
+/** What the deadline says when its read finds no run to follow. */
+const RUN_UNCONFIRMED = {
+  title: "Couldn't confirm the run started",
+  description: "If a run was already going, its insights will still arrive.",
+};
+
 /** A member who may also ask Langy, which a run is. */
 const ASKER: StubInsightHostOptions = { permissions: ["analytics:view", "langy:create"] };
 
@@ -982,6 +988,7 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS - 60_000);
       expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE);
       expect(board.host.failures).toEqual([]);
+      expect(board.host.notices).toEqual([]);
     }
 
     /** @scenario "The deadline follows a run its last read finds" */
@@ -1233,20 +1240,46 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       },
     );
 
-    /** @scenario "The deadline says the run could not be started when its last read finds none" */
-    it("says so once, after one more read, and offers Run now again", async () => {
+    /** @scenario "The deadline says the start is unconfirmed when its last read finds none" */
+    it("says once, after one more read, that the start is unconfirmed, and offers Run now again", async () => {
       const board = openBoard({ setting: ON, host: ASKER, write: () => runNowAnswer() });
       await aMinuteBeforeTheDeadline(board);
 
       await vi.advanceTimersByTimeAsync(60_000);
 
-      await waitFor(() => expect(board.host.failures).toHaveLength(1));
-      expect(board.host.failures[0]?.fallbackTitle).toBe("Couldn't start the run");
+      await waitFor(() => expect(board.host.notices).toEqual([RUN_UNCONFIRMED]));
       expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
       await vi.advanceTimersByTimeAsync(60_000);
-      expect(board.host.failures).toHaveLength(1);
+      expect(board.host.notices).toHaveLength(1);
+      expect(board.host.failures).toEqual([]);
       const again = await openDropdown(board.user);
       expect(again.getByRole("button", { name: "Run now" })).toBeInTheDocument();
+      expect(board.host.queries).toEqual([]);
+    });
+
+    /** @scenario "A run that took the request unseen leaves the deadline unconfirmed, not failed" */
+    it("says the start is unconfirmed and opens nothing for a run that started before the request", async () => {
+      const requestedAt = nowInstant().epochMilliseconds;
+      let read = ON;
+      const board = openBoard({
+        setting: () => read,
+        host: ASKER,
+        write: () => runNowAnswer({ requestedAt }),
+      });
+      await aMinuteBeforeTheDeadline(board);
+
+      read = ranToday({
+        outcome: "filed",
+        filedCount: 1,
+        conversationId: "conversation-9",
+        runId: "scheduled-1",
+        startedAt: requestedAt - 1_000,
+        at: requestedAt + 60_000,
+      });
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      await waitFor(() => expect(board.host.notices).toEqual([RUN_UNCONFIRMED]));
+      expect(board.host.failures).toEqual([]);
       expect(board.host.queries).toEqual([]);
     });
 
@@ -1258,14 +1291,14 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       const rebuilt = new StubInsightHost(ASKER);
       board.swapHost(rebuilt);
       await vi.advanceTimersByTimeAsync(50_000);
-      expect(rebuilt.failures).toEqual([]);
+      expect(rebuilt.notices).toEqual([]);
       await vi.advanceTimersByTimeAsync(10_000);
 
-      await waitFor(() => expect(rebuilt.failures).toHaveLength(1));
-      expect(board.host.failures).toEqual([]);
+      await waitFor(() => expect(rebuilt.notices).toHaveLength(1));
+      expect(board.host.notices).toEqual([]);
       expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
       await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS);
-      expect(rebuilt.failures).toHaveLength(1);
+      expect(rebuilt.notices).toHaveLength(1);
       expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
     });
 
@@ -1282,10 +1315,10 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       answerRead = READ_REFUSED;
       await vi.advanceTimersByTimeAsync(60_000);
 
-      await waitFor(() => expect(board.host.failures).toHaveLength(1));
-      expect(board.host.failures[0]?.fallbackTitle).toBe("Couldn't start the run");
+      await waitFor(() => expect(board.host.notices).toEqual([RUN_UNCONFIRMED]));
       await vi.advanceTimersByTimeAsync(60_000);
-      expect(board.host.failures).toHaveLength(1);
+      expect(board.host.notices).toHaveLength(1);
+      expect(board.host.failures).toEqual([]);
       expect(board.reads()).toHaveLength(READS_BEFORE_DEADLINE + 1);
       expect(board.host.queries).toEqual([]);
     });
@@ -1307,7 +1340,7 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       });
       await aMinuteBeforeTheDeadline(board);
       await vi.advanceTimersByTimeAsync(60_000);
-      await waitFor(() => expect(board.host.failures).toHaveLength(1));
+      await waitFor(() => expect(board.host.notices).toHaveLength(1));
 
       read = late;
       await board.readHint();
@@ -1315,9 +1348,9 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       const after = await openDropdown(board.user);
       expect(await after.findByText(line)).toBeInTheDocument();
       expect(board.host.queries).toEqual([]);
-      expect(board.host.notices).toEqual([]);
+      expect(board.host.notices).toEqual([RUN_UNCONFIRMED]);
       expect(board.host.successes).toEqual([]);
-      expect(board.host.failures).toHaveLength(1);
+      expect(board.host.failures).toEqual([]);
     });
   });
 });
