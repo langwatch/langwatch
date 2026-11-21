@@ -190,6 +190,7 @@ export class CodingAgentModule implements CodingAgentApi {
       traceSessions: repositories.traceSessions,
       metricSeries: repositories.metricSeries,
       sessionEvents: repositories.sessionEvents,
+      storedTraces: dependencies.traces,
       github: dependencies.github,
       projects: dependencies.projects,
       billing: GovernanceCodingAgentBillingService.create({ governance: dependencies.governance }),

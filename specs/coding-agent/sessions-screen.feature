@@ -356,6 +356,26 @@ Rule: Clicking a session replays it in the terminal
     Then the newest mapped trace is answered with the time it occurred
     And a session with no mapped trace answers nothing
 
+  @unit
+  Scenario: A trace the session's telemetry only named is skipped for one that was stored
+    Given a session whose newest mapped trace came from a log record whose trace was never stored
+    And an older mapped trace of the session that was stored
+    When the latest turn of the session is asked for
+    Then the older stored trace is answered
+    And the reader never opens a trace that is not found
+
+  @integration
+  Scenario: The repository answers a session's newest mapped traces, newest first
+    Given a session with more mapped traces than one read asks for
+    When the session's recent traces are read with a limit
+    Then the newest traces are answered newest first, up to the limit
+
+  @unit
+  Scenario: The replay opens on the session's newest stored turn, not the first page of its history
+    Given a session whose conversation holds more traces than one page of turns
+    When the user chooses its row
+    Then the replay opens on the session's newest stored trace
+
   @integration
   Scenario: Leaving the replay returns to the table as it was
     Given an open terminal replay reached from the table
@@ -411,8 +431,9 @@ Rule: A session can be replayed from wherever it is listed
 Rule: A link can open a session's replay on the Sessions page
 
   Another tool (Laze's Investigate button) links straight to one session. The
-  link adds `session=<id>`, or `sessionName=<name>` for the newest session with
-  that name, to `/<project>/sessions`. It combines with `langy=open` and
+  link adds `session=<id>`, `sessionName=<name>` for the newest session with
+  that name, or both (the id first, the name when the id is not listed), to
+  `/<project>/sessions`. It combines with `langy=open` and
   `langyPrompt=<text>` to have Langy ready with a question about the session.
 
   @integration
@@ -427,6 +448,14 @@ Rule: A link can open a session's replay on the Sessions page
     Given two listed sessions named "Scout", the newer one updated last
     When the user opens the Sessions page with "sessionName=Scout"
     Then the newer session's terminal replay opens
+
+  @unit
+  Scenario: A link with a session id and a name falls back to the name
+    Given a link with "session=agent-1" and "sessionName=Scout"
+    And no listed session has the id "agent-1"
+    And a listed session is named "Scout"
+    When the session link is applied
+    Then the newest session named "Scout" is the one opened
 
   @integration
   Scenario: A link to a session that is not listed says so

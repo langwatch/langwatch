@@ -15,6 +15,7 @@ import {
   TestMetricSeries,
   createTestProjects,
   TestSessions,
+  TestStoredTraces,
   TestTraceSessions,
   branchSession,
   pullRequest,
@@ -123,6 +124,7 @@ function serviceWith({ sessions, events }: { sessions: TestSessions; events?: Te
   return CodingAgentFeatureService.create({
     sessions,
     traceSessions: new TestTraceSessions(),
+    storedTraces: new TestStoredTraces(),
     metricSeries: new TestMetricSeries(),
     sessionEvents: events ?? new TestEvents(),
     github,

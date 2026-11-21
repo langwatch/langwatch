@@ -10,6 +10,7 @@ import {
   TestMetricSeries,
   createTestProjects,
   TestSessions,
+  TestStoredTraces,
   TestTraceSessions,
   session,
 } from "../../__tests__/fixtures/coding-agent.fixture.ts";
@@ -29,12 +30,14 @@ function serviceWith(input: {
   traceSessions?: TestTraceSessions;
   metricSeries?: TestMetricSeries;
   events?: TestEvents;
+  storedTraces?: TestStoredTraces;
 }) {
   return CodingAgentFeatureService.create({
     sessions: input.sessions ?? new TestSessions(),
     traceSessions: input.traceSessions ?? new TestTraceSessions(),
     metricSeries: input.metricSeries ?? new TestMetricSeries(),
     sessionEvents: input.events ?? new TestEvents(),
+    storedTraces: input.storedTraces ?? new TestStoredTraces(),
     github: new TestGithubService(),
     projects: createTestProjects(),
     billing: new TestBillingPolicy(),
@@ -182,8 +185,52 @@ describe("Coding Agent session reads", () => {
         sessionId: SESSION,
         fromMs: startedAtMs - CODING_AGENT_SESSION_READ_WINDOW_MS,
         toMs: TEST_NOW_MS + CODING_AGENT_SESSION_READ_WINDOW_MS,
+        limit: 50,
       },
     ]);
+  });
+
+  /** @scenario "A trace the session's telemetry only named is skipped for one that was stored" */
+  it("skips a newer mapped trace that was never stored for the newest stored one", async () => {
+    const traceSessions = new TestTraceSessions();
+    const mapped = (traceId: string, occurredAtMs: number) => ({
+      tenantId: PROJECT,
+      traceId,
+      sessionId: SESSION,
+      occurredAtMs,
+    });
+    traceSessions.recent = [
+      mapped("named-by-a-log-only", TEST_NOW_MS - 1_000),
+      mapped(TRACE, TEST_NOW_MS - 60_000),
+      mapped("older", TEST_NOW_MS - 120_000),
+    ];
+    const storedTraces = new TestStoredTraces();
+    storedTraces.missing.add("named-by-a-log-only");
+    const service = serviceWith({ traceSessions, storedTraces });
+
+    await expect(
+      service.findLastTurnOfSession({ projectId: PROJECT, sessionId: SESSION }),
+    ).resolves.toEqual({ traceId: TRACE, occurredAtMs: TEST_NOW_MS - 60_000 });
+    expect(storedTraces.inputs).toEqual([
+      { projectId: PROJECT, traceIds: ["named-by-a-log-only", TRACE, "older"] },
+    ]);
+  });
+
+  it("answers nothing when none of the session's mapped traces was stored", async () => {
+    const traceSessions = new TestTraceSessions();
+    traceSessions.mapping = {
+      tenantId: PROJECT,
+      traceId: TRACE,
+      sessionId: SESSION,
+      occurredAtMs: TEST_NOW_MS - 1_000,
+    };
+    const storedTraces = new TestStoredTraces();
+    storedTraces.missing.add(TRACE);
+    const service = serviceWith({ traceSessions, storedTraces });
+
+    await expect(
+      service.findLastTurnOfSession({ projectId: PROJECT, sessionId: SESSION }),
+    ).resolves.toBeNull();
   });
 
   it("answers nothing when no trace of the session was mapped", async () => {

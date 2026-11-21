@@ -483,6 +483,20 @@ export class TestSessions extends CodingAgentSessionRepository {
   }
 }
 
+/** The project's stored traces; every asked id is stored unless named in `missing`. */
+export class TestStoredTraces {
+  readonly missing = new Set<string>();
+  inputs: { projectId: string; traceIds: readonly string[] }[] = [];
+
+  async findExistingTraceIds(input: {
+    projectId: string;
+    traceIds: readonly string[];
+  }): Promise<string[]> {
+    this.inputs.push(input);
+    return input.traceIds.filter((traceId) => !this.missing.has(traceId));
+  }
+}
+
 export class TestTraceSessions extends CodingAgentTraceSessionRepository {
   mapping: CodingAgentTraceSessionRecord | null = null;
   inputs: { tenantId: string; traceId: string }[] = [];
@@ -497,16 +511,25 @@ export class TestTraceSessions extends CodingAgentTraceSessionRepository {
     return this.mapping;
   }
 
-  latestInputs: { tenantId: string; sessionId: string; fromMs: number; toMs: number }[] = [];
-
-  async findLatestBySessionId(input: {
+  /** The session's mapped traces, newest first; defaults to the one `mapping`. */
+  recent: CodingAgentTraceSessionRecord[] | null = null;
+  latestInputs: {
     tenantId: string;
     sessionId: string;
     fromMs: number;
     toMs: number;
-  }): Promise<CodingAgentTraceSessionRecord | null> {
+    limit: number;
+  }[] = [];
+
+  async findRecentBySessionId(input: {
+    tenantId: string;
+    sessionId: string;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }): Promise<CodingAgentTraceSessionRecord[]> {
     this.latestInputs.push(input);
-    return this.mapping;
+    return (this.recent ?? (this.mapping ? [this.mapping] : [])).slice(0, input.limit);
   }
 }
 

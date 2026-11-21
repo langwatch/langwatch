@@ -16,7 +16,7 @@ const { queryImpls, utils } = vi.hoisted(() => ({
       conversationContext: { fetch: vi.fn(), prefetch: vi.fn() },
     },
     codingAgents: {
-      lastTurn: { fetch: vi.fn() },
+      lastTurn: { fetch: vi.fn(), prefetch: vi.fn() },
     },
   },
 }));
@@ -644,9 +644,9 @@ describe("the personal Sessions table", () => {
 
       await user.hover(screen.getByText("Link sessions to pull requests"));
 
-      expect(utils.traces.conversationContext.prefetch).toHaveBeenCalledWith({
+      expect(utils.codingAgents.lastTurn.prefetch).toHaveBeenCalledWith({
         projectId: "proj-personal",
-        conversationId: "session-1",
+        sessionId: "session-1",
       });
     });
 
@@ -695,6 +695,31 @@ describe("the personal Sessions table", () => {
         sessionId: "session-1",
       });
       expect(host.recording.infos).toEqual([]);
+    });
+
+    /** @scenario "The replay opens on the session's newest stored turn, not the first page of its history" */
+    it("opens the session's newest stored trace over the last turn of the first conversation page", async () => {
+      utils.codingAgents.lastTurn.fetch.mockResolvedValue({
+        traceId: "trace-newest",
+        occurredAtMs: LONG_AGO + 90_000,
+      });
+      const user = userEvent.setup();
+      renderTable();
+
+      await user.click(screen.getByText("Link sessions to pull requests"));
+
+      await waitFor(() =>
+        expect(writtenQueries()).toEqual([
+          {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": "trace-newest",
+            "drawer.t": String(LONG_AGO + 90_000),
+            "drawer.mode": "terminal",
+            "drawer.projectId": "proj-personal",
+          },
+        ]),
+      );
+      expect(utils.traces.conversationContext.fetch).not.toHaveBeenCalled();
     });
 
     /** @scenario "A session link opens that session's terminal replay" */
@@ -957,10 +982,9 @@ describe("the group project's Sessions table", () => {
 
       await user.hover(screen.getByText("Session from member B"));
 
-      expect(utils.traces.conversationContext.prefetch).toHaveBeenCalledWith({
-        projectId: "proj-group",
-        conversationId: "shared",
-        tenantId: "member-b",
+      expect(utils.codingAgents.lastTurn.prefetch).toHaveBeenCalledWith({
+        projectId: "member-b",
+        sessionId: "shared",
       });
     });
   });
