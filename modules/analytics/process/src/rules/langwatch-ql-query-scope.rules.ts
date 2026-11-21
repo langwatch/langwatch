@@ -106,9 +106,7 @@ function assertNoShadowedView({
   if (windows === undefined) return;
   // Case-folded, unlike the reference match: a refusal here can only over-refuse.
   const folded = new Set([...withNames].map((name) => name.trim().toLowerCase()));
-  const shadowed = views
-    .map((view) => view.name.toLowerCase())
-    .filter((name) => folded.has(name));
+  const shadowed = views.map((view) => view.name.toLowerCase()).filter((name) => folded.has(name));
   if (shadowed.length > 0) throw new LangWatchQLShadowedViewError({ names: shadowed });
 }
 

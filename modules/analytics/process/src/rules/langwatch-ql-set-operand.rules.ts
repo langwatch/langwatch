@@ -42,6 +42,7 @@ function holdsPlainName(operand: unknown): boolean {
 export function findNamedSetOperands(node: SqlAstNode): readonly unknown[] {
   const { name, arguments: args } = node;
   if (node.type !== "Function" || typeof name !== "string" || !Array.isArray(args)) return [];
-  if (!SET_MEMBERSHIP_FUNCTIONS.has(name.trim().toLowerCase())) return [];
+  const functionName = name.trim().toLowerCase();
+  if (!SET_MEMBERSHIP_FUNCTIONS.has(functionName)) return [];
   return args.slice(1).filter(holdsPlainName);
 }
