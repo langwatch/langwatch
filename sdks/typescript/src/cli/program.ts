@@ -549,7 +549,7 @@ function registerOpenCommands(program: Command): void {
   program
     .command("open [path]")
     .description(
-      "Open the LangWatch app in your browser. No path: /me in personal mode, project home if LANGWATCH_API_KEY is set. With a path: BASE/<path>.",
+      "Open the LangWatch app in your browser. No path: your coding agents page (/me, which newer servers redirect to /coding-agents) in personal mode, project home if LANGWATCH_API_KEY is set. With a path: BASE/<path>.",
     )
     .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
     .action(async (path: string | undefined, options: { browser?: string }) => {
@@ -4281,8 +4281,8 @@ function registerGraphCommands(program: Command): void {
       .option("--dashboard-id <id>", "Dashboard to add the graph to")
       .option("--graph <json>", "Graph definition as JSON")
       .option("--filters <json>", "Filter conditions as JSON")
-      .option("--col-span <n>", "Column span (1-2)")
-      .option("--row-span <n>", "Row span (1-2)")
+      .option("--col-span <n>", "Column span (1-8)")
+      .option("--row-span <n>", "Row span (1-20)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
       name: string,

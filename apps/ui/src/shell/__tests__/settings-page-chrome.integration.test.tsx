@@ -13,12 +13,12 @@ import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { browserModules } from "../../browser-modules.generated.ts";
-import { uiRouteTable } from "../ui-route-table";
+import { uiMountedRouteTable } from "../ui-route-table";
 
 const { resolveShellRoute } = await navigationWeb.installation.capabilities.chrome.load();
 
 const stubbedPages: UiPageLoaderRegistry = Object.fromEntries(
-  uiRoutePageKeys(uiRouteTable).map((key) => [
+  uiRoutePageKeys(uiMountedRouteTable).map((key) => [
     key,
     async () => ({
       default: () => (
@@ -41,7 +41,7 @@ function Chrome() {
 }
 
 const routes = createUiRouteObjects({
-  table: uiRouteTable,
+  table: uiMountedRouteTable,
   loaders: stubbedPages,
   shellLayouts: {
     auth: async () => ({ default: () => <Outlet /> }),
