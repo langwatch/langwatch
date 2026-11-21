@@ -3,7 +3,7 @@ Feature: Scenario run detail drawer
   I want to see run details in a drawer overlaying the list/grid
   So that I can review criteria, conversation, and actions without leaving the runs view
 
-  # Parity status: 2 of 6 scenarios bound to existing tests.
+  # Parity status: 3 of 7 scenarios bound to existing tests.
   # The remaining 4 @unimplemented scenarios describe shipped behavior
   # that does not yet have an integration test (#3458):
   #   - "Clicking a run opens the detail drawer"
@@ -32,6 +32,14 @@ Feature: Scenario run detail drawer
     When the detail drawer opens for that run
     Then the criteria section shows "0/4 passed"
     And each criterion displays its name and pass/fail indicator
+
+  @integration
+  Scenario: A run with no success criteria hides misleading score lines
+    Given a completed scenario run whose criteria list is empty
+    When the detail drawer opens for that run
+    Then no "Success Criteria:" line is shown
+    And no "Success Rate:" line is shown
+    And the duration is still shown
 
   @integration @unimplemented
   Scenario: Failed criteria show expandable reasoning
