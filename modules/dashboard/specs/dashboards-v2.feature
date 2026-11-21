@@ -64,7 +64,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit
   Scenario: AC215b Partial cost: some spans priced at zero
-    Given some spans priced at 0 and some with no cost
+    Given every priced span is priced at 0 and some spans have no cost
     Then it shows "$0.00, some spans not priced"
     And never "$0.00+"
     And the loops card, which cannot count priced spans, shows "$0.00, some spans not priced" whenever its sum is 0 and some repeats have no cost
@@ -529,7 +529,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then a trace has looped when it calls one tool 3 or more times with the same input
     And a trace has retried when a failed span is followed under the same parent by the same step, or by another model call
     And it shows those traces per bucket, their share of all traces, and the cost of the repeated calls
-    And that cost reads as a lower bound, marked "+", when a repeated span carries no cost
+    And that cost reads as a lower bound, marked "+", when its sum is above 0 and a repeated span carries no cost
 
   @unit
   Scenario: AC63 Where my agent breaks: tool error rate says how many tool errors the agent recovered
