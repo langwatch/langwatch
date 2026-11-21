@@ -9880,6 +9880,7 @@ export interface operations {
                     };
                     row_indices?: number[];
                     concurrency?: number;
+                    repeat?: number;
                 };
             };
         };
@@ -13180,6 +13181,10 @@ export interface operations {
                         simulatorModel?: string | null;
                         /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
                         judgeModel?: string | null;
+                        /** @description Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceQuietPeriodMs?: number | null;
+                        /** @description Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceWaitTimeoutMs?: number | null;
                         /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
                         maxTurns?: number | null;
                         /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
@@ -13228,6 +13233,10 @@ export interface operations {
                     simulatorModel?: string | null;
                     /** @description Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default. */
                     judgeModel?: string | null;
+                    /** @description Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation. */
+                    traceQuietPeriodMs?: number | null;
+                    /** @description Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation. */
+                    traceWaitTimeoutMs?: number | null;
                     /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
                     maxTurns?: number | null;
                     /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
@@ -13287,6 +13296,10 @@ export interface operations {
                         simulatorModel?: string | null;
                         /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
                         judgeModel?: string | null;
+                        /** @description Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceQuietPeriodMs?: number | null;
+                        /** @description Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceWaitTimeoutMs?: number | null;
                         /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
                         maxTurns?: number | null;
                         /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
@@ -13341,6 +13354,10 @@ export interface operations {
                         simulatorModel?: string | null;
                         /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
                         judgeModel?: string | null;
+                        /** @description Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceQuietPeriodMs?: number | null;
+                        /** @description Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceWaitTimeoutMs?: number | null;
                         /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
                         maxTurns?: number | null;
                         /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
@@ -13400,6 +13417,10 @@ export interface operations {
                     simulatorModel?: string | null;
                     /** @description Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default. */
                     judgeModel?: string | null;
+                    /** @description Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation. */
+                    traceQuietPeriodMs?: number | null;
+                    /** @description Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation. */
+                    traceWaitTimeoutMs?: number | null;
                     /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
                     maxTurns?: number | null;
                     /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
@@ -13440,6 +13461,10 @@ export interface operations {
                         simulatorModel?: string | null;
                         /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
                         judgeModel?: string | null;
+                        /** @description Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceQuietPeriodMs?: number | null;
+                        /** @description Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceWaitTimeoutMs?: number | null;
                         /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
                         maxTurns?: number | null;
                         /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
@@ -13535,6 +13560,10 @@ export interface operations {
                     simulatorModel?: string | null;
                     /** @description Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default. */
                     judgeModel?: string | null;
+                    /** @description Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation. */
+                    traceQuietPeriodMs?: number | null;
+                    /** @description Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation. */
+                    traceWaitTimeoutMs?: number | null;
                     /** @description Maximum conversation turns for a run of this scenario. Null uses the default. */
                     maxTurns?: number | null;
                     /** @description Minimum conversation turns before the judge may end the run. Null uses the default. */
@@ -13575,6 +13604,10 @@ export interface operations {
                         simulatorModel?: string | null;
                         /** @description The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family. */
                         judgeModel?: string | null;
+                        /** @description Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceQuietPeriodMs?: number | null;
+                        /** @description Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceWaitTimeoutMs?: number | null;
                         /** @description The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family. */
                         maxTurns?: number | null;
                         /** @description The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family. */
@@ -14080,6 +14113,10 @@ export interface operations {
                         simulatorModel: string | null;
                         /** @description The model that judges the run, or null for the scenario or project default. */
                         judgeModel: string | null;
+                        /** @description Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceQuietPeriodMs?: number | null;
+                        /** @description Milliseconds the judge waits for the agent's trace before a verdict, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceWaitTimeoutMs?: number | null;
                         /** @description The labels the plan carries. */
                         labels: string[];
                         /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
@@ -14179,6 +14216,10 @@ export interface operations {
                         simulatorModel?: string | null;
                         /** @description The model that judges every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default. */
                         judgeModel?: string | null;
+                        /** @description Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation. */
+                        traceQuietPeriodMs?: number | null;
+                        /** @description Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation. */
+                        traceWaitTimeoutMs?: number | null;
                         /** @description The scenarios a test_suites or scenarios scope covers. Read by a scenarios scope alone; a scope that states a rule resolves its own list at run time. */
                         scenarioIds?: string[];
                         /** @description The plan's own evaluators, run beside the ones attached to the test suites its scenarios belong to. A plan evaluator reads the conversation and the trace, never a scenario field. Leave it out to keep what the plan already holds. */
@@ -14357,6 +14398,10 @@ export interface operations {
                         simulatorModel: string | null;
                         /** @description The model that judges the run, or null for the scenario or project default. */
                         judgeModel: string | null;
+                        /** @description Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceQuietPeriodMs?: number | null;
+                        /** @description Milliseconds the judge waits for the agent's trace before a verdict, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings. */
+                        traceWaitTimeoutMs?: number | null;
                         /** @description The labels the plan carries. */
                         labels: string[];
                         /** @description The plan's own evaluators. Absent on servers that predate evaluators on this family. */
@@ -15166,6 +15211,10 @@ export interface operations {
                     simulatorModel?: string | null;
                     /** @description The model that judges every scenario in this run. Leave it out for the scenario or project default. */
                     judgeModel?: string | null;
+                    /** @description Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation. */
+                    traceQuietPeriodMs?: number | null;
+                    /** @description Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation. */
+                    traceWaitTimeoutMs?: number | null;
                     /** @description Repeat the same key to make a retry join the batch the first call started instead of running everything again. Send the same request with it: the same key over a different configuration starts its own batch. Defaults to a new key per call. */
                     idempotencyKey?: string;
                     /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name, and a target that names the same parameter in its runParameters overrides it for that target. */
@@ -15853,6 +15902,10 @@ export interface operations {
                     simulatorModel?: string | null;
                     /** @description The model that judges every scenario in the run. Used only when the id names a test suite. */
                     judgeModel?: string | null;
+                    /** @description Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Used only when the id names a test suite. */
+                    traceQuietPeriodMs?: number | null;
+                    /** @description Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Used only when the id names a test suite. */
+                    traceWaitTimeoutMs?: number | null;
                     /** @description Constant values applied to every scenario in the run, e.g. a fixture id or a tenant. A value supplied here overrides the scenario's own default for that name. */
                     parameters?: {
                         [key: string]: string | number | boolean;

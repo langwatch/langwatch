@@ -10,6 +10,7 @@ import {
   SharedDocumentationFetcher,
 } from "./documentation-fetch.ts";
 import { createDatasetSchema, datasetColumnDefinitionSchema } from "./schemas/create-dataset.ts";
+import { runExperimentSchema } from "./schemas/run-experiment.ts";
 import {
   runParametersSchema,
   runPlanScopeSchema,
@@ -2189,19 +2190,8 @@ function registerSecretTools(server: McpServer): void {
 function registerExperimentTools(server: McpServer): void {
   server.tool(
     "platform_run_experiment",
-    "Start an experiment run by slug. Returns a run ID for polling status.",
-    {
-      slug: z.string().describe("The experiment slug to run"),
-      concurrency: z
-        .number()
-        .int()
-        .min(1)
-        .max(24)
-        .optional()
-        .describe(
-          "Cells (one row against one target) to run at once, for this run only (default: the server's setting). Use 1 to run them one at a time, in order.",
-        ),
-    },
+    "Start an experiment run by slug. Returns a run ID for polling status. Models rarely answer the same way twice, so before calling a failing row a real failure, run again with `repeat` (3 or more): every dataset row then runs that many times in one run, and a row that fails only some of its runs is noise, not a regression.",
+    runExperimentSchema.shape,
     withToolLogging("platform_run_experiment", async (params) => {
       requireApiKey();
       return {
