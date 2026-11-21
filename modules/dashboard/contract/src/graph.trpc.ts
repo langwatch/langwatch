@@ -6,13 +6,15 @@
 import {
   chartGridPlacementSchema,
   fitsChartGridWidth,
+  fitsGridWidthIssue,
+  partialPlacementFitsGridWidth,
 } from "@langwatch/analytics-contract/chart-grid";
 import { jsonTextField } from "@langwatch/api/json-text-field";
 import { triggerSchema } from "@langwatch/automation-contract";
 import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { fitsGridWidthIssue, graphSchema, partialPlacementFitsGridWidth } from "./graph.ts";
+import { graphSchema } from "./graph.ts";
 
 /**
  * `create` takes each placement field optionally and persists the grid's

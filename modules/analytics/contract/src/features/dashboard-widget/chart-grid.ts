@@ -84,6 +84,24 @@ export const fitsChartGridWidth = ({
 }): boolean => gridColumn + colSpan <= CHART_GRID_COLUMNS;
 
 /**
+ * Width check for a placement whose fields are each optional: an omitted
+ * one is stored at the grid's default, so the check runs on that placement.
+ */
+export const partialPlacementFitsGridWidth = ({
+  gridColumn = 0,
+  colSpan = CHART_GRID_DEFAULT_COL_SPAN,
+}: {
+  gridColumn?: number;
+  colSpan?: number;
+}): boolean => fitsChartGridWidth({ gridColumn, colSpan });
+
+/** The refusal every grid width check raises, on the span that overran. */
+export const fitsGridWidthIssue = {
+  message: "gridColumn + colSpan must not exceed the grid's columns",
+  path: ["colSpan"],
+};
+
+/**
  * The rendered height of a card spanning `rowSpan` rows: the rows themselves
  * plus the gaps between them, which the card also covers.
  */

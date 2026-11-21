@@ -15,7 +15,6 @@ import {
   implementedWidget,
   TRUNKS,
 } from "../catalogue/index.ts";
-import { BOARD_WIDGET_DEFAULT_ROW_SPAN } from "../model/board-grid.ts";
 import {
   type CatalogueFilters,
   filterCatalogue,
@@ -209,7 +208,7 @@ describe("the templates finder", () => {
 
       expect(unbuilt.length).toBeGreaterThan(0);
       expect(unbuilt.map(({ key, layout }) => [key, layout.rowSpan])).toEqual(
-        unbuilt.map(({ key }) => [key, BOARD_WIDGET_DEFAULT_ROW_SPAN]),
+        unbuilt.map(({ key }) => [key, 5]),
       );
     });
   });
