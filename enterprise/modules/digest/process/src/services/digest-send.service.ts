@@ -91,7 +91,7 @@ async function requestSends({
           homes.set(member.userId, home.kind === "home" ? home.organizationId : null);
         }
         await requestSend({
-          ...member,
+          userId: member.userId,
           organizationId,
           isoWeek,
           homeOrganizationId: homes.get(member.userId) ?? null,
@@ -234,7 +234,7 @@ export class DigestSendService {
     organizationId,
     isoWeek,
     homeOrganizationId,
-  }: DigestSendRequest & { at: number }): Promise<void> {
+  }: DigestSendRequest): Promise<void> {
     const [settings, enrolled, unsubscribed, sent] = await Promise.all([
       this.deps.audience.getSettings(),
       this.deps.audience.findEnrolled(),

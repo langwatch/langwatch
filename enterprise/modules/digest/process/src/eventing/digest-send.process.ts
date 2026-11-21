@@ -28,10 +28,8 @@ export const planWeekIntentSchema = z.object({
 });
 export type PlanWeekIntent = z.infer<typeof planWeekIntentSchema>;
 
-export const sendDigestIntentSchema = z.object({
-  ...digestSendRequestedEventDataSchema.shape,
-  at: z.number().int().nonnegative(),
-});
+/** The ask as it was recorded; the event's own `occurredAt` already holds when it was asked. */
+export const sendDigestIntentSchema = digestSendRequestedEventDataSchema;
 export type SendDigestIntent = z.infer<typeof sendDigestIntentSchema>;
 
 export const digestPlanStateSchema = z.object({ lastWakeAt: z.number().nullable() });
@@ -66,9 +64,6 @@ export const digestSendRequested: EventHandler<
 > = (state, data, context) => ({
   state: { requestedAt: state.requestedAt ?? context.at },
   intents: [
-    context.intent("sendDigest", `send:${data.userId}:${data.isoWeek}`, {
-      ...data,
-      at: context.at,
-    }),
+    context.intent("sendDigest", `send:${data.userId}:${data.isoWeek}`, data),
   ],
 });

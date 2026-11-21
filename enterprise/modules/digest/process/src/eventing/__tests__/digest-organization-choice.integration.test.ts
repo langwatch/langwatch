@@ -20,7 +20,6 @@ import {
   OTHER_PROJECT,
   PROJECT,
   SENT_WEEK,
-  WAKE_AT,
 } from "./digest.fixture.ts";
 
 let digest: InstalledDigest;
@@ -38,7 +37,7 @@ const enrol = (organizationId: string) =>
 const arm = () => digest.repositories.audience.setArmed({ armed: true });
 
 const sendIn = ({ userId, organizationId }: { userId: string; organizationId: string }) =>
-  digest.carryOut({ userId, organizationId, isoWeek: SENT_WEEK, admin: false, at: WAKE_AT });
+  digest.carryOut({ userId, organizationId, isoWeek: SENT_WEEK });
 
 /** The week's trace count an email shows; only the traces-week template shows one. */
 const tracesOf = (mail: RenderedDigestMail): number | undefined =>
@@ -188,13 +187,7 @@ describe("when the picked template cannot be built", () => {
       traces: 1_200,
     });
 
-    await digest.carryOut({
-      userId: ADMIN,
-      organizationId: ORGANIZATION,
-      isoWeek: SENT_WEEK,
-      admin: true,
-      at: WAKE_AT,
-    });
+    await digest.carryOut({ userId: ADMIN, organizationId: ORGANIZATION, isoWeek: SENT_WEEK });
 
     expect(digest.mail.map((mail) => mail.templateId)).toEqual(["digest-traces-week"]);
   });
@@ -208,13 +201,7 @@ describe("when a member's profile is deactivated", () => {
     digest.world.usage = { currentMonthMessagesCount: 900, maxMonthlyUsageLimit: 1_000 };
     digest.world.deactivated.add(ADMIN);
 
-    await digest.carryOut({
-      userId: ADMIN,
-      organizationId: ORGANIZATION,
-      isoWeek: SENT_WEEK,
-      admin: true,
-      at: WAKE_AT,
-    });
+    await digest.carryOut({ userId: ADMIN, organizationId: ORGANIZATION, isoWeek: SENT_WEEK });
 
     expect(digest.mail).toEqual([]);
     expect(await digest.repositories.sends.isSent({ userId: ADMIN, isoWeek: SENT_WEEK })).toBe(

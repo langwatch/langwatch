@@ -13,8 +13,6 @@ export const digestSendRequestedEventDataSchema = z.object({
   userId: z.string().min(1),
   organizationId: z.string().min(1),
   isoWeek: z.string().min(1),
-  /** An organization admin may be sent the plan-pressure email. */
-  admin: z.boolean(),
   /**
    * For a person in several enrolled organizations, the one whose week they are sent, decided
    * once at plan time so every organization's send agrees even if the folds change in between.

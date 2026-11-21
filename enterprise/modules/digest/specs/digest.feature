@@ -405,6 +405,20 @@ Feature: Weekly digest emails
     Then the call is refused with digest_operator_address_missing
     And no email is sent
 
+  @integration
+  Scenario: A test send of a member whose pick has nothing to show is refused
+    Given an enrolled organization and a member whose pick has nothing to show this week
+    When an operator sends themself a test of that member's email
+    Then the call is refused with digest_nothing_to_send
+    And no email is sent
+
+  @integration
+  Scenario: A test email's unsubscribe link names the operator, not the member
+    Given an enrolled organization
+    When an operator sends themself a test of a member's email
+    And the test email's one-click unsubscribe is followed
+    Then the operator is unsubscribed and the member is not
+
   @integration @unimplemented
   Scenario: Metrics count sends, unique clickers and unsubscribes by template and week
     Given ten sends of digest-traces-week this week, three members who clicked twice each and one unsubscribe

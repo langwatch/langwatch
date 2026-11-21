@@ -81,7 +81,7 @@ function tokenOf(oneClickUrl: string): string {
 
 /** One member's send for a week, carried out as the outbox would. */
 const sendFor = ({ userId, isoWeek }: { userId: string; isoWeek: string }) =>
-  digest.carryOut({ userId, organizationId: ORGANIZATION, isoWeek, admin: true, at: WAKE_AT });
+  digest.carryOut({ userId, organizationId: ORGANIZATION, isoWeek });
 
 /** Each send carried out in turn, as the outbox would. */
 async function carryOutAll(payloads: readonly unknown[]): Promise<void> {
@@ -757,6 +757,7 @@ describe("an operator's test send", () => {
       );
     });
 
+    /** @scenario "A test email's unsubscribe link names the operator, not the member" */
     it("signs its unsubscribe for the operator, never the member", async () => {
       everyoneNearTheLimit();
       await digest.sendTest({ organizationId: ORGANIZATION, userId: MEMBER, operatorId: OPERATOR });
@@ -771,6 +772,7 @@ describe("an operator's test send", () => {
   });
 
   describe("when the member's pick has nothing to show", () => {
+    /** @scenario "A test send of a member whose pick has nothing to show is refused" */
     it("is refused as nothing to send and mails no one", async () => {
       await enrol();
       await expect(

@@ -41,9 +41,9 @@ afterEach(async () => {
   await digest.close();
 });
 
-/** One member's send of the sent week, carrying the role the plan saw. */
-const sendFor = ({ userId, admin }: { userId: string; admin: boolean }) =>
-  digest.carryOut({ userId, organizationId: ORGANIZATION, isoWeek: SENT_WEEK, admin, at: WAKE_AT });
+/** One member's send of the sent week. */
+const sendFor = ({ userId }: { userId: string }) =>
+  digest.carryOut({ userId, organizationId: ORGANIZATION, isoWeek: SENT_WEEK });
 
 /** The organization at 90% of its plan, so an admin's pick is plan-pressure. */
 function nearTheLimit() {
@@ -70,7 +70,7 @@ describe("a member's send", () => {
       nearTheLimit();
       digest.world.members = digest.world.members.filter((member) => member.userId !== ADMIN);
 
-      await sendFor({ userId: ADMIN, admin: true });
+      await sendFor({ userId: ADMIN });
 
       expect(digest.mail).toEqual([]);
     });
@@ -85,7 +85,7 @@ describe("a member's send", () => {
         member.userId === ADMIN ? { ...member, disabledAt } : member,
       );
 
-      await sendFor({ userId: ADMIN, admin: true });
+      await sendFor({ userId: ADMIN });
 
       expect(digest.mail).toEqual([]);
     });
@@ -99,7 +99,7 @@ describe("a member's send", () => {
         member.userId === ADMIN ? { ...member, role: "MEMBER" } : member,
       );
 
-      await sendFor({ userId: ADMIN, admin: true });
+      await sendFor({ userId: ADMIN });
 
       expect(digest.mail.map((mail) => mail.templateId)).not.toContain("digest-plan-pressure");
     });
@@ -116,8 +116,8 @@ describe("a member's send", () => {
       });
       digest.world.hiddenFrom.set(MEMBER, [PROJECT]);
 
-      await sendFor({ userId: MEMBER, admin: false });
-      await sendFor({ userId: OTHER_MEMBER, admin: false });
+      await sendFor({ userId: MEMBER });
+      await sendFor({ userId: OTHER_MEMBER });
 
       expect(digest.mail.map((mail) => mail.to)).toEqual([emailOf(OTHER_MEMBER)]);
       expect(digest.mail[0]).toMatchObject({
