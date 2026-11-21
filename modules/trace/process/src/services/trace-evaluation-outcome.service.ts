@@ -43,8 +43,8 @@ export class EvaluationRunNotYetReadableError extends Error {
 
 /**
  * A trace an evaluation names that trace analytics has not stored yet. The delivery retries after
- * the wait it names, which the queue keeps as a floor over its own backoff. Its peer subscribers
- * take one event per job and no `handleBatch`, so the delay never holds back a batch split.
+ * the wait it names, a floor over the queue's backoff, and counts as a planned wait, not a failure.
+ * Its peer subscribers take one event per job and no `handleBatch`, so no batch split waits on it.
  */
 export class EvaluatedTraceNotYetStoredError extends GroupQueueError {
   constructor({ traceId, retryAfterMs }: { traceId: string; retryAfterMs: number }) {
@@ -53,6 +53,7 @@ export class EvaluatedTraceNotYetStoredError extends GroupQueueError {
       operation: "recordEvaluationOutcome",
       message: `trace ${traceId} is not stored yet; its evaluation outcome is retried`,
       retryAfterMs,
+      waiting: true,
     });
     this.name = "EvaluatedTraceNotYetStoredError";
   }

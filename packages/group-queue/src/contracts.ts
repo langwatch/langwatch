@@ -143,6 +143,8 @@ export interface GroupQueueFailureDecision {
    * the job may use the longer overload attempt budget before its group blocks.
    */
   retryAfterMs?: number;
+  /** A planned wait, not a failure: counted as gq_jobs_waited_total, not as a retry. */
+  waiting?: boolean;
 }
 
 export interface GroupQueueFailureClassifier {

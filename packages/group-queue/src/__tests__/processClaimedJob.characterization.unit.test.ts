@@ -1,12 +1,17 @@
 /** Pins every outcome of a claimed job as the ordered calls it makes; see ADR-090 and ADR-080. */
 
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { nowInstant } from "@langwatch/time";
 import { Redis as IORedis } from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle.ts";
-import { HandBackGroupQueueError, NonRetryableGroupQueueError } from "../errors.ts";
+import {
+  GroupQueueError,
+  HandBackGroupQueueError,
+  NonRetryableGroupQueueError,
+} from "../errors.ts";
 import {
   GroupQueueProcessor,
   HAND_BACK_CONFIG,
@@ -62,6 +67,8 @@ type Scenario = {
   failStreak?: number;
   retryable?: boolean;
   retryAfterMs?: number;
+  /** The failure is a planned wait, not a failure. */
+  waiting?: boolean;
   /** Another worker recovered the claim, so every fenced write answers false. */
   claimLost?: boolean;
   onExhausted?: GroupQueueRuntimeDefinition<TestPayload>["onExhausted"];
@@ -155,14 +162,14 @@ function recordingProcessor(scenario: Scenario): {
       classify: () => ({
         retryable: scenario.retryable ?? true,
         ...(scenario.retryAfterMs === undefined ? {} : { retryAfterMs: scenario.retryAfterMs }),
+        ...(scenario.waiting === undefined ? {} : { waiting: scenario.waiting }),
       }),
     },
   });
   return { processor, calls };
 }
 
-async function runClaimed(scenario: Scenario): Promise<unknown[]> {
-  const { processor, calls } = recordingProcessor(scenario);
+async function runClaimedOn(processor: GroupQueueProcessor<TestPayload>): Promise<void> {
   await processor["processClaimedJob"]({
     stagedJobId: "job-1",
     groupId: GROUP,
@@ -170,6 +177,11 @@ async function runClaimed(scenario: Scenario): Promise<unknown[]> {
     originalScore: 1000,
     claimToken: "claim-1",
   });
+}
+
+async function runClaimed(scenario: Scenario): Promise<unknown[]> {
+  const { processor, calls } = recordingProcessor(scenario);
+  await runClaimedOn(processor);
   return calls;
 }
 
@@ -517,6 +529,72 @@ describe("given a coalesced batch that fails", () => {
       });
 
       expect(named(calls, "handler.processBatch").length).toBeGreaterThan(1);
+    });
+  });
+});
+
+describe("given a claimed job whose handler waits on work still to land", () => {
+  const WAIT_LOG = "Job waiting on a dependency, re-staged after its named delay";
+  const runWaiting = async ({ waiting }: { waiting: boolean }) => {
+    const meter = createRecordingMeterProvider();
+    meter.install();
+    const { processor, calls } = recordingProcessor({
+      retryAfterMs: 60_000,
+      waiting,
+      process: async () => {
+        throw new GroupQueueError({
+          queueName: "trace",
+          operation: "wait",
+          message: "not stored yet",
+          retryAfterMs: 60_000,
+          waiting,
+        });
+      },
+    });
+    const warn = vi.spyOn(processor["logger"], "warn");
+    const debug = vi.spyOn(processor["logger"], "debug");
+    await runClaimedOn(processor);
+    const read = {
+      calls,
+      waited: meter.valueOf("gq_jobs_waited_total"),
+      retried: meter.valueOf("gq_jobs_retried_total"),
+      warned: warn.mock.calls.map((call) => call[1]),
+      debugged: debug.mock.calls.map((call) => call[1]),
+      waitLogs: debug.mock.calls.filter((call) => call[1] === WAIT_LOG).map((call) => call[0]),
+    };
+    meter.uninstall();
+    return read;
+  };
+
+  describe("when the failure is a planned wait", () => {
+    /** @scenario "A planned wait is counted apart from a failed retry" */
+    it("counts a wait, not a retry, and logs it below warn", async () => {
+      const { waited, retried, warned, debugged } = await runWaiting({ waiting: true });
+
+      expect({ waited, retried }).toEqual({ waited: 1, retried: 0 });
+      expect(debugged).toContain(WAIT_LOG);
+      expect(warned).not.toContain("Job attempt failed, re-staged with backoff");
+    });
+
+    it("still spends an attempt and re-stages after the named delay", async () => {
+      const { calls, waitLogs } = await runWaiting({ waiting: true });
+
+      const restages = calls.filter(
+        (call) => Array.isArray(call) && call[0] === "scripts.retryRestage",
+      );
+      const restaged = [expect.objectContaining({ attempt: 2 })];
+      expect(restages).toEqual([["scripts.retryRestage", restaged]]);
+      expect(waitLogs).toEqual([expect.objectContaining({ attempt: 1, backoffMs: 60_000 })]);
+    });
+  });
+
+  describe("when the failure names a delay but is not a planned wait", () => {
+    /** @scenario "A planned wait is counted apart from a failed retry" */
+    it("counts a retry and warns, as an overloaded server does", async () => {
+      const { waited, retried, warned } = await runWaiting({ waiting: false });
+
+      expect({ waited, retried }).toEqual({ waited: 0, retried: 1 });
+      expect(warned).toContain("Job attempt failed, re-staged with backoff");
     });
   });
 });
