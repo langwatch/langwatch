@@ -9,7 +9,7 @@ import type {
   LangWatchQLProtections,
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
-import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import type { InstantEvalApi, InstantEvalQuerySource } from "@langwatch/instant-eval-contract";
 
 import { DEFAULT_LWQL_HYDRATION_LIMITS } from "../features/hydration/rules/langwatch-ql-hydration-assembly.rules.ts";
 import {
@@ -25,6 +25,10 @@ import {
   pickLangWatchQLConversationJudgements,
 } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
+
+/** The columns a judged row's kept result is keyed on, as LangWatchQL names them. */
+const LWQL_TRACE_COLUMN = "TraceId";
+const LWQL_TIME_COLUMN = "OccurredAt";
 
 type LangWatchQLExtractionDependencies = {
   readonly hydration?: Pick<LangWatchQLHydrationService, "hydrate"> | undefined;
@@ -48,12 +52,15 @@ export class LangWatchQLExtractionService {
     validation,
     execution,
     signal,
+    source,
   }: {
     readonly projects: readonly LangWatchQLCaller[];
     readonly protections: LangWatchQLProtections;
     readonly validation: Pick<AcceptedLangWatchQL, "appFunctions">;
     readonly execution: Pick<LangWatchQLQueryResult, "columns" | "rows">;
     readonly signal?: AbortSignal;
+    /** The widget that asked, which its kept eval results name; absent, the query is an ask. */
+    readonly source?: InstantEvalQuerySource;
   }): Promise<
     Pick<LangWatchQLQueryResult, "columns" | "rows"> & {
       readonly appFunctions?: LangWatchQLAppFunctionDiagnosticsInput;
@@ -86,7 +93,14 @@ export class LangWatchQLExtractionService {
           }
         : {}),
     });
-    const judged = await this.judge({ projects, judgements, rows: hydrated.rows, signal });
+    const judged = await this.judge({
+      projects,
+      judgements,
+      rows: hydrated.rows,
+      traceStartedAt: hydrated.traceStartedAt,
+      signal,
+      source,
+    });
 
     return {
       columns: langWatchQLJudgedColumns({
@@ -113,12 +127,16 @@ export class LangWatchQLExtractionService {
     projects,
     judgements,
     rows,
+    traceStartedAt,
     signal,
+    source,
   }: {
     readonly projects: readonly LangWatchQLCaller[];
     readonly judgements: ReturnType<typeof langWatchQLJudgementCalls>;
     readonly rows: readonly Record<string, unknown>[];
-    readonly signal?: AbortSignal;
+    readonly traceStartedAt: ReadonlyMap<string, number>;
+    readonly signal?: AbortSignal | undefined;
+    readonly source?: InstantEvalQuerySource | undefined;
   }): Promise<{
     rows: readonly Record<string, unknown>[];
     skipped?: Readonly<Record<string, number>>;
@@ -128,11 +146,13 @@ export class LangWatchQLExtractionService {
     if (!project || others.length > 0) {
       throw new Error("an eval function reached execution outside a single-project scope");
     }
+    const timed = withTraceTimes({ rows, traceStartedAt });
     const judged = await this.deps.judging.judgeQuery({
       projectId: project.id,
       judgements,
-      rows,
+      rows: timed,
       ...(signal ? { signal } : {}),
+      ...(source ? { source } : {}),
     });
     if (judged.cancellation) {
       throw signal?.reason instanceof Error
@@ -140,6 +160,52 @@ export class LangWatchQLExtractionService {
         : new DOMException("The query was cancelled", "AbortError");
     }
 
-    return { rows: judged.rows, skipped: judged.skipped };
+    return {
+      rows: withoutAddedTimes({
+        judged: judged.rows,
+        projectsTime: rows.some((row) => LWQL_TIME_COLUMN in row),
+      }),
+      skipped: judged.skipped,
+    };
   }
+}
+
+/**
+ * Each row naming a trace hydration read, with that trace's start as its time when the statement
+ * projected none: recall keys a kept result on it (ADR-189 section 2). A projected time wins, and
+ * a row whose trace was not found is sent as it is, so it is not kept.
+ */
+function withTraceTimes({
+  rows,
+  traceStartedAt,
+}: {
+  rows: readonly Record<string, unknown>[];
+  traceStartedAt: ReadonlyMap<string, number>;
+}): readonly Record<string, unknown>[] {
+  return rows.map((row) => {
+    const traceId = row[LWQL_TRACE_COLUMN];
+    if (LWQL_TIME_COLUMN in row || typeof traceId !== "string") return row;
+    const startedAt = traceStartedAt.get(traceId);
+
+    return startedAt === undefined ? row : { ...row, [LWQL_TIME_COLUMN]: startedAt };
+  });
+}
+
+/**
+ * The judged rows without the time only the judge was given, so the answer holds the columns the
+ * statement projected. A statement projects the same columns on every row, so whether it projected
+ * a time is decided once, and the strip needs neither the judge's row order nor its objects.
+ */
+function withoutAddedTimes({
+  judged,
+  projectsTime,
+}: {
+  judged: readonly Record<string, unknown>[];
+  projectsTime: boolean;
+}): readonly Record<string, unknown>[] {
+  if (projectsTime) return judged;
+
+  return judged.map((row) =>
+    Object.fromEntries(Object.entries(row).filter(([column]) => column !== LWQL_TIME_COLUMN)),
+  );
 }

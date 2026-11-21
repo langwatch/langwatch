@@ -108,6 +108,33 @@ describe("langWatchQLJudgementCalls, given a hydration plan", () => {
     });
   });
 
+  describe("when the eval call judges an extraction", () => {
+    const over = (source: LangWatchQLAppFunctionCall["source"]) =>
+      only([call({ function: "eval", options: ["annoyed"], ...(source ? { source } : {}) })]);
+
+    it("names a trace's extraction and its key kind, so the verdict can live on that trace", () => {
+      expect(over({ function: "llm_readable_trace", options: [8000] }).judgedText).toEqual({
+        function: "llm_readable_trace",
+        keyKind: "trace",
+      });
+    });
+
+    it("names a span's extraction as span keyed", () => {
+      expect(over({ function: "llm_messages_span", options: [] }).judgedText).toEqual({
+        function: "llm_messages_span",
+        keyKind: "span",
+      });
+    });
+
+    it("names nothing for a thread's text, which belongs to no single trace", () => {
+      expect(over({ function: "conversation", options: [] })).not.toHaveProperty("judgedText");
+    });
+
+    it("names nothing for a literal text", () => {
+      expect(over(undefined)).not.toHaveProperty("judgedText");
+    });
+  });
+
   describe("when the plan calls several", () => {
     it("answers one judgement per call, in projection order", () => {
       expect(

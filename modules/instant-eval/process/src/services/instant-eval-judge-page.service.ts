@@ -42,6 +42,7 @@ import {
   type InstantEvalKeyPage,
 } from "../rules/instant-eval-row-keys.rules.ts";
 import { instantEvalHydrationPlan } from "../rules/instant-eval-run-sizing.rules.ts";
+import type { EvalResultsRecallService } from "./eval-results-recall.service.ts";
 import type { InstantEvalTextSource } from "./instant-eval-estimate.service.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
 import type { InstantEvalGatewayBudgetService } from "./instant-eval-gateway-budget.service.ts";
@@ -100,6 +101,8 @@ type InstantEvalJudgePageDeps = {
   /** Only an own model's refused key fails a run; LangWatch's is not the customer's to fix. */
   ownModels: InstantEvalOwnDecisionModels;
   concurrency?: number;
+  /** Recalls a page's texts before judging and keeps what it judged (ADR-189). */
+  results?: Pick<EvalResultsRecallService, "recall" | "write">;
   now?: () => number;
 };
 
@@ -117,7 +120,11 @@ export class InstantEvalJudgePageService {
   private readonly ownModels: InstantEvalOwnDecisionModels;
   private readonly now: () => number;
 
-  private constructor(options: Required<InstantEvalJudgePageDeps>) {
+  private constructor(
+    options: Required<Omit<InstantEvalJudgePageDeps, "results">> & {
+      results: InstantEvalJudgePageDeps["results"] | undefined;
+    },
+  ) {
     this.context = options.context;
     this.rowSource = options.rowSource;
     this.textSource = options.textSource;
@@ -131,6 +138,7 @@ export class InstantEvalJudgePageService {
     this.judgeRows = InstantEvalJudgeRowsService.create({
       judge: options.judge,
       concurrency: options.concurrency,
+      ...(options.results ? { results: options.results } : {}),
     });
     this.now = options.now;
   }
@@ -147,6 +155,7 @@ export class InstantEvalJudgePageService {
     readAhead = InstantEvalReadAheadService.create(),
     ownModels,
     concurrency = INSTANT_EVAL_JUDGE_CONCURRENCY,
+    results,
     now = () => nowInstant().epochMilliseconds,
   }: InstantEvalJudgePageDeps): InstantEvalJudgePageService {
     return new InstantEvalJudgePageService({
@@ -161,6 +170,7 @@ export class InstantEvalJudgePageService {
       readAhead,
       ownModels,
       concurrency,
+      results,
       now,
     });
   }
@@ -354,11 +364,13 @@ export class InstantEvalJudgePageService {
     const stops = [watch.signal, deadline].filter((candidate) => candidate !== null);
     const signal = stops.length > 0 ? AbortSignal.any(stops) : null;
     try {
+      // A recalled verdict is still written to the run's own judgements, so its page stays whole.
       const judged = await this.judgeRows.judgeRows({
         projectId: input.projectId,
         rows,
         questions: loaded.questions,
         signal,
+        source: { kind: "run", id: input.runId },
       });
 
       return { judged, ...pageStopFor({ watch: watch.signal, deadline }) };

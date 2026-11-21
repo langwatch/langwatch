@@ -24,7 +24,9 @@ import type {
   InstantEvalClassifyRequest,
   InstantEvalJudgeChannel,
 } from "../../channels/instant-eval-judging.channel.ts";
+import { MemoryEvalResultsRepository } from "../../repositories/memory/memory.eval-results.repository.ts";
 import { MemoryInstantEvalBudgetReservationsRepository } from "../../repositories/memory/memory.instant-eval-budget-reservations.repository.ts";
+import { EvalResultsRecallService } from "../eval-results-recall.service.ts";
 import { InstantEvalFreeBudgetService } from "../instant-eval-free-budget.service.ts";
 import { InstantEvalJudgeRowsService } from "../instant-eval-judge-rows.service.ts";
 import {
@@ -111,6 +113,7 @@ function harness({
   concurrency,
   recordJudgeSpend,
   holdPricing = INSTANT_EVAL_PRICING,
+  results,
   gatewayRefusal,
 }: {
   judge?: ScriptedJudge;
@@ -121,6 +124,8 @@ function harness({
   recordJudgeSpend?: (input: InstantEvalJudgeSpendRecord) => Promise<void>;
   /** What the judge says a query's hold is priced at: its dearest reachable rate. */
   holdPricing?: InstantEvalPricing;
+  /** Where kept results are recalled and written; absent, nothing is kept. */
+  results?: EvalResultsRecallService;
   /** What a gateway budget set to block refuses with, once it is reached. */
   gatewayRefusal?: Error;
 } = {}) {
@@ -156,6 +161,7 @@ function harness({
     rows: InstantEvalJudgeRowsService.create({
       judge,
       ...(concurrency === undefined ? {} : { concurrency }),
+      ...(results ? { results } : {}),
     }),
     budget: {
       reserve: async (input) => {
@@ -669,6 +675,81 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
       expect(judged).toEqual({ rows: [{ annoyed: "one" }], skipped: {} });
       expect(events).toEqual([]);
       expect(judge.requests).toHaveLength(0);
+    });
+  });
+  describe("given a query whose eval() reads a trace's text, with results kept", () => {
+    const traceCall = booleanCall("annoyed", {
+      judgedText: { function: "llm_readable_trace", keyKind: "trace" },
+    });
+    const traceRows = [
+      { TraceId: "trace-1", OccurredAt: "2026-10-06 09:00:00.000", annoyed: "hello" },
+    ];
+    const keptResults = () => {
+      const kept = MemoryEvalResultsRepository.create();
+      const results = EvalResultsRecallService.create({
+        results: kept,
+        peers: {
+          isReleased: async () => true,
+          judgeModelOf: async () => "langwatch/instant-evals",
+          retentionDaysOf: async () => 30,
+        },
+        now: () => AT.epochMilliseconds,
+      });
+      return { kept, results };
+    };
+
+    /** @scenario "A quick eval() ask's results name the query" */
+    it("names an ask by the query's own id", async () => {
+      const { kept, results } = keptResults();
+      const { service } = harness({ results });
+
+      await service.judgeQuery({
+        projectId: "project-1",
+        judgements: [traceCall],
+        rows: traceRows,
+      });
+
+      const [row] = kept.findAll();
+      expect(row?.Source).toBe("ask");
+      expect(row?.SourceId).toMatch(/^query:/);
+    });
+
+    /** @scenario "A dashboard widget's results name the widget" */
+    it("names a widget's query by the widget", async () => {
+      const { kept, results } = keptResults();
+      const { service } = harness({ results });
+
+      await service.judgeQuery({
+        projectId: "project-1",
+        judgements: [traceCall],
+        rows: traceRows,
+        source: { kind: "dashboard", id: "widget-1" },
+      });
+
+      expect(kept.findAll().map((row) => [row.Source, row.SourceId])).toEqual([
+        ["dashboard", "widget-1"],
+      ]);
+    });
+
+    it("records no spend for a query every cell of which was recalled", async () => {
+      const { results } = keptResults();
+      const first = harness({ results });
+      await first.service.judgeQuery({
+        projectId: "project-1",
+        judgements: [traceCall],
+        rows: traceRows,
+      });
+      const again = harness({ results });
+
+      const judged = await again.service.judgeQuery({
+        projectId: "project-1",
+        judgements: [traceCall],
+        rows: traceRows,
+      });
+
+      expect(judged.rows[0]?.annoyed).toBe(0.9);
+      expect(again.judge.requests).toHaveLength(0);
+      expect(again.records).toEqual([]);
     });
   });
 });

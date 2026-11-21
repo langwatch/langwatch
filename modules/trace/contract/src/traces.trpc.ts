@@ -4,6 +4,7 @@
  * sharedTrace (ADR-057); getSampleTraces stays on the API.
  */
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
+import { instantEvalTraceResultSchema } from "@langwatch/instant-eval-contract";
 import { defineTrpcContract, type Named } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
@@ -486,6 +487,19 @@ export const tracesTrpc = defineTrpcContract("traces")
     }),
   )
   .withOutput(tracesEvaluationRunsSchema)
+
+  /** The trace's kept Instant Evals results, over its time window (ADR-189 section 3). */
+  .query("instantEvalResults")
+  .withInput(
+    z.object({
+      projectId: z.string(),
+      traceId: z.string(),
+      occurredFrom: z.number().int(),
+      occurredUntil: z.number().int(),
+      ...traceTenantShape,
+    }),
+  )
+  .withOutput(instantEvalTraceResultSchema.array())
 
   .query("traceLogs")
   .withInput(

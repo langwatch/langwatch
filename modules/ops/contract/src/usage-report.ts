@@ -45,7 +45,7 @@ export interface UsageField {
 }
 
 /** The version of this dictionary. */
-export const USAGE_REPORT_SCHEMA_VERSION = 5;
+export const USAGE_REPORT_SCHEMA_VERSION = 6;
 
 /** Every field, in the order the docs page lists them. */
 export const USAGE_FIELDS: readonly UsageField[] = [
@@ -396,6 +396,11 @@ export const USAGE_FIELDS: readonly UsageField[] = [
     source: "instant_eval_judgments, counted per organization and added up",
   }),
   ...lifetimeAndWindows({
+    key: "instant_eval_judged_results",
+    why: "How many results Instant Evals judged, one per question per judged text (recalls add no row).",
+    source: "eval_results rows with Status judged, counted per organization and added up",
+  }),
+  ...lifetimeAndWindows({
     key: "langy_turns",
     why: "How many questions Langy has answered, which says whether the assistant is used or only present.",
     source: "LangyConversationTurnProjection",
@@ -742,6 +747,9 @@ const usageReportBodySchemaDefinition = z.object({
   instant_eval_judgments: z.number().optional(),
   instant_eval_judgments_7d: z.number().optional(),
   instant_eval_judgments_28d: z.number().optional(),
+  instant_eval_judged_results: z.number().optional(),
+  instant_eval_judged_results_7d: z.number().optional(),
+  instant_eval_judged_results_28d: z.number().optional(),
   langy_turns: z.number().optional(),
   langy_turns_7d: z.number().optional(),
   langy_turns_28d: z.number().optional(),

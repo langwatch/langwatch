@@ -84,6 +84,13 @@ export type LangWatchQLJudgementAsked =
       options: readonly Readonly<{ name: string; description: string }>[];
     }>;
 
+/** The extraction an eval call judges, named with the kind of key it reads one trace by. */
+export type LangWatchQLJudgedText = Readonly<{
+  /** The extraction function, e.g. `llm_readable_trace`. */
+  function: string;
+  keyKind: "trace" | "span";
+}>;
+
 /**
  * One judged column of a statement: the question its call asks, plus how the
  * column reads the answer. Derived from the catalogue, so a caller never has
@@ -97,6 +104,11 @@ export type LangWatchQLJudgementCall = Readonly<{
   reads: LangWatchQLJudgementReading;
   /** Where a boolean call's probability becomes a pass. */
   threshold?: number;
+  /**
+   * The trace's or span's extraction the call judges, which ties its verdict to that trace
+   * (ADR-189). Absent for a thread's text or a literal one, which belong to no single trace.
+   */
+  judgedText?: LangWatchQLJudgedText;
 }> &
   LangWatchQLJudgementAsked;
 

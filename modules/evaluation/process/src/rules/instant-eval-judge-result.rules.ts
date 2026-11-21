@@ -10,6 +10,7 @@ import {
   type InstantEvalJudgeRefusalCode,
   type InstantEvalJudgeRouting,
   type InstantEvalJudgement,
+  type InstantEvalVerdict,
 } from "@langwatch/instant-eval-judge-contract";
 
 import {
@@ -56,6 +57,24 @@ export function instantEvalJudgeResult({
 }
 
 /**
+ * A monitor's kept verdict served again (ADR-189 section 5): today's shape, without a cost, since
+ * nothing was judged and nothing is billed.
+ */
+export function instantEvalRecalledResultOf({
+  judge,
+  verdict,
+}: {
+  judge: InstantEvalJudge;
+  verdict: InstantEvalVerdict;
+}): SingleEvaluationResult {
+  const recalled = { ...verdict, questionId: INSTANT_EVAL_JUDGE_QUESTION_ID };
+  return verdictResultOf({
+    judge,
+    judgement: { verdicts: [recalled], inputTokens: 0, isTextTruncated: false },
+  });
+}
+
+/**
  * A routed judgement names the product and how many questions escalated, never a route table
  * backend id; `answeredBy` stays on the judgement only (ADR-190 decision 10, amended).
  */
@@ -71,14 +90,15 @@ function verdictResultOf({
 }: {
   judge: InstantEvalJudge;
   judgement: InstantEvalJudgement;
-  priceUsd: number;
+  /** Absent for a recalled verdict, which costs nothing and records no cost row. */
+  priceUsd?: number | undefined;
 }): SingleEvaluationResult {
   if (judgement.skippedReason) return instantEvalSkipResultOf(judgement.skippedReason);
   const verdict = judgement.verdicts.find(
     ({ questionId }) => questionId === INSTANT_EVAL_JUDGE_QUESTION_ID,
   );
   if (!verdict) return instantEvalSkipResultOf("classifier_failed");
-  const cost = { currency: "USD", amount: priceUsd };
+  const cost = priceUsd === undefined ? {} : { cost: { currency: "USD", amount: priceUsd } };
 
   switch (judge.evaluatorType) {
     case "langevals/llm_boolean": {
@@ -92,7 +112,7 @@ function verdictResultOf({
         passed,
         score: passed ? 1 : 0,
         details: confidenceLine({ answer: String(passed), confidence }),
-        cost,
+        ...cost,
       };
     }
     case "langevals/llm_score": {
@@ -102,7 +122,7 @@ function verdictResultOf({
         status: "processed",
         score,
         details: `Instant Evals: ${roundForDetails(score)}`,
-        cost,
+        ...cost,
       };
     }
     case "langevals/llm_category": {
@@ -114,7 +134,7 @@ function verdictResultOf({
         status: "processed",
         label,
         details: confidenceLine({ answer: label, confidence }),
-        cost,
+        ...cost,
       };
     }
   }

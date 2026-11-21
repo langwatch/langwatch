@@ -46,6 +46,34 @@ export const INSTANT_EVAL_SELECTION_PARAMETER = "instant_eval_selection_ids";
 /** The flag that releases Instant Evals to a project. */
 export const INSTANT_EVALS_FLAG = "release_instant_evals";
 
+/** The flag that keeps a project's Instant Evals results and recalls them (ADR-189). */
+export const INSTANT_EVAL_RESULTS_FLAG = "release_instant_eval_results";
+
+/** The sources a trace's drawer shows a kept result from; a monitor's shows from its own runs. */
+export const INSTANT_EVAL_TRACE_RESULT_SOURCES = ["ask", "run", "dashboard"] as const;
+
+export type InstantEvalTraceResultSource = (typeof INSTANT_EVAL_TRACE_RESULT_SOURCES)[number];
+
+/**
+ * The longest trace window the drawer's results read spans from the trace's start, so no caller
+ * widens it past partition pruning; a longer trace shows what was kept within this of its start.
+ */
+export const INSTANT_EVAL_TRACE_RESULTS_MAX_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Who asked for a kept judgement (ADR-189): a provenance label only, which recall never reads. */
+export const INSTANT_EVAL_RESULT_SOURCES = [
+  ...INSTANT_EVAL_TRACE_RESULT_SOURCES,
+  "monitor",
+] as const;
+
+export type InstantEvalResultSource = (typeof INSTANT_EVAL_RESULT_SOURCES)[number];
+
+/**
+ * How long a monitor waits on eval_results for one recall or one write (ADR-189 section 5); past
+ * it, the monitor judges or moves on as it would without the table.
+ */
+export const EVAL_RESULTS_MONITOR_TIMEOUT_MS = 300;
+
 /** Whether a judgement was made, declined, or attempted and lost. */
 export const INSTANT_EVAL_JUDGMENT_STATUSES = ["judged", "skipped", "failed"] as const;
 

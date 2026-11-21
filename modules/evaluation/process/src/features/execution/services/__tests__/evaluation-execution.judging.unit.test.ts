@@ -11,6 +11,7 @@ import {
   type InstantEvalJudgeCall,
 } from "@langwatch/instant-eval-judge-contract";
 import type { DecisionModelResolution, ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -73,8 +74,9 @@ function buildService({
   const resolveDecisionModel = vi
     .fn<ModelProviderApi["resolveDecisionModel"]>()
     .mockResolvedValue(decisionModel);
-  const isRoutedSpy = vi.fn(async (_input: { projectId: string }) => isRouted);
-  const isHostedOffSpy = vi.fn(async (_input: { projectId: string }) => isHostedOff);
+  type FlagTarget = { projectId: string; organizationId: string | undefined };
+  const isRoutedSpy = vi.fn(async (_input: FlagTarget) => isRouted);
+  const isHostedOffSpy = vi.fn(async (_input: FlagTarget) => isHostedOff);
 
   const service = EvaluationExecutionService.create({
     runs: { findTraceEvaluations: async () => [] },
@@ -104,6 +106,8 @@ function buildService({
       resolveDecisionModel: resolveDecisionModel,
     }),
     judgeRouting: { isRouted: isRoutedSpy, isHostedOff: isHostedOffSpy },
+    monitorJudgments: { recall: async () => ({ kind: "not_kept" }), keep: async () => undefined },
+    projects: createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
     installEnvironment: {},
   });
 
@@ -488,7 +492,10 @@ describe("EvaluationExecutionService with the judge router", () => {
 
       await runBooleanJudge(service);
 
-      expect(isRouted).toHaveBeenCalledWith({ projectId: PROJECT_ID });
+      expect(isRouted).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        organizationId: "organization-1",
+      });
       expect(calls[0]?.route).toEqual({ job: "llm_judge" });
       expect(calls[0]?.decisionModel).toBeUndefined();
     });
@@ -549,7 +556,10 @@ describe("EvaluationExecutionService for an organization LangWatch switched its 
 
       expect(judge).not.toHaveBeenCalled();
       expect(isRouted).not.toHaveBeenCalled();
-      expect(isHostedOff).toHaveBeenCalledWith({ projectId: PROJECT_ID });
+      expect(isHostedOff).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        organizationId: "organization-1",
+      });
       expect(result.status).toBe("error");
       const error = result.status === "error" ? result.error : "";
       expect(error).toContain("classifier_not_configured");

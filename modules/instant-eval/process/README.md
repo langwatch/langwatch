@@ -1,6 +1,6 @@
 # @langwatch/instant-eval-process
 
-The server half of [instant-eval](../README.md). Instant evaluations: the opt-in, the estimate, and running or cancelling an instant evaluation over sampled data.
+The server half of [instant-eval](../README.md). Instant evaluations: the opt-in, the estimate, and running or cancelling an instant evaluation over sampled data. With `release_instant_eval_results` on, it keeps each trace-linked Instant Evals result (judged, failed or skipped) in ClickHouse `eval_results` and recalls a judged verdict before judging the same text again; that covers results from asks, runs, dashboards and monitors (the monitor write comes from [evaluation](../../evaluation/README.md)), and the trace drawer reads them ([ADR-189](../../../dev/docs/adr/189-instant-eval-result-storage.md)).
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`InstantEvalApi`)
 
-Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:98`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/instant-eval.api.ts:131`; nothing else in this package is public.
 
 #### `isEnabled`
 
@@ -148,12 +148,36 @@ Main's hosted-call recorder: a Connect licence's judgements, billed to the calli
 recordSpendForHostedCalls(input: { projectId: string; virtualKeyId: string; inputTokens: number; requests: number; costUsd: number; priceUsd: number; occurredAt: Instant; }): Promise<void>;
 ```
 
+#### `findResultsByTrace`
+
+A trace's kept results for its drawer (ADR-189 section 3): per span, question and judged column the latest judged verdict, else a failed or skipped one; never a monitor's, which shows from evaluation_runs. Empty without reading where `release_instant_eval_results` is off.
+
+```typescript
+findResultsByTrace(input: { projectId: string; traceId: string; /** The trace's time window, epoch milliseconds: what prunes the partitions. */ occurredFrom: number; occurredUntil: number; }): Promise<InstantEvalTraceResultWire[]>;
+```
+
 #### `countUsage`
 
-The usage report's figures (ADR-156, section 10).
+The usage report's figures (ADR-156, section 10), with the judge-call count read from `eval_results` (ADR-189).
 
 ```typescript
 countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<InstantEvalUsageCount>;
+```
+
+#### `findMonitorJudgments`
+
+A monitor's kept verdict for this trace, question, judge model and mapped texts (ADR-189 section 5), filed under the question asked: at most one. Empty on a miss, and without reading where `release_instant_eval_results` is off.
+
+```typescript
+findMonitorJudgments(input: InstantEvalMonitorJudgment): Promise<InstantEvalVerdict[]>;
+```
+
+#### `keepMonitorJudgment`
+
+Keeps what the judge answered a monitor, as `Source = monitor` and its id (ADR-189 section 5); writes nothing where `release_instant_eval_results` is off.
+
+```typescript
+keepMonitorJudgment(input: InstantEvalMonitorJudgment & { judgement: InstantEvalMonitorJudgementAnswer }): Promise<void>;
 ```
 
 ## REST transport
@@ -176,8 +200,8 @@ Permission `analytics:manage`. Declared at `src/transport/instant-eval.rest.ts:6
 Answers at `/api/v1/instant-evals`.
 
 ```typescript
-type Body = z.infer<typeof instantEvalRunInputSchema>; // ../contract/src/instant-eval.schemas.ts:237
-type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant-eval.schemas.ts:418
+type Body = z.infer<typeof instantEvalRunInputSchema>; // ../contract/src/instant-eval.schemas.ts:238
+type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant-eval.schemas.ts:419
 ```
 
 #### `POST /estimate` · `estimateInstantEvalRun`
@@ -189,8 +213,8 @@ Permission `analytics:manage`. Declared at `src/transport/instant-eval.rest.ts:8
 Answers at `/api/v1/instant-evals/estimate`.
 
 ```typescript
-type Body = z.infer<typeof instantEvalRunInputSchema>; // ../contract/src/instant-eval.schemas.ts:237
-// Response: instantEvalEstimateSchema, ../contract/src/instant-eval.schemas.ts:443
+type Body = z.infer<typeof instantEvalRunInputSchema>; // ../contract/src/instant-eval.schemas.ts:238
+// Response: instantEvalEstimateSchema, ../contract/src/instant-eval.schemas.ts:444
 interface Response {
   rows: number;
   isRowsCapped: boolean;
@@ -211,13 +235,13 @@ Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:105
 Answers at `/api/v1/instant-evals`.
 
 ```typescript
-// Query: instantEvalListQuerySchema, ../contract/src/instant-eval.schemas.ts:300
+// Query: instantEvalListQuerySchema, ../contract/src/instant-eval.schemas.ts:301
 interface Query {
   limit?: number;
   before?: string;
   beforeId?: string;
 }
-type Response = z.infer<typeof instantEvalRunListSchema>; // ../contract/src/instant-eval.schemas.ts:481
+type Response = z.infer<typeof instantEvalRunListSchema>; // ../contract/src/instant-eval.schemas.ts:482
 ```
 
 #### `GET /:id` · `getInstantEvalRun`
@@ -229,11 +253,11 @@ Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:122
 Answers at `/api/v1/instant-evals/:id`.
 
 ```typescript
-// Params: instantEvalIdParamsSchema, ../contract/src/instant-eval.schemas.ts:256
+// Params: instantEvalIdParamsSchema, ../contract/src/instant-eval.schemas.ts:257
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant-eval.schemas.ts:418
+type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant-eval.schemas.ts:419
 ```
 
 #### `POST /:id/cancel` · `cancelInstantEvalRun`
@@ -245,10 +269,10 @@ Permission `analytics:manage`. Declared at `src/transport/instant-eval.rest.ts:1
 Answers at `/api/v1/instant-evals/:id/cancel`.
 
 ```typescript
-type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:256
-// Body: cancelInstantEvalRunBodySchema, ../contract/src/instant-eval.schemas.ts:247
+type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:257
+// Body: cancelInstantEvalRunBodySchema, ../contract/src/instant-eval.schemas.ts:248
 type Body = Record<string, unknown>;
-type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant-eval.schemas.ts:418
+type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant-eval.schemas.ts:419
 ```
 
 #### `GET /:id/results` · `listInstantEvalRunResults`
@@ -260,8 +284,8 @@ Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:157
 Answers at `/api/v1/instant-evals/:id/results`.
 
 ```typescript
-type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:256
-// Query: instantEvalResultsQuerySchema, ../contract/src/instant-eval.schemas.ts:330
+type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:257
+// Query: instantEvalResultsQuerySchema, ../contract/src/instant-eval.schemas.ts:331
 interface Query {
   questionId?: string;
   matched?: "0" | "1" | "true" | "yes" | "false" | "no";
@@ -269,7 +293,7 @@ interface Query {
   limit?: number;
   cursor?: string;
 }
-type Response = z.infer<typeof instantEvalResultsSchema>; // ../contract/src/instant-eval.schemas.ts:494
+type Response = z.infer<typeof instantEvalResultsSchema>; // ../contract/src/instant-eval.schemas.ts:495
 ```
 
 #### `GET /:id/sample` · `sampleInstantEvalRun`
@@ -281,12 +305,12 @@ Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:180
 Answers at `/api/v1/instant-evals/:id/sample`.
 
 ```typescript
-type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:256
-// Query: instantEvalSampleQuerySchema, ../contract/src/instant-eval.schemas.ts:346
+type Params = z.infer<typeof instantEvalIdParamsSchema>; // ../contract/src/instant-eval.schemas.ts:257
+// Query: instantEvalSampleQuerySchema, ../contract/src/instant-eval.schemas.ts:347
 interface Query {
   n?: number;
 }
-type Response = z.infer<typeof instantEvalSampleSchema>; // ../contract/src/instant-eval.schemas.ts:505
+type Response = z.infer<typeof instantEvalSampleSchema>; // ../contract/src/instant-eval.schemas.ts:506
 ```
 
 ## tRPC transport
@@ -308,7 +332,7 @@ Contract `../contract/src/instant-eval.trpc.ts:20`, router `src/transport/instan
 ```typescript
 // instantEval.estimate
 type Input = z.infer<typeof explorerInstantEvalRunSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:39
-type Output = z.infer<typeof instantEvalEstimateSchema>; // ../contract/src/instant-eval.schemas.ts:443
+type Output = z.infer<typeof instantEvalEstimateSchema>; // ../contract/src/instant-eval.schemas.ts:444
 
 // instantEval.start
 type Input = z.infer<typeof explorerInstantEvalRunSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:39
@@ -343,11 +367,11 @@ type Output = z.infer<typeof explorerInstantEvalProgressSchema>; // ../contract/
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof instantEvalOptInAccessSchema>; // ../contract/src/instant-eval.schemas.ts:585
+type Output = z.infer<typeof instantEvalOptInAccessSchema>; // ../contract/src/instant-eval.schemas.ts:619
 
 // instantEval.enable
 type Input = z.infer<typeof explorerInstantEvalProjectSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:49
-type Output = z.infer<typeof instantEvalOptInAccessSchema>; // ../contract/src/instant-eval.schemas.ts:585
+type Output = z.infer<typeof instantEvalOptInAccessSchema>; // ../contract/src/instant-eval.schemas.ts:619
 
 // instantEval.classifySearch
 // Input: explorerSearchClassificationInputSchema, ../contract/src/instant-eval-explorer.schemas.ts:107

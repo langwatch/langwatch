@@ -92,6 +92,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       "evaluation_runs",
       "evaluation_analytics",
       "evaluation_analytics_rollup",
+      "eval_results",
       "langy_analytics_events",
       "dspy_steps",
     ];

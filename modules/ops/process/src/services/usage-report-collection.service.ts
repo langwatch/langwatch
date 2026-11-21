@@ -26,11 +26,18 @@ import type {
   StoredObjectApi,
   StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
-import { type Instant, Temporal } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import {
+  iso,
+  rung,
+  type Windowed,
+  windowed,
+  windowedWhereCounted,
+} from "../rules/usage-report-figures.rules.ts";
 import type { OpsHealthService } from "./ops-health.service.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -99,13 +106,6 @@ export interface UsageReportCollectInput {
   >;
   readonly switches?: UsageReportSwitches;
   readonly now: Instant;
-}
-
-/** One answer, taken lifetime and from each window's start (epoch ms). */
-interface Windowed<T> {
-  readonly lifetime: T;
-  readonly sevenDays: T;
-  readonly twentyEightDays: T;
 }
 
 interface Scope {
@@ -417,6 +417,12 @@ export class UsageReportCollectionService {
       ...windowed("spans", traces, (count) => count.spans),
       ...windowed("instant_eval_runs", instantEvals, (count) => count.runs),
       ...windowed("instant_eval_judgments", instantEvals, (count) => count.judgments),
+      // Instant-eval answers judged results only for organizations that keep their results.
+      ...windowedWhereCounted(
+        "instant_eval_judged_results",
+        instantEvals,
+        (count) => count.judgedResults,
+      ),
       ...windowed("coding_agent_sessions", codingAgents, (count) => count.sessions),
       ...windowed("gateway_requests", gateway, (count) => count.requests),
       ...windowed("gateway_spend_usd", gateway, (count) => count.spendUsd),
@@ -426,15 +432,6 @@ export class UsageReportCollectionService {
     };
   }
 }
-
-/** Where a lifetime total already had a name on the wire before the windows existed. */
-const LIFETIME_KEYS: Readonly<Record<string, string>> = {
-  traces: "totalTraces",
-  scenario_runs: "totalScenarioEvents",
-  batch_evaluations: "batchEvaluations",
-  dataset_records: "datasetRecords",
-  langy_active_users: "langy_users",
-};
 
 async function inWindows<T>(
   scope: Scope,
@@ -457,29 +454,4 @@ async function inWindowsInTurn<T>(
   const sevenDays = await read({ since: scope.sevenDays });
   const twentyEightDays = await read({ since: scope.twentyEightDays });
   return { lifetime, sevenDays, twentyEightDays };
-}
-
-/** One figure under its three dictionary keys. */
-function windowed<T>(
-  key: string,
-  answer: Windowed<T>,
-  pick: (count: T) => number,
-): Record<string, number> {
-  return {
-    [LIFETIME_KEYS[key] ?? key]: pick(answer.lifetime),
-    [`${key}_7d`]: pick(answer.sevenDays),
-    [`${key}_28d`]: pick(answer.twentyEightDays),
-  };
-}
-
-/** The wire's timestamp shape: ISO 8601 with milliseconds, as the report has always sent. */
-function iso(epochMilliseconds: number): string {
-  return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds).toString({
-    fractionalSecondDigits: 3,
-  });
-}
-
-/** A rung of getting started: the day it was reached, or null on the wire where it never was. */
-function rung(key: string, epochMilliseconds: number | undefined): Record<string, string | null> {
-  return { [key]: epochMilliseconds === undefined ? null : iso(epochMilliseconds) };
 }

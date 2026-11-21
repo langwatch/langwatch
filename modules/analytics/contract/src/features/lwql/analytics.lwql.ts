@@ -306,7 +306,10 @@ export type LangWatchQLRunContext = Readonly<{
   userId?: string;
   /** The caller's request, as main's query took it: a hang-up stops judging (eval-functions). */
   signal?: AbortSignal;
-  /** Who ran it, for its log line and metrics only; it never changes what the query reads. */
+  /**
+   * Who ran it, for its log line and metrics, and the widget its kept eval results name
+   * (ADR-189); it never changes what the query reads.
+   */
   telemetry?: LangWatchQLRunTelemetry;
 }>;
 

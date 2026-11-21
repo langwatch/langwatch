@@ -9,6 +9,7 @@ import {
   type InstantEvalJudgeApi,
   type InstantEvalJudgeCall,
 } from "@langwatch/instant-eval-judge-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
 import { vi } from "vitest";
@@ -16,6 +17,8 @@ import { vi } from "vitest";
 import { EvaluationExecutionIntentService } from "../../features/execution/services/evaluation-execution-intent.service.ts";
 import { EvaluationExecutionReceiptService } from "../../features/execution/services/evaluation-execution-receipt.service.ts";
 import { EvaluationExecutionService } from "../../features/execution/services/evaluation-execution.service.ts";
+import type { EvaluationJudgeRouting } from "../../features/execution/services/evaluation-judging.service.ts";
+import type { EvaluationMonitorJudgmentsService } from "../../features/execution/services/evaluation-monitor-judgments.service.ts";
 import {
   buildExecutionDeps,
   buildMonitor,
@@ -26,11 +29,25 @@ export const INSTANT_EVAL_MONITOR_PROJECT_ID = "project-evaluation-test";
 
 type Judge = InstantEvalJudgeApi["judge"];
 
-function traceOf(projectId: string): Trace {
+/** Every judge call judged as without kept results: no monitor verdict is recalled or kept. */
+const NOT_KEPT: Pick<EvaluationMonitorJudgmentsService, "recall" | "keep"> = {
+  recall: async () => ({ kind: "not_kept" }),
+  keep: async () => undefined,
+};
+
+function traceOf({
+  projectId,
+  traceId,
+  threadId,
+}: {
+  projectId: string;
+  traceId: string;
+  threadId?: string;
+}): Trace {
   return {
-    trace_id: "trace-evaluation-test",
+    trace_id: traceId,
     project_id: projectId,
-    metadata: {},
+    metadata: threadId === undefined ? {} : { thread_id: threadId },
     input: { value: "where is my order?" },
     output: { value: "it ships tomorrow" },
     timestamps: { started_at: 0, inserted_at: 0, updated_at: 0 },
@@ -39,8 +56,29 @@ function traceOf(projectId: string): Trace {
 }
 
 /** The monitor's command handler, the judge calls it made, and the cost rows it wrote. */
-export function buildInstantEvalMonitor({ judge }: { judge: Judge }) {
+export function buildInstantEvalMonitor({
+  judge,
+  monitorJudgments = NOT_KEPT,
+  judgeRouting = { isRouted: async () => false, isHostedOff: async () => false },
+  projects = createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
+  traceId = "trace-evaluation-test",
+  level = "trace",
+}: {
+  judge: Judge;
+  monitorJudgments?: Pick<EvaluationMonitorJudgmentsService, "recall" | "keep">;
+  judgeRouting?: EvaluationJudgeRouting;
+  projects?: Pick<ProjectApi, "findOrganizationId">;
+  traceId?: string;
+  /** A thread-level monitor reads its trace's thread, rendered as one conversation. */
+  level?: "trace" | "thread";
+}) {
   const calls: InstantEvalJudgeCall[] = [];
+  const traceRead = () =>
+    traceOf({
+      projectId: INSTANT_EVAL_MONITOR_PROJECT_ID,
+      traceId,
+      ...(level === "thread" ? { threadId: "thread-evaluation-test" } : {}),
+    });
   const execution = EvaluationExecutionService.create({
     runs: { findTraceEvaluations: async () => [] },
     authz: {
@@ -49,10 +87,13 @@ export function buildInstantEvalMonitor({ judge }: { judge: Judge }) {
       },
     },
     traces: {
-      readTracesWithSpans: vi.fn(async () => [traceOf(INSTANT_EVAL_MONITOR_PROJECT_ID)]),
-      readThreadsTraces: vi.fn(async () => []),
+      readTracesWithSpans: vi.fn(async () => [traceRead()]),
+      readThreadsTraces: vi.fn(async () => [traceRead()]),
     },
-    spanDigest: { format: vi.fn(async () => ""), formatThread: vi.fn(async () => "") },
+    spanDigest: {
+      format: vi.fn(async () => ""),
+      formatThread: vi.fn(async () => "user: where is my order?\nassistant: it ships tomorrow"),
+    },
     modelEnvResolver: {
       resolveForEvaluator: () => {
         throw new Error("a judge on Instant Evals looks up no model provider");
@@ -76,7 +117,9 @@ export function buildInstantEvalMonitor({ judge }: { judge: Judge }) {
       },
     },
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
-    judgeRouting: { isRouted: async () => false, isHostedOff: async () => false },
+    judgeRouting,
+    monitorJudgments,
+    projects,
     installEnvironment: {},
   });
   const costRecorder = new TestCostRecorder();
@@ -84,6 +127,7 @@ export function buildInstantEvalMonitor({ judge }: { judge: Judge }) {
     monitor: buildMonitor({
       checkType: "langevals/llm_boolean",
       parameters: { model: INSTANT_EVAL_JUDGE_MODEL_ID, prompt: "is the reply polite?" },
+      level,
     }),
   });
   const handler = EvaluationExecutionIntentService.create({

@@ -1269,6 +1269,123 @@
       ]
     },
     {
+      "name": "eval_results",
+      "engine": "ReplacingMergeTree",
+      "sortingKey": "TenantId, TraceId, SpanId, QuestionHash, JudgeModel, InputHash, JudgedColumn, SourceId, JudgedAt",
+      "columns": [
+        {
+          "name": "TenantId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "TraceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "SpanId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "QuestionHash",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "Question",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "Kind",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "JudgeModel",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "InputHash",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "JudgedColumn",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "KeyVersion",
+          "type": "UInt16",
+          "comment": ""
+        },
+        {
+          "name": "Source",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "SourceId",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "Status",
+          "type": "LowCardinality(String)",
+          "comment": ""
+        },
+        {
+          "name": "Score",
+          "type": "Nullable(Float64)",
+          "comment": ""
+        },
+        {
+          "name": "Label",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "Probability",
+          "type": "Nullable(Float64)",
+          "comment": ""
+        },
+        {
+          "name": "Probabilities",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "Error",
+          "type": "String",
+          "comment": ""
+        },
+        {
+          "name": "OccurredAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "JudgedAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "UpdatedAt",
+          "type": "DateTime64(3)",
+          "comment": ""
+        },
+        {
+          "name": "_retention_days",
+          "type": "UInt16",
+          "comment": ""
+        }
+      ]
+    },
+    {
       "name": "evaluation_analytics",
       "engine": "ReplacingMergeTree",
       "sortingKey": "TenantId, OccurredAt, EvaluationId",

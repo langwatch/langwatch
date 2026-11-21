@@ -23,6 +23,12 @@ import {
   type InstantEvalJudgementUnit,
 } from "../rules/instant-eval-judge-page.rules.ts";
 import type { InstantEvalRunQuestion } from "../rules/instant-eval-run-questions.rules.ts";
+import type {
+  EvalResultsJudgedUnit,
+  EvalResultsRecall,
+  EvalResultsRecallService,
+  EvalResultsSourceReference,
+} from "./eval-results-recall.service.ts";
 
 /**
  * Classifications one batch of rows keeps in flight. High enough that the judge's own token
@@ -50,25 +56,32 @@ export interface InstantEvalRowsJudgement {
   readonly cancellation?: { readonly unjudgedRows: readonly number[] };
 }
 
+/** Where a batch's kept results are recalled and written; absent, nothing is kept. */
+type InstantEvalKeptResults = Pick<EvalResultsRecallService, "recall" | "write">;
+
 export class InstantEvalJudgeRowsService {
   private constructor(
     private readonly judge: InstantEvalJudgeChannel,
     private readonly concurrency: number,
+    private readonly results: InstantEvalKeptResults | undefined,
   ) {}
 
   static create({
     judge,
     concurrency = INSTANT_EVAL_JUDGE_CONCURRENCY,
+    results,
   }: {
     judge: InstantEvalJudgeChannel;
     concurrency?: number;
+    /** Recalls before judging and keeps what was judged (ADR-189). */
+    results?: InstantEvalKeptResults;
   }): InstantEvalJudgeRowsService {
-    return new InstantEvalJudgeRowsService(judge, concurrency);
+    return new InstantEvalJudgeRowsService(judge, concurrency, results);
   }
 
   /**
-   * One request per text, at most {@link concurrency} in flight. `tokenBudget` caps the whole
-   * batch before anything is sent; absent, it is a page's (the judge's state per row).
+   * One request per text, at most {@link concurrency} in flight. `tokenBudget` caps what is left
+   * after recall before anything is sent; absent, it is a page's (the judge's state per row).
    */
   async judgeRows({
     projectId,
@@ -76,15 +89,23 @@ export class InstantEvalJudgeRowsService {
     questions,
     tokenBudget,
     signal,
+    source,
   }: {
     projectId: string;
     rows: readonly Record<string, unknown>[];
     questions: readonly InstantEvalRunQuestion[];
     tokenBudget?: number;
     signal: AbortSignal | null;
+    /** Who asked, which the kept rows name; absent, nothing is recalled or kept. */
+    source?: EvalResultsSourceReference;
   }): Promise<InstantEvalRowsJudgement> {
     const { limits } = this.judge;
-    const units = instantEvalJudgementUnits({ rows, questions, limits });
+    const asked = instantEvalJudgementUnits({ rows, questions, limits });
+    const recall =
+      this.results && source
+        ? await this.results.recall({ projectId, rows, units: asked })
+        : undefined;
+    const units = recall?.units ?? asked;
     assertInstantEvalPageBudget({
       units,
       budget: tokenBudget ?? instantEvalPageTokenBudget({ rows: rows.length, limits }),
@@ -100,20 +121,28 @@ export class InstantEvalJudgeRowsService {
       routedInputTokens: 0,
     };
     const cells = new Map<number, Map<string, InstantEvalVerdict | null>>();
+    const answered: EvalResultsJudgedUnit[] = [];
     const lost: unknown[] = [];
     const isCancelled = await inParallel({
       items: units,
       limit: this.concurrency,
       signal,
       run: async (unit) => {
-        const judgement = await this.#classify({ projectId, unit, signal, usage, lost });
-        record({ unit, judgement: judgement ?? LOST_JUDGEMENT, cells, usage });
+        const judgement =
+          (await this.#classify({ projectId, unit, signal, usage, lost })) ?? LOST_JUDGEMENT;
+        record({ unit, judgement, cells, usage });
+        answered.push({ unit, judgement });
       },
     });
     // Every unit failing is the judge not answering at all, and rows of nulls
     // would read as "nothing matched". One shared reason is thrown as itself.
-    if (lost.length > 0 && lost.length === units.length) {
+    // A recalled verdict is an answer, so a batch holding one is delivered.
+    const isRecalled = (recall?.recalled.length ?? 0) > 0;
+    if (lost.length > 0 && lost.length === units.length && !isRecalled) {
       throw getTotalLossError(lost);
+    }
+    if (recall && source) {
+      await this.#keep({ projectId, source, recall, answered, cells });
     }
 
     const judged = instantEvalJudgedRows({ rows, questions, cells });
@@ -123,6 +152,28 @@ export class InstantEvalJudgeRowsService {
       usage,
       ...(isCancelled ? { cancellation: { unjudgedRows: judged.unjudgedRows } } : {}),
     };
+  }
+
+  /** Files the recalled verdicts beside the judged ones, then keeps what was judged. */
+  async #keep({
+    projectId,
+    source,
+    recall,
+    answered,
+    cells,
+  }: {
+    projectId: string;
+    source: EvalResultsSourceReference;
+    recall: EvalResultsRecall;
+    answered: readonly EvalResultsJudgedUnit[];
+    cells: Map<number, Map<string, InstantEvalVerdict | null>>;
+  }): Promise<void> {
+    for (const { rowIndex, questionId, verdict } of recall.recalled) {
+      const row = cells.get(rowIndex) ?? new Map<string, InstantEvalVerdict | null>();
+      row.set(questionId, verdict);
+      cells.set(rowIndex, row);
+    }
+    await this.results?.write({ projectId, source, recall, judged: answered });
   }
 
   /**

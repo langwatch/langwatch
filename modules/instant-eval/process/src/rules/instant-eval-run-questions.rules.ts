@@ -5,6 +5,7 @@
  */
 
 import type {
+  LangWatchQLJudgedText,
   LangWatchQLJudgementCall,
   LangWatchQLJudgementReading,
 } from "@langwatch/analytics-contract";
@@ -34,6 +35,8 @@ export interface InstantEvalRunQuestion {
   readonly question: InstantEvalQuestion;
   /** Where a boolean question's probability becomes a pass. */
   readonly threshold?: number;
+  /** The trace's or span's text it judges; absent, its verdicts are not kept (ADR-189). */
+  readonly judgedText?: LangWatchQLJudgedText;
 }
 
 const questionKindSchema = z.enum(["boolean", "score", "category"]);
@@ -50,6 +53,9 @@ const instantEvalRunQuestionSchema = z.object({
   reads: z.enum(["probability", "passed", "score", "label", "probabilities"]),
   question: z.object({ id: z.string(), kind: questionKindSchema }).passthrough(),
   threshold: z.number().optional(),
+  judgedText: z
+    .object({ function: z.string().min(1), keyKind: z.enum(["trace", "span"]) })
+    .optional(),
 });
 
 const instantEvalRunQuestionsSchema = z.array(instantEvalRunQuestionSchema);
@@ -68,6 +74,7 @@ export function readInstantEvalRunQuestions(stored: unknown): readonly InstantEv
     reads: entry.reads,
     question: questionOf(entry),
     ...(entry.threshold === undefined ? {} : { threshold: entry.threshold }),
+    ...(entry.judgedText === undefined ? {} : { judgedText: entry.judgedText }),
   }));
 }
 
@@ -114,6 +121,7 @@ function runQuestionOf(call: LangWatchQLJudgementCall): InstantEvalRunQuestion {
     reads: call.reads,
     question: toInstantEvalQuestion(call),
     ...(call.threshold === undefined ? {} : { threshold: call.threshold }),
+    ...(call.judgedText === undefined ? {} : { judgedText: call.judgedText }),
   };
 }
 

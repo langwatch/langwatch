@@ -1,5 +1,6 @@
 import type { InstantEvalCancellationRepository } from "../instant-eval-cancellation.repository.ts";
 import type { InstantEvalRepositories } from "../instant-eval.repositories.ts";
+import { MemoryEvalResultsRepository } from "./memory.eval-results.repository.ts";
 import { MemoryInstantEvalBudgetReservationsRepository } from "./memory.instant-eval-budget-reservations.repository.ts";
 import { MemoryInstantEvalJudgmentsRepository } from "./memory.instant-eval-judgments.repository.ts";
 /**
@@ -35,6 +36,7 @@ export class MemoryInstantEvalRepositories {
     return {
       runs: MemoryInstantEvalRunRepository.create(),
       judgments: MemoryInstantEvalJudgmentsRepository.create(),
+      evalResults: MemoryEvalResultsRepository.create(),
       cancellations: MemoryInstantEvalCancellationRepository.create(),
       budgetReservations: MemoryInstantEvalBudgetReservationsRepository.create(),
     };

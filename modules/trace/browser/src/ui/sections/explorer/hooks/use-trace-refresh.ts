@@ -19,6 +19,7 @@ export function useTraceRefresh(traceId: string) {
         trpcUtils.traces.header.invalidate({ traceId }),
         trpcUtils.traces.spanTree.invalidate({ traceId }),
         trpcUtils.traces.evals.invalidate({ traceId }),
+        trpcUtils.traces.instantEvalResults.invalidate({ traceId }),
         // Refreshing inside the drawer should also bring the row in the
         // underlying table back in sync — without this, fields like
         // duration / cost / status that the projection just refreshed

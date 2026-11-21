@@ -21,8 +21,10 @@ import { useFocusSectionStore } from "../../../../../features/trace-drawer/behav
 import { useTraceEvaluations } from "../../../../../features/trace-drawer/behavior/use-trace-evaluations.ts";
 import { useTraceEvents } from "../../../../../features/trace-drawer/behavior/use-trace-events.ts";
 import { useTraceHeaderCanonical } from "../../../../../features/trace-drawer/behavior/use-trace-header.ts";
+import { useTraceInstantEvalResults } from "../../../../../features/trace-drawer/behavior/use-trace-instant-eval-results.ts";
 import { rankedErrorSpans } from "../../../../../model/explorer/error-spans.ts";
 import { countFlatLeaves } from "../../../../../model/explorer/trace-drawer/trace-accordions/utils.ts";
+import type { InstantEvalResultEntry } from "../../../../../model/instant-eval-trace-results.ts";
 import { changedTraceMetadataKeys } from "../../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
 import {
   EmptyHint,
@@ -41,7 +43,7 @@ import { CorrectedFieldFrame } from "../edit-mode/corrected-field.tsx";
 import { TraceEditableInput } from "../edit-mode/trace-editable-input.tsx";
 import { TraceEditableOutput } from "../edit-mode/trace-editable-output.tsx";
 import { useTraceMetadataEditing } from "../edit-mode/use-trace-metadata-editing.ts";
-import { EvalsList, RetryingEvalRow } from "../eval-cards/index.ts";
+import { EvalsList, InstantEvalResultRow, RetryingEvalRow } from "../eval-cards/index.ts";
 import { IOViewer } from "../io-viewer.tsx";
 import { PromptsPanel } from "../prompts-panel.tsx";
 import { AccordionShell, Section } from "./accordion-shell.tsx";
@@ -108,6 +110,9 @@ export function TraceSummaryAccordions({
     pendingCount,
     isLoading: evalsLoading,
   } = useTraceEvaluations();
+  // Instant Evals results kept on this trace (ADR-189), a section only with its flag on.
+  const instantEvals = useTraceInstantEvalResults({ trace });
+  const hasInstantEvalsContent = instantEvals.isShown && instantEvals.results.length > 0;
 
   // What has been said about the trace's own parts: a count on each section
   // header, and the comments each metadata row carries.
@@ -186,10 +191,19 @@ export function TraceSummaryAccordions({
         hasError,
         hasEvalsContent,
         hasEventsContent,
+        hasInstantEvalsContent,
         hasIO,
         showOther,
       }),
-    [hasIO, hasError, trace.containsPrompt, hasEvalsContent, hasEventsContent, showOther],
+    [
+      hasIO,
+      hasError,
+      trace.containsPrompt,
+      hasEvalsContent,
+      hasEventsContent,
+      hasInstantEvalsContent,
+      showOther,
+    ],
   );
 
   // Auto-open Metadata only when the trace has its own attributes — when
@@ -203,6 +217,7 @@ export function TraceSummaryAccordions({
     attributes: hasTraceAttributes,
     scope: hasScope,
     evals: hasEvalsContent,
+    instantEvals: hasInstantEvalsContent,
     events: hasEventsContent,
     other: showOther,
   });
@@ -253,6 +268,7 @@ export function TraceSummaryAccordions({
             hasTraceAttributes,
             id,
             inputCorrected,
+            instantEvalResults: instantEvals.results,
             isEditing,
             isFirst: idx === 0,
             isOpen: openSections.includes(id),
@@ -408,6 +424,7 @@ interface TraceSectionContext {
   hasTraceAttributes: boolean;
   id: string;
   inputCorrected: boolean;
+  instantEvalResults: InstantEvalResultEntry[];
   outputCorrected: boolean;
   isEditing: boolean;
   isFirst: boolean;
@@ -436,6 +453,7 @@ function traceSectionElement(ctx: TraceSectionContext): ReactNode {
   if (ctx.id === "scope") return scopeTraceSection(ctx);
   if (ctx.id === "exceptions") return exceptionsTraceSection(ctx);
   if (ctx.id === "evals") return evalsTraceSection(ctx);
+  if (ctx.id === "instantEvals") return instantEvalsTraceSection(ctx);
   if (ctx.id === "other") return otherTraceSection(ctx);
   return eventsTraceSection(ctx);
 }
@@ -635,6 +653,42 @@ function evalsTraceSection(ctx: TraceSectionContext): ReactNode {
   );
 }
 
+/** The trace's kept Instant Evals results, each labelled with who asked, its judge and when. */
+function instantEvalsTraceSection(ctx: TraceSectionContext): ReactNode {
+  return (
+    <Section
+      key="instantEvals"
+      value="instantEvals"
+      title="Instant Evals"
+      count={ctx.instantEvalResults.length}
+      isFirst={ctx.isFirst}
+      open={ctx.isOpen}
+    >
+      <VStack align="stretch" gap={3}>
+        {ctx.instantEvalResults.map((result) => (
+          <InstantEvalResultRow
+            key={result.key}
+            result={result}
+            spanName={spanNameOf({ spans: ctx.spans, spanId: result.spanId })}
+            onSelectSpan={ctx.onSelectSpan}
+          />
+        ))}
+      </VStack>
+    </Section>
+  );
+}
+
+/** The name of the span a result was read from, when the drawer holds that span. */
+function spanNameOf({
+  spans,
+  spanId,
+}: {
+  spans: SpanTreeNode[];
+  spanId: string | undefined;
+}): string | undefined {
+  return spanId ? spans.find((span) => span.spanId === spanId)?.name : undefined;
+}
+
 /** Signals that settled with nothing, as compact cards rather than empty sections. */
 function otherTraceSection(ctx: TraceSectionContext): ReactNode {
   // Empty evals / events / prompts share this one section as a row
@@ -737,12 +791,24 @@ function emptySignalCards({
   return cards;
 }
 
+type TraceSectionId =
+  | "io"
+  | "prompts"
+  | "attributes"
+  | "scope"
+  | "evals"
+  | "instantEvals"
+  | "events"
+  | "exceptions"
+  | "other";
+
 /** The sections the trace summary shows, in the order the stack renders them. */
 function traceSectionIds({
   containsPrompt,
   hasError,
   hasEvalsContent,
   hasEventsContent,
+  hasInstantEvalsContent,
   hasIO,
   showOther,
 }: {
@@ -750,19 +816,11 @@ function traceSectionIds({
   hasError: boolean;
   hasEvalsContent: boolean;
   hasEventsContent: boolean;
+  hasInstantEvalsContent: boolean;
   hasIO: boolean;
   showOther: boolean;
-}): ("io" | "prompts" | "attributes" | "scope" | "evals" | "events" | "exceptions" | "other")[] {
-  const list: (
-    | "io"
-    | "prompts"
-    | "attributes"
-    | "scope"
-    | "evals"
-    | "events"
-    | "exceptions"
-    | "other"
-  )[] = [];
+}): TraceSectionId[] {
+  const list: TraceSectionId[] = [];
   if (hasError && !hasIO) list.push("exceptions");
   list.push("io");
   if (hasError && hasIO) list.push("exceptions");
@@ -778,6 +836,7 @@ function traceSectionIds({
   // card; while a query is still loading the signal is simply absent, so it
   // never flashes a full-width empty state on the way to becoming a card.
   if (hasEvalsContent) list.push("evals");
+  if (hasInstantEvalsContent) list.push("instantEvals");
   if (hasEventsContent) list.push("events");
   if (showOther) list.push("other");
   return list;
