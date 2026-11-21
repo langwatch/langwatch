@@ -61,6 +61,9 @@ class FakeBudgetRepository extends GatewayBudgetRepository {
   findDetailById(): never {
     throw new Error("not used");
   }
+  getScopeOwnership(): never {
+    throw new Error("not used");
+  }
   findScopeReachCandidates(): never {
     throw new Error("not used");
   }

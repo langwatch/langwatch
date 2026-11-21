@@ -43,6 +43,7 @@ import {
   type BudgetHealth,
   type BudgetListWithHealth,
   type BudgetPageWithHealth,
+  type BudgetScopeOwnership,
   type CreateBudgetInput,
   type GatewayBudgetCheckReadInput,
   type GatewayBudgetReadInput,
@@ -311,6 +312,19 @@ export class MemoryGatewayBudgetRepository extends GatewayBudgetRepository {
     if (!stored || stored.archivedAt !== null) return null;
     const { budgets, spendAvailable, readAt } = await this.#withSpend([stored], input);
     return { budget: budgets[0] ?? stored, spendAvailable, readAt, unreachableByAnyKey: false };
+  }
+
+  async getScopeOwnership(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<BudgetScopeOwnership> {
+    const budget = this.#stored(input);
+    if (!budget) throw new GatewayBudgetNotFoundError();
+    return {
+      scopeType: budget.scopeType,
+      scopeId: budget.scopeId,
+      scopeKeyOwner: budget.scopeType === "VIRTUAL_KEY" ? this.#ownerOf(budget.scopeId) : null,
+    };
   }
 
   async findDetailById(input: GatewayBudgetReadInput): Promise<BudgetDetail | null> {

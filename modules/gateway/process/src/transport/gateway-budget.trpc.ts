@@ -194,6 +194,8 @@ export const gatewayBudgetTrpcTransport: TrpcRouterDeclaration<
   .procedure("update")
   .withPermission("gatewayBudgets:update")
   .handle(async ({ app, input, actor }) => {
+    const reader = { kind: "member", userId: actor.id } as const;
+    await app.assertBudgetOpensFor({ id: input.id, organizationId: input.organizationId, reader });
     const row = await app.updateBudget({ ...input, actorUserId: actor.id });
 
     return toDto(row);
@@ -202,6 +204,8 @@ export const gatewayBudgetTrpcTransport: TrpcRouterDeclaration<
   .procedure("archive")
   .withPermission("gatewayBudgets:delete")
   .handle(async ({ app, input, actor }) => {
+    const reader = { kind: "member", userId: actor.id } as const;
+    await app.assertBudgetOpensFor({ id: input.id, organizationId: input.organizationId, reader });
     const row = await app.archiveBudget({ ...input, actorUserId: actor.id });
 
     return toDto(row);

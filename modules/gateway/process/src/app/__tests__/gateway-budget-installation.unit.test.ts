@@ -123,7 +123,7 @@ describe("gateway budget installation", () => {
         await expect(run(null)).resolves.toEqual({ afterId: null, marked: 0 });
         await expect(run({ afterId: "vk_last", marked: 3 })).resolves.toEqual({
           afterId: "vk_last",
-          marked: 0,
+          marked: 3,
         });
         expect(saved).toEqual([]);
       } finally {

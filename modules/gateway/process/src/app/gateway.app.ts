@@ -120,6 +120,7 @@ import {
   type GatewayGuardrailResource,
   type GatewayBudgetResource,
   type GatewayBudgetDetail,
+  type GatewayBudgetReader,
   type GatewayBudgetScopeTarget,
   type GatewayCacheRuleResource,
   type GatewayBudgetScopeReachResult,
@@ -873,6 +874,7 @@ function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayContro
     budgetLedgerVisibility: GatewayBudgetLedgerVisibilityService.create({
       permissions,
       users: options.users,
+      budgets: repositories.budgets,
     }),
     budgetSpend,
     changeEvents: changes,
@@ -2019,9 +2021,17 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     if (!detail) throw new GatewayBudgetNotFoundError();
     return this.#dependencies.budgetLedgerVisibility.detailFor({
       organizationId,
-      actorUserId,
+      reader: { kind: "member", userId: actorUserId },
       detail,
     });
+  }
+
+  assertBudgetOpensFor(input: {
+    id: string;
+    organizationId: string;
+    reader: GatewayBudgetReader;
+  }): Promise<void> {
+    return this.#dependencies.budgetLedgerVisibility.assertOpens(input);
   }
 
   createBudget(input: CreateGatewayBudgetInput): Promise<GatewayBudgetResource> {

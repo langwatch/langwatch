@@ -211,6 +211,8 @@ async function gatewayFor({
 
   return {
     open: (id = BUDGET_ID) => procedures.get({ id, organizationId: ORG_ID }),
+    rename: (id = BUDGET_ID) => procedures.update({ id, organizationId: ORG_ID, name: "renamed" }),
+    archive: (id = BUDGET_ID) => procedures.archive({ id, organizationId: ORG_ID }),
     asked,
     lookedUp: () => sorted(channels.users.asked),
   };
@@ -251,19 +253,19 @@ describe("gatewayBudgets.get, the recent ledger of a budget", () => {
     const keys = ["vk_shared", "vk_personal"] as const;
 
     /** @scenario "Personal-key usage on a budget's detail is visible only to its owner and to those allowed to see other members' personal keys" */
-    it("shows the key's owner both rows, without asking for any permission", async () => {
-      const { shown, asked } = await detailFor({ caller: "usr_owner", keys });
+    it("shows the key's owner both rows", async () => {
+      const { shown } = await detailFor({ caller: "usr_owner", keys });
 
       expect(shown).toEqual(["vk_personal", "vk_shared"]);
-      expect(asked).toEqual([]);
     });
 
     /** @scenario "Personal-key usage on a budget's detail is visible only to its owner and to those allowed to see other members' personal keys" */
-    it("shows an organization admin both rows", async () => {
-      const { shown, asked } = await detailFor({ caller: "usr_admin", keys });
+    it("shows an organization admin both rows, without looking up any creator's account", async () => {
+      const { shown, asked, lookedUp } = await detailFor({ caller: "usr_admin", keys });
 
       expect(shown).toEqual(["vk_personal", "vk_shared"]);
       expect(asked).toEqual(["virtualKeys:viewOtherPersonal"]);
+      expect(lookedUp).toEqual([]);
     });
 
     /** @scenario "Personal-key usage on a budget's detail is visible only to its owner and to those allowed to see other members' personal keys" */
@@ -344,7 +346,7 @@ describe("gatewayBudgets.get, the recent ledger of a budget", () => {
     it("fails the read rather than counting the account as gone", async () => {
       const outage = new Error("the user module did not answer");
       const gateway = await gatewayFor({
-        caller: "usr_admin",
+        caller: "usr_member",
         debits: debitsThrough({ key: "vk_orphaned" }),
         lookupOutage: outage,
       });
@@ -360,19 +362,15 @@ describe("gatewayBudgets.get, the recent ledger of a budget", () => {
   describe("given a row through a key a project credential created", () => {
     /** @scenario "A key a machine created never counts as personal on a budget's detail" */
     it("shows it to a member without looking up an account for its creator", async () => {
-      const { shown, lookedUp, asked } = await detailFor({
-        caller: "usr_member",
-        keys: ["vk_machine"],
-      });
+      const { shown, lookedUp } = await detailFor({ caller: "usr_member", keys: ["vk_machine"] });
 
       expect(shown).toEqual(["vk_machine"]);
       expect(lookedUp).toEqual([]);
-      expect(asked).toEqual([]);
     });
   });
 });
 
-describe("gatewayBudgets.get, a budget scoped to one person", () => {
+describe("gatewayBudgets get, update and archive, a budget scoped to one person", () => {
   const personalBudgets = [
     ["one member", budgetScopedTo({ scopeType: "PRINCIPAL", scopeId: "usr_owner" })],
     ["a personal key", budgetScopedTo({ scopeType: "VIRTUAL_KEY", scopeId: "vk_personal" })],
@@ -403,6 +401,26 @@ describe("gatewayBudgets.get, a budget scoped to one person", () => {
         expect(refused).not.toBeNull();
         expect(refused).toEqual(await refusalOf(gateway.open("bdg_unknown")));
       });
+
+      /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
+      it("answers a viewer's edit and archive exactly as for a budget that does not exist", async () => {
+        const gateway = await gatewayFor({ caller: "usr_viewer", budget });
+
+        const renamed = await refusalOf(gateway.rename());
+        const archived = await refusalOf(gateway.archive());
+
+        expect(renamed).not.toBeNull();
+        expect(renamed).toEqual(await refusalOf(gateway.rename("bdg_unknown")));
+        expect(archived).toEqual(await refusalOf(gateway.archive("bdg_unknown")));
+      });
+
+      /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
+      it("lets its owner edit and archive it", async () => {
+        const gateway = await gatewayFor({ caller: "usr_owner", budget });
+
+        expect(await gateway.rename()).toMatchObject({ id: BUDGET_ID, name: "renamed" });
+        expect((await gateway.archive()).archivedAt).not.toBeNull();
+      });
     });
   }
 
@@ -410,6 +428,16 @@ describe("gatewayBudgets.get, a budget scoped to one person", () => {
     /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
     it("opens for a viewer", async () => {
       const budget = budgetScopedTo({ scopeType: "VIRTUAL_KEY", scopeId: "vk_shared" });
+      const opened = await (await gatewayFor({ caller: "usr_viewer", budget })).open();
+
+      expect(opened.id).toBe(BUDGET_ID);
+    });
+  });
+
+  describe("given a budget capping each end user of a shared key", () => {
+    /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
+    it("opens for a viewer, since a key's end users are not members", async () => {
+      const budget = budgetScopedTo({ scopeType: "ATTRIBUTED_USER", scopeId: "vk_shared" });
       const opened = await (await gatewayFor({ caller: "usr_viewer", budget })).open();
 
       expect(opened.id).toBe(BUDGET_ID);

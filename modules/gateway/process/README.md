@@ -137,10 +137,18 @@ listBudgetScopeTargets(budgets: { scopeType: string; scopeId: string }[], organi
 
 #### `getBudgetDetail`
 
-The budget's detail as `actorUserId` may see it. A budget scoped to one person or to a personal key, and personal-key ledger rows, are for that person and holders of `virtualKeys:viewOtherPersonal`. Throws the handled 404 when there is no such budget for them.
+The budget's detail as `actorUserId` may see it: opened as `assertBudgetOpensFor` does, with personal-key ledger rows under the same rule. Throws the handled 404 otherwise.
 
 ```typescript
 getBudgetDetail(input: { id: string; organizationId: string; actorUserId: string; }): Promise<GatewayBudgetDetail>;
+```
+
+#### `assertBudgetOpensFor`
+
+Throws the handled 404 for a budget scoped to one member or to a personal key, unless the reader is that member or holds `virtualKeys:viewOtherPersonal` at the organization.
+
+```typescript
+assertBudgetOpensFor(input: { id: string; organizationId: string; reader: GatewayBudgetReader; }): Promise<void>;
 ```
 
 #### `createBudget`

@@ -129,8 +129,9 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       And budgets scoped to the organization, to a shared key, to a personal key, to one member and to each end user
       When anyone queries gateway_budget_ledgers or gateway_budgets, admins and the key's owner included
       Then they see the shared key's ledger rows and the organization and shared-key budgets
-      And no ledger row of the personal key and no budget scoped to a person or a personal key appears
-      And gateway_budget_bucket_boundaries holds no boundary of a per-end-user budget
+      And they see each end user's budget and its spend, since a key's end users are not members
+      And no ledger row of the personal key and no budget scoped to a member or a personal key appears
+      And gateway_budget_bucket_boundaries holds the boundaries of per-end-user budgets too
 
     @unit @integration
     Scenario: A key with no owner whose creator's account is gone counts as personal, unless a machine created it

@@ -280,7 +280,7 @@ describe("given the derived Postgres catalog's overrides", () => {
         `NOT EXISTS (\n` +
           `  SELECT 1 FROM "public"."GatewayBudget" AS "b"\n` +
           `  WHERE "b"."id" = "m"."budgetId"\n` +
-          `    AND "b"."scopeType" IN ('PRINCIPAL', 'ATTRIBUTED_USER')\n` +
+          `    AND "b"."scopeType" IN ('PRINCIPAL')\n` +
           `)`,
       );
     });
@@ -288,23 +288,24 @@ describe("given the derived Postgres catalog's overrides", () => {
     /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
     it("leaves budgets scoped to one person or to a personal key out, for every caller", () => {
       expect(statementOf("GatewayBudget")).toContain(
-        `\nWHERE ("m"."scopeType" NOT IN ('PRINCIPAL', 'ATTRIBUTED_USER') AND ` +
+        `\nWHERE ("m"."scopeType" NOT IN ('PRINCIPAL') AND ` +
           `("m"."scopeType" <> 'VIRTUAL_KEY' OR NOT ${personalKeyOf(`"m"."scopeId"`)}))`,
       );
     });
 
     /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
-    it("leaves the bucket boundaries of a per-end-user budget out, for every caller", () => {
+    it("keeps per-end-user budgets and their spend, whose end users are not members", () => {
+      for (const baseRelation of ["GatewayBudget", "GatewayBudgetLedger"]) {
+        expect(statementOf(baseRelation), baseRelation).not.toContain("'ATTRIBUTED_USER'");
+      }
+    });
+
+    /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
+    it("shows the bucket boundaries of every budget, per-end-user ones included", () => {
       const statement = statementOf("GatewayBudgetBucketBoundary");
 
-      expect(statement).toContain(
-        `\nWHERE (NOT EXISTS (\n` +
-          `  SELECT 1 FROM "public"."GatewayBudget" AS "b"\n` +
-          `  WHERE "b"."id" = "m"."budgetId"\n` +
-          `    AND "b"."scopeType" IN ('ATTRIBUTED_USER')\n` +
-          `))`,
-      );
-      expect(statement).not.toContain("'PRINCIPAL'");
+      expect(statement).not.toContain(`"GatewayBudget" AS "b"`);
+      expect(statement).not.toContain("'ATTRIBUTED_USER'");
     });
 
     /** @scenario "A key with no owner whose creator's account is gone counts as personal, unless a machine created it" */

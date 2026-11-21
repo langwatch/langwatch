@@ -46,6 +46,8 @@ import {
   type GatewayVirtualKeySnakeDto,
   type GatewayVirtualKeyScope,
   type GatewayBudgetScope,
+  type GatewayBudgetReader,
+  type GatewayKeyCaller,
   type VirtualKeyBudgetInput,
 } from "@langwatch/gateway-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
@@ -250,6 +252,13 @@ async function liveBudgetAnswer({
       ...(includeReach ? { reachable: !found.unreachableByAnyKey } : {}),
     }),
   };
+}
+
+/** A key caller as a budget reader: an API key acts for its user, a project key for no one. */
+function budgetReaderOf(caller: GatewayKeyCaller): GatewayBudgetReader {
+  return caller.kind === "apiKey"
+    ? { kind: "apiKey", apiKeyId: caller.apiKeyId, userId: caller.userId }
+    : { kind: "projectKey" };
 }
 
 function scopeFromWire(
@@ -686,6 +695,8 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId } = await app.getKeyCaller({ caller });
+    const reader = budgetReaderOf(caller);
+    await app.assertBudgetOpensFor({ id: input.id, organizationId, reader });
     return liveBudgetAnswer({ app, id: input.id, organizationId });
   })
 
@@ -753,6 +764,8 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
+    const reader = budgetReaderOf(caller);
+    await app.assertBudgetOpensFor({ id: input.id, organizationId, reader });
     const row = await app.updateBudget({
       id: input.id,
       organizationId,
@@ -785,6 +798,8 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
+    const reader = budgetReaderOf(caller);
+    await app.assertBudgetOpensFor({ id: input.id, organizationId, reader });
     const row = await app.archiveBudget({ id: input.id, organizationId, actorUserId });
     return { budget: toBudgetDto({ budget: row }) };
   })
@@ -807,6 +822,8 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
+    const reader = budgetReaderOf(caller);
+    await app.assertBudgetOpensFor({ id: input.id, organizationId, reader });
     const row = await app.resetBudget({
       id: input.id,
       organizationId,

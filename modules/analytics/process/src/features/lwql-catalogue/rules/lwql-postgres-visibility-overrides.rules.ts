@@ -74,11 +74,14 @@ const isPersonalKey = (keyColumn: string) =>
   `    )\n` +
   `)`;
 
-/** One member's budget, or each end user's: never a shared figure. */
-const PERSON_SCOPES = `('PRINCIPAL', 'ATTRIBUTED_USER')`;
+/**
+ * One member's budget. An ATTRIBUTED_USER budget caps each end user of a key or project, people
+ * who are not members (specs/ai-gateway/end-user-attribution.feature), so it stays shared.
+ */
+const MEMBER_SCOPES = `('PRINCIPAL')`;
 
 const NOT_A_PERSONAL_BUDGET =
-  `"m"."scopeType" NOT IN ${PERSON_SCOPES} AND ` +
+  `"m"."scopeType" NOT IN ${MEMBER_SCOPES} AND ` +
   `("m"."scopeType" <> 'VIRTUAL_KEY' OR NOT ${isPersonalKey(`"m"."scopeId"`)})`;
 
 /** The row's budget (`budgetId`) is not one of `scopes`. */
@@ -98,15 +101,10 @@ export const VISIBILITY_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverri
     rowFilter: NOT_A_PERSONAL_BUDGET,
     rowFilterNote: " Budgets scoped to one person or to a personal key are not queryable.",
   },
-  // Only an ATTRIBUTED_USER budget keeps per-person boundaries (one per end user it has seen).
-  GatewayBudgetBucketBoundary: {
-    rowFilter: notOnBudgetScopedTo(`('ATTRIBUTED_USER')`),
-    rowFilterNote: " Boundaries of per-end-user budgets are not queryable.",
-  },
   GatewayBudgetLedger: {
     rowFilter: allOf(
       `NOT ${isPersonalKey(`"m"."virtualKeyId"`)}`,
-      notOnBudgetScopedTo(PERSON_SCOPES),
+      notOnBudgetScopedTo(MEMBER_SCOPES),
     ),
     rowFilterNote:
       " Spend through a personal key, or against a budget scoped to one person, is not queryable.",

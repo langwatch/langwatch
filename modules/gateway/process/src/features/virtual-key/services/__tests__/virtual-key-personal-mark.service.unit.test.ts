@@ -28,11 +28,11 @@ async function storeBeforeTheMark() {
   store.mintedAsPersonal.clear();
   const saved: VirtualKeyPersonalMarkReport[] = [];
   const service = VirtualKeyPersonalMarkService.create({ virtualKeys });
-  const run = (input: { dryRun?: boolean; afterId?: string }) =>
+  const run = (input: { dryRun?: boolean; resumeFrom?: VirtualKeyPersonalMarkReport }) =>
     service.markPersonalKeys({
       dryRun: input.dryRun ?? false,
       signal: new AbortController().signal,
-      afterId: input.afterId ?? null,
+      resumeFrom: input.resumeFrom ?? null,
       onPageDone: async (report) => {
         saved.push(report);
       },
@@ -76,12 +76,14 @@ describe("the personal-key mark step", () => {
     });
 
     /** @scenario "Keys minted for a person before the mark existed are marked by a background step" */
-    it("resumes after the key its checkpoint names", async () => {
-      const { store, run } = await storeBeforeTheMark();
+    it("resumes after the key its checkpoint names, counting on from the total it saved", async () => {
+      const { store, saved, run } = await storeBeforeTheMark();
 
-      await run({ afterId: "vk_a" });
+      const report = await run({ resumeFrom: { afterId: "vk_a", marked: 1 } });
 
       expect([...store.mintedAsPersonal]).toEqual(["vk_b"]);
+      expect(report).toEqual({ afterId: "vk_b", marked: 2 });
+      expect(saved).toEqual([{ afterId: "vk_b", marked: 2 }]);
     });
   });
 });

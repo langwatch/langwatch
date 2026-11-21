@@ -89,4 +89,23 @@ describe.skipIf(!databaseUrl)("the personal-key mark queries against real Postgr
       expect(await markedIds()).toEqual([KEYS.first, KEYS.second]);
     });
   });
+
+  describe("given an unmarked key edited before the mark", () => {
+    /** @scenario "Keys minted for a person before the mark existed are marked by a background step" */
+    it("marks it and leaves its last edit time as it was", async () => {
+      const id = `${PREFIX}d`;
+      await seedKey({ id, principalUserId: USER_ID });
+      const editedAt = async () => {
+        const key = await prisma.virtualKey.findFirstOrThrow({
+          where: { id, organizationId: ORG_ID },
+          select: { updatedAt: true },
+        });
+        return key.updatedAt.toISOString();
+      };
+      const before = await editedAt();
+
+      expect(await repository().markMintedAsPersonal({ ids: [id] })).toBe(1);
+      expect(await editedAt()).toBe(before);
+    });
+  });
 });

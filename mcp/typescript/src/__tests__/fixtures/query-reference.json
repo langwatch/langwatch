@@ -11844,7 +11844,7 @@
         },
         {
           "name": "analytics.gateway_budget_bucket_boundaries",
-          "description": "Rows of the GatewayBudgetBucketBoundary table, one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project. Boundaries of per-end-user budgets are not queryable.",
+          "description": "Rows of the GatewayBudgetBucketBoundary table, one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project",
           "joinKeys": [
             "TenantId",

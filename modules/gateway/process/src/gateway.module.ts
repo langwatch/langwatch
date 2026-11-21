@@ -26,7 +26,10 @@ import {
   GatewayBudgetChangeDedupeService,
   type BudgetChangeEventDedupeService,
 } from "./features/budget/services/gateway-budget-change-dedupe.service.ts";
-import { VirtualKeyPersonalMarkService } from "./features/virtual-key/services/virtual-key-personal-mark.service.ts";
+import {
+  VirtualKeyPersonalMarkService,
+  virtualKeyPersonalMarkReportSchema,
+} from "./features/virtual-key/services/virtual-key-personal-mark.service.ts";
 import { GATEWAY_ID_INDEXES } from "./repositories/clickhouse/clickhouse.gateway-id-indexes.database.ts";
 import { gatewayRepositories } from "./repositories/gateway-repositories.registry.ts";
 import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
@@ -83,13 +86,13 @@ export const gatewayProcessModule: PublishedProcessModule<
       // An older image still serving mints personal keys without the mark.
       needsOldWritersGone: true,
       run: async ({ checkpoint, dryRun, signal }) => {
-        const resumed = checkpoint.resumeFrom?.afterId;
+        const resumed = virtualKeyPersonalMarkReportSchema.safeParse(checkpoint.resumeFrom);
         return VirtualKeyPersonalMarkService.create({
           virtualKeys: repositories.virtualKeys,
         }).markPersonalKeys({
           dryRun,
           signal,
-          afterId: typeof resumed === "string" ? resumed : null,
+          resumeFrom: resumed.success ? resumed.data : null,
           onPageDone: (report) => checkpoint.save({ report }),
         });
       },

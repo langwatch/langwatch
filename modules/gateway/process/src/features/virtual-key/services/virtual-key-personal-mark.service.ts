@@ -1,10 +1,13 @@
+import { z } from "zod";
+
 import type { GatewayVirtualKeyRepository } from "../../../repositories/gateway-virtual-key.repository.ts";
 
-/** What one pass did; the ledger keeps it. A count and a key id, never a person. */
-export type VirtualKeyPersonalMarkReport = {
-  afterId: string | null;
-  marked: number;
-};
+/** What the step has done so far; the ledger keeps it. A count and a key id, never a person. */
+export const virtualKeyPersonalMarkReportSchema = z.object({
+  afterId: z.string().nullable(),
+  marked: z.number(),
+});
+export type VirtualKeyPersonalMarkReport = z.infer<typeof virtualKeyPersonalMarkReportSchema>;
 
 type PersonalMarkStore = Pick<
   GatewayVirtualKeyRepository,
@@ -33,15 +36,18 @@ export class VirtualKeyPersonalMarkService {
   async markPersonalKeys({
     dryRun,
     signal,
-    afterId,
+    resumeFrom,
     onPageDone,
   }: {
     dryRun: boolean;
     signal: AbortSignal;
-    afterId: string | null;
+    resumeFrom: VirtualKeyPersonalMarkReport | null;
     onPageDone: (report: VirtualKeyPersonalMarkReport) => Promise<void>;
   }): Promise<VirtualKeyPersonalMarkReport> {
-    const report: VirtualKeyPersonalMarkReport = { afterId, marked: 0 };
+    const report: VirtualKeyPersonalMarkReport = {
+      afterId: resumeFrom?.afterId ?? null,
+      marked: resumeFrom?.marked ?? 0,
+    };
     while (!signal.aborted) {
       const ids = await this.virtualKeys.findUnmarkedPersonalIds({
         afterId: report.afterId,

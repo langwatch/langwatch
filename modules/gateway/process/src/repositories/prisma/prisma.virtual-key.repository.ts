@@ -351,11 +351,17 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
 
   async markMintedAsPersonal({ ids }: { ids: readonly string[] }): Promise<number> {
     if (ids.length === 0) return 0;
-    const { count } = await this.prisma.virtualKey.updateMany({
-      where: { id: { in: [...ids] }, principalUserId: { not: null }, mintedAsPersonal: false },
-      data: { mintedAsPersonal: true },
-    });
-    return count;
+    // Raw, so Prisma's @updatedAt keeps each key's last edit time as it was.
+    return this.prisma.$executeRaw`
+      UPDATE "VirtualKey" SET "mintedAsPersonal" = true
+      WHERE "id" = ANY(${[...ids]}::text[])
+        AND "principalUserId" IS NOT NULL
+        AND NOT "mintedAsPersonal"
+      ${skipTenantCheck({
+        // The personal-key mark backfill, every organization (background upgrade step, worker)
+        SKIP_TENANT_CHECK: true,
+      })}
+    `;
   }
 
   async findRoutingPolicyOwner({

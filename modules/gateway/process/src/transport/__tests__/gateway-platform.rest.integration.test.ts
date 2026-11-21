@@ -216,6 +216,7 @@ function mountGatewayPlatform(options: { allowedAtOrganization: readonly string[
       actor: null,
       actorUserId: "user_1",
     }),
+    assertBudgetOpensFor: async () => undefined,
     archiveBudget,
     updateCacheRule,
     groupMemberCounts: async () => new Map<string, number>(),
@@ -832,6 +833,7 @@ describe("the gateway budget routes behind the key door", () => {
           actor: null,
           actorUserId: "user_1",
         }),
+        assertBudgetOpensFor: async () => undefined,
         getBudgetWithHealth: async () => ({
           budget: budgetRow(),
           spendAvailable: true,
@@ -918,6 +920,7 @@ describe("the gateway budget routes behind the key door", () => {
           actor: null,
           actorUserId: "user_1",
         }),
+        assertBudgetOpensFor: async () => undefined,
         updateBudget: async () => written,
         getBudgetWithHealth: async () => ({
           budget: live,
@@ -950,6 +953,7 @@ describe("the gateway budget routes behind the key door", () => {
           actor: null,
           actorUserId: "user_1",
         }),
+        assertBudgetOpensFor: async () => undefined,
         resetBudget: async () => budgetRow(),
         getBudgetWithHealth: async () => ({
           budget: budgetRow(),

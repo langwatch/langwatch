@@ -117,6 +117,7 @@ function mount(
       actorUserId: `svc_${PROJECT_ID}`,
       projectId: PROJECT_ID,
     }),
+    assertBudgetOpensFor: async () => undefined,
     ...overrides,
   });
   const door = ({ request }: { request: Request }) => {

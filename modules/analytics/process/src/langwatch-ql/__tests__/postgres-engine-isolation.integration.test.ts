@@ -110,6 +110,7 @@ function personalUsageSeed({ tenant }: { tenant: string }): string[] {
         debit("orphaned", sharedBudgetId, orphaned),
         debit("machine", sharedBudgetId, machine),
         debit("on-principal", `${tenant}-bdg-principal`, `${tenant}-vk`),
+        debit("on-attributed", `${tenant}-bdg-attributed`, `${tenant}-vk`),
       ].join(", "),
     `INSERT INTO "GatewayBudgetBucketBoundary" ("id", "organizationId", "budgetId", ` +
       `"bucketScopeId", "periodStartedAt") VALUES ('${tenant}-bnd-attributed', '${org}', ` +
@@ -1087,20 +1088,22 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     });
 
     /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
-    it("keeps shared usage and drops personal-key spend and budgets scoped to a person", async () => {
+    it("keeps shared and per-end-user usage, and drops personal-key spend and member budgets", async () => {
       const ledger = await idsIn("gateway_budget_ledgers", "GatewayBudgetLedgerId");
       const budgets = await idsIn("gateway_budgets", "GatewayBudgetId");
       const droppedLedger = seeded("led", ["personal", "minted", "on-principal"]);
-      const droppedBudgets = seeded("bdg", ["principal", "attributed", "personal-key"]);
+      const droppedBudgets = seeded("bdg", ["principal", "personal-key"]);
 
       expect(ledger).toContain(`${tenant()}-GatewayBudgetLedger-1`);
+      expect(ledger).toContain(`${tenant()}-led-on-attributed`);
       expect(ledger.filter((id) => droppedLedger.includes(id))).toEqual([]);
       expect(budgets).toContain(sharedBudgetId());
       expect(budgets).toContain(`${tenant()}-bdg-shared-key`);
+      expect(budgets).toContain(`${tenant()}-bdg-attributed`);
       expect(budgets.filter((id) => droppedBudgets.includes(id))).toEqual([]);
       expect(
         await idsIn("gateway_budget_bucket_boundaries", "GatewayBudgetBucketBoundaryId"),
-      ).toEqual([`${tenant()}-GatewayBudgetBucketBoundary-1`]);
+      ).toEqual([`${tenant()}-GatewayBudgetBucketBoundary-1`, `${tenant()}-bnd-attributed`]);
     }, 60_000);
 
     /** @scenario "A key with no owner whose creator's account is gone counts as personal, unless a machine created it" */
@@ -1108,9 +1111,11 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
       expect(await idsIn("gateway_budget_ledgers", "GatewayBudgetLedgerId")).toEqual([
         `${tenant()}-GatewayBudgetLedger-1`,
         `${tenant()}-led-machine`,
+        `${tenant()}-led-on-attributed`,
       ]);
       expect(await idsIn("gateway_budgets", "GatewayBudgetId")).toEqual([
         sharedBudgetId(),
+        `${tenant()}-bdg-attributed`,
         `${tenant()}-bdg-machine-key`,
         `${tenant()}-bdg-shared-key`,
       ]);

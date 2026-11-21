@@ -85,10 +85,12 @@ Feature: Gateway budget decision service
   @unit
   Scenario: A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys
     Given a budget scoped to one member, and a budget scoped to that member's personal key
-    When the member, an organization admin and a viewer each open it
-    Then the member and the admin see its detail
+    When the member, an organization admin and a viewer each open, edit or archive it
+    Then the member and the admin reach it
     And the viewer is answered exactly as for a budget that does not exist
-    And a budget scoped to a shared key opens for the viewer
+    And over the REST API, a key acting for the member or holding that permission at the organization reads it
+    And any other key is answered exactly as for a budget that does not exist
+    And a budget scoped to a shared key, or capping each end user of a key, opens for the viewer
 
   @unit
   Scenario: A key with no owner whose creator's account is gone counts as personal on a budget's detail
@@ -120,3 +122,5 @@ Feature: Gateway budget decision service
     And the key without a principal is left unmarked
     And a second run marks nothing
     And a dry run marks nothing and saves no progress
+    And a resumed run counts on from the total its checkpoint saved
+    And marking a key leaves its last edit time as it was

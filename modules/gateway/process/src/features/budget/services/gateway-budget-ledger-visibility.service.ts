@@ -1,12 +1,20 @@
 /**
- * What of a budget's detail a caller sees (gateway-budget-service.feature). The door asks
- * `gatewayBudgets:view`; this rule depends on the loaded budget and each row's key, so the
- * service asks the rest.
+ * Who may open a budget, and what of its detail they see (gateway-budget-service.feature). The
+ * doors ask the budget permission; this rule depends on the stored budget and each row's key, so
+ * the service asks the rest, for the detail screen, edits, archives and the REST read alike.
  */
-import { GatewayBudgetNotFoundError, type GatewayBudgetDetail } from "@langwatch/gateway-contract";
+import {
+  GatewayBudgetNotFoundError,
+  type GatewayBudgetDetail,
+  type GatewayBudgetReader,
+} from "@langwatch/gateway-contract";
 
 import type { GatewayUserDirectoryChannel } from "../../../channels/gateway-user-directory.channel.ts";
-import type { BudgetDetail } from "../../../repositories/gateway-budget.repository.ts";
+import type {
+  BudgetDetail,
+  BudgetScopeOwnership,
+  GatewayBudgetRepository,
+} from "../../../repositories/gateway-budget.repository.ts";
 import {
   hangsOnItsCreator,
   isMarkedPersonal,
@@ -20,9 +28,13 @@ type ShownRow = GatewayBudgetDetail["recentLedger"][number];
 /** How many recent ledger rows the detail screen lists. */
 const RECENT_LEDGER_SHOWN = 20;
 
+/** The only scopes a budget can be one person's through. */
+const PERSONAL_SCOPE_TYPES = new Set(["PRINCIPAL", "VIRTUAL_KEY"]);
+
 type Dependencies = Readonly<{
-  permissions: Pick<GatewayScopePermissions, "sessionHolds">;
+  permissions: Pick<GatewayScopePermissions, "sessionHolds" | "apiKeyHolds">;
   users: GatewayUserDirectoryChannel;
+  budgets: Pick<GatewayBudgetRepository, "getScopeOwnership">;
 }>;
 
 export class GatewayBudgetLedgerVisibilityService {
@@ -33,53 +45,104 @@ export class GatewayBudgetLedgerVisibilityService {
   private constructor(private readonly dependencies: Dependencies) {}
 
   /**
-   * A budget scoped to one person, or to a personal key, opens only for that person and holders
-   * of `virtualKeys:viewOtherPersonal`; anyone else is told it does not exist. Its newest rows
-   * follow the same rule per key, and each leaves without its key's owner.
+   * A budget scoped to one member, or to a personal key, opens only for that person and holders
+   * of `virtualKeys:viewOtherPersonal` at the organization; anyone else is told it does not exist.
+   */
+  async assertOpens({
+    id,
+    organizationId,
+    reader,
+  }: {
+    id: string;
+    organizationId: string;
+    reader: GatewayBudgetReader;
+  }): Promise<void> {
+    const scope = await this.dependencies.budgets.getScopeOwnership({ id, organizationId });
+    if (!PERSONAL_SCOPE_TYPES.has(scope.scopeType)) return;
+    if (await this.seesOthers({ organizationId, reader })) return;
+    const gone = await this.goneCreators({ owners: [scope.scopeKeyOwner] });
+    refuseUnlessOpens({ scope, gone, reader });
+  }
+
+  /**
+   * The detail, opened as {@link assertOpens} does. Its newest rows follow the same rule per key,
+   * and each leaves without its key's owner.
    */
   async detailFor({
     organizationId,
-    actorUserId,
+    reader,
     detail,
   }: {
     organizationId: string;
-    actorUserId: string;
+    reader: GatewayBudgetReader;
     detail: BudgetDetail;
   }): Promise<GatewayBudgetDetail> {
-    const gone = await this.goneCreators({
-      owners: [...detail.recentLedger.map(({ keyOwner }) => keyOwner), detail.scopeKeyOwner],
-    });
-    let asked: Promise<boolean> | undefined;
-    const seesOthers = (): Promise<boolean> => {
-      asked ??= this.dependencies.permissions.sessionHolds({
-        userId: actorUserId,
-        permission: "virtualKeys:viewOtherPersonal",
-        scope: { type: "org", id: organizationId },
-      });
-      return asked;
-    };
-
-    const ownership = budgetOwnership({ detail, gone });
-    const callersOwn = ownership.kind === "owned" && ownership.userId === actorUserId;
-    if (ownership.kind !== "shared" && !callersOwn && !(await seesOthers())) {
-      throw new GatewayBudgetNotFoundError();
-    }
-    const othersPersonal = detail.recentLedger.filter(
-      ({ keyOwner }) =>
-        isPersonal({ owner: keyOwner, gone }) && keyOwner?.principalUserId !== actorUserId,
-    );
-    const shown = othersPersonal.length === 0 || (await seesOthers());
+    const rows = (await this.seesOthers({ organizationId, reader }))
+      ? detail.recentLedger
+      : await this.ownOrSharedRows({ reader, detail });
 
     return {
       budget: detail.budget,
       scopeTarget: detail.scopeTarget,
       spendAvailable: detail.spendAvailable,
       unreachableByAnyKey: detail.unreachableByAnyKey,
-      recentLedger: detail.recentLedger
-        .filter((row) => shown || !othersPersonal.includes(row))
-        .slice(0, RECENT_LEDGER_SHOWN)
-        .map(withoutOwner),
+      recentLedger: rows.slice(0, RECENT_LEDGER_SHOWN).map(withoutOwner),
     };
+  }
+
+  /** For a reader without the permission: refuses another's budget, else drops others' rows. */
+  private async ownOrSharedRows({
+    reader,
+    detail,
+  }: {
+    reader: GatewayBudgetReader;
+    detail: BudgetDetail;
+  }): Promise<LedgerRow[]> {
+    const gone = await this.goneCreators({
+      owners: [...detail.recentLedger.map(({ keyOwner }) => keyOwner), detail.scopeKeyOwner],
+    });
+    const { scopeType, scopeId } = detail.budget;
+    refuseUnlessOpens({
+      scope: { scopeType, scopeId, scopeKeyOwner: detail.scopeKeyOwner },
+      gone,
+      reader,
+    });
+
+    return detail.recentLedger.filter(
+      ({ keyOwner }) =>
+        !isPersonal({ owner: keyOwner, gone }) ||
+        isReader({ userId: keyOwner?.principalUserId, reader }),
+    );
+  }
+
+  /** Whether the reader holds `virtualKeys:viewOtherPersonal` at the organization. */
+  private seesOthers({
+    organizationId,
+    reader,
+  }: {
+    organizationId: string;
+    reader: GatewayBudgetReader;
+  }): Promise<boolean> {
+    const permission = "virtualKeys:viewOtherPersonal";
+    const scope = { type: "org", id: organizationId } as const;
+    switch (reader.kind) {
+      case "member":
+        return this.dependencies.permissions.sessionHolds({
+          userId: reader.userId,
+          permission,
+          scope,
+        });
+      case "apiKey":
+        return this.dependencies.permissions.apiKeyHolds({
+          apiKeyId: reader.apiKeyId,
+          userId: reader.userId,
+          organizationId,
+          permission,
+          scope,
+        });
+      case "projectKey":
+        return Promise.resolve(false);
+    }
   }
 
   /**
@@ -119,6 +182,18 @@ function isPersonal({
   );
 }
 
+/** Whether `userId` names the reader; a project key, or an API key with no user, is no one. */
+function isReader({
+  userId,
+  reader,
+}: {
+  userId: string | null | undefined;
+  reader: GatewayBudgetReader;
+}): boolean {
+  if (reader.kind === "projectKey" || !userId) return false;
+  return reader.userId === userId;
+}
+
 /** Whether a budget belongs to one person; a personal key's budget may name no one. */
 type BudgetOwnership =
   | { kind: "shared" }
@@ -126,22 +201,36 @@ type BudgetOwnership =
   | { kind: "ownerUnnamed" };
 
 function budgetOwnership({
-  detail,
+  scope,
   gone,
 }: {
-  detail: BudgetDetail;
+  scope: BudgetScopeOwnership;
   gone: ReadonlySet<string>;
 }): BudgetOwnership {
-  if (detail.budget.scopeType === "PRINCIPAL") {
-    return { kind: "owned", userId: detail.budget.scopeId };
-  }
-  const owner = detail.scopeKeyOwner;
-  if (detail.budget.scopeType !== "VIRTUAL_KEY" || !isPersonal({ owner, gone })) {
+  if (scope.scopeType === "PRINCIPAL") return { kind: "owned", userId: scope.scopeId };
+  const owner = scope.scopeKeyOwner;
+  if (scope.scopeType !== "VIRTUAL_KEY" || !isPersonal({ owner, gone })) {
     return { kind: "shared" };
   }
   return owner?.principalUserId
     ? { kind: "owned", userId: owner.principalUserId }
     : { kind: "ownerUnnamed" };
+}
+
+/** For a reader without `virtualKeys:viewOtherPersonal`: another person's budget is not found. */
+function refuseUnlessOpens({
+  scope,
+  gone,
+  reader,
+}: {
+  scope: BudgetScopeOwnership;
+  gone: ReadonlySet<string>;
+  reader: GatewayBudgetReader;
+}): void {
+  const ownership = budgetOwnership({ scope, gone });
+  if (ownership.kind === "shared") return;
+  if (ownership.kind === "owned" && isReader({ userId: ownership.userId, reader })) return;
+  throw new GatewayBudgetNotFoundError();
 }
 
 function withoutOwner({

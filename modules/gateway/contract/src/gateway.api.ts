@@ -16,6 +16,7 @@ import type {
   GatewayBudgetCheckResult,
   GatewayBudgetDebitRow,
   GatewayBudgetDetail,
+  GatewayBudgetReader,
   GatewayBudgetListWithHealth,
   GatewayBudgetPageWithHealth,
   GatewayBudgetResolutionTarget,
@@ -636,15 +637,23 @@ export interface GatewayApi extends GatewayInternalProtocol {
     organizationId: string | null,
   ): Promise<Map<string, GatewayBudgetScopeTarget>>;
   /**
-   * The budget's detail as `actorUserId` may see it. A budget scoped to one person or to a
-   * personal key, and personal-key ledger rows, are for that person and holders of
-   * `virtualKeys:viewOtherPersonal`. Throws the handled 404 when there is no such budget for them.
+   * The budget's detail as `actorUserId` may see it: opened as `assertBudgetOpensFor` does,
+   * with personal-key ledger rows under the same rule. Throws the handled 404 otherwise.
    */
   getBudgetDetail(input: {
     id: string;
     organizationId: string;
     actorUserId: string;
   }): Promise<GatewayBudgetDetail>;
+  /**
+   * Throws the handled 404 for a budget scoped to one member or to a personal key, unless the
+   * reader is that member or holds `virtualKeys:viewOtherPersonal` at the organization.
+   */
+  assertBudgetOpensFor(input: {
+    id: string;
+    organizationId: string;
+    reader: GatewayBudgetReader;
+  }): Promise<void>;
   createBudget(input: CreateGatewayBudgetInput): Promise<GatewayBudgetResource>;
   updateBudget(input: UpdateGatewayBudgetInput): Promise<GatewayBudgetResource>;
   archiveBudget(input: ArchiveGatewayBudgetInput): Promise<GatewayBudgetResource>;

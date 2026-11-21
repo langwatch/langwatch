@@ -47,6 +47,7 @@ import {
   GatewayBudgetRepository,
   type AttributedUserBudgetTemplate,
   type BucketBoundaryRow,
+  type BudgetScopeOwnership,
   type GatewayBudgetCheckReadInput,
   type GatewayBudgetReadInput,
   type GatewayKeyReachRow,
@@ -784,6 +785,25 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       spendAvailable,
       unreachableByAnyKey: scopeReach.get(budget.id)?.reachable === false,
     };
+  }
+
+  async getScopeOwnership({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<BudgetScopeOwnership> {
+    const budget = await this.tryGetStored(id, organizationId);
+    if (!budget) throw new GatewayBudgetNotFoundError();
+    const scopeKeyOwner =
+      budget.scopeType === "VIRTUAL_KEY"
+        ? await this.prisma.virtualKey.findFirst({
+            where: { id: budget.scopeId, organizationId },
+            select: { principalUserId: true, mintedAsPersonal: true, createdById: true },
+          })
+        : null;
+    return { scopeType: budget.scopeType, scopeId: budget.scopeId, scopeKeyOwner };
   }
 
   /**
