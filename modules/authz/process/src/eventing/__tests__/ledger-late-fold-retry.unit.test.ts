@@ -179,11 +179,16 @@ describe.each(FOLD_LAGS_MS)(
     describe("when a skipping attach is retried for an identity an earlier attempt appended", () => {
       let writer: ReturnType<typeof ledger>["writer"];
       let memory: ReturnType<typeof ledger>["memory"];
+      let first: ReturnType<typeof track>;
 
       beforeEach(async () => {
         ({ writer, memory } = ledger(lag));
-        const first = track(writer.attachBindings(attach("rb_first")));
+        first = track(writer.attachBindings(attach("rb_first")));
         await elapse(WINDOW_MS + 500);
+      });
+
+      /** @scenario "A retry is confirmed by the earlier attempt's landed append" */
+      it("leaves the first attempt not confirmed while its append has not landed", () => {
         expect(first.error).toBeInstanceOf(AuthzGrantNotConfirmedError);
         expect(memory.grants).toHaveLength(0);
       });
