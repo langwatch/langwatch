@@ -5,7 +5,7 @@ import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
-import { CLIENT_FLAG_STALE_TIME_MS } from "@langwatch/feature-flag-client";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
@@ -369,16 +369,18 @@ function StarredDashboardsGroup({
 
 /** Released and granted per project: the section follows the one it works in, not the page's. */
 function StarredDashboardsInProject({ project }: { project: StarredDashboardsProject }) {
-  const released = navigationApi.featureFlag.isEnabled.useQuery(
-    { flag: "release_dashboards", projectId: project.id },
-    { staleTime: CLIENT_FLAG_STALE_TIME_MS, refetchOnWindowFocus: false },
-  );
+  // LLM Ops only opens a project in the page's organization, so that organization targets it.
+  const organizationId = useNavigationHost().organization()?.id;
+  const released = useFeatureFlag(FrontendFlags.release_dashboards, {
+    projectId: project.id,
+    organizationId,
+  });
   const standing = navigationApi.authz.effectivePermissions.useQuery(
     { projectId: project.id },
     { staleTime: GRANTS_STALE_TIME_MS },
   );
   const granted = standing.data?.permissions;
-  if (!released.data?.enabled || !granted) return null;
+  if (!released.enabled || !granted) return null;
   if (!permissionSatisfiedBy({ granted: new Set(granted), requested: "analytics:view" })) {
     return null;
   }

@@ -38,25 +38,42 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   useUiDeclarations: () => declarations.current,
 }));
 
+/** The server's flag answer per project; a read this browser's `?ff_` override holds gets none. */
+vi.mock("@langwatch/api/web", async (importOriginal) => {
+  const original = await importOriginal<{ createModuleApi: () => object }>();
+  const featureFlag = {
+    isEnabled: {
+      useQuery: (
+        { flag, projectId }: { flag: string; projectId?: string | null },
+        { enabled }: { enabled: boolean },
+      ) => ({
+        data: enabled
+          ? {
+              enabled:
+                flag === "release_dashboards" &&
+                (dashboardsRelease.byProject[projectId ?? ""] ?? dashboardsRelease.fallback),
+            }
+          : undefined,
+        isLoading: false,
+      }),
+    },
+  };
+  return {
+    ...original,
+    createModuleApi: () =>
+      new Proxy(original.createModuleApi(), {
+        get: (target, key) => (key === "featureFlag" ? featureFlag : Reflect.get(target, key)),
+      }),
+  };
+});
+
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     annotation: { getPendingItemsCount: { useQuery: () => ({ data: { count: 0 } }) } },
     personalWorkspaceFeatures: { get: { useQuery: () => ({}) } },
     limits: { getUsage: { useQuery: () => ({}) } },
     ops: { getBadgeCounts: { useQuery: () => ({}) } },
-    featureFlag: {
-      isEnabledForEachOrganization: { useQuery: () => ({}) },
-      isEnabled: {
-        useQuery: ({ flag, projectId }: { flag: string; projectId?: string | null }) => ({
-          data: {
-            enabled:
-              flag === "release_dashboards" &&
-              (dashboardsRelease.byProject[projectId ?? ""] ?? dashboardsRelease.fallback),
-          },
-          isLoading: false,
-        }),
-      },
-    },
+    featureFlag: { isEnabledForEachOrganization: { useQuery: () => ({}) } },
     authz: {
       effectivePermissions: {
         useQuery: ({ projectId }: { projectId: string }) => ({
@@ -67,6 +84,10 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
   },
 }));
 
+import {
+  applyFeatureFlagOverridesFromSearch,
+  clearAllFeatureFlagOverrides,
+} from "@langwatch/feature-flag-client";
 import type { NavigationProject, NavigationTeam } from "@langwatch/navigation-contract";
 
 import { WithStubNavigationHost } from "../../../testing.tsx";
@@ -177,6 +198,7 @@ function renderSidebar({
 
 afterEach(() => {
   cleanup();
+  clearAllFeatureFlagOverrides();
   declarations.current = undefined;
 });
 
@@ -452,6 +474,28 @@ describe("the Dashboards section with Dashboards in every product on", () => {
         expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
           "Pinned dashboards in Shop (project-shop)",
         );
+      });
+    });
+
+    describe("when this browser turned Dashboards on but Shop is not released", () => {
+      /** @scenario "This browser's Dashboards override decides the named project's section" */
+      it("hands the section Shop", async () => {
+        applyFeatureFlagOverridesFromSearch("?ff_release_dashboards=on");
+        renderSidebar({ ...codingAgents, dashboardsFlagByProject: { [SHOP.id]: false } });
+
+        expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
+          "Pinned dashboards in Shop (project-shop)",
+        );
+      });
+    });
+
+    describe("when this browser turned Dashboards off but Shop is released", () => {
+      /** @scenario "This browser's Dashboards override decides the named project's section" */
+      it("draws no section", async () => {
+        applyFeatureFlagOverridesFromSearch("?ff_release_dashboards=off");
+        renderSidebar({ ...codingAgents, dashboardsFlagByProject: { [SHOP.id]: true } });
+
+        await expectNoSection();
       });
     });
 

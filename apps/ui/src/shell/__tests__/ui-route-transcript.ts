@@ -5,21 +5,6 @@
  */
 
 export const expectedUiRouteTranscript: readonly string[] = [
-  "layout -> auth",
-  "  route /auth/signin -> pages/auth/signin",
-  "  route /auth/signup -> pages/auth/signup",
-  "  route /auth/forgot-password -> pages/auth/forgot-password",
-  "  route /auth/reset-password -> pages/auth/reset-password",
-  "  route /auth/verify-email -> pages/auth/verify-email",
-  "  route /auth/error -> pages/auth/error",
-  "  route /auth/resume -> pages/auth/resume",
-  "  route /auth/join -> pages/auth/join",
-  "  route /auth/sso-test-complete -> pages/auth/sso-test-complete",
-  // Moved under the auth layout 2026-09-18: it is auth's own screen and reads
-  // auth's host, which only this layout mounts.
-  "  route /invite/accept -> pages/invite/accept",
-  "redirect /admin -> /ops/cloud (from /admin)",
-  "redirect /admin/* -> /ops (from /admin) [map user=users users=users organization=organizations organizations=organizations project=projects projects=projects sso-connections=sso-connections identity-lookup=identity-lookup directory-sync=directory-sync subscription=cloud/subscriptions subscriptions=cloud/subscriptions licenses=cloud/licenses self-hosted-instances=cloud/self-hosted-instances bug-reports=cloud/bug-reports]",
   "redirect /me/devices -> /coding-agents/configure (from /me/devices) [pin tab=devices]",
   "redirect /me/devices/* -> /coding-agents/configure (from /me/devices) [pin tab=devices] [map ]",
   "redirect /me/budget/request -> /coding-agents (from /me)",
@@ -104,6 +89,21 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "redirect /me/datasets/:id -> /coding-agents (from /me) [map configure=configure pull-requests=pull-requests sessions=sessions]",
   "redirect /me/* -> /coding-agents (from /me) [map configure=configure pull-requests=pull-requests sessions=sessions]",
   "redirect /me -> /coding-agents (from /me) [map configure=configure pull-requests=pull-requests sessions=sessions]",
+  "layout -> auth",
+  "  route /auth/signin -> pages/auth/signin",
+  "  route /auth/signup -> pages/auth/signup",
+  "  route /auth/forgot-password -> pages/auth/forgot-password",
+  "  route /auth/reset-password -> pages/auth/reset-password",
+  "  route /auth/verify-email -> pages/auth/verify-email",
+  "  route /auth/error -> pages/auth/error",
+  "  route /auth/resume -> pages/auth/resume",
+  "  route /auth/join -> pages/auth/join",
+  "  route /auth/sso-test-complete -> pages/auth/sso-test-complete",
+  // Moved under the auth layout 2026-09-18: it is auth's own screen and reads
+  // auth's host, which only this layout mounts.
+  "  route /invite/accept -> pages/invite/accept",
+  "redirect /admin -> /ops/cloud (from /admin)",
+  "redirect /admin/* -> /ops (from /admin) [map user=users users=users organization=organizations organizations=organizations project=projects projects=projects sso-connections=sso-connections identity-lookup=identity-lookup directory-sync=directory-sync subscription=cloud/subscriptions subscriptions=cloud/subscriptions licenses=cloud/licenses self-hosted-instances=cloud/self-hosted-instances bug-reports=cloud/bug-reports]",
   "route /share/:id -> pages/share/[id]",
   "route /unsubscribe -> pages/unsubscribe",
   "route /onboarding -> pages/onboarding",

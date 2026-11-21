@@ -269,6 +269,15 @@ Feature: Product sidebars
     Then Coding agents shows no Dashboards section and no "+"
     And when Dashboards is released for "Shop" but not for the page's own project, the section shows
 
+  # A `?ff_release_dashboards=on|off` link answers the flag in that browser, "Shop" included.
+  @integration
+  Scenario: This browser's Dashboards override decides the named project's section
+    Given Dashboards in every product is on
+    And LLM Ops would open the project "Shop"
+    When this browser opened a link with "?ff_release_dashboards=on" and "Shop" is not released
+    Then Coding agents shows the Dashboards section for "Shop"
+    And after a link with "?ff_release_dashboards=off", with "Shop" released, there is no section
+
   # Reaching Dashboards takes analytics:view where it works, so the section asks "Shop" for the
   # grant, never the page's own project.
   @integration

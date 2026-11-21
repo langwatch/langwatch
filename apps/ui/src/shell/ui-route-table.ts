@@ -1098,21 +1098,8 @@ export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] 
   { path: RETIRED_PERSONAL_PATH, redirect: toCodingAgents },
 ];
 
-/** The top-level retired address the /me rows sit after, beside it and above the chrome. */
-const CODING_AGENTS_REDIRECTS_AFTER = "/admin/*";
-
-/**
- * `table` with `uiCodingAgentsRedirectRoutes` at the top level, after the /admin retirement.
- * Throws when that row is gone, so the rows cannot fall somewhere unplanned.
- */
-function withCodingAgentsRedirects(table: readonly UiRouteDescriptor[]): UiRouteDescriptor[] {
-  const at = table.findIndex((descriptor) => descriptor.path === CODING_AGENTS_REDIRECTS_AFTER) + 1;
-  if (at === 0) {
-    throw new Error(`uiRouteTable has no top-level ${CODING_AGENTS_REDIRECTS_AFTER} row`);
-  }
-  return [...table.slice(0, at), ...uiCodingAgentsRedirectRoutes, ...table.slice(at)];
-}
-
-/** What the router mounts: `uiRouteTable` plus the /me redirect rows derived from it. */
-export const uiMountedRouteTable: readonly UiRouteDescriptor[] =
-  withCodingAgentsRedirects(uiRouteTable);
+/** What the router mounts: the /me redirect rows at the top level, then `uiRouteTable`. */
+export const uiMountedRouteTable: readonly UiRouteDescriptor[] = [
+  ...uiCodingAgentsRedirectRoutes,
+  ...uiRouteTable,
+];
