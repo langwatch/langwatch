@@ -63,7 +63,5 @@ export const digestSendRequested: EventHandler<
   MemberSendIntents
 > = (state, data, context) => ({
   state: { requestedAt: state.requestedAt ?? context.at },
-  intents: [
-    context.intent("sendDigest", `send:${data.userId}:${data.isoWeek}`, data),
-  ],
+  intents: [context.intent("sendDigest", `send:${data.userId}:${data.isoWeek}`, data)],
 });
