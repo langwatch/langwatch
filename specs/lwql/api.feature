@@ -756,7 +756,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And it writes the set as a plain name: a view, a table, a FROM alias or a WITH name, quoted, qualified, in parentheses or wrapped in a function
     Then the query is refused before it reaches the database
     And the refusal names the IN_TABLE_OPERAND rule and tells the caller to write rows of a view as a subquery, x IN (SELECT ... FROM view), and a list of values inline or as a bound parameter
-    And a set written as a subquery, a literal, a tuple or array of literals, an allowed function over literals only or a query parameter bound to a value is accepted
+    And a set written as a subquery, a literal, a tuple or array of literals, an allowed function over literals and lambdas only or a query parameter bound to a value is accepted
     And a set test the restricted identity runs over a LangWatchQL table matches only its own tenant's rows
 
   @unit

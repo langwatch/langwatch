@@ -462,6 +462,13 @@ describe("validateLangWatchQL given a set membership test", () => {
   });
 
   /** @scenario "A set membership test names its set with a subquery" */
+  it("reports a FROM alias written as the set once, under IN_TABLE_OPERAND alone", () => {
+    expect(codesOf(validate("SELECT count() FROM spans AS s WHERE TraceId IN s"))).toEqual([
+      "IN_TABLE_OPERAND",
+    ]);
+  });
+
+  /** @scenario "A set membership test names its set with a subquery" */
   it.each([
     ["a subquery", "SELECT count() FROM spans WHERE TraceId IN (SELECT TraceId FROM traces)"],
     [
@@ -491,6 +498,10 @@ describe("validateLangWatchQL given a set membership test", () => {
       "SELECT count() FROM spans WHERE TraceId IN tuple('a', tuple('b', 'c'))",
     ],
     ["a query parameter", "SELECT count() FROM spans WHERE TraceId NOT IN {ids:Array(String)}"],
+    [
+      "an allowed function over a lambda and literals",
+      "SELECT count() FROM spans WHERE 1 IN arrayFilter(y -> y > 0, [1, 2, 3])",
+    ],
   ])("accepts a set written as %s", (_case, sql) => {
     expect(codesOf(validate(sql, UNGATED_POLICY))).toEqual([]);
   });

@@ -29,14 +29,15 @@ function bindsIdentifier(parameter: SqlAstNode): boolean {
 }
 
 /**
- * Whether a set operand holds a plain name, itself or in any function argument; an
- * `Identifier`-typed parameter is one. Whether a function may be called at all (`numbers(10)` may
- * not) is the validator's function allowlist, applied before the scope step, not this rule's job.
+ * Whether a set operand holds a plain name, itself or in a function argument; an `Identifier`-typed
+ * parameter is one, a lambda (whose names are its own parameters) is not. Whether a function may be
+ * called at all (`numbers(10)` may not) is the validator's allowlist, not this rule's job.
  */
 function holdsPlainName(operand: unknown): boolean {
   if (!isNode(operand)) return true;
   if (operand.type === "QueryParameter") return bindsIdentifier(operand);
   if (operand.type !== "Function") return !SET_OPERAND_TYPES.has(operand.type);
+  if (operand.is_lambda_function === true) return false;
   const args = Array.isArray(operand.arguments) ? operand.arguments : [];
   const params = Array.isArray(operand.parameters) ? operand.parameters : [];
   return [...args, ...params].some(holdsPlainName);

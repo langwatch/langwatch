@@ -231,11 +231,20 @@ export function assertNoUnsupportedTableModifiers({
 }): void {
   if (!/\b(final|sample)\b/i.test(sql)) return;
   const parsed = clickHouseSqlParser.parse(sql);
-  if (parsed.ok) assertNoPostgresTableModifiers({ statements: parsed.statements, views, database });
+  if (parsed.ok)
+    assertNoUnsupportedTableModifiersInStatements({
+      statements: parsed.statements,
+      views,
+      database,
+    });
 }
 
-/** {@link assertNoUnsupportedTableModifiers} over statements already parsed. */
-function assertNoPostgresTableModifiers({
+/**
+ * {@link assertNoUnsupportedTableModifiers} over statements already parsed: refuses `FINAL` or
+ * `SAMPLE` on a subquery or a PostgreSQL-resident view in any statement.
+ * @throws {LangWatchQLTableModifierError} naming the modifiers written.
+ */
+function assertNoUnsupportedTableModifiersInStatements({
   statements,
   views,
   database,
@@ -385,6 +394,9 @@ function datedPicks({
   );
 }
 
+/** A plain statement without one of these words has no set test or table modifier to check. */
+const PLAIN_CHECK_WORDS = /\b(in|notin|globalin|globalnotin|final|sample)\b/i;
+
 /**
  * `sql` with each catalogued view it reads kept to the members inside their grants' windows, and
  * a view outside `views` reading nothing (ADR-177 v4.14). It adds no origin condition: a statement
@@ -408,12 +420,17 @@ export function scopeLangWatchQL({
 }): string {
   // Whole-history members need no rewrite: the row policy bounds them exactly.
   const isWindowed = memberWindows?.some((window) => window.from > 0) === true;
+  if (!isWindowed && !PLAIN_CHECK_WORDS.test(sql)) return sql;
   const parsed = clickHouseSqlParser.parse(sql);
   if (!isWindowed) {
     // A statement that does not parse is left for the validator to refuse.
     if (!parsed.ok) return sql;
     assertNoNamedSetOperands(parsed.statements);
-    assertNoPostgresTableModifiers({ statements: parsed.statements, views, database });
+    assertNoUnsupportedTableModifiersInStatements({
+      statements: parsed.statements,
+      views,
+      database,
+    });
     return sql;
   }
 
