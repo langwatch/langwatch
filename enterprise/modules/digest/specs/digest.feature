@@ -347,6 +347,12 @@ Feature: Weekly digest emails
     Then the caller is refused as digest_unsubscribe_rate_limited
     And the token is not verified, no subscription is read, and nothing is written
 
+  @unit
+  Scenario: Unsubscribe still works when the attempt counter is unavailable
+    Given the attempt counter fails
+    When a member unsubscribes with a valid token
+    Then the member is unsubscribed and no error is raised
+
   @integration @unimplemented
   Scenario: The click route is rate limited
     When one caller asks the click route past the limit

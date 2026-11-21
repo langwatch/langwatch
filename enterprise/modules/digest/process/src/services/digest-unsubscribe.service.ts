@@ -7,11 +7,14 @@ import {
   type DigestTokenCall,
   DigestUnsubscribeRateLimitedError,
 } from "@langwatch/enterprise-digest-contract";
+import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";
 
 import type { DigestAudienceRepository } from "../repositories/digest-audience.repository.ts";
 import type { DigestCallCounterRepository } from "../repositories/digest-call-counter.repository.ts";
+
+const logger = createLogger("langwatch:digest");
 
 /**
  * What an unsubscribe token signs: the person, the send whose link it rode in, and when it
@@ -100,11 +103,18 @@ export class DigestUnsubscribeService {
     action: keyof typeof ATTEMPT_LIMITS;
     callerAddress: string | null;
   }): Promise<void> {
-    const limit = await this.deps.limits.count({
-      key: `digest-unsubscribe:${action}:${callerAddress ?? "unknown"}`,
-      windowSeconds: ATTEMPT_WINDOW_SECONDS,
-      max: ATTEMPT_LIMITS[action],
-    });
+    let limit: Awaited<ReturnType<DigestCallCounterRepository["count"]>>;
+    try {
+      limit = await this.deps.limits.count({
+        key: `digest-unsubscribe:${action}:${callerAddress ?? "unknown"}`,
+        windowSeconds: ATTEMPT_WINDOW_SECONDS,
+        max: ATTEMPT_LIMITS[action],
+      });
+    } catch (error) {
+      // Unsubscribing is a legal obligation: a down counter must not stop it.
+      logger.warn({ error, action }, "the digest attempt counter failed; allowing the attempt");
+      return;
+    }
     if (!limit.allowed) throw new DigestUnsubscribeRateLimitedError();
   }
 
