@@ -99,10 +99,14 @@ const SOURCES = [
 ];
 
 // A source with no traces says so; one with traces but no price never shows $0.00.
-function SourceRow({ label, colour, cost, total, traces, unpriced, origin }) {
+function SourceRow({ label, colour, cost, total, traces, unpriced, unpricedCounted, origin }) {
   const open = origin && traces > 0 ? () => openTraces({ origin }) : undefined;
+  // Zero-rate spans cost null but aren't unpriced (span-cost-metrics.ts); a null sum (inferred)
+  // is 0 where unpriced is counted (flight-deck-costs-queries.ts:447). Not evaluations: their
+  // evaluator runs add a constant 0 AS unpriced (flight-deck-costs-queries.ts:454).
   const figure = traces === 0 ? "No runs"
-    : costText({ sum: cost, priced: unpriced < traces, unpriced: unpriced > 0 });
+    : costText({ sum: unpricedCounted ? cost ?? 0 : cost, priced: unpriced < traces,
+      unpriced: unpriced > 0 });
   return (
     <div onClick={open} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5,
       padding: "3px 0", cursor: open ? "pointer" : "default",
@@ -159,7 +163,8 @@ function UnpricedRow({ traces }) {
       <div style={{ marginTop: 8 }}>
         {shown.map(([key, label, colour, origin]) => (
           <SourceRow key={key} label={label} colour={colour} cost={costOf(key)} total={total}
-            traces={tracesOf(key)} unpriced={unpricedOf(key)} origin={origin} />
+            traces={tracesOf(key)} unpriced={unpricedOf(key)}
+            unpricedCounted={key !== "evaluations"} origin={origin} />
         ))}
         {unpriced > 0 ? <UnpricedRow traces={unpriced} /> : null}
       </div>

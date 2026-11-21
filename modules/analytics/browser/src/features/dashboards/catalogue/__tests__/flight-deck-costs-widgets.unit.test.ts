@@ -165,15 +165,42 @@ describe("given the Running costs widgets", () => {
     expect(code).toContain('<Headline value={pct(ratio(test, total), 0)} label="test traffic" />');
   });
 
-  /** @scenario "AC215 Partial cost: no span priced" */
-  it('shows "Not priced" on a source row whose traces all lack a cost', () => {
+  // The stored expression is what the row runs; evaluating it is the test.
+  function sourceRowFigure() {
     const figure = build("cost-by-source").code.match(/const figure = ([\s\S]*?);\n/)?.[1];
     if (!figure) throw new Error("no figure on the source row");
-    // The stored expression is what the row runs; evaluating it is the test.
     // oxlint-disable-next-line no-implied-eval
-    const rowFigure = new Function("cost", "traces", "unpriced", `${NUMBERS}\nreturn ${figure};`);
+    const run = new Function(
+      "cost",
+      "traces",
+      "unpriced",
+      "unpricedCounted",
+      `${NUMBERS}\nreturn ${figure};`,
+    );
+    return (cost: number | null, traces: number, unpriced: number, unpricedCounted = true) =>
+      run(cost, traces, unpriced, unpricedCounted);
+  }
+
+  /** @scenario "AC215 Partial cost: no span priced" */
+  it('shows "Not priced" on a source row whose traces all lack a cost', () => {
+    const rowFigure = sourceRowFigure();
     expect(rowFigure(0, 3, 3)).toBe("Not priced");
     expect(rowFigure(null, 3, 3)).not.toContain("$0.00+");
+    expect(rowFigure(null, 2, 2)).toBe("Not priced");
+  });
+
+  /** @scenario "AC215b Partial cost: some spans priced at zero" */
+  it("shows $0.00 on a source row whose priced spans all cost 0", () => {
+    const rowFigure = sourceRowFigure();
+    // What SPEND_BY_SOURCE_SQL returns for zero-rate traces: their cost sums to null, not 0.
+    expect(rowFigure(null, 2, 1)).toBe("$0.00, some spans not priced");
+    expect(rowFigure(null, 2, 0)).toBe("$0.00");
+  });
+
+  /** @scenario "AC215b Partial cost: some spans priced at zero" */
+  it("keeps the dash on the evaluations row, whose unpriced count is a constant 0", () => {
+    // Evaluator runs join the evaluations source with 0 AS unpriced, so a null cost may be unpriced.
+    expect(sourceRowFigure()(null, 2, 0, false)).toBe("–");
   });
 
   /** @scenario "AC30 Running costs: Wasted spend counts each production trace once" */
