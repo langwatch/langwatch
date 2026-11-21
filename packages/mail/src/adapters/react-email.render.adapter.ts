@@ -1,5 +1,21 @@
 import { MailRender } from "../mail-render.ts";
 import {
+  type DigestCodingAgentWeekProps,
+  renderDigestCodingAgentWeekEmail,
+} from "../templates/digest-coding-agent-week.tsx";
+import {
+  type DigestPlanPressureProps,
+  renderDigestPlanPressureEmail,
+} from "../templates/digest-plan-pressure.tsx";
+import {
+  type DigestScenariosTrendProps,
+  renderDigestScenariosTrendEmail,
+} from "../templates/digest-scenarios-trend.tsx";
+import {
+  type DigestTracesWeekProps,
+  renderDigestTracesWeekEmail,
+} from "../templates/digest-traces-week.tsx";
+import {
   renderJoinRequestExpiredEmail,
   renderJoinRequestReminderEmail,
 } from "../templates/join-request-emails.tsx";
@@ -63,5 +79,27 @@ export class ReactEmailMailRenderer extends MailRender {
     input: PlatformOperatorChangeEmailProps,
   ): Promise<{ subject: string; html: string }> {
     return renderPlatformOperatorChangeEmail(input);
+  }
+
+  renderDigestPlanPressure(
+    input: DigestPlanPressureProps,
+  ): Promise<{ subject: string; html: string }> {
+    return renderDigestPlanPressureEmail(input);
+  }
+
+  renderDigestScenariosTrend(
+    input: DigestScenariosTrendProps,
+  ): Promise<{ subject: string; html: string }> {
+    return renderDigestScenariosTrendEmail(input);
+  }
+
+  renderDigestCodingAgentWeek(
+    input: DigestCodingAgentWeekProps,
+  ): Promise<{ subject: string; html: string }> {
+    return renderDigestCodingAgentWeekEmail(input);
+  }
+
+  renderDigestTracesWeek(input: DigestTracesWeekProps): Promise<{ subject: string; html: string }> {
+    return renderDigestTracesWeekEmail(input);
   }
 }

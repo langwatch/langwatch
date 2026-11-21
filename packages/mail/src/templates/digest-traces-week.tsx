@@ -10,7 +10,7 @@ import {
   formatUsd,
 } from "./digest-parts.tsx";
 import { ActionRow, DataTable, DetailTable, Muted } from "./email-layout.tsx";
-import { defineTemplate } from "./registry.ts";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 export const digestTracesWeekProps = z.object({
   ...digestCommonFields,
@@ -166,3 +166,11 @@ export const digestTracesWeekTemplate = defineTemplate({
     },
   },
 });
+
+/** Rendered by the digest module, which owns the envelope and its one-click unsubscribe. */
+export const renderDigestTracesWeekEmail = async (
+  props: DigestTracesWeekProps,
+): Promise<{ subject: string; html: string }> => {
+  const { subject, html } = await renderMailTemplate(digestTracesWeekTemplate, props);
+  return { subject, html };
+};
