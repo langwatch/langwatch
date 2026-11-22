@@ -375,9 +375,17 @@ export async function runUnifiedLoginFlow(
 class ResumedCodeLapsedError extends Error {}
 
 /** Why the wait ended, as the person reads it; the pending code is forgotten once it is spent. */
-function loginFailure({ err, resumed }: { err: unknown; resumed: boolean }): unknown {
+function loginFailure({
+  err,
+  resumed,
+  deviceCode,
+}: {
+  err: unknown;
+  resumed: boolean;
+  deviceCode: string;
+}): unknown {
   if (!(err instanceof DeviceFlowError)) return err;
-  if (err.kind === "denied" || err.kind === "expired") clearPendingLogin();
+  if (err.kind === "denied" || err.kind === "expired") clearPendingLogin({ deviceCode });
   if (err.kind === "expired" && resumed) return new ResumedCodeLapsedError(err.message);
   switch (err.kind) {
     case "denied":
@@ -449,14 +457,14 @@ async function waitOnDeviceCode({
   process.once("SIGINT", onSigint);
   try {
     const result = await pollUntilDone({ baseUrl }, dc);
-    clearPendingLogin();
+    clearPendingLogin({ deviceCode: dc.device_code });
     if (result.kind === "device_session") {
       return await completeDeviceSession({ cfg, result, spinner, isQuiet });
     }
     return await completeProjectKey({ cfg, result, spinner });
   } catch (err) {
     spinner.fail();
-    throw loginFailure({ err, resumed: resumed !== undefined });
+    throw loginFailure({ err, resumed: resumed !== undefined, deviceCode: dc.device_code });
   } finally {
     process.removeListener("SIGINT", onSigint);
   }

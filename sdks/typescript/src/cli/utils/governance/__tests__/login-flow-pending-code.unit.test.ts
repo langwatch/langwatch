@@ -147,6 +147,53 @@ describe("a login waiting on a device code", () => {
     });
   });
 
+  describe("when the rerun comes in the code's last seconds", () => {
+    /** @scenario A code in its last seconds is still picked up */
+    it("waits on the earlier code rather than starting a new one", async () => {
+      startDeviceCode.mockResolvedValueOnce(deviceCode("FRST-CODE"));
+      pollUntilDone.mockImplementationOnce(killedWhileWaiting);
+      await expect(runDeviceFlowLogin()).rejects.toThrow("killed");
+
+      const saved = JSON.parse(fs.readFileSync(pendingLoginPath(), "utf8")) as {
+        expires_at: number;
+      };
+      vi.spyOn(Date, "now").mockReturnValue(saved.expires_at - 30_000);
+      pollUntilDone.mockResolvedValueOnce(signedIn);
+      await runDeviceFlowLogin();
+
+      expect(startDeviceCode).toHaveBeenCalledTimes(1);
+      expect(pollUntilDone.mock.calls[1]?.[1]).toMatchObject({
+        device_code: "dc-FRST-CODE",
+        expires_in: 30,
+      });
+    });
+  });
+
+  describe("when another login saved its code while this one waited", () => {
+    /** @scenario A finished login leaves another login's code alone */
+    it("keeps the other login's code when this one finishes", async () => {
+      let finish: (value: typeof signedIn) => void = () => {};
+      startDeviceCode
+        .mockResolvedValueOnce(deviceCode("FRST-CODE"))
+        .mockResolvedValueOnce(deviceCode("SCND-CODE"));
+      pollUntilDone
+        .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)))
+        .mockImplementationOnce(killedWhileWaiting);
+
+      const first = runDeviceFlowLogin();
+      await vi.waitFor(() => expect(pollUntilDone).toHaveBeenCalledTimes(1));
+      controlPlane.url = "https://langwatch.other.test";
+      await expect(runDeviceFlowLogin()).rejects.toThrow("killed");
+      finish(signedIn);
+      await first;
+
+      const pending = JSON.parse(fs.readFileSync(pendingLoginPath(), "utf8")) as {
+        device_code: string;
+      };
+      expect(pending.device_code).toBe("dc-SCND-CODE");
+    });
+  });
+
   describe("when the next login asks for something else", () => {
     /** @scenario A login for something else starts its own code */
     it("starts a new code for another control plane or another credential type", async () => {

@@ -12,9 +12,6 @@ import { z } from "zod";
 import { configPath } from "./config";
 import type { DeviceCode } from "./device-flow";
 
-/** A code with less time left than this is not worth handing to a person. */
-const MIN_REMAINING_MS = 60_000;
-
 const pendingLoginSchema = z.object({
   control_plane_url: z.string(),
   kind: z.enum(["device_session", "project_api_key"]),
@@ -74,7 +71,7 @@ export function savePendingLogin({
 
 /**
  * The still-live code an earlier run of the same login left, as a device code with the time it
- * has left; undefined when there is none, it answers another request, or it is about to expire.
+ * has left; undefined when there is none, it answers another request, or it has expired.
  */
 export function resumablePendingLogin({
   request,
@@ -93,9 +90,10 @@ export function resumablePendingLogin({
     pending.cwd === request.cwd;
   if (!sameRequest) return undefined;
 
+  // A code in its last seconds may already carry an approval: resume it and let the poll say.
   const remainingMs = pending.expires_at - now;
-  if (remainingMs < MIN_REMAINING_MS) {
-    clearPendingLogin();
+  if (remainingMs <= 0) {
+    clearPendingLogin({ deviceCode: pending.device_code });
     return undefined;
   }
 
@@ -107,12 +105,13 @@ export function resumablePendingLogin({
       ? { verification_uri_complete: pending.verification_uri_complete }
       : {}),
     interval: pending.interval,
-    expires_in: Math.floor(remainingMs / 1000),
+    expires_in: Math.max(1, Math.floor(remainingMs / 1000)),
   };
 }
 
-/** Forgets the pending code once its login ends: signed in, denied or expired. */
-export function clearPendingLogin(): void {
+/** Forgets the pending code once its login ends, unless a later login saved its own since. */
+export function clearPendingLogin({ deviceCode }: { deviceCode: string }): void {
+  if (readPendingLogin()?.device_code !== deviceCode) return;
   try {
     fs.rmSync(pendingLoginPath(), { force: true });
   } catch {

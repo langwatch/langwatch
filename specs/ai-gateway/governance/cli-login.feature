@@ -81,6 +81,19 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And the approval the person gives that code signs the machine in
 
   @unit
+  Scenario: A code in its last seconds is still picked up
+    Given a login left a pending device code with 30 seconds left
+    When the same login runs again
+    Then it waits on that code rather than asking for a new one
+
+  @unit
+  Scenario: A finished login leaves another login's code alone
+    Given a login is waiting on a device code
+    And another login saved its own pending code since
+    When the first login finishes
+    Then the other login's pending code is kept
+
+  @unit
   Scenario: A login for something else starts its own code
     Given a login left a pending device code for one control plane
     When a login runs against another control plane or another credential type
