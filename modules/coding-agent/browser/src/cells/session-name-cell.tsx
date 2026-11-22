@@ -3,8 +3,9 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 
 import type { SessionListRow } from "../behavior/session-list-row.ts";
+import { sessionDisplayName } from "../model/session-display-name.ts";
 
-// Session name and branch; untitled sessions show branch (work identifier);
+// Session name and branch; an unnamed session shows its agent and day, plus branch;
 // name is keyboard-focusable control for replay. A group project's rows also
 // name the member project that recorded each session.
 export const SessionNameCell: React.FC<{
@@ -13,6 +14,7 @@ export const SessionNameCell: React.FC<{
   isOpening: boolean;
   onOpenReplay?: (() => void) | undefined;
 }> = ({ row, showProject = false, isOpening, onOpenReplay }) => {
+  const name = sessionDisplayName(row);
   const where = [row.repositoryFullName, row.gitBranch].filter((part) => part !== "").join(" · ");
 
   return (
@@ -21,14 +23,14 @@ export const SessionNameCell: React.FC<{
     // lets a long branch name run under the next column instead of ellipsing.
     <VStack align="start" gap={0} minWidth={0} width="full">
       <HStack gap={2} minWidth={0} width="full">
-        <SessionNameButton onOpenReplay={onOpenReplay} label={row.title ?? "untitled session"}>
-          {row.title ? (
-            <Text fontSize="sm" fontWeight="medium" truncate>
-              {row.title}
+        <SessionNameButton onOpenReplay={onOpenReplay} label={name.text}>
+          {name.isFallback ? (
+            <Text fontSize="sm" color="fg.muted" truncate>
+              {name.text}
             </Text>
           ) : (
-            <Text fontSize="sm" color="fg.muted" truncate>
-              Untitled session
+            <Text fontSize="sm" fontWeight="medium" truncate>
+              {name.text}
             </Text>
           )}
         </SessionNameButton>

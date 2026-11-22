@@ -33,19 +33,87 @@ export interface CodeModeScript {
   /** The script's source; null on a metadata-only session. */
   code: string | null;
   lineCount: number | null;
+  /** The script's full length when Claude Code's telemetry kept only its start; else null. */
+  cutFromChars: number | null;
 }
+
+/** Claude Code's telemetry keeps the first 128 characters of a long value and appends this. */
+const CUT_MARKER = /\u2026\[(\d+) chars\]$/;
 
 export function readCodeModeScript(input: unknown): CodeModeScript {
   const record = input !== null && typeof input === "object" && !Array.isArray(input) ? input : {};
   const { code, description } = record as Record<string, unknown>;
-  const source = typeof code === "string" && code.trim() !== "" ? code : null;
+  const raw = typeof code === "string" && code.trim() !== "" ? code : null;
+  const cut = raw === null ? null : CUT_MARKER.exec(raw);
+  const source = raw === null || cut === null ? raw : raw.slice(0, cut.index);
 
   return {
     description:
       typeof description === "string" && description.trim() !== "" ? description.trim() : null,
     code: source,
     lineCount: source === null ? null : source.replace(/\n+$/, "").split("\n").length,
+    cutFromChars: cut === null ? null : Number(cut[1]),
   };
+}
+
+/** What a script handed back, read off a REPL or Poll output. */
+export interface CodeModeScriptResult {
+  /** The script's number in the session (`eval="3"`); null when the output names none. */
+  evalNumber: number | null;
+  /** The event's status, such as `settled`; null on a plain text result. */
+  status: string | null;
+  /** How long the script ran, in milliseconds; null when not recorded. */
+  durationMs: number | null;
+  text: string;
+  isError: boolean;
+}
+
+/** The REPL call's answer while the script keeps running; a later Poll carries the result. */
+const DISPATCH_RECEIPT = /^\(dispatched #\d+\)$/;
+/** Harness text around the events: the nonce notice and the tool summary. */
+const HARNESS_ELEMENTS = /<(system|tools-used-before-summary)>[\s\S]*?<\/\1>/g;
+/** Only the harness's own script event, never an `<event>` a script printed. */
+const SCRIPT_EVENT_ELEMENT = /<event\b([^>]*(?<![\w-])kind="repl-eval"[^>]*)>([\s\S]*?)<\/event>/g;
+const EVENT_ATTRIBUTE = /([\w-]+)="([^"]*)"/g;
+
+/**
+ * The results a REPL or Poll output carries, oldest first: each settled script event's
+ * `<result>` or `<error>` body, or the whole text a script returned. Null when the output is
+ * the span's status summary, a dispatch receipt, or empty: none of those is a result.
+ */
+export function readCodeModeScriptResults(output: unknown): CodeModeScriptResult[] | null {
+  const text = codeModeResultText(output);
+  if (text === null || DISPATCH_RECEIPT.test(text.trim())) return null;
+
+  const withoutHarness = text.replace(HARNESS_ELEMENTS, "");
+  const events = [...withoutHarness.matchAll(SCRIPT_EVENT_ELEMENT)];
+  if (events.length > 0) {
+    return events.map(([, attrs = "", body = ""]) => readScriptEvent({ attrs, body }));
+  }
+
+  const plain = withoutHarness.trim();
+  if (plain === "") return null;
+  return [{ evalNumber: null, status: null, durationMs: null, text: plain, isError: false }];
+}
+
+function readScriptEvent({ attrs, body }: { attrs: string; body: string }): CodeModeScriptResult {
+  const fields = new Map([...attrs.matchAll(EVENT_ATTRIBUTE)].map(([, k = "", v = ""]) => [k, v]));
+  const error = /<error>([\s\S]*?)<\/error>/.exec(body);
+  const result = /<result>([\s\S]*?)<\/result>/.exec(body);
+  const evalNumber = Number(fields.get("eval"));
+  const durationMs = Number(fields.get("ms"));
+
+  return {
+    evalNumber: fields.has("eval") && Number.isFinite(evalNumber) ? evalNumber : null,
+    status: fields.get("status") ?? null,
+    durationMs: fields.has("ms") && Number.isFinite(durationMs) ? durationMs : null,
+    text: trimBlankLines((error ?? result)?.[1] ?? body),
+    isError: error !== null,
+  };
+}
+
+function trimBlankLines(text: string): string {
+  return text.replace(/^\s*\n/, "").replace(/\s+$/, "");
 }
 
 /**
