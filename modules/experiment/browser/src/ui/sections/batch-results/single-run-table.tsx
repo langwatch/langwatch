@@ -3,7 +3,7 @@
  */
 
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
-import { Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   createColumnHelper,
   flexRender,
@@ -19,6 +19,13 @@ import {
   ESTIMATED_ROW_HEIGHT_PX,
   type RowHeight,
 } from "../../../model/batch-evaluation-results.row-height.ts";
+import {
+  passRateText,
+  repetitionLabel,
+  repetitionOf,
+  runRepeatExplanation,
+  type RowPassRate,
+} from "../../../model/batch-evaluation-results.run-repeat.ts";
 import { TableSkeleton } from "../../elements/batch-results/table-skeleton.tsx";
 import {
   type BatchTargetAggregate,
@@ -90,6 +97,9 @@ type BuildColumnsOptions = {
   renderTracePeek?: RenderTracePeek;
   onOpenTrace?: (traceId: string) => void;
   renderDatasetImage?: RenderDatasetImage;
+  /** How many times the run repeated every dataset row; absent ran each once. */
+  repeat?: number | undefined;
+  rowPassRates?: Map<string, RowPassRate> | undefined;
 };
 
 /** Infer a dataset column's type from its first non-null value. */
@@ -107,6 +117,76 @@ const inferDatasetColumnType = ({
     }
   }
   return "string";
+};
+
+/** A repeated run's dataset row pass rate, one line per target when it ran several. */
+const RowPassRateCell = ({
+  datasetRow,
+  targetColumns,
+  rowPassRates,
+}: {
+  datasetRow: number;
+  targetColumns: BatchTargetColumn[];
+  rowPassRates: Map<string, RowPassRate>;
+}) => (
+  <VStack align="start" gap={0} data-testid={`row-pass-rate-${datasetRow}`}>
+    {targetColumns.map((target) => (
+      <Text key={target.id} textStyle="caption" whiteSpace="nowrap" truncate maxWidth="full">
+        {targetColumns.length > 1 ? `${target.displayName ?? target.name}: ` : ""}
+        {passRateText(rowPassRates.get(`${datasetRow}:${target.id}`))}
+      </Text>
+    ))}
+  </VStack>
+);
+
+/**
+ * The row number column, and for a repeated run the pass rate column: such a run numbers each
+ * row by its dataset row and repetition.
+ */
+const rowNumberColumns = ({
+  targetColumns,
+  repeat,
+  rowPassRates,
+}: {
+  targetColumns: BatchTargetColumn[];
+  repeat?: number;
+  rowPassRates?: Map<string, RowPassRate>;
+}) => {
+  const rowNumber = columnHelper.display({
+    id: "rowNumber",
+    header: "",
+    size: repeat ? 56 : 32,
+    cell: ({ row }) => (
+      <Text
+        textStyle="caption"
+        color="fg.muted"
+        textAlign="right"
+        paddingRight={1}
+        whiteSpace="nowrap"
+        data-testid={repeat ? `run-row-repetition-${row.original.index}` : undefined}
+      >
+        {repeat ? repetitionLabel({ index: row.original.index, repeat }) : row.index + 1}
+      </Text>
+    ),
+  });
+  if (!repeat || !rowPassRates) return [rowNumber];
+  const passRate = columnHelper.display({
+    id: "rowPassRate",
+    header: () => (
+      <Text textStyle="caption" fontWeight="medium" title={runRepeatExplanation(repeat)}>
+        Pass rate
+      </Text>
+    ),
+    size: targetColumns.length > 1 ? 160 : 90,
+    cell: ({ row }) => (
+      <RowPassRateCell
+        datasetRow={repetitionOf({ index: row.original.index, repeat }).datasetRow}
+        targetColumns={targetColumns}
+        rowPassRates={rowPassRates}
+      />
+    ),
+  });
+  return [rowNumber, passRate];
 };
 
 /**
@@ -129,6 +209,8 @@ const buildColumns = ({
   renderTracePeek,
   onOpenTrace,
   renderDatasetImage,
+  repeat,
+  rowPassRates,
 }: BuildColumnsOptions) => {
   // Evaluator ids whose per-row chip is redundant with the dedicated Winner
   // column below — the generic `EvaluatorResultChip` renders the comparison
@@ -138,19 +220,7 @@ const buildColumns = ({
   const comparisonEvaluatorIds = new Set(comparisonColumns.map((p) => p.evaluatorId));
   const columns = [];
 
-  // Row number column
-  columns.push(
-    columnHelper.display({
-      id: "rowNumber",
-      header: "",
-      size: 32,
-      cell: ({ row }) => (
-        <Text textStyle="caption" color="fg.muted" textAlign="right" paddingRight={1}>
-          {row.index + 1}
-        </Text>
-      ),
-    }),
-  );
+  columns.push(...rowNumberColumns({ targetColumns, repeat, rowPassRates }));
 
   // Dataset columns with type icons (skip hidden columns)
   for (const col of datasetColumns) {
@@ -347,6 +417,8 @@ export function SingleRunTable({
       renderTracePeek,
       onOpenTrace,
       renderDatasetImage,
+      repeat: data.repeat,
+      rowPassRates: data.rowPassRates,
     });
   }, [
     data,

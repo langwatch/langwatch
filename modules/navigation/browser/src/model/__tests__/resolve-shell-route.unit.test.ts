@@ -145,9 +145,9 @@ describe("resolveShellRoute", () => {
   });
 
   describe("given a personal address", () => {
-    it("names Me for /me itself", () => {
-      expect(resolve("/me/sessions").activeProductId).toBe("me");
-      expect(resolve("/me/sessions").isPersonalScopeRoute).toBe(true);
+    it("names Coding agents for /coding-agents itself", () => {
+      expect(resolve("/coding-agents/sessions").activeProductId).toBe("me");
+      expect(resolve("/coding-agents/sessions").isPersonalScopeRoute).toBe(true);
     });
 
     it("names Me when the reader is on their own personal project", () => {
@@ -191,9 +191,12 @@ describe("resolveShellRoute", () => {
     });
 
     describe("when the address names their own Me workspace or a project", () => {
-      it.each(["/me/sessions", "/personal-ada-abc123/traces"])("opens %s", (pathname) => {
-        expect(resolve(pathname, { organizationRole: "DEVELOPER" }).seatRefusal).toBeNull();
-      });
+      it.each(["/coding-agents/sessions", "/personal-ada-abc123/traces"])(
+        "opens %s",
+        (pathname) => {
+          expect(resolve(pathname, { organizationRole: "DEVELOPER" }).seatRefusal).toBeNull();
+        },
+      );
     });
 
     describe("when the address belongs to no product", () => {

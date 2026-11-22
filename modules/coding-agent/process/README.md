@@ -20,10 +20,12 @@ Peers call these through the token, declared at `../contract/src/coding-agent.ap
 findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null>;
 ```
 
-#### `findSessionForTrace`
+#### `findSessionForTraceForViewer`
+
+The session one trace belongs to, its name blanked unless the viewer may read content.
 
 ```typescript
-findSessionForTrace(input: { projectId: string; traceId: string; }): Promise<CodingAgentSession | null>;
+findSessionForTraceForViewer(input: { projectId: string; traceId: string; authorization: Authorization }, by: CodingAgentViewer): Promise<CodingAgentSession | null>;
 ```
 
 #### `findLastTurnOfSession`
@@ -379,8 +381,8 @@ Declared at `src/eventing/coding-agent-project-milestones.pipeline.ts:18`. Event
 
 | Kind   | Leaf                    | Environment variable               | Declared at                                |
 | ------ | ----------------------- | ---------------------------------- | ------------------------------------------ |
-| secret | `repositoryKey`         | `CREDENTIALS_SECRET`               | `src/app/coding-agent.app.ts:157`          |
-| secret | `repositoryKeyFallback` | `NEXTAUTH_SECRET`                  | `src/app/coding-agent.app.ts:158`          |
+| secret | `repositoryKey`         | `CREDENTIALS_SECRET`               | `src/app/coding-agent.app.ts:158`          |
+| secret | `repositoryKeyFallback` | `NEXTAUTH_SECRET`                  | `src/app/coding-agent.app.ts:159`          |
 | config | `foldCacheTtlSeconds`   | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/coding-agent.config.ts:4` |
 
 <!-- readme:generated:end -->

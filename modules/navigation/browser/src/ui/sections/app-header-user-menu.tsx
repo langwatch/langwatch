@@ -8,6 +8,7 @@ import { UserAvatar } from "@langwatch/design-system/avatar";
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, HStack, Portal } from "@langwatch/design-system/primitives";
 import type { NavigationUser } from "@langwatch/navigation-contract";
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 import { Monitor, PanelsTopLeft } from "lucide-react";
 
 import {
@@ -186,7 +187,7 @@ export function AppHeaderUserMenu() {
 
 /**
  * A plain link for the org-less reader, else one item per governance org.
- * Picking one writes that org into scope, then opens `/me`.
+ * Picking one writes that org into scope, then opens `/coding-agents`.
  */
 function PersonalWorkspaceEntries({
   entries,
@@ -201,7 +202,7 @@ function PersonalWorkspaceEntries({
   if (orgLess) {
     return (
       <Menu.Item value="my-workspace" asChild>
-        <NavigationLink href="/me">My Workspace</NavigationLink>
+        <NavigationLink href={CODING_AGENTS_PATH}>My Workspace</NavigationLink>
       </Menu.Item>
     );
   }
@@ -218,7 +219,7 @@ function PersonalWorkspaceEntries({
                 teamId: "",
                 projectSlug: "",
               });
-              host.navigate("/me");
+              host.navigate(CODING_AGENTS_PATH);
             }}
           >
             My Workspace

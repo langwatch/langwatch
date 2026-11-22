@@ -20,6 +20,7 @@ import {
   type EvaluationScope,
 } from "./trace-query-evaluation-scope.rules.ts";
 import { boundedSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
+import { hintForUnknownTraceFilterField } from "./trace-query-unknown-field.rules.ts";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
@@ -234,7 +235,11 @@ export function translateTraceTag({
   const def = fieldDefs.get(fieldName);
 
   if (!def) {
-    throw new FilterFieldUnknownError(fieldName, [...fieldDefs.keys()]);
+    throw new FilterFieldUnknownError(
+      fieldName,
+      [...fieldDefs.keys()],
+      hintForUnknownTraceFilterField({ field: fieldName, knownFields: [...fieldDefs.keys()] }),
+    );
   }
 
   return def.toClickHouse(tag, negated, ctx);

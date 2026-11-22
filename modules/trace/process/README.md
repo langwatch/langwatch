@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`TraceApi`)
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:205`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:203`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -103,10 +103,12 @@ Main's `getNormalizedSpansByTraceId`: a trace's stored spans, attributes unresol
 findNormalizedSpansByTraceId(input: { authorization: Authorization; traceId: string; limit?: number; }): Promise<NormalizedSpan[]>;
 ```
 
-#### `resolveIngestWaitTimeout`
+#### `resolveTraceSettleSettings`
+
+The project's recommended verdict-time trace wait, measured on its own span arrivals.
 
 ```typescript
-resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number>;
+resolveTraceSettleSettings(input: TraceIngestWaitInput): Promise<TraceSettleSettings>;
 ```
 
 #### `getEvaluationSpans`
@@ -963,14 +965,6 @@ With a proof, the trace member's runs, content gated for the viewer (ADR-177 blo
 readEvaluationRuns(input: | { tenantId: string; traceId: string } | { projectId: string; traceId: string; tenantId?: string | undefined; authorization: Authorization; viewerUserId: string; }): Promise<unknown>;
 ```
 
-#### `readInstantEvalResults`
-
-The trace member's kept Instant Evals results, asked of instant-eval over the trace's time window (ADR-189 section 3); empty where its flag is off or no member holds the trace.
-
-```typescript
-readInstantEvalResults(input: { projectId: string; traceId: string; tenantId?: string | undefined; occurredFrom: number; occurredUntil: number; authorization: Authorization; viewerUserId: string; }): Promise<InstantEvalTraceResultWire[]>;
-```
-
 #### `readCodingAgentTranscript`
 
 The transcript through the viewer's own protections; `codingAgents.transcript` reads it.
@@ -1344,7 +1338,7 @@ type Response = unknown;
 
 |             |                                      |
 | ----------- | ------------------------------------ |
-| Declared at | `src/transport/traces.rest.ts:308`   |
+| Declared at | `src/transport/traces.rest.ts:309`   |
 | Base URL    | `/api/traces`, twin `/api/v1/traces` |
 | Addressing  | dated                                |
 | Credential  | project                              |
@@ -1354,21 +1348,38 @@ type Response = unknown;
 
 Search traces for a project
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:312`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:313`.
 
 Answers at `/api/traces/search`, `/api/v1/traces/search`; also, undocumented, `/api/traces/2026-08-07/search`, `/api/v1/traces/2026-08-07/search`, `/api/traces/latest/search`, `/api/v1/traces/latest/search`.
 
 ```typescript
 type Body = z.infer<typeof traceSearchBodySchema>; // ../contract/src/trace-rest.schemas.ts:131
-// Response: inline, src/transport/traces.rest.ts:317
+// Response: inline, src/transport/traces.rest.ts:318
 type Response = unknown;
+```
+
+#### `GET /settle-settings` · `getTraceSettleSettings`
+
+Recommended trace wait for a scenario judge
+
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:340`.
+
+Answers at `/api/traces/settle-settings`, `/api/v1/traces/settle-settings`; also, undocumented, `/api/traces/2026-08-07/settle-settings`, `/api/v1/traces/2026-08-07/settle-settings`, `/api/traces/latest/settle-settings`, `/api/v1/traces/latest/settle-settings`.
+
+```typescript
+// Response: traceSettleSettingsSchema, ../contract/src/trace.queries.ts:76
+interface Response {
+  waitTimeoutMs: number;
+  waitExtensionMs: number;
+  quietPeriodMs: number;
+}
 ```
 
 #### `GET /facets` · `getTraceFacets`
 
 Discover what the trace filter fields hold
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:339`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:364`.
 
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
@@ -1390,7 +1401,7 @@ type Response = Record<string, unknown>;
 
 Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:372`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:397`.
 
 Answers at `/api/traces/:traceId/transcript`, `/api/v1/traces/:traceId/transcript`; also, undocumented, `/api/traces/2026-08-07/:traceId/transcript`, `/api/v1/traces/2026-08-07/:traceId/transcript`, `/api/traces/latest/:traceId/transcript`, `/api/v1/traces/latest/:traceId/transcript`.
 
@@ -1406,7 +1417,7 @@ type Response = z.infer<typeof transcriptRestResponseSchema>; // ../contract/src
 
 Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
 
-Permission `traces:update`. Declared at `src/transport/traces.rest.ts:411`.
+Permission `traces:update`. Declared at `src/transport/traces.rest.ts:436`.
 
 Answers at `/api/traces/:traceId/metadata`, `/api/v1/traces/:traceId/metadata`; also, undocumented, `/api/traces/2026-08-07/:traceId/metadata`, `/api/v1/traces/2026-08-07/:traceId/metadata`, `/api/traces/latest/:traceId/metadata`, `/api/v1/traces/latest/:traceId/metadata`.
 
@@ -1426,7 +1437,7 @@ interface Response {
 
 Get a single trace by ID.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:437`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:462`.
 
 Answers at `/api/traces/:traceId`, `/api/v1/traces/:traceId`; also, undocumented, `/api/traces/2026-08-07/:traceId`, `/api/v1/traces/2026-08-07/:traceId`, `/api/traces/latest/:traceId`, `/api/v1/traces/latest/:traceId`.
 
@@ -1519,7 +1530,7 @@ type Output = z.infer<typeof exportProgressEventSchema>; // ../contract/src/feat
 
 ### `sharedTrace`
 
-Contract `../contract/src/traces.trpc.ts:681`, router `src/transport/shared-trace.trpc.ts:30`.
+Contract `../contract/src/traces.trpc.ts:667`, router `src/transport/shared-trace.trpc.ts:30`.
 
 | Procedure         | Kind  | Gate                                                                                                                                                | Input                       | Output                 |
 | ----------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------------- |
@@ -1527,7 +1538,7 @@ Contract `../contract/src/traces.trpc.ts:681`, router `src/transport/shared-trac
 
 ```typescript
 // sharedTrace.get
-// Input: sharedTraceGetInputSchema, ../contract/src/traces.trpc.ts:679
+// Input: sharedTraceGetInputSchema, ../contract/src/traces.trpc.ts:665
 interface Input {
   token: string;
 }
@@ -1536,7 +1547,7 @@ type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-sha
 
 ### `spans`
 
-Contract `../contract/src/traces.trpc.ts:690`, router `src/transport/spans.trpc.ts:10`.
+Contract `../contract/src/traces.trpc.ts:676`, router `src/transport/spans.trpc.ts:10`.
 
 | Procedure                  | Kind  | Gate                     | Input              | Output                   |
 | -------------------------- | ----- | ------------------------ | ------------------ | ------------------------ |
@@ -1545,7 +1556,7 @@ Contract `../contract/src/traces.trpc.ts:690`, router `src/transport/spans.trpc.
 
 ```typescript
 // spans.getAllForTrace
-// Input: traceScopeSchema, ../contract/src/traces.trpc.ts:134
+// Input: traceScopeSchema, ../contract/src/traces.trpc.ts:133
 interface Input {
   projectId: string;
   traceId: string;
@@ -1553,7 +1564,7 @@ interface Input {
 type Output = z.infer<typeof spansForTraceSchema>; // ../contract/src/trace.responses.ts:63
 
 // spans.getForPromptStudio
-// Input: inline, ../contract/src/traces.trpc.ts:697
+// Input: inline, ../contract/src/traces.trpc.ts:683
 interface Input {
   projectId: string;
   spanId: string;
@@ -1593,7 +1604,7 @@ type Input = z.infer<typeof traceScopeSchema>; // ../contract/src/features/edit-
 
 ### `traces`
 
-Contract `../contract/src/traces.trpc.ts:191`, router `src/transport/traces.trpc.ts:33`.
+Contract `../contract/src/traces.trpc.ts:190`, router `src/transport/traces.trpc.ts:33`.
 
 | Procedure                              | Kind         | Gate                                                                  | Input                           | Output                             |
 | -------------------------------------- | ------------ | --------------------------------------------------------------------- | ------------------------------- | ---------------------------------- |
@@ -1628,7 +1639,6 @@ Contract `../contract/src/traces.trpc.ts:191`, router `src/transport/traces.trpc
 | `traces.changeName`                    | mutation     | Permission `traces:update`                                            | inline                          | `tracesChangedNameSchema`          |
 | `traces.changeMetadata`                | mutation     | Permission `traces:update`                                            | inline                          | `traceMetadataResponseSchema`      |
 | `traces.evals`                         | query        | Permission `traces:view`                                              | inline                          | `tracesEvaluationRunsSchema`       |
-| `traces.instantEvalResults`            | query        | Permission `traces:view`                                              | inline                          | inline                             |
 | `traces.traceLogs`                     | query        | Permission `traces:view`                                              | inline                          | `tracesTraceLogsSchema`            |
 | `traces.spansPaginated`                | query        | Permission `traces:view`                                              | inline                          | `tracesSpansPageSchema`            |
 | `traces.spansDelta`                    | query        | Permission `traces:view`                                              | inline                          | `tracesSpansDeltaSchema`           |
@@ -1648,11 +1658,11 @@ Contract `../contract/src/traces.trpc.ts:191`, router `src/transport/traces.trpc
 
 ```typescript
 // traces.getAllForProject
-type Input = z.infer<typeof traceListInputSchema>; // ../contract/src/traces.trpc.ts:125
+type Input = z.infer<typeof traceListInputSchema>; // ../contract/src/traces.trpc.ts:124
 type Output = z.infer<typeof tracesForProjectResultSchema>; // ../contract/src/trace-read.contract.ts:202
 
 // traces.getById
-// Input: inline, ../contract/src/traces.trpc.ts:199
+// Input: inline, ../contract/src/traces.trpc.ts:198
 interface Input {
   projectId: string;
   traceId: string;
@@ -1661,24 +1671,24 @@ interface Input {
 type Output = z.infer<typeof traceSchema>; // ../contract/src/trace-format.schemas.ts:855
 
 // traces.getEvaluations
-// Input: inline, ../contract/src/traces.trpc.ts:203
+// Input: inline, ../contract/src/traces.trpc.ts:202
 interface Input {
   projectId: string;
   traceId: string;
   tenantId?: string;
 }
-// Output: evaluationSchema.array().optional() (inline, ../contract/src/traces.trpc.ts:204)
+// Output: evaluationSchema.array().optional() (inline, ../contract/src/traces.trpc.ts:203)
 
 // traces.getEvaluationsMultiple
-// Input: inline, ../contract/src/traces.trpc.ts:207
+// Input: inline, ../contract/src/traces.trpc.ts:206
 interface Input {
   projectId: string;
   traceIds: string[];
 }
-// Output: z.record(z.string(), evaluationSchema.array()) (inline, ../contract/src/traces.trpc.ts:208)
+// Output: z.record(z.string(), evaluationSchema.array()) (inline, ../contract/src/traces.trpc.ts:207)
 
 // traces.getCustomersAndLabels
-type Input = z.infer<typeof traceFilterInputSchema>; // ../contract/src/traces.trpc.ts:113
+type Input = z.infer<typeof traceFilterInputSchema>; // ../contract/src/traces.trpc.ts:112
 // Output: customersAndLabelsResultSchema, ../contract/src/trace-read.contract.ts:219
 interface Output {
   customers: string[];
@@ -1686,51 +1696,51 @@ interface Output {
 }
 
 // traces.getTracesByThreadId
-// Input: inline, ../contract/src/traces.trpc.ts:215
+// Input: inline, ../contract/src/traces.trpc.ts:214
 interface Input {
   projectId: string;
   threadId: string;
 }
-// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:216)
+// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:215)
 
 // traces.getTracesWithSpans
-// Input: inline, ../contract/src/traces.trpc.ts:220
+// Input: inline, ../contract/src/traces.trpc.ts:219
 interface Input {
   projectId: string;
   traceIds: string[];
   withEditOverlay?: boolean;
 }
-// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:226)
+// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:225)
 
 // traces.getFormattedSpansDigest
-// Input: inline, ../contract/src/traces.trpc.ts:230
+// Input: inline, ../contract/src/traces.trpc.ts:229
 interface Input {
   projectId: string;
   traceIds: string[];
   withEditOverlay?: boolean;
 }
-// Output: inline, ../contract/src/traces.trpc.ts:236
+// Output: inline, ../contract/src/traces.trpc.ts:235
 type Output = Record<string, string>;
 
 // traces.getTracesWithSpansByThreadIds
-// Input: inline, ../contract/src/traces.trpc.ts:240
+// Input: inline, ../contract/src/traces.trpc.ts:239
 interface Input {
   projectId: string;
   threadIds: string[];
   withEditOverlay?: boolean;
 }
-// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:246)
+// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:245)
 
 // traces.getSampleTracesDataset
-// Input: z.object({ ...traceFilterInputSchema.shape, ...sampleExtrasSchema.shape }) (inline, ../contract/src/traces.trpc.ts:249)
-// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:250)
+// Input: z.object({ ...traceFilterInputSchema.shape, ...sampleExtrasSchema.shape }) (inline, ../contract/src/traces.trpc.ts:248)
+// Output: traceSchema.array() (inline, ../contract/src/traces.trpc.ts:249)
 
 // traces.getSampleTraces
-// Input: z.object({ ...traceFilterInputSchema.shape, ...sampleExtrasSchema.shape, query: z.string(… (inline, ../contract/src/traces.trpc.ts:254)
-// Output: z.object({ ...traceSchema.shape, passesPreconditions: z.boolean() }).array() (inline, ../contract/src/traces.trpc.ts:263)
+// Input: z.object({ ...traceFilterInputSchema.shape, ...sampleExtrasSchema.shape, query: z.string(… (inline, ../contract/src/traces.trpc.ts:253)
+// Output: z.object({ ...traceSchema.shape, passesPreconditions: z.boolean() }).array() (inline, ../contract/src/traces.trpc.ts:262)
 
 // traces.getFieldNames
-// Input: inline, ../contract/src/traces.trpc.ts:266
+// Input: inline, ../contract/src/traces.trpc.ts:265
 interface Input {
   projectId: string;
   startDate: number;
@@ -1739,7 +1749,7 @@ interface Input {
 type Output = z.infer<typeof distinctFieldNamesResultSchema>; // ../contract/src/trace-read.contract.ts:232
 
 // traces.getFieldRedactionStatus
-// Input: inline, ../contract/src/traces.trpc.ts:271
+// Input: inline, ../contract/src/traces.trpc.ts:270
 interface Input {
   projectId: string;
 }
@@ -1756,23 +1766,23 @@ interface Output {
 }
 
 // traces.getAllForDownload
-// Input: z.object({ ...traceListInputSchema.shape, ...downloadExtrasSchema.shape, pageSize: z.numb… (inline, ../contract/src/traces.trpc.ts:276)
+// Input: z.object({ ...traceListInputSchema.shape, ...downloadExtrasSchema.shape, pageSize: z.numb… (inline, ../contract/src/traces.trpc.ts:275)
 type Output = z.infer<typeof tracesForProjectResultSchema>; // ../contract/src/trace-read.contract.ts:202
 
 // traces.onTraceUpdate
-// Input: inline, ../contract/src/traces.trpc.ts:289
+// Input: inline, ../contract/src/traces.trpc.ts:288
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/traces.trpc.ts:290
+// Output: inline, ../contract/src/traces.trpc.ts:289
 type Output = unknown;
 
 // traces.list
-// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, sort: sortSchema, page: z.n… (inline, ../contract/src/traces.trpc.ts:298)
+// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, sort: sortSchema, page: z.n… (inline, ../contract/src/traces.trpc.ts:297)
 type Output = z.infer<typeof tracesListPageSchema>; // ../contract/src/trace.responses.ts:126
 
 // traces.listEvents
-// Input: inline, ../contract/src/traces.trpc.ts:321
+// Input: inline, ../contract/src/traces.trpc.ts:320
 interface Input {
   projectId: string;
   traceIds: string[];
@@ -1797,14 +1807,14 @@ type Output = Record<
 >;
 
 // traces.newCount
-// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, since: z.number(), query: z… (inline, ../contract/src/traces.trpc.ts:331)
+// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, since: z.number(), query: z… (inline, ../contract/src/traces.trpc.ts:330)
 // Output: tracesNewCountSchema, ../contract/src/trace.responses.ts:159
 interface Output {
   count: number;
 }
 
 // traces.suggest
-// Input: inline, ../contract/src/traces.trpc.ts:343
+// Input: inline, ../contract/src/traces.trpc.ts:342
 interface Input {
   projectId: string;
   field: string;
@@ -1817,7 +1827,7 @@ interface Output {
 }
 
 // traces.conversationContext
-// Input: inline, ../contract/src/traces.trpc.ts:359
+// Input: inline, ../contract/src/traces.trpc.ts:358
 interface Input {
   projectId: string;
   conversationId: string;
@@ -1826,23 +1836,23 @@ interface Input {
 type Output = z.infer<typeof tracesConversationContextSchema>; // ../contract/src/trace.responses.ts:189
 
 // traces.discover
-// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, query: z.string().nullish()… (inline, ../contract/src/traces.trpc.ts:375)
+// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, query: z.string().nullish()… (inline, ../contract/src/traces.trpc.ts:374)
 type Output = z.infer<typeof discoverResultSchema>; // ../contract/src/features/list/trace-list-view.ts:173
 
 // traces.facets
-// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, query: z.string().nullish()… (inline, ../contract/src/traces.trpc.ts:387)
+// Input: z.object({ projectId: z.string(), timeRange: timeRangeSchema, query: z.string().nullish()… (inline, ../contract/src/traces.trpc.ts:386)
 type Output = z.infer<typeof discoverResultSchema>; // ../contract/src/features/list/trace-list-view.ts:173
 
 // traces.onDiscoverUpdate
-// Input: inline, ../contract/src/traces.trpc.ts:402
+// Input: inline, ../contract/src/traces.trpc.ts:401
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/traces.trpc.ts:403
+// Output: inline, ../contract/src/traces.trpc.ts:402
 type Output = unknown;
 
 // traces.facetValues
-// Input: inline, ../contract/src/traces.trpc.ts:407
+// Input: inline, ../contract/src/traces.trpc.ts:406
 interface Input {
   projectId: string;
   timeRange: {
@@ -1866,7 +1876,7 @@ interface Output {
 }
 
 // traces.aiQuery
-// Input: inline, ../contract/src/traces.trpc.ts:421
+// Input: inline, ../contract/src/traces.trpc.ts:420
 interface Input {
   projectId: string;
   prompt: string;
@@ -1891,7 +1901,7 @@ type Output =
     };
 
 // traces.aiAction
-// Input: inline, ../contract/src/traces.trpc.ts:432
+// Input: inline, ../contract/src/traces.trpc.ts:431
 interface Input {
   projectId: string;
   prompt: string;
@@ -1920,7 +1930,7 @@ type Input = z.infer<typeof routeSearchInputSchema>; // ../contract/src/features
 type Output = z.infer<typeof routeSearchResultSchema>; // ../contract/src/features/query/trace-search-route.ts:134
 
 // traces.header
-// Input: inline, ../contract/src/traces.trpc.ts:451
+// Input: inline, ../contract/src/traces.trpc.ts:450
 interface Input {
   projectId: string;
   traceId: string;
@@ -1931,7 +1941,7 @@ interface Input {
 type Output = z.infer<typeof traceHeaderSchema>; // ../contract/src/trace-view.contract.ts:154
 
 // traces.changeName
-// Input: inline, ../contract/src/traces.trpc.ts:463
+// Input: inline, ../contract/src/traces.trpc.ts:462
 interface Input {
   projectId: string;
   traceId: string;
@@ -1944,7 +1954,7 @@ interface Output {
 }
 
 // traces.changeMetadata
-// Input: inline, ../contract/src/traces.trpc.ts:473
+// Input: inline, ../contract/src/traces.trpc.ts:472
 interface Input {
   projectId: string;
   traceId: string;
@@ -1953,7 +1963,7 @@ interface Input {
 type Output = z.infer<typeof traceMetadataResponseSchema>; // ../contract/src/trace-rest.schemas.ts:261
 
 // traces.evals
-// Input: inline, ../contract/src/traces.trpc.ts:483
+// Input: inline, ../contract/src/traces.trpc.ts:482
 interface Input {
   projectId: string;
   traceId: string;
@@ -1961,19 +1971,8 @@ interface Input {
 }
 type Output = z.infer<typeof tracesEvaluationRunsSchema>; // ../contract/src/trace.responses.ts:216
 
-// traces.instantEvalResults
-// Input: inline, ../contract/src/traces.trpc.ts:494
-interface Input {
-  projectId: string;
-  traceId: string;
-  occurredFrom: number;
-  occurredUntil: number;
-  tenantId?: string;
-}
-// Output: instantEvalTraceResultSchema.array() (inline, ../contract/src/traces.trpc.ts:502)
-
 // traces.traceLogs
-// Input: inline, ../contract/src/traces.trpc.ts:506
+// Input: inline, ../contract/src/traces.trpc.ts:492
 interface Input {
   projectId: string;
   traceId: string;
@@ -1994,7 +1993,7 @@ type Output = {
 }[];
 
 // traces.spansPaginated
-// Input: inline, ../contract/src/traces.trpc.ts:516
+// Input: inline, ../contract/src/traces.trpc.ts:502
 interface Input {
   projectId: string;
   traceId: string;
@@ -2006,7 +2005,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpansPageSchema>; // ../contract/src/trace.responses.ts:203
 
 // traces.spansDelta
-// Input: inline, ../contract/src/traces.trpc.ts:528
+// Input: inline, ../contract/src/traces.trpc.ts:514
 interface Input {
   projectId: string;
   traceId: string;
@@ -2017,7 +2016,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpansDeltaSchema>; // ../contract/src/trace.responses.ts:208
 
 // traces.spanTreePaginated
-// Input: inline, ../contract/src/traces.trpc.ts:543
+// Input: inline, ../contract/src/traces.trpc.ts:529
 interface Input {
   projectId: string;
   traceId: string;
@@ -2033,7 +2032,7 @@ interface Input {
 type Output = z.infer<typeof spanTreePageSchema>; // ../contract/src/trace.ts:50
 
 // traces.spanTreeDelta
-// Input: inline, ../contract/src/traces.trpc.ts:552
+// Input: inline, ../contract/src/traces.trpc.ts:538
 interface Input {
   projectId: string;
   traceId: string;
@@ -2044,7 +2043,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpanTreeNodesSchema>; // ../contract/src/trace.responses.ts:224
 
 // traces.spanTree
-// Input: inline, ../contract/src/traces.trpc.ts:562
+// Input: inline, ../contract/src/traces.trpc.ts:548
 interface Input {
   projectId: string;
   traceId: string;
@@ -2054,7 +2053,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpanTreeNodesSchema>; // ../contract/src/trace.responses.ts:224
 
 // traces.spanLangwatchSignals
-// Input: inline, ../contract/src/traces.trpc.ts:577
+// Input: inline, ../contract/src/traces.trpc.ts:563
 interface Input {
   projectId: string;
   traceId: string;
@@ -2071,7 +2070,7 @@ type Output = {
 }[];
 
 // traces.spansFull
-// Input: inline, ../contract/src/traces.trpc.ts:592
+// Input: inline, ../contract/src/traces.trpc.ts:578
 interface Input {
   projectId: string;
   traceId: string;
@@ -2081,7 +2080,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpanDetailsSchema>; // ../contract/src/trace.responses.ts:237
 
 // traces.agentCallGraph
-// Input: inline, ../contract/src/traces.trpc.ts:603
+// Input: inline, ../contract/src/traces.trpc.ts:589
 interface Input {
   projectId: string;
   traceId: string;
@@ -2091,7 +2090,7 @@ interface Input {
 type Output = z.infer<typeof agentCallGraphSchema>; // ../contract/src/trace-read.contract.ts:289
 
 // traces.spanDetail
-// Input: inline, ../contract/src/traces.trpc.ts:613
+// Input: inline, ../contract/src/traces.trpc.ts:599
 interface Input {
   projectId: string;
   traceId: string;
@@ -2103,7 +2102,7 @@ interface Input {
 type Output = z.infer<typeof spanDetailSchema>; // ../contract/src/trace-view.contract.ts:297
 
 // traces.resourceInfo
-// Input: inline, ../contract/src/traces.trpc.ts:631
+// Input: inline, ../contract/src/traces.trpc.ts:617
 interface Input {
   projectId: string;
   traceId: string;
@@ -2113,7 +2112,7 @@ interface Input {
 type Output = z.infer<typeof traceResourceInfoSchema>; // ../contract/src/trace-view.contract.ts:358
 
 // traces.traceEvents
-// Input: inline, ../contract/src/traces.trpc.ts:645
+// Input: inline, ../contract/src/traces.trpc.ts:631
 interface Input {
   projectId: string;
   traceId: string;

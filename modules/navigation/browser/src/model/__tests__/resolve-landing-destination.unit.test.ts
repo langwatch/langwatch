@@ -58,10 +58,10 @@ describe("resolveLandingDestination", () => {
           input({
             rememberedProduct: "governance",
             reachableProducts: ["me", "llm-ops"],
-            serverHomeDestination: "/me",
+            serverHomeDestination: "/coding-agents",
           }),
         ),
-      ).toBe("/me");
+      ).toBe("/coding-agents");
     });
 
     /** @scenario A remembered LLM Ops without any project falls through */
@@ -107,7 +107,9 @@ describe("resolveLandingDestination", () => {
     /** @scenario With nothing to go on the safety nets decide */
     it("falls back to the known project, then Me, then nothing", () => {
       expect(resolveLandingDestination(input({ projectSlug: "demo" }))).toBe("/demo");
-      expect(resolveLandingDestination(input({ reachableProducts: ["me"] }))).toBe("/me");
+      expect(resolveLandingDestination(input({ reachableProducts: ["me"] }))).toBe(
+        "/coding-agents",
+      );
       expect(resolveLandingDestination(input({ reachableProducts: [] }))).toBeNull();
     });
   });

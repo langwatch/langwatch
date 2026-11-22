@@ -288,7 +288,7 @@ export function parseWait(value: boolean | string | undefined): WaitOptions | un
  */
 export function parseRepeat(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
-  const repeat = Number.parseInt(value, 10);
+  const repeat = /^\s*\d+\s*$/.test(value) ? Number(value) : Number.NaN;
   if (!Number.isInteger(repeat) || repeat < 1 || repeat > 5) {
     console.error(chalk.red(`Error: --repeat takes a whole number from 1 to 5, not "${value}".`));
     process.exit(1);

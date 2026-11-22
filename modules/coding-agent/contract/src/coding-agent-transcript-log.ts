@@ -12,6 +12,7 @@ import {
   normalizeEventName,
   parseMcpToolName,
   deriveConversationKey,
+  readDeclaredSessionKey,
   classifyToolCall,
   unwrapUserQuery,
   isUtilityQuerySource,
@@ -35,7 +36,11 @@ export function collectLogEntries(
     const event = normalizeEventName(pickString(log.attributes, "event.name"));
     if (event === null) continue;
 
-    sessionId ??= deriveConversationKey(log.attributes);
+    sessionId ??=
+      readDeclaredSessionKey({
+        attributes: log.attributes,
+        resourceAttributes: log.resourceAttributes ?? null,
+      }) ?? deriveConversationKey(log.attributes);
     const entry = buildLogEntry({ event, log, claimedToolCalls, seenScriptCalls });
     if (entry !== null) entries.push(entry);
   }

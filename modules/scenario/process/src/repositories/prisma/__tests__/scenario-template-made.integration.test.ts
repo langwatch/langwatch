@@ -1,3 +1,9 @@
+/**
+ * @vitest-environment node
+ * Template-made scenarios over real rows: a key with no person writes no author, and the Free
+ * scenario cap counts them once they leave their own template suite.
+ * @see specs/licensing/cloud-free-creation-caps.feature
+ */
 import { randomUUID } from "node:crypto";
 
 import { createLogger } from "@langwatch/observability";
@@ -9,12 +15,6 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-/**
- * @vitest-environment node
- * Template-made scenarios over real rows: a key with no person writes no author, and the Free
- * scenario cap counts them once they leave their own template suite.
- * @see specs/licensing/cloud-free-creation-caps.feature
- */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nowInstant } from "@langwatch/time";

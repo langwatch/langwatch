@@ -64,9 +64,9 @@ Feature: Landing
   Scenario: A remembered product I lost access to falls through
     Given the device remembers "governance" for my organization
     And Governance is not reachable for me anymore
-    And the organization intent points at "/me"
+    And the organization intent points at "/coding-agents"
     When "/" resolves
-    Then I land on "/me"
+    Then I land on "/coding-agents"
 
   @unit
   Scenario: A remembered LLM Ops without any project falls through
