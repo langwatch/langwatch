@@ -18,7 +18,13 @@ import {
   windowDocument,
 } from "../../utils/timeWindow";
 import { parseOriginOption } from "./origin-filter";
-import { type SearchedDocument, searchedDocument, searchedLines, widenCommand } from "./searched";
+import {
+  type SearchedDocument,
+  searchedDocument,
+  searchedLines,
+  spanSearchSuggestion,
+  widenCommand,
+} from "./searched";
 
 /** Traces are walked in chunks so the progress bar moves rather than jumping 0 → 1. */
 const PROGRESS_CHUNK = 5;
@@ -218,7 +224,13 @@ const renderSearch = async ({
     {
       ...withHint({ document: result, hint }),
       window: windowDoc,
-      ...(empty ? { searched: empty.searched, widen: empty.widen ?? null } : {}),
+      ...(empty
+        ? {
+            searched: empty.searched,
+            widen: empty.widen ?? null,
+            ...(empty.inSpans ? { inSpans: empty.inSpans } : {}),
+          }
+        : {}),
     },
     {
       ...options,
@@ -245,6 +257,8 @@ interface EmptySearch {
   searched: SearchedDocument;
   /** The exact command that searches a wider window, or undefined once a year was read. */
   widen: string | undefined;
+  /** How to look for the query's text inside spans, which the search does not read. */
+  inSpans: string | null;
 }
 
 const describeEmpty = async ({
@@ -264,8 +278,10 @@ const describeEmpty = async ({
     origin,
     errorsOnly: options.errorsOnly,
   };
+  const searched = searchedDocument(input);
   return {
-    searched: searchedDocument(input),
+    searched,
+    inSpans: spanSearchSuggestion(searched),
     widen: widenCommand({
       base: "langwatch trace search",
       searched: input,
@@ -420,6 +436,7 @@ function printEmptySearch({
       ),
     );
   }
+  if (empty.inSpans) console.log(chalk.gray(empty.inSpans));
   if (empty.widen) {
     console.log(chalk.gray(`Search further back: ${chalk.cyan(empty.widen)}`));
   }

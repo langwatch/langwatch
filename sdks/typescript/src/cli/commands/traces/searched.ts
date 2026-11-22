@@ -14,7 +14,12 @@ export interface SearchedDocument {
   filter: string | null;
   origin: string[] | null;
   errorsOnly: boolean;
+  /** The trace fields the free-text query was matched against, or null without a query. */
+  queryFields: readonly string[] | null;
 }
+
+/** Free text matches the trace's own input, output and name; span content is not searched. */
+export const FREE_TEXT_FIELDS = ["input", "output", "name"] as const;
 
 export interface SearchedInput {
   project: string | null;
@@ -33,7 +38,17 @@ export const searchedDocument = (input: SearchedInput): SearchedDocument => ({
   filter: input.filter ?? null,
   origin: input.origin ?? null,
   errorsOnly: input.errorsOnly === true,
+  queryFields: input.query ? FREE_TEXT_FIELDS : null,
 });
+
+/**
+ * Where text that a free-text search missed may still be: inside a span. Null
+ * without a query. Spans are read per trace, so the way in is `trace get`.
+ */
+export const spanSearchSuggestion = (searched: SearchedDocument): string | null =>
+  searched.query === null
+    ? null
+    : `The text query matches only each trace's input, output and name, not span content (tool calls, retrieved documents, intermediate LLM calls). To look inside spans, list candidate traces without -q (narrow with --filter or the time window), open one with \`langwatch trace get <traceId> -o json\` and grep its spans for "${searched.query}".`;
 
 /** The same read over the next wider lookback, or undefined once a year was searched. */
 export const widenCommand = ({
@@ -65,7 +80,9 @@ export const widenCommand = ({
 export const searchedLines = (searched: SearchedDocument): string[] => [
   `Project: ${searched.project ?? "the project of the current API key"}`,
   `Window:  ${searched.from} to ${searched.to}`,
-  ...(searched.query === null ? [] : [`Query:   ${searched.query}`]),
+  ...(searched.query === null
+    ? []
+    : [`Query:   ${searched.query} (matched against ${searched.queryFields?.join(", ")})`]),
   ...(searched.filter === null ? [] : [`Filter:  ${searched.filter}`]),
   ...(searched.origin === null ? [] : [`Origin:  ${searched.origin.join(", ")}`]),
   ...(searched.errorsOnly ? ["Errors only"] : []),

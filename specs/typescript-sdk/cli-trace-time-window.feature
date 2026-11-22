@@ -27,6 +27,16 @@ Feature: Trace reads in the CLI find what an agent saw without guessing flags
     Then the document names the project, the window, the query and the filters
     And it carries the exact command that reads further back
 
+  # Free text matches only a trace's input, output and name. An agent that
+  # searched for text living in a span read zero hits as "no such trace".
+  @unit
+  Scenario: An empty text search says which fields it matched and how to look inside spans
+    Given nothing matched a free-text query
+    When I run `langwatch trace search -q <text>` in table or JSON output
+    Then the output says the query was matched against the trace's input, output and name only
+    And it suggests opening a candidate trace with `langwatch trace get` and grepping its spans for the text
+    And a search without a query carries no such suggestion
+
   @unit
   Scenario: An empty export says what it read on stderr and keeps stdout the file
     Given no trace matches the export window
