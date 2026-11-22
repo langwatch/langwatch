@@ -1,5 +1,7 @@
 export interface CodingAgentSessionDisplay {
   traceIds: string[];
+  /** The session's name, best source first (its own name, then a derived title); "" if none. */
+  title: string;
   costUsd: number;
   modelCalls: number;
   toolCalls: number;

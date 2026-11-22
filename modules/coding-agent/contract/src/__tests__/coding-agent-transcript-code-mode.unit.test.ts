@@ -226,3 +226,44 @@ describe("model replies in the transcript", () => {
     expect(texts).toEqual(["notes.txt has 4 lines."]);
   });
 });
+
+describe("buildCodingAgentTranscript with no user_prompt log record", () => {
+  function modelCall({ spanId, atMs, input }: { spanId: string; atMs: number; input: unknown }) {
+    return span({
+      spanId,
+      name: "claude_code.llm_request",
+      type: "llm",
+      startTimeMs: atMs,
+      endTimeMs: atMs + 100,
+      durationMs: 100,
+      params: { model: "claude-opus-5-5" },
+      input: JSON.stringify({ type: "chat_messages", value: input }),
+    });
+  }
+
+  /** @scenario "A tool-result turn is never shown as the user's prompt" */
+  it("makes no prompt line from a tool message holding a script's result", () => {
+    const { entries } = buildCodingAgentTranscript({
+      spans: [
+        modelCall({
+          spanId: "call-1",
+          atMs: 100,
+          input: [{ role: "user", content: "Check the ACME links" }],
+        }),
+        modelCall({
+          spanId: "call-2",
+          atMs: 2_000,
+          input: [
+            { role: "user", content: "Check the ACME links" },
+            { role: "assistant", content: "[tool_use: Poll]" },
+            { role: "tool", content: '<event kind="repl-eval"><result>ok</result></event>' },
+          ],
+        }),
+      ],
+      logs: [],
+    });
+
+    const prompts = entries.filter((entry) => entry.kind === "user_prompt");
+    expect(prompts.map((entry) => entry.text)).toEqual(["Check the ACME links"]);
+  });
+});

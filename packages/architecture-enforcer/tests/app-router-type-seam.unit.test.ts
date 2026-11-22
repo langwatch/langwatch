@@ -17,8 +17,8 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 /** A ceiling, lowered when earned: 1,540 `pnpm ensure:built` (#8795); 1,561-1,569 ADR-185, -190,
  * -192, -188, agent/evaluator versions; 1,570 `dataset-version.ts`; 1,576 seat requests; 1,578
  * Langy, Grok; 1,583 trace-limit cache, coalescer, entitlement errors, client-fault telemetry;
- * 1,585 seat peak; 1,589 braids; 1,592 agent registry; 1,593 docs playground policy; 1,594 http-mux
- * metrics; 1,595 `payment-recovery.ts`; 1,596-1,599 SIEM, kill switch, `/coding-agents`, prompt */
+ * 1,585 seat peak; 1,589 braids; 1,592 agent registry; 1,593 docs playground; 1,594 http-mux
+ * metrics; 1,595 payment recovery; 1,596-1,599 OCSF SIEM, kill switch, coding agents, run wait. */
 const CEILING = 1_599;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */

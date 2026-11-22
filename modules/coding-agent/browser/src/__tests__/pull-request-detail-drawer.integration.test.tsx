@@ -17,7 +17,7 @@ const { queryImpls, utils, mockOnClose } = vi.hoisted(() => ({
       conversationContext: { fetch: vi.fn(), prefetch: vi.fn() },
     },
     codingAgents: {
-      lastTurn: { fetch: vi.fn() },
+      lastTurn: { fetch: vi.fn(), prefetch: vi.fn() },
     },
   },
   mockOnClose: vi.fn(),
@@ -281,7 +281,7 @@ describe("the pull request detail drawer", () => {
       expect(screen.getByText("Add the sessions screen")).toBeInTheDocument();
       // A session with no title, and one whose title this reader may not see,
       // read the same way: the row is still worth listing for what it cost.
-      expect(screen.getByText("Untitled session")).toBeInTheDocument();
+      expect(screen.getByText(/^Claude Code session/)).toBeInTheDocument();
     });
   });
 
@@ -787,9 +787,9 @@ describe("the pull request detail drawer", () => {
 
         await user.hover(screen.getByText("Teach the fold about branches"));
 
-        expect(utils.traces.conversationContext.prefetch).toHaveBeenCalledWith({
+        expect(utils.codingAgents.lastTurn.prefetch).toHaveBeenCalledWith({
           projectId: "proj-personal",
-          conversationId: "session-a",
+          sessionId: "session-a",
         });
       });
     });

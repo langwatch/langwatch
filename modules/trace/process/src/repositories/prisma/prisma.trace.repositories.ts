@@ -96,6 +96,7 @@ export class PostgresTraceRepositories {
       braidReads: ClickHouseTraceBraidReadsRepository.create({ clickhouse }),
       existence: ClickHouseTraceExistenceRepository.create({
         resolveClient: traceClickHouse,
+        clickhouse: members.clickhouse,
       }),
       derivationSpans: TraceDerivationSpanClickHouseRepository.create({
         resolveClient: traceClickHouse,

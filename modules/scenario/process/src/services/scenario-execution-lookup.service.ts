@@ -49,6 +49,8 @@ export class ScenarioExecutionLookupService {
     parameters: RunParameterValues;
     simulatorModel: string | null;
     judgeModel: string | null;
+    traceQuietPeriodMs: number | null;
+    traceWaitTimeoutMs: number | null;
     callerVoice: CallerVoiceConfig;
   }> {
     const scenario = await this.options.scenarios.getById({
@@ -100,6 +102,8 @@ export class ScenarioExecutionLookupService {
       parameters,
       simulatorModel: scenario.simulatorModel ?? null,
       judgeModel: scenario.judgeModel ?? null,
+      traceQuietPeriodMs: scenario.traceQuietPeriodMs ?? null,
+      traceWaitTimeoutMs: scenario.traceWaitTimeoutMs ?? null,
       callerVoice: parseCallerVoiceConfig(scenario.callerVoice),
     };
   }
