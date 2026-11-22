@@ -579,7 +579,10 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
           z.object({
             identifier: z.string().min(1),
             type: z.enum(PROMPT_OUTPUT_TYPES),
-            json_schema: z.object({ type: z.string() }).passthrough().optional(),
+            json_schema: z
+              .object({ type: z.string().min(1, "Type cannot be empty") })
+              .passthrough()
+              .optional(),
           }),
         )
         .optional()
