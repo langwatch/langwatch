@@ -5,6 +5,7 @@
  */
 import type {
   ResolvedRetention,
+  RetentionPolicy,
   RetentionPolicySnapshot,
   ScopeAssignment,
 } from "@langwatch/data-retention-contract";
@@ -36,6 +37,13 @@ type RetentionScopeLens = {
   canRead(scopeType: ScopeAssignment["scopeType"], scopeId: string): boolean;
   nameOf(scopeType: ScopeAssignment["scopeType"], scopeId: string): string;
 };
+
+/** A rule row as the stored apply status reads it: its scope and when it was saved. */
+const savedScope = ({ scopeType, scopeId, updatedAt }: RetentionPolicy) => ({
+  scopeType,
+  scopeId,
+  savedAt: updatedAt.getTime(),
+});
 
 export class DataRetentionSnapshotService {
   static create(options: DataRetentionSnapshotServiceOptions): DataRetentionSnapshotService {
@@ -155,11 +163,7 @@ export class DataRetentionSnapshotService {
     const readableRows = rows.filter((row) => lens.canRead(row.scopeType, row.scopeId));
     const storedApply = storedApplyStatuses({
       organizationId,
-      scopes: readableRows.map((row) => ({
-        scopeType: row.scopeType,
-        scopeId: row.scopeId,
-        savedAt: row.updatedAt.getTime(),
-      })),
+      scopes: readableRows.map(savedScope),
       records: applyRecords,
       teamOfProject: new Map(
         organizationDirectory.projects.map((project) => [project.id, project.teamId]),

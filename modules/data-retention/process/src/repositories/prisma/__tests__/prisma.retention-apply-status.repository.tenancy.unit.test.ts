@@ -1,3 +1,4 @@
+import { createTenantId } from "@langwatch/eventing";
 /**
  * @vitest-environment node
  * The apply-status rows under the production tenancy guard, which answers every statement it
@@ -12,7 +13,6 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
-import { createTenantId } from "@langwatch/eventing";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
