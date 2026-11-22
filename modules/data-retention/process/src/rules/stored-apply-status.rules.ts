@@ -7,8 +7,8 @@ import type { RetentionScopeType, StoredApplyStatus } from "@langwatch/data-rete
 
 type ScopeRef = Readonly<{ scopeType: RetentionScopeType; scopeId: string }>;
 
-/** A saved rule row; its `updatedAt` counts as a change even when the record of it was lost. */
-type ScopeRule = ScopeRef & Readonly<{ updatedAt?: Date }>;
+/** A saved rule; `savedAt` (epoch ms) counts as a change even when the record of it was lost. */
+type ScopeRule = ScopeRef & Readonly<{ savedAt?: number }>;
 
 /** What the status projection keeps per scope. */
 export type ScopeApplyRecord = ScopeRef &
@@ -23,6 +23,26 @@ export function retentionApplyStatusKey({
 }
 
 const refKey = ({ scopeType, scopeId }: ScopeRef): string => `${scopeType}:${scopeId}`;
+
+/** Each scope with a recorded change, once, at the later of its recorded change and its saves. */
+function lastChanges({
+  scopes,
+  byScope,
+}: {
+  scopes: readonly ScopeRule[];
+  byScope: ReadonlyMap<string, ScopeApplyRecord>;
+}): { scope: ScopeRef; changedAt: number }[] {
+  const changes = new Map<string, { scope: ScopeRef; changedAt: number }>();
+  for (const scope of scopes) {
+    const key = refKey(scope);
+    const recorded = byScope.get(key)?.changedAt ?? null;
+    if (recorded === null) continue;
+    const previous = changes.get(key)?.changedAt ?? recorded;
+    const changedAt = Math.max(previous, scope.savedAt ?? recorded);
+    changes.set(key, { scope: changes.get(key)?.scope ?? pick(scope), changedAt });
+  }
+  return [...changes.values()];
+}
 
 /**
  * One status per asked scope with a recorded change; a scope whose rule predates the record has
@@ -55,30 +75,14 @@ export function storedApplyStatuses({
     ];
   };
 
-  const savedAt = new Map<string, number>();
-  for (const scope of scopes) {
-    const at = scope.updatedAt?.getTime();
-    if (at !== undefined) savedAt.set(refKey(scope), Math.max(at, savedAt.get(refKey(scope)) ?? at));
-  }
-
-  const seen = new Set<string>();
-  const statuses: StoredApplyStatus[] = [];
-  for (const scope of scopes) {
-    if (seen.has(refKey(scope))) continue;
-    seen.add(refKey(scope));
-    const recorded = byScope.get(refKey(scope))?.changedAt ?? null;
-    if (recorded === null) continue;
-    const changedAt = Math.max(recorded, savedAt.get(refKey(scope)) ?? recorded);
+  return lastChanges({ scopes, byScope }).map(({ scope, changedAt }) => {
     const covering = coveringScopes(scope)
       .map(appliedAt)
       .filter((at): at is number => at !== null && at >= changedAt);
-    statuses.push(
-      covering.length > 0
-        ? { ...pick(scope), status: "applied", at: Math.max(...covering) }
-        : { ...pick(scope), status: "pending", at: changedAt },
-    );
-  }
-  return statuses;
+    return covering.length > 0
+      ? { ...scope, status: "applied", at: Math.max(...covering) }
+      : { ...scope, status: "pending", at: changedAt };
+  });
 }
 
 const pick = ({ scopeType, scopeId }: ScopeRef): ScopeRef => ({ scopeType, scopeId });

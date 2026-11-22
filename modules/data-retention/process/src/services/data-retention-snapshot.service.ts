@@ -155,7 +155,11 @@ export class DataRetentionSnapshotService {
     const readableRows = rows.filter((row) => lens.canRead(row.scopeType, row.scopeId));
     const storedApply = storedApplyStatuses({
       organizationId,
-      scopes: readableRows,
+      scopes: readableRows.map((row) => ({
+        scopeType: row.scopeType,
+        scopeId: row.scopeId,
+        savedAt: row.updatedAt.getTime(),
+      })),
       records: applyRecords,
       teamOfProject: new Map(
         organizationDirectory.projects.map((project) => [project.id, project.teamId]),

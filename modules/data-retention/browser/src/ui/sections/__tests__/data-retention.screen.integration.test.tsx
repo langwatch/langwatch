@@ -111,7 +111,13 @@ const {
           category: "scenarios" as const,
           retentionDays: 91,
         },
-      ],
+      ] as {
+        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+        scopeId: string;
+        name: string;
+        category: "traces" | "scenarios" | "experiments";
+        retentionDays: number;
+      }[],
       storedApply: [] as {
         scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
         scopeId: string;
@@ -353,7 +359,9 @@ describe("given the retention policies page", () => {
     it("says on the team's row that stored data is not on it yet", () => {
       renderScreen(new TestRetentionHost());
 
-      expect(within(rowOf("Platform")).getByText("Not applied to stored data yet")).toBeInTheDocument();
+      expect(
+        within(rowOf("Platform")).getByText("Not applied to stored data yet"),
+      ).toBeInTheDocument();
       expect(within(rowOf("Acme")).queryByText(/Not applied/)).not.toBeInTheDocument();
     });
   });

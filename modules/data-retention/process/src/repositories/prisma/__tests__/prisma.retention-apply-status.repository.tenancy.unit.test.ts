@@ -12,6 +12,7 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
+import { createTenantId } from "@langwatch/eventing";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
@@ -82,7 +83,7 @@ describe("given the Prisma apply-status repository behind the tenancy guard", ()
           updatedAt: 1,
           version: "2026-11-22",
         },
-        { aggregateId: "organization_1", tenantId: "organization_1", key: KEY },
+        { aggregateId: "organization_1", tenantId: createTenantId("organization_1"), key: KEY },
       );
 
       expect(guard.admitted).toEqual(["findUnique", "upsert"]);

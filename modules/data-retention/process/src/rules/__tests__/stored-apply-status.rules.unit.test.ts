@@ -134,7 +134,7 @@ describe("a scope's stored apply status", () => {
       expect(
         storedApplyStatuses({
           organizationId,
-          scopes: [{ ...organization, updatedAt: new Date(NOON) }],
+          scopes: [{ ...organization, savedAt: NOON }],
           records: [{ ...organization, changedAt: TEN, appliedAt: ELEVEN }],
           teamOfProject,
         }),
