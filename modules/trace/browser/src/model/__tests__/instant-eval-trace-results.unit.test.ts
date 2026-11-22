@@ -67,7 +67,6 @@ describe("instantEvalJudgedTextLabel", () => {
         "llm_output_messages",
         "llm_messages_span",
         "trace_json",
-        "monitor",
       ];
 
       expect(columns.map(instantEvalJudgedTextLabel)).toEqual([
@@ -77,7 +76,6 @@ describe("instantEvalJudgedTextLabel", () => {
         "output messages",
         "span messages",
         "full trace",
-        "monitor",
       ]);
     });
   });

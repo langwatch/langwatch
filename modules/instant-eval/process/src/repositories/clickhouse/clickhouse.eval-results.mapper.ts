@@ -20,10 +20,11 @@ import type {
 import { parseProbabilities } from "./clickhouse.instant-eval-judgments.mapper.ts";
 
 /**
- * Partitions one insert may touch: ClickHouse's `max_partitions_per_insert_block`. The table is
- * partitioned by the trace's week, so a run over old traces spans many.
+ * Kept under ClickHouse's `max_partitions_per_insert_block` (100). The table is partitioned by the
+ * trace's week (`toYearWeek(OccurredAt)`), so a run over old traces spans many. The headroom is
+ * for a Sunday week `toYearWeek` may split at New Year: 90 weeks cross at most two New Years.
  */
-export const EVAL_RESULTS_MAX_WEEKS_PER_INSERT = 100;
+export const EVAL_RESULTS_MAX_WEEKS_PER_INSERT = 90;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

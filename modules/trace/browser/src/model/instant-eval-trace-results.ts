@@ -22,7 +22,6 @@ const JUDGED_TEXT_LABELS: ReadonlyMap<string, string> = new Map([
   ["llm_output_messages", "output messages"],
   ["llm_messages_span", "span messages"],
   ["trace_json", "full trace"],
-  ["monitor", "monitor"],
 ]);
 
 /** The judged text in plain words; a column this list does not know reads as itself. */
