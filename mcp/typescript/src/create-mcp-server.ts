@@ -46,6 +46,22 @@ import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experim
 import { handleTestAgent } from "./tools/test-agent.ts";
 import { handleUpdateTestSuite } from "./tools/update-test-suite.ts";
 
+const PROMPT_INPUT_TYPES = [
+  "str",
+  "float",
+  "bool",
+  "image",
+  "file",
+  "list",
+  "list[str]",
+  "list[float]",
+  "list[int]",
+  "list[bool]",
+  "dict",
+  "chat_messages",
+] as const;
+const PROMPT_OUTPUT_TYPES = ["str", "float", "bool", "json_schema"] as const;
+
 const modelSchema = z
   .string()
   .describe(
@@ -530,7 +546,9 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
 
   server.tool(
     "platform_update_prompt",
-    "Update an existing prompt on the LangWatch platform. Every update creates a new version.",
+    "Update an existing prompt on the LangWatch platform. Every update creates a new version. " +
+      "Only the fields you pass change; everything else (inputs, outputs, parameters, model, " +
+      "temperature, max tokens, messages) is carried over from the current version.",
     {
       idOrHandle: z.string().describe("Prompt ID or handle to update"),
       messages: z
@@ -543,6 +561,35 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         .optional()
         .describe("Updated messages"),
       model: modelSchema.optional(),
+      temperature: z.number().optional().describe("Sampling temperature"),
+      maxTokens: z.number().int().positive().optional().describe("Maximum output tokens"),
+      inputs: z
+        .array(
+          z.object({
+            identifier: z.string().min(1),
+            type: z.enum(PROMPT_INPUT_TYPES),
+          }),
+        )
+        .optional()
+        .describe(
+          "Prompt variables, replacing the current list, e.g. [{ identifier: 'question', type: 'str' }]",
+        ),
+      outputs: z
+        .array(
+          z.object({
+            identifier: z.string().min(1),
+            type: z.enum(PROMPT_OUTPUT_TYPES),
+            json_schema: z.object({ type: z.string() }).passthrough().optional(),
+          }),
+        )
+        .optional()
+        .describe(
+          "Prompt outputs, replacing the current list. Use type 'json_schema' with a json_schema for structured output",
+        ),
+      parameters: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe("Runtime parameters (free-form JSON object), replacing the current ones"),
       commitMessage: z.string().describe("Commit message describing the change"),
       tags: z
         .array(z.string())
