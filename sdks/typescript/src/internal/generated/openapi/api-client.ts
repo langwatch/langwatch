@@ -11537,7 +11537,6 @@ export interface operations {
                     /** @enum {string} */
                     schemaVersion?: "1.0";
                     tags?: string[];
-                    /** @default {} */
                     parameters?: {
                         [key: string]: components["schemas"]["JsonValue"];
                     };
@@ -12517,7 +12516,6 @@ export interface operations {
                     /** @enum {string} */
                     schemaVersion?: "1.0";
                     tags?: string[];
-                    /** @default {} */
                     parameters?: {
                         [key: string]: components["schemas"]["JsonValue"];
                     };
