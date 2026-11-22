@@ -172,11 +172,13 @@ export function canonicaliseLogRecord({
   scopeName,
   body,
   attributes,
+  resourceAttributes,
 }: {
   canonicalisers: readonly AttributeCanonicaliser[];
   scopeName: string;
   body: string;
   attributes: CanonicalAttributes;
+  resourceAttributes?: CanonicalAttributes;
 }): CanonicalisedLogRecord {
   const bag = canonicalLogRecordStore({
     scopeName,
@@ -203,7 +205,14 @@ export function canonicaliseLogRecord({
   };
 
   for (const canonicaliser of canonicalisers) {
-    canonicaliser.applyLog?.({ bag, out, recordRule, setAttr, setAttrIfAbsent });
+    canonicaliser.applyLog?.({
+      bag,
+      out,
+      resourceAttributes,
+      recordRule,
+      setAttr,
+      setAttrIfAbsent,
+    });
   }
 
   return { attributes: out, appliedRules };

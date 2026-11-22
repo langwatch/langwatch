@@ -46,13 +46,18 @@ export const INSTANT_EVAL_DECISION_FEATURE_KEY = "instant_eval.judge";
 /**
  * The request shapes the Instant Evals judge speaks, one channel each (ADR-182 decision 8).
  * `jev` is the System One body (Jev, Inception, Perplexity, Microsoft-Decision-1, OpenRouter);
- * Cloudflare's REST route wraps that answer in `result`, which `cloudflare_jev` unwraps.
+ * `cloudflare_jev` unwraps Cloudflare's `result`; `gemini_decisions` sends `input`, not `state`.
  */
-export const DECISION_MODEL_WIRES = ["openai_decisions", "jev", "cloudflare_jev"] as const;
+export const DECISION_MODEL_WIRES = [
+  "openai_decisions",
+  "jev",
+  "cloudflare_jev",
+  "gemini_decisions",
+] as const;
 export type DecisionModelWire = (typeof DECISION_MODEL_WIRES)[number];
 
-/** How the key travels: `Authorization: Bearer`, or Azure's `api-key` header. */
-export const DECISION_MODEL_AUTH_HEADERS = ["bearer", "api_key"] as const;
+/** How the key travels: `Authorization: Bearer`, Azure's `api-key` or Google's `x-goog-api-key`. */
+export const DECISION_MODEL_AUTH_HEADERS = ["bearer", "api_key", "goog_api_key"] as const;
 export type DecisionModelAuthHeader = (typeof DECISION_MODEL_AUTH_HEADERS)[number];
 
 /**
@@ -221,6 +226,16 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
     wire: "jev",
     providerModel: "liquid/d1.1",
     endpoint: OPENROUTER_DECISIONS,
+  },
+  {
+    id: "gemini/decisions:gemini-decision-1",
+    provider: "gemini",
+    label: "Gemini Decision 1",
+    description: "Google's Gemini Decisions API, on your AI Studio key.",
+    wire: "gemini_decisions",
+    providerModel: "gemini-decision-1",
+    endpoint: "https://generativelanguage.googleapis.com/v1beta/decisions",
+    authHeader: "goog_api_key",
   },
   {
     id: "fireworks/decisions:rune",

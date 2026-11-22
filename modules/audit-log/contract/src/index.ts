@@ -17,6 +17,12 @@ export {
   type AuditLogHistoryEntrySchema,
   type AuditLogTargetEntrySchema,
   type FindAuditLogByTargetKindInputSchema,
+  auditLogExportEntrySchema,
+  type AuditLogExportEntry,
+  type AuditLogExportEntrySchema,
+  findAuditLogForOrganizationInputSchema,
+  type FindAuditLogForOrganizationInput,
+  type FindAuditLogForOrganizationInputSchema,
 } from "./audit-log.ts";
 export {
   auditLogIntentSchema,
@@ -26,7 +32,7 @@ export {
   type AuditLogIntentSchema,
   type RecordAuditLogCommandSchema,
 } from "./audit-log.ts";
-export { AuditLogApi } from "./audit-log.ts";
+export { AUDIT_LOG_EXPORT_PAGE_MAX, AuditLogApi } from "./audit-log.ts";
 export {
   recentItemSchema,
   recentItemsInputSchema,

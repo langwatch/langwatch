@@ -1,5 +1,5 @@
 /**
- * Frame for /me/* pages (container only; chrome belongs to route tree).
+ * Frame for /coding-agents/* pages (container only; chrome belongs to route tree).
  */
 
 import { Box, Container } from "@langwatch/design-system/primitives";
@@ -7,7 +7,7 @@ import type { PropsWithChildren } from "react";
 
 export function PersonalWorkspaceLayout({ children }: PropsWithChildren) {
   return (
-    <Container maxW="container.xl" paddingX={6} paddingY={4}>
+    <Container maxW="container.xl" paddingX={6} paddingTop={6} paddingBottom={4}>
       <Box width="full">{children}</Box>
     </Container>
   );

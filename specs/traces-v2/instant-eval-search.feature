@@ -40,6 +40,8 @@ Feature: Instant Evals inside the Trace Explorer
       And the run is estimated and started on the question as written, with the other terms as its filter
       And no model rewrites the question on the way, since the reader wrote it
       And a chip spelled `eval.conversation:` keeps judging conversations, whatever the lens shows
+      And a chip typed under NOT keeps its NOT, so the run lists the rows the judge did not match
+      And a chip under an OR, or under a NOT over other terms, is rebuilt beside them, as its run judges only those
       And the same question under another target is another chip, kept in the filter of the run that starts
       And a chip a run already answered is applied with no call at all
       And a refusal leaves the typed chip where it is rather than replacing it with a phrase search
@@ -357,6 +359,7 @@ Feature: Instant Evals inside the Trace Explorer
         | connect_license_revoked            | 0        | This license is no longer active, so Instant Evals are off. Nothing was charged. |
         | instant_eval_classifier_unavailable | 0       | The judge did not answer. Nothing was charged.                                   |
         | instant_eval_stalled               | 0.02     | This Instant Eval stopped before it finished. Only the rows judged were charged. |
+        | instant_eval_decision_model_key_invalid | 0  | Your model provider refused the key for this Instant Evals model. Check it in Settings > Model Providers. Nothing was charged. |
 
     @integration
     Scenario: Retry starts the same eval again
@@ -411,11 +414,12 @@ Feature: Instant Evals inside the Trace Explorer
       And the sentence and the terms typed beside it are routed again with Instant Evals unavailable
       And the router's answer is applied: a filter, a phrase or a question for the assistant, never an eval chip
 
-    # Instant Evals off for the organization: the popover offers the switch or a word
-    # with us, depending on the plan. Both are specified in
-    # modules/instant-eval/specs/instant-eval-opt-in.feature ("Instant Evals off for a
-    # self-serve organization open the enable popover", "Instant Evals off for an
-    # enterprise organization open the contact-us popover"). Either way no estimate
+    # Instant Evals off for the organization: the popover offers the switch, the
+    # project's own decision model, or a word with us, depending on the plan. All are
+    # specified in modules/instant-eval/specs/instant-eval-opt-in.feature ("Instant
+    # Evals off for a self-serve organization open the enable popover", "Instant Evals
+    # off for an enterprise organization ask for a decision model of its own", "Instant
+    # Evals off for an enterprise organization open the contact-us popover"). Either way no estimate
     # is requested, the typed query stays in the bar, and a chip typed alongside
     # other words is refused the same way, before any request.
 

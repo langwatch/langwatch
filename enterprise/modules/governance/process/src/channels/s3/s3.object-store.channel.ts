@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
-import { AwsClientConfiguration } from "@langwatch/aws-client";
+import { AwsClientConfiguration, defaultS3Host, s3RegionOf } from "@langwatch/aws-client";
 import { createSsrfUrlValidator } from "@langwatch/egress";
 
 import type {
@@ -17,11 +17,6 @@ type ObjectStoreTarget = {
   endpoint?: string;
   credentials: GovernanceObjectStorageCredentials;
 };
-
-function defaultS3Host(region: string): string {
-  const suffix = region.startsWith("cn-") ? ".amazonaws.com.cn" : ".amazonaws.com";
-  return `s3.${region}${suffix}`;
-}
 
 function appendListedKeys(
   keys: string[],
@@ -109,12 +104,13 @@ export class S3ObjectStoreChannel implements GovernanceObjectStore {
     input: ObjectStoreTarget,
     operation: (client: S3Client) => Promise<T>,
   ): Promise<T> {
-    const targetHost = input.endpoint ? new URL(input.endpoint).host : defaultS3Host(input.region);
+    const region = s3RegionOf({ region: input.region, endpoint: input.endpoint });
+    const targetHost = input.endpoint ? new URL(input.endpoint).host : defaultS3Host(region);
     await this.#validate(input.endpoint ?? `https://${targetHost}/`);
     const { accessKeyId, secretAccessKey, sessionToken } = input.credentials;
     const client = new S3Client({
       ...this.#aws.build({
-        region: input.region,
+        region,
         endpoint: input.endpoint,
         targetHost,
         staticCredentials: { accessKeyId, secretAccessKey, sessionToken },

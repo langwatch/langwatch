@@ -61,6 +61,9 @@ const transcriptEntrySchemaDefinition = z.discriminatedUnion("kind", [
     failed: z.boolean(),
     agentId: z.string().nullable(),
     spanId: z.string(),
+    // True for a call Claude Code's Code Mode made from inside a REPL script: it left only a
+    // decision log, so it has no span and no recorded output.
+    inScript: z.boolean().optional(),
   }),
   z.object({
     kind: z.literal("tool_rejected"),

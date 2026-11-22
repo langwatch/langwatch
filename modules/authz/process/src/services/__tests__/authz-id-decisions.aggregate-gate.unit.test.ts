@@ -6,6 +6,7 @@ import { StubAuthzLineageEpoch } from "../../repositories/__tests__/support/auth
 import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub.ts";
 import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../../repositories/__tests__/support/authz-read.stub.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { AuthzService } from "../authz.service.ts";
 
 /** ADR-177 decision 5 (M8487-BATCH-GATE): a batch never admits what a single check refuses. */
@@ -20,6 +21,7 @@ const admin: CollectedBinding[] = [
 
 function makeAuthz({ role, kind }: { role: "ADMIN" | "MEMBER"; kind: string }) {
   return AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     isOnEngine: async () => true,
     repository: makeReader({
       findOrganizationMembership: vi.fn().mockResolvedValue({ role, disabled: false }),

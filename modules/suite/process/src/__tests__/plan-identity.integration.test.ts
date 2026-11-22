@@ -137,6 +137,7 @@ function fakeScenarioService(): ScenarioApi {
     list: async ({ projectId: pid }: { projectId: string }) => {
       const rows = await database().scenario.findMany({
         where: { projectId: pid, archivedAt: null },
+        omit: { sourceTemplateId: true },
       });
       return rows.map((row) => scenarioSchema.parse(row));
     },

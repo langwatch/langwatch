@@ -5,10 +5,13 @@ import {
   CUSTOM_PRESET_VALUE,
   INDEFINITE_PRESET_VALUE,
   LEGACY_PRESET_VALUE,
+  retentionLengthBillsStorage,
 } from "../retention-constants.ts";
 
 const labels = (items: { label: string }[]) => items.map((i) => i.label);
 const values = (items: { value: string }[]) => items.map((i) => i.value);
+
+const PAID_LABELS = ["30 days", "60 days", "90 days", "180 days", "1 year"];
 
 describe("buildRetentionMenuItems", () => {
   describe("given a paid (non-enterprise) org", () => {
@@ -18,17 +21,20 @@ describe("buildRetentionMenuItems", () => {
       legacyDays: null,
     });
 
-    /** @scenario "A paid organization sees only the two fixed options" */
-    it("offers exactly the two fixed presets, in order", () => {
-      expect(labels(items)).toEqual(["1 month", "2 months"]);
+    /**
+     * @scenario "A paid organization sees only the fixed Growth options"
+     * @scenario "Growth administrators can pick the same options later in settings"
+     */
+    it("offers exactly the Growth presets, in order", () => {
+      expect(labels(items)).toEqual(PAID_LABELS);
     });
 
-    /** @scenario "A paid organization sees only the two fixed options" */
+    /** @scenario "A paid organization sees only the fixed Growth options" */
     it("offers no custom option", () => {
       expect(values(items)).not.toContain(CUSTOM_PRESET_VALUE);
     });
 
-    /** @scenario "A paid organization sees only the two fixed options" */
+    /** @scenario "A paid organization sees only the fixed Growth options" */
     it("offers no keep-forever option", () => {
       expect(values(items)).not.toContain(INDEFINITE_PRESET_VALUE);
     });
@@ -43,14 +49,7 @@ describe("buildRetentionMenuItems", () => {
 
     /** @scenario "An enterprise organization gets the full menu and a custom value" */
     it("offers the full preset list plus custom", () => {
-      expect(labels(items)).toEqual([
-        "1 month",
-        "2 months",
-        "3 months",
-        "1 year",
-        "5 years",
-        "Custom…",
-      ]);
+      expect(labels(items)).toEqual([...PAID_LABELS, "5 years", "Custom…"]);
     });
 
     /**
@@ -81,14 +80,14 @@ describe("buildRetentionMenuItems", () => {
       const items = buildRetentionMenuItems({
         isEnterprise: false,
         isPlatformAdmin: false,
-        legacyDays: 371,
+        legacyDays: 1827,
       });
       expect(items[0]).toEqual({
         value: LEGACY_PRESET_VALUE,
-        label: "Current: 371 days (legacy)",
+        label: "Current: 1827 days (legacy)",
       });
       // The real plan options still follow.
-      expect(labels(items).slice(1)).toEqual(["1 month", "2 months"]);
+      expect(labels(items).slice(1)).toEqual(PAID_LABELS);
     });
 
     it("labels an indefinite legacy value as keep-forever", () => {
@@ -99,5 +98,36 @@ describe("buildRetentionMenuItems", () => {
       });
       expect(items[0]?.label).toBe("Current: keep forever (legacy)");
     });
+  });
+});
+
+describe("given a plan that bills storage and a reader without subscription:manage", () => {
+  const items = buildRetentionMenuItems({
+    isEnterprise: false,
+    isPlatformAdmin: true,
+    legacyDays: null,
+    billedLocked: true,
+  });
+
+  it("disables every length above 90 days and keeping forever, naming why", () => {
+    expect(items.filter((item) => item.disabled).map((item) => item.label)).toEqual([
+      "180 days (needs billing access)",
+      "1 year (needs billing access)",
+      "No retention (keep forever) (needs billing access)",
+    ]);
+  });
+});
+
+describe("retentionLengthBillsStorage", () => {
+  it("bills above 90 days and forever only on a plan that bills storage", () => {
+    const bills = (storageBilled: boolean, retentionDays: number) =>
+      retentionLengthBillsStorage({ storageBilled, retentionDays });
+
+    expect([bills(true, 91), bills(true, 182), bills(true, 0), bills(false, 371)]).toEqual([
+      false,
+      true,
+      true,
+      false,
+    ]);
   });
 });

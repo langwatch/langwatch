@@ -121,13 +121,19 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions other-session kin
   });
 
   // Row-level probe, no dedup: the older non-auxiliary version still matches. That can only
-  // mistake a helper for main, which reads as "not first" (the safe side).
+  // mistake a helper for main, which reads as "not first" (the safe side). Merges stay stopped
+  // until the probe has read, so a background merge cannot fold the two versions first.
   it("reads a helper whose earlier version was not yet auxiliary as main", async () => {
     const tenantId = tenantFor("refold");
-    await store(tenantId, "h1", false);
-    await store(tenantId, "h1", true);
+    await ch.command({ query: "SYSTEM STOP MERGES coding_agent_sessions" });
+    try {
+      await store(tenantId, "h1", false);
+      await store(tenantId, "h1", true);
 
-    expect(await kindOf(tenantId, ["x"])).toBe("main");
+      expect(await kindOf(tenantId, ["x"])).toBe("main");
+    } finally {
+      await ch.command({ query: "SYSTEM START MERGES coding_agent_sessions" });
+    }
   });
 
   /** @scenario "A history check fails closed while the session id index is not ready" */

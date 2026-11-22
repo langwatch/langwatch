@@ -55,15 +55,9 @@ abstract class LangyTurnContextRenderer {
   abstract render(input: { context: object; isUiActionSurfaceOpen: boolean }): string | null;
 }
 
-/** Checks and reserves GitHub pull-request capacity for Langy turns. */
+/** The daily pull request cap, read before a turn is handed the GitHub token. */
 export abstract class LangyGithubPermit {
-  abstract reserve(input: { userId: string }): Promise<{
-    reserved: boolean;
-    allowed: boolean;
-    resetAt: number;
-  }>;
-  abstract release(input: { userId: string }): Promise<void>;
-  abstract check(input: { userId: string }): Promise<{ allowed: boolean }>;
+  abstract check(input: { userId: string }): Promise<{ allowed: boolean; resetAt: number }>;
 }
 
 /** Ends what a turn left open on the developer's machine: its local calls and its cards. */
@@ -76,6 +70,14 @@ export const LANGY_OVERRIDE = LANGY_TURN_OVERRIDE_FALLBACK;
 interface LangyChatMessageInput {
   role: "user" | "assistant" | "system";
   parts: LangyMessagePart[];
+}
+
+/** The pull request commit whose finished checks started a turn, and how the turn is counted. */
+export interface LangyCiFollowUpTurn {
+  repositoryFullName: string;
+  prNumber: number;
+  headSha: string;
+  countTurn: () => Promise<void>;
 }
 
 export interface StartConversationTurnInput {
@@ -94,6 +96,12 @@ export interface StartConversationTurnInput {
    * asked once the turn is claimed, so a replay counts nothing.
    */
   unattended?: { title: string; countTurn: () => Promise<void> };
+  /**
+   * Set for a turn CI started on a pull request Langy opened: it continues that conversation
+   * with the unattended ceiling, plus a GitHub token for this one repository. The recorded user
+   * message carries the pull request and commit, so the fold tells it from the person speaking.
+   */
+  ciFollowUp?: LangyCiFollowUpTurn;
 }
 
 export interface LangyTurnServiceDeps {
@@ -121,6 +129,8 @@ export interface LangyTurnServiceDeps {
   handoffStore: LangyTurnHandoffRepository;
   localWork: LangyTurnLocalWork;
   messages: LangyMessageRepository | null;
+  /** How long a send waits out a turn that ended but still holds the conversation (tests). */
+  endedTurnWait?: { waitMs: number; pollMs: number };
 }
 
 export type LangyTurnServiceDependencies = LangyTurnServiceDeps & {

@@ -116,3 +116,21 @@ export function frameRequest({ operation, state }: { operation: Operation; state
     body: request.body ?? null,
   };
 }
+
+/** The room above and below the frame inside the space a page leaves for it. */
+export const FRAME_MARGIN = 8;
+
+type Box = { top: number; left: number; width: number };
+
+/**
+ * Where the one session frame sits, relative to its persistent host, so it covers the room the
+ * current page leaves for it (ADR-185, amendment of 2026-11-13). Null when the page leaves none.
+ */
+export function frameBox({ room, host }: { room: Box | null; host: Box }): Box | null {
+  if (!room || room.width <= 0) return null;
+  return {
+    top: room.top - host.top + FRAME_MARGIN,
+    left: room.left - host.left,
+    width: room.width,
+  };
+}

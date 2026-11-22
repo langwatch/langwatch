@@ -4,6 +4,7 @@ import {
   breakdownGapMessage,
   dailyBars,
   chartAxis,
+  developerSeats,
   fullSeats,
   liteRow,
   monthEvents,
@@ -19,6 +20,7 @@ const FREE: UsagePagePlan = {
   free: true,
   maxMembers: 2,
   maxMembersLite: 0,
+  maxMembersDeveloper: 0,
   maxMessagesPerMonth: 50_000,
   planSource: "free",
 };
@@ -182,6 +184,43 @@ describe("liteRow", () => {
 describe("fullSeats", () => {
   it("shows only the count where the plan does not cap seats", () => {
     expect(fullSeats({ used: 12, plan: { ...FREE, maxMembers: 9_999 } })).toBe("12");
+  });
+
+  it("shows only the count where a licence writes no cap as 1M or more", () => {
+    expect(fullSeats({ used: 12, plan: { ...FREE, maxMembers: Number.MAX_SAFE_INTEGER } })).toBe(
+      "12",
+    );
+  });
+
+  it("keeps a finite cap above the catalogue's stand-in as a cap", () => {
+    expect(fullSeats({ used: 12, plan: { ...FREE, maxMembers: 10_000 } })).toBe("12 / 10,000");
+  });
+
+  it("keeps a licence's 9,999 as a cap, not the catalogue's stand-in", () => {
+    expect(
+      fullSeats({ used: 12, plan: { ...FREE, maxMembers: 9_999, planSource: "license" } }),
+    ).toBe("12 / 9,999");
+  });
+});
+
+describe("developerSeats", () => {
+  /** @scenario The usage page shows Developer seats against the Developer seats paid for */
+  it("counts Developer seats against the Developer seats paid for", () => {
+    expect(developerSeats({ used: 3, plan: { ...FREE, maxMembersDeveloper: 4 } })).toBe("3 / 4");
+  });
+
+  it("shows no row where none are paid for and none are held", () => {
+    expect(developerSeats({ used: 0, plan: FREE })).toBeNull();
+  });
+
+  it("still shows a Developer held over a cap of none", () => {
+    expect(developerSeats({ used: 2, plan: FREE })).toBe("2 / 0");
+  });
+
+  it("shows only the count where the plan does not cap Developer seats", () => {
+    expect(
+      developerSeats({ used: 7, plan: { ...FREE, maxMembersDeveloper: Number.MAX_SAFE_INTEGER } }),
+    ).toBe("7");
   });
 });
 

@@ -75,6 +75,26 @@ describe("decisionModelResolutionOf", () => {
 
     expect(resolved).toMatchObject({ kind: "own_unavailable", reason: "key_missing" });
   });
+  describe("given the Gemini decision model", () => {
+    /** @scenario "A Gemini decision model is sent to Gemini with the key in Google's own header" */
+    it("resolves to Gemini's Decisions endpoint and sends the key as x-goog-api-key", () => {
+      const resolution = decisionModelResolutionOf({
+        model: "gemini/decisions:gemini-decision-1",
+        row: { enabled: true, customKeys: { GEMINI_API_KEY: "gemini-key" } },
+      });
+
+      expect(resolution).toEqual({
+        kind: "own",
+        model: "gemini/decisions:gemini-decision-1",
+        wire: "gemini_decisions",
+        providerModel: "gemini-decision-1",
+        endpoint: "https://generativelanguage.googleapis.com/v1beta/decisions",
+        authHeader: "goog_api_key",
+        apiKey: "gemini-key",
+      });
+    });
+  });
+
   describe("given an Azure decision model", () => {
     const AZURE_DECISIONS = "azure/decisions:gpt-6-luna";
     const DECISION_1 = "azure/decisions:microsoft-decision-1";

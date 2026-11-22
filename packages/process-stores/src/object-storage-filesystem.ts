@@ -112,6 +112,15 @@ export function filesystemBackend(options: { root: string }): ObjectBackend {
 
     read,
 
+    async exists(at) {
+      try {
+        return (await fs.stat(pathsOf(root, at.key).object)).isFile();
+      } catch (error) {
+        if (isCode(error, "ENOENT")) return false;
+        throw error;
+      }
+    },
+
     async digest(at) {
       const held = await heldDigest(pathsOf(root, at.key));
       return held ?? digestOf(await read(at));
@@ -124,6 +133,7 @@ export function filesystemBackend(options: { root: string }): ObjectBackend {
     },
 
     signUpload: () => Promise.resolve({ kind: "through-process" }),
+    uploadRoute: "through-process",
     signDownload: (at) => Promise.reject(new UnsignableDownloadError("file", at.key)),
 
     async probe() {

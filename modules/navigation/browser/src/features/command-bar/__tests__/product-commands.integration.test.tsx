@@ -97,8 +97,8 @@ describe("Quick Search across products", () => {
 
       expect(sessions).toMatchObject({
         label: "Sessions",
-        productLabel: "Me",
-        path: "/me/sessions",
+        productLabel: "Coding agents",
+        path: "/coding-agents/sessions",
       });
     });
   });
@@ -108,7 +108,7 @@ describe("Quick Search across products", () => {
     it("finds pull requests, coding agent traces and my usage", () => {
       const labelFor = (query: string) =>
         commandsFor({ query, reachable: EVERYTHING })
-          .filter((command) => command.productLabel === "Me")
+          .filter((command) => command.productLabel === "Coding agents")
           .map((command) => command.label);
 
       expect(labelFor("pull request")).toContain("Pull Requests");
@@ -176,10 +176,10 @@ describe("Quick Search across products", () => {
       personalFeatures = undefined;
       const off = commandsFor({ query: "datasets", reachable: EVERYTHING });
 
-      expect(on.find((command) => command.productLabel === "Me")?.path).toBe(
+      expect(on.find((command) => command.productLabel === "Coding agents")?.path).toBe(
         "/me-project/datasets",
       );
-      expect(off.some((command) => command.productLabel === "Me")).toBe(false);
+      expect(off.some((command) => command.productLabel === "Coding agents")).toBe(false);
     });
   });
 

@@ -37,6 +37,7 @@ const SETTINGS: HeadSettings = {
   },
   tagManager: "GTM-ABC123",
   dates: new Map([["integration/quick-start", "2026-10-12T08:12:32+00:00"]]),
+  published: new Map([["integration/quick-start", "2025-03-04T10:00:00+00:00"]]),
 };
 
 function structuredData({ head }: { head: string }) {
@@ -188,6 +189,7 @@ describe("when docs.json describes the site and its organization", () => {
     });
     expect(structuredData({ head: dated })[0]).toMatchObject({
       "@type": "TechArticle",
+      datePublished: "2025-03-04T10:00:00+00:00",
       dateModified: "2026-10-12T08:12:32+00:00",
       isPartOf: {
         "@type": "WebSite",
@@ -204,6 +206,7 @@ describe("when docs.json describes the site and its organization", () => {
       head: pageHead({ slug: "guide", title: "Guide", settings: EMPTY }),
     });
     expect(undated[0]).not.toHaveProperty("dateModified");
+    expect(undated[0]).not.toHaveProperty("datePublished");
     expect(undated[0]).not.toHaveProperty("isPartOf.publisher");
   });
 
@@ -212,8 +215,10 @@ describe("when docs.json describes the site and its organization", () => {
     const settings = headSettings();
     expect(settings.organization?.name).toBe("LangWatch");
     expect(settings.description).not.toBe("");
-    const unreadable = [...settings.dates.values()].filter((date) => !isInstant({ date }));
-    expect(unreadable).toEqual([]);
+    const dates = [...settings.dates.values(), ...(settings.published?.values() ?? [])];
+    expect(dates.filter((date) => !isInstant({ date }))).toEqual([]);
+    for (const [slug, published] of settings.published ?? [])
+      expect(published <= (settings.dates.get(slug) ?? "")).toBe(true);
   });
 });
 
@@ -232,13 +237,20 @@ describe("when a guide is described to search engines", () => {
     expect(structuredData({ head })[0]).toMatchObject({
       "@type": "TechArticle",
       headline: "Quick Start",
+      datePublished: "2025-03-04T10:00:00+00:00",
+      dateModified: "2026-10-12T08:12:32+00:00",
       inLanguage: "en",
-      image: "https://langwatch.ai/docs/images/coding-agents/optimized/session-detail-1560.webp",
+      image: expect.stringMatching(
+        /^https:\/\/langwatch\.ai\/docs\/social\/integration\.[0-9a-f]{12}\.webp$/,
+      ),
       mainEntityOfPage: "https://langwatch.ai/docs/integration/quick-start",
       author: { "@type": "Organization", name: "LangWatch" },
       publisher: { "@type": "Organization", name: "LangWatch" },
     });
     expect(head).toContain('<meta property="og:type" content="article">');
+    expect(head).toContain(
+      '<meta property="article:published_time" content="2025-03-04T10:00:00+00:00">',
+    );
     expect(head).toContain(
       '<meta property="article:modified_time" content="2026-10-12T08:12:32+00:00">',
     );

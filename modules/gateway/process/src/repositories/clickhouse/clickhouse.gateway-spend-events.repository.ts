@@ -18,7 +18,7 @@ import {
  * every read here is FINAL since RMT dedup is eventual. CostNanoUSD is canonical.
  */
 import { createLogger } from "@langwatch/observability";
-import { Temporal } from "@langwatch/time";
+import { Temporal, toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
@@ -226,7 +226,9 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       PodId: state.podId,
       PodSeq: state.podSeq,
       DurationMS: state.durationMs,
-      OccurredAt: state.occurredAtMs || state.LastEventOccurredAt,
+      OccurredAt: toDate(
+        Temporal.Instant.fromEpochMilliseconds(state.occurredAtMs || state.LastEventOccurredAt),
+      ),
       Version: GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
       CreatedAt: state.createdAt,
       LastEventOccurredAt: state.LastEventOccurredAt,

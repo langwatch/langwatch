@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
+import {
+  type GovernanceOcsfExportRow,
+  OCSF_PUSHED_SOURCE_TYPE,
+} from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
 
+import { type GovernanceSeatReportRow, seatReportsOf } from "../../rules/ocsf-seat-report.rules.ts";
+import { OCSF_STORED_SCHEMA_VERSION } from "../governance.repositories.ts";
 import type {
   GovernanceOcsfEvent,
   GovernanceOcsfEventsReader,
@@ -46,17 +51,6 @@ const logger = createLogger("langwatch:governance:clickhouse-ocsf-events-reposit
 const OCSF_CLASS_API_ACTIVITY = 6003;
 const OCSF_CATEGORY_APPLICATION_ACTIVITY = 6;
 
-/**
- * Single source of truth for the OCSF schema version stamped on every
- * row written to governance_ocsf_events. SIEM consumers filter on this
- * to opt into / out of new OCSF revisions. Bump in lockstep with the
- * `RawOcsfJson` payload shape; downstream OCSF v1.2 work would update
- * this constant + (optionally) emit a new ClassUid.
- *
- * Migration: 00028_add_ocsf_schema_version.sql
- */
-const OCSF_SCHEMA_VERSION = "1.1.0" as const;
-
 /** Cursor-paginated read of `governance_ocsf_events`, ordered EventTime ASC. */
 export interface FindOcsfEventsInput {
   tenantId: string;
@@ -75,6 +69,29 @@ export interface FindOcsfEventsInput {
 export interface OcsfEventBatchWriter {
   insertEvents(rows: GovernanceOcsfEvent[]): Promise<void>;
 }
+
+/** An export row with the time ClickHouse stored it, which is what the SIEM cursor pages by. */
+export type GovernanceOcsfIngestOrderedRow = GovernanceOcsfExportRow & { ingestedAtMs: number };
+
+/** Events stored after an (ingest time, EventId) watermark, so a back-dated event is still read. */
+export interface FindOcsfEventsByIngestInput {
+  tenantId: string;
+  afterIngestedMs: number;
+  afterEventId: string;
+  limit: number;
+  /** Inclusive lower bound on EventTime. */
+  sinceMs?: number;
+  /** Exclusive upper bound on EventTime. */
+  untilMs?: number;
+  sourceType?: string;
+  sourceId?: string;
+}
+
+export interface OcsfIngestOrderedReader {
+  findAllByIngest(input: FindOcsfEventsByIngestInput): Promise<GovernanceOcsfIngestOrderedRow[]>;
+}
+
+export type { GovernanceSeatReportRow };
 
 /** The licence-seat read `governanceCost.service.ts`'s seats screen needs. */
 export interface OcsfSeatReportReader {
@@ -105,109 +122,41 @@ interface OcsfExportCHRow {
   RawOcsfJson: string;
 }
 
-/**
- * One licence pool, as its newest seat report describes it.
- *
- * Counts, never money. A seat event states how many units the tenant holds and
- * how many a person is sitting in; what those seats cost is on the invoice the
- * cost lanes already read, and a figure invented from a unit count here would
- * be added to it.
- *
- * The four facts travel independently rather than as one label, exactly as the
- * licence read records them — a pool can be free AND company-wide AND
- * suspended at once, and a single label would have to choose which to say.
- * Which pools count as seats is the caller's decision, not the table's.
- */
-export interface GovernanceSeatReportRow {
-  sourceId: string;
-  skuPartNumber: string;
-  /** `YYYY-MM-DD`, the day the count belongs to. */
-  day: string;
-  seatsBought: number;
-  seatsAssigned: number;
-  perPerson: boolean;
-  live: boolean;
-  free: boolean;
-  seatStem: boolean;
-}
-
-interface SeatReportCHRow {
-  SourceId: string;
-  SkuPartNumber: string;
-  Day: string;
-  LatestRawOcsfJson: string;
-}
-
-/** The `metadata.extension` bag a pull event's payload carries, or null when unreadable. */
-function findOcsfExtension(rawOcsfJson: string): Record<string, unknown> | null {
-  try {
-    const parsed = JSON.parse(rawOcsfJson) as {
-      metadata?: { extension?: Record<string, unknown> };
-    };
-    return parsed.metadata?.extension ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * A count off the payload, or null when the payload holds no number there.
- *
- * `Number("")` and `Number(null)` are both 0, and a 0 here would say the
- * tenant bought no seats — a confident wrong answer where the honest one is
- * that this pool could not be read.
- */
-function findSeatCount(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const count = Number(value);
-  return Number.isFinite(count) ? count : null;
-}
-
-/**
- * One seat report row into the typed row, or null when it cannot be read.
- *
- * The counts ride inside the OCSF document rather than in a column, so a pool
- * whose payload is unreadable is stepped over here. Dropping it costs the
- * screen one pool; passing it through as zeros would report seats nobody
- * bought, and one bad pool must never cost the tenant the rest of its list.
- *
- * A missing classifying fact reads as false, which leaves the pool uncounted.
- * That is the conservative direction: an unclassifiable pool shown as seats is
- * the loud wrong finding the licence read exists to avoid.
- */
-function findSeatReport(row: SeatReportCHRow): GovernanceSeatReportRow | null {
-  const extension = findOcsfExtension(String(row.LatestRawOcsfJson ?? ""));
-  if (!extension) return null;
-
-  const seatsBought = findSeatCount(extension.seatsBought);
-  const seatsAssigned = findSeatCount(extension.seatsAssigned);
-  if (seatsBought === null || seatsAssigned === null) return null;
-
+function toExportRow(r: OcsfExportCHRow): GovernanceOcsfExportRow {
   return {
-    sourceId: String(row.SourceId ?? ""),
-    skuPartNumber: String(row.SkuPartNumber ?? ""),
-    day: String(row.Day ?? ""),
-    seatsBought,
-    seatsAssigned,
-    perPerson: extension.perPerson === true,
-    live: extension.live === true,
-    free: extension.free === true,
-    seatStem: extension.seatStem === true,
+    eventId: r.EventId,
+    ocsfSchemaVersion: r.OcsfSchemaVersion,
+    traceId: r.TraceId,
+    sourceId: r.SourceId,
+    sourceType: r.SourceType,
+    classUid: Number(r.ClassUid),
+    categoryUid: Number(r.CategoryUid),
+    activityId: Number(r.ActivityId),
+    typeUid: Number(r.TypeUid),
+    severityId: Number(r.SeverityId),
+    eventTimeMs: Number(r.EventTimeMs),
+    actorUserId: r.ActorUserId,
+    actorEmail: r.ActorEmail,
+    actorEnduserId: r.ActorEnduserId,
+    actionName: r.ActionName,
+    targetName: r.TargetName,
+    anomalyAlertId: r.AnomalyAlertId,
+    rawOcsfJson: r.RawOcsfJson,
   };
 }
 
 function toOcsfEventValues(row: GovernanceOcsfEvent): Record<string, unknown> {
   return {
     TenantId: row.tenantId,
-    OcsfSchemaVersion: OCSF_SCHEMA_VERSION,
+    OcsfSchemaVersion: OCSF_STORED_SCHEMA_VERSION,
     EventId: row.eventId,
     TraceId: row.traceId,
     SourceId: row.sourceId,
     SourceType: row.sourceType,
-    ClassUid: OCSF_CLASS_API_ACTIVITY,
-    CategoryUid: OCSF_CATEGORY_APPLICATION_ACTIVITY,
+    ClassUid: row.classUid ?? OCSF_CLASS_API_ACTIVITY,
+    CategoryUid: row.categoryUid ?? OCSF_CATEGORY_APPLICATION_ACTIVITY,
     ActivityId: row.activityId,
-    TypeUid: OCSF_CLASS_API_ACTIVITY * 100 + row.activityId,
+    TypeUid: row.typeUid ?? (row.classUid ?? OCSF_CLASS_API_ACTIVITY) * 100 + row.activityId,
     SeverityId: row.severityId,
     // `eventTime` is a Temporal Instant on this branch; the client wants a Date.
     EventTime: toDate(row.eventTime),
@@ -226,7 +175,8 @@ export class ClickHouseOcsfEventsRepository
     GovernanceOcsfEventsReader,
     GovernanceOcsfEventWriter,
     OcsfEventBatchWriter,
-    OcsfSeatReportReader
+    OcsfSeatReportReader,
+    OcsfIngestOrderedReader
 {
   private constructor(private readonly resolveClient: GovernanceClickHouseTenantResolver) {}
 
@@ -287,11 +237,11 @@ export class ClickHouseOcsfEventsRepository
   }
 
   /**
-   * SIEM forwarding pull — the read side of `governance_ocsf_events`,
-   * deduped to the latest version of each (TenantId, EventId) and ordered
-   * EventTime ASC for cursor pagination.
-   *
-   * Spec: specs/ai-gateway/governance/siem-export.feature
+   * SIEM forwarding pull: the latest version of each (TenantId, EventId), EventTime ASC.
+   * The plain `EventTime >=` prunes partitions (the tuple cursor alone prunes none) and
+   * implies nothing the tuple does not. The dedup set holds the page's keys only, and each
+   * key's EventTime prunes the payload read to the page's months.
+   * Spec: enterprise/modules/governance/specs/ocsf-event-pages.feature
    */
   async findAll(input: FindOcsfEventsInput): Promise<GovernanceOcsfExportRow[]> {
     const client = await this.resolveClient(input.tenantId);
@@ -318,13 +268,17 @@ export class ClickHouseOcsfEventsRepository
           RawOcsfJson
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
+          AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})
           AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
-          AND (TenantId, EventId, LastUpdatedAt) IN (
-            SELECT TenantId, EventId, max(LastUpdatedAt)
+          AND (TenantId, EventId, LastUpdatedAt, EventTime) IN (
+            SELECT TenantId, EventId, max(LastUpdatedAt), argMax(EventTime, LastUpdatedAt) AS LatestTime
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
+              AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})
               AND (EventTime, EventId) > (fromUnixTimestamp64Milli({sinceMs:UInt64}), {sinceEventId:String})
             GROUP BY TenantId, EventId
+            ORDER BY LatestTime ASC, EventId ASC
+            LIMIT {limit:UInt32}
           )
         ORDER BY EventTime ASC, EventId ASC
         LIMIT {limit:UInt32}
@@ -339,26 +293,88 @@ export class ClickHouseOcsfEventsRepository
     });
 
     const rows = (await result.json()) as OcsfExportCHRow[];
-    return rows.map((r) => ({
-      eventId: r.EventId,
-      ocsfSchemaVersion: r.OcsfSchemaVersion,
-      traceId: r.TraceId,
-      sourceId: r.SourceId,
-      sourceType: r.SourceType,
-      classUid: Number(r.ClassUid),
-      categoryUid: Number(r.CategoryUid),
-      activityId: Number(r.ActivityId),
-      typeUid: Number(r.TypeUid),
-      severityId: Number(r.SeverityId),
-      eventTimeMs: Number(r.EventTimeMs),
-      actorUserId: r.ActorUserId,
-      actorEmail: r.ActorEmail,
-      actorEnduserId: r.ActorEnduserId,
-      actionName: r.ActionName,
-      targetName: r.TargetName,
-      anomalyAlertId: r.AnomalyAlertId,
-      rawOcsfJson: r.RawOcsfJson,
-    }));
+    return rows.map(toExportRow);
+  }
+
+  /**
+   * The SIEM stream: the latest version of each event, ordered by the time it was stored (paging
+   * by EventTime would skip a back-dated event); only versions from the watermark on are grouped.
+   * Spec: enterprise/modules/governance/specs/ocsf-siem.feature
+   */
+  async findAllByIngest(
+    input: FindOcsfEventsByIngestInput,
+  ): Promise<GovernanceOcsfIngestOrderedRow[]> {
+    const client = await this.resolveClient(input.tenantId);
+    const filters = [
+      input.sinceMs === undefined
+        ? ""
+        : "AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})",
+      input.untilMs === undefined
+        ? ""
+        : "AND EventTime < fromUnixTimestamp64Milli({untilMs:UInt64})",
+      input.sourceType === undefined ? "" : "AND SourceType = {sourceType:String}",
+      input.sourceId === undefined ? "" : "AND SourceId = {sourceId:String}",
+    ].join(" ");
+    const result = await client.query({
+      query: `
+        SELECT
+          EventId,
+          OcsfSchemaVersion,
+          TraceId,
+          SourceId,
+          SourceType,
+          ClassUid,
+          CategoryUid,
+          ActivityId,
+          TypeUid,
+          SeverityId,
+          toString(toUnixTimestamp64Milli(EventTime)) AS EventTimeMs,
+          toString(toUnixTimestamp64Milli(LastUpdatedAt)) AS IngestedAtMs,
+          ActorUserId,
+          ActorEmail,
+          ActorEnduserId,
+          ActionName,
+          TargetName,
+          AnomalyAlertId,
+          RawOcsfJson
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND LastUpdatedAt >= fromUnixTimestamp64Milli({afterIngestedMs:UInt64})
+          ${filters}
+          AND (TenantId, EventId, LastUpdatedAt, EventTime) IN (
+            SELECT
+              TenantId,
+              EventId,
+              max(LastUpdatedAt) AS Latest,
+              argMax(EventTime, LastUpdatedAt) AS LatestTime
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND LastUpdatedAt >= fromUnixTimestamp64Milli({afterIngestedMs:UInt64})
+              ${filters}
+            GROUP BY TenantId, EventId
+            HAVING (Latest, EventId) > (fromUnixTimestamp64Milli({afterIngestedMs:UInt64}), {afterEventId:String})
+            ORDER BY Latest ASC, EventId ASC
+            LIMIT {limit:UInt32}
+          )
+        ORDER BY LastUpdatedAt ASC, EventId ASC
+        LIMIT 1 BY EventId
+        LIMIT {limit:UInt32}
+      `,
+      query_params: {
+        tenantId: input.tenantId,
+        afterIngestedMs: input.afterIngestedMs,
+        afterEventId: input.afterEventId,
+        limit: input.limit,
+        ...(input.sinceMs === undefined ? {} : { sinceMs: input.sinceMs }),
+        ...(input.untilMs === undefined ? {} : { untilMs: input.untilMs }),
+        ...(input.sourceType === undefined ? {} : { sourceType: input.sourceType }),
+        ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = (await result.json()) as (OcsfExportCHRow & { IngestedAtMs: string })[];
+    return rows.map((r) => ({ ...toExportRow(r), ingestedAtMs: Number(r.IngestedAtMs) }));
   }
 
   /**
@@ -377,7 +393,8 @@ export class ClickHouseOcsfEventsRepository
    * whichever version the merge had not collapsed yet, so the same query would
    * answer differently before and after a merge.
    *
-   * TenantId leads the predicate — nothing else here is unique across tenants
+   * Events pushed in from another source (`ocsf_push`) never count: a seat figure is
+   * LangWatch's own read of the provider. TenantId leads the predicate — nothing else here is unique across tenants
    * — and `ActionName` narrows to seat reports, so no conversation reaches the
    * decode.
    */
@@ -396,17 +413,31 @@ export class ClickHouseOcsfEventsRepository
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND ActionName = {actionName:String}
+          AND SourceType != {pushedSourceType:String}
         GROUP BY SourceId, TargetName
         ORDER BY SourceId, TargetName
       `,
       query_params: {
         tenantId: input.tenantId,
         actionName: input.actionName,
+        pushedSourceType: OCSF_PUSHED_SOURCE_TYPE,
       },
       format: "JSONEachRow",
     });
 
-    const rows = (await result.json()) as SeatReportCHRow[];
-    return rows.flatMap((row) => findSeatReport(row) ?? []);
+    const rows = (await result.json()) as {
+      SourceId: string;
+      SkuPartNumber: string;
+      Day: string;
+      LatestRawOcsfJson: string;
+    }[];
+    return rows.flatMap((row) =>
+      seatReportsOf({
+        sourceId: String(row.SourceId ?? ""),
+        skuPartNumber: String(row.SkuPartNumber ?? ""),
+        day: String(row.Day ?? ""),
+        rawOcsfJson: String(row.LatestRawOcsfJson ?? ""),
+      }),
+    );
   }
 }
