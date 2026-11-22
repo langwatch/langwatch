@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.1](https://github.com/langwatch/langwatch/compare/mcp-server@v3.2.0...mcp-server@v3.2.1) (2026-11-22)
+
+
+### Bug Fixes
+
+* **mcp:** platform_update_prompt keeps the prompt's parameters ([#9776](https://github.com/langwatch/langwatch/issues/9776)) ([99e82c5](https://github.com/langwatch/langwatch/commit/99e82c56dbbb20829141150b94cdd4361977512c))
+
 ## [3.2.0](https://github.com/langwatch/langwatch/compare/mcp-server@v3.1.0...mcp-server@v3.2.0) (2026-11-21)
 
 
