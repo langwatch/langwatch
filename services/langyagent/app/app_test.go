@@ -457,6 +457,9 @@ func TestApp_Turn_AgentErrorFrameCarriesTypedCauseChain(t *testing.T) {
 		if len(e.Herr.Reasons) != 1 || e.Herr.Reasons[0].Type != "no_provider_configured" {
 			t.Fatalf("frame herr reasons = %+v, want the captured gateway herr", e.Herr.Reasons)
 		}
+		if e.Herr.Retryable {
+			t.Errorf("a captured cause decides retry, want the agent_error herr not retryable")
+		}
 		if e.Herr.Reasons[0].Message != "no model provider configured" {
 			t.Errorf("gateway reason message = %q", e.Herr.Reasons[0].Message)
 		}
@@ -492,6 +495,9 @@ func TestApp_Turn_AgentErrorWithoutCapturedCauseStillEmitsTypedFrame(t *testing.
 			}
 			if len(e.Herr.Reasons) != 0 {
 				t.Errorf("no captured LLM error ⇒ no reasons on the wire, got %+v", e.Herr.Reasons)
+			}
+			if !e.Herr.Retryable {
+				t.Errorf("no captured cause ⇒ nothing says a resend fails the same way, want retryable")
 			}
 		}
 	}
@@ -720,5 +726,35 @@ func TestApp_Turn_ResumeFromHandoffEmitsPickingUpStatus(t *testing.T) {
 
 	if got := statusOf(relay.stream.emitted); got != "Picking up where it left off…" {
 		t.Errorf("resume readiness status = %q, want the picking-up line", got)
+	}
+}
+
+func TestApp_Turn_AgentErrorWithRetryableCauseIsRetryable(t *testing.T) {
+	worker := &fakeWorker{
+		claimOK:   true,
+		streamErr: herr.NewLight(context.Background(), domain.ErrAgentError, nil, errors.New("raw prose")),
+		llmErr: herr.NewLight(context.Background(), "upstream_rate_limited",
+			herr.M{"message": "rate limited"}).WithRetryable(true),
+		llmErrOK: true,
+	}
+	relay := &fakeRelay{}
+	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
+
+	var errorFrames []herr.ErrorBody
+	for _, f := range relay.stream.emitted {
+		var e struct {
+			Type string         `json:"type"`
+			Herr herr.ErrorBody `json:"herr"`
+		}
+		_ = json.Unmarshal([]byte(f.JSON()), &e)
+		if e.Type == "error" {
+			errorFrames = append(errorFrames, e.Herr)
+		}
+	}
+	if len(errorFrames) != 1 || errorFrames[0].Type != "agent_error" {
+		t.Fatalf("want exactly one agent_error frame, got %+v", errorFrames)
+	}
+	if !errorFrames[0].Retryable {
+		t.Errorf("a retryable captured cause must make the agent_error herr retryable")
 	}
 }

@@ -16,11 +16,11 @@ describe("firePromptCreated", () => {
       });
 
       /** @scenario "First prompt creation identifies user with has_prompts true" */
-      it("decides to identify them with has_prompts and an org-wide count of one", () => {
+      it("decides to identify them with has_prompts and no prompt count", () => {
         expect(calls[0]).toEqual({
           type: "identify",
           userId: "user-1",
-          traits: { has_prompts: true, prompt_count: 1 },
+          traits: { has_prompts: true },
         });
       });
 
@@ -38,8 +38,8 @@ describe("firePromptCreated", () => {
 
   describe("given an organization that already has prompts", () => {
     describe("when another prompt is created in any project", () => {
-      /** @scenario "Subsequent prompt creation updates org-wide prompt_count without firing first event" */
-      it("decides to update the org-wide count and track nothing", () => {
+      /** @scenario "Subsequent prompt creation keeps has_prompts without firing first event" */
+      it("decides to keep has_prompts and track nothing", () => {
         const calls = firePromptCreated({
           userId: "user-1",
           projectId: "project-2",
@@ -47,7 +47,7 @@ describe("firePromptCreated", () => {
         });
 
         expect(calls).toEqual([
-          { type: "identify", userId: "user-1", traits: { has_prompts: true, prompt_count: 4 } },
+          { type: "identify", userId: "user-1", traits: { has_prompts: true } },
         ]);
       });
     });

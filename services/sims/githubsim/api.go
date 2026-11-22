@@ -25,6 +25,7 @@ func (s *Server) routes() http.Handler {
 	api("GET /repos/{owner}/{repo}/pulls/{number}", s.handleGetPull)
 	api("POST /repos/{owner}/{repo}/check-runs", s.handleCreateCheckRun)
 	api("GET /repos/{owner}/{repo}/commits/{ref}/check-runs", s.handleListCheckRuns)
+	api("GET /repos/{owner}/{repo}/commits/{ref}/check-suites", s.handleListCheckSuites)
 	api("GET /login/oauth/authorize", s.handleAuthorize)
 	api("POST /login/oauth/access_token", s.handleAccessToken)
 	api("GET /user", s.handleUser)
@@ -466,4 +467,57 @@ func (s *Server) handleListCheckRuns(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"total_count": len(runs), "check_runs": runs})
+}
+
+// handleListCheckSuites answers one GitHub Actions suite per commit, rolled up from its check runs:
+// completed only when every run is, failed when any run did not pass.
+func (s *Server) handleListCheckSuites(w http.ResponseWriter, r *http.Request) {
+	repo := r.PathValue("owner") + "/" + r.PathValue("repo")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.tokenAuth(w, r, "checks", "read", repo) == nil {
+		return
+	}
+	suites := []map[string]any{}
+	if suite := s.suiteFor(repo, r.PathValue("ref")); suite != nil {
+		suites = append(suites, suite)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"total_count": len(suites), "check_suites": suites})
+}
+
+// failedConclusion is true for a finished check run that did not pass.
+func failedConclusion(conclusion string) bool {
+	switch conclusion {
+	case "", "success", "neutral", "skipped":
+		return false
+	}
+	return true
+}
+
+// suiteFor is the commit's suite, or nil when no check run names the commit. The caller holds s.mu.
+func (s *Server) suiteFor(repo, sha string) map[string]any {
+	count, status, conclusion := 0, "completed", "success"
+	for _, c := range s.checks {
+		if !strings.EqualFold(c.Repo, repo) || c.HeadSHA != sha {
+			continue
+		}
+		count++
+		if c.Status != "completed" {
+			status = "in_progress"
+		}
+		if failedConclusion(c.Conclusion) {
+			conclusion = "failure"
+		}
+	}
+	if count == 0 {
+		return nil
+	}
+	var concluded any = conclusion
+	if status != "completed" {
+		concluded = nil
+	}
+	return map[string]any{
+		"id": 1, "head_sha": sha, "status": status, "conclusion": concluded,
+		"app": map[string]any{"name": "GitHub Actions", "slug": "github-actions"}, "latest_check_runs_count": count,
+	}
 }

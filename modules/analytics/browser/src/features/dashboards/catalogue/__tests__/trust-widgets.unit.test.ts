@@ -19,18 +19,21 @@ describe("given the Can I trust my numbers? widgets", () => {
   /** @scenario "AC166 Can I trust my numbers?: data health names each missing field and what it unlocks" */
   it("counts each field as a filter, so its gap is never the frame's setup view", () => {
     const { code, sql } = buildOf("data-health");
-    for (const filter of [
-      "AND notEmpty(Models)",
-      "AND (TotalCost IS NOT NULL OR empty(Models))",
-      "AND UserId IS NOT NULL",
-      "AND ConversationId IS NOT NULL",
-      "AND notEmpty(Labels)",
-      "AND MetadataOutcome != ''",
+    for (const flag of [
+      "max(notEmpty(Models)) AS has_model",
+      "max((TotalCost IS NOT NULL OR empty(Models))) AS has_cost",
+      "max(UserId IS NOT NULL) AS has_user",
+      "max(ConversationId IS NOT NULL) AS has_conversation",
+      "max(notEmpty(Labels)) AS has_labels",
+      "max(MetadataOutcome != '') AS has_outcome",
     ]) {
-      expect(sql.fields).toContain(filter);
+      expect(sql.fields).toContain(flag);
     }
-    expect(sql.fields).toContain("SELECT 'all' AS field");
-    expect(sql.fields).not.toMatch(/SELECT [^']*\b(?:UserId|TotalCost|ConversationId)\b[^\n]*AS/);
+    expect(sql.fields).toContain("field = 'all', total");
+    // The result reads only the field and its count, never a trace column.
+    expect(sql.fields).toMatch(
+      /^SELECT arrayJoin\(splitByChar\(',', '[a-z,]+'\)\) AS field,\n  multiIf\(/,
+    );
     expect(code).toContain("Missing on ");
     expect(code).toContain("Sending it unlocks: ");
     expect(code).toContain('<AllGood title="Every field arrives"');
@@ -78,10 +81,12 @@ describe("given the Can I trust my numbers? widgets", () => {
   /** @scenario "AC168 Can I trust my numbers?: noise is traffic that clearly comes from tests, staging and the like" */
   it("reads origins and non-production environments, never health checks or duplicates", () => {
     const { code, sql } = buildOf("noise");
-    expect(sql.sources).toContain("has(['playground', 'evaluation', 'simulation'], t.origin)");
-    expect(sql.sources).toContain("ResourceAttributes['deployment.environment']");
-    expect(sql.sources).toContain("Attributes['metadata.environment']");
-    expect(sql.sources).toContain("JSONExtract(Attributes['langwatch.labels'], 'Array(String)')");
+    expect(sql.sources).toContain("has(['playground', 'evaluation', 'simulation'], Origin)");
+    // Typed columns copied from the maps, never the maps themselves (goose 00128).
+    expect(sql.sources).toContain("lower(DeploymentEnvironment)");
+    expect(sql.sources).toContain("lower(MetadataEnvironment)");
+    expect(sql.sources).toContain("arrayMap((label) -> lower(label), Labels)");
+    expect(sql.sources).not.toContain("Attributes[");
     expect(sql.sources).toContain("'staging'");
     expect(sql.sources).not.toMatch(/health|duplicate/i);
     expect(code).toContain('header: "Of cost"');

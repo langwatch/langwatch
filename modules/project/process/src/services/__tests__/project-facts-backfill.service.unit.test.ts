@@ -26,6 +26,8 @@ function row(input: Partial<ProjectBackfillRow> & { id: string }): ProjectBackfi
     presenceEnabled: true,
     isArchived: false,
     adminUserId: "admin-1",
+    ownerUserId: null,
+    firstMessage: false,
     ...input,
   };
 }

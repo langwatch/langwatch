@@ -1,4 +1,5 @@
 import { defineSlice } from "@langwatch/browser-host/global-store";
+import { onUiStorageReaderChange } from "@langwatch/browser-host/storage";
 import {
   applyLangyTurnEvents,
   initialLangyTurnProjection,
@@ -99,6 +100,13 @@ interface LangyState extends TurnPhaseState, LangySliceSurface {
   // Spec: specs/langy/langy-peek-dock.feature
   closePanel: () => void;
   togglePanel: () => void;
+  /**
+   * The saved open state while the panel is open only because a link opened it, else null.
+   * Spec: specs/langy/langy-prompt-link.feature
+   */
+  savedOpenBeforeLink: boolean | null;
+  /** Open on a fresh conversation with `prompt` typed, not sent, keeping the saved open state. */
+  openFromLink: (prompt: string) => void;
 
   // Command-bar → panel handoff: a question queued from the Cmd+K "Ask Langy"
   // activation, auto-sent by the panel once it is mounted and idle. Ephemeral
@@ -432,6 +440,7 @@ const emptyConversationState = () => ({
  */
 const SCOPE_INDEPENDENT_KEYS: ReadonlySet<string> = new Set<keyof LangyState>([
   "isOpen",
+  "savedOpenBeforeLink",
   "panelMode",
   "panelEffect",
   "devMode",
@@ -591,6 +600,14 @@ export function isTurnInPanelScope({
 }
 
 /**
+ * May a read keyed on this conversation run yet? A conversation this tab just minted answers
+ * "not found" until its projection folds, so its reads wait for the confirmation.
+ */
+export function selectConversationReadable(s: LangyState, id: string | null | undefined) {
+  return !!id && s.unconfirmedConversations[id] !== true;
+}
+
+/**
  * The open conversation, if it belongs to `projectId`. The scope reset clears it one render
  * after a move, so reads pairing the new project with the old id answer "not found".
  */
@@ -727,19 +744,42 @@ function resetScope(state: LangyState, scope: Partial<LangyScope>): Partial<Lang
   };
 }
 
+function openFromLink({
+  state,
+  set,
+  prompt,
+}: {
+  state: LangyState;
+  set: (patch: Partial<LangyState>) => void;
+  prompt: string;
+}): void {
+  const savedOpenBeforeLink = state.savedOpenBeforeLink ?? state.isOpen;
+  const text = prompt.trim();
+  if (!text) {
+    set({ isOpen: true, savedOpenBeforeLink });
+    return;
+  }
+  state.startNewConversation();
+  set({ isOpen: true, savedOpenBeforeLink, draft: text });
+}
+
 export const useLangyStore = defineSlice<LangyState>({
   name: LANGY_STORE_SLICE,
   create: (set, get) => ({
     isOpen: false,
-    openPanel: () => set({ isOpen: true }),
-    closePanel: () => set({ isOpen: false }),
+    openPanel: () => set({ isOpen: true, savedOpenBeforeLink: null }),
+    closePanel: () => set({ isOpen: false, savedOpenBeforeLink: null }),
 
-    togglePanel: () => set((state) => ({ isOpen: !state.isOpen })),
+    togglePanel: () => set((state) => ({ isOpen: !state.isOpen, savedOpenBeforeLink: null })),
+
+    savedOpenBeforeLink: null,
+    openFromLink: (prompt) => openFromLink({ state: get(), set, prompt }),
 
     pendingPrompt: null,
     askLangy: (prompt) =>
       set(() => ({
         isOpen: true,
+        savedOpenBeforeLink: null,
         // A fresh ask starts a clean conversation like startNewConversation, but the context the
         // user just grabbed rides along.
         activeConversationId: null,
@@ -764,6 +804,7 @@ export const useLangyStore = defineSlice<LangyState>({
     queueGuidedKickoff: (kickoff) =>
       set(() => ({
         isOpen: true,
+        savedOpenBeforeLink: null,
         // The kickoff lands where the caller's conversation is: the attached
         // one when there is one, a fresh one otherwise.
         activeConversationId: kickoff.conversationId ?? null,
@@ -1026,7 +1067,7 @@ export const useLangyStore = defineSlice<LangyState>({
   // open state, its layout, developer mode and WHICH CONVERSATION was open.
   persist: {
     partialize: (state) => ({
-      isOpen: state.isOpen,
+      isOpen: state.savedOpenBeforeLink ?? state.isOpen,
       devMode: state.devMode,
       panelMode: state.panelMode,
       panelEffect: state.panelEffect,
@@ -1081,3 +1122,7 @@ export function attachedContextToChip(item: LangyAttachedContext): LangyContextC
     ref: item.id,
   };
 }
+
+// A link's kept preference belongs to the reader who followed it; registered after the slice's
+// own restore, so the next reader's restored `isOpen` is what gets saved.
+onUiStorageReaderChange(() => useLangyStore.setState({ savedOpenBeforeLink: null }));

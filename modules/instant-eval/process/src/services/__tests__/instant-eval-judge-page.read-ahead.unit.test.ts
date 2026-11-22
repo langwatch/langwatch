@@ -162,7 +162,9 @@ async function pipeline({
     },
     cancellation,
     budget: { assertWithinBudget: async () => undefined },
+    gatewayBudget: { assertWithinGatewayBudget: async () => undefined },
     readAhead,
+    ownModels: { isOwnDecisionModel: async () => false },
     now: () => AT.epochMilliseconds,
   });
 

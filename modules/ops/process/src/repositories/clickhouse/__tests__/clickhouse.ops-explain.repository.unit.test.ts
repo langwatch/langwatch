@@ -1,7 +1,11 @@
 /**
  * The lazily-built client for the dedicated read-only ops ClickHouse account.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const clickHouseMocks = vi.hoisted(() => ({
   close: vi.fn(async () => undefined),
@@ -47,5 +51,50 @@ describe("OpsClickHouseRuntime", () => {
     });
     expect(runtime.findClient()).toBeNull();
     await runtime.close();
+  });
+
+  describe("given CLICKHOUSE_OPS_PASSWORD_FILE names a file that gives no password", () => {
+    let root: string;
+    let path: string;
+
+    beforeEach(() => {
+      root = mkdtempSync(join(tmpdir(), "clickhouse-ops-password-file-"));
+      path = join(root, "password");
+    });
+
+    afterEach(() => {
+      rmSync(root, { recursive: true, force: true });
+    });
+
+    const cases: [string, () => void][] = [
+      ["is missing", () => undefined],
+      ["is empty", () => writeFileSync(path, "  \n")],
+      ["is a directory", () => mkdirSync(path)],
+    ];
+
+    for (const [label, arrange] of cases) {
+      describe(`when the file ${label}`, () => {
+        /** @scenario "An ops password file that cannot be read at boot stops the process" */
+        it("fails the build naming the ops variable and the path", () => {
+          arrange();
+
+          const build = () =>
+            OpsClickHouseRuntime.create({
+              url: "http://langwatch_ops:url-password@ch.example:8123/langwatch",
+              passwordFile: path,
+              buildTime: false,
+            });
+
+          expect(build).toThrow(
+            expect.objectContaining({
+              code: "clickhouse_password_file_unreadable",
+              variable: "CLICKHOUSE_OPS_PASSWORD_FILE",
+              path,
+            }),
+          );
+          expect(build).not.toThrow(/url-password/);
+        });
+      });
+    }
   });
 });

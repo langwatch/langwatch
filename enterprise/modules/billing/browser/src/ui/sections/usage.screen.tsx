@@ -30,6 +30,7 @@ import {
   breakdownGapMessage,
   chartAxis,
   dailyBars,
+  developerSeats,
   fullSeats,
   liteRow,
   monthEvents,
@@ -221,6 +222,7 @@ function HostedUsage({
       {plan && usage.data && (
         <UsageSeatsCard
           fullSeats={fullSeats({ used: usage.data.membersCount, plan })}
+          developerSeats={developerSeats({ used: usage.data.membersDeveloperCount, plan })}
           lite={liteRow({
             plan,
             pricingModel,
@@ -309,7 +311,7 @@ export default function UsageScreen() {
         )}
         {isSaaS === false && actionFor({ href: actionHref, label: selfHostedActionLabel })}
       </PageLayout.Header>
-      <VStack gap={4} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={4} width="full" align="stretch">
         <Text color="fg.muted">
           What this organization used this month, against what its plan includes.
         </Text>

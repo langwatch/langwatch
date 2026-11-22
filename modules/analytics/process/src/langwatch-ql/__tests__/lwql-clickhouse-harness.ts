@@ -1174,6 +1174,9 @@ export async function seedEveryCatalogSource({
             row[column.name] = tenant.tenantId;
           } else if (column.name === "_retention_days") {
             row[column.name] = 0;
+          } else if (column.name === view.dedup.signColumn) {
+            // A settled view keeps a key only while its signs sum above zero.
+            row[column.name] = 1;
           } else if (column.type.startsWith("DateTime")) {
             row[column.name] = now;
           } else if (sortKey.has(column.name) && SEEDABLE_KEY_TYPE.test(column.type)) {

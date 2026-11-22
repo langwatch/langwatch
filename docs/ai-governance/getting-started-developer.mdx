@@ -1,6 +1,6 @@
 ---
 title: Your first 5 minutes (developer)
-description: A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /me, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
+description: A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /coding-agents, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
 sidebarTitle: First 5 minutes (dev)
 ---
 
@@ -10,7 +10,7 @@ When you finish you will have:
 
 - A signed-in `langwatch` CLI on your laptop.
 - A [Personal Virtual Key](/ai-gateway/governance/personal-keys) bound to your identity, your monthly budget, and your org's [Routing Policy](/ai-gateway/governance/routing-policies).
-- One real request flowing through the [AI Gateway](/ai-gateway/overview) that you can see in your own [/me dashboard](/ai-governance/personal-portal/overview).
+- One real request flowing through the [AI Gateway](/ai-gateway/overview) that you can see in your own [/coding-agents dashboard](/ai-governance/personal-portal/overview).
 
 If you are an admin trying to make the org _ready_ for developers to do this, jump to the [admin walkthrough](/ai-governance/getting-started-admin) instead.
 
@@ -22,7 +22,7 @@ Before you start, your IT admin should already have:
 
 1. Provisioned your account in LangWatch (you should have an invite email or be able to sign in via your company SSO).
 2. Published at least one default [Routing Policy](/ai-gateway/governance/routing-policies). If they haven't, the CLI fails with a `409 no_default_routing_policy` error, see the [CLI error catalog](/ai-governance/cli-debug#error-catalog) and ping your admin.
-3. Optionally: published an [AI Tools Portal](/ai-governance/personal-portal/overview) catalog (the card grid you'll see on `/me`). If they haven't, your `/me` page shows a "your IT team is still setting things up" empty state, you can still use the CLI directly.
+3. Optionally: published an [AI Tools Portal](/ai-governance/personal-portal/overview) catalog (the card grid you'll see on `/coding-agents`). If they haven't, your `/coding-agents` page shows a "your IT team is still setting things up" empty state, you can still use the CLI directly.
 
 If any of those are missing your admin's first stop is [From zero to your first governed request](/ai-governance/getting-started-admin).
 
@@ -55,9 +55,9 @@ The Personal VK is bound to your identity via JWT claims (`organization_id`, `pr
 
 If sign-in fails, the [CLI error catalog](/ai-governance/cli-debug#error-catalog) maps every error code (`409 no_default_routing_policy`, `401 unauthorized`, `403 forbidden`) back to the admin action that fixes it.
 
-## Step 3: Land on /me
+## Step 3: Land on /coding-agents
 
-Open `https://<your-langwatch-host>/me` in a browser. You're on your **personal home**.
+Open `https://<your-langwatch-host>/coding-agents` in a browser. You're on your **personal home**.
 
 What you see (top to bottom):
 
@@ -65,7 +65,7 @@ What you see (top to bottom):
 - **My Usage**: spend this month vs your budget, request count, most-used model.
 - **Spending over time**: a daily bar chart for the last 30 days.
 - **By tool**: your spend split by coding assistant, model provider.
-- **Recent activity**: the last few requests you made (timestamp, model, cost). No prompt or completion content is rendered here even if the org runs in `full` [no-spy mode](/ai-governance/no-spy-mode): `/me` is a ledger view, not a trace viewer.
+- **Recent activity**: the last few requests you made (timestamp, model, cost). No prompt or completion content is rendered here even if the org runs in `full` [no-spy mode](/ai-governance/no-spy-mode): `/coding-agents` is a ledger view, not a trace viewer.
 
 If your admin has published a catalog, the next step is one click. If they haven't, skip to the alternative path at the bottom of this page.
 
@@ -100,7 +100,7 @@ A plain `claude` run then reports to LangWatch. Add `--project <id-or-slug>` to 
 
 ## Step 5: Read your spend back
 
-Refresh `/me`. You should see:
+Refresh `/coding-agents`. You should see:
 
 - **Recent activity**: your request from Step 4 with timestamp, model, and cost.
 - **Spending over time**: today's bar updated.
@@ -111,14 +111,14 @@ If the request didn't appear, the [CLI debug commands](/ai-governance/cli-debug)
 ## Where to next
 
 - **Want to switch tools?** Every coding assistant has its own setup page: [Claude Code](/coding-agents/claude-code), [Codex](/coding-agents/openai-codex), [Gemini CLI](/coding-agents/gemini-cli), [Cursor](/coding-agents/overview), [opencode](/coding-agents/opencode), [Aider](/coding-agents/overview).
-- **Want to use a model provider directly from your code?** Click the provider tile on `/me` (OpenAI, Anthropic, Bedrock, Gemini), name a key, and copy the secret once. The form posts to `personalVirtualKeys.issuePersonal` and the result is a virtual key you drop into your app's config, same gateway, same budget, no provider credentials in your dotfiles. See [Model-provider tiles](/ai-governance/personal-portal/end-user#model-provider-tiles).
+- **Want to use a model provider directly from your code?** Click the provider tile on `/coding-agents` (OpenAI, Anthropic, Bedrock, Gemini), name a key, and copy the secret once. The form posts to `personalVirtualKeys.issuePersonal` and the result is a virtual key you drop into your app's config, same gateway, same budget, no provider credentials in your dotfiles. See [Model-provider tiles](/ai-governance/personal-portal/end-user#model-provider-tiles).
 - **Want to share a key with your team?** Don't use a personal VK, create a project and a project-scoped VK instead. The portal nudges you toward this with a "building an app for your team? Consider creating a project" hint.
-- **Want to know which devices are signed in?** [/me/devices](/ai-governance/personal-portal/sessions) lists every active CLI session with platform, hostname, and last-used timestamp; revoke any session in one click.
+- **Want to know which devices are signed in?** [/coding-agents/configure?tab=devices](/ai-governance/personal-portal/sessions) lists every active CLI session with platform, hostname, and last-used timestamp; revoke any session in one click.
 - **Got an error?** [CLI debug → Error catalog](/ai-governance/cli-debug#error-catalog) maps every CLI error to the admin action that fixes it.
 
 ## Alternative path: admin hasn't published a catalog yet
 
-If `/me` shows the empty-state "your IT team is still setting things up" message, you can still use the CLI directly without the portal:
+If `/coding-agents` shows the empty-state "your IT team is still setting things up" message, you can still use the CLI directly without the portal:
 
 ```bash
 # Sign in

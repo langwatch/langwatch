@@ -34,6 +34,8 @@ function row(overrides: Partial<RawRunConfigurationRow>): RawRunConfigurationRow
     RepeatCount: "1",
     SimulatorModel: "",
     JudgeModel: "",
+    TraceQuietPeriodMs: "",
+    TraceWaitTimeoutMs: "",
     Parameters: "",
     FirstTargetParameters: "",
     // The flag saying a note was taken, never the note. Off by default.
@@ -96,6 +98,37 @@ describe("Feature: reading a configuration back off the runs", () => {
       expect(entry.configuration.targets).toHaveLength(2);
       expect(entry.configuration.targets).toEqual(expect.arrayContaining(targets));
       expect(entry.runParameters).toEqual(runParameters);
+    });
+  });
+
+  describe("given rows of one plan run with and without judge trace wait settings", () => {
+    /** @scenario "The run history offers back the judge trace wait settings a plan ran with" */
+    it("reads the stamped settings back as milliseconds and keys the two apart", () => {
+      const plan = {
+        id: "suite-1",
+        name: "Refunds",
+        slug: "refunds",
+        kind: "run_plan",
+        scope: { mode: "all" },
+        scenarioIds: [],
+        targets: [],
+      };
+
+      const withWait = toEntry({
+        row: row({ TraceQuietPeriodMs: "20000", TraceWaitTimeoutMs: "90000" }),
+        plan,
+      });
+      const without = toEntry({ row: row({}), plan });
+
+      expect(withWait.configuration).toMatchObject({
+        traceQuietPeriodMs: 20_000,
+        traceWaitTimeoutMs: 90_000,
+      });
+      expect(without.configuration).toMatchObject({
+        traceQuietPeriodMs: null,
+        traceWaitTimeoutMs: null,
+      });
+      expect(withWait.key).not.toBe(without.key);
     });
   });
 

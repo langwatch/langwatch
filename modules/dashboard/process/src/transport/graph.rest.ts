@@ -1,7 +1,7 @@
 /**
  * REST for the custom graphs a dashboard is built from, under `/api/graphs`.
  * The two timestamps leave as ISO strings, as this family has always sent them.
- * A graph posted without a size is 1 by 1 here, as on main; tRPC's default is 4 by 3.
+ * A graph posted without a size takes the grid's default footprint, as over tRPC.
  */
 import { defineRestRouter, MANAGEMENT_API_VERSION, nameUnlessMissing } from "@langwatch/api/rest";
 import {
@@ -87,8 +87,8 @@ export const graphRest = defineRestRouter(DashboardApi)
         layout: {
           ...(input.gridColumn === undefined ? {} : { gridColumn: input.gridColumn }),
           ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
-          colSpan: input.colSpan ?? 1,
-          rowSpan: input.rowSpan ?? 1,
+          ...(input.colSpan === undefined ? {} : { colSpan: input.colSpan }),
+          ...(input.rowSpan === undefined ? {} : { rowSpan: input.rowSpan }),
         },
       }),
     ),

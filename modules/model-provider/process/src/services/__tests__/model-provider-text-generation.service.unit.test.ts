@@ -10,7 +10,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const ai = vi.hoisted(() => ({ generateText: vi.fn() }));
 
-vi.mock("ai", () => ({ generateText: ai.generateText }));
+vi.mock("ai", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  generateText: ai.generateText,
+}));
 
 import { AiCallFailureService } from "../ai-call-failure.service.ts";
 import { ModelProviderExecutionHandleService } from "../model-provider-execution-handle.service.ts";

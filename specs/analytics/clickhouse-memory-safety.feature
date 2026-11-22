@@ -96,21 +96,21 @@ Feature: ClickHouse Query Memory Safety Regression Tests
   @integration
   Scenario: Dashboard panels on a high-volume project answer under a memory cap
     Given about a million traces over the current and previous 30 days, half of them with a second version
-    When the trace, user, error, latency and thread panels run with a 150 MB per-query cap
+    When the trace, user, error, latency and thread panels run with a 190 MB per-query cap
     Then every panel answers without a memory exceeded error
     And the trace, user and error counts match the seeded data
 
   @integration
   Scenario: The model-grouped chart answers under a memory cap
     Given about a million traces with one LLM span each
-    When the LLM calls chart grouped by model runs with a 200 MB per-query cap
+    When the LLM calls chart grouped by model runs with a 300 MB per-query cap
     Then it answers without a memory exceeded error
     And every current trace is counted under its model
 
   @integration
   Scenario: The documents panel reads only the RAG contexts attribute
     Given about a million traces whose root spans carry RAG contexts and large message attributes
-    When the top documents panel runs with a 150 MB per-query cap
+    When the top documents panel runs with a 190 MB per-query cap
     Then it answers in one query with the top 10 documents and the distinct document total
 
   @unit

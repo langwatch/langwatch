@@ -39,7 +39,7 @@ describe("resolveOrgSwitchDestination", () => {
           reachableProducts: ["llm-ops", "me"],
           projectSlug: null,
         }),
-      ).toBe("/me");
+      ).toBe("/coding-agents");
     });
   });
 
@@ -62,7 +62,7 @@ describe("resolveOrgSwitchDestination", () => {
           reachableProducts: ["me"],
           projectSlug: null,
         }),
-      ).toBe("/me");
+      ).toBe("/coding-agents");
     });
   });
 

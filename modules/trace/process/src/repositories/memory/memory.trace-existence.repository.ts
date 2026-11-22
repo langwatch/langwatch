@@ -27,6 +27,19 @@ export class MemoryTraceExistenceRepository extends TraceExistenceRepository {
     return this.#store.findTraceIds({ tenantId: input.projectId, traceIds: input.traceIds });
   }
 
+  async findProjectsHoldingTrace(input: {
+    projectIds: readonly string[];
+    traceId: string;
+  }): Promise<string[]> {
+    const holding = new Set(
+      this.#store
+        .findByTenants({ tenantIds: input.projectIds })
+        .filter((span) => span.traceId === input.traceId)
+        .map((span) => span.tenantId),
+    );
+    return input.projectIds.filter((projectId) => holding.has(projectId));
+  }
+
   /** A trace's cost is the sum of its written spans' costs, as the summary fold adds them. */
   async findTraceCosts(input: {
     projectId: string;

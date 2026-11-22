@@ -1,7 +1,9 @@
 Feature: CLI device flow refusals keep the RFC 8628 wire
   Released `langwatch` CLI builds and the browser approval page parse the
-  device flow's two-field refusal body, `{ error, error_description }`, at the
-  status the flow names. Every refusal on the family keeps that body exactly.
+  device flow's refusal body, `{ error, error_description }`, at the status the
+  flow names. Every refusal on the family keeps those two fields. The lookup's
+  410 expired refusal may add `client` when a known app (Laze) asked for the
+  code, so the approval page can send the person back to that app.
 
   @integration
   Scenario: An unknown device code polled at exchange answers expired_token
@@ -49,4 +51,4 @@ Feature: CLI device flow refusals keep the RFC 8628 wire
   Scenario: A CLI login is not approved while an operator acts as another member
     Given an operator signed in as a member through impersonation
     When they approve a device code for the member's organization
-    Then it is answered 403 with error "permission_denied" before any membership is read
+    Then it is answered 403 with error "impersonation_cannot_mint_credential" before any membership is read

@@ -29,10 +29,12 @@ import {
 import type { LangWatchQLViewDefinition } from "./langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
 import type { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
+import { LangWatchQLFlooredReadService } from "./langwatch-ql-floored-read.service.ts";
 import type { LangWatchQLRunTelemetryService } from "./langwatch-ql-run-telemetry.service.ts";
 import type { LangWatchQLGranularityResolution } from "./langwatch-ql-time-window.service.ts";
 
 const lwqlDiagnostics = LangWatchQLDiagnosticsService.create();
+const flooredRead = LangWatchQLFlooredReadService.create();
 
 const logger = createLogger("langwatch:analytics:lwql");
 
@@ -174,16 +176,18 @@ export class LangWatchQLExecutionService {
     // empty, so an unparameterised query keeps the request shape it had.
     const executionParameters = langWatchQLExecutionParameters({ validation, granularity });
 
-    const execution = await executor.execute({
-      // The submitted statement with a default `LIMIT` when the caller named none, so an
-      // unbounded query is capped rather than streamed.
-      sql: scopeLangWatchQL({
-        sql: langWatchQLRowLimitedSql({ sql, validation, maxRows: limits.maxRows }),
-        database,
-        views,
-        ...(timeWindow ? { timeWindow } : {}),
-        ...(memberWindows ? { memberWindows } : {}),
-      }),
+    // The submitted statement with a default `LIMIT` when the caller named none, so an
+    // unbounded query is capped rather than streamed.
+    const scoped = scopeLangWatchQL({
+      sql: langWatchQLRowLimitedSql({ sql, validation, maxRows: limits.maxRows }),
+      database,
+      views,
+      ...(timeWindow ? { timeWindow } : {}),
+      ...(memberWindows ? { memberWindows } : {}),
+      projectIds: projects.map((project) => project.id),
+    });
+    const request = {
+      sql: scoped,
       // The resolved record, not the caller's: it is the one carrying the
       // window this surface injected AND the step this run was bucketed at.
       // `validation.boundParameters` is the wrong half: it predates the
@@ -191,7 +195,8 @@ export class LangWatchQLExecutionService {
       ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
       tenantCapability,
       projectIds: projects.map(({ id }) => id),
-    });
+    };
+    const execution = await flooredRead.execute({ executor, request, database, views });
     // Refused rather than cut: a body that looks whole but is missing its tail is the worse
     // failure for an analytics caller. The row count is already bounded by the LIMIT above.
     this.assertResultWithinByteCeiling({ rows: execution.rows });

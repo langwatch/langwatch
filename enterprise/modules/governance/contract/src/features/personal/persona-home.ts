@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { Named } from "@langwatch/module";
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 import { z } from "zod";
 
 export const governanceOrganizationIntentSchema = z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]);
@@ -68,7 +69,7 @@ export class PersonaHomeResolverService {
         persona,
         destination:
           input.organizationIntent === "AGENT_GOVERNANCE" && input.hasGovernanceUi
-            ? "/me"
+            ? CODING_AGENTS_PATH
             : projectHome,
         isOverride: false,
         governanceUiEnabled: input.hasGovernanceUi,
@@ -120,7 +121,7 @@ export class PersonaHomeResolverService {
     } catch {
       return {
         persona: "project_only",
-        destination: input.firstProjectSlug ? `/${input.firstProjectSlug}` : "/me",
+        destination: input.firstProjectSlug ? `/${input.firstProjectSlug}` : CODING_AGENTS_PATH,
         isOverride: false,
         governanceUiEnabled: input.hasGovernanceUi ?? false,
         intentPinned: false,
@@ -145,7 +146,7 @@ export class PersonaHomeResolverService {
   }
 
   private mapPersonaToDestination(persona: Persona, input: PersonaResolverInput): string {
-    const noProjectHome = input.hasGovernanceUi ? "/me" : "/onboarding/welcome";
+    const noProjectHome = input.hasGovernanceUi ? CODING_AGENTS_PATH : "/onboarding/welcome";
     const projectHome = input.firstProjectSlug ? `/${input.firstProjectSlug}` : noProjectHome;
 
     if (!input.hasGovernanceUi) return projectHome;
@@ -154,7 +155,7 @@ export class PersonaHomeResolverService {
         return "/governance";
       case "personal_only":
       case "mixed":
-        return "/me";
+        return CODING_AGENTS_PATH;
       case "project_only":
         return projectHome;
     }

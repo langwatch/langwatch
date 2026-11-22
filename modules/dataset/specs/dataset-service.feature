@@ -7,7 +7,7 @@ Feature: Shared Dataset service
     When a caller creates a dataset for a project with columns and records
     Then the service validates the input with the Dataset contract
     And it returns a portable Dataset value
-    And the records are written through the Dataset record repository
+    And the records are written to object storage
 
   @unit
   Scenario: Dataset names remain unique within a project
@@ -32,8 +32,8 @@ Feature: Shared Dataset service
   @unit
   Scenario: Dataset copy remains a Dataset operation
     When a caller copies a dataset to another project
-    Then the service creates the target through its own repository
-    And it copies records through the Dataset record repository
+    Then the service creates the target in object storage
+    And it reads the source records through the Dataset record repository
     And it does not construct a Dataset Record feature
 
   @unit
@@ -164,6 +164,13 @@ Feature: Shared Dataset service
     Given a dataset whose stored columns still carry the upload's source header, as main stores them
     When the project's datasets are read
     Then the columns read as name and type and the dataset lists, never a 422 for the whole project
+
+  @unit @regression
+  Scenario: An import refused before its file is read gives the file's connection back
+    Given a dataset import from a stored file
+    When the import is refused before the first byte of the file is read
+    Then the file's byte stream is ended, so it holds no storage connection
+    And the file is opened only once the organization's limits have been read
 
   @integration
   Scenario: A storage migration pages one project's datasets by id, archived ones included

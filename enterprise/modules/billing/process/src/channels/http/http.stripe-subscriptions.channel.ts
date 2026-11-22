@@ -31,6 +31,22 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
     return subscriptionOf(await this.stripe.subscriptions.retrieve(subscriptionId));
   }
 
+  async listCustomerSubscriptions({
+    customerId,
+  }: {
+    customerId: string;
+  }): Promise<BillingSubscription[]> {
+    const subscriptions: BillingSubscription[] = [];
+    for await (const subscription of this.stripe.subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 100,
+    })) {
+      subscriptions.push(subscriptionOf(subscription));
+    }
+    return subscriptions;
+  }
+
   async updateSubscription({
     subscriptionId,
     change,
@@ -178,7 +194,15 @@ function subscriptionOf(subscription: Stripe.Subscription): BillingSubscription 
     })),
     currentPeriodEnd: subscription.current_period_end,
     currency: subscription.currency,
+    ...customerOf(subscription),
   };
+}
+
+/** The billed customer, when the provider's answer names one. */
+function customerOf(subscription: Stripe.Subscription): { customerId?: string } {
+  const customer: Stripe.Subscription["customer"] | undefined = subscription.customer;
+  if (!customer) return {};
+  return { customerId: typeof customer === "string" ? customer : customer.id };
 }
 
 function previewDetailsOf(

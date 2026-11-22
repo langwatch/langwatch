@@ -1,7 +1,7 @@
 export { entitlementConfig, type EntitlementConfig } from "./entitlement.config.ts";
 export * from "./member-classification.ts";
 export * from "./plan-creation-caps.ts";
-export type { MoneyByCurrency, Plan, PlanInfo, PlanSource } from "./plan.ts";
+export type { MoneyByCurrency, OverPlan, Plan, PlanInfo, PlanSource } from "./plan.ts";
 export { EntitlementApi } from "./entitlement.api.ts";
 export type {
   BaselinePlanSource,
@@ -26,10 +26,12 @@ export {
 } from "./provider.ts";
 export {
   moneyByCurrencySchema,
+  overPlanSchema,
   planSchema,
   planSourceSchema,
   PricingModel,
   type MoneyByCurrencySchema,
+  type OverPlanSchema,
   type PlanSchema,
 } from "./plan.ts";
 export {

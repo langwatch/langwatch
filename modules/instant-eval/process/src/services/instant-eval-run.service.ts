@@ -26,6 +26,7 @@ import type {
   InstantEvalEstimateService,
 } from "./instant-eval-estimate.service.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
+import type { InstantEvalGatewayBudgetService } from "./instant-eval-gateway-budget.service.ts";
 import type { InstantEvalReadsService } from "./instant-eval-reads.service.ts";
 import {
   InstantEvalRequestStatementService,
@@ -54,6 +55,11 @@ export interface InstantEvalRunPeers extends InstantEvalRequestStatementPeers {
   isReleased(input: { projectId: string }): Promise<boolean>;
   /** Whether this deployment provisioned a LangWatchQL identity at all. */
   isQueryIdentityAvailable(): boolean;
+  /**
+   * Whether the project's tenant is mapped for the restricted identity, mapping it first when
+   * not. False means a statement would read zero rows, so the run is refused instead.
+   */
+  ensureQueryTenant(input: { projectId: string }): Promise<boolean>;
   /** The restricted tenant identity and protections this asker runs as. */
   resolveCaller(input: {
     projectId: string;
@@ -83,6 +89,8 @@ interface InstantEvalRunUnits {
     InstantEvalFreeBudgetService,
     "standing" | "assertWithinBudget" | "reserve" | "release"
   >;
+  /** The gateway budgets set to block, which bind every plan. */
+  gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
   /** The asker's traces:view proof a filter's selection is read under. */
   proofs: Pick<InstantEvalTraceProofService, "mint">;
 }
@@ -129,6 +137,7 @@ export class InstantEvalRunService {
     // Before the statement is accepted, so an organization past its budget is
     // told so without the probe reading anything on its behalf.
     await this.units.budget.assertWithinBudget({ projectId });
+    await this.units.gatewayBudget.assertWithinGatewayBudget({ projectId });
     const accepted = await this.#accept({ projectId, actor, caller, input, rowLimit });
     const runId = this.units.creates.nextRunId();
     await this.#reserve({ projectId, caller, accepted, rowLimit, runId });
@@ -293,14 +302,16 @@ export class InstantEvalRunService {
   }): Promise<LangWatchQLRunCaller> {
     await this.#assertEnabled(projectId);
     const resolved = await this.peers.resolveCaller({ projectId, actor });
+    const project = getInstantEvalQueryCapability({
+      project: { id: resolved.project.id, lwqlKey: resolved.project.lwqlKey || null },
+      hasDeploymentIdentity: this.peers.isQueryIdentityAvailable(),
+    });
+    // An unmapped tenant reads zero rows with no error, so it is refused, never run empty.
+    if (!(await this.peers.ensureQueryTenant({ projectId: project.id }))) {
+      throw new InstantEvalNotEnabledError();
+    }
 
-    return {
-      project: getInstantEvalQueryCapability({
-        project: { id: resolved.project.id, lwqlKey: resolved.project.lwqlKey || null },
-        hasDeploymentIdentity: this.peers.isQueryIdentityAvailable(),
-      }),
-      protections: resolved.protections,
-    };
+    return { project, protections: resolved.protections };
   }
 
   /** Released but refused means the deployment has no judge, which the operator fixes. */

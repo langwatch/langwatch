@@ -6,6 +6,7 @@ import { StubAuthzLineageEpoch } from "../../repositories/__tests__/support/auth
 import { StubAuthzListingRepository } from "../../repositories/__tests__/support/authz-listing.stub.ts";
 import { StubAuthzManagedGrantRepository } from "../../repositories/__tests__/support/authz-managed-grant.stub.ts";
 import { makeReader } from "../../repositories/__tests__/support/authz-read.stub.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { LINEAGE_CACHE_MAX_AGE_MS } from "../authz-scope-lineage.service.ts";
 import { AuthzService } from "../authz.service.ts";
 
@@ -49,6 +50,7 @@ function makeWorld({
     lineageEpoch = (lineageEpoch ?? 0) + 1;
   });
   const authz = AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     isOnEngine: async () => true,
     repository: reader,
     listing: new StubAuthzListingRepository(),
@@ -228,6 +230,7 @@ function makeCutoverWorld() {
     beginPass: vi.fn(() => (passes++ === 0 ? current : stale)),
   });
   const authz = AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     isOnEngine: async () => true,
     repository: reader,
     listing: new StubAuthzListingRepository(),
