@@ -73,12 +73,81 @@ describe("presentLangyToolError", () => {
     });
   });
 
+  describe("given the server's own permission_denied code", () => {
+    const denied = ({
+      code = "permission_denied",
+      denialReason,
+      permission = "scenarios:manage",
+      message = "Permission denied",
+    }: {
+      code?: string;
+      denialReason?: string;
+      permission?: string;
+      message?: string;
+    }) =>
+      present(
+        failureDocument({
+          code,
+          message,
+          httpStatus: 403,
+          meta: { permission, denialReason },
+          isHandled: true,
+        }),
+      );
+
+    /** @scenario "A failure card says what went wrong in the user's terms" */
+    it.each(["permission_denied", "project_permission_denied"])(
+      "names the missing access for %s",
+      (code) => {
+        expect(denied({ code, denialReason: "no-grant" }).message).toBe(
+          "You can't manage scenarios in this project.",
+        );
+      },
+    );
+
+    /** @scenario "A reader who lost access is told so" */
+    it.each(["no-membership", "membership-disabled"])(
+      "says access was removed for %s",
+      (denialReason) => {
+        const presentation = denied({ denialReason });
+        expect(presentation.message).toBe("You no longer have access to this project.");
+        expect(presentation.detail).toBe(
+          "Ask whoever manages access for your team if you need it back.",
+        );
+      },
+    );
+
+    /** @scenario "A reader who lost access is told so" */
+    it("names the one permission lost when the owner's access was reduced", () => {
+      expect(denied({ denialReason: "owner-ceiling" }).message).toBe(
+        "You can no longer manage scenarios in this project.",
+      );
+    });
+
+    /** @scenario "A reader who lost access is told so" */
+    it("keeps a reduced access to one action when the action has no plain words", () => {
+      expect(denied({ denialReason: "owner-ceiling", permission: "agents:deploy" }).message).toBe(
+        "This action isn't available to you any more in this project.",
+      );
+    });
+
+    /** @scenario "A seat limit keeps the platform's own sentence" */
+    it.each([
+      ["developer-restricted", "This is outside your Developer seat"],
+      ["lite-member-restricted", "This feature is not available for your account"],
+    ])("keeps the server's seat sentence for %s", (denialReason, sentence) => {
+      const presentation = denied({ denialReason, message: sentence });
+      expect(presentation.message).toBe(sentence);
+      expect(presentation.detail).toBe("Ask whoever manages seats for your team if you need it.");
+    });
+  });
+
   describe("given a denial that named no permission", () => {
     /** @scenario "A refused permission reads as a permissions problem" */
     it("still says the access does not cover it, with no invented detail", () => {
       const presentation = present(
         failureDocument({
-          code: "unauthorized",
+          code: "forbidden",
           message: "Forbidden",
           httpStatus: 403,
           meta: {},
@@ -88,6 +157,79 @@ describe("presentLangyToolError", () => {
       expect(presentation.message).toBe("This action isn't available to you in this project.");
       expect(presentation.message).not.toContain("API key");
     });
+  });
+
+  // A 401 is Langy's own short-lived key refused, not the reader's access.
+  describe.each([
+    {
+      code: "unauthorized",
+      message: "Unauthorized",
+      httpStatus: 401,
+      suggestions: [
+        "Check that your API key is still valid — run `langwatch login` to re-authenticate",
+      ],
+    },
+    {
+      code: "missing_api_key",
+      message: "Not logged in and LANGWATCH_API_KEY is not set. Sign in with `langwatch login`.",
+      httpStatus: 0,
+      suggestions: ["Run `langwatch login` to authenticate"],
+    },
+    {
+      code: "not_authenticated",
+      message: "Not logged in. Run `langwatch login --device` to sign in via your company SSO.",
+      httpStatus: 0,
+      suggestions: [],
+    },
+  ])("given Langy's own credential failed with $code", (error) => {
+    const failure = failureDocument({
+      ...error,
+      meta: {},
+      isHandled: true,
+      docUrl: "https://docs.langwatch.ai/platform/api-keys",
+    });
+
+    /** @scenario "Langy's own refused credential reads as an internal error" */
+    it("says Langy hit an internal error", () => {
+      expect(present(failure).message).toBe(
+        "Langy hit an internal error and couldn't complete this step.",
+      );
+    });
+
+    /** @scenario "Langy's own refused credential reads as an internal error" */
+    it("never says the reader lacks access or tells them to sign in", () => {
+      const presentation = present(failure);
+      const shown = [presentation.message, presentation.detail, ...(presentation.tips ?? [])].join(
+        " ",
+      );
+      expect(shown).not.toMatch(/manages access|isn't available to you|log ?in|sign in|api key/i);
+      expect(presentation.tips).toBeUndefined();
+      expect(presentation.docsUrl).toBeUndefined();
+    });
+  });
+
+  describe("given a missing key on the developer's own machine", () => {
+    /** @scenario "A missing key on the developer's own machine keeps the CLI's own words" */
+    it.each(["missing_api_key", "unauthorized", "not_authenticated"])(
+      "keeps the CLI's sentence and next steps for a local tool (%s)",
+      (code) => {
+        const presentation = presentLangyToolError({
+          title: "Running a command",
+          toolName: "local_bash",
+          errorText: failureDocument({
+            code,
+            message: "Not logged in and LANGWATCH_API_KEY is not set.",
+            httpStatus: 0,
+            meta: {},
+            isHandled: true,
+            suggestions: ["Run `langwatch login` to authenticate"],
+          }),
+        });
+
+        expect(presentation.message).toBe("Not logged in and LANGWATCH_API_KEY is not set.");
+        expect(presentation.tips).toEqual(["Run `langwatch login` to authenticate"]);
+      },
+    );
   });
 
   // The failure the user hit: a free-plan scenario limit, rendered as
@@ -300,6 +442,164 @@ describe("presentLangyToolError", () => {
 
     it("keeps the whole text for copying", () => {
       expect(present(stderr).raw).toContain("ECONNRESET");
+    });
+  });
+
+  describe("given a sentence printed after a Python warning", () => {
+    const stderr = [
+      "DeprecationWarning: datetime.datetime.utcnow() is deprecated",
+      "✖ Failed to reach the API: socket hang up (ECONNRESET)",
+    ].join("\n");
+
+    /** @scenario "A failed command says its exit code and its last error line" */
+    it("does not take the warning for a stack trace and keeps the sentence", () => {
+      expect(present(stderr).detail).toBe("Failed to reach the API: socket hang up (ECONNRESET)");
+    });
+  });
+
+  describe("given a command on the developer's machine that failed", () => {
+    const ESC = "\u001b";
+    /** How the worker renders a shell result: the exit code, then stdout and stderr. */
+    const shellResult = ({
+      exitCode,
+      stdout,
+      stderr,
+    }: {
+      exitCode: string;
+      stdout: string;
+      stderr: string;
+    }) => `exit code: ${exitCode}\n\nstdout:\n${stdout}\n\nstderr:\n${stderr}`;
+    const presentCommand = (errorText: string) =>
+      presentLangyToolError({
+        title: "Running a command on your machine",
+        errorText,
+        toolName: "local_bash",
+      });
+
+    /** uv's progress bars and colours, a uv warning, two Python warnings, then the traceback. */
+    const uvPythonImportFailure = shellResult({
+      exitCode: "1",
+      stdout: "(empty)",
+      stderr: [
+        `${ESC}[2mResolved ${ESC}[1m42 packages${ESC}[0m ${ESC}[2min 1.21s${ESC}[0m`,
+        `${ESC}[?25l⠙ Preparing packages... (0/3)\r${ESC}[2K⠹ Preparing packages... (1/3)`,
+        `numpy==2.1.3 ${ESC}[32m━━━━━━${ESC}[2m━━━━${ESC}[0m 4.1 MiB/16.0 MiB\r${ESC}[2K${ESC}[1A${ESC}[2K${ESC}[?25h`,
+        `${ESC}[2mInstalled ${ESC}[1m3 packages${ESC}[0m ${ESC}[2min 120ms${ESC}[0m`,
+        `${ESC}[33mwarning${ESC}[0m${ESC}[1m:${ESC}[0m \`VIRTUAL_ENV=/Users/ada/.venv\` does not match the project environment path \`.venv\` and will be ignored`,
+        "/Users/ada/acme-app/.venv/lib/python3.13/site-packages/pydantic/_internal/_config.py:345: UserWarning: Valid config keys have changed in V2:",
+        "  warnings.warn(message, UserWarning)",
+        "DeprecationWarning: pkg_resources is deprecated as an API",
+        "Traceback (most recent call last):",
+        '  File "/Users/ada/acme-app/main.py", line 3, in <module>',
+        "    from langwatch import connect_agent",
+        "ImportError: cannot import name 'connect_agent' from 'langwatch' (/Users/ada/acme-app/.venv/lib/python3.13/site-packages/langwatch/__init__.py)",
+      ].join("\n"),
+    });
+
+    /** uv refusing to resolve, with an OSC hyperlink and a warning before the error. */
+    const uvResolutionFailure = shellResult({
+      exitCode: "2",
+      stdout: "",
+      stderr: [
+        `${ESC}[1m${ESC}[33mwarning${ESC}[0m${ESC}[1m:${ESC}[0m No \`requires-python\` value found in the workspace. Defaulting to \`>=3.14\`.`,
+        `  ${ESC}[31m×${ESC}[0m No solution found when resolving dependencies:`,
+        `  ╰─▶ Because all versions of langwatch>=1.4.0 require Python<3.14 and you require ${ESC}]8;;https://pypi.org/project/langwatch/${ESC}\\langwatch>=1.4.0${ESC}]8;;${ESC}\\, we can conclude that your requirements are unsatisfiable.`,
+      ].join("\n"),
+    });
+
+    /** @scenario "A failed command says its exit code and its last error line" */
+    it("says the exit code the command stopped with", () => {
+      expect(presentCommand(uvPythonImportFailure).message).toBe(
+        "The command stopped with exit code 1.",
+      );
+      expect(presentCommand(uvResolutionFailure).message).toBe(
+        "The command stopped with exit code 2.",
+      );
+    });
+
+    /** @scenario "A failed command says its exit code and its last error line" */
+    it("shows the last error line the command printed, past every warning", () => {
+      expect(presentCommand(uvPythonImportFailure).detail).toBe(
+        "ImportError: cannot import name 'connect_agent' from 'langwatch' (/Users/ada/acme-app/.venv/lib/python3.13/site-packages/langwatch/__init__.py)",
+      );
+      expect(presentCommand(uvResolutionFailure).detail).toBe(
+        "Because all versions of langwatch>=1.4.0 require Python<3.14 and you require langwatch>=1.4.0, we can conclude that your requirements are unsatisfiable.",
+      );
+    });
+
+    /** @scenario "A failed command says its exit code and its last error line" */
+    it("keeps the details free of every terminal escape and overwritten progress line", () => {
+      const raw = presentCommand(uvPythonImportFailure).raw ?? "";
+      expect(raw).not.toContain(ESC);
+      expect(raw).not.toContain("\r");
+      expect(raw).not.toContain("Preparing packages");
+      expect(raw).toContain("Resolved 42 packages in 1.21s");
+      expect(raw).toContain("Traceback (most recent call last):");
+      expect(presentCommand(uvResolutionFailure).raw).not.toContain(ESC);
+      expect(presentCommand(uvResolutionFailure).raw).not.toContain("8;;");
+    });
+
+    /** @scenario "A failed command says its exit code and its last error line" */
+    it("reads the same way for a folder-bound shell call that arrives named bash", () => {
+      const presentation = presentLangyToolError({
+        title: "Running a command",
+        errorText: uvPythonImportFailure,
+        toolName: "bash",
+      });
+      expect(presentation.message).toBe("The command stopped with exit code 1.");
+      expect(presentation.detail).toMatch(/^ImportError: cannot import name 'connect_agent'/);
+    });
+
+    it("leaves a sandbox shell failure, which the sandbox writes its own way, on its old card", () => {
+      const sandbox = presentLangyToolError({
+        title: "Running a command",
+        errorText: "ImportError: cannot import name 'x'\n\nCommand exited with code 1",
+        toolName: "bash",
+      });
+      expect(sandbox.message).toBe("This step couldn't be completed.");
+      expect(sandbox.detail).toBeUndefined();
+    });
+
+    it("drops a string sequence's payload, terminated or cut off", () => {
+      const raw =
+        presentCommand(
+          shellResult({
+            exitCode: "1",
+            stdout: "(empty)",
+            stderr: `${ESC}P1$r0m${ESC}\\error: Failed to spawn: \`python3.14\`\n${ESC}]0;uv run main.py`,
+          }),
+        ).raw ?? "";
+      expect(raw).toContain("error: Failed to spawn: `python3.14`");
+      expect(raw).not.toContain(ESC);
+      expect(raw).not.toContain("1$r0m");
+      expect(raw).not.toContain("uv run main.py");
+    });
+
+    it("says the exit code alone when the command printed nothing", () => {
+      const presentation = presentCommand(
+        shellResult({ exitCode: "127", stdout: "(empty)", stderr: "(empty)" }),
+      );
+      expect(presentation.message).toBe("The command stopped with exit code 127.");
+      expect(presentation.detail).toBeUndefined();
+    });
+
+    it("says the command stopped without an exit code when it was killed", () => {
+      const presentation = presentCommand(
+        shellResult({ exitCode: "none", stdout: "(empty)", stderr: "Killed" }),
+      );
+      expect(presentation.message).toBe("The command stopped without an exit code.");
+      expect(presentation.detail).toBe("Killed");
+    });
+
+    it("reads the error from stdout when stderr is empty", () => {
+      const presentation = presentCommand(
+        shellResult({
+          exitCode: "1",
+          stdout: "collected 3 items\nFAILED tests/test_agent.py::test_reply - AssertionError",
+          stderr: "(empty)",
+        }),
+      );
+      expect(presentation.detail).toBe("FAILED tests/test_agent.py::test_reply - AssertionError");
     });
   });
 

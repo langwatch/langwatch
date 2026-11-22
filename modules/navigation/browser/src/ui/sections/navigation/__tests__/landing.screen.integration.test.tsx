@@ -4,7 +4,7 @@
  * Landing page (/): per-org product memory resolves before server. Moved from platform/app.
  */
 
-import { render, waitFor } from "@testing-library/react";
+import { render, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const replaceMock = vi.fn();
@@ -19,7 +19,7 @@ let mockTestArrival: { data?: { testing: boolean }; isLoading: boolean } = {
 
 vi.mock("../../../../behavior/use-reachable-products.ts", () => ({
   useReachableProducts: () => ({
-    reachableProducts: ["me", "llm-ops", "gateway", "governance"],
+    reachableProducts: ["me", "llm-ops", "dashboards", "gateway", "governance"],
     isLoading: false,
   }),
 }));
@@ -35,6 +35,7 @@ vi.mock("../../../../behavior/navigation-api.ts", () => ({
   },
 }));
 
+import { useNavigationTracking } from "../../../../behavior/use-navigation-tracking.ts";
 import { writeLastVisitedProduct } from "../../../../model/product-memory.ts";
 import { WithStubNavigationHost } from "../../../../testing.tsx";
 import LandingScreen from "../landing.screen.tsx";
@@ -82,6 +83,29 @@ describe("the root landing", () => {
 
       await waitFor(() => {
         expect(replaceMock).toHaveBeenCalledWith("/gateway/virtual-keys");
+      });
+    });
+
+    /** @scenario "AC3l Opening Dashboards from the Analytics entry makes Dashboards the remembered product" */
+    it("lands on Dashboards after the Analytics entry took the member there", async () => {
+      renderHook(() => useNavigationTracking(), {
+        wrapper: ({ children }) => (
+          <WithStubNavigationHost
+            readings={{
+              organization: ORGANIZATION,
+              organizations: [ORGANIZATION],
+              project: PROJECT,
+              pathname: "/demo/dashboards",
+            }}
+          >
+            {children}
+          </WithStubNavigationHost>
+        ),
+      });
+      renderLanding();
+
+      await waitFor(() => {
+        expect(replaceMock).toHaveBeenCalledWith("/demo/dashboards");
       });
     });
 

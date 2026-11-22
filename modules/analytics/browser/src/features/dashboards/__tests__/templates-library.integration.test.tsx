@@ -107,6 +107,28 @@ describe("the templates finder", () => {
     });
   });
 
+  describe("given the flag is on", () => {
+    /** @scenario "AC3i The Dashboards pages point back to the old Analytics" */
+    it("points back to the old Analytics", () => {
+      openLibrary();
+
+      expect(screen.getByTestId("old-analytics-banner")).toHaveTextContent(
+        "Looking for the old Analytics? It is still here.",
+      );
+      expect(screen.getByRole("link", { name: "Open Analytics" })).toHaveAttribute(
+        "href",
+        "/test-project/analytics",
+      );
+    });
+
+    /** @scenario "AC3s The Dashboards pages show no old-Analytics banner to a member without analytics:view" */
+    it("shows no banner to a member without analytics:view", () => {
+      openLibrary({ permissions: [] });
+
+      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
+    });
+  });
+
   describe("given no search and no filters", () => {
     /** @scenario "AC101 Templates library: every ready template is listed by trunk" */
     it("lists every ready template once, under its trunk, in trunk order", () => {
@@ -290,7 +312,7 @@ describe("the templates finder", () => {
       const card = screen.getByRole("article", { name: READY.name });
 
       const added = await within(card).findByRole("link", {
-        name: `${READY.name} is added: open its board`,
+        name: `${READY.name} is added: open its dashboard`,
       });
       expect(added).toHaveAttribute("href", "/test-project/dashboards/board-9");
       expect(added).toHaveTextContent("Added");

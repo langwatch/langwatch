@@ -33,6 +33,6 @@ None: notification declares no peers.
 
 ## Who depends on notification
 
-[auth](../auth/README.md), [automation](../automation/README.md), [billing](../../enterprise/modules/billing/README.md), [identity](../identity/README.md), [langy](../langy/README.md), [ops](../ops/README.md), [organization](../organization/README.md), [user](../user/README.md) (as a peer).
+[auth](../auth/README.md), [automation](../automation/README.md), [billing](../../enterprise/modules/billing/README.md), [identity](../identity/README.md), [langy](../langy/README.md), [monitor](../monitor/README.md), [ops](../ops/README.md), [organization](../organization/README.md), [user](../user/README.md) (as a peer).
 
 <!-- readme:generated:end -->

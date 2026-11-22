@@ -41,3 +41,11 @@ export function fireIntegrationMethod({
     },
   ];
 }
+
+/**
+ * A member of an organization that sends coding-agent sessions. A trait of its own, so the
+ * integration_method a member chose in onboarding is never overwritten.
+ */
+export function fireUsesCodingAgent({ userId }: { userId: string }): CioBatchCall[] {
+  return [{ type: "identify", userId, traits: { uses_coding_agent: true } }];
+}

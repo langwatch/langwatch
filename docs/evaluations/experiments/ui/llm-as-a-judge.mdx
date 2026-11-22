@@ -1,5 +1,5 @@
 ---
-title: "LLM-as-a-Judge: score outputs on criteria without expected answers"
+title: "LLM-as-a-Judge: score outputs without expected answers"
 sidebarTitle: LLM-as-a-Judge
 description: Score outputs against written criteria with an LLM-as-a-Judge evaluator when your dataset has inputs but no expected answers, and read the reason behind each verdict.
 ---
@@ -39,9 +39,9 @@ Open [Experiments](https://app.langwatch.ai/@project/experiments), click **New E
 <Step title="Create the judge">
 On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the **LLM as Judge** category and **LLM-as-a-Judge Boolean Evaluator**.
 
-Name it, pick the judge model, and replace the default prompt with your criteria. Write the criteria as a checklist the judge can apply to one answer at a time. For example:
+Name it, pick the judge model, and replace the default prompt with your criteria. The model picker also lists **Decision models**, such as OpenAI Decisions API, TypeSafe Jev, Cloudflare Clef or Gemini Decision 1, which answer yes or no, score and category questions on your own provider key. [Your own model](/features/instant-evals/own-model) lists each one and the key it needs. Write the criteria as a checklist the judge can apply to one answer at a time. For example:
 
-```
+```text
 You are evaluating a business coaching assistant.
 The output passes only if all of these are true:
 1. It answers the question the user asked, not a different one.

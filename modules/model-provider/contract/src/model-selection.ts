@@ -1,6 +1,8 @@
 /** Which models a picker offers, from the providers a project has stored. Pure: consumers fetch. */
 import { isCodexModel, isModelAllowedForFeature } from "./catalog/codex-restrictions.ts";
-import { allLitellmModels } from "./catalog/model-catalog.ts";
+import { findDecisionModel, isOwnDecisionModelId } from "./catalog/decision-models.ts";
+import { isLatestAlias } from "./catalog/latest-aliases.ts";
+import { allLitellmModels, isChatSurfaceCatalogModel } from "./catalog/model-catalog.ts";
 import type { ModelOption } from "./model-options.ts";
 import { buildCustomModelDisplayNames, modelDisplayLabel } from "./model-provider-display-names.ts";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "./model-provider-registry.ts";
@@ -15,8 +17,40 @@ export type ModelOptionGroup = {
 /** A model LangWatch serves itself, so a project needs no provider of its own to pick it. */
 export type BuiltInModel = { value: string; label: string };
 
-/** The heading built-in models are listed under. */
-export const BUILT_IN_MODELS_GROUP_LABEL = "LangWatch";
+/**
+ * The heading built-in models are listed under. Not "LangWatch": an own decision model in it
+ * runs on the project's provider, which its icon names, as a chat model's does.
+ */
+export const BUILT_IN_MODELS_GROUP_LABEL = "Decision models";
+
+/**
+ * The built-in group's key. A constant, never a model id's prefix: an own-key decision model
+ * reads `openai/decisions:<name>`, and keying on that collided with the provider's own group.
+ */
+export const BUILT_IN_MODELS_GROUP_KEY = "langwatch-built-in";
+
+/**
+ * Whether only a built-in offer can serve this model: the catalogue's own-key decision models,
+ * whose ids carry a provider's prefix that would otherwise vouch for a model the judge can no
+ * longer run. A custom model its owner happened to name `decisions:…` is not one of them.
+ */
+export const isServedOnlyAsBuiltIn = (model: string): boolean => isOwnDecisionModelId(model);
+
+const PROVIDER_NOT_ENABLED_REMEDY =
+  "provider isn't enabled here. Re-add the provider or pick a different model to use it.";
+
+const DECISION_MODEL_WITHDRAWN_REMEDY =
+  "This decision model is no longer available to this project. Pick a different model.";
+
+/**
+ * Why the project cannot run the chosen model, with the remedy that works: re-adding a provider
+ * cannot bring back a decision model the catalogue no longer offers, and that provider may well
+ * be enabled already.
+ */
+export const unavailableModelReason = ({ model }: { model: string }): string =>
+  isServedOnlyAsBuiltIn(model)
+    ? DECISION_MODEL_WITHDRAWN_REMEDY
+    : `${model.split("/")[0] ?? ""} ${PROVIDER_NOT_ENABLED_REMEDY}`;
 
 export type GroupedModelOptions = ModelOptionGroup[];
 
@@ -117,6 +151,7 @@ const mergeProviderRowsByKey = (
         existing.customEmbeddingsModels,
         row.customEmbeddingsModels,
       ),
+      servedModels: existing.servedModels ?? row.servedModels ?? null,
     };
   }
   return byKey;
@@ -167,6 +202,36 @@ const enabledCustomModelIds = (
   return ids;
 };
 
+/**
+ * Per provider key, the bare ids its own model list answered with, or none to trust the catalogue.
+ * A list sharing no id with the catalogue names models another way (a proxy's own aliases), so it
+ * proves nothing about which catalogue ids answer and the catalogue is kept.
+ */
+const servedModelSets = (
+  modelProviders: Record<string, MaybeStoredModelProvider>,
+  options: string[],
+): Map<string, Set<string>> => {
+  const sets = new Map<string, Set<string>>();
+  for (const [providerKey, config] of Object.entries(modelProviders)) {
+    if (!config.servedModels?.length) continue;
+    const served = new Set(config.servedModels);
+    const prefix = `${providerKey}/`;
+    const overlaps = options.some(
+      (option) => option.startsWith(prefix) && served.has(option.slice(prefix.length)),
+    );
+    if (overlaps) sets.set(providerKey, served);
+  }
+  return sets;
+};
+
+/** Whether the provider's own model list, when known, carries this registry id. */
+const isServedByProvider = (option: string, served: Map<string, Set<string>>): boolean => {
+  const provider = option.split("/")[0]!;
+  const set = served.get(provider);
+  if (!set || isLatestAlias(option)) return true;
+  return set.has(option.slice(provider.length + 1));
+};
+
 /** Combines registry models (`options`, filtered by `mode`) with custom models, custom first. */
 export const getCustomModels = (
   modelProviders: Record<string, MaybeStoredModelProvider>,
@@ -176,6 +241,7 @@ export const getCustomModels = (
   const customModelIds = enabledCustomModelIds(modelProviders, mode);
   const registryModelIds: string[] = [];
   const customSet = new Set(customModelIds);
+  const served = servedModelSets(modelProviders, options);
 
   // Include registry models from enabled providers, filtered by mode
   for (const option of options) {
@@ -184,6 +250,8 @@ export const getCustomModels = (
 
     const registryMode = allLitellmModels[option]?.mode;
     if (registryMode && registryMode !== mode) continue;
+    if (mode === "chat" && !isChatSurfaceCatalogModel(option)) continue;
+    if (!isServedByProvider(option, served)) continue;
 
     // Skip if already added as a custom model (same ID)
     if (customSet.has(option)) continue;
@@ -230,30 +298,31 @@ export function modelSelectionFrom({
     mode,
     isCustom: customModelIdSet.has(modelValue),
   }));
-  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label }) => ({
-    label,
-    value,
-    isDisabled: false,
-    mode,
-  }));
-  const builtInGroups: GroupedModelOptions = builtInOptions.map((option) => ({
-    provider: option.value.split("/")[0]!,
-    label: BUILT_IN_MODELS_GROUP_LABEL,
-    models: [option],
-  }));
+  // A decision model's line, and a shorter row title where it has one, come from the catalogue.
+  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label }) => {
+    const entry = findDecisionModel(value);
+    const subtitle = entry?.description;
+    return {
+      label: entry?.pickerLabel ?? label,
+      value,
+      isDisabled: false,
+      mode,
+      isBuiltIn: true,
+      ...(subtitle ? { subtitle } : {}),
+    };
+  });
+  const builtInGroups: GroupedModelOptions =
+    builtInOptions.length === 0
+      ? []
+      : [
+          {
+            provider: BUILT_IN_MODELS_GROUP_KEY,
+            label: BUILT_IN_MODELS_GROUP_LABEL,
+            models: builtInOptions,
+          },
+        ];
   return {
     selectOptions: [...builtInOptions, ...selectOptions],
-    groupedByProvider: [...mergeGroups(builtInGroups), ...groupOptionsByProvider(selectOptions)],
+    groupedByProvider: [...builtInGroups, ...groupOptionsByProvider(selectOptions)],
   };
-}
-
-/** Built-in models sharing a provider prefix read as one group. */
-function mergeGroups(groups: GroupedModelOptions): GroupedModelOptions {
-  const byProvider = new Map<string, ModelOptionGroup>();
-  for (const group of groups) {
-    const existing = byProvider.get(group.provider);
-    if (existing) existing.models.push(...group.models);
-    else byProvider.set(group.provider, { ...group, models: [...group.models] });
-  }
-  return [...byProvider.values()];
 }

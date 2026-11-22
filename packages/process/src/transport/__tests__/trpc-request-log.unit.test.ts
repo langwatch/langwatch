@@ -19,6 +19,10 @@ class ClickhouseOverloadedError extends HandledError {
   }
 }
 
+const hostRecords = vi.hoisted(
+  () => [] as { logger: string; level: string; message: string; fields: Record<string, unknown> }[],
+);
+
 const records = vi.hoisted(
   () => [] as { logger: string; message: string; fields: Record<string, unknown> }[],
 );
@@ -29,7 +33,18 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
     ...actual,
     createLogger: (name: string) => {
       const logger = actual.createLogger(name);
-      if (name !== "langwatch:api:hono") return logger;
+      if (name !== "langwatch:api:hono") {
+        const keep =
+          (level: string) =>
+          (fields: Record<string, unknown>, message: string): void => {
+            hostRecords.push({ logger: name, level, message, fields });
+          };
+        return Object.assign(Object.create(logger), {
+          info: keep("info"),
+          warn: keep("warn"),
+          error: keep("error"),
+        });
+      }
       const capture =
         () =>
         (fields: Record<string, unknown>, message: string): void => {
@@ -54,12 +69,20 @@ const sweepTrpc = defineTrpcContract("sweeper")
   .query("sweep")
   .withInput(z.void())
   .withOutput(z.object({ swept: z.number() }))
+  .subscription("ticks")
+  .withInput(z.void())
+  .withOutput(z.object({ tick: z.number() }))
   .build();
 
 const router = defineTrpcRouter(SweepApi, sweepTrpc)
   .procedure("sweep")
   .noPermission({ reason: "a test namespace; no permission applies" })
   .handle(({ app }) => app.sweep())
+  .procedure("ticks")
+  .noPermission({ reason: "a test namespace; no permission applies" })
+  .handle(async function* () {
+    yield { tick: 1 };
+  })
   .build();
 
 function composeSweeper(sweep: () => { swept: number }) {
@@ -81,6 +104,7 @@ function composeSweeper(sweep: () => { swept: number }) {
 describe("the tRPC lane's access record", () => {
   beforeEach(() => {
     records.length = 0;
+    hostRecords.length = 0;
   });
 
   describe("when the dashboard calls a procedure that answers", () => {
@@ -104,6 +128,30 @@ describe("the tRPC lane's access record", () => {
     });
   });
 
+  describe("when a signed-in user's procedure call is answered", () => {
+    /** @scenario "The request log names the user behind a session" */
+    it("names the session's user on the access record", async () => {
+      const answer = await composeSweeper(() => ({ swept: 1 })).request("/api/trpc/sweeper.sweep");
+
+      expect(answer.status).toBe(200);
+      expect(records[0]?.fields).toMatchObject({ "user.id": "user_ada" });
+    });
+  });
+
+  describe("when a signed-in user's subscription is streamed", () => {
+    /** @scenario "The request log names the user behind a live subscription" */
+    it("names the session's user on the access record", async () => {
+      const answer = await composeSweeper(() => ({ swept: 0 })).request("/api/sse/sweeper.ticks", {
+        headers: { "sec-fetch-site": "same-origin" },
+      });
+      await answer.text();
+      await vi.waitFor(() => expect(records).toHaveLength(1));
+
+      expect(answer.status).toBe(200);
+      expect(records[0]?.fields).toMatchObject({ family: "sse", "user.id": "user_ada" });
+    });
+  });
+
   describe("when the procedure fails with a handled platform error", () => {
     /** @scenario "A tRPC failure with a handled cause is logged by its fault" */
     it("carries the handled code and fault on the record", async () => {
@@ -121,6 +169,24 @@ describe("the tRPC lane's access record", () => {
         handledErrorCode: "clickhouse_overloaded",
         handledErrorFault: "platform",
       });
+    });
+  });
+
+  describe("when the procedure fails with an unhandled error", () => {
+    /** @scenario "A failed tRPC call writes its failure once" */
+    it("writes the failure on one trpc call record and nowhere else", async () => {
+      const boom = new Error("boom");
+      const app = composeSweeper(() => {
+        throw boom;
+      });
+
+      await app.request("/api/trpc/sweeper.sweep");
+
+      const failures = hostRecords.filter((record) => record.level === "error");
+      expect(failures).toHaveLength(1);
+      expect(failures[0]?.message).toBe("trpc call");
+      expect(failures[0]?.fields.error).toBeDefined();
+      expect(hostRecords.map((record) => record.message)).not.toContain("tRPC call failed");
     });
   });
 });

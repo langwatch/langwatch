@@ -17,7 +17,7 @@ evaluations/         — Experiments, Online Evaluation (guardrails via as_guard
 agent-simulations/   — Scenarios, Runs, Test Suites, Run Plans
 prompt-management/   — Prompts, Prompt Playground
 library/             — Agents, Workflows, Evaluators, Datasets
-dashboards/          — Custom analytics dashboards
+dashboards/          — Dashboards and their widgets, Analytics Reports
 triggers/            — Automations / alerts
 ai-gateway/          — Virtual Keys, Budgets, Governance, Inventory (ingestion)
 settings/            — Model Providers, Model Defaults, Project Secrets
@@ -86,6 +86,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | Datasets                     |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  ✅  |
 | **Cross-cutting**            |        |        |        |     |              |     |     |                  |     |      |
 | Dashboards                   |   ✅   |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  —   |
+| Analytics Reports            |   ✅   |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  —   |
 | Triggers                     |   ✅   |   ✅   |   ✅   | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  —   |
 | **AI Gateway**               |        |        |        |     |              |     |     |                  |     |      |
 | Virtual Keys                 |   —    |   —    |   —    | ✅  |      —       | ✅  |  —  |        —         | ✅  |  ✅  |
@@ -114,7 +115,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 
 - **User Events** — Python (`langwatch.track_event`) and Go (`client.Events`, plus `langwatch.Span.RecordEvent` on the tracing side). No TS, CLI, UI, or MCP by design.
 - **SDK go** — The Go SDK splits across two modules: `github.com/langwatch/langwatch/sdks/go` (tracing, spans, evaluations, events, prompt telemetry, data-capture controls, and the eight provider instrumentations under `instrumentation/`) and `github.com/langwatch/langwatch/sdks/go/client` (the typed REST client, whose `Client` fields name the covered features). Table entries read `langwatch.*` for the tracing module and `client.*` for the REST client.
-- **Go gaps** — Analytics, Experiments, Suites, Agents, Workflows, Evaluators, Dashboards, Model Providers, Project Secrets, Model Defaults, Agent Skills, API Keys, and every AI Gateway feature have no Go surface: the REST client exposes only Prompts, Datasets, Traces, Annotations, Events, Evaluations, Triggers, Monitors, Scenarios, and Projects.
+- **Go gaps** — Analytics, Experiments, Suites, Agents, Workflows, Evaluators, Dashboards, Analytics Reports, Model Providers, Project Secrets, Model Defaults, Agent Skills, API Keys, and every AI Gateway feature have no Go surface: the REST client exposes only Prompts, Datasets, Traces, Annotations, Events, Evaluations, Triggers, Monitors, Scenarios, and Projects.
 - **Prompt Playground** — Pure UI feature; no SDK/CLI/MCP planned.
 - **AI Gateway** — CLI/UI/API only (no SDK or MCP surface yet). `ingest` is read-only by design; `ingest install` is a hidden scripting primitive and deliberately not in the map.
 - **Agent Skills** — CLI-only by design: `langwatch skills list/get/install/uninstall/update` installs the bundled agent skills (compiled from `skills/` into the CLI at build time) into `~/.agents/skills`. No platform surface — the skills repo (`langwatch/skills`) and `npx skills add` remain the browser-side distribution.

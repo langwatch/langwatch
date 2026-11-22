@@ -64,8 +64,9 @@ export function dataHealthCode({
     unlocks: unlocks[key] ?? [],
   }));
   return widgetCode({
-    summary: "Share of traces that carry each field the boards read, and what sending it unlocks.",
-    subtitle: "Send what is missing so every board can answer",
+    summary:
+      "Share of traces that carry each field the dashboards read, and what sending it unlocks.",
+    subtitle: "Send what is missing so every dashboard can answer",
     parts: [NUMBERS, SHARE_PCT, HEADLINE, SHARE_ROWS],
     components: `${ALL_GOOD}
 
@@ -161,7 +162,7 @@ export const COST_ACCURACY_CODE = widgetCode({
 export const NOISE_CODE = widgetCode({
   summary:
     "Traffic from tests, staging and the like, by source, with its share of traces and cost.",
-  subtitle: "Filter test and staging traffic out before you read the other boards",
+  subtitle: "Filter test and staging traffic out before you read the other dashboards",
   parts: [NUMBERS, SHARE_PCT, TABLE, HEADLINE],
   components: `${ALL_GOOD}
 

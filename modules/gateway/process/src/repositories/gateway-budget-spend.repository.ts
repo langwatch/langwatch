@@ -14,6 +14,7 @@ export type GatewayBudgetSpendRecord = {
   currentPeriodStartedAt: Instant;
   lastResetAt: Instant | null;
   cycleAnchorAt: Instant | null;
+  timezone: string | null;
 };
 
 export type BudgetBucketBoundary = {

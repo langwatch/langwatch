@@ -64,8 +64,8 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PostApiDatasetBySlugOrIdUploadBody,
 ) -> Response[PostApiDatasetBySlugOrIdUploadResponse200]:
-    """Upload a file (CSV, JSON, JSONL) to an existing dataset upload the file as a stored object with the
-    purpose dataset_import, then create the dataset from it
+    """Upload a file (CSV, JSON, JSONL) to an existing dataset. upload the file as a stored object with the
+    purpose dataset_import, then create the dataset from it.
 
     Args:
         slug_or_id (str):
@@ -97,8 +97,8 @@ def sync(
     client: AuthenticatedClient,
     body: PostApiDatasetBySlugOrIdUploadBody,
 ) -> PostApiDatasetBySlugOrIdUploadResponse200 | None:
-    """Upload a file (CSV, JSON, JSONL) to an existing dataset upload the file as a stored object with the
-    purpose dataset_import, then create the dataset from it
+    """Upload a file (CSV, JSON, JSONL) to an existing dataset. upload the file as a stored object with the
+    purpose dataset_import, then create the dataset from it.
 
     Args:
         slug_or_id (str):
@@ -125,8 +125,8 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PostApiDatasetBySlugOrIdUploadBody,
 ) -> Response[PostApiDatasetBySlugOrIdUploadResponse200]:
-    """Upload a file (CSV, JSON, JSONL) to an existing dataset upload the file as a stored object with the
-    purpose dataset_import, then create the dataset from it
+    """Upload a file (CSV, JSON, JSONL) to an existing dataset. upload the file as a stored object with the
+    purpose dataset_import, then create the dataset from it.
 
     Args:
         slug_or_id (str):
@@ -156,8 +156,8 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PostApiDatasetBySlugOrIdUploadBody,
 ) -> PostApiDatasetBySlugOrIdUploadResponse200 | None:
-    """Upload a file (CSV, JSON, JSONL) to an existing dataset upload the file as a stored object with the
-    purpose dataset_import, then create the dataset from it
+    """Upload a file (CSV, JSON, JSONL) to an existing dataset. upload the file as a stored object with the
+    purpose dataset_import, then create the dataset from it.
 
     Args:
         slug_or_id (str):

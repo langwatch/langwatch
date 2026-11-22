@@ -2,6 +2,7 @@
 import {
   IngestionRateLimitedError,
   IngestionReceiverUnavailableError,
+  IngestionSourceDisabledError,
   IngestionSourceUnauthorizedError,
   IngestionWrongEndpointError,
   type GovernanceIngestHeaders,
@@ -140,8 +141,16 @@ export class GovernanceIngestService {
     return accepted(body);
   }
 
-  #authorize(input: { sourceId: string; headers: GovernanceIngestHeaders }) {
-    return this.#access.authorize({ headers: toHeaders(input.headers), sourceId: input.sourceId });
+  #authorize(input: {
+    sourceId: string;
+    headers: GovernanceIngestHeaders;
+    callerAddress: string | null;
+  }) {
+    return this.#access.authorize({
+      headers: toHeaders(input.headers),
+      sourceId: input.sourceId,
+      callerAddress: input.callerAddress,
+    });
   }
 }
 
@@ -157,8 +166,13 @@ function accepted(body: GovernanceIngestReceipt): GovernanceIngestResponse {
 
 function refusalOf(
   gate: Exclude<GovernanceIngestAuthorization, { outcome: "authorized" }>,
-): IngestionRateLimitedError | IngestionSourceUnauthorizedError {
-  return gate.outcome === "rate-limited"
-    ? new IngestionRateLimitedError({ retryAfterSec: gate.retryAfterSec })
-    : new IngestionSourceUnauthorizedError();
+): IngestionRateLimitedError | IngestionSourceDisabledError | IngestionSourceUnauthorizedError {
+  switch (gate.outcome) {
+    case "rate-limited":
+      return new IngestionRateLimitedError({ retryAfterSec: gate.retryAfterSec });
+    case "disabled":
+      return new IngestionSourceDisabledError();
+    case "unauthorized":
+      return new IngestionSourceUnauthorizedError();
+  }
 }

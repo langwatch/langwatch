@@ -141,7 +141,7 @@ describe("Daily insights skill", () => {
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent ran `langwatch dashboard-widget get` for the listed widgets before it ran any query",
+              "Agent ran `langwatch dashboard widget get` for the listed widgets before it ran any query",
               "Agent ran each query with `langwatch query` and the --start and --end flags the brief gave, one query per command, on one line",
               "Agent ran queries over the window AND over the window before it, and compared them",
               "Every number in a finding appears in a query result the agent read",

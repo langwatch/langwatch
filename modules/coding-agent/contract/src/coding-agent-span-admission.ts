@@ -1,6 +1,7 @@
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 import { detectCodingAgent } from "./telemetry/coding-agent-normalization.ts";
+import { genAiOperationRoleOf } from "./telemetry/gen-ai-operations.ts";
 import { CODING_AGENT_REGISTRY } from "./telemetry/index.ts";
 
 /** Claude Code's self-namespaced span names: admitted without asking the scope. */
@@ -21,14 +22,19 @@ export interface CodingAgentSessionSpanCandidate {
   scopeName?: string | null;
 }
 
-/** Whether a span belongs to a coding-agent session; a bare declared name also asks the scope. */
+/**
+ * Whether a span belongs to a coding-agent session; a bare declared name also asks the scope, and
+ * a GenAI operation joins only for the agent that declared it.
+ */
 export function admitsCodingAgentSpan({
   name,
   scopeName,
 }: CodingAgentSessionSpanCandidate): boolean {
   if (SELF_NAMESPACED_SPAN_NAMES.has(name)) return true;
+  const agent = detectCodingAgent({ recordName: name, scopeName });
+  if (genAiOperationRoleOf({ agent, name }) !== "undeclared") return true;
   if (!DECLARED_SPAN_NAMES.has(name)) return false;
-  return detectCodingAgent({ recordName: name, scopeName }) !== "unknown";
+  return agent !== "unknown";
 }
 
 /** One received span, normalized by trace, whose session facts coding-agent derives. */

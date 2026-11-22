@@ -1,7 +1,13 @@
 import { PRODUCT_NAMES } from "@langwatch/design-system/product-colours";
 import { describe, expect, it } from "vitest";
 
-import { PRODUCTS, productById, productFromPathname, seatReachesProduct } from "../products.ts";
+import {
+  isEntityAddressedDetourRoute,
+  PRODUCTS,
+  productById,
+  productFromPathname,
+  seatReachesProduct,
+} from "../products.ts";
 
 describe("product registry", () => {
   describe("given the five products the registry declares", () => {
@@ -46,8 +52,14 @@ describe("product registry", () => {
       ]);
     });
 
+    /** @scenario The product switcher names the personal workspace Coding agents */
+    it("labels the personal product Coding agents", () => {
+      expect(productById("me").label).toBe("Coding agents");
+    });
+
+    /** @scenario The product switcher names the personal workspace Coding agents */
     it("points the org and personal products at fixed homes", () => {
-      expect(productById("me").homeHref({})).toBe("/me");
+      expect(productById("me").homeHref({})).toBe("/coding-agents");
       expect(productById("gateway").homeHref({})).toBe("/gateway/virtual-keys");
       expect(productById("governance").homeHref({})).toBe("/governance");
     });
@@ -56,8 +68,11 @@ describe("product registry", () => {
 
 describe("productFromPathname", () => {
   it("maps product pages to their product", () => {
+    expect(productFromPathname("/coding-agents")).toBe("me");
+    expect(productFromPathname("/coding-agents/configure")).toBe("me");
+    // The retired address, for the one render its redirect takes.
     expect(productFromPathname("/me")).toBe("me");
-    expect(productFromPathname("/me/configure")).toBe("me");
+    expect(productFromPathname("/me/sessions")).toBe("me");
     expect(productFromPathname("/gateway")).toBe("gateway");
     expect(productFromPathname("/gateway/virtual-keys/vk_1")).toBe("gateway");
     expect(productFromPathname("/governance")).toBe("governance");
@@ -133,6 +148,28 @@ describe("productFromPathname", () => {
           }
         }
       });
+    });
+  });
+});
+
+describe("detour addresses that name an entity", () => {
+  describe("given an address that names one organization's team", () => {
+    it("reports it as entity-addressed, since the next organization has no such team", () => {
+      expect(isEntityAddressedDetourRoute("/settings/teams/acme-core")).toBe(true);
+    });
+  });
+
+  describe("given a detour address that names no organization entity", () => {
+    it("reports it as portable, including the team list and the instance pages", () => {
+      for (const pathname of [
+        "/settings",
+        "/settings/members",
+        "/settings/teams",
+        "/ops",
+        "/ops/projections/run_17",
+      ]) {
+        expect(isEntityAddressedDetourRoute(pathname)).toBe(false);
+      }
     });
   });
 });

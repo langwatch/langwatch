@@ -6,7 +6,7 @@ The server half of [enterprise-ops](../README.md). Operator views over Enterpris
 
 ## Installation
 
-`defineProcessModule("enterprise-ops").withApi(EnterpriseOpsModule).withTransports(licenseRegistryTrpcTransport, selfHostedInstancesTrpcTransport)`, `src/enterprise-ops.module.ts:8`.
+`defineProcessModule("enterprise-ops").withApi(EnterpriseOpsModule).withTransports(licenseRegistryTrpcTransport, selfHostedInstancesTrpcTransport, selfHostedNoticesTrpcTransport)`, `src/enterprise-ops.module.ts:9`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The operator views over enterprise subjects (ARCHITECTURE.md section 3): each op admits Cloud admin staff through OpsApi, then forwards to the owner's Api.
 
-Peers call these through the token, declared at `../contract/src/enterprise-ops.api.ts:27`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/enterprise-ops.api.ts:30`; nothing else in this package is public.
 
 #### `listIssuedLicenses`
 
@@ -31,7 +31,7 @@ getIssuedLicense(input: { id: string; operator: OpsOperator | null }): Promise<I
 #### `issueLicense`
 
 ```typescript
-issueLicense(input: { customer: LicenseCustomer; email: string; planType: string; maxMembers: number; maxMembersLite?: number; maxMessagesPerMonth?: number; /** ISO 8601. The instant the term ends. */ expiresAt: string; terms?: LicenseTermsInput; operator: OpsOperator | null; }): Promise<SignedIssuedLicense>;
+issueLicense(input: { customer: LicenseCustomer; email: string; planType: string; maxMembers: number; maxMembersLite?: number; maxMembersDeveloper?: number; maxMessagesPerMonth?: number; /** ISO 8601. The instant the term ends. */ expiresAt: string; terms?: LicenseTermsInput; operator: OpsOperator | null; }): Promise<SignedIssuedLicense>;
 ```
 
 #### `registerLegacyLicense`
@@ -49,7 +49,7 @@ revokeIssuedLicense(input: { id: string; reason: string; operator: OpsOperator |
 #### `reissueLicense`
 
 ```typescript
-reissueLicense(input: { id: string; maxMembers?: number; maxMembersLite?: number; maxMessagesPerMonth?: number; /** ISO 8601. The instant the new term ends. */ expiresAt: string; operator: OpsOperator | null; }): Promise<SignedIssuedLicense>;
+reissueLicense(input: { id: string; maxMembers?: number; maxMembersLite?: number; maxMembersDeveloper?: number; maxMessagesPerMonth?: number; /** ISO 8601. The instant the new term ends. */ expiresAt: string; operator: OpsOperator | null; }): Promise<SignedIssuedLicense>;
 ```
 
 #### `changeLicenseSeats`
@@ -85,7 +85,7 @@ listActivationCodes(input: { page: number; pageSize: number; organizationId?: st
 #### `issueActivationCode`
 
 ```typescript
-issueActivationCode(input: { organizationId: string; organizationName: string; email: string; planType: string; maxMembers: number; maxMembersLite?: number; licenseTermDays: number; services?: string[]; /** ISO 8601. The instant the code stops working. */ expiresAt: string; reusable?: boolean; operator: OpsOperator | null; }): Promise<IssuedActivationCode>;
+issueActivationCode(input: { organizationId: string; organizationName: string; email: string; planType: string; maxMembers: number; maxMembersLite?: number; maxMembersDeveloper?: number; licenseTermDays: number; services?: string[]; /** ISO 8601. The instant the code stops working. */ expiresAt: string; reusable?: boolean; operator: OpsOperator | null; }): Promise<IssuedActivationCode>;
 ```
 
 #### `revokeActivationCode`
@@ -128,6 +128,36 @@ A five-minute link to one bundle: the sensitive read, so it asks `ops:manage`.
 getUpgradeDiagnosticsDownload(input: { id: string; operator: OpsOperator | null; }): Promise<UpgradeDiagnosticsDownload>;
 ```
 
+#### `findSelfHostedNotices`
+
+```typescript
+findSelfHostedNotices(input: { operator: OpsOperator | null }): Promise<SelfHostedNoticeView[]>;
+```
+
+#### `createSelfHostedNotice`
+
+```typescript
+createSelfHostedNotice(input: CreateSelfHostedNoticeInput & { operator: OpsOperator | null }): Promise<SelfHostedNoticeView>;
+```
+
+#### `updateSelfHostedNotice`
+
+```typescript
+updateSelfHostedNotice(input: UpdateSelfHostedNoticeInput & { operator: OpsOperator | null }): Promise<SelfHostedNoticeView>;
+```
+
+#### `publishSelfHostedNotice`
+
+```typescript
+publishSelfHostedNotice(input: { id: string; operator: OpsOperator | null; }): Promise<SelfHostedNoticeView>;
+```
+
+#### `withdrawSelfHostedNotice`
+
+```typescript
+withdrawSelfHostedNotice(input: { id: string; operator: OpsOperator | null; }): Promise<SelfHostedNoticeView>;
+```
+
 ## REST transport
 
 None: this module declares no REST family.
@@ -164,60 +194,61 @@ interface Input {
   pageSize?: number;
   search?: string;
 }
-type Output = z.infer<typeof issuedLicensePageSchema>; // ../../licensing/contract/src/issued-license.ts:100
+type Output = z.infer<typeof issuedLicensePageSchema>; // ../../licensing/contract/src/issued-license.ts:102
 
 // licenseRegistry.getById
 // Input: licenseIdInputSchema, ../../licensing/contract/src/license-registry.ts:32
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:82
 
 // licenseRegistry.issue
-type Input = z.infer<typeof issueLicenseInputSchema>; // ../../licensing/contract/src/license-registry.ts:47
-type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:134
+type Input = z.infer<typeof issueLicenseInputSchema>; // ../../licensing/contract/src/license-registry.ts:48
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:136
 
 // licenseRegistry.registerLegacy
-// Input: registerLegacyLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:58
+// Input: registerLegacyLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:59
 interface Input {
   licenseKey: string;
   organizationId: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:82
 
 // licenseRegistry.revoke
-// Input: revokeIssuedLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:68
+// Input: revokeIssuedLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:69
 interface Input {
   id: string;
   reason: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:82
 
 // licenseRegistry.reissue
-// Input: reissueLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:82
+// Input: reissueLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:84
 interface Input {
   id: string;
   maxMembers?: number;
   maxMembersLite?: number;
+  maxMembersDeveloper?: number;
   maxMessagesPerMonth?: number;
   expiresAt: string;
 }
-type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:134
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:136
 
 // licenseRegistry.changeSeats
-// Input: changeLicenseSeatsInputSchema, ../../licensing/contract/src/license-registry.ts:92
+// Input: changeLicenseSeatsInputSchema, ../../licensing/contract/src/license-registry.ts:94
 interface Input {
   id: string;
   maxMembers: number;
 }
-type Output = z.infer<typeof seatChangeResultSchema>; // ../../licensing/contract/src/issued-license.ts:151
+type Output = z.infer<typeof seatChangeResultSchema>; // ../../licensing/contract/src/issued-license.ts:153
 
 // licenseRegistry.resetInstanceBinding
 type Input = z.infer<typeof licenseIdInputSchema>; // ../../licensing/contract/src/license-registry.ts:32
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:82
 
 // licenseRegistry.updateTerms
-// Input: updateLicenseTermsInputSchema, ../../licensing/contract/src/license-registry.ts:102
+// Input: updateLicenseTermsInputSchema, ../../licensing/contract/src/license-registry.ts:104
 interface Input {
   id: string;
   services?: ("instant_evals" | "managed_models")[];
@@ -227,47 +258,35 @@ interface Input {
   overageEnabled?: boolean;
   overageMaxUsdCents?: number | null;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:82
 
 // licenseRegistry.linkToOrganization
-// Input: linkLicenseToOrganizationInputSchema, ../../licensing/contract/src/license-registry.ts:112
+// Input: linkLicenseToOrganizationInputSchema, ../../licensing/contract/src/license-registry.ts:114
 interface Input {
   id: string;
   organizationId: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:82
 
 // licenseRegistry.activationCodes
-// Input: listActivationCodesInputSchema, ../../licensing/contract/src/activation-code.ts:68
+// Input: listActivationCodesInputSchema, ../../licensing/contract/src/activation-code.ts:70
 interface Input {
   page?: number;
   pageSize?: number;
   organizationId?: string;
 }
-type Output = z.infer<typeof activationCodePageSchema>; // ../../licensing/contract/src/activation-code.ts:56
+type Output = z.infer<typeof activationCodePageSchema>; // ../../licensing/contract/src/activation-code.ts:58
 
 // licenseRegistry.issueActivationCode
-// Input: issueActivationCodeInputSchema, ../../licensing/contract/src/activation-code.ts:88
-interface Input {
-  organizationId: string;
-  organizationName: string;
-  email: string;
-  planType: string;
-  maxMembers: number;
-  maxMembersLite?: number;
-  licenseTermDays: number;
-  services?: string[];
-  expiresAt: string;
-  reusable?: boolean;
-}
-type Output = z.infer<typeof issuedActivationCodeSchema>; // ../../licensing/contract/src/activation-code.ts:109
+type Input = z.infer<typeof issueActivationCodeInputSchema>; // ../../licensing/contract/src/activation-code.ts:91
+type Output = z.infer<typeof issuedActivationCodeSchema>; // ../../licensing/contract/src/activation-code.ts:112
 
 // licenseRegistry.revokeActivationCode
-// Input: revokeActivationCodeInputSchema, ../../licensing/contract/src/activation-code.ts:98
+// Input: revokeActivationCodeInputSchema, ../../licensing/contract/src/activation-code.ts:101
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof activationCodeViewSchema>; // ../../licensing/contract/src/activation-code.ts:45
+type Output = z.infer<typeof activationCodeViewSchema>; // ../../licensing/contract/src/activation-code.ts:47
 ```
 
 ### `selfHostedInstances`
@@ -328,6 +347,61 @@ interface Output {
   url: string;
   expiresAt: string;
 }
+```
+
+### `selfHostedNotices`
+
+Contract `../contract/src/self-hosted-notice.trpc.ts:15`, router `src/transport/self-hosted-notice.trpc.ts:14`.
+
+| Procedure                    | Kind     | Gate                             | Input                               | Output                       |
+| ---------------------------- | -------- | -------------------------------- | ----------------------------------- | ---------------------------- |
+| `selfHostedNotices.getAll`   | query    | Platform permission `ops:view`   | inline                              | inline                       |
+| `selfHostedNotices.create`   | mutation | Platform permission `ops:manage` | `createSelfHostedNoticeInputSchema` | `selfHostedNoticeViewSchema` |
+| `selfHostedNotices.update`   | mutation | Platform permission `ops:manage` | `updateSelfHostedNoticeInputSchema` | `selfHostedNoticeViewSchema` |
+| `selfHostedNotices.publish`  | mutation | Platform permission `ops:manage` | `selfHostedNoticeIdInputSchema`     | `selfHostedNoticeViewSchema` |
+| `selfHostedNotices.withdraw` | mutation | Platform permission `ops:manage` | `selfHostedNoticeIdInputSchema`     | `selfHostedNoticeViewSchema` |
+
+```typescript
+// selfHostedNotices.getAll
+// Input: inline, ../contract/src/self-hosted-notice.trpc.ts:17
+type Input = unknown;
+// Output: z.array(selfHostedNoticeViewSchema) (inline, ../contract/src/self-hosted-notice.trpc.ts:18)
+
+// selfHostedNotices.create
+// Input: createSelfHostedNoticeInputSchema, ../../licensing/contract/src/self-hosted-notice.ts:37
+interface Input {
+  severity: "info" | "warning" | "security";
+  title: string;
+  body: string;
+  url: string | null;
+  fixedIn: string | null;
+  expiresAt: string | null;
+}
+type Output = z.infer<typeof selfHostedNoticeViewSchema>; // ../../licensing/contract/src/self-hosted-notice.ts:78
+
+// selfHostedNotices.update
+// Input: updateSelfHostedNoticeInputSchema, ../../licensing/contract/src/self-hosted-notice.ts:48
+interface Input {
+  id: string;
+  severity: "info" | "warning" | "security";
+  title: string;
+  body: string;
+  url: string | null;
+  fixedIn: string | null;
+  expiresAt: string | null;
+}
+type Output = z.infer<typeof selfHostedNoticeViewSchema>; // ../../licensing/contract/src/self-hosted-notice.ts:78
+
+// selfHostedNotices.publish
+// Input: selfHostedNoticeIdInputSchema, ../../licensing/contract/src/self-hosted-notice.ts:56
+interface Input {
+  id: string;
+}
+type Output = z.infer<typeof selfHostedNoticeViewSchema>; // ../../licensing/contract/src/self-hosted-notice.ts:78
+
+// selfHostedNotices.withdraw
+type Input = z.infer<typeof selfHostedNoticeIdInputSchema>; // ../../licensing/contract/src/self-hosted-notice.ts:56
+type Output = z.infer<typeof selfHostedNoticeViewSchema>; // ../../licensing/contract/src/self-hosted-notice.ts:78
 ```
 
 ## Sockets

@@ -9,15 +9,20 @@ import type {
   OrganizationApiKeyResolution,
   ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { PROJECT_KIND } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {
   ApiRestCredentialsService,
   type ApiRestCredentialPeers,
 } from "../api-rest-credentials.service.ts";
+
+/** Every legacy key in this suite keeps full access; the default is legacy-project-key-scope's. */
+const KEEPS_FULL_ACCESS = createApiFixture<FeatureFlagApi>({ isEnabled: async () => true });
 
 const PROJECT = {
   id: "project-1",
@@ -80,6 +85,7 @@ function doorOver(store: KeyStore): ApiRestCredentialsService {
       listApiKeyBindings: () => Promise.reject(new Error("the key door asks no permission")),
       getScope: () => Promise.reject(new Error("the key door reads no scope")),
     },
+    featureFlags: KEEPS_FULL_ACCESS,
     cliProjects: {
       getCliAccessProject: () => Promise.reject(new Error("the key door reads no CLI session")),
     },
@@ -243,6 +249,46 @@ describe("the key door", () => {
     });
   });
 
+  describe("given an organization key, with and without the Langy session flag", () => {
+    const orgDoor = doorOver(
+      new KeyStore(
+        new Map(),
+        new Map<string, OrganizationApiKeyResolution>([
+          ["sk-lw-org-plain", ORG_KEY],
+          [
+            "sk-lw-org-langy",
+            {
+              ok: true,
+              resolved: {
+                type: "apiKey-org",
+                apiKeyId: "key-langy",
+                userId: null,
+                organizationId: "org-2",
+                isLangySessionKey: true,
+              },
+            },
+          ],
+        ]),
+      ),
+    );
+
+    it("adds no Langy flag to a key without it", async () => {
+      const credential = await orgDoor.identifyKey({
+        request: request({ authorization: "Bearer sk-lw-org-plain" }),
+      });
+
+      expect(credential.principal).not.toHaveProperty("isLangySessionKey");
+    });
+
+    it("carries the Langy flag on a Langy session key", async () => {
+      const credential = await orgDoor.identifyKey({
+        request: request({ authorization: "Bearer sk-lw-org-langy" }),
+      });
+
+      expect(credential.principal).toMatchObject({ isLangySessionKey: true });
+    });
+  });
+
   describe("given a request with no credential", () => {
     /** @scenario "A request with neither credential is refused" */
     it("is refused as missing credentials", async () => {
@@ -354,6 +400,7 @@ describe("the project door", () => {
         listApiKeyBindings: () => Promise.reject(new Error("no bindings are listed")),
         getScope: () => Promise.reject(new Error("no scope is read")),
       },
+      featureFlags: KEEPS_FULL_ACCESS,
       cliProjects: {
         getCliAccessProject: () => Promise.reject(new Error("no CLI session is read")),
       },
@@ -487,6 +534,7 @@ describe("a project-bound CLI access token", () => {
           return Promise.resolve(holds);
         },
       },
+      featureFlags: KEEPS_FULL_ACCESS,
       cliProjects: {
         getCliAccessProject: () =>
           Promise.resolve({ userId: "user-9", organizationId: "org-1", project: PROJECT }),
@@ -637,6 +685,7 @@ describe("given an API key whose ceiling does not hold the route's permission", 
         listApiKeyBindings: () => Promise.reject(new Error("no bindings are listed")),
         getScope: () => Promise.reject(new Error("no scope is read")),
       },
+      featureFlags: KEEPS_FULL_ACCESS,
       cliProjects: {
         getCliAccessProject: () => Promise.reject(new Error("no CLI session is read")),
       },

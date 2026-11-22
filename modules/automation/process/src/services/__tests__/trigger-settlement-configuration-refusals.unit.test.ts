@@ -11,7 +11,8 @@ import {
 const loggerWarn = vi.hoisted(() => vi.fn());
 const loggerError = vi.hoisted(() => vi.fn());
 
-vi.mock("@langwatch/observability", () => ({
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -70,6 +71,51 @@ describe("settlement refusals caused by the automation's saved configuration", (
         ]);
         expect(loggerError).not.toHaveBeenCalled();
         expect(fixture.observability.captures).toEqual([]);
+      });
+    });
+  });
+
+  describe("given an email automation that keeps firing with recipients that no longer validate", () => {
+    describe("when several matches settle", () => {
+      /** @scenario "An automation that keeps firing with an invalid saved configuration warns once per window" */
+      it("ends each dispatch without retrying and warns once for the automation", async () => {
+        const fixture = createSettlementFixture(
+          settlementTrigger("SEND_EMAIL", { actionParams: { members: [] } }),
+        );
+
+        for (const messageKey of ["digest:1", "digest:2", "digest:3"]) {
+          await expect(
+            fixture.service.notifyDigest(digest, settlementContext(messageKey)),
+          ).resolves.toBeUndefined();
+        }
+
+        expect(fixture.delivery.emails).toHaveLength(0);
+        expect(refusalWarnings()).toHaveLength(1);
+        expect(fixture.observability.captures).toEqual([]);
+        expect(loggerError).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given two email automations with recipients that no longer validate", () => {
+    describe("when each settles a match", () => {
+      /** @scenario "Each automation with an invalid saved configuration warns on its own" */
+      it("warns once for each automation", async () => {
+        const first = settlementTrigger("SEND_EMAIL", { actionParams: { members: [] } });
+        const fixture = createSettlementFixture(first);
+
+        await fixture.service.notifyDigest(digest, settlementContext("digest:1"));
+        fixture.automation.activeTrigger = { ...first, id: "trigger-2" };
+        await fixture.service.notifyDigest(
+          { ...digest, triggerId: "trigger-2" },
+          settlementContext("digest:2"),
+        );
+        await fixture.service.notifyDigest(digest, settlementContext("digest:3"));
+
+        expect(refusalWarnings().map(([fields]) => fields.triggerId)).toEqual([
+          "trigger-1",
+          "trigger-2",
+        ]);
       });
     });
   });
@@ -137,6 +183,41 @@ describe("settlement refusals caused by the automation's saved configuration", (
           ],
         ]);
         expect(loggerError).not.toHaveBeenCalled();
+        expect(fixture.observability.captures).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a persist action refused for every trace in the page", () => {
+    describe("when the persist page settles", () => {
+      /** @scenario "A persist page of refused traces warns once per window" */
+      it("warns once for the automation", async () => {
+        const fixture = createSettlementFixture(
+          settlementTrigger("ADD_TO_DATASET", {
+            actionParams: {
+              datasetId: "dataset-1",
+              datasetMapping: { mapping: {}, expansions: [] },
+            },
+          }),
+        );
+        for (const traceId of ["trace-1", "trace-2"]) {
+          fixture.writer.errors.set(
+            traceId,
+            new AutomationDatasetUnavailableError({
+              datasetId: "dataset-1",
+              reason: "it is gone or archived",
+            }),
+          );
+        }
+
+        await expect(
+          fixture.service.persistMatch(
+            { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
+            settlementContext("persist:page-1"),
+          ),
+        ).resolves.toBeUndefined();
+
+        expect(refusalWarnings()).toHaveLength(1);
         expect(fixture.observability.captures).toEqual([]);
       });
     });

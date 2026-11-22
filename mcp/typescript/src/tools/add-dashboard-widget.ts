@@ -1,19 +1,14 @@
 /**
- * The `add_dashboard_widget` MCP tool: create, then place, as the platform's own write path
- * does. The dashboard is checked first so a typo leaves no unplaced widget behind, and a
- * failed placement deletes the widget it just created.
+ * `add_dashboard_widget`: one create under the dashboard's path, which also places the widget.
  */
 
-import {
-  assignDashboardWidgetToDashboard,
-  createDashboardWidget,
-  deleteDashboardWidget,
-} from "../langwatch-api-dashboard-widgets.js";
-import { getCurrentProject } from "../langwatch-api-projects.js";
-import { assertDashboardExists } from "./dashboard-exists.js";
+import { createWidgetOnDashboard } from "../langwatch-api-dashboards.js";
+import { LangWatchApiError } from "../langwatch-api.js";
+import type { WidgetSource } from "../schemas/widget-sources.js";
 import {
   type DashboardWidgetQueriesInput,
   normalizeDashboardWidgetQueries,
+  withLists,
 } from "./dashboard-widget-queries.js";
 
 export interface AddDashboardWidgetParams {
@@ -21,37 +16,33 @@ export interface AddDashboardWidgetParams {
   name: string;
   code: string;
   queries: DashboardWidgetQueriesInput;
+  /** Set on every query; absent, the platform stores application on each. */
+  sources?: WidgetSource[] | null;
+  /** Set on every query; absent, the widget reads its board's project. */
+  projects?: string[] | null;
 }
 
 export async function handleAddDashboardWidget(params: AddDashboardWidgetParams): Promise<string> {
-  const queries = normalizeDashboardWidgetQueries({ queries: params.queries });
-
-  const project = await getCurrentProject();
-  await assertDashboardExists({ projectId: project.id, dashboardId: params.dashboardId });
-
-  const widget = await createDashboardWidget({
-    projectId: project.id,
-    name: params.name,
-    code: params.code,
-    queries,
+  const queries = withLists({
+    queries: normalizeDashboardWidgetQueries({ queries: params.queries }),
+    sources: params.sources,
+    projects: params.projects,
   });
 
+  let widget;
   try {
-    await assignDashboardWidgetToDashboard({
-      projectId: project.id,
-      widgetId: widget.id,
+    widget = await createWidgetOnDashboard({
       dashboardId: params.dashboardId,
+      name: params.name,
+      code: params.code,
+      queries,
     });
   } catch (error) {
-    // The widget now exists but is not on the dashboard we promised — never
-    // leave it dangling because the dashboard vanished between the check
-    // above and this call.
-    await deleteDashboardWidget({
-      projectId: project.id,
-      widgetId: widget.id,
-    }).catch(() => {
-      // Best-effort cleanup; the assign error below is what the caller needs.
-    });
+    if (error instanceof LangWatchApiError && error.status === 404) {
+      throw new Error(
+        `No dashboard with ID "${params.dashboardId}" was found in this project. Use list_dashboards to find a valid dashboard ID.`,
+      );
+    }
     throw error;
   }
 

@@ -167,3 +167,39 @@ describe("the analytics pages on an aggregate project", () => {
     });
   });
 });
+
+describe("the legacy banner on a page drawn in the analytics layout", () => {
+  const drawLayout = (options: Parameters<typeof renderWithAnalyticsHost>[1]) =>
+    renderWithAnalyticsHost(
+      <AnalyticsLayout tab="metrics">
+        <p>the charts</p>
+      </AnalyticsLayout>,
+      { project: projectOfKind("ordinary"), ...options },
+    );
+
+  /** @scenario "AC3c The legacy Analytics page offers Dashboards when the flag is on" */
+  it("offers Dashboards when the flag is on", () => {
+    drawLayout({ flags: { release_dashboards: true } });
+
+    expect(screen.getByTestId("legacy-analytics-banner")).toHaveTextContent("legacy analytics");
+    expect(screen.getByRole("link", { name: "Open Dashboards" })).toHaveAttribute(
+      "href",
+      "/company-traces/dashboards",
+    );
+  });
+
+  /** @scenario "AC3d The legacy Analytics page shows no banner when the flag is off" */
+  it("shows no banner when the flag is off", () => {
+    drawLayout({ flags: { release_dashboards: false } });
+
+    expect(screen.getByText("the charts")).toBeInTheDocument();
+    expect(screen.queryByTestId("legacy-analytics-banner")).toBeNull();
+  });
+
+  /** @scenario "AC3e The legacy Analytics page shows no banner to a member without analytics:view" */
+  it("shows no banner to a member without analytics:view", () => {
+    drawLayout({ flags: { release_dashboards: true }, permissions: [] });
+
+    expect(screen.queryByTestId("legacy-analytics-banner")).toBeNull();
+  });
+});

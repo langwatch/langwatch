@@ -71,10 +71,11 @@ Feature: AI Gateway — prompt-cache token telemetry and cache-aware cost
   # the input rate for an hour-long entry against 1.25 times for a five-minute
   # one, and states which is which only in its own `usage.cache_creation`
   # breakdown. The Anthropic-native lanes read that breakdown off the provider's
-  # body and put it on the span. Every other lane goes through a normalized usage
-  # struct carrying one flat cache-write count, so its writes stay priced
-  # short-lived; that is a known gap, and the session totals a coding agent
-  # reports for itself are where it would show.
+  # body and put it on the span. The translated messages lane reads the same
+  # split from Bifrost's write details, which Bedrock fills. Other lanes carry
+  # one flat cache-write count, so their writes stay priced short-lived; that is
+  # a known gap, and the session totals a coding agent reports for itself are
+  # where it would show.
 
   @bdd @gateway @cache-telemetry @unit
   Scenario: A cache write bought for an hour is recorded as such on the span

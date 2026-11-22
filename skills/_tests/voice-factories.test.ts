@@ -24,7 +24,7 @@ describe("voice factory surface (documented in scenarios skill)", () => {
   it("constructs composableAgent with documented stt/llm/tts values", () => {
     const composable = scenario.composableAgent({
       stt: new voice.OpenAISTTProvider({ model: "whisper-1" }),
-      llm: openai("gpt-5-mini"),
+      llm: openai("gpt-6-luna"),
       tts: "openai/nova",
     });
     expect(composable).toBeDefined();

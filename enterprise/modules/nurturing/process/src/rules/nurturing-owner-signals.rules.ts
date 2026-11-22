@@ -36,6 +36,8 @@ import type {
 import type { UserLifecycleEventData } from "@langwatch/user-contract";
 import type { WorkflowCreatedEventData } from "@langwatch/workflow-contract";
 
+import { utcDayOf } from "./nurturing-time.rules.ts";
+
 /** The signal a peer's event raises, keyed by the aggregate and instant the event carries. */
 type OwnerEvent<Data> = Readonly<{ data: Data; aggregateId: string }>;
 /** An owner's event whose data names no tenant: the delivery context's is the event's own. */
@@ -289,9 +291,9 @@ export function ssoAutoAddedSignal({
   data,
   aggregateId,
 }: OwnerEvent<SsoAutoAddedEventData>): NurturingSignal {
-  const { tenantId, occurredAt, userId, organizationId, organizationName } = data;
+  const { tenantId, occurredAt, userId, organizationId, organizationName, role } = data;
   const sourceEventId = `${organizationId}:${aggregateId}`;
-  const who = { userId, organizationId, organizationName };
+  const who = { userId, organizationId, organizationName, role };
   return { kind: "sso_auto_added", sourceEventId, tenantId, occurredAt, ...who };
 }
 
@@ -329,9 +331,9 @@ export function inviteAcceptedSignal({
   data,
   aggregateId,
 }: OwnerEvent<InviteAcceptedEventData>): NurturingSignal {
-  const { tenantId, occurredAt, userId, organizationId, organizationName } = data;
+  const { tenantId, occurredAt, userId, organizationId, organizationName, role } = data;
   const sourceEventId = `${aggregateId}:${data.inviteId}`;
-  const who = { userId, organizationId, organizationName };
+  const who = { userId, organizationId, organizationName, role };
   return { kind: "invite_accepted", sourceEventId, tenantId, occurredAt, ...who };
 }
 
@@ -511,7 +513,7 @@ export function projectActiveDaySignal({
   organizationCreatedAt,
   onboardingVariant,
 }: ActiveDaySignal): NurturingSignal {
-  const day = Temporal.Instant.fromEpochMilliseconds(occurredAt).toString().slice(0, 10);
+  const day = utcDayOf(occurredAt);
   const daysSinceSignup =
     organizationCreatedAt == null
       ? null

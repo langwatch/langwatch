@@ -6,6 +6,7 @@ import { publicRoute } from "@langwatch/api/access";
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  type RestKeyCredential,
   type RestProtocolRefusal,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
@@ -60,7 +61,12 @@ export type CollectorProject = Readonly<{
 }>;
 
 /** A resolved credential; a refusal is thrown, and this door renders it. */
-export type CollectorCredential = Readonly<{ project: CollectorProject; markUsed: () => void }>;
+export type CollectorCredential = Readonly<{
+  project: CollectorProject;
+  markUsed: () => void;
+  /** The key the bearer is, for the request's access record: id and kind only. */
+  key: RestKeyCredential;
+}>;
 
 /** How this process turns a request into a project credential. */
 export type CollectorCredentialResolver = (input: {
@@ -246,10 +252,12 @@ async function collect({
   app,
   request,
   body,
+  recordKey,
 }: {
   app: CollectorApp;
   request: Request;
   body: CollectorBody;
+  recordKey: (key: RestKeyCredential) => void;
 }): Promise<CollectorAnswer> {
   let auth: CollectorCredential;
   try {
@@ -258,6 +266,9 @@ async function collect({
     if (!isIngestDoorRefusal(error)) throw error;
     return refusalAnswer(error);
   }
+
+  // This route is public, so no door records the key: the handler names the one it resolved.
+  recordKey(auth.key);
 
   const project = auth.project;
 
@@ -309,8 +320,8 @@ export const collectorRest = defineRestRouter(CollectorApi)
     refusal: ingestPlanLimitRefusal,
   })
   .withDocs({ hide: true })
-  .handle(async ({ app, input, request, response }) =>
-    response.write(await collect({ app, request, body: input })),
+  .handle(async ({ app, input, request, response, recordKey }) =>
+    response.write(await collect({ app, request, body: input, recordKey })),
   )
 
   .build();

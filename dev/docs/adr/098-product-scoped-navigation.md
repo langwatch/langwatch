@@ -128,6 +128,32 @@ the one suppressed redirect branch only run in the new modes.
 - Follow-up ADRs own: settings page consolidation, /me/profile, org-slug
   URLs, saved dashboards, the insights inbox.
 
+## Amendment (2026-11-19): Settings opened from a project lands on the project
+
+Decision 6 listed the groups organisation first, and every Settings entry
+opened `/settings`, which is Organization > General. A reader who opened
+Settings from a project had to find the Project group at the bottom of the
+menu, and could not tell from the page which project it acted on (#9710).
+
+- **Landing.** The Settings entries (the icon rail tile, the sidebar link and
+  the account menu) open Project > General (`/settings/project`) when the
+  address names a shared, non-aggregate project and the reader holds
+  `project:update` on it. Otherwise they open Organization > General as
+  before: from a page with no project, from a personal workspace or an
+  aggregate (neither becomes the remembered project the settings pages act
+  on), or for a reader who may not update the project. The rule is one pure
+  function, `settingsEntryHref`, in the navigation module.
+- **`/settings` keeps its page.** The address still opens Organization >
+  General, so deep links, bookmarks and the command bar's "Organization
+  settings" entry are unchanged. Only where the entries point moves.
+- **Order.** The settings menu reads YOU, PROJECT, ORGANIZATION, then the
+  remaining groups as before. The group label stays "Project".
+- **Back.** "Back to {product}" is unchanged: it captures the page left on
+  entering any settings address, so it returns to the project page.
+
+The project picker in the project settings header is issue #9731's.
+Spec: specs/navigation/settings-shell-v2.feature.
+
 ## References
 
 - Related ADRs: ADR-038 (intent-forked onboarding; carries a forward note to

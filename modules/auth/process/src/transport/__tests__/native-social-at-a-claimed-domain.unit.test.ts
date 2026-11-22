@@ -57,6 +57,7 @@ function repoFor({
       deactivatedAt: null,
       pendingSsoSetup: false,
       signupConfirmationPending: false,
+      passwordResetRequiredAt: null,
       lastLoginAt: null,
       emailVerified: true,
     }),
@@ -91,11 +92,11 @@ function collaborators({
   organizations?: SsoDomainOrganizations;
 } = {}): BetterAuthHookCollaborators {
   return {
+    users: createApiFixture<BetterAuthHookCollaborators["users"]>(),
     organizations,
     federation: licensed,
     invites: createApiFixture<BetterAuthHookCollaborators["invites"]>(),
     announcements: createApiFixture<BetterAuthHookCollaborators["announcements"]>(),
-    authzGrants: createApiFixture<BetterAuthHookCollaborators["authzGrants"]>(),
     arrivals: createApiFixture<SsoArrivalApi>({ admit }),
     ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({ record: async () => undefined }),
     linkProposals: createApiFixture<LinkProposals>(),

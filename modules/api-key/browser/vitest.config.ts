@@ -21,11 +21,13 @@ export default mergeConfig(
   }),
   {
     resolve: {
-      alias: {
-        "@langwatch/api-key-contract": fileURLToPath(
-          new URL("../contract/src/index.ts", import.meta.url),
-        ),
-      },
+      // Exact, so a subpath such as `/docs-session-frame` resolves through the package's exports.
+      alias: [
+        {
+          find: /^@langwatch\/api-key-contract$/,
+          replacement: fileURLToPath(new URL("../contract/src/index.ts", import.meta.url)),
+        },
+      ],
     },
   },
 );

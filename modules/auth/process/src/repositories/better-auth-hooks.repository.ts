@@ -12,6 +12,9 @@ export type BetterAuthHookUser = {
   pendingSsoSetup: boolean;
   /** A password sign-up still awaiting its emailed proof: no session until it lands. */
   signupConfirmationPending: boolean;
+  /** Set while an operator marks the password as no longer trusted: no password session until
+   *  a reset. */
+  passwordResetRequiredAt: Instant | null;
   /** Null until the account's first session: the one its sign-up started. */
   lastLoginAt: Instant | null;
 };
@@ -62,4 +65,6 @@ export abstract class BetterAuthHooksRepository {
     accountId: string;
   }): Promise<void>;
   abstract recordLastLogin(input: { userId: string }): Promise<void>;
+  /** Lifts the forced-reset mark once a new password replaced the untrusted one. */
+  abstract clearPasswordResetRequirement(input: { userId: string }): Promise<void>;
 }

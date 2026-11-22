@@ -81,8 +81,20 @@ the offending field and the fields that exist.
 langwatch query "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces
 FROM analytics.traces
 WHERE OccurredAt >= subtractDays(now(), 7)
-GROUP BY day ORDER BY day"
+GROUP BY day ORDER BY day" --projects <project id>
 ```
+
+A key that reaches several projects must name the projects to read with `--projects` (the `projects` field over REST and in `run_query`). Without them the run is refused with `projects_required` (422): "Name the projects to query: send `projects`, a list of project ids, or \"all\"". A project API key, or any key that can read exactly one project, reads that project and needs none.
+
+Send `"all"` (the string, in any case; `--projects all` on the CLI) to read every project the key can read. It must stand alone: a list that holds it is refused with a 422: "all" stands alone; send it by itself, or list project ids. Only projects it holds `analytics:view` on, in its own organization, are read. `params.dashboard_context_projects` lists the projects that were read, in id order.
+
+If the key reads no project and it sends `"all"` or names no project, the run is refused with `projects_unreadable` (422); ask an admin to grant it `analytics:view` on one. A project it names and cannot read is refused with `project_not_found` (404). A member who reads none gets `project_not_found` (404). If it reads more than 10,000, the run is refused with a 422 asking you to name the projects. A widget does not store `"all"`; name its project ids.
+
+Every REST answer carries `params`: each placeholder the statement declares, by its SQL name, with the value it ran with (for example `dashboard_context_sources` and `dashboard_context_projects`), plus the `period` it followed. The CLI returns the same `params` and the `diagnostics` beside the rows in `-o json` and `--format json` (one object with `rows`, `params` and `diagnostics`). For CSV and JSON lines it prints `params` as one JSON line on stderr, and the table format adds a line under the table.
+
+The placeholder does not filter by itself: write a condition such as `WHERE Source IN {dashboard_context_sources:Array(String)}`. A statement that never uses `{dashboard_context_sources:Array(String)}` counts every origin. When the request named `sources`, the answer says so with a `SOURCES_IGNORED` diagnostic; a request that named none gets no note. When the period is too long for the step asked, the query runs at a coarser step and the answer carries a `GRANULARITY_COARSENED` diagnostic.
+
+`--sources` (`sources`) sets the origins that parameter is bound to; the default is `application`, which applies only to a statement that uses the parameter.
 
 The statement runs exactly as submitted. Filter on the dataset's time column, as
 every example does: without that predicate the read touches every partition your
@@ -93,7 +105,7 @@ parameter the statement declares, and `--start` with `--end` fills the reserved
 period parameters.
 
 ```bash
-langwatch query --sql-file report.sql --param days=30 -f json
+langwatch query --sql-file report.sql --param days=30 --projects <project id> -f json
 ```
 
 ## Exporting rows
@@ -103,7 +115,7 @@ back into real values, which is the shape a training-data reader expects.
 `--format csv` writes a header row with RFC 4180 escaping. `--out` writes to a file.
 
 ```bash
-langwatch query --sql-file export.sql --format jsonl --out train.jsonl
+langwatch query --sql-file export.sql --projects <project id> --format jsonl --out train.jsonl
 ```
 
 The query endpoint has no cursor of its own, so a result larger than one
@@ -121,7 +133,7 @@ LIMIT 1000
 ```
 
 ```bash
-langwatch query --sql-file export.sql --page-by keyset --format jsonl --out train.jsonl
+langwatch query --sql-file export.sql --projects <project id> --page-by keyset --format jsonl --out train.jsonl
 ```
 
 ## From an MCP client

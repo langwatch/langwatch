@@ -18,13 +18,20 @@ export class ApiKeyLastUsedService {
   private constructor(
     private readonly repository: Pick<ApiKeyRepository, "updateLastUsedAt">,
     private readonly now: () => Instant,
+    private readonly subject: "apiKeyId" | "projectId",
   ) {}
 
   static create(options: {
     repository: Pick<ApiKeyRepository, "updateLastUsedAt">;
+    /** What the id names, for the failure log line. */
+    subject?: "apiKeyId" | "projectId";
     now?: () => Instant;
   }): ApiKeyLastUsedService {
-    return new ApiKeyLastUsedService(options.repository, options.now ?? nowInstant);
+    return new ApiKeyLastUsedService(
+      options.repository,
+      options.now ?? nowInstant,
+      options.subject ?? "apiKeyId",
+    );
   }
 
   /** Fire-and-forget: at most one write per key per window in this process, O(1) per use. */
@@ -47,7 +54,7 @@ export class ApiKeyLastUsedService {
         this.heldUntil.delete(id);
       }
 
-      logger.warn({ error, apiKeyId: id }, "recording the key's last use failed, non-fatal");
+      logger.warn({ error, [this.subject]: id }, "recording the key's last use failed, non-fatal");
     });
   }
 

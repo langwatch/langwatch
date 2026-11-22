@@ -114,6 +114,19 @@ Feature: Langy recognises its own CLI behind a shell tool call
       And it then tells the reader who to ask for it
       And the card never shows an internal permission name as its headline
 
+    @unit
+    Scenario: A reader who lost access is told so
+      When Langy's tool call is refused because the reader's access was removed or reduced mid-conversation
+      Then a removed membership says they no longer have access to this project
+      And a reduced permission says only that action is no longer available, named when it has plain words
+      And it tells the reader who to ask
+
+    @unit
+    Scenario: A seat limit keeps the platform's own sentence
+      When Langy's tool call is refused because the reader's seat does not include the action
+      Then the card shows the platform's sentence naming the seat
+      And it tells the reader to ask whoever manages seats, not for a permission
+
     # The sandbox's `gh` has no login when the GitHub App is not installed, and
     # it says so in its own words: "To get started with GitHub CLI, please run:
     # gh auth login". That is a shell the customer cannot reach. The manager's
@@ -165,6 +178,22 @@ Feature: Langy recognises its own CLI behind a shell tool call
     Scenario: A refused permission reads as a permissions problem
       When Langy's tool call is refused because the caller's access does not cover it
       Then the card says the access does not cover the action
+
+    # 401 (unauthorized), missing_api_key and not_authenticated are Langy's own
+    # sandbox key, which the reader cannot see or fix. 403 (forbidden) stays the
+    # reader's access.
+    @unit
+    Scenario: Langy's own refused credential reads as an internal error
+      When Langy's tool call fails because Langy's own key is missing or refused
+      Then the card says Langy hit an internal error
+      And it never says the reader lacks access
+      And it never tells the reader to sign in or set a key
+
+    @unit
+    Scenario: A missing key on the developer's own machine keeps the CLI's own words
+      When a tool call in the shared local folder fails because no API key is set
+      Then the card says what the CLI said
+      And it keeps the CLI's next steps
 
     @unit
     Scenario: A refusal on the same status for a different reason keeps its own words

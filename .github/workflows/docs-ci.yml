@@ -3,16 +3,11 @@
 name: docs-ci
 
 on:
+  # Pull requests and the merge queue reach this through pr.yml.
+  workflow_call:
   push:
     branches:
       - main
-  pull_request:
-    # ready_for_review is NOT a default pull_request activity type. Without
-    # it, taking a PR out of draft fires no event at all, so the jobs gated
-    # on `heavy` below would never get their first non-draft run.
-    # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
-    types: [opened, synchronize, reopened, ready_for_review]
-  merge_group:
 
 # No job here writes anything. Declared explicitly rather than inherited,
 # because this workflow installs an npm dependency tree and runs it: if the
@@ -22,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: docs-ci-${{ github.ref }}
   # A newer commit supersedes an older run, on main too: the newest verdict
   # covers the commits before it. Image and release builds keep their own rule.
   cancel-in-progress: true

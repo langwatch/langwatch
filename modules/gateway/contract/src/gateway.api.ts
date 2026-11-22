@@ -38,6 +38,8 @@ import type {
 import type {
   GatewayPricedSpend,
   GatewayPricedSpendResult,
+  GatewayProviderUsage,
+  GatewayProviderUsageResult,
   SpendEventRow,
   SpendEventStatus,
   SpendFilters,
@@ -514,8 +516,16 @@ export type GatewaySpendEventAcrossTenantsQuery = {
   statuses: readonly SpendEventStatus[];
 };
 
+/**
+ * A key found by a presented secret: `presentedPreviousSecret` when it is the one a
+ * rotation replaced.
+ */
+export type GatewayPresentedVirtualKey = GatewayVirtualKeyRecord & {
+  presentedPreviousSecret: boolean;
+};
+
 export interface GatewayInternalProtocol {
-  findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null>;
+  findVirtualKeyBySecret(secret: string): Promise<GatewayPresentedVirtualKey | null>;
   /** Resolves an `lwl_` token by the facts licensing wrote onto its managed key. */
   resolveLicenseToken(input: {
     token: string;
@@ -909,6 +919,12 @@ export interface GatewayApi extends GatewayInternalProtocol {
    * drain path's re-rating would answer zero for it.
    */
   recordPricedSpend(input: GatewayPricedSpend): Promise<GatewayPricedSpendResult>;
+
+  /**
+   * Appends one call LangWatch made with stored provider credentials, rated against the model
+   * registry and debited from the project's, team's and organization's budgets (ADR-193).
+   */
+  recordProviderUsage(input: GatewayProviderUsage): Promise<GatewayProviderUsageResult>;
 
   /**
    * What one request type has cost these tenants, in integer nano-USD, over the

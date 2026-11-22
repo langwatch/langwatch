@@ -9,6 +9,11 @@ import type {
   DashboardWidgetDefinition,
   DashboardWidgetSource,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import {
+  type UiAnalytics,
+  type UiAnalyticsEvent,
+  useUiAnalytics,
+} from "@langwatch/browser-host/analytics";
 import { startTransition, useRef, useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
@@ -25,8 +30,16 @@ import {
   boardWidgetsOf,
   duplicateSlot,
 } from "../model/board-widgets.ts";
+import {
+  dashboardEdited,
+  langyTracesToggled,
+  widgetAdded,
+  widgetDeleted,
+  widgetEdited,
+} from "../model/dashboard-usage-events.ts";
 import type { WidgetQuestion } from "../model/widget-questions.ts";
 import { CODE_SOURCE, catalogueSource } from "../model/widget-source.ts";
+import { withStoredSources } from "../model/widget-sources.ts";
 import { offerUndo, withdrawUndo } from "./widget-undo.ts";
 
 /** What a new widget is made from: its name, its stored parts and where it came from. */
@@ -52,6 +65,20 @@ function withHidden({
   return next;
 }
 
+/** Sends a change's product events once it has landed; a refused change sends none. */
+function trackLanded({
+  analytics,
+  done,
+  events,
+}: {
+  analytics: UiAnalytics;
+  done: boolean;
+  events: readonly (UiAnalyticsEvent | undefined)[];
+}): void {
+  if (!done) return;
+  for (const event of events) if (event) analytics.track(event);
+}
+
 export function useBoardWidgets({
   dashboardId,
   isOwnedElsewhere = false,
@@ -61,6 +88,7 @@ export function useBoardWidgets({
   isOwnedElsewhere?: boolean;
 }) {
   const host = useAnalyticsHost();
+  const analytics = useUiAnalytics();
   const projectId = host.project()?.id ?? "";
   const utils = analyticsApi.useUtils();
 
@@ -137,7 +165,7 @@ export function useBoardWidgets({
               id,
               name,
               code: definition.code,
-              queries: definition.queries,
+              queries: withStoredSources(definition.queries),
             }),
           ),
         );
@@ -156,12 +184,16 @@ export function useBoardWidgets({
   const undoable = async ({
     title,
     change,
+    events,
   }: {
     title: string;
     change: () => Promise<boolean>;
+    /** The product events the change sends once it lands; a refused one sends none. */
+    events: readonly (UiAnalyticsEvent | undefined)[];
   }): Promise<boolean> => {
     const before = stored;
     const done = await change();
+    trackLanded({ analytics, done, events });
     if (done) offerUndo({ title, undo: () => void restore(before) });
     return done;
   };
@@ -169,6 +201,7 @@ export function useBoardWidgets({
   const duplicateWidget = (widget: BoardWidget) =>
     undoable({
       title: "Widget duplicated",
+      events: [widgetAdded({ addedFrom: "duplicate", addedCount: 1 })],
       change: () =>
         write({
           fallbackTitle: "Couldn't duplicate the widget",
@@ -207,6 +240,7 @@ export function useBoardWidgets({
     try {
       return await undoable({
         title: "Widget added",
+        events: [widgetAdded({ addedFrom: "catalogue", addedCount: picked.length })],
         change: () =>
           write({
             fallbackTitle: "Couldn't add the widget",
@@ -235,6 +269,7 @@ export function useBoardWidgets({
   const addWidget = (draft: DashboardWidgetDraft) =>
     undoable({
       title: "Widget added",
+      events: [widgetAdded({ addedFrom: "editor", addedCount: 1 })],
       change: () =>
         write({
           fallbackTitle: "Couldn't add the widget",
@@ -252,11 +287,20 @@ export function useBoardWidgets({
   const saveWidget = ({ widget, draft }: { widget: BoardWidget; draft: DashboardWidgetDraft }) =>
     undoable({
       title: "Widget saved",
+      events: [
+        widgetEdited(),
+        langyTracesToggled({ before: widget.definition.queries, after: draft.queries }),
+      ],
       change: () =>
         write({
           fallbackTitle: "Couldn't save the widget",
           work: async () => {
-            await update.mutateAsync({ projectId, id: widget.id, ...draft });
+            await update.mutateAsync({
+              projectId,
+              id: widget.id,
+              ...draft,
+              queries: withStoredSources(draft.queries),
+            });
           },
         }),
     });
@@ -281,6 +325,7 @@ export function useBoardWidgets({
     });
     const done = await removal;
     setHidden({ id: widget.id, hidden: false });
+    trackLanded({ analytics, done, events: [widgetDeleted()] });
     if (!done) withdrawUndo(toastId);
     return done;
   };
@@ -288,6 +333,7 @@ export function useBoardWidgets({
   const commitPlacements = (next: readonly ChartGridPlacement[]) =>
     undoable({
       title: "Layout saved",
+      events: [dashboardEdited({ change: "layout" })],
       change: () =>
         write({
           fallbackTitle: "Couldn't save the layout",

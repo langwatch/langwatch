@@ -7,6 +7,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   type ShortcutHelpGroup,
   type ShortcutHelpItem,
+  helpGroupsFor,
+  type ShortcutGuardContext,
   TRACE_DRAWER_HELP_GROUPS,
 } from "../../../../features/trace-drawer/behavior/trace-drawer-shortcut-table.ts";
 
@@ -124,6 +126,8 @@ interface KeyboardShortcutsHelpProps {
   onClose: () => void;
   /** Override the shortcut groups shown. Defaults to the trace drawer set. */
   groups?: ShortcutGroup[];
+  /** The open trace, so shortcuts whose guard would not run drop out of the help. */
+  context?: ShortcutGuardContext;
   /** Where focus lands if the control that opened this has since unmounted. */
   fallbackFocusSelector?: string;
 }
@@ -160,9 +164,12 @@ function ShortcutRow({ item }: { item: ShortcutHelpItem }) {
 export function KeyboardShortcutsHelp({
   open,
   onClose,
-  groups = DRAWER_GROUPS,
+  groups: groupsOverride,
+  context,
   fallbackFocusSelector,
 }: KeyboardShortcutsHelpProps) {
+  const baseGroups = groupsOverride ?? DRAWER_GROUPS;
+  const groups = context ? helpGroupsFor({ groups: baseGroups, context }) : baseGroups;
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);

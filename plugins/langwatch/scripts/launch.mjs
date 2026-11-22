@@ -112,6 +112,8 @@ async function main() {
   const hook = process.argv[2];
   const command = CLI_COMMANDS[hook];
   if (!command || !CLAUDE_MARKERS.some((name) => (process.env[name] ?? "").trim())) return;
+  // Grok runs Claude Code's plugin hooks with Claude's markers set; its own hook reports.
+  if ((process.env.GROK_HOOK_EVENT ?? "").trim()) return;
   const cli = recordedCli() ?? cliOnPath();
   if (!cli) {
     if (hook === "session-context") await notifyNotInstalled();

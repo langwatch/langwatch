@@ -11,8 +11,10 @@ import {
   type LangWatchQLCaller,
   type LangWatchQLExecuteInput,
   type LangWatchQLProtections,
+  type LangWatchQLReadableProject,
   type LangWatchQLQueryResult,
   type LangWatchQLSchema,
+  type LangWatchQLSpanDataFloor,
   type LangWatchQLTimeWindow,
   type LangWatchQLValidationResult,
 } from "@langwatch/analytics-contract";
@@ -48,6 +50,13 @@ export interface AnalyticsLwqlApi {
     projectId: string;
     protections: LangWatchQLProtections;
   }): Promise<LangWatchQLSchema>;
+  /** Where span_metrics' history starts: the span_analytics replay's recorded since. */
+  spanDataFloor(): Promise<LangWatchQLSpanDataFloor>;
+  /** The organization's live projects this member holds `analytics:view` on. */
+  listReadableProjects(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<LangWatchQLReadableProject[]>;
   /** The statement's refusals for this member with their positions; nothing is run. */
   diagnoseLangWatchQL(input: {
     projectId: string;
@@ -107,6 +116,17 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
     });
   })
 
+  // No rollout gate: dashboards read it, and the floor names no project data.
+  .procedure("spanDataFloor")
+  .withPermission("analytics:view")
+  .handle(({ app }) => app.spanDataFloor())
+
+  .procedure("readableProjects")
+  .withPermission("analytics:view")
+  .handle(async ({ app, input, actor }) => ({
+    projects: await app.listReadableProjects({ projectId: input.projectId, userId: actor.id }),
+  }))
+
   .procedure("query")
   .withPermission("analytics:view")
   .handle(async ({ app, input, actor, authorization, signal }) => {
@@ -128,8 +148,12 @@ export const analyticsLwqlTrpcTransport: TrpcRouterDeclaration<
       ...(input.granularitySeconds === undefined
         ? {}
         : { granularitySeconds: input.granularitySeconds }),
-      ...(input.excludeOrigins ? { excludeOrigins: input.excludeOrigins } : {}),
+      ...(input.sources === undefined ? {} : { sources: input.sources }),
+      ...(input.projects === undefined ? {} : { projects: input.projects, userId: actor.id }),
       ...(signal ? { signal } : {}),
+      telemetry: input.telemetry
+        ? { caller: "dashboard_widget", ...input.telemetry }
+        : { caller: "workbench" },
     });
   })
   .build();

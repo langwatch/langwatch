@@ -12,6 +12,7 @@ import {
   type TraceAnalyticsData,
 } from "../trace-derived.projection.ts";
 import { TraceAnalyticsStore } from "../trace-derived.store.ts";
+import { memoryEvaluationAnalytics } from "./trace-evaluation-analytics.fixtures.ts";
 import { createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 /**
@@ -66,6 +67,7 @@ describe("TraceAnalyticsStore — redelivery watermark", () => {
       const { storage, written } = recordingPort();
       const store = TraceAnalyticsStore.create({
         storage,
+        evaluationAnalytics: memoryEvaluationAnalytics(),
         defaultRetentionDays: () => 90,
         authorize: ownProofAuthorizer,
       });
@@ -81,6 +83,7 @@ describe("TraceAnalyticsStore — redelivery watermark", () => {
       const { storage } = recordingPort();
       const store = TraceAnalyticsStore.create({
         storage,
+        evaluationAnalytics: memoryEvaluationAnalytics(),
         defaultRetentionDays: () => 90,
         authorize: ownProofAuthorizer,
       });

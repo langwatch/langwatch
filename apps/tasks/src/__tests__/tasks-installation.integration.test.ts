@@ -147,9 +147,11 @@ describe("the tasks process installation", () => {
       const names = runtime.tasks(isTask).map((task) => task.name);
       expect(names).toEqual([
         "clear-stale-pending-sso-setup",
+        "require-password-reset",
         "slack-alert",
         "tiered-free-to-seat-event",
         "stripe-prices-sync",
+        "retention-storage-report",
         "demo-data",
         "trace-destination-report",
         "insight-daily-run-request",

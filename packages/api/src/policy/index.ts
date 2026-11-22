@@ -4,8 +4,9 @@
 export { BrowserOriginGuard, type OriginBearingRequest } from "./browser-origin.ts";
 export {
   ClientAddress,
+  trustedHopRange,
   type AddressedRequest,
-  type ClientAddressReporter,
+  type TrustedHopRange,
 } from "./client-address.ts";
 export {
   ContentSecurityPolicy,

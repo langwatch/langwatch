@@ -16,7 +16,14 @@ export type WarnThrottle = {
   reset: () => void;
 };
 
-export function createWarnThrottle(intervalMs: number): WarnThrottle {
+/** Identities a throttle remembers by default; a key per tenant or per row stays bounded. */
+const DEFAULT_MAX_KEYS = 10_000;
+
+export function createWarnThrottle(
+  intervalMs: number,
+  { maxKeys = DEFAULT_MAX_KEYS }: { maxKeys?: number } = {},
+): WarnThrottle {
+  // Insertion order is last-warned order: a key is re-inserted each time it warns.
   const state = new Map<string, ThrottleEntry>();
 
   return {
@@ -27,7 +34,12 @@ export function createWarnThrottle(intervalMs: number): WarnThrottle {
         return undefined;
       }
       const suppressed = entry?.suppressed ?? 0;
+      state.delete(key);
       state.set(key, { lastWarnedAt: now, suppressed: 0 });
+      if (state.size > maxKeys) {
+        const longestQuiet = state.keys().next().value;
+        if (longestQuiet !== undefined) state.delete(longestQuiet);
+      }
       return suppressed;
     },
     reset() {

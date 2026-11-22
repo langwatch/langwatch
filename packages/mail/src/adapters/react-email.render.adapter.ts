@@ -4,6 +4,14 @@ import {
   renderJoinRequestReminderEmail,
 } from "../templates/join-request-emails.tsx";
 import {
+  type MonitorAutoPausedEmailProps,
+  renderMonitorAutoPausedEmail,
+} from "../templates/monitor-auto-paused-email.tsx";
+import {
+  type PlatformOperatorChangeEmailProps,
+  renderPlatformOperatorChangeEmail,
+} from "../templates/platform-operator-change-email.tsx";
+import {
   renderTriggerDigestEmail,
   type TriggerDigestMail,
 } from "../templates/trigger-digest-email.tsx";
@@ -43,5 +51,17 @@ export class ReactEmailMailRenderer extends MailRender {
 
   renderUpgradeAlert(input: UpgradeAlertEmailProps): Promise<{ subject: string; html: string }> {
     return renderUpgradeAlertEmail(input);
+  }
+
+  renderMonitorAutoPaused(
+    input: MonitorAutoPausedEmailProps,
+  ): Promise<{ subject: string; html: string }> {
+    return renderMonitorAutoPausedEmail(input);
+  }
+
+  renderPlatformOperatorChange(
+    input: PlatformOperatorChangeEmailProps,
+  ): Promise<{ subject: string; html: string }> {
+    return renderPlatformOperatorChangeEmail(input);
   }
 }

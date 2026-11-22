@@ -9,6 +9,7 @@ import {
   type CodingAgentPullRequestUsageInput,
   type CodingAgentRecentSessionsInput,
   type CodingAgentSession,
+  type CodingAgentSessionLastTurn,
   type CodingAgentSessionCursor,
   type CodingAgentSessionEvent,
   type CodingAgentSessionEventsInput,
@@ -39,7 +40,11 @@ import type { CodingAgentTraceSessionRepository } from "../repositories/coding-a
 import type { SessionMetricSeriesRepository } from "../repositories/session-metric-series.repository.ts";
 import type { CodingAgentClock } from "./coding-agent-clock.service.ts";
 import type { CodingAgentBillingPolicy } from "./coding-agent-cost-attribution.service.ts";
-import { CodingAgentSessionReadService } from "./coding-agent-session-read.service.ts";
+import {
+  CodingAgentSessionReadService,
+  type CodingAgentStoredTraces,
+} from "./coding-agent-session-read.service.ts";
+import type { CodingAgentCostEstimator } from "./model-catalog-cost-estimator.service.ts";
 
 export const MAX_SESSION_EVENTS_PAGE_SIZE = MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE;
 
@@ -57,6 +62,10 @@ export interface CodingAgentSessionService {
   findSessionForTrace(
     input: CodingAgentTraceSessionLookupInput,
   ): Promise<CodingAgentSession | null>;
+  findLastTurnOfSession(input: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<CodingAgentSessionLastTurn | null>;
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>;
   backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void>;
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
@@ -88,21 +97,26 @@ export class CodingAgentFeatureService implements CodingAgentSessionService {
     traceSessions: CodingAgentTraceSessionRepository;
     metricSeries: SessionMetricSeriesRepository;
     sessionEvents: CodingAgentSessionEventRepository;
+    storedTraces: CodingAgentStoredTraces;
     github: GithubApi;
     projects: ProjectApi;
     billing: CodingAgentBillingPolicy;
     clock: CodingAgentClock;
+    modelProviders: CodingAgentCostEstimator;
   }): CodingAgentFeatureService {
     const sessionReads = CodingAgentSessionReadService.create({
       sessions: options.sessions,
       traceSessions: options.traceSessions,
       metricSeries: options.metricSeries,
       sessionEvents: options.sessionEvents,
+      storedTraces: options.storedTraces,
       clock: options.clock,
     });
     const assignments = CodingAgentPullRequestAssignmentService.create();
     const shares = CodingAgentPullRequestShareService.create({ assignments });
-    const usage = CodingAgentPullRequestUsageService.create();
+    const usage = CodingAgentPullRequestUsageService.create({
+      modelProviders: options.modelProviders,
+    });
     const personalValues = CodingAgentPersonalPullRequestValuesService.create({
       assignments,
       usage,
@@ -169,6 +183,13 @@ export class CodingAgentFeatureService implements CodingAgentSessionService {
     input: CodingAgentTraceSessionLookupInput,
   ): Promise<CodingAgentSession | null> {
     return this.collaborators.sessionReads.findSessionForTrace(input);
+  }
+
+  findLastTurnOfSession(input: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<CodingAgentSessionLastTurn | null> {
+    return this.collaborators.sessionReads.findLastTurnOfSession(input);
   }
 
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]> {

@@ -6,11 +6,12 @@
 import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { lwqlStatementSchema } from "./analytics-lwql.schemas.ts";
+import { lwqlMemberProjectsRequestSchema, lwqlStatementSchema } from "./analytics-lwql.schemas.ts";
 import {
   langWatchQLAvailabilitySchema,
   langWatchQLQueryResultSchema,
   langWatchQLSchema,
+  traceSourcesSchema,
 } from "./analytics.lwql.ts";
 import {
   LWQL_CLAUSES,
@@ -31,13 +32,42 @@ const lwqlRunRequestSchemaDefinition = z.object({
 export interface LwqlRunRequestSchema extends Named<typeof lwqlRunRequestSchemaDefinition> {}
 export const lwqlRunRequestSchema: LwqlRunRequestSchema = lwqlRunRequestSchemaDefinition;
 
+/** An id a log line records: bounded, so a run cannot write an arbitrary string into the logs. */
+const telemetryIdSchema = z.string().min(1).max(200);
+
+/** What the browser says of the widget a run is for. */
+const lwqlRunTelemetryRequestSchemaDefinition = z
+  .object({
+    dashboardId: telemetryIdSchema.optional(),
+    widgetId: telemetryIdSchema,
+    templateId: telemetryIdSchema.optional(),
+  })
+  .strict();
+/** The named type of {@link lwqlRunTelemetryRequestSchema}. */
+export interface LwqlRunTelemetryRequestSchema extends Named<
+  typeof lwqlRunTelemetryRequestSchemaDefinition
+> {}
+/** The widget ids a query request may carry for its log line; it can name no caller. */
+export const lwqlRunTelemetryRequestSchema: LwqlRunTelemetryRequestSchema =
+  lwqlRunTelemetryRequestSchemaDefinition;
+/** What the browser says of the widget a run is for. */
+export type LangWatchQLRunTelemetryRequest = z.infer<typeof lwqlRunTelemetryRequestSchema>;
+
 /**
- * One statement run for a surface that leaves trace origins out, as a Dashboards board leaves
- * out Langy's turns. Only this door takes it: the REST query runs what it is sent.
+ * One statement run, kept to the trace origins a dashboard query counts (dashboards-v2 AC200):
+ * its stored list, or `null` when it stores none, which the server reads as the default. Absent,
+ * the run is no widget's and reads every origin. The REST query runs what it is sent.
  */
 const lwqlQueryRequestSchemaDefinition = z.object({
   ...lwqlRunRequestSchema.shape,
-  excludeOrigins: z.array(z.string().min(1).max(64)).max(20).readonly().optional(),
+  sources: traceSourcesSchema.nullable().optional(),
+  /** The projects the card reads; absent, the board's project (AC206). */
+  projects: lwqlMemberProjectsRequestSchema.optional(),
+  /**
+   * The widget a run is for, recorded on its log line only. Present, the server names the
+   * caller `dashboard_widget`; absent, `workbench`. The browser never names the caller.
+   */
+  telemetry: lwqlRunTelemetryRequestSchema.optional(),
 });
 export interface LwqlQueryRequestSchema extends Named<typeof lwqlQueryRequestSchemaDefinition> {}
 export const lwqlQueryRequestSchema: LwqlQueryRequestSchema = lwqlQueryRequestSchemaDefinition;
@@ -71,6 +101,36 @@ export const lwqlValidationResultSchema: LwqlValidationResultSchema =
 
 export type LangWatchQLValidationResult = z.infer<typeof lwqlValidationResultSchema>;
 
+/** A project the member may name on a card's query: its id and the name the picker shows. */
+const lwqlReadableProjectSchemaDefinition = z.object({ id: z.string(), name: z.string() });
+export interface LwqlReadableProjectSchema extends Named<
+  typeof lwqlReadableProjectSchemaDefinition
+> {}
+export const lwqlReadableProjectSchema: LwqlReadableProjectSchema =
+  lwqlReadableProjectSchemaDefinition;
+export type LangWatchQLReadableProject = z.infer<typeof lwqlReadableProjectSchema>;
+
+const lwqlReadableProjectsSchemaDefinition = z.object({
+  projects: z.array(lwqlReadableProjectSchema),
+});
+export interface LwqlReadableProjectsSchema extends Named<
+  typeof lwqlReadableProjectsSchemaDefinition
+> {}
+export const lwqlReadableProjectsSchema: LwqlReadableProjectsSchema =
+  lwqlReadableProjectsSchemaDefinition;
+
+/**
+ * Where the span widgets' history starts: `span_metrics` holds spans from `from` on, or all of
+ * them when null; `rebuilding` while its replay has not started yet (ADR-006).
+ */
+const lwqlSpanDataFloorSchemaDefinition = z.object({
+  from: z.string().nullable(),
+  rebuilding: z.boolean(),
+});
+export interface LwqlSpanDataFloorSchema extends Named<typeof lwqlSpanDataFloorSchemaDefinition> {}
+export const lwqlSpanDataFloorSchema: LwqlSpanDataFloorSchema = lwqlSpanDataFloorSchemaDefinition;
+export type LangWatchQLSpanDataFloor = z.infer<typeof lwqlSpanDataFloorSchema>;
+
 export const analyticsLwqlTrpc = defineTrpcContract("analytics.lwql")
   // Separate from `schema` because the catalog is answerable without an
   // executor, so a deployment with no LangWatchQL identity would describe a
@@ -88,6 +148,16 @@ export const analyticsLwqlTrpc = defineTrpcContract("analytics.lwql")
   .query("validate")
   .withInput(lwqlRunRequestSchema)
   .withOutput(lwqlValidationResultSchema)
+
+  /** Where span_metrics' history starts, so a span widget can say its data begins there. */
+  .query("spanDataFloor")
+  .withInput(lwqlProjectScopeSchema)
+  .withOutput(lwqlSpanDataFloorSchema)
+
+  /** The projects of the organization this member may read, for the editor's project picker. */
+  .query("readableProjects")
+  .withInput(lwqlProjectScopeSchema)
+  .withOutput(lwqlReadableProjectsSchema)
 
   .mutation("query")
   .withInput(lwqlQueryRequestSchema)

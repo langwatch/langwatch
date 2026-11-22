@@ -28,6 +28,7 @@ describe("userFromRecord", () => {
       passkeyNudgeDismissedAt: null,
       joinOfferDismissedDomains: [],
       notificationPreferences: {},
+      passwordResetRequiredAt: null,
     });
 
     expect(Object.keys(user).toSorted()).toEqual(
@@ -78,6 +79,8 @@ describe("organizationFromRecord", () => {
       joinerRole: "MEMBER",
       presenceEnabled: true,
       traceSharingEnabled: true,
+      docsPlaygroundSessionsEnabled: true,
+      docsPlaygroundSessionsDisabledAt: null,
       supportContact: null,
       primaryIntent: null,
       promoCode: null,

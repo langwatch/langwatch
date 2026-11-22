@@ -30,11 +30,13 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
+const spinnerFail = vi.hoisted(() => vi.fn());
+
 vi.mock("ora", () => ({
   default: () => ({
     start: vi.fn().mockReturnThis(),
     succeed: vi.fn(),
-    fail: vi.fn(),
+    fail: spinnerFail,
   }),
 }));
 
@@ -195,7 +197,7 @@ describe("runQueryCommand", () => {
     /** @scenario "The row limit is applied to what is printed" */
     it("keeps only that many rows", async () => {
       const result = await runQueryCommand("SELECT 1", { limit: "1" });
-      expect((result as { data: unknown[] }).data).toHaveLength(1);
+      expect((result as { data: { rows: unknown[] } }).data.rows).toHaveLength(1);
     });
 
     it("refuses a limit that is not a whole number", async () => {
@@ -204,17 +206,16 @@ describe("runQueryCommand", () => {
   });
 
   describe("when the format is the default", () => {
-    // The payload is the rows array, so `-o json` prints exactly one JSON
-    // array. The columns reach a reader through the table renderer, which the
-    // command hands back alongside it.
+    // The payload is the rows with the run's params and diagnostics beside them (owner: "they
+    // get the params back as part of the success or final state object in the response").
     /** @scenario "The table format prints the result's own columns" */
     it("returns the rows for the table renderer to print", async () => {
       const result = await runQueryCommand("SELECT 1", {});
       const { data, table } = result as {
-        data: Record<string, unknown>[];
+        data: { rows: Record<string, unknown>[] };
         table: () => void;
       };
-      expect(Object.keys(data[0] ?? {})).toEqual(["TraceId", "OccurredAt"]);
+      expect(Object.keys(data.rows[0] ?? {})).toEqual(["TraceId", "OccurredAt"]);
       expect(typeof table).toBe("function");
     });
   });
@@ -387,5 +388,170 @@ describe("runQueryCommand across projects", () => {
         mockQuery.mock.calls.map(() => "project_b"),
       );
     });
+  });
+});
+
+describe("runQueryCommand with --projects and --sources", () => {
+  /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
+  it("sends the named projects and sources as lists", async () => {
+    await runQueryCommand("SELECT 1", { projects: "A, B", sources: "application,langy" });
+
+    expect(mockQuery).toHaveBeenCalledWith({
+      sql: "SELECT 1",
+      projects: ["A", "B"],
+      sources: ["application", "langy"],
+    });
+  });
+
+  /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
+  it("prints what the run was bound to under the table", async () => {
+    mockQuery.mockResolvedValue({
+      ...RESULT,
+      params: { dashboard_context_projects: ["A"] },
+    });
+
+    const result = await runQueryCommand("SELECT 1", { projects: "A" });
+    (result as { table: () => void }).table();
+
+    const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
+    expect(printed).toContain('Ran with {"dashboard_context_projects":["A"]}');
+  });
+
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it('sends "all" as the string when --projects is all', async () => {
+    await runQueryCommand("SELECT 1", { projects: "all" });
+
+    expect(mockQuery).toHaveBeenCalledWith({ sql: "SELECT 1", projects: "all" });
+  });
+
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it("refuses all mixed with ids, before anything is sent", async () => {
+    await expect(runQueryCommand("SELECT 1", { projects: "all,proj_x" })).rejects.toThrow(
+      ProcessExitError,
+    );
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "QP03e The CLI and the MCP tool tell the user to pass the projects" */
+  it("refuses --project beside --projects before it reads any credential", async () => {
+    await expect(
+      runQueryCommand("SELECT 1", { project: "my-slug", projects: "proj_x" }),
+    ).rejects.toThrow(ProcessExitError);
+
+    expect(vi.mocked(console.error).mock.calls.flat().join("\n")).toContain("pass one of them");
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(resolveCredentials).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "QP03e The CLI and the MCP tool tell the user to pass the projects" */
+  it("refuses a bad --sources list before it reads any credential", async () => {
+    await expect(runQueryCommand("SELECT 1", { sources: " , " })).rejects.toThrow(ProcessExitError);
+
+    expect(resolveCredentials).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "QP03f projects accepts the word all for every project the caller can read" */
+  it("reads All and ALL as the word all", async () => {
+    await runQueryCommand("SELECT 1", { projects: "ALL" });
+
+    expect(mockQuery).toHaveBeenCalledWith(expect.objectContaining({ projects: "all" }));
+  });
+
+  /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
+  it("prints nothing about params when the statement declared no placeholder", async () => {
+    mockQuery.mockResolvedValue({ ...RESULT, params: {} });
+
+    const result = await runQueryCommand("SELECT 1", { projects: "A" });
+    (result as { table: () => void }).table();
+
+    expect(vi.mocked(console.log).mock.calls.flat().join("\n")).not.toContain("Ran with");
+  });
+
+  /** @scenario "QP03e The CLI and the MCP tool tell the user to pass the projects" */
+  it("tells the user to pass --projects when the platform asks for them", async () => {
+    mockQuery.mockRejectedValue(
+      Object.assign(
+        new Error('Name the projects to query: send `projects`, a list of project ids, or "all"'),
+        {
+          code: "projects_required",
+          kind: "projects_required",
+          httpStatus: 422,
+          meta: {},
+          isHandled: true,
+        },
+      ),
+    );
+
+    await expect(runQueryCommand("SELECT 1", {})).rejects.toThrow(ProcessExitError);
+
+    const printed = vi.mocked(console.error).mock.calls.flat().join("\n");
+    expect(printed).toContain(
+      "Name the projects to query: pass --projects <id,id>, or --projects all",
+    );
+    expect(printed).not.toMatch(/project_[a-z0-9]+/);
+  });
+});
+
+describe("runQueryCommand when the key reads no project", () => {
+  /** @scenario "QP03j A key that reads no project is told so, not asked to name one" */
+  it("shows the platform's message, not a request to pass --projects", async () => {
+    mockQuery.mockRejectedValue(
+      Object.assign(new Error("This key reads no project. Ask an admin to grant one"), {
+        code: "projects_unreadable",
+        kind: "projects_unreadable",
+        httpStatus: 422,
+        meta: {},
+        isHandled: true,
+      }),
+    );
+
+    await expect(runQueryCommand("SELECT 1", {})).rejects.toThrow(ProcessExitError);
+
+    const printed = [
+      ...vi.mocked(console.error).mock.calls.flat(),
+      ...spinnerFail.mock.calls.flat(),
+    ].join("\n");
+    expect(printed).toContain("reads no project");
+    expect(printed).not.toContain("pass --projects");
+  });
+});
+
+describe("runQueryCommand with machine output", () => {
+  const PARAMS = { dashboard_context_sources: ["application"], dashboard_context_projects: ["A"] };
+
+  /** @scenario "QP19 The CLI sends the parameters and returns the params in the result" */
+  it("returns params and diagnostics beside the rows in the success object", async () => {
+    mockQuery.mockResolvedValue({ ...RESULT, params: PARAMS });
+
+    const result = await runQueryCommand("SELECT 1", { projects: "A" });
+
+    expect((result as { data: unknown }).data).toEqual({
+      rows: RESULT.rows,
+      params: PARAMS,
+      diagnostics: RESULT.diagnostics,
+    });
+  });
+
+  it("prints one JSON object with the rows and params for --format json", async () => {
+    mockQuery.mockResolvedValue({ ...RESULT, params: PARAMS });
+
+    await runQueryCommand("SELECT 1", { projects: "A", format: "json" });
+
+    const printed = stdoutWrite.mock.calls.map(([chunk]) => String(chunk)).join("");
+    expect(JSON.parse(printed)).toMatchObject({ rows: RESULT.rows, params: PARAMS });
+  });
+
+  it("keeps CSV and JSON lines to the rows and puts params on stderr", async () => {
+    mockQuery.mockResolvedValue({ ...RESULT, params: PARAMS });
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await runQueryCommand("SELECT 1", { projects: "A", format: "jsonl" });
+
+    expect(stderr).toHaveBeenCalledWith(`${JSON.stringify({ params: PARAMS })}\n`);
+  });
+
+  it("refuses a blank --projects or --sources rather than reading the default", async () => {
+    await expect(runQueryCommand("SELECT 1", { projects: "," })).rejects.toThrow(ProcessExitError);
+    await expect(runQueryCommand("SELECT 1", { sources: "" })).rejects.toThrow(ProcessExitError);
   });
 });

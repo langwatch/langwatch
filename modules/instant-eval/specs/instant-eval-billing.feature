@@ -77,6 +77,25 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       When a run's spend is recorded
       Then the failure is raised so the finish is delivered again
 
+    @unit
+    Scenario: A routed page that reports after its run finished is billed on its own
+      Given a routed run that finished while one of its pages was still judging
+      When that page reports its routed spend after the finish
+      Then the page is billed on a spend record of its own, beside the run's record
+      And only once the run's finish has landed, whichever reported first
+      And its cost and price are added to the finished run's row
+      So the row's cost and price always equal what the run's spend records bill
+      And a late page that carries no routed spend changes nothing, as before the router
+
+    @unit
+    Scenario: A held late page is billed even when its run's finish never lands
+      Given a routed run whose late page is held until the run's finish lands
+      When the finish has not landed by the end of the hold
+      Then the held page is billed on its own spend record without it
+      And its amounts are logged at error, naming the run and the page
+      And a finish that lands after all bills the page no second time
+      And a run row update that fails after the page's spend is written is retried, then logged at error
+
   Rule: The spend page names the judged rows
 
     @unit
@@ -94,6 +113,40 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       Then it debits the organization, team and project budgets that apply
       # The debits process already takes an outcome that carries its own
       # attribution; the empty key and provider only narrow which budgets match.
+
+  # The check is the gateway's own preflight for the project, under a key no
+  # key budget names, so the organization, team and project budgets apply.
+  # An own decision model is checked too: its provider usage is debited to the
+  # same budgets (ADR-193).
+  Rule: A gateway budget set to block stops Instant Evals
+
+    @unit
+    Scenario: A run is refused once a blocking budget is reached
+      Given an organization on a paid plan whose project budget is set to block
+      And the budget's spend is at its limit
+      When a run is requested
+      Then it is refused with instant_eval_gateway_budget_exceeded
+      And the refusal names the budget, its scope, window, limit and spend
+      And nothing is held or queued
+
+    @unit
+    Scenario: A budget set to warn never refuses a run
+      Given an organization whose only reached budget is set to warn
+      When a run is requested
+      Then it is accepted
+
+    @unit
+    Scenario: A run under way stops between pages once its spend reaches a blocking budget
+      Given a run whose judged rows have taken a blocking budget to its limit
+      When the next page is asked for
+      Then it is refused with instant_eval_gateway_budget_exceeded before anything is read
+      And the check projects the run's own spend so far
+
+    @unit
+    Scenario: A judged query is refused once a blocking budget is reached
+      Given a project whose blocking budget is at its limit
+      When a statement calling an eval function is submitted
+      Then it is refused with instant_eval_gateway_budget_exceeded before anything is held or judged
 
   Rule: The month's Instant Eval price is one Stripe meter per organization
 

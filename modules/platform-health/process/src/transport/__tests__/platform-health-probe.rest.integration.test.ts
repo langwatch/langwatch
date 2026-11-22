@@ -31,7 +31,9 @@ function probe() {
   const service = ProjectKeyedProbeService.create({
     probes,
     resolveCaller: async ({ token }) =>
-      token === KEY ? { projectId: "project-1", userId: null, apiKeyId: null } : null,
+      token === KEY
+        ? { projectId: "project-1", userId: null, apiKeyId: null, legacyKeyOutsideScope: null }
+        : null,
     scenarioCanary: ScenarioCanaryService.create({
       peers: {
         scenarios: createApiFixture<ScenarioApi>(),

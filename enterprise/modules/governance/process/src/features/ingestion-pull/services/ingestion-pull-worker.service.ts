@@ -1,8 +1,9 @@
-import type {
-  GovernanceIngestionSource,
-  NormalizedPullEvent,
-  PullResult,
-  PulledUsageObservedEventData,
+import {
+  ingestionSourceIsLive,
+  type GovernanceIngestionSource,
+  type NormalizedPullEvent,
+  type PullResult,
+  type PulledUsageObservedEventData,
 } from "@langwatch/enterprise-governance-contract";
 import { isDispatchError } from "@langwatch/eventing";
 import {
@@ -202,7 +203,7 @@ export class IngestionPullWorkerService {
       throw new Error(`IngestionSource ${input.sourceId} not found`);
     }
 
-    if (source.status !== "active" && source.status !== "awaiting_first_event") {
+    if (!ingestionSourceIsLive(source)) {
       this.diagnostics.info("IngestionSource not active, skipping", {
         ingestionSourceId: source.id,
         status: source.status,

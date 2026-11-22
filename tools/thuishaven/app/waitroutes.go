@@ -70,7 +70,8 @@ func (o *Orchestrator) waitMoves(pass waitPass, slug string, svc *domain.Service
 	if svc.Port == 0 || svc.IsFallback || svc.Name == domain.ClickHouseService || svc.Name == domain.PostgresService || svc.Name == domain.RedisService {
 		return nil
 	}
-	up := pass.leaving || o.sys.PortInUse(svc.Port)
+	target := o.waitTarget(pass, svc)
+	up := pass.leaving || o.sys.PortInUse(target)
 	waiting := !up && o.downPastGrace(slug+"/"+svc.Name)
 	if up {
 		delete(o.waitDownSince, slug+"/"+svc.Name)
@@ -81,14 +82,25 @@ func (o *Orchestrator) waitMoves(pass waitPass, slug string, svc *domain.Service
 		switch {
 		case !has && up:
 			// A route lost to a racing teardown or a concurrent portless write comes back.
-			moves = append(moves, o.registerRoute(name, slug, svc.Port))
-		case has && port == svc.Port && waiting:
+			moves = append(moves, o.registerRoute(name, slug, target))
+		case has && waiting && (port == svc.Port || port == svc.RoutePort):
 			moves = append(moves, o.registerRoute(name, slug, pass.daemonPort))
-		case has && port == pass.daemonPort && up:
-			moves = append(moves, o.registerRoute(name, slug, svc.Port))
+		case has && port != target && up && (port == pass.daemonPort || port == svc.Port || port == svc.RoutePort):
+			// Back from the waiting page, or between the docs mount and the app itself.
+			moves = append(moves, o.registerRoute(name, slug, target))
 		}
 	}
 	return moves
+}
+
+// waitTarget is where a live service's hostname belongs. The app hostname goes
+// to the docs mount while the mount listens (it answers app paths itself when
+// the app is down, so the docs stay up) and straight to the app otherwise.
+func (o *Orchestrator) waitTarget(pass waitPass, svc *domain.Service) int {
+	if svc.RoutePort != 0 && (pass.leaving || o.sys.PortInUse(svc.RoutePort)) {
+		return svc.RoutePort
+	}
+	return svc.Port
 }
 
 // downPastGrace records when key was first seen down and answers whether that

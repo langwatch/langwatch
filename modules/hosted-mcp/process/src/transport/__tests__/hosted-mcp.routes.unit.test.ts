@@ -8,11 +8,11 @@ import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
 import { MemoryHostedMcpRepositories } from "../../repositories/memory/memory.hosted-mcp.repositories.ts";
 import { HOSTED_MCP_FAMILY, hostedMcpRoutePolicies } from "../../rules/mcp-routes.rules.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
-import { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
 import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
+import { ResolvedMcpClientAddressService } from "../../services/resolved-mcp-client-address.service.ts";
 import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 class NoProjects implements Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey"> {
@@ -33,7 +33,7 @@ function handler() {
     projects: new NoProjects(),
     grants: new NoGrants(),
     cliSessions: new FakeCliSessions(),
-    address: HeaderMcpClientAddressService.create(),
+    address: ResolvedMcpClientAddressService.create(),
     baseHost: "https://app.langwatch.ai",
   }).createHandler();
 }
@@ -42,6 +42,7 @@ function handler() {
 const DISPATCHED_PATHS = [
   "/mcp",
   "/mcp/health",
+  "/mcp/docs",
   "/sse",
   "/.well-known/oauth-protected-resource",
   "/.well-known/oauth-protected-resource/mcp",
@@ -85,6 +86,29 @@ describe("given the hosted MCP route policy declarations", () => {
       expect(byVerb.get("OPTIONS /mcp")?.policy.kind).toBe("public");
       expect(byVerb.get("POST /mcp")?.family).toBe(HOSTED_MCP_FAMILY);
       expect(byVerb.get("POST /sse")?.policy).toEqual(byVerb.get("POST /mcp")?.policy);
+    });
+  });
+
+  describe("when the docs endpoint's policy is read", () => {
+    /** @scenario "The docs endpoint is declared public and the MCP transport stays behind a credential" */
+    it("declares POST /mcp/docs public with no credential and keeps POST /mcp behind an API key", () => {
+      const byVerb = new Map(
+        hostedMcpRoutePolicies().map((route) => [`${route.method} ${route.path}`, route]),
+      );
+
+      expect(byVerb.get("POST /mcp/docs")).toMatchObject({
+        policy: { kind: "public" },
+        credentialClass: "none",
+        credential: "public",
+        family: HOSTED_MCP_FAMILY,
+      });
+      expect(byVerb.get("OPTIONS /mcp/docs")?.policy.kind).toBe("public");
+      expect(byVerb.has("GET /mcp/docs")).toBe(false);
+      expect(byVerb.has("DELETE /mcp/docs")).toBe(false);
+      expect(byVerb.get("POST /mcp")).toMatchObject({
+        policy: { kind: "handlerManaged", credential: "apiKey" },
+        credentialClass: "project_api_key",
+      });
     });
   });
 

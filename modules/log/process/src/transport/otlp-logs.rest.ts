@@ -15,13 +15,18 @@ import { createLogger } from "@langwatch/observability";
 import {
   ingestDoorRefusalBody,
   ingestDoorRefusalStatus,
+  recordIngestDoorRefusal,
   isIngestDoorRefusal,
   OTLP_CORRECTED_PATH_HEADER,
   OTLP_REFUSED_MEDIA_TYPES,
   readCorrectedPath,
   type OtlpDoorAnswer,
 } from "@langwatch/otlp";
-import { otlpIngestCredentialSchema, type OtlpIngestCredential } from "@langwatch/otlp/door";
+import {
+  otlpIngestCredentialSchema,
+  otlpIngestKeyOf,
+  type OtlpIngestCredential,
+} from "@langwatch/otlp/door";
 import { resolveRequestBound } from "@langwatch/plans";
 import { TraceApi } from "@langwatch/trace-contract";
 
@@ -53,16 +58,16 @@ export const otlpLogsDoor = defineRestDoor("otlp_ingest", {
       const { apiKeyId } = resolution.identity;
       const actor = apiKeyId ? { type: "api_key" as const, id: apiKeyId } : null;
 
-      return { actor, scope: { tier: "project", id: resolution.project.id }, session: resolution };
+      return {
+        actor,
+        scope: { tier: "project", id: resolution.project.id },
+        session: resolution,
+        key: otlpIngestKeyOf(resolution.identity),
+      };
     } catch (error) {
       if (!isIngestDoorRefusal(error)) throw error;
 
-      logger.warn(
-        { ...diagnostics, refusalStatus: ingestDoorRefusalStatus(error) },
-        diagnostics.hasEmptyAuthToken
-          ? "Authentication failed: X-Auth-Token sent but empty"
-          : "Authentication failed",
-      );
+      recordIngestDoorRefusal({ logger: logger, signal: "logs", error, diagnostics });
       throw error;
     }
   },
@@ -89,9 +94,14 @@ async function receive({
   request: Request;
   credential: OtlpIngestCredential;
 }): Promise<
-  Readonly<{ status: OtlpDoorAnswer["status"]; mediaType: typeof PRODUCES_JSON; body: string }>
+  Readonly<{
+    status: OtlpDoorAnswer["status"];
+    mediaType: typeof PRODUCES_JSON;
+    body: string;
+    headers?: OtlpDoorAnswer["headers"];
+  }>
 > {
-  const { status, body } = otlpLogAnswer(
+  const { status, body, headers } = otlpLogAnswer(
     await app.receiveOtlpLogs({
       request: {
         method: request.method,
@@ -106,7 +116,12 @@ async function receive({
       credential,
     }),
   );
-  return { status, mediaType: PRODUCES_JSON, body: JSON.stringify(body) };
+  return {
+    status,
+    mediaType: PRODUCES_JSON,
+    body: JSON.stringify(body),
+    ...(headers ? { headers } : {}),
+  };
 }
 
 export const otlpLogsRest = defineRestRouter(LogApi)

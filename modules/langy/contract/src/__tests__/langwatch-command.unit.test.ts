@@ -1,4 +1,8 @@
-import { isSoleLangwatchInvocation, parseLangwatchCommand } from "@langwatch/langy-contract";
+import {
+  isSoleLangwatchInvocation,
+  parseAllLangwatchCommands,
+  parseLangwatchCommand,
+} from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
 describe("parseLangwatchCommand", () => {
@@ -240,6 +244,19 @@ describe("parseLangwatchCommand", () => {
 
     it("still returns null when the globals name no resource at all", () => {
       expect(parseLangwatchCommand("lw --output json")).toBeNull();
+    });
+  });
+});
+
+describe("parseAllLangwatchCommands", () => {
+  describe("given globals in root position, before the resource", () => {
+    it("skips them for every invocation, as the single parse does", () => {
+      expect(
+        parseAllLangwatchCommands("lw --output json scenario create a && lw -o json monitor list"),
+      ).toMatchObject([
+        { resource: "scenario", verb: "create" },
+        { resource: "monitor", verb: "list" },
+      ]);
     });
   });
 });

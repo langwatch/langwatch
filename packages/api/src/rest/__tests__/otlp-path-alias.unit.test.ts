@@ -5,6 +5,7 @@ import { OTLP_CORRECTED_PATH_HEADER, readCorrectedPath } from "@langwatch/observ
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
+import { ClientAddress } from "../../policy/client-address.ts";
 import { canonicalOtlpRequest, withOtlpPathAliases } from "../otlp-path-alias.ts";
 
 const post = (path: string, body = "batch") =>
@@ -21,6 +22,20 @@ describe("the OTLP path alias", () => {
         readCorrectedPath(rewritten.headers.get(OTLP_CORRECTED_PATH_HEADER) ?? undefined),
       ).toBe("/api/otel/v1/traces/v1/logs");
       expect(await rewritten.text()).toBe("batch");
+    });
+
+    /** @scenario A rewritten OTLP request keeps the caller's resolved address */
+    it("keeps the address the door resolved for the original request", () => {
+      const original = post("/api/otel/v1/traces/v1/logs");
+      ClientAddress.fromTrustedProxies({}).handle({
+        request: original,
+        socketAddress: "198.51.100.7",
+      });
+
+      const rewritten = canonicalOtlpRequest(original);
+
+      expect(rewritten).not.toBe(original);
+      expect(ClientAddress.resolvedFor(rewritten)).toBe("198.51.100.7");
     });
   });
 

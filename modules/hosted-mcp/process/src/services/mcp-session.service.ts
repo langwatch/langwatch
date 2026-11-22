@@ -91,7 +91,7 @@ export class McpSessionService {
       { hasApiKey: !!apiKey, endpoint: baseConfig.endpoint },
       "Running with session config",
     );
-    return runWithConfig({ ...baseConfig, apiKey }, work);
+    return runWithConfig({ ...baseConfig, apiKey, hosted: true }, work);
   }
 
   /** A fresh MCP server for one session, with the composing process's extra tools installed. */
@@ -270,7 +270,7 @@ export class McpSessionService {
 /**
  * Enqueues `text` on each stream the transport holds open, answering how many took it.
  * WORKAROUND: the SDK keeps its stream controllers private; checked against
- * @modelcontextprotocol/sdk@1.29.0, and a changed shape writes nothing rather than throwing.
+ * @modelcontextprotocol/sdk@1.32.0, and a changed shape writes nothing rather than throwing.
  */
 function writeToOpenStreams(transport: StreamableHTTPServerTransport, text: string): number {
   const transportFields: Record<string, unknown> = Object(transport);

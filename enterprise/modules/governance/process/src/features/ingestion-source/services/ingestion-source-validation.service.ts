@@ -11,6 +11,12 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
+import {
+  findPullConfigComplaints,
+  findPullCredentialComplaints,
+} from "../../ingestion-pull/rules/pull-config-shape.rules.ts";
+import { isSameEnvironment } from "../../microsoft/rules/dataverse-environment-service.rules.ts";
+
 export class IngestionSourceValidationService {
   private constructor(private readonly projects: Pick<ProjectApi, "findWithTeam">) {}
 
@@ -97,6 +103,64 @@ export class IngestionSourceValidationService {
           "An update that replaces the configuration has to carry the same report value rather than omit it."
         : `This source has already pulled its ${report} report. ` +
           "Changing the report would record the same spend a second time, so it is fixed once a source has run.";
+
+    throw new GovernanceValidationError(message, { formErrors: [message] });
+  }
+
+  /** The adapter's own schema, run at save so a value it would refuse never reaches a pull. */
+  assertPullConfig(parserConfig: Record<string, unknown>): void {
+    const complaints = findPullConfigComplaints(parserConfig);
+    if (complaints.length === 0) {
+      return;
+    }
+
+    throw new GovernanceValidationError(complaints.join(" "), { formErrors: complaints });
+  }
+
+  /**
+   * The credentials a save sends of its own, whole: a create, or an edit replacing them. An edit
+   * that sends none keeps the stored ones and is not asked for them again.
+   */
+  assertPullCredentials(parserConfig: Record<string, unknown>): void {
+    const complaints = findPullCredentialComplaints(parserConfig);
+    if (complaints.length === 0) {
+      return;
+    }
+
+    throw new GovernanceValidationError(complaints.join(" "), { formErrors: complaints });
+  }
+
+  /**
+   * Whether this update moves a conversation source to another environment. Refused once the
+   * source has pulled, since its cursor is a position in the old environment's history; before
+   * that, `true` tells the caller to pin the write to the cursor it read.
+   */
+  assertEnvironmentUnchangedOncePulled(
+    existing: GovernanceIngestionSource,
+    incoming: Record<string, unknown>,
+  ): boolean {
+    const stored = existing.parserConfig.environmentUrl;
+    const next = incoming.environmentUrl;
+    if (typeof stored !== "string" || stored === next) {
+      return false;
+    }
+
+    const isSame =
+      typeof next === "string" && isSameEnvironment({ value: next, environmentUrl: stored });
+    if (isSame) {
+      return false;
+    }
+
+    if (!IngestionSourceValidationService.hasPollerCursor(existing.pollerCursor)) {
+      return true;
+    }
+
+    const message =
+      next === undefined
+        ? "This source has already read conversations from its environment. An update that " +
+          "replaces the configuration has to carry the same environment address rather than omit it."
+        : "This source has already read conversations from its environment, so the environment is " +
+          "fixed. Archive this source and create a new one to read another environment.";
 
     throw new GovernanceValidationError(message, { formErrors: [message] });
   }

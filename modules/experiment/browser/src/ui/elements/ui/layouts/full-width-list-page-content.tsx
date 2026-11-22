@@ -7,7 +7,7 @@ export function FullWidthListPageContent({ children }: PropsWithChildren) {
       data-testid="full-width-list-page-content"
       width="full"
       paddingX="var(--page-inset)"
-      paddingTop={4}
+      paddingTop={6}
       paddingBottom={8}
     >
       {children}

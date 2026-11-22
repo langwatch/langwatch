@@ -107,7 +107,9 @@ export * from "./ops-bug-report.ts";
 export { opsBugReportTrpc } from "./ops-bug-report.trpc.ts";
 // Browser types only until the screens move to enterprise-ops (.claude/handoffs/boundary-b2a.md).
 export { licenseRegistryTrpc } from "./features/license-registry/license-registry.trpc.ts";
+export { developerSeatsInputSchema } from "./features/license-registry/license-registry.ts";
 export { selfHostedInstancesTrpc } from "./features/license-registry/self-hosted-instance.ts";
+export { selfHostedNoticesTrpc } from "./features/license-registry/self-hosted-notice.trpc.ts";
 export { opsDashboardTrpc } from "./features/dashboard/ops-dashboard.trpc.ts";
 export { opsEventLogTrpc } from "./features/event-log/ops-event-log.trpc.ts";
 export { opsPlatformTrpc } from "./ops-platform.trpc.ts";
@@ -118,6 +120,7 @@ export * from "./features/migrations/ops-upgrade.ts";
 export * from "./features/migrations/ops-upgrade-diagnostics.ts";
 export * from "./features/migrations/ops-upgrade.errors.ts";
 export * from "./ops.config.ts";
+export * from "./self-hosted-notice.ts";
 export * from "./usage-report.ts";
 export * from "./usage-report-docs.ts";
 export * from "./features/checkup/checkup.ts";

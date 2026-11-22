@@ -30,6 +30,16 @@ import type {
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
+/** A live project whose legacy `apiKey` still authenticates; never the key itself. */
+export type LiveLegacyKey = Readonly<{
+  projectId: string;
+  /** The owning team, so a standing decision needs no lineage read of its own. */
+  teamId: string;
+  projectName: string;
+  projectSlug: string;
+  lastUsedAt: Instant | null;
+}>;
+
 export type TouchCodingAgentActivityInput = {
   projectId: string;
   at: Instant;
@@ -46,7 +56,10 @@ export interface ProjectWithOrgAdmin {
   organizationCreatedAt: Instant | null;
 }
 
-/** One stored project as the project facts step reads it, with its organization's oldest admin. */
+/**
+ * One stored project as the project data steps read it (the facts step and the history listing),
+ * with its organization's oldest admin.
+ */
 export type ProjectBackfillRow = Readonly<{
   id: string;
   createdAt: Instant;
@@ -57,10 +70,13 @@ export type ProjectBackfillRow = Readonly<{
   presenceEnabled: boolean;
   isArchived: boolean;
   adminUserId: string | null;
+  /** A personal project's owner; null for a shared project. */
+  ownerUserId: string | null;
+  firstMessage: boolean;
 }>;
 
 /**
- * One row of the projects table for the facts step: a whole project, or an orphan whose team or
+ * One row of the projects table for the data steps: a whole project, or an orphan whose team or
  * organization is gone, so nothing can be recorded for it.
  */
 export type ProjectBackfillEntry =
@@ -155,6 +171,11 @@ export interface ProjectRepository {
   findTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]>;
   /** The live project the legacy `apiKey` column names, or nothing. */
   findIdByLegacyApiKey(input: { token: string }): Promise<string | null>;
+  markLegacyApiKeyUsed(input: { projectId: string; at: Instant }): Promise<void>;
+  /** When the legacy key last authenticated, or nothing when no use was stamped. */
+  findLegacyApiKeyLastUsedAt(input: { projectId: string }): Promise<Instant | null>;
+  /** Live legacy keys in the organisation, excluding UNMANAGED_PROJECT_KEY_KINDS. */
+  findLiveLegacyKeys(input: { organizationId: string }): Promise<LiveLegacyKey[]>;
   /** False when no live row took the write, which is how the caller learns nothing rotated. */
   rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean>;
   /** Creates a team's personal project once and answers its id; a second call creates nothing. */

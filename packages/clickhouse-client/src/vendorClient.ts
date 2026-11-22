@@ -4,6 +4,7 @@
  * {@link ClickHouseQueryClient}: retry, outcome metrics, in-band exceptions.
  */
 
+import { markInsertFailure } from "./insertFailure.ts";
 import type { AbortSignalLike } from "./query.ts";
 import { runWithRetry } from "./retry.ts";
 import { turnsAsyncInsertOff, VIEW_DEDUP } from "./routingDriver.ts";
@@ -173,6 +174,7 @@ export class VendorClientResilience {
       const durationMs = now() - start;
       this.report.failure({ operation: "insert", error, durationMs, params });
       this.report.outcome({ queryType: "INSERT", table, durationMs, outcome: "error" });
+      markInsertFailure(error);
       throw error;
     }
   }

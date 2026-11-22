@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { isLockoutCountedPath } from "../../../rules/sign-in-identifier-hash.rules.ts";
 import {
   answerAuthRefusalByRegisteredCode,
+  answeringReleasedRefusals,
   refuseDirectTwoStepDisable,
   releaseHandledRefusal,
   twoFactorPlugin,
@@ -71,7 +72,9 @@ function twoStepHarness() {
 
   const host = new Hono();
   host.onError(createErrorHandler());
-  host.all("/api/auth/*", (context) => auth.handler(context.req.raw));
+  host.all("/api/auth/*", (context) =>
+    answeringReleasedRefusals(() => auth.handler(context.req.raw)),
+  );
 
   async function post(path: string, body: unknown, cookie = ""): Promise<Response> {
     return host.fetch(

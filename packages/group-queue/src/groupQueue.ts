@@ -61,8 +61,10 @@ import {
   PayloadTooLargeError,
   readEnvelopeDescriptor,
   readJobAttempt,
+  readJobOverloadAttempts,
   readJobPayloadBytes,
   readJobRoutingMeta,
+  readJobStagedAt,
   withJobAttempt,
 } from "./jobEnvelope.ts";
 import { JobLatencyStats } from "./jobLatencyStats.ts";
@@ -111,11 +113,12 @@ function createBlockingConnection({
   }
   return redisConnection;
 }
-import { nowInstant, Temporal } from "@langwatch/time";
+import { nowEpochMs, nowInstant, Temporal } from "@langwatch/time";
 
 import { fallbackReadyScore, isPlausibleReadyScore, resolveReadyScore } from "./readyScore.ts";
 import { ScriptCallBatcher } from "./scriptCallBatcher.ts";
 import {
+  activeKeyHeartbeatMs,
   DEFAULT_BISECTION_SPLITS_PER_DISPATCH,
   DEFAULT_CONFIRMED_DEATH_THRESHOLD,
   DEFAULT_GROUP_QUARANTINE_THRESHOLD,
@@ -178,15 +181,46 @@ async function withActiveSpan<T>(
 
 export const JOB_RETRY_CONFIG = {
   maxAttempts: 25,
+  /** An overloaded server is not the job's fault: about three more hours, jittered, at the cap. */
+  maxOverloadedAttempts: 61,
   backoffBaseMs: 500,
   maxBackoffMs: 600_000,
 } as const;
 
-export function getBackoffMs(attempt: number): number {
+/**
+ * The attempts a failure may use: an overload names a retry delay and gets the longer budget.
+ * An ordinary failure gets its own rungs on top of the overload retries already spent.
+ */
+export function attemptBudgetOf({
+  decision,
+  overloadAttempts,
+}: {
+  decision: { retryAfterMs?: number };
+  overloadAttempts: number;
+}): number {
+  if (decision.retryAfterMs !== undefined) return JOB_RETRY_CONFIG.maxOverloadedAttempts;
   return Math.min(
+    JOB_RETRY_CONFIG.maxAttempts + overloadAttempts,
+    JOB_RETRY_CONFIG.maxOverloadedAttempts,
+  );
+}
+
+/** Carried in job data only once an overload retry was spent, so other jobs encode unchanged. */
+function overloadAttemptsField(count: number): { __overloadAttempts?: number } {
+  return count > 0 ? { __overloadAttempts: count } : {};
+}
+
+/**
+ * The wait before the retry after `attempt`, with full jitter: anywhere from zero to the
+ * exponential rung, so the jobs of one failed batch or one overloaded server spread out instead
+ * of retrying in the same instant.
+ */
+export function getBackoffMs(attempt: number, random: () => number = Math.random): number {
+  const rung = Math.min(
     JOB_RETRY_CONFIG.backoffBaseMs * Math.pow(2, attempt - 1),
     JOB_RETRY_CONFIG.maxBackoffMs,
   );
+  return Math.floor(random() * rung);
 }
 
 /**
@@ -194,12 +228,6 @@ export function getBackoffMs(attempt: number): number {
  * derived from retry config to prevent fresh-delivery misreads on re-expire.
  */
 export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil((JOB_RETRY_CONFIG.maxBackoffMs / 1000) * 3);
-
-/** A handed-back job waits `delayMs`; once handed back for over `windowMs`, it spends attempts. */
-export const HAND_BACK_CONFIG = {
-  delayMs: 1_000,
-  windowMs: 30 * 60_000,
-} as const;
 
 /** Whether a job no worker has handled yet is handed back again, or has waited long enough. */
 export function handBackOutcome({
@@ -274,6 +302,17 @@ export const GROUP_QUEUE_CONFIG = {
   shutdownTimeoutMs: 25_000,
 } as const;
 
+/**
+ * A handed-back job waits `delayMs`; past `windowMs` it spends attempts. Each worker that handed it
+ * back passes its group over for `passOverMs`, two signal waits (#9148). The re-stage holds the
+ * group ~3s, leaving a peer ~7s against its 5s wait: a longer `delayMs` needs a longer pass-over.
+ */
+export const HAND_BACK_CONFIG = {
+  delayMs: 1_000,
+  windowMs: 30 * 60_000,
+  passOverMs: 2 * GROUP_QUEUE_CONFIG.signalTimeoutSec * 1000,
+} as const;
+
 /** Default TTL for deduplication in milliseconds */
 const DEFAULT_DEDUPLICATION_TTL_MS = 200;
 
@@ -314,6 +353,7 @@ const INTERNAL_FIELDS = [
   "__dispatchScore",
   "__attempt",
   "__handedBackSince",
+  "__overloadAttempts",
 ] as const;
 
 /**
@@ -378,6 +418,8 @@ type ClaimedJob<Payload> = {
   jobAttempt: number;
   /** When a worker first handed this job back for want of a handler; absent if none has. */
   handedBackSince: number | undefined;
+  /** Retries this job spent on failures that named a retry delay (an overloaded server). */
+  overloadAttempts: number;
   jobName: string;
   routingLabels: { queue_name: string; pipeline_name: string; job_type: string; job_name: string };
   batchPayloads: Payload[] | null;
@@ -663,10 +705,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           ? `${this.dispatchGroupAllowListKey}:candidates`
           : undefined,
         listedGroupsKeys: this.dispatchListed
-          ? () => this.scripts.findOpenGroupLists(nowInstant().epochMilliseconds)
+          ? () => this.scripts.findOpenGroupLists(nowEpochMs())
           : undefined,
         groupBatch: () => this.groupBatching(),
         claimGuardWorkerId: () => this.claimGuardWorkerId(),
+        workerId: this.workerId,
       });
       this.dispatcher.start();
       this.adaptiveSlots.start();
@@ -726,7 +769,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
    * writes one goes through here, since scanning the ready set later can't work
    * once the bad value has replaced it. `delay` is excluded: a queue decision.
    */
-  private resolveScore(rawScore: unknown, nowMs: number = nowInstant().epochMilliseconds): number {
+  private resolveScore(rawScore: unknown, nowMs: number = nowEpochMs()): number {
     const { score, isRejected } = resolveReadyScore({
       score: rawScore,
       nowMs,
@@ -785,7 +828,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const stagedJobId = this.generateStagedJobId(payload);
     // Not `?? Date.now()`: a score function returning 0 or NaN (a payload with
     // no usable occurrence time) survives `??` and stages the job at the epoch.
-    const score = this.resolveScore(this.score?.(payload));
+    const nowMs = nowEpochMs();
+    const score = this.resolveScore(this.score?.(payload), nowMs);
 
     const span = trace.getActiveSpan();
     if (span) {
@@ -795,6 +839,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const jobDataJson = await this.blobLifecycle.encode({
       jobData: { ...(payload as Record<string, unknown>), __context: contextMetadata },
       groupId,
+      stagedAtMs: nowMs,
     });
     return {
       stagedJobId,
@@ -1044,7 +1089,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       ...capturedContext,
       queueDispatchScopeKey: scopeKeyOf(capturedContext) ?? this.dispatchGroupAllowListKey,
     };
-    const now = nowInstant().epochMilliseconds;
+    const now = nowEpochMs();
 
     const shouldExtend = dedup ? dedup.extend !== false : true;
     const shouldReplace = dedup ? dedup.replace !== false : true;
@@ -1082,6 +1127,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           jobDataJson: await this.blobLifecycle.encode({
             jobData: payloadWithContext,
             groupId,
+            stagedAtMs: now,
           }),
           shouldExtend,
           shouldReplace,
@@ -1376,7 +1422,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const { activeTtlSec } = GROUP_QUEUE_CONFIG;
     const timer = setInterval(
       () => this.beatGroupBatch({ due: [...beating], beating, activeTtlSec }),
-      (activeTtlSec * 1000) / 3,
+      activeKeyHeartbeatMs({ activeTtlSec }),
     );
     return new Map(
       jobs.map((job) => [
@@ -1689,6 +1735,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const attempt = Math.max(jobAttempt, await (groupAttempt ?? this.readGroupAttempt(groupId)));
     const handedBackSince =
       typeof jobData.__handedBackSince === "number" ? jobData.__handedBackSince : undefined;
+    const overloadAttempts =
+      typeof jobData.__overloadAttempts === "number" ? jobData.__overloadAttempts : 0;
     // Checked, not asserted: these become Prometheus label values, and `??`
     // would let a non-string through to be stringified into one.
     const pipelineName = nonEmptyString(jobData.__pipelineName) ?? "unknown";
@@ -1718,6 +1766,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       attempt,
       jobAttempt,
       handedBackSince,
+      overloadAttempts,
       jobName,
       routingLabels,
     };
@@ -1753,7 +1802,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     try {
       drainedSiblings = await this.scripts.drainGroupReady({
         groupId,
-        nowMs: nowInstant().epochMilliseconds,
+        nowMs: nowEpochMs(),
         maxJobs: maxBatch - 1,
         maxBytes,
         initialBytes,
@@ -2113,7 +2162,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     if (err instanceof HandBackGroupQueueError) {
       const outcome = handBackOutcome({
         handedBackSince: job.handedBackSince,
-        now: nowInstant().epochMilliseconds,
+        now: nowEpochMs(),
       });
       if (outcome.kind === "hand-back") {
         await this.handBackClaimedJob({ job, error, since: outcome.since, stopHeartbeat });
@@ -2137,8 +2186,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     span.recordException(error);
     span.setStatus({ code: SpanStatusCode.ERROR });
     const [quarantineError] = await this.quarantineErrors({ job, error, isRetryable });
-    if (isRetryable && attempt < JOB_RETRY_CONFIG.maxAttempts && !quarantineError) {
-      await this.retryClaimedJob({ job, error, decision, stopHeartbeat });
+    const budget = attemptBudgetOf({ decision, overloadAttempts: job.overloadAttempts });
+    if (isRetryable && attempt < budget && !quarantineError) {
+      await this.retryClaimedJob({ job, error, decision, budget, stopHeartbeat });
       return;
     }
     await this.exhaustClaimedJob({ job, error, isRetryable, quarantineError, span, offender });
@@ -2210,11 +2260,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     job,
     error,
     decision,
+    budget,
     stopHeartbeat,
   }: {
     job: ClaimedJob<Payload>;
     error: Error;
     decision: { retryable: boolean; retryAfterMs?: number };
+    /** The attempt budget the caller enforced, logged as is. */
+    budget: number;
     stopHeartbeat: () => void;
   }): Promise<void> {
     const {
@@ -2254,8 +2307,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           __context: contextMetadata,
           __attempt: attempt + 1,
           ...(job.handedBackSince === undefined ? {} : { __handedBackSince: job.handedBackSince }),
+          ...overloadAttemptsField(
+            job.overloadAttempts + (decision.retryAfterMs === undefined ? 0 : 1),
+          ),
         },
         groupId,
+        stagedAtMs: readJobStagedAt(jobDataJson) ?? undefined,
       });
     } catch (encodeErr) {
       this.recordDrop({
@@ -2298,7 +2355,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId,
       stagedJobId,
       newStagedJobId,
-      dispatchAfterMs: nowInstant().epochMilliseconds + backoffMs,
+      dispatchAfterMs: nowEpochMs() + backoffMs,
       jobDataJson: retryJobData,
       backoffMs,
       // Written inside the same script as the re-stage: the chain is the only
@@ -2347,7 +2404,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         groupId,
         stagedJobId,
         attempt,
-        maxAttempts: JOB_RETRY_CONFIG.maxAttempts,
+        maxAttempts: budget,
         backoffMs,
         // The whole Error, not `error.message`: the serializer emits
         // the stack, and for a handler crash the stack IS the
@@ -2362,7 +2419,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
 
   /**
    * Returns a job this worker has no handler for to the queue unspent: same attempt, no failure
-   * streak, no audit. A short delay keeps this worker from taking it straight back.
+   * streak, no audit. This worker passes the group over meanwhile, so a peer takes it first.
    */
   private async handBackClaimedJob({
     job,
@@ -2385,8 +2442,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           __context: contextMetadata,
           __attempt: attempt,
           __handedBackSince: since,
+          ...overloadAttemptsField(job.overloadAttempts),
         },
         groupId,
+        stagedAtMs: readJobStagedAt(jobDataJson) ?? undefined,
       });
     } catch (encodeErr) {
       this.recordDrop({
@@ -2415,12 +2474,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId,
       stagedJobId,
       newStagedJobId: stagedJobId,
-      dispatchAfterMs: nowInstant().epochMilliseconds + HAND_BACK_CONFIG.delayMs,
+      dispatchAfterMs: nowEpochMs() + HAND_BACK_CONFIG.delayMs,
       jobDataJson: handBackJobData,
       backoffMs: HAND_BACK_CONFIG.delayMs,
       attempt,
       attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
       claimToken,
+      passOver: { workerId: this.workerId, ttlMs: HAND_BACK_CONFIG.passOverMs },
     });
     if (restaged) {
       await this.blobLifecycle.transferLease({
@@ -2519,6 +2579,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId: job.groupId,
       stagedJobId: job.stagedJobId,
       payload: job.payload,
+      claimedJobDataJson: job.jobDataJson,
       originalScore: job.originalScore,
       claimToken: job.claimToken,
       lastError,
@@ -2553,6 +2614,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const freshValue = await this.blobLifecycle.encode({
       jobData: { ...payload, __context: contextMetadata },
       groupId,
+      stagedAtMs: readJobStagedAt(job.jobDataJson) ?? undefined,
     });
     const handlerError = lastError.cause instanceof Error ? lastError.cause : lastError;
     const refusedJobIds: string[] = [];
@@ -2986,7 +3048,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
             workerId: this.workerId,
             error: err instanceof Error ? err.message : String(err),
           },
-          "Failed to publish worker liveness beacon; the poison guard may read this worker as dead if this persists",
+          "Failed to publish worker liveness beacon; if this persists, dispatch reclaims this worker's claims and the poison guard counts them as deaths",
         );
       }
     };
@@ -3025,7 +3087,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     /** True once the job's outcome is decided; see `stopHeartbeat`. */
     isCancelled: () => boolean;
   }): ReturnType<typeof setInterval> {
-    const intervalMs = (GROUP_QUEUE_CONFIG.activeTtlSec * 1000) / 3;
+    const intervalMs = activeKeyHeartbeatMs({ activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec });
     return setInterval(() => {
       this.scripts
         .refreshActiveKey({
@@ -3060,6 +3122,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     groupId,
     stagedJobId,
     payload,
+    claimedJobDataJson,
     originalScore,
     claimToken,
     lastError,
@@ -3069,6 +3132,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     groupId: string;
     stagedJobId: string;
     payload: Payload;
+    /** The value as claimed, whose header holds when the job was first staged. */
+    claimedJobDataJson: string;
     originalScore: number;
     claimToken: string;
     lastError: Error | undefined;
@@ -3090,6 +3155,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         __context: contextMetadata,
       },
       groupId,
+      stagedAtMs: readJobStagedAt(claimedJobDataJson) ?? undefined,
     });
 
     // The quarantine breaker wraps the handler error to explain WHY the group
@@ -3347,10 +3413,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   }): Promise<void> {
     const attempt =
       Math.max(readJobAttempt(jobDataJson) ?? 0, await this.readGroupAttempt(groupId)) + 1;
-    if (attempt >= JOB_RETRY_CONFIG.maxAttempts) {
+    // The overload retries already spent are not this failure's rungs (they ride the header).
+    const budget = attemptBudgetOf({
+      decision: {},
+      overloadAttempts: readJobOverloadAttempts(jobDataJson),
+    });
+    if (attempt >= budget) {
       // The retry ladder is out of rungs — a discard like any other, not
       // recoverable via replay (#5538). Reaching here means every read failed
-      // (~2h27m of sustained unreachability), which says the STORE is down, not
+      // (~1h15m on average of sustained unreachability), which says the STORE is down, not
       // that the blob is gone — so the drop keeps the shared bytes for lazy
       // reclaim while retiring this job's lease.
       await this.dropStagedJob({
@@ -3373,7 +3444,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId,
       stagedJobId,
       newStagedJobId: stagedJobId,
-      dispatchAfterMs: nowInstant().epochMilliseconds + backoffMs,
+      dispatchAfterMs: nowEpochMs() + backoffMs,
       jobDataJson: withJobAttempt({ value: jobDataJson, attempt }),
       backoffMs,
       attempt,
@@ -3563,7 +3634,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     work: (list?: ListedRun) => Promise<Result>;
   }): Promise<Result> {
     const listKey = `${this.queueName}:gq:listed:${name}`;
-    await this.scripts.openGroupList({ listKey, nowMs: nowInstant().epochMilliseconds });
+    await this.scripts.openGroupList({ listKey, nowMs: nowEpochMs() });
     try {
       const scope = { ...this.captureContext(), queueDispatchScopeKey: listKey };
       const fault = { operation: "runListedWork", work: `Queue work of ${name}` };
@@ -3605,13 +3676,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     maxOutstanding: number;
     signal?: AbortSignal;
   }): Promise<void> {
-    let deadline = nowInstant().epochMilliseconds + timeoutMs;
+    let deadline = nowEpochMs() + timeoutMs;
     let lastLook: number | undefined;
     while (!signal?.aborted) {
-      const lookStartedMs = nowInstant().epochMilliseconds;
+      const lookStartedMs = nowEpochMs();
       const outstanding = await this.scripts.countListedOutstanding(listKey);
       if (outstanding <= maxOutstanding) return;
-      const nowMs = nowInstant().epochMilliseconds;
+      const nowMs = nowEpochMs();
       if (outstanding !== lastLook) {
         lastLook = outstanding;
         deadline = nowMs + timeoutMs;
@@ -3643,16 +3714,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     onHeld?: (state: PreflightTargetsState) => void;
     whileDraining?: boolean;
   }): Promise<PreflightTargetsState | undefined> {
-    let deadline = nowInstant().epochMilliseconds + timeoutMs;
+    let deadline = nowEpochMs() + timeoutMs;
     let reportedHeld = false;
     let lastLook = "";
     while (true) {
-      const lookStartedMs = nowInstant().epochMilliseconds;
+      const lookStartedMs = nowEpochMs();
       const state = await this.scripts.inspectPreflightTargets(key);
-      const lookMs = nowInstant().epochMilliseconds - lookStartedMs;
+      const lookMs = nowEpochMs() - lookStartedMs;
       const look = [state.pending, state.active, state.pendingGroups, ...state.pendingGroupIds];
       if (whileDraining && look.join("\n") !== lastLook) {
-        deadline = nowInstant().epochMilliseconds + timeoutMs;
+        deadline = nowEpochMs() + timeoutMs;
         lastLook = look.join("\n");
       }
       if (!reportedHeld && state.heldFromBefore > 0) {
@@ -3662,7 +3733,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       // A blocked group stays blocked until an operator acts: no point waiting it out.
       if (state.blocked > 0) this.assertTargetsSucceeded({ state, fault });
       if (this.targetsHaveSettled({ state, fault })) return undefined;
-      if (nowInstant().epochMilliseconds >= deadline) return state;
+      if (nowEpochMs() >= deadline) return state;
       // Rest at least as long as the look took, so a paged look holds at most half of Redis.
       await new Promise<void>((resolve) => setTimeout(resolve, Math.max(100, lookMs)));
     }

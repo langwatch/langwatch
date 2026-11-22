@@ -173,6 +173,50 @@ describe("the declaration spool", () => {
     });
   });
 
+  describe("when the collector stops answering partway through", () => {
+    /** @scenario "A drain stops at the first queued declaration the collector does not answer" */
+    it("sends nothing after the send that got no answer and keeps the rest", async () => {
+      queue({ sessionId: "a", now: NOW - 3 });
+      queue({ sessionId: "b", now: NOW - 2 });
+      queue({ sessionId: "c", now: NOW - 1 });
+      const sent: unknown[] = [];
+
+      const delivered = await drainSessionContextSpool({
+        stateDir,
+        now: () => NOW,
+        post: async (payload) => {
+          sent.push(payload);
+          if (sent.length > 1) throw new Error("connect ETIMEDOUT");
+          return true;
+        },
+      });
+
+      expect(delivered).toBe(1);
+      expect(sent).toEqual([{ session: "a" }, { session: "b" }]);
+      expect(readSpooledDeclarations({ stateDir, now: () => NOW }).map((e) => e.sessionId)).toEqual(
+        ["b", "c"],
+      );
+    });
+
+    it("still tries the next entry after one the collector answered and refused", async () => {
+      queue({ sessionId: "a", now: NOW - 2 });
+      queue({ sessionId: "b", now: NOW - 1 });
+      const sent: unknown[] = [];
+
+      const delivered = await drainSessionContextSpool({
+        stateDir,
+        now: () => NOW,
+        post: async (payload) => {
+          sent.push(payload);
+          return sent.length > 1;
+        },
+      });
+
+      expect(delivered).toBe(1);
+      expect(sent).toHaveLength(2);
+    });
+  });
+
   describe("when an entry on disk is unreadable", () => {
     it("drops it rather than offer a declaration it cannot trust", () => {
       queue({ sessionId: "a" });

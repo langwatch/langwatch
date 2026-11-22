@@ -104,7 +104,7 @@ Expected: a `200` with a `data` array of models the key can route to.
 curl -sS https://gateway.acme.com/v1/chat/completions \
   -H "Authorization: Bearer $LW_VK" \
   -H "Content-Type: application/json" \
-  -d '{"model":"openai/gpt-5-mini","messages":[{"role":"user","content":"ping"}]}'
+  -d '{"model":"openai/gpt-6-luna","messages":[{"role":"user","content":"ping"}]}'
 ```
 
 Expected: a `chat.completion` object from the provider. The response carries `X-LangWatch-Gateway-Request-Id`, the id to search for in [Trace Explorer](/ai-gateway/observability).

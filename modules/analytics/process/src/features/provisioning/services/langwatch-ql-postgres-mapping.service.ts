@@ -4,6 +4,8 @@
  * @see specs/lwql/api.feature
  */
 
+import { scryptSync } from "node:crypto";
+
 import {
   clickHouseLiteral,
   postgresLiteral,
@@ -42,6 +44,12 @@ interface LangWatchQLColumn {
  * PostgreSQL-engine storage, so a catalog of six datasets asks for six pools.
  */
 export const DEFAULT_POSTGRES_ENGINE_POOL_SIZE = 2;
+
+/** Starts the engine-table comment that names the collection values the table was built on. */
+const CREDENTIAL_COMMENT_PREFIX = "lwql-credentials=";
+
+/** Fixed, so the fingerprint is stable across processes; scrypt makes a guess costly. */
+const CREDENTIAL_FINGERPRINT_SALT = "lwql-postgres-named-collection";
 
 /**
  * Alias the approved view's body gives the base relation. Fixed rather than
@@ -165,25 +173,27 @@ export class LangWatchQLPostgresMappingService {
   private constructor() {}
 
   /**
-   * Creates the named collection holding the PostgreSQL credentials server-side.
+   * A short, one-way digest of every value the named collection holds plus the schema the
+   * engine tables read, never the password itself. An engine table's pool keeps the values it
+   * was built with, so a changed digest means rebuild.
    */
-  namedCollectionStatements({ connection }: { connection: PostgresNamedCollection }): string[] {
-    sqlText.assertIdentifier(connection.collection, "named collection");
-    if (!Number.isInteger(connection.port)) {
-      throw new Error(
-        `lwql provisioning: named collection port must be an integer, got ${connection.port}`,
-      );
-    }
+  credentialFingerprint({
+    connection,
+    schema,
+  }: {
+    connection: Omit<PostgresNamedCollection, "collection">;
+    /** Part of the digest: a table built before the schema was pinned reads as stale. */
+    schema: string;
+  }): string {
+    const { host, port, database, user, password } = connection;
+    const material = JSON.stringify([host, port, database, user, password, schema]);
 
-    return [
-      `DROP NAMED COLLECTION IF EXISTS ${connection.collection}`,
-      `CREATE NAMED COLLECTION ${connection.collection} AS ` +
-        `host=${clickHouseLiteral(connection.host)}, ` +
-        `port=${connection.port}, ` +
-        `database=${clickHouseLiteral(connection.database)}, ` +
-        `user=${clickHouseLiteral(connection.user)}, ` +
-        `password=${clickHouseLiteral(connection.password)}`,
-    ];
+    return scryptSync(material, CREDENTIAL_FINGERPRINT_SALT, 8).toString("hex");
+  }
+
+  /** The comment an engine table built on these collection values carries. */
+  credentialComment({ fingerprint }: { fingerprint: string }): string {
+    return `${CREDENTIAL_COMMENT_PREFIX}${fingerprint}`;
   }
 
   /**
@@ -197,15 +207,21 @@ export class LangWatchQLPostgresMappingService {
     columns,
     collection,
     postgresRelation,
+    schema,
     connectionPoolSize = DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
+    credentialFingerprint,
   }: {
     names: LangWatchQLNames;
     table: string;
     columns: LangWatchQLColumn[];
     collection: string;
     postgresRelation: string;
+    /** The app PostgreSQL schema; the role's search_path is never set, so it may omit it. */
+    schema: string;
     /** Connections this one mapped table may hold open. See the constant. */
     connectionPoolSize?: number;
+    /** Stamped once ClickHouse is shown to hold these values; absent reads as stale (#8858). */
+    credentialFingerprint?: string;
   }): string {
     accessModel.assertNames(names);
     sqlText.assertIdentifier(collection, "named collection");
@@ -225,11 +241,16 @@ export class LangWatchQLPostgresMappingService {
     const columnList = columns
       .map((column) => `${sqlText.assertIdentifier(column.name, "column")} ${column.type}`)
       .join(", ");
+    const comment =
+      credentialFingerprint === undefined
+        ? ""
+        : ` COMMENT ${clickHouseLiteral(this.credentialComment({ fingerprint: credentialFingerprint }))}`;
 
     return (
       `CREATE OR REPLACE TABLE ${accessModel.qualified(names, table)} (${columnList}) ` +
-      `ENGINE = PostgreSQL(${collection}, table=${clickHouseLiteral(postgresRelation)}) ` +
-      `SETTINGS postgresql_connection_pool_size = ${connectionPoolSize}`
+      `ENGINE = PostgreSQL(${collection}, table=${clickHouseLiteral(postgresRelation)}, schema=${clickHouseLiteral(schema)}) ` +
+      `SETTINGS postgresql_connection_pool_size = ${connectionPoolSize}` +
+      comment
     );
   }
 

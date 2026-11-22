@@ -7,6 +7,7 @@ import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
 import { flexibleDateSchema } from "@langwatch/api/dates";
 import { principalRefSchema } from "@langwatch/authorization";
 import type { Named } from "@langwatch/module";
+import { resolveRequestBound } from "@langwatch/plans";
 import { Temporal, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
@@ -22,6 +23,9 @@ import {
   traceSchema,
 } from "./trace-format.schemas.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
+
+/** The most traces one `includeSpans` search page answers; the REST handler refuses above it. */
+const TRACES_WITH_SPANS_PAGE_SIZE_MAX = resolveRequestBound("tracesWithSpansPageSizeMax", "FREE");
 
 /** Longest `filter` string the boundary accepts; a shape ceiling, not a cost one. */
 const MAX_TRACE_FILTER_LENGTH = 4_000;
@@ -52,7 +56,10 @@ export const traceSearchBodyExtensions = {
     .boolean()
     .optional()
     .describe(
-      "When true, fetches full span data for each trace. Useful for bulk export. Default false.",
+      "When true, fetches full span data for each trace. Useful for bulk export. Default false. " +
+        `A page with spans holds at most ${TRACES_WITH_SPANS_PAGE_SIZE_MAX} traces, and that is ` +
+        "its default; a larger `pageSize` is refused with 422 `trace_page_size_too_large`. " +
+        "When a response carries a `scrollId`, send it to fetch the next page.",
     ),
   llmMode: z.boolean().optional(),
   dateField: z
@@ -407,7 +414,8 @@ const facetWindowBoundSchema = z
     (value) =>
       EPOCH_MILLIS.test(value) || (namesARealDay(value) && Number.isFinite(toEpochMs(value))),
     { message: "Expected epoch milliseconds or a date string" },
-  );
+  )
+  .describe("Epoch milliseconds, or an ISO 8601 date string.");
 
 /** `GET /api/v1/traces/facets`: with `field`, one field's values, paged. */
 const traceFacetsQuerySchemaDefinition = z.object({

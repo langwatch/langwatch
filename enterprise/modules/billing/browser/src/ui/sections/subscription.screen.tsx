@@ -10,20 +10,28 @@ import { Skeleton, SkeletonText, Text, VStack } from "@langwatch/design-system/p
 import { Server } from "lucide-react";
 
 import { useBillingHost } from "../../model/billing-host.ts";
+import { SaasPageOpened } from "./saas-page-opened.tsx";
 import { SubscriptionPage } from "./subscription-page.tsx";
 
 export default function SubscriptionScreen() {
   const host = useBillingHost();
 
   const isSettled = host.isDeploymentSettled();
-  if (isSettled && host.isSaaS()) return <SubscriptionPage />;
+  if (isSettled && host.isSaaS()) {
+    return (
+      <>
+        <SaasPageOpened page="settings_subscription" />
+        <SubscriptionPage />
+      </>
+    );
+  }
 
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Subscription</PageLayout.Heading>
+        <PageLayout.Heading>Plan & billing</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack width="full" gap={6} align="stretch" paddingTop={4}>
+      <VStack width="full" gap={6} align="stretch">
         {isSettled ? (
           <Text color="fg.muted">What running LangWatch yourself means for billing.</Text>
         ) : (

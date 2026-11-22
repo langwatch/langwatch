@@ -1,5 +1,5 @@
 Feature: AI Tools Portal — Model-provider tile inline VK creation
-  As an end user picking a model provider from my /me portal
+  As an end user picking a model provider from my /coding-agents portal
   I want to issue a virtual key right from the tile (label + button)
   and see the show-once secret + base URL inline
   So that I can wire up my own integration without leaving the portal
@@ -10,7 +10,7 @@ Feature: AI Tools Portal — Model-provider tile inline VK creation
     same routing policy the admin configured for that provider.
 
   Background:
-    Given user "jane@acme.com" is on /me with the AI Tools Portal visible
+    Given user "jane@acme.com" is on /coding-agents with the AI Tools Portal visible
     And the org-scoped catalog has a model-provider entry "Anthropic" with:
       | field                     | value                                              |
       | providerKey               | anthropic                                          |

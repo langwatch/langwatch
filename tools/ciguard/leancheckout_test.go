@@ -44,8 +44,8 @@ const bareJob = `jobs:
         run: echo hi
 `
 
-// allowlistJob names one path and nothing else, the way deployment-impact-check
-// takes only .github/scripts.
+// allowlistJob names one path and nothing else, the way a job that runs only
+// .github/scripts can.
 const allowlistJob = `jobs:
   deployment-impact:
     steps:

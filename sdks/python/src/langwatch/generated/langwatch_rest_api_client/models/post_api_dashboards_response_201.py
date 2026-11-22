@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from dateutil.parser import isoparse
+
+from ..models.post_api_dashboards_response_201_scope import PostApiDashboardsResponse201Scope
 
 T = TypeVar("T", bound="PostApiDashboardsResponse201")
 
@@ -16,17 +16,21 @@ class PostApiDashboardsResponse201:
     Attributes:
         id (str):
         name (str):
-        order (int):
-        created_at (datetime.datetime):
-        updated_at (datetime.datetime):
+        description (None | str):
+        scope (PostApiDashboardsResponse201Scope):
+        created_by_id (None | str):
+        created_at (str):
+        updated_at (str):
         platform_url (str):
     """
 
     id: str
     name: str
-    order: int
-    created_at: datetime.datetime
-    updated_at: datetime.datetime
+    description: None | str
+    scope: PostApiDashboardsResponse201Scope
+    created_by_id: None | str
+    created_at: str
+    updated_at: str
     platform_url: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -34,11 +38,17 @@ class PostApiDashboardsResponse201:
 
         name = self.name
 
-        order = self.order
+        description: None | str
+        description = self.description
 
-        created_at = self.created_at.isoformat()
+        scope = self.scope.value
 
-        updated_at = self.updated_at.isoformat()
+        created_by_id: None | str
+        created_by_id = self.created_by_id
+
+        created_at = self.created_at
+
+        updated_at = self.updated_at
 
         platform_url = self.platform_url
 
@@ -48,7 +58,9 @@ class PostApiDashboardsResponse201:
             {
                 "id": id,
                 "name": name,
-                "order": order,
+                "description": description,
+                "scope": scope,
+                "createdById": created_by_id,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
                 "platformUrl": platform_url,
@@ -64,18 +76,34 @@ class PostApiDashboardsResponse201:
 
         name = d.pop("name")
 
-        order = d.pop("order")
+        def _parse_description(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
 
-        created_at = isoparse(d.pop("createdAt"))
+        description = _parse_description(d.pop("description"))
 
-        updated_at = isoparse(d.pop("updatedAt"))
+        scope = PostApiDashboardsResponse201Scope(d.pop("scope"))
+
+        def _parse_created_by_id(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        created_by_id = _parse_created_by_id(d.pop("createdById"))
+
+        created_at = d.pop("createdAt")
+
+        updated_at = d.pop("updatedAt")
 
         platform_url = d.pop("platformUrl")
 
         post_api_dashboards_response_201 = cls(
             id=id,
             name=name,
-            order=order,
+            description=description,
+            scope=scope,
+            created_by_id=created_by_id,
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,

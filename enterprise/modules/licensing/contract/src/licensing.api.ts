@@ -1,5 +1,6 @@
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { moduleApi } from "@langwatch/module";
+import type { SelfHostedNotice } from "@langwatch/ops-contract";
 
 import type {
   ActivationCodePage,
@@ -59,6 +60,11 @@ import type {
   SelfHostedInstanceSummary,
   SelfHostedSignal,
 } from "./self-hosted-instance.ts";
+import type {
+  CreateSelfHostedNoticeInput,
+  SelfHostedNoticeView,
+  UpdateSelfHostedNoticeInput,
+} from "./self-hosted-notice.ts";
 import type {
   UpgradeDiagnosticsAvailability,
   UpgradeDiagnosticsDownload,
@@ -129,6 +135,7 @@ export interface LicensingApi {
     id: string;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth?: number;
     /** ISO 8601. The instant the new term ends. */
     expiresAt: string;
@@ -164,6 +171,8 @@ export interface LicensingApi {
   }): Promise<ConnectCredentialResolution>;
   /** The `licence_token` door's check on a sync bearer; a refusal throws its code. */
   verifyLicenceToken(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller>;
+  /** The sync door's check: as above, but an expired license may collect its waiting renewal. */
+  verifyLicenceTokenForSync(input: ConnectPresentedCredential): Promise<ConnectLicenceCaller>;
   /** The door's check on an activation bearer: looked up, never claimed (W02-ACTIVATE-DOOR). */
   verifyActivationCode(input: ConnectPresentedCredential): Promise<ConnectActivationCaller>;
   /** One daily sync from the install its door verified; a refusal throws its code. */
@@ -238,6 +247,10 @@ export interface LicensingApi {
 
   /** What a customer's licenses add up to commercially, right now. */
   getContractTerms(input: { organizationId: string }): Promise<ContractTerms>;
+  /** Full member seats an organization uses now: active members and live invitations. */
+  countFullSeatsInUse(input: { organizationId: string }): Promise<number>;
+  /** Developer seats an organization uses now: Developer members and live invitations. */
+  countDevelopersInUse(input: { organizationId: string }): Promise<number>;
   /** The seats a connected customer holds and last reported, for its statement and overview. */
   getConnectedSeats(input: { organizationId: string }): Promise<ConnectedSeats>;
   /** Every seat change that raised a linked license, oldest first; one customer's when named. */
@@ -316,6 +329,19 @@ export interface LicensingApi {
   findUpgradeDiagnostics(input: { instanceRowId: string }): Promise<UpgradeDiagnosticsReport[]>;
   /** A five-minute link to one report's bundle; an unknown id throws its code. */
   getUpgradeDiagnosticsDownload(input: { id: string }): Promise<UpgradeDiagnosticsDownload>;
+
+  /**
+   * Notices LangWatch staff send self-hosted installs (self-hosted-notices.feature): written and
+   * published in Cloud admin, sent in the usage report reply while published and not expired.
+   * An unknown id throws `not_found`.
+   */
+  findSelfHostedNotices(): Promise<SelfHostedNoticeView[]>;
+  createSelfHostedNotice(input: CreateSelfHostedNoticeInput): Promise<SelfHostedNoticeView>;
+  updateSelfHostedNotice(input: UpdateSelfHostedNoticeInput): Promise<SelfHostedNoticeView>;
+  publishSelfHostedNotice(input: { id: string; operatorId: string }): Promise<SelfHostedNoticeView>;
+  withdrawSelfHostedNotice(input: { id: string }): Promise<SelfHostedNoticeView>;
+  /** What an install is sent now: published and not expired, the newest published first. */
+  findPublishedSelfHostedNotices(): Promise<SelfHostedNotice[]>;
 }
 
 /** Re-exported so a peer naming a service does not reach past the api file. */

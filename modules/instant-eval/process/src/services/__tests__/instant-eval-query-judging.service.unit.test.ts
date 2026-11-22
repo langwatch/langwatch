@@ -5,12 +5,15 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 import type { LangWatchQLJudgementCall } from "@langwatch/analytics-contract";
+import { InstantEvalGatewayBudgetExceededError } from "@langwatch/instant-eval-contract";
 import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalJudgement,
   type InstantEvalJudgeSpendRecord,
+  type InstantEvalPricing,
   type InstantEvalVerdict,
   INSTANT_EVAL_PRICING,
+  InstantEvalJudgeStoppedError,
   instantEvalCostUsd,
   instantEvalPriceUsd,
 } from "@langwatch/instant-eval-judge-contract";
@@ -107,6 +110,8 @@ function harness({
   queryTokenBudget = 4_000_000,
   concurrency,
   recordJudgeSpend,
+  holdPricing = INSTANT_EVAL_PRICING,
+  gatewayRefusal,
 }: {
   judge?: ScriptedJudge;
   spentNanoUsd?: number;
@@ -114,8 +119,13 @@ function harness({
   concurrency?: number;
   /** The Instant Evals judge's record, which writes the ledger row from its priced fact. */
   recordJudgeSpend?: (input: InstantEvalJudgeSpendRecord) => Promise<void>;
+  /** What the judge says a query's hold is priced at: its dearest reachable rate. */
+  holdPricing?: InstantEvalPricing;
+  /** What a gateway budget set to block refuses with, once it is reached. */
+  gatewayRefusal?: Error;
 } = {}) {
   const events: string[] = [];
+  const gatewayAsked: { projectId: string; inFlightUsd?: number }[] = [];
   const priced: InstantEvalJudgeSpendRecord[] = [];
   const records: InstantEvalJudgedSpend[] = [];
   const reservations = MemoryInstantEvalBudgetReservationsRepository.create({ now: () => AT });
@@ -157,18 +167,24 @@ function harness({
         await budget.release(input);
       },
     },
+    gatewayBudget: {
+      assertWithinGatewayBudget: async (input) => {
+        gatewayAsked.push(input);
+        if (gatewayRefusal) throw gatewayRefusal;
+      },
+    },
     spend: {
       recordSpend: async (record) => {
         records.push(record);
         await spend.recordSpend(record);
       },
     },
-    pricing: INSTANT_EVAL_PRICING,
+    holdPricing: async () => holdPricing,
     queryTokenBudget,
     now: () => AT,
   });
 
-  return { service, judge, events, priced, records };
+  return { service, judge, events, priced, records, gatewayAsked };
 }
 
 async function refusalOf(run: () => Promise<unknown>): Promise<Record<string, unknown>> {
@@ -406,6 +422,96 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
     });
   });
 
+  describe("given a routed call stopped after some of its calls were paid", () => {
+    /** @scenario "A caller's stop keeps the legs already paid billed" */
+    it("bills what the stopped call's paid legs spent with the answered rows", async () => {
+      const controller = new AbortController();
+      const judge = new ScriptedJudge(async ({ request, index }) => {
+        if (index === 0) return answerEvery({ probability: 0.7 })({ request, index });
+        controller.abort();
+        throw new InstantEvalJudgeStoppedError({
+          inputTokens: 40,
+          costNanoUsd: 0,
+          cause: controller.signal.reason,
+        });
+      });
+      const { service, records } = harness({ judge, concurrency: 1 });
+
+      const judged = await service.judgeQuery({
+        projectId: "project-1",
+        judgements: [booleanCall("annoyed")],
+        rows: [{ annoyed: "one" }, { annoyed: "two" }],
+        signal: controller.signal,
+      });
+
+      expect(judged.cancellation).toEqual({ unjudgedRows: [1] });
+      expect(records.map((record) => record.inputTokens)).toEqual([TOKENS_PER_TEXT + 40]);
+      expect(records[0]).toMatchObject({ routedInputTokens: 40, costNanoUsd: 0 });
+    });
+  });
+
+  describe("given routed and unrouted judgements in one batch", () => {
+    /** @scenario "Routed and unrouted tokens are billed separately" */
+    it("records a routed cost that covers no input tokens, apart from the unrouted ones", async () => {
+      const judge = new ScriptedJudge(async ({ request, index }) => {
+        const judgement = await answerEvery({ probability: 0.7 })({ request, index });
+        return index === 0 ? { ...judgement, inputTokens: 0, costNanoUsd: 5000 } : judgement;
+      });
+      const { service, records } = harness({ judge, concurrency: 1 });
+
+      await service.judgeQuery({
+        projectId: "project-1",
+        judgements: [booleanCall("annoyed")],
+        rows: [{ annoyed: "one" }, { annoyed: "two" }],
+      });
+
+      expect(records[0]).toMatchObject({
+        inputTokens: TOKENS_PER_TEXT,
+        costNanoUsd: 5000,
+        routedInputTokens: 0,
+      });
+    });
+
+    /** @scenario "A routed cost with no input tokens is still billed" */
+    it("records a query whose routed judgements cost something but carried no input tokens", async () => {
+      const judge = new ScriptedJudge(async ({ request, index }) => {
+        const judgement = await answerEvery({ probability: 0.7 })({ request, index });
+        return { ...judgement, inputTokens: 0, costNanoUsd: 5000 };
+      });
+      const { service, records } = harness({ judge, concurrency: 1 });
+
+      await service.judgeQuery({
+        projectId: "project-1",
+        judgements: [booleanCall("annoyed")],
+        rows: [{ annoyed: "one" }, { annoyed: "two" }],
+      });
+
+      expect(records).toHaveLength(1);
+      expect(records[0]).toMatchObject({ inputTokens: 0, costNanoUsd: 10_000 });
+    });
+
+    /** @scenario "A routed judgement is priced from the summed cost of every call" */
+    it("counts a routed judgement that cost nothing as routed tokens, apart from the unrouted ones", async () => {
+      const judge = new ScriptedJudge(async ({ request, index }) => {
+        const judgement = await answerEvery({ probability: 0.7 })({ request, index });
+        return index === 0 ? { ...judgement, costNanoUsd: 0 } : judgement;
+      });
+      const { service, records } = harness({ judge, concurrency: 1 });
+
+      await service.judgeQuery({
+        projectId: "project-1",
+        judgements: [booleanCall("annoyed")],
+        rows: [{ annoyed: "one" }, { annoyed: "two" }],
+      });
+
+      expect(records[0]).toMatchObject({
+        inputTokens: 2 * TOKENS_PER_TEXT,
+        costNanoUsd: 0,
+        routedInputTokens: TOKENS_PER_TEXT,
+      });
+    });
+  });
+
   describe("given rows whose every key resolved to no text", () => {
     /** @scenario "A query that judged nothing reports no spend" */
     it("judges nothing and records no spend", async () => {
@@ -471,6 +577,34 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
     });
   });
 
+  describe("given a project whose gateway budget set to block is reached", () => {
+    /** @scenario "A judged query is refused once a blocking budget is reached" */
+    it("refuses with instant_eval_gateway_budget_exceeded before anything is held or judged", async () => {
+      const { service, judge, events, gatewayAsked } = harness({
+        gatewayRefusal: new InstantEvalGatewayBudgetExceededError({
+          budgetId: "budget-1",
+          scope: "organization",
+          window: "month",
+          limitUsd: 100,
+          spentUsd: 100,
+        }),
+      });
+
+      const refusal = await refusalOf(() =>
+        service.judgeQuery({
+          projectId: "project-1",
+          judgements: [booleanCall("annoyed")],
+          rows: [{ annoyed: "one" }],
+        }),
+      );
+
+      expect(refusal.code).toBe("instant_eval_gateway_budget_exceeded");
+      expect(gatewayAsked).toEqual([{ projectId: "project-1" }]);
+      expect(events).toEqual([]);
+      expect(judge.requests).toHaveLength(0);
+    });
+  });
+
   describe("given a free organization under its budget", () => {
     /** @scenario "A judged query holds its ceiling while it judges" */
     it("holds the whole query token budget's price first and releases it once recorded", async () => {
@@ -484,6 +618,24 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
 
       const ceiling = instantEvalPriceUsd({ costUsd: instantEvalCostUsd({ inputTokens: 1_000 }) });
       expect(events).toEqual([`reserve ${ceiling} with 0 judged`, "release after 1 recorded"]);
+    });
+
+    /** @scenario "A judged query is held at the dearest rate a route can reach" */
+    it("holds at the dearest rate a routed call could reach, as the judge names it", async () => {
+      const holdPricing = { usdPerMillionInputTokens: 3, markup: 1.3 };
+      const { service, events } = harness({ queryTokenBudget: 1_000, holdPricing });
+
+      await service.judgeQuery({
+        projectId: "project-1",
+        judgements: [booleanCall("annoyed")],
+        rows: [{ annoyed: "one" }],
+      });
+
+      const ceiling = instantEvalPriceUsd({
+        costUsd: instantEvalCostUsd({ inputTokens: 1_000, pricing: holdPricing }),
+        pricing: holdPricing,
+      });
+      expect(events[0]).toBe(`reserve ${ceiling} with 0 judged`);
     });
 
     it("keeps the hold when the spend could not be recorded, still answering", async () => {

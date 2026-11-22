@@ -36,7 +36,7 @@ function boot({ isSaas, recorded }: { isSaas: boolean; recorded: IncomingUsageRe
 
 const REQUEST = {
   report: { event: "daily_usage_stats", instance_id: "install-1" },
-  addressHeaders: {},
+  callerAddress: null,
 };
 
 describe("saas installation", () => {

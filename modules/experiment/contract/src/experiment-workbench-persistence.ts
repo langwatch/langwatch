@@ -7,6 +7,7 @@ import {
   evaluatorConfigSchema,
   targetConfigSchema,
   targetRowMetadataSchema,
+  MAX_CONCURRENCY,
 } from "./experiment-workbench.ts";
 
 // ============================================================================
@@ -44,7 +45,7 @@ const persistedEvaluationsV3StateSchemaDefinition = z.object({
   // Hidden columns - stored as array for JSON serialization, converted to Set on load
   hiddenColumns: z.array(z.string()).optional(),
   // Concurrency setting for parallel execution
-  concurrency: z.number().min(1).max(24).optional(),
+  concurrency: z.number().min(1).max(MAX_CONCURRENCY).optional(),
 });
 export interface PersistedEvaluationsV3StateSchema extends Named<
   typeof persistedEvaluationsV3StateSchemaDefinition

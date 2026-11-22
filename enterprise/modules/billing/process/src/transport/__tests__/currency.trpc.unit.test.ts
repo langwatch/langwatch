@@ -3,7 +3,11 @@
  * The `currency.*` surface: that the answer comes from the request's headers
  * rather than the input, and that the input stays as permissive as ever.
  */
-import { bindTrpcMiddlewareContext, createTrpcRuntime } from "@langwatch/api/trpc";
+import {
+  bindTrpcMiddlewareContext,
+  callerAddressContext,
+  createTrpcRuntime,
+} from "@langwatch/api/trpc";
 import { Currency } from "@langwatch/enterprise-billing-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
@@ -27,11 +31,15 @@ const router = createTrpcRuntime<BillingTrpcTestContext>({
   // The headers are the PROCESS's to read, off the transport it authenticated.
   middlewareContext: [
     bindTrpcMiddlewareContext(currencyRequestHeadersContext, (ctx) => ctx.headers ?? null),
+    bindTrpcMiddlewareContext(callerAddressContext, (ctx) => ctx.callerAddress ?? null),
   ],
 });
 
-function callerFor(headers: BillingTrpcTestContext["headers"]) {
-  return router.createCaller({ actor: { id: "reader" }, headers });
+function callerFor(
+  headers: BillingTrpcTestContext["headers"],
+  callerAddress: string | null = null,
+) {
+  return router.createCaller({ actor: { id: "reader" }, headers, callerAddress });
 }
 
 describe("given the mounted currency router", () => {
@@ -63,6 +71,43 @@ describe("given a request the CDN stamped with a country", () => {
         currency: Currency.EUR,
         country: "NL",
       });
+    });
+  });
+});
+
+describe("given a request with no country and a forged address header", () => {
+  describe("when the currency is detected", () => {
+    it("hands the detection the resolved address rather than the header", async () => {
+      const seen: (string | null | undefined)[] = [];
+      const spying = createTrpcRuntime<BillingTrpcTestContext>({
+        root: trpc,
+        procedure: trpc.procedure,
+        members: trpcTestMembers<BillingTrpcTestContext>(),
+      }).mount(
+        currencyTrpcTransport,
+        () => ({
+          detectCurrency: (request) => {
+            seen.push(request.callerAddress);
+            return { currency: Currency.EUR, country: null };
+          },
+        }),
+        {
+          middlewareContext: [
+            bindTrpcMiddlewareContext(currencyRequestHeadersContext, (ctx) => ctx.headers ?? null),
+            bindTrpcMiddlewareContext(callerAddressContext, (ctx) => ctx.callerAddress ?? null),
+          ],
+        },
+      );
+
+      await spying
+        .createCaller({
+          actor: { id: "reader" },
+          headers: { "cf-connecting-ip": "9.9.9.9" },
+          callerAddress: "203.0.113.9",
+        })
+        .detectCurrency({});
+
+      expect(seen).toEqual(["203.0.113.9"]);
     });
   });
 });
@@ -126,6 +171,7 @@ describe("given a deployment that serves no currency detection", () => {
     {
       middlewareContext: [
         bindTrpcMiddlewareContext(currencyRequestHeadersContext, (ctx) => ctx.headers ?? null),
+        bindTrpcMiddlewareContext(callerAddressContext, () => null),
       ],
     },
   );

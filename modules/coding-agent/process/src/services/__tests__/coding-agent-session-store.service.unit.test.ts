@@ -16,8 +16,12 @@ import {
   type CodingAgentSessionRow,
   type CodingAgentSessionState,
 } from "../../eventing/coding-agent-session.projection.ts";
+import { repositoryKeyOfWith } from "../../rules/coding-agent-repository-key.rules.ts";
 import { toCodingAgentSessionRow } from "../../rules/coding-agent-session-row-mapper.rules.ts";
-import { EventingCodingAgentSessionStoreService } from "../coding-agent-session-store.service.ts";
+import {
+  EventingCodingAgentSessionStoreService,
+  type StoredSession,
+} from "../coding-agent-session-store.service.ts";
 
 const tenantId = createTenantId("tenant-1");
 
@@ -96,6 +100,11 @@ class FakePersistence implements CodingAgentProjectionPersistence {
   async appendSessionEvents(): Promise<void> {}
 }
 
+const repositoryKeyOf = repositoryKeyOfWith({
+  secret: "server-secret",
+  normalizeHost: (host) => host || "github.com",
+});
+
 const context = (over: Partial<ProjectionStoreContext> = {}): ProjectionStoreContext => ({
   aggregateId: "session-1",
   tenantId,
@@ -104,12 +113,13 @@ const context = (over: Partial<ProjectionStoreContext> = {}): ProjectionStoreCon
 
 function storeWith(
   persistence: FakePersistence,
-  hooks: { onSessionsStored?: (tenantIds: string[]) => Promise<void> } = {},
+  hooks: { onSessionsStored?: (sessions: StoredSession[]) => Promise<void> } = {},
 ): EventingCodingAgentSessionStoreService {
   return EventingCodingAgentSessionStoreService.create({
     persistence,
     defaultRetentionDays: () => 30,
     onSessionsStored: hooks.onSessionsStored,
+    repositoryKeyOf,
   });
 }
 
@@ -228,33 +238,111 @@ describe("EventingCodingAgentSessionStoreService durable dedup", () => {
   });
 
   describe("given the store carries the sessions-stored hook", () => {
+    const stored = (over: Partial<StoredSession> = {}): StoredSession => ({
+      tenantId: String(tenantId),
+      sessionId: "session-1",
+      agent: "claude_code",
+      occurredAt: 1_000,
+      firstStoredAt: 1_000,
+      auxiliary: false,
+      terminalType: null,
+      repositoryKey: null,
+      ...over,
+    });
+
     describe("when a fold step commits", () => {
-      it("reports the committed tenant after the durable write", async () => {
+      it("reports the committed session after the durable write", async () => {
         const persistence = new FakePersistence();
-        const seen: string[][] = [];
+        const seen: StoredSession[][] = [];
         const store = storeWith(persistence, {
-          onSessionsStored: async (tenantIds) => {
+          onSessionsStored: async (sessions) => {
             // The row must be durable before the project is stamped.
             expect(persistence.upsertCalls).toHaveLength(1);
-            seen.push(tenantIds);
+            seen.push(sessions);
           },
         });
 
-        await store.store(makeState(), context());
+        await store.store(makeState({ agent: "claude_code" }), context());
         await Promise.resolve();
 
-        expect(seen).toEqual([[String(tenantId)]]);
+        expect(seen).toEqual([[stored()]]);
+      });
+
+      /** @scenario "A stored session reports its terminal type and a key standing for its repo" */
+      it("reports the terminal type and the repo's key, never the repo itself", async () => {
+        const seen: StoredSession[][] = [];
+        const store = storeWith(new FakePersistence(), {
+          onSessionsStored: async (sessions) => void seen.push(sessions),
+        });
+        const repository = {
+          repositoryHost: "github.com",
+          repositoryOwner: "acme",
+          repositoryName: "payments",
+        };
+
+        await store.store(makeState({ terminalType: "vscode", ...repository }), context());
+        await Promise.resolve();
+
+        expect(seen[0]?.[0]).toMatchObject({
+          terminalType: "vscode",
+          repositoryKey: repositoryKeyOf(repository),
+        });
+        expect(JSON.stringify(seen)).not.toMatch(/acme|payments|github\.com/);
+      });
+
+      /** @scenario "A client's terminal string reaches peers only as one of a closed set" */
+      it("reports a terminal it cannot name as other", async () => {
+        const seen: StoredSession[][] = [];
+        const store = storeWith(new FakePersistence(), {
+          onSessionsStored: async (sessions) => void seen.push(sessions),
+        });
+
+        await store.store(
+          makeState({ terminalType: "my-terminal", repositoryName: "r" }),
+          context(),
+        );
+        await Promise.resolve();
+
+        expect(seen[0]?.[0]?.terminalType).toBe("other");
+      });
+
+      /** @scenario "A repo's key ignores case and differs per repo" */
+      it.each([
+        ["owner", { repositoryName: "payments" }],
+        ["name", { repositoryOwner: "acme" }],
+      ])("reports no repo key for a repo with no %s", async (_missing, repository) => {
+        const seen: StoredSession[][] = [];
+        const store = storeWith(new FakePersistence(), {
+          onSessionsStored: async (sessions) => void seen.push(sessions),
+        });
+
+        await store.store(makeState(repository), context());
+        await Promise.resolve();
+
+        expect(seen[0]?.[0]?.repositoryKey).toBeNull();
+      });
+
+      /** @scenario "A helper-thread session is reported as auxiliary" */
+      it("marks an auxiliary session as such", async () => {
+        const persistence = new FakePersistence();
+        const seen: StoredSession[][] = [];
+        const store = storeWith(persistence, {
+          onSessionsStored: async (sessions) => void seen.push(sessions),
+        });
+
+        await store.store(makeState({ auxiliary: true }), context());
+        await Promise.resolve();
+
+        expect(seen[0]?.[0]?.auxiliary).toBe(true);
       });
     });
 
     describe("when a batch commits several sessions of one project", () => {
-      it("reports the tenant once, not once per session", async () => {
+      it("reports each committed session with its own id", async () => {
         const persistence = new FakePersistence();
-        const seen: string[][] = [];
+        const seen: StoredSession[][] = [];
         const store = storeWith(persistence, {
-          onSessionsStored: async (tenantIds) => {
-            seen.push(tenantIds);
-          },
+          onSessionsStored: async (sessions) => void seen.push(sessions),
         });
 
         await store.storeBatch([
@@ -263,13 +351,12 @@ describe("EventingCodingAgentSessionStoreService durable dedup", () => {
         ]);
         await Promise.resolve();
 
-        expect(seen).toEqual([[String(tenantId)]]);
+        expect(seen[0]?.map((session) => session.sessionId)).toEqual(["session-1", "session-2"]);
       });
     });
 
     describe("when the hook rejects anyway", () => {
-      // The touch helper never rejects by contract; this pins that a
-      // misbehaving hook still cannot fail the committed fold write.
+      /** @scenario "A failing session-stored recorder never fails the stored row" */
       it("does not fail the store call", async () => {
         const persistence = new FakePersistence();
         const store = storeWith(persistence, {
@@ -277,6 +364,17 @@ describe("EventingCodingAgentSessionStoreService durable dedup", () => {
         });
 
         await expect(store.store(makeState(), context())).resolves.toBeUndefined();
+      });
+
+      it("does not fail the batch call", async () => {
+        const persistence = new FakePersistence();
+        const store = storeWith(persistence, {
+          onSessionsStored: () => Promise.reject(new Error("boom")),
+        });
+
+        await expect(
+          store.storeBatch([{ state: makeState(), context: context() }]),
+        ).resolves.toBeUndefined();
       });
     });
   });

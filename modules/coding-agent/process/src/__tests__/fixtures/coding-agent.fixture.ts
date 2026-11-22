@@ -40,9 +40,13 @@ import type { Instant } from "@langwatch/time";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { CodingAgentBillingPolicy } from "../../services/coding-agent-cost-attribution.service.ts";
 import type { CodingAgentClock } from "../../services/coding-agent-clock.service.ts";
+import type { CodingAgentStoredTraces } from "../../services/coding-agent-session-read.service.ts";
 import { CODING_AGENT_ID_INDEXES } from "../../repositories/clickhouse/clickhouse.coding-agent-id-indexes.database.ts";
 import { CodingAgentSessionEventRepository } from "../../repositories/coding-agent-session-event.repository.ts";
-import { CodingAgentSessionRepository } from "../../repositories/coding-agent-session.repository.ts";
+import {
+  CodingAgentSessionRepository,
+  type OtherSessionKind,
+} from "../../repositories/coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionRepository } from "../../repositories/coding-agent-trace-session.repository.ts";
 import {
   SessionMetricSeriesRepository,
@@ -293,6 +297,7 @@ export function sessionEventRecord(
     toolResultBytes: 0,
     promptChars: 0,
     totalTokens: 10,
+    aiUnits: 0,
     // The working context the contribute command stamps on. '' is what a row
     // carries before the session declared one, which is the shape these
     // suites read.
@@ -405,6 +410,17 @@ export class TestSessions extends CodingAgentSessionRepository {
     return this.applied;
   }
 
+  async findOtherSessionKind(input: {
+    tenantId: string;
+    excludeSessionIds: string[];
+  }): Promise<OtherSessionKind> {
+    const others = this.rows.filter(
+      (row) => row.tenantId === input.tenantId && !input.excludeSessionIds.includes(row.sessionId),
+    );
+    if (others.some((row) => !row.auxiliary)) return "main";
+    return others.length > 0 ? "helpers_only" : "none";
+  }
+
   async findManyRecent(input: {
     tenantId: string;
     userId?: string;
@@ -468,6 +484,13 @@ export class TestSessions extends CodingAgentSessionRepository {
   }
 }
 
+/** The stored-trace lookup, unconfigured: a test that reaches it configures it. */
+export function storedTracesFixture(
+  overrides: Partial<CodingAgentStoredTraces> = {},
+): CodingAgentStoredTraces {
+  return createApiFixture<CodingAgentStoredTraces>(overrides, "storedTraces");
+}
+
 export class TestTraceSessions extends CodingAgentTraceSessionRepository {
   mapping: CodingAgentTraceSessionRecord | null = null;
   inputs: { tenantId: string; traceId: string }[] = [];
@@ -480,6 +503,27 @@ export class TestTraceSessions extends CodingAgentTraceSessionRepository {
   }): Promise<CodingAgentTraceSessionRecord | null> {
     this.inputs.push(input);
     return this.mapping;
+  }
+
+  /** The session's mapped traces, newest first; defaults to the one `mapping`. */
+  recent: CodingAgentTraceSessionRecord[] | null = null;
+  latestInputs: {
+    tenantId: string;
+    sessionId: string;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }[] = [];
+
+  async findRecentBySessionId(input: {
+    tenantId: string;
+    sessionId: string;
+    fromMs: number;
+    toMs: number;
+    limit: number;
+  }): Promise<CodingAgentTraceSessionRecord[]> {
+    this.latestInputs.push(input);
+    return (this.recent ?? (this.mapping ? [this.mapping] : [])).slice(0, input.limit);
   }
 }
 
@@ -532,6 +576,8 @@ export class TestEvents extends CodingAgentSessionEventRepository {
     cacheReadTokens: number;
     cacheCreationTokens: number;
     costUsd: number;
+    /** Absent reads as none, as a row from before the column does. */
+    aiUnits?: number;
   }[] = [];
   modelTotalInputs: {
     tenantIds: string[];
@@ -580,10 +626,11 @@ export class TestEvents extends CodingAgentSessionEventRepository {
       cacheReadTokens: number;
       cacheCreationTokens: number;
       costUsd: number;
+      aiUnits: number;
     }[]
   > {
     this.modelTotalInputs.push(input);
-    return this.modelTotals;
+    return this.modelTotals.map((total) => ({ ...total, aiUnits: total.aiUnits ?? 0 }));
   }
 
   async findSessionsByStampedBranch(input: {
@@ -777,7 +824,10 @@ export class TestGithubService implements GithubApi {
   }
 }
 
-function projectRow(id: string): PaginatedProjects["data"][number] {
+export function projectRow(
+  id: string,
+  overrides: Partial<PaginatedProjects["data"][number]> = {},
+): PaginatedProjects["data"][number] {
   const at = new Date(0);
   return {
     id,
@@ -808,6 +858,7 @@ function projectRow(id: string): PaginatedProjects["data"][number] {
     langyEgressAllowlist: null,
     lastCodingAgentSessionAt: null,
     lastCodingAgentPullRequestAt: null,
+    ...overrides,
   };
 }
 

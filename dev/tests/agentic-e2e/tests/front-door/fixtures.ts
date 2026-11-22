@@ -1,7 +1,7 @@
 /**
- * Front-door test fixtures: one distinct caller IP per test, via
- * `x-forwarded-for` (loopback is a trusted hop). Without it every CI test
- * shares one rate-limit bucket, breaking the sign-in/out tolerance test.
+ * Front-door test fixtures: one distinct caller IP per test via `x-forwarded-for`, read because
+ * CI trusts loopback (TRUSTED_PROXY_ADDRESSES in e2e-ci.yml). Without it every CI test shares
+ * one rate-limit bucket, breaking the sign-in/out tolerance test.
  */
 import { test as base } from "@playwright/test";
 

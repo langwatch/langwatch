@@ -8,6 +8,10 @@ import {
 } from "@langwatch/experiment-contract";
 import { z } from "zod";
 
+import {
+  rowPassRatesOf,
+  type RowPassRate,
+} from "../../model/batch-evaluation-results.run-repeat.ts";
 import { disambiguateNames } from "./batch-results/presentation.tsx";
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
@@ -109,6 +113,10 @@ export type BatchTargetColumn = {
   promptVersion?: number | null;
   /** For agents: the agent ID */
   agentId?: string | null;
+  /** For agents pinned to a deploy label: the label the run ran at */
+  agentLabel?: string | null;
+  /** For agents pinned to a deploy label: the version the label resolved to at run start */
+  agentVersion?: number | null;
   /** For evaluator targets: the evaluator ID */
   evaluatorId?: string | null;
   /** Model used */
@@ -222,6 +230,10 @@ export type BatchEvaluationData = {
    * evaluator after target columns.
    */
   comparisonColumns?: BatchComparisonColumn[];
+  /** How many times the run repeated every dataset row; absent ran each once. */
+  repeat?: number;
+  /** A repeated run's pass rate per dataset row and target, keyed `${datasetRow}:${targetId}`. */
+  rowPassRates?: Map<string, RowPassRate>;
   /** Row data */
   rows: BatchResultRow[];
 };
@@ -315,6 +327,8 @@ const declaredTargetColumnsOf = ({
     promptId: target.promptId,
     promptVersion: target.promptVersion,
     agentId: target.agentId,
+    agentLabel: target.agentLabel,
+    agentVersion: target.agentVersion,
     evaluatorId: target.evaluatorId,
     model: target.model,
     metadata: target.metadata,
@@ -516,6 +530,9 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
     evaluatorIds: Array.from(evaluatorNames.keys()),
     evaluatorNames: Object.fromEntries(evaluatorNames),
     comparisonColumns: detectComparisonColumns(evaluations, targetColumns, rows),
+    ...(data.repeat && data.repeat > 1
+      ? { repeat: data.repeat, rowPassRates: rowPassRatesOf({ rows, repeat: data.repeat }) }
+      : {}),
     rows,
   };
 };

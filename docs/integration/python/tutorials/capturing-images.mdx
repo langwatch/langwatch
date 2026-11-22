@@ -35,7 +35,7 @@ def describe(prompt: str, path: str) -> str:
     langwatch.get_current_trace().autotrack_openai_calls(client)
 
     completion = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[
             {
                 "role": "user",

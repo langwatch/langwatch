@@ -2,6 +2,7 @@
 /**
  * The bridge's session with one frame: the init handshake, the messages it forwards,
  * the query lifecycle, disposal and the heartbeat watchdog.
+ * @see modules/analytics/specs/dashboard-widget-frame-states.feature
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -51,6 +52,7 @@ function attach(
     onHeightChange: (px) => events.push({ height: px }),
     onNavigate: (args) => events.push({ navigate: args }),
     onTeardown: () => events.push("teardown"),
+    onIdleChange: (idle) => events.push({ idle }),
   });
   const frameWindow = iframe.contentWindow!;
   frameWindow.postMessage = (message: unknown, target: unknown, transfer?: Transferable[]) => {
@@ -224,6 +226,29 @@ describe("the frame bridge session", () => {
     expect(fromParent).toEqual([
       { type: "lw:dashboard-context-change", dashboardContext: { ...CONTEXT, theme: "dark" } },
     ]);
+  });
+
+  /** @scenario "A widget whose code is still loading keeps its skeleton" */
+  it("takes the frame's word on idle: no query open is not idle until the frame says so", async () => {
+    const { events, load, send, bridge } = attach();
+    load();
+    await send({ type: "lw:heartbeat", idle: false });
+    expect(events).toEqual([{ idle: false }]);
+
+    await send({ type: "lw:heartbeat", idle: true });
+    expect(events).toEqual([{ idle: false }, { idle: true }]);
+    bridge.dispose();
+  });
+
+  /** @scenario "A query that starts after the frame was idle brings the skeleton back" */
+  it("tells its caller the frame is busy again as soon as a query opens", async () => {
+    const { events, load, send, bridge } = attach();
+    load();
+    await send({ type: "lw:heartbeat", idle: true });
+    await send({ type: "lw:query", requestId: 1, queryName: "q" });
+
+    expect(events).toEqual([{ idle: true }, { idle: false }]);
+    bridge.dispose();
   });
 
   it("tears the frame down after ten seconds without a heartbeat", () => {

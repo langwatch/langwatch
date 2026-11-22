@@ -4,14 +4,17 @@
  * member's stars never show to another. Failures travel raw to the host (#5984).
  */
 
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import type { DashboardStar } from "@langwatch/dashboard-contract";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import { type MemberStar, sameStar, starRefOf } from "../model/sidebar-boards.ts";
+import { dashboardFavourited } from "../model/dashboard-usage-events.ts";
+import { type MemberStar, sameStar, starRefOf, swapShownStars } from "../model/sidebar-boards.ts";
 
 export function useFavourites() {
   const host = useAnalyticsHost();
+  const analytics = useUiAnalytics();
   const projectId = host.project()?.id ?? "";
   const utils = analyticsApi.useUtils();
 
@@ -49,19 +52,23 @@ export function useFavourites() {
   const isStarred = (star: DashboardStar) => refs.some((ref) => sameStar(ref, star));
 
   const toggleStar = (star: DashboardStar) => {
-    const mutation = isStarred(star) ? unstarMutation : starMutation;
+    const starred = !isStarred(star);
+    const mutation = starred ? starMutation : unstarMutation;
     mutation.mutate(
       { projectId, star },
       {
-        onSuccess: () => void refresh(),
-        onError: (error) => host.failed({ error, fallbackTitle: "Couldn't change your stars" }),
+        onSuccess: () => {
+          analytics.track(dashboardFavourited({ starred }));
+          void refresh();
+        },
+        onError: (error) => host.failed({ error, fallbackTitle: "Couldn't change your pins" }),
       },
     );
   };
 
   /**
    * Moves one star up or down among the `shown` ones and saves the order; a no-op at the end
-   * it faces. Stars the sidebar does not show (My dashboard) keep their place after them.
+   * it faces. Stars the sidebar does not show (My dashboard) keep their position (AC155b).
    */
   const moveStar = ({
     star,
@@ -72,14 +79,12 @@ export function useFavourites() {
     direction: "up" | "down";
     shown: readonly DashboardStar[];
   }) => {
-    const ordered = [...shown];
-    const from = ordered.findIndex((ref) => sameStar(ref, star));
+    const from = shown.findIndex((ref) => sameStar(ref, star));
     const to = direction === "up" ? from - 1 : from + 1;
-    if (from === -1 || to < 0 || to >= ordered.length) return;
-    [ordered[from], ordered[to]] = [ordered[to]!, ordered[from]!];
-    const hidden = refs.filter((ref) => !shown.some((visible) => sameStar(visible, ref)));
+    const order = swapShownStars({ all: refs, shown, from, to });
+    if (!order) return;
     reorderMutation.mutate(
-      { projectId, stars: [...ordered, ...hidden] },
+      { projectId, stars: order },
       {
         onSuccess: () => void refresh(),
         onError: (error) =>

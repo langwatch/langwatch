@@ -1,6 +1,5 @@
 /** The User application: one object behind every user door this product opens. */
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { EventingParticipation, OwnEventStore } from "@langwatch/eventing";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
@@ -18,6 +17,7 @@ import type {
   CredentialAccountInput,
   RemoveUserAvatarInput,
   RotateUserPasswordInput,
+  PasswordHolder,
   SetFirstUserPasswordInput,
   SetFirstUserPasswordResult,
   SetOwnAvatarInput,
@@ -67,7 +67,6 @@ import {
 import { userBudgetRequestMailChannels } from "../channels/user-budget-request-mail-channels.registry.ts";
 import type { UserBudgetRequestMailChannel } from "../channels/user-budget-request-mail.channel.ts";
 import type { UserChannels } from "../channels/user.channels.ts";
-import { EventingUserStandingRepository } from "../repositories/eventing/eventing.user-standing.repository.ts";
 import type { UserRateLimitRepository } from "../repositories/user-rate-limit.repository.ts";
 import type { UserRepositories } from "../repositories/user.repositories.ts";
 import { isServableUserAvatar, type ServableUserAvatar } from "../rules/user-avatar-read.rules.ts";
@@ -189,7 +188,6 @@ export class UserModule implements UserApi {
     now = nowInstant,
   }: UserTestSetup): UserModule {
     const lifecycle = UserLifecycleNoticeService.create();
-    const lifecycleLog = EventingUserStandingRepository.create();
     const avatarObjects = UserAvatarObjectService.create({
       storedObjects: dependencies.storedObjects,
     });
@@ -208,10 +206,9 @@ export class UserModule implements UserApi {
       lifecycle,
       createdFactBackfill: UserCreatedFactBackfillService.create({
         users: repositories.users,
-        standings: lifecycleLog,
+        standings: repositories.standings,
         lifecycle,
       }),
-      lifecycleLog,
       credentials: UserCredentialService.create({
         repository: repositories.credentials,
         passwords,
@@ -233,7 +230,6 @@ export class UserModule implements UserApi {
   readonly #users: UserService;
   readonly #lifecycle: UserLifecycleNoticeService;
   readonly #createdFactBackfill: UserCreatedFactBackfillService;
-  readonly #lifecycleLog: EventingUserStandingRepository;
   readonly #credentials: UserCredentialService;
   readonly #account: UserAccountService;
   readonly #peers: UserAppDependencies;
@@ -250,7 +246,6 @@ export class UserModule implements UserApi {
     users: UserService;
     lifecycle: UserLifecycleNoticeService;
     createdFactBackfill: UserCreatedFactBackfillService;
-    lifecycleLog: EventingUserStandingRepository;
     credentials: UserCredentialService;
     directory: UserOrganizationDirectoryService;
     avatarObjects: UserAvatarObjectService;
@@ -265,7 +260,6 @@ export class UserModule implements UserApi {
     this.#users = input.users;
     this.#lifecycle = input.lifecycle;
     this.#createdFactBackfill = input.createdFactBackfill;
-    this.#lifecycleLog = input.lifecycleLog;
     this.#credentials = input.credentials;
     this.#account = UserAccountService.create();
     this.#peers = input.dependencies;
@@ -305,6 +299,10 @@ export class UserModule implements UserApi {
     return this.#users.getProfiles(input);
   }
 
+  searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]> {
+    return this.#users.searchForOperators(input);
+  }
+
   findByEmail(input: UserEmailInput): Promise<UserProfile | null> {
     return this.#users.findByEmail(input);
   }
@@ -312,6 +310,11 @@ export class UserModule implements UserApi {
   /** The directory mint: an account row with no sign-in method attached yet. */
   create(input: CreateUserInput): Promise<UserProfile> {
     return this.#users.create(input);
+  }
+
+  /** An account Better Auth wrote itself: its created fact joins the outbox a mint uses. */
+  recordCreated(input: UserIdInput): Promise<void> {
+    return this.#users.recordCreated(input);
   }
 
   /** Everything the account screen reads about one user. */
@@ -415,6 +418,14 @@ export class UserModule implements UserApi {
   /** Whether this account can sign in with a password at all. */
   hasPassword(input: UserIdInput): Promise<boolean> {
     return this.#users.hasPassword(input);
+  }
+
+  findPasswordHolders(input: { emails: readonly string[] | null }): Promise<PasswordHolder[]> {
+    return this.#users.findPasswordHolders(input);
+  }
+
+  markPasswordResetRequired(input: { userIds: readonly string[] }): Promise<{ marked: number }> {
+    return this.#users.markPasswordResetRequired(input);
   }
 
   /** Sets a first password on an account that has none. */
@@ -521,14 +532,6 @@ export class UserModule implements UserApi {
     input: UserCreatedFactBackfillRun,
   ): Promise<UserCreatedFactBackfillReport> {
     return this.#createdFactBackfill.recordExisting(input);
-  }
-
-  /** Keeps user_lifecycle's own event store as the process builds it; a listing keeps none. */
-  keepLifecycleEventStore(input: {
-    participation: EventingParticipation;
-    eventStore: Pick<OwnEventStore, "findAggregates"> | undefined;
-  }): void {
-    this.#lifecycleLog.keep(input);
   }
 
   /** The fact outbox's delivery, on the worker: one committed fact recorded on user_lifecycle. */
@@ -678,12 +681,23 @@ export class UserModule implements UserApi {
     return this.#users.countUsageForMembers(input);
   }
 
+  findSignedInSince(input: {
+    userIds: readonly string[];
+    since: number;
+  }): Promise<readonly string[]> {
+    return this.#users.findSignedInSince(input);
+  }
+
   hasAccountOnDomain(input: { domain: string }): Promise<boolean> {
     return this.#users.hasAccountOnDomain(input);
   }
 
   hasAnyAccount(): Promise<boolean> {
     return this.#users.hasAnyAccount();
+  }
+
+  isFirstCreatedAccount(input: { userId: string }): Promise<boolean> {
+    return this.#users.isFirstCreatedAccount(input);
   }
 
   /**

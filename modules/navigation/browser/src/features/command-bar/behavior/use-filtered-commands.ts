@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { useAnalyticsEntry } from "../../../behavior/use-analytics-entry.ts";
 import { useNavigationHost } from "../../../model/navigation-host.ts";
 import { planManagementHref } from "../../../model/plan-management-href.ts";
 import {
@@ -87,11 +88,17 @@ export function useFilteredCommands({
   const commandFeatureFlags = useCommandFeatureFlags();
   const projectNavigation = useCommandProjectNavigation();
   const productCommands = useProductCommands();
+  const analyticsEntry = useAnalyticsEntry();
 
   const availableNavCommands = useMemo(() => {
-    const commands = hasOpsAccess
-      ? navigationCommands
-      : navigationCommands.filter((cmd) => !cmd.id.startsWith("nav-ops"));
+    const commands = (
+      hasOpsAccess
+        ? navigationCommands
+        : navigationCommands.filter((cmd) => !cmd.id.startsWith("nav-ops"))
+    )
+      // Same destination as the sidebar entry, and withheld while that entry waits.
+      .filter((cmd) => cmd.id !== "nav-analytics" || analyticsEntry.isSettled)
+      .map((cmd) => (cmd.id === "nav-analytics" ? { ...cmd, path: analyticsEntry.path } : cmd));
     return [
       ...withLlmOpsProductLabel(
         filterCommandsByProjectNavigation({
@@ -101,7 +108,14 @@ export function useFilteredCommands({
       ),
       ...productCommands,
     ];
-  }, [hasOpsAccess, commandFeatureFlags, projectNavigation, productCommands]);
+  }, [
+    hasOpsAccess,
+    commandFeatureFlags,
+    projectNavigation,
+    productCommands,
+    analyticsEntry.path,
+    analyticsEntry.isSettled,
+  ]);
 
   const filteredNavigation = useMemo(
     () =>

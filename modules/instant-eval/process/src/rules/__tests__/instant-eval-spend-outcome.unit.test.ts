@@ -28,6 +28,18 @@ function record(overrides: Partial<InstantEvalSpendRecord> = {}): InstantEvalSpe
   };
 }
 
+describe("instantEvalSpendRequestId for a late page", () => {
+  /** @scenario "A routed page that reports after its run finished is billed on its own" */
+  it("gives a routed page billed after its run finished an id of its own beside the run's", () => {
+    const run = instantEvalSpendRequestId({ runId: "r" });
+
+    expect(instantEvalSpendRequestId({ runId: "r", latePage: 3 })).toBe(`${run}_late_page_3`);
+    expect(instantEvalSpendRequestId({ runId: "r", latePage: 3 })).not.toBe(
+      instantEvalSpendRequestId({ runId: "r", latePage: 4 }),
+    );
+  });
+});
+
 describe("instantEvalSpendRequestId", () => {
   it("derives a run's request id from the run, so a repeated finish lands on one event", () => {
     expect(instantEvalSpendRequestId({ runId: "instanteval_abc" })).toBe(
@@ -104,5 +116,12 @@ describe("instantEvalPricedSpend", () => {
       inputTokens: 12_000,
       occurredAt: Date.parse("2026-09-22T10:00:00.000Z"),
     });
+  });
+
+  /** @scenario "An unrouted spend row names the product, never a backend" */
+  it("names the product customers read in billing, never an internal backend id", () => {
+    const { model } = instantEvalPricedSpend({ record: record(), attribution, requestId: "req-1" });
+
+    expect(model).toBe("langwatch-evals-preview");
   });
 });

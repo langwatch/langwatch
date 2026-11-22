@@ -19,6 +19,9 @@ const state = vi.hoisted(() => ({
 vi.mock("../behavior/use-personal-context.ts", () => ({
   usePersonalContext: () => state,
 }));
+vi.mock("@langwatch/auth-client", () => ({
+  useRecordPageOpened: () => undefined,
+}));
 vi.mock("../ui/sections/personal-workspace-layout.tsx", () => ({
   PersonalWorkspaceLayout: ({ children }: { children: React.ReactNode }) => children,
 }));

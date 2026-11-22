@@ -37,10 +37,14 @@ function commandsFor({
   query,
   reachable,
   codingAgentSessions = false,
+  dashboards = false,
+  projectKind,
 }: {
   query: string;
   reachable: { governance: boolean; gateway: boolean };
   codingAgentSessions?: boolean;
+  dashboards?: boolean;
+  projectKind?: string;
 }): Command[] {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <WithStubNavigationHost
@@ -53,6 +57,7 @@ function commandsFor({
           id: "project_1",
           slug: "demo",
           name: "Demo",
+          ...(projectKind ? { kind: projectKind } : {}),
           lastCodingAgentSessionAt: codingAgentSessions ? new Date().toISOString() : undefined,
         },
         pathname: "/demo",
@@ -60,11 +65,13 @@ function commandsFor({
           "traces:view",
           ...(reachable.gateway ? ["virtualKeys:view"] : []),
           ...(reachable.governance ? ["governance:view"] : []),
+          ...(dashboards ? ["analytics:view"] : []),
         ],
         flags: {
           release_ui_ai_gateway_menu_enabled: reachable.gateway ? ON : OFF,
           release_ui_ai_governance_enabled: ON,
           release_ui_governance_billed_cost_enabled: OFF,
+          release_dashboards: dashboards ? ON : OFF,
         },
       }}
     >
@@ -90,8 +97,8 @@ describe("Quick Search across products", () => {
 
       expect(sessions).toMatchObject({
         label: "Sessions",
-        productLabel: "Me",
-        path: "/me/sessions",
+        productLabel: "Coding agents",
+        path: "/coding-agents/sessions",
       });
     });
   });
@@ -101,7 +108,7 @@ describe("Quick Search across products", () => {
     it("finds pull requests, coding agent traces and my usage", () => {
       const labelFor = (query: string) =>
         commandsFor({ query, reachable: EVERYTHING })
-          .filter((command) => command.productLabel === "Me")
+          .filter((command) => command.productLabel === "Coding agents")
           .map((command) => command.label);
 
       expect(labelFor("pull request")).toContain("Pull Requests");
@@ -169,10 +176,10 @@ describe("Quick Search across products", () => {
       personalFeatures = undefined;
       const off = commandsFor({ query: "datasets", reachable: EVERYTHING });
 
-      expect(on.find((command) => command.productLabel === "Me")?.path).toBe(
+      expect(on.find((command) => command.productLabel === "Coding agents")?.path).toBe(
         "/me-project/datasets",
       );
-      expect(off.some((command) => command.productLabel === "Me")).toBe(false);
+      expect(off.some((command) => command.productLabel === "Coding agents")).toBe(false);
     });
   });
 
@@ -190,6 +197,30 @@ describe("Quick Search across products", () => {
 
       expect(analytics?.productLabel).toBe("LLM Ops");
       expect(sessions?.path).toBe("/[project]/sessions");
+    });
+  });
+
+  describe("when the Analytics page is listed", () => {
+    const analyticsPath = (options: { dashboards: boolean; projectKind?: string }) =>
+      commandsFor({ query: "analytics", reachable: EVERYTHING, ...options }).find(
+        (command) => command.id === "nav-analytics",
+      )?.path;
+
+    /** @scenario "AC3r Quick Search opens the same Analytics destination as the sidebar" */
+    it("opens Dashboards when the sidebar entry would", () => {
+      expect(analyticsPath({ dashboards: true })).toBe("/[project]/dashboards");
+    });
+
+    /** @scenario "AC3r Quick Search opens the same Analytics destination as the sidebar" */
+    it("opens analytics when Dashboards is out of reach", () => {
+      expect(analyticsPath({ dashboards: false })).toBe("/[project]/analytics");
+    });
+
+    /** @scenario "AC3r Quick Search opens the same Analytics destination as the sidebar" */
+    it("opens analytics for an aggregate project", () => {
+      expect(analyticsPath({ dashboards: true, projectKind: "aggregate" })).toBe(
+        "/[project]/analytics",
+      );
     });
   });
 });

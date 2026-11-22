@@ -22,6 +22,21 @@ Feature: Resolve a feature flag, roll it out, and let people opt into experiment
       Then the flag resolves to its registry default
 
     @unit
+    Scenario: A self-hosted install resolves a flag to its self-hosted default
+      Given a flag whose self-hosted default differs from its registry default
+      And IS_SAAS is unset, so the install is self-hosted
+      When a caller resolves the flag with nothing overriding it
+      Then the flag resolves to its self-hosted default
+      And LangWatch Cloud, with IS_SAAS set, resolves it to its registry default
+      And the operator catalogue shows the default this deployment resolves to
+
+    @unit
+    Scenario: An operator row overrides the self-hosted default
+      Given a flag whose self-hosted default is off on a self-hosted install
+      When an operator switches it on
+      Then the flag resolves on
+
+    @unit
     Scenario: An operator row overrides the registry default
       Given an operator switched a registered flag off fleet-wide
       When a caller resolves the flag

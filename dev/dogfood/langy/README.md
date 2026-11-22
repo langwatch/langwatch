@@ -12,7 +12,7 @@ feature gap, listed below.
 src/agent.ts         connectAgent("langy"), the turn, the setup and teardown hooks
 src/turn.ts          one Langy turn over POST /api/langy/conversations/:id/messages
 src/world-names.ts   every world the `world` run parameter can name
-src/worlds.ts        the board worlds (issue 8573: D1, D2, A1, D3, X1, D5, plus B1)
+src/worlds.ts        the dashboard worlds (issue 8573: D1, D2, A1, D3, X1, D5, plus B1)
 src/topic-world.ts   T1: Topic Clustering setup, model defaults snapshot and restore
 src/quiet-world.ts   W1: only traces about 7 hours old, asked about the last 2 hours
 src/login-world.ts   C1: a coding-agent cost question (issue 8770)
@@ -38,16 +38,16 @@ src/sync-files.ts    reads and checks the files; src/sync-api.ts the public rout
   - `prompt_and_traces` (default): a prompt `e2e-<id>` whose text holds
     `PINEAPPLE-<ID>`, and 3 traces that fail with one unique error message.
   - `D1`, `D2`, `A1`, `D3`, `X1`, `D5`, `B1`: 48 traces with a per-run trace
-    name over the last two full UTC days, a board with the row's widgets, and
-    a decoy or second board where the row needs one.
+    name over the last two full UTC days, a dashboard with the row's widgets, and
+    a decoy or second dashboard where the row needs one.
   - `T1`: a snapshot of the project's model defaults (the Topic Clustering
     settings live there).
   - `W1`: 5 traces with a per-run name, the newest about 7 hours old.
   - `C1`: nothing; the question alone leads Langy to `langwatch whoami`.
 - **After each turn** the world's code-check facts go in the state as
   `facts_now` and `facts_after_turn`, so the judge grades the world, not only
-  Langy's words: per-board widgets added, changed or removed, what the newest
-  widget counts and new alerts (board worlds); model-default keys changed (T1);
+  Langy's words: per-dashboard widgets added, changed or removed, what the newest
+  widget counts and new alerts (dashboard worlds); model-default keys changed (T1);
   the newest trace's age (W1); login or no-tools phrases in the reply (C1).
 - **Teardown** returns the final facts, what it deleted or restored, and what
   it left behind (traces and saved charts have no delete route).
@@ -68,8 +68,10 @@ Stack prerequisites (once per stack):
 2. The seeded admin must be a platform operator to flip flags:
    `eval "$(haven env --reveal)"; pnpm --silent --filter @langwatch/tasks task grant-platform-operator admin@mail.langwatch.localhost`
    (haven does this itself only when it manages the database).
-3. Flags `release_langy_enabled` and `release_langy_api_key_turns_enabled` on
-   (`/ops/feature-flags`, or the `ops.setFeatureFlag` tRPC mutation).
+3. Flags `release_langy_enabled`, `release_langy_api_key_turns_enabled` and
+   `release_dashboards` on (`/ops/feature-flags`, or the `ops.setFeatureFlag`
+   tRPC mutation). Setup makes its dashboards at `/api/v1/dashboards`, which answers
+   404 while `release_dashboards` is off.
 4. A model provider for Langy, the simulator and the judge, set as the project
    default through `POST /api/model-defaults`.
 
@@ -151,7 +153,7 @@ hit. "Fix in" names who closes it.
    dashboard?" this way). Fix in: **Langy API** (return the pending question as
    the reply, take the answer as the next turn).
 3. **REST turns carry no page context.** `turnContext: {}`
-   (`langy-turns.rest.ts:88`), so "the board the user attached" has to be named
+   (`langy-turns.rest.ts:88`), so "the dashboard the user attached" has to be named
    in the user's message. Fix in: **Langy API** (accept a context on the turn).
 4. **No on-demand insights run.** The public surface only configures a daily
    run (`modules/insight/process/src/transport/insight.trpc.ts:42-47`); running
@@ -161,7 +163,7 @@ hit. "Fix in" names who closes it.
 5. **No API to create a second member.** The organization API only invites
    (`modules/organization/process/src/transport/organization-management.rest.ts:318`);
    a member exists once the invitee signs in. Row P1 (a member who cannot edit
-   the board) is not built. Fix in: **agent testing** (a test identity a hook
+   the dashboard) is not built. Fix in: **agent testing** (a test identity a hook
    can make), or the organization API.
 6. **No trace delete route.** The traces API reads and searches only
    (`modules/trace/process/src/transport/traces.rest.ts:311-434`), so teardown
@@ -192,11 +194,12 @@ hit. "Fix in" names who closes it.
     (`modules/langy/process/src/rules/langy-conversation-shape.rules.ts:30`);
     the platform's `scenario_…` ids fit today. Fix in: **Langy API** (document
     it on the route).
-13. **B1: Langy cannot see a board's widgets** (a Langy bug). Langy reads a
-    board through the Reports API `GET /api/v1/dashboards/:id`; #8707 (on main,
-    not on this branch) hides Dashboards-only boards from it
+13. **B1: Langy cannot see a dashboard's widgets** (a Langy bug). Langy reads a
+    dashboard through the Analytics Reports API (`GET /api/v1/analytics/reports/:reportId`;
+    before 2026-10-26 `GET /api/v1/dashboards/:id`); #8707 (on main,
+    not on this branch) hides Dashboards-only dashboards from it
     (`prisma.dashboard.repository.ts:147`). Even here Langy answered "Release
-    review 816422 is empty right now, with no graphs configured" for a board
+    review 816422 is empty right now, with no graphs configured" for a dashboard
     with two widgets (`scenariorun_8390b10b758f5c77d3df3910487d715b`), and in X1
     said "There isn't an Error count widget" (`scenariorun_d3ea8eb7a7d41c491b219035d7b509fe`):
     it sees classic graphs, not dashboard widgets. Fix in: **Langy**.

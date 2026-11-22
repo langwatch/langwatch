@@ -34,7 +34,7 @@ Feature: Core OTLP protection applies Enterprise policy without owning it
   Scenario: VS Code policy excludes inherited telemetry
     Given Governance resolves policy for a copilot_vscode ingestion key
     When trace or metric scopes contain Copilot and unrelated instrumentation
-    Then only github.copilot and @github/copilot scopes survive
+    Then only github.copilot, @github/copilot and copilot-chat scopes survive
     And empty resource groups are removed
     But log scopes are not filtered
 

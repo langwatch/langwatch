@@ -134,7 +134,7 @@ Dropped fields are reported on the `X-LangWatch-Params-Dropped` header and on th
 
 Claude models take a thinking budget in tokens. On the anthropic lane and on the bedrock lane, the gateway derives that budget from your output cap:
 
-```
+```text
 budget = 1024 + ratio x (max_tokens - 1024)
 ```
 

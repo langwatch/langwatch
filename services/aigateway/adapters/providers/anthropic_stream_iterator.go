@@ -170,6 +170,9 @@ func (it *anthropicTranslatedStreamIterator) consume(resp *bfschemas.BifrostResp
 		if u.CacheCreationTokens > 0 {
 			it.usage.CacheCreationTokens = u.CacheCreationTokens
 		}
+		if u.CacheCreation1hTokens > 0 {
+			it.usage.CacheCreation1hTokens = u.CacheCreation1hTokens
+		}
 		if u.TotalTokens > 0 {
 			it.usage.TotalTokens = u.TotalTokens
 		} else {

@@ -158,4 +158,25 @@ describe("GovernanceCliCredentialService.mintIngestionKey", () => {
       });
     });
   });
+
+  describe("when the organization turned direct OTLP off for grok", () => {
+    /** @scenario An org that turns Grok's direct path off refuses the key */
+    it("refuses a grok_cli key by outcome, naming the grok policy", async () => {
+      const { service, mint, resolveToolPolicy } = setup();
+      resolveToolPolicy.mockImplementation(async ({ slug }: { slug: string }) => ({
+        allowVk: false,
+        allowOtelDirect: slug !== "grok",
+      }));
+
+      await expect(
+        service.mintIngestionKey({
+          caller,
+          sourceType: "grok_cli",
+          projectRef: undefined,
+          deviceLabel: undefined,
+        }),
+      ).resolves.toEqual({ outcome: "direct-otel-not-allowed", toolSlug: "grok" });
+      expect(mint).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -1,35 +1,32 @@
 import { Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { useTraceQueryArgs } from "../../../../../behavior/explorer/use-trace-query-args.ts";
-import {
-  useCodingAgentSession,
-  useCodingAgentTranscript,
-} from "../../../../../behavior/reads/use-coding-agent-reads.ts";
+import { useCodingAgentSession } from "../../../../../behavior/reads/use-coding-agent-reads.ts";
 import { SessionView } from "../../../../elements/coding-agent/trace/session-view.tsx";
+import { useSessionTranscript } from "./use-session-transcript.ts";
 
 interface SessionTabProps {
   projectId: string;
   traceId: string;
   /** Partition-pruning hint for the transcript read. */
   occurredAtMs?: number;
+  /** The agent's session id, which every turn of the session shares; null outside one. */
+  conversationId: string | null;
 }
 
 /**
  * The Session tab's data boundary.
  */
-export function SessionTab({ projectId, traceId, occurredAtMs }: SessionTabProps) {
+export function SessionTab({ projectId, traceId, occurredAtMs, conversationId }: SessionTabProps) {
   const query = useCodingAgentSession({ projectId, traceId });
-  // The token timeline reflects the trace currently open, not (yet) every
-  // trace the merged session above spans — stitching a transcript across
-  // sibling traces is a reasonable follow-up, not done here. Shares its
-  // cache key with the Terminal tab's own read, so switching tabs on a
-  // session already opened once costs nothing extra.
+  // The chart draws every turn of the session, as the cards above count it.
   const { tenantId } = useTraceQueryArgs();
-  const transcriptQuery = useCodingAgentTranscript({
+  const transcript = useSessionTranscript({
     projectId,
+    tenantId: tenantId ?? null,
     traceId,
     occurredAtMs,
-    tenantId,
+    conversationId,
     enabled: !!query.data,
   });
 
@@ -63,7 +60,7 @@ export function SessionTab({ projectId, traceId, occurredAtMs }: SessionTabProps
     );
   }
 
-  return <SessionView session={query.data} entries={transcriptQuery.data?.entries} />;
+  return <SessionView session={query.data} entries={transcript.entries} />;
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

@@ -15,7 +15,7 @@ import { ArrowUpRight, Plus } from "lucide-react";
 import { BarChart2 } from "react-feather";
 
 import { useDashboards } from "../../../behavior/use-dashboards.ts";
-import { useAnalyticsHost } from "../../../model/analytics-host.ts";
+import { projectAwaitsFirstTrace, useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { Link } from "../../../ui/elements/analytics-link.tsx";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
 import { DocumentsMetrics } from "../../../ui/sections/documents-metrics.tsx";
@@ -30,7 +30,7 @@ function AnalyticsContent() {
   return (
     <AnalyticsLayout tab="overview">
       {/* An aggregate receives no traces of its own (ADR-177), so it is not asked to send any. */}
-      {project && !project.hasFirstMessage && !isAggregateProjectKind(project.kind) && (
+      {project && projectAwaitsFirstTrace(project) && (
         <Box marginBottom={6}>
           <Banner
             status="warning"

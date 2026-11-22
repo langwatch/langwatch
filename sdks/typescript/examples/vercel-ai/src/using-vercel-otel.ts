@@ -72,7 +72,7 @@ async function main() {
           console.log("🤖 Thinking...");
 
           const result = await generateText({
-            model: openai("gpt-5-mini"),
+            model: openai("gpt-6-luna"),
             messages: conversationHistory,
             experimental_telemetry: { isEnabled: true },
           });

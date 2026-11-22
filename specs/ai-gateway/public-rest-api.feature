@@ -15,6 +15,10 @@ Feature: Public REST API — /api/gateway/v1/*
   legacy project API key or a scoped API key (Bearer, X-Project-Id optional
   on the virtual key and budget routes, where a key that names no project
   answers for everything it reaches in its organization).
+  Every scenario here that names a legacy project key is about a project on
+  the `legacy_project_key_full_access` allowlist. Off it, a legacy key is
+  refused on these routes with `legacy_project_key_ingestion_only`
+  (modules/auth/specs/legacy-project-key-scope.feature).
   There is exactly one implementation of every write rule: REST handlers
   route through the SAME service-layer methods and pre-flight asserts as
   the tRPC mutations (VirtualKeyService, GatewayBudgetService,
@@ -113,7 +117,7 @@ Feature: Public REST API — /api/gateway/v1/*
     And a project-bound access token is refused
 
   @unit @rest @pat
-  Scenario: A legacy project key passes the key door by its class
+  Scenario: A legacy project key on the full-access allowlist passes the key door by its class
     When a legacy project key calls a virtual key or budget route
     Then the key door admits it without asking a grant
 
@@ -154,8 +158,8 @@ Feature: Public REST API — /api/gateway/v1/*
 
   @integration @rest @rbac
   Scenario: A legacy project key cannot mint keys beyond its own project
-    # Legacy project keys keep their historical power: full access to their
-    # own project, nothing above it. Broader provisioning requires a scoped
+    # An allowlisted legacy project key keeps its historical power: full access
+    # to its own project, nothing above it. Broader provisioning requires a scoped
     # API key that can prove the grants.
     When a legacy project key requests an organization-scoped key
     Then the response status is 403
@@ -194,8 +198,8 @@ Feature: Public REST API — /api/gateway/v1/*
 
   @unit @rbac
   Scenario: A legacy project key writes organization-wide budgets and cache rules
-    # As on main: the legacy key carries full access by its class alone for
-    # these seven writes. Nothing else widens; its keys stay project-bound.
+    # As on main for an allowlisted project: the legacy key carries full access by
+    # its class alone for these seven writes. Nothing else widens; its keys stay project-bound.
     When a legacy project key asks to write an organization-wide gateway row
     Then it is admitted without any grant being asked
     And the write is attributed to the synthetic actor `svc_<projectId>`

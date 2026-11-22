@@ -1,7 +1,7 @@
 /**
  * A board's header: title (badged on a From LangWatch board, with its scope on a stored one),
- * what peers lend it and one action, then the description, the Project chip of an
- * Organization board and the period. Star and rename live in the sidebar.
+ * what peers lend it and one action, then the description, an Organization board's Project
+ * chip and the period. Star and rename live in the sidebar.
  */
 
 import { type BoardHeaderActionProps, BoardHeaderActionToken } from "@langwatch/analytics-client";

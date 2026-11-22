@@ -5,18 +5,15 @@
 name: codeql
 
 on:
+  # Pull requests and the merge queue reach this through pr.yml.
+  workflow_call:
   push:
     branches: ["main"]
-  pull_request:
-    branches: ["main"]
-    # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
-    types: [opened, synchronize, reopened, ready_for_review]
-  merge_group:
   schedule:
     - cron: "00 08 * * *"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: codeql-${{ github.ref }}
   # A newer commit supersedes an older run, on main too: the newest verdict
   # covers the commits before it. Image and release builds keep their own rule.
   cancel-in-progress: true

@@ -331,6 +331,36 @@ export function widgetMissingDataDraft({
   return widgetDraft({ prompt, widget, board, period });
 }
 
+/** How many widgets on a board must show no data before the board offers Langy to set them up. */
+export const EMPTY_WIDGETS_TO_OFFER_SETUP = 2;
+
+/** Whether a board with these empty widgets offers "Ask Langy to set this up". */
+export function offersBoardSetup(emptyWidgetNames: readonly string[]): boolean {
+  return emptyWidgetNames.length >= EMPTY_WIDGETS_TO_OFFER_SETUP;
+}
+
+/**
+ * "Ask Langy to set this up" on a board where several widgets show no data: find out what
+ * each one needs and help send it. A draft for the reader to send, about the board.
+ */
+export function boardSetupDraft({
+  emptyWidgetNames,
+  board,
+  period,
+}: {
+  emptyWidgetNames: readonly string[];
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
+  const names = emptyWidgetNames.map((name) => `"${name}"`).join(", ");
+  const prompt =
+    `These widgets on my "${board.name}" dashboard show no data: ${names}. For each one, ` +
+    "find out what data it needs and whether my project sends it. Then tell me in plain " +
+    "words what fills it: the LangWatch SDK call, the setting or the integration, and help " +
+    "me set up what I am missing.";
+  return boardPromptDraft({ prompt, board, period });
+}
+
 /** What a draft from the editor is about when the editor is open on a widget not saved yet. */
 export const NEW_WIDGET_REF = "new";
 

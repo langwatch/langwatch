@@ -16,6 +16,18 @@ import {
 } from "../../../../../model/experiments-v3/types.ts";
 import { DatasetTabs } from "../dataset-tabs.tsx";
 
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: "project-1", slug: "project-1" } }),
+}));
+
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    dataset: {
+      versions: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
+  },
+}));
+
 const onSelectExisting = vi.fn();
 const onUploadCSV = vi.fn();
 const onEditDataset = vi.fn();

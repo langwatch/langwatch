@@ -6,9 +6,10 @@ const logCorrelationSourceSchema = z.enum([
   "wire",
   "claude_synthesized",
   "codex_synthesized",
+  "grok_synthesized",
 ]);
 
-const logProviderKindSchema = z.enum(["generic", "claude_code", "codex"]);
+const logProviderKindSchema = z.enum(["generic", "claude_code", "codex", "grok"]);
 
 /** The trace-fold payload derived from one canonical log record. */
 const logTraceContributionSchemaDefinition = z.object({
@@ -24,6 +25,8 @@ const logTraceContributionSchemaDefinition = z.object({
   correlationSource: logCorrelationSourceSchema.exclude(["none"]),
   input: z.string().nullable(),
   output: z.string().nullable(),
+  /** The record declared its output (`langwatch.output`); absent on events written before it. */
+  outputDeclared: z.boolean().optional(),
   liftedAttributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
   nonBillable: z.boolean(),
   piiRedactionLevel: z.enum(["STRICT", "ESSENTIAL", "DISABLED"]),

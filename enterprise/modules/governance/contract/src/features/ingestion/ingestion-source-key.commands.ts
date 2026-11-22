@@ -48,6 +48,8 @@ export const PERSONAL_INGEST_SOURCE_TYPES = [
   "copilot_cli",
   "copilot_vscode",
   "copilot_app",
+  "grok_cli",
+  "pi_cli",
 ] as const;
 
 /** What became of one of the caller's own personal ingest keys. */

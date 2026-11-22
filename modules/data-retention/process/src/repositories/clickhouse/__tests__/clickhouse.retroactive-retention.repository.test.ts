@@ -79,6 +79,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     const expectedTables = [
       "event_log",
       "stored_spans",
+      "span_analytics",
       "stored_log_records",
       "log_records",
       "metric_data_points",
@@ -87,6 +88,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       "trace_summaries",
       "trace_analytics",
       "trace_analytics_rollup",
+      "trace_evaluation_analytics",
       "evaluation_runs",
       "evaluation_analytics",
       "evaluation_analytics_rollup",
@@ -115,7 +117,9 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     const eventLogCommand = required(
       commands.find((candidate) => candidate.sql.includes("ALTER TABLE event_log")),
     );
-    expect(eventLogCommand.sql).toContain("AggregateType IN ('coding_agent_session'");
+    expect(eventLogCommand.sql).toContain(
+      "AggregateType IN ('coding_agent_project_milestone', 'coding_agent_session'",
+    );
     expect(eventLogCommand.sql).not.toContain("AggregateType NOT IN");
     expect(eventLogCommand.sql).toContain("langwatch:event-log-retention-category:traces");
     expect(
@@ -167,7 +171,9 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
     const experimentsEventLog = required(
       experiments.commands.find((command) => command.sql.includes("ALTER TABLE event_log")),
     );
-    expect(experimentsEventLog.sql).toContain("AggregateType IN ('experiment_run')");
+    expect(experimentsEventLog.sql).toContain(
+      "AggregateType IN ('dataset_history', 'experiment_run')",
+    );
     expect(experimentsEventLog.sql).toContain("langwatch:event-log-retention-category:experiments");
   });
 

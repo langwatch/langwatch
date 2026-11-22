@@ -4,7 +4,12 @@
  * rather than just ignoring the answer. Same seam `spanTreePagedQuery` uses.
  */
 
-import type { LangWatchQLQueryResult, LangWatchQLTimeWindow } from "@langwatch/analytics-contract";
+import type {
+  LangWatchQLQueryResult,
+  LangWatchQLRunTelemetryRequest,
+  LangWatchQLTimeWindow,
+  TraceSource,
+} from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 
 import type { LangWatchQLExecute } from "../model/lwql-request-controller.ts";
@@ -15,7 +20,9 @@ export interface LangWatchQLQueryInput {
   sql: string;
   parameters?: Readonly<Record<string, LangWatchQLParameterValue>>;
   timeWindow?: LangWatchQLTimeWindow;
-  excludeOrigins?: readonly string[];
+  sources?: TraceSource[] | null;
+  projects?: string[];
+  telemetry?: LangWatchQLRunTelemetryRequest | undefined;
 }
 
 const isoInstant = (epochMs: number): string =>
@@ -40,10 +47,13 @@ export function createLangWatchQLExecute({
   transport: LangWatchQLQueryTransport;
   projectId: string;
 }): LangWatchQLExecute {
-  return ({ timeWindow, ...request }, { signal }) =>
+  return ({ timeWindow, sources, projects, ...request }, { signal }) =>
     transport.mutate(
       {
         ...request,
+        // The wire takes plain arrays, the draft holds read-only ones.
+        ...(sources === undefined ? {} : { sources: sources === null ? null : [...sources] }),
+        ...(projects === undefined ? {} : { projects: [...projects] }),
         // ISO instants on the wire, milliseconds in the draft: the draft
         // compares snapshots by value, and the endpoint reads a window.
         ...(timeWindow

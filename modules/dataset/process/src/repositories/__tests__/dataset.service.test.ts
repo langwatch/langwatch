@@ -8,9 +8,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestContent,
   createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
+import { lockedView } from "../../rules/dataset-record-lock.rules.ts";
 import { DatasetService } from "../../services/dataset.service.ts";
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import type { DatasetRepository } from "../dataset.repository.ts";
@@ -53,8 +55,21 @@ class Repo implements DatasetRepository {
   async findStoragePage(): Promise<DatasetStorageEntry[]> {
     return [];
   }
+  async findEmptySlugPage(): Promise<{ id: string; name: string }[]> {
+    return [];
+  }
+  async fillEmptySlug(): Promise<"not-empty"> {
+    return "not-empty";
+  }
 }
 class Records implements DatasetRecordRepository {
+  withDatasetLock: DatasetRecordRepository["withDatasetLock"] = (_key, work) =>
+    work(
+      lockedView({
+        records: this,
+        columns: { columnTypes: async () => [], setColumnTypes: async () => undefined },
+      }),
+    );
   countByDataset = async () => [];
   async count(): Promise<number> {
     return 0;
@@ -72,6 +87,7 @@ class Records implements DatasetRecordRepository {
     throw new Error("unused");
   };
   deleteMany = async () => 0;
+  replaceAll = async () => undefined;
 }
 
 describe("DatasetService", () => {
@@ -79,6 +95,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository: new Repo(),
       records: new Records(),
+      content: createDatasetTestContent(),
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
       inlineAttachments: createDatasetTestInlineAttachments(),

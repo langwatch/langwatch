@@ -45,7 +45,6 @@
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
-    "@types/nodemailer": "catalog:",
     "@types/web-push": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -291,7 +291,6 @@ describe("when a provider callback writes a sign-in account", () => {
         id: "account_1",
         userId: "user_1",
         providerId: "github",
-        issuer: "https://github.com",
         accountId: "gh_1",
         createdAt: new Date(0),
         updatedAt: new Date(0),
@@ -305,7 +304,8 @@ describe("when a provider callback writes a sign-in account", () => {
         id: "account_1",
         userId: "user_1",
         providerId: "github",
-        issuer: "https://github.com",
+        // Better Auth 1.7.3 no longer sends the issuer; the hook derives it from the provider.
+        issuer: "local:oauth:github",
         accountId: "gh_1",
         createdAt: new Date(0),
         updatedAt: new Date(0),

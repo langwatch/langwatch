@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { Instant } from "@langwatch/time";
 import type Stripe from "stripe";
 
 import type { StripeSubscriptionsChannel } from "../../../channels/stripe-subscriptions.channel.ts";
@@ -25,6 +26,8 @@ export abstract class LicenseGenerator {
     organizationName: string;
     email: string;
     maxMembers: number;
+    /** Absent signs the licensing default term from now. */
+    expiresAt?: Instant;
   }): Promise<GeneratedLicense>;
 }
 
@@ -79,6 +82,16 @@ export type PurchasedCheckout = Pick<
   Stripe.Checkout.Session,
   "id" | "amount_total" | "currency"
 > & { customer_details: { email: string | null; name: string | null } | null };
+
+/** A paid renewal of a licence subscription: the next term, for the seats invoiced. */
+export type LicenseRenewal = {
+  email: string;
+  organizationName: string;
+  seats: number;
+  expiresAt: Instant;
+  amountPaid: number;
+  currency: string;
+};
 
 /** The one Stripe read the purchase makes: the seats bought. */
 type CheckoutLineItems = Pick<StripeSubscriptionsChannel, "listCheckoutLineItems">;
@@ -138,12 +151,60 @@ export class LicensePurchaseService {
     const lineItems = await stripeSubscriptions.listCheckoutLineItems({
       checkoutSessionId: checkoutSession.id,
     });
-    const quantity = lineItems[0]?.quantity ?? 1;
-    const { licenseKey, licenseData } = await this.generateLicense.generate({
+    await this.issue({
+      email,
       organizationName: businessName,
+      seats: lineItems[0]?.quantity ?? 1,
+      amountPaid: checkoutSession.amount_total ?? 0,
+      currency: checkoutSession.currency ?? "usd",
+    });
+  }
+
+  /** Signs the next term's licence of a renewed licence subscription and records it. */
+  async mintRenewal(renewal: LicenseRenewal): Promise<GeneratedLicense> {
+    return this.mint(renewal);
+  }
+
+  /** Mails a minted renewal and tells the team; safe to call again after a failure. */
+  async sendRenewal({
+    renewal,
+    license,
+  }: {
+    renewal: LicenseRenewal;
+    license: GeneratedLicense;
+  }): Promise<void> {
+    await this.send({ ...renewal, license });
+  }
+
+  private async issue(input: {
+    email: string;
+    organizationName: string;
+    seats: number;
+    amountPaid: number;
+    currency: string;
+  }): Promise<void> {
+    const license = await this.mint(input);
+    await this.send({ ...input, license });
+  }
+
+  private async mint({
+    email,
+    organizationName,
+    seats: quantity,
+    expiresAt,
+  }: {
+    email: string;
+    organizationName: string;
+    seats: number;
+    expiresAt?: Instant;
+  }): Promise<GeneratedLicense> {
+    const generated = await this.generateLicense.generate({
+      organizationName,
       email,
       maxMembers: quantity,
+      ...(expiresAt ? { expiresAt } : {}),
     });
+    const { licenseKey, licenseData } = generated;
 
     logger.info(
       {
@@ -164,7 +225,22 @@ export class LicensePurchaseService {
       );
       this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
     }
+    return generated;
+  }
 
+  private async send({
+    email,
+    seats: quantity,
+    amountPaid,
+    currency,
+    license: { licenseKey, licenseData },
+  }: {
+    email: string;
+    seats: number;
+    amountPaid: number;
+    currency: string;
+    license: GeneratedLicense;
+  }): Promise<void> {
     const unlockedFeatures = await this.tryResolveUnlockedFeatures(licenseData.plan.type);
     await this.delivery.sendLicenseEmail({
       email,
@@ -183,8 +259,8 @@ export class LicensePurchaseService {
       buyerEmail: email,
       planType: licenseData.plan.type,
       seats: quantity,
-      amountPaid: checkoutSession.amount_total ?? 0,
-      currency: checkoutSession.currency ?? "usd",
+      amountPaid,
+      currency,
     });
   }
 

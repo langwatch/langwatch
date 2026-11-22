@@ -301,7 +301,7 @@ Auto-open browser on macOS (`open`) and Linux (`xdg-open`). Skip if `--no-open` 
 Triggers:
 
 - `workflow_dispatch` (manual)
-- `schedule: '0 4 * * *'` (nightly 04:00 UTC)
+- `workflow_call` from the nightly suite (`.github/workflows/nightly.yml`, 01:00 UTC); it has no schedule of its own
 - `push` paths: `package.json`, `pnpm-workspace.yaml`, `apps/server/**`, `langwatch_nlp/pyproject.toml`, `services/langevals/**/pyproject.toml`, `services/aigateway/**`, `platform/app/package.json`, `platform/app/scripts/**`
 
 Matrix:

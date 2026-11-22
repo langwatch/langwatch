@@ -6,13 +6,13 @@ The server half of [ops](../README.md). Platform administration for every deploy
 
 ## Installation
 
-`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…).withIdIndexes(…, …)`, `src/ops.module.ts:41`.
+`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(seatSharingEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…).withIdIndexes(…, …)`, `src/ops.module.ts:46`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`OpsApi`)
 
-Peers call these through the token, declared at `../contract/src/ops.api.ts:440`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/ops.api.ts:446`; nothing else in this package is public.
 
 #### `startAdminImpersonation`
 
@@ -531,7 +531,7 @@ submitBugReport(input: { report: SubmitBugReport; callerKey: string; /** The pro
 One report as the intake door received it, answered in the bodies released builds read.
 
 ```typescript
-receiveBugReport(input: { report: SubmitBugReport; forwardedFor: string | null; linkedProjectId: string | null; }): Promise<OpsDoorAnswer>;
+receiveBugReport(input: { report: SubmitBugReport; /** The address the door resolved for the caller; null shares the one unknown bucket. */ callerAddress: string | null; linkedProjectId: string | null; }): Promise<OpsDoorAnswer>;
 ```
 
 #### `findDashboardData`
@@ -606,6 +606,38 @@ revokePlatformOperator(input: { grantId: string; operator: OpsOperator | null })
 
 ```typescript
 featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue>;
+```
+
+#### `searchFeatureFlagTargets`
+
+Targets a rule may name, by name, slug, id or email; at most ten.
+
+```typescript
+searchFeatureFlagTargets(input: OpsSearchFeatureFlagTargetsInput): Promise<OpsFeatureFlagTarget[]>;
+```
+
+#### `findFeatureFlagTargets`
+
+The targets stored rules name by id; an id nothing answers for is left out.
+
+```typescript
+findFeatureFlagTargets(input: OpsFindFeatureFlagTargetsInput): Promise<OpsFeatureFlagTarget[]>;
+```
+
+#### `findSeatSharingChecks`
+
+The last seat sharing check, empty before the first; not found without Cloud admin.
+
+```typescript
+findSeatSharingChecks(): Promise<SeatSharingCheck[]>;
+```
+
+#### `runSeatSharingCheck`
+
+Runs the seat sharing check over every organization on a paid plan and keeps the result.
+
+```typescript
+runSeatSharingCheck(): Promise<void>;
 ```
 
 #### `setFeatureFlagEnabled`
@@ -1047,7 +1079,7 @@ type Response = z.infer<typeof checkupResultSchema>; // ../contract/src/features
 
 |             |                                           |
 | ----------- | ----------------------------------------- |
-| Declared at | `src/transport/ops-bug-report.rest.ts:43` |
+| Declared at | `src/transport/ops-bug-report.rest.ts:40` |
 | Base URL    | none: each route's path is its address    |
 | Addressing  | literal                                   |
 | Credential  | project                                   |
@@ -1056,12 +1088,12 @@ type Response = z.infer<typeof checkupResultSchema>; // ../contract/src/features
 
 File an issue report from a coding agent
 
-Optional credential: the reporter may be struggling precisely because setup failed, so filing a report must never require a working login; a project credential only enriches the report. Declared at `src/transport/ops-bug-report.rest.ts:48`.
+Optional credential: the reporter may be struggling precisely because setup failed, so filing a report must never require a working login; a project credential only enriches the report. Declared at `src/transport/ops-bug-report.rest.ts:45`.
 
 Answers at `/api/bug-reports`, `/api/v1/bug-reports`.
 
 ```typescript
-// Body: submitBugReportSchema, ../contract/src/ops-bug-report.ts:152
+// Body: submitBugReportSchema, ../contract/src/ops-bug-report.ts:142
 interface Body {
   source: "cli" | "mcp";
   kind: "summary" | "full_session";
@@ -1074,8 +1106,7 @@ interface Body {
   cliVersion?: string;
   metadata?: Record<string, string | number | boolean>;
 }
-type Headers = z.infer<typeof bugReportIntakeHeadersSchema>; // ../contract/src/ops-bug-report.ts:125
-// Response: inline, src/transport/ops-bug-report.rest.ts:67
+// Response: inline, src/transport/ops-bug-report.rest.ts:63
 type Response = unknown;
 ```
 
@@ -1612,24 +1643,27 @@ interface Output {
 
 ### `ops`
 
-Contract `../contract/src/ops-platform.trpc.ts:29`, router `src/transport/ops-platform.trpc.ts:15`.
+Contract `../contract/src/ops-platform.trpc.ts:32`, router `src/transport/ops-platform.trpc.ts:15`.
 
-| Procedure                 | Kind     | Gate                             | Input                               | Output                               |
-| ------------------------- | -------- | -------------------------------- | ----------------------------------- | ------------------------------------ |
-| `ops.listFeatureFlags`    | query    | Platform permission `ops:view`   | inline                              | `operatorFeatureFlagCatalogueSchema` |
-| `ops.setFeatureFlag`      | mutation | Platform permission `ops:manage` | `opsSetFeatureFlagInputSchema`      | `opsOkOutputSchema`                  |
-| `ops.setFeatureFlagRules` | mutation | Platform permission `ops:manage` | `opsSetFeatureFlagRulesInputSchema` | `opsOkOutputSchema`                  |
-| `ops.clearFeatureFlag`    | mutation | Platform permission `ops:manage` | `opsFeatureFlagKeyInputSchema`      | `opsOkOutputSchema`                  |
-| `ops.listBlobQueues`      | query    | Platform permission `ops:view`   | inline                              | `opsQueueNameListSchema`             |
-| `ops.getBlobStoreStats`   | query    | Platform permission `ops:view`   | inline                              | `opsBlobStoreStatsSchema`            |
-| `ops.listBlobs`           | query    | Platform permission `ops:view`   | `listBlobsInputSchema`              | `opsBlobPageSchema`                  |
-| `ops.getBlob`             | query    | Platform permission `ops:view`   | `getBlobInputSchema`                | inline                               |
-| `ops.runBlobCleanup`      | mutation | Platform permission `ops:manage` | `runBlobCleanupOperatorInputSchema` | `blobSweepReportSchema`              |
-| `ops.deleteBlob`          | mutation | Platform permission `ops:manage` | `deleteBlobOperatorInputSchema`     | `deleteBlobResultSchema`             |
+| Procedure                      | Kind     | Gate                             | Input                                    | Output                               |
+| ------------------------------ | -------- | -------------------------------- | ---------------------------------------- | ------------------------------------ |
+| `ops.listFeatureFlags`         | query    | Platform permission `ops:view`   | inline                                   | `operatorFeatureFlagCatalogueSchema` |
+| `ops.setFeatureFlag`           | mutation | Platform permission `ops:manage` | `opsSetFeatureFlagInputSchema`           | `opsOkOutputSchema`                  |
+| `ops.setFeatureFlagRules`      | mutation | Platform permission `ops:manage` | `opsSetFeatureFlagRulesInputSchema`      | `opsOkOutputSchema`                  |
+| `ops.searchFeatureFlagTargets` | query    | Platform permission `ops:view`   | `opsSearchFeatureFlagTargetsInputSchema` | `opsFeatureFlagTargetListSchema`     |
+| `ops.findFeatureFlagTargets`   | query    | Platform permission `ops:view`   | `opsFindFeatureFlagTargetsInputSchema`   | `opsFeatureFlagTargetListSchema`     |
+| `ops.clearFeatureFlag`         | mutation | Platform permission `ops:manage` | `opsFeatureFlagKeyInputSchema`           | `opsOkOutputSchema`                  |
+| `ops.listBlobQueues`           | query    | Platform permission `ops:view`   | inline                                   | `opsQueueNameListSchema`             |
+| `ops.getBlobStoreStats`        | query    | Platform permission `ops:view`   | inline                                   | `opsBlobStoreStatsSchema`            |
+| `ops.listBlobs`                | query    | Platform permission `ops:view`   | `listBlobsInputSchema`                   | `opsBlobPageSchema`                  |
+| `ops.getBlob`                  | query    | Platform permission `ops:view`   | `getBlobInputSchema`                     | inline                               |
+| `ops.runBlobCleanup`           | mutation | Platform permission `ops:manage` | `runBlobCleanupOperatorInputSchema`      | `blobSweepReportSchema`              |
+| `ops.deleteBlob`               | mutation | Platform permission `ops:manage` | `deleteBlobOperatorInputSchema`          | `deleteBlobResultSchema`             |
+| `ops.findSeatSharingChecks`    | query    | Platform permission `ops:view`   | inline                                   | inline                               |
 
 ```typescript
 // ops.listFeatureFlags
-// Input: inline, ../contract/src/ops-platform.trpc.ts:36
+// Input: inline, ../contract/src/ops-platform.trpc.ts:39
 type Input = unknown;
 type Output = z.infer<typeof operatorFeatureFlagCatalogueSchema>; // ../../feature-flag/contract/src/feature-flag.schemas.ts:76
 
@@ -1645,6 +1679,23 @@ type Output = z.infer<typeof opsOkOutputSchema>; // ../contract/src/ops-feature-
 type Input = z.infer<typeof opsSetFeatureFlagRulesInputSchema>; // ../contract/src/ops-feature-flag.ts:45
 type Output = z.infer<typeof opsOkOutputSchema>; // ../contract/src/ops-feature-flag.ts:13
 
+// ops.searchFeatureFlagTargets
+// Input: opsSearchFeatureFlagTargetsInputSchema, ../contract/src/ops-feature-flag.ts:137
+interface Input {
+  kind: "organization" | "project" | "user";
+  query: string;
+}
+type Output = z.infer<typeof opsFeatureFlagTargetListSchema>; // ../contract/src/ops-feature-flag.ts:126
+
+// ops.findFeatureFlagTargets
+// Input: opsFindFeatureFlagTargetsInputSchema, ../contract/src/ops-feature-flag.ts:156
+interface Input {
+  organizationIds: string[];
+  projectIds: string[];
+  userIds: string[];
+}
+type Output = z.infer<typeof opsFeatureFlagTargetListSchema>; // ../contract/src/ops-feature-flag.ts:126
+
 // ops.clearFeatureFlag
 // Input: opsFeatureFlagKeyInputSchema, ../contract/src/ops-feature-flag.ts:20
 interface Input {
@@ -1653,13 +1704,13 @@ interface Input {
 type Output = z.infer<typeof opsOkOutputSchema>; // ../contract/src/ops-feature-flag.ts:13
 
 // ops.listBlobQueues
-// Input: inline, ../contract/src/ops-platform.trpc.ts:52
+// Input: inline, ../contract/src/ops-platform.trpc.ts:65
 type Input = unknown;
 // Output: opsQueueNameListSchema, ../contract/src/ops.responses.ts:275
 type Output = string[];
 
 // ops.getBlobStoreStats
-// Input: inline, ../contract/src/ops-platform.trpc.ts:56
+// Input: inline, ../contract/src/ops-platform.trpc.ts:69
 type Input = unknown;
 // Output: opsBlobStoreStatsSchema, ../contract/src/blob-store.ts:76
 interface Output {
@@ -1690,7 +1741,7 @@ interface Input {
   projectId: string;
   hash: string;
 }
-// Output: inline, ../contract/src/ops-platform.trpc.ts:65
+// Output: inline, ../contract/src/ops-platform.trpc.ts:78
 type Output = {
   queueName: string;
   projectId: string;
@@ -1723,6 +1774,22 @@ interface Input {
 interface Output {
   deleted: boolean;
 }
+
+// ops.findSeatSharingChecks
+// Input: inline, ../contract/src/ops-platform.trpc.ts:90
+type Input = unknown;
+// Output: inline, ../contract/src/ops-platform.trpc.ts:91
+type Output = {
+  checkedAt: number;
+  windowDays: number;
+  readings: {
+    organizationId: string;
+    planName: string;
+    seats: number;
+    activePeople: number;
+    flagged: boolean;
+  }[];
+}[];
 ```
 
 ### `ops`
@@ -2266,7 +2333,7 @@ interface Output {
 
 ### `ops.upgrade`
 
-Contract `../contract/src/features/migrations/ops-upgrade.ts:361`, router `src/transport/ops-upgrade.trpc.ts:16`.
+Contract `../contract/src/features/migrations/ops-upgrade.ts:364`, router `src/transport/ops-upgrade.trpc.ts:16`.
 
 | Procedure                                               | Kind     | Gate                                                                                                                                                                                 | Input                                             | Output                                    |
 | ------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- | ----------------------------------------- |
@@ -2296,22 +2363,22 @@ Contract `../contract/src/features/migrations/ops-upgrade.ts:361`, router `src/t
 
 ```typescript
 // ops.upgrade.status
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:364
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:367
 type Input = unknown;
-type Output = z.infer<typeof opsUpgradeStatusSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:137
+type Output = z.infer<typeof opsUpgradeStatusSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:140
 
 // ops.upgrade.attentionNotice
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:372
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:375
 type Input = unknown;
-// Output: opsUpgradeAttentionNoticeSchema, ../contract/src/features/migrations/ops-upgrade.ts:358
+// Output: opsUpgradeAttentionNoticeSchema, ../contract/src/features/migrations/ops-upgrade.ts:361
 interface Output {
   show: boolean;
 }
 
 // ops.upgrade.listReleases
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:377
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:380
 type Input = unknown;
-// Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:258
+// Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:261
 interface Output {
   items: {
     release: string | null;
@@ -2324,28 +2391,28 @@ interface Output {
 }
 
 // ops.upgrade.listSteps
-// Input: opsUpgradeListStepsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:282
+// Input: opsUpgradeListStepsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:285
 interface Input {
   release?: string | null;
   mode?: string;
   status?: string;
 }
-type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:265
+type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:268
 
 // ops.upgrade.getStep
-// Input: opsUpgradeIdInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:320
+// Input: opsUpgradeIdInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:323
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:224
+type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:227
 
 // ops.upgrade.listRuns
-// Input: opsUpgradeListRunsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:293
+// Input: opsUpgradeListRunsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:296
 interface Input {
   cursor?: string | null;
   limit?: number;
 }
-// Output: opsUpgradeRunPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:269
+// Output: opsUpgradeRunPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:272
 interface Output {
   items: {
     id: string;
@@ -2359,13 +2426,13 @@ interface Output {
 }
 
 // ops.upgrade.getRun
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:320
-type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:250
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:323
+type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:253
 
 // ops.upgrade.listTargets
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:401
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:404
 type Input = unknown;
-// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:402
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:405
 type Output = {
   target: string;
   version: string | null;
@@ -2375,15 +2442,15 @@ type Output = {
 }[];
 
 // ops.upgrade.retryStep
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:320
-type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:224
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:323
+type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:227
 
 // ops.upgrade.getDiagnostics
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:320
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:323
 type Output = z.infer<typeof upgradeDiagnosticsBundleSchema>; // ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:82
 
 // ops.upgrade.diagnosticsAvailability
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:415
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:418
 type Input = unknown;
 // Output: opsUpgradeDiagnosticsAvailabilitySchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:96
 interface Output {
@@ -2393,7 +2460,7 @@ interface Output {
 }
 
 // ops.upgrade.sendDiagnostics
-type Input = z.infer<typeof opsUpgradeSendDiagnosticsInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:331
+type Input = z.infer<typeof opsUpgradeSendDiagnosticsInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:334
 // Output: opsUpgradeDiagnosticsReceiptSchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:110
 interface Output {
   reportId: string;
@@ -2401,19 +2468,19 @@ interface Output {
 }
 
 // ops.upgrade.listSystemMigrations
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:429
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:432
 type Input = unknown;
-// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:430)
+// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:433)
 
 // ops.upgrade.listTenants
-// Input: opsUpgradeListTenantsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:307
+// Input: opsUpgradeListTenantsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:310
 interface Input {
   step?: string;
   state?: "migrated" | "finalized" | "parked" | "rolled_back";
   cursor?: string | null;
   limit?: number;
 }
-// Output: opsUpgradeTenantPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:314
+// Output: opsUpgradeTenantPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:317
 interface Output {
   items: {
     migrationName: string;
@@ -2426,7 +2493,7 @@ interface Output {
 }
 
 // ops.upgrade.listMigrationEnrollments
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:442
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:445
 type Input = unknown;
 // Output: opsMigrationEnrollmentListingSchema, ../contract/src/features/migrations/ops-system-migration.ts:160
 interface Output {
@@ -2445,7 +2512,7 @@ interface Output {
 interface Input {
   query: string;
 }
-// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:451
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:454
 type Output = {
   id: string;
   name: string;
@@ -2506,7 +2573,7 @@ interface Output {
 }
 
 // ops.upgrade.runSystemMigrationPass
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:494
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:497
 type Input = Record<string, unknown>;
 // Output: opsMigrationPassStartedSchema, ../contract/src/ops.responses.ts:450
 interface Output {
@@ -2580,6 +2647,14 @@ Declared at `src/eventing/ops-projection-replay.pipeline.ts:43`. Events: `projec
 | command         | `requestProjectionReplay` | –                          | `src/eventing/ops-projection-replay.pipeline.ts:48` |
 | process manager | `projectionReplay`        | intents `execute` (outbox) | `src/eventing/ops-projection-replay.pipeline.ts:49` |
 
+### Pipeline `ops_seat_sharing` (aggregate `global`)
+
+Declared at `src/eventing/ops-seat-sharing.pipeline.ts:25`.
+
+| Kind            | Name          | Handles                                                                                | Declared at                                    |
+| --------------- | ------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| process manager | `seatSharing` | every 1 h (`SEAT_SHARING_WAKE_INTERVAL_MS = 60 * 60 * 1000`); intents `check` (outbox) | `src/eventing/ops-seat-sharing.pipeline.ts:30` |
+
 ### Pipeline `ops_storage_stats` (aggregate `global`)
 
 Declared at `src/eventing/ops-storage-stats.pipeline.ts:27`.
@@ -2630,29 +2705,32 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                 | Environment variable                    | Declared at                        |
 | ------ | ------------------------------------ | --------------------------------------- | ---------------------------------- |
-| secret | `licensePrivateKey`                  | `LANGWATCH_LICENSE_PRIVATE_KEY`         | `src/app/ops.app.ts:819`           |
-| secret | `slackBugReportsBotToken`            | `SLACK_BUG_REPORTS_BOT_TOKEN`           | `src/app/ops.app.ts:820`           |
-| secret | `credentials`                        | `CREDENTIALS_SECRET`                    | `src/app/ops.app.ts:822`           |
-| secret | `credentialsFallback`                | `NEXTAUTH_SECRET`                       | `src/app/ops.app.ts:823`           |
-| secret | `credentialsPrevious`                | `CREDENTIALS_SECRET_PREVIOUS`           | `src/app/ops.app.ts:824`           |
-| config | `apiKey`                             | `LANGWATCH_OPS_API_KEY`                 | `../contract/src/ops.config.ts:30` |
-| config | `clickhouseOpsUrl`                   | `CLICKHOUSE_OPS_URL`                    | `../contract/src/ops.config.ts:32` |
-| config | `usageStats.disabled`                | `DISABLE_USAGE_STATS`                   | `../contract/src/ops.config.ts:34` |
-| config | `usageStats.installMethod`           | `INSTALL_METHOD`                        | `../contract/src/ops.config.ts:35` |
-| config | `usageStats.chartVersion`            | `LANGWATCH_CHART_VERSION`               | `../contract/src/ops.config.ts:37` |
-| config | `upgradeDiagnosticsAutoSendDisabled` | `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND` | `../contract/src/ops.config.ts:40` |
-| config | `collectClickHouseBackupMetrics`     | `CLICKHOUSE_BACKUP_METRICS_ENABLED`     | `../contract/src/ops.config.ts:44` |
-| config | `productAnalytics.key`               | `POSTHOG_KEY`                           | `../contract/src/ops.config.ts:51` |
-| config | `productAnalytics.host`              | `POSTHOG_HOST`                          | `../contract/src/ops.config.ts:51` |
-| config | `grafana`                            | `GRAFANA_BASE_URL`                      | `../contract/src/ops.config.ts:53` |
-| config | `bugReportSlackChannel`              | `SLACK_BUG_REPORTS_CHANNEL`             | `../contract/src/ops.config.ts:55` |
-| config | `slackApiBase`                       | `SLACK_API_BASE`                        | `../contract/src/ops.config.ts:57` |
-| config | `cloudOps`                           | `LANGWATCH_CLOUD_OPS`                   | `../contract/src/ops.config.ts:59` |
-| config | `adminEmails`                        | `ADMIN_EMAILS`                          | `../contract/src/ops.config.ts:61` |
-| config | `nodeEnvironment`                    | `NODE_ENV`                              | `../contract/src/ops.config.ts:63` |
-| config | `isSaas`                             | `IS_SAAS`                               | `../contract/src/ops.config.ts:64` |
-| config | `publicBaseUrl`                      | `BASE_HOST`                             | `../contract/src/ops.config.ts:65` |
-| config | `serviceVersion`                     | `SERVICE_VERSION`                       | `../contract/src/ops.config.ts:67` |
-| config | `otelResourceAttributes`             | `OTEL_RESOURCE_ATTRIBUTES`              | `../contract/src/ops.config.ts:68` |
+| secret | `licensePrivateKey`                  | `LANGWATCH_LICENSE_PRIVATE_KEY`         | `src/app/ops.app.ts:839`           |
+| secret | `slackBugReportsBotToken`            | `SLACK_BUG_REPORTS_BOT_TOKEN`           | `src/app/ops.app.ts:840`           |
+| secret | `credentials`                        | `CREDENTIALS_SECRET`                    | `src/app/ops.app.ts:842`           |
+| secret | `credentialsFallback`                | `NEXTAUTH_SECRET`                       | `src/app/ops.app.ts:843`           |
+| secret | `credentialsPrevious`                | `CREDENTIALS_SECRET_PREVIOUS`           | `src/app/ops.app.ts:844`           |
+| config | `apiKey`                             | `LANGWATCH_OPS_API_KEY`                 | `../contract/src/ops.config.ts:31` |
+| config | `clickhouseOpsUrl`                   | `CLICKHOUSE_OPS_URL`                    | `../contract/src/ops.config.ts:33` |
+| config | `clickhouseOpsPasswordFile`          | `CLICKHOUSE_OPS_PASSWORD_FILE`          | `../contract/src/ops.config.ts:35` |
+| config | `usageStats.disabled`                | `DISABLE_USAGE_STATS`                   | `../contract/src/ops.config.ts:43` |
+| config | `usageStats.installMethod`           | `INSTALL_METHOD`                        | `../contract/src/ops.config.ts:44` |
+| config | `usageStats.chartVersion`            | `LANGWATCH_CHART_VERSION`               | `../contract/src/ops.config.ts:46` |
+| config | `noticesDisabled`                    | `DISABLE_LANGWATCH_NOTICES`             | `../contract/src/ops.config.ts:49` |
+| config | `upgradeDiagnosticsAutoSendDisabled` | `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND` | `../contract/src/ops.config.ts:51` |
+| config | `clickhouseCluster`                  | `CLICKHOUSE_CLUSTER`                    | `../contract/src/ops.config.ts:60` |
+| config | `collectClickHouseBackupMetrics`     | `CLICKHOUSE_BACKUP_METRICS_ENABLED`     | `../contract/src/ops.config.ts:61` |
+| config | `productAnalytics.key`               | `POSTHOG_KEY`                           | `../contract/src/ops.config.ts:68` |
+| config | `productAnalytics.host`              | `POSTHOG_HOST`                          | `../contract/src/ops.config.ts:68` |
+| config | `grafana`                            | `GRAFANA_BASE_URL`                      | `../contract/src/ops.config.ts:70` |
+| config | `bugReportSlackChannel`              | `SLACK_BUG_REPORTS_CHANNEL`             | `../contract/src/ops.config.ts:72` |
+| config | `slackApiBase`                       | `SLACK_API_BASE`                        | `../contract/src/ops.config.ts:74` |
+| config | `cloudOps`                           | `LANGWATCH_CLOUD_OPS`                   | `../contract/src/ops.config.ts:76` |
+| config | `adminEmails`                        | `ADMIN_EMAILS`                          | `../contract/src/ops.config.ts:78` |
+| config | `nodeEnvironment`                    | `NODE_ENV`                              | `../contract/src/ops.config.ts:80` |
+| config | `isSaas`                             | `IS_SAAS`                               | `../contract/src/ops.config.ts:81` |
+| config | `publicBaseUrl`                      | `BASE_HOST`                             | `../contract/src/ops.config.ts:82` |
+| config | `serviceVersion`                     | `SERVICE_VERSION`                       | `../contract/src/ops.config.ts:84` |
+| config | `otelResourceAttributes`             | `OTEL_RESOURCE_ATTRIBUTES`              | `../contract/src/ops.config.ts:85` |
 
 <!-- readme:generated:end -->

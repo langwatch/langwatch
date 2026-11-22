@@ -28,6 +28,7 @@ import {
   type RemoveUserAvatarInput,
   type SetUserAvatarInput,
   type SetUserHomePathInput,
+  type PasswordHolder,
   type SetFirstUserPasswordInput,
   type SetFirstUserPasswordResult,
   type UpdateUserEmailInput,
@@ -43,6 +44,7 @@ import {
   type UserProfilesInput,
   type UserSsoStatus,
   type UserTourPreference,
+  setUserCodeAccessPreferenceInputSchema,
   type UserCodeAccessPreference,
   type UserNotificationPreference,
   type UserNotificationTopicInput,
@@ -139,6 +141,10 @@ export class UserService {
     return this.repository.countUsageAmong({ userIds: memberUserIds });
   }
 
+  findSignedInSince(input: { userIds: readonly string[]; since: number }): Promise<string[]> {
+    return this.repository.findSignedInSince(input);
+  }
+
   /** A domain with a wildcard in it is no domain, so it matches nobody. */
   hasAccountOnDomain({ domain }: { domain: string }): Promise<boolean> {
     const normalised = domain.trim().toLowerCase();
@@ -150,10 +156,21 @@ export class UserService {
     return this.repository.hasAnyAccount();
   }
 
+  async isFirstCreatedAccount({ userId }: { userId: string }): Promise<boolean> {
+    return (await this.repository.findFirstCreatedId()) === userId;
+  }
+
   getProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {
     const parsed = userProfilesInputSchema.parse(input);
 
     return this.repository.findProfiles([...new Set(parsed.userIds)]);
+  }
+
+  searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]> {
+    const query = input.query.trim();
+    if (query === "") return Promise.resolve([]);
+
+    return this.repository.searchProfiles({ query, limit: input.limit });
   }
 
   findById(input: UserIdInput): Promise<UserProfile | null> {
@@ -196,6 +213,9 @@ export class UserService {
     return this.repository.create(createUserInputSchema.parse(input));
   }
 
+  recordCreated = (input: UserIdInput): Promise<void> =>
+    this.repository.appendCreatedFact(userIdInputSchema.parse(input).id);
+
   /**
    * The signup form's mint: its registered fact commits with the account. Born confirmed when a
    * spent mailbox proof confirmed the address.
@@ -228,6 +248,36 @@ export class UserService {
     const parsed = userIdInputSchema.parse(input);
 
     return this.repository.hasPassword(parsed.id);
+  }
+
+  /** Addresses are matched lower-cased on both sides, so a stored mixed-case address is found. */
+  async findPasswordHolders({
+    emails,
+  }: {
+    emails: readonly string[] | null;
+  }): Promise<PasswordHolder[]> {
+    const wanted =
+      emails === null
+        ? null
+        : [...new Set(emails.map((email) => email.trim().toLowerCase()))].filter(Boolean);
+    if (wanted?.length === 0) return [];
+    const rows = await this.repository.findPasswordHolders({ emails: wanted });
+    return rows.map((row) => ({
+      id: row.id,
+      email: row.email,
+      markedForReset: row.passwordResetRequiredAt !== null,
+    }));
+  }
+
+  async markPasswordResetRequired({
+    userIds,
+  }: {
+    userIds: readonly string[];
+  }): Promise<{ marked: number }> {
+    if (userIds.length === 0) return { marked: 0 };
+    return {
+      marked: await this.repository.markPasswordResetRequired({ ids: userIds, at: this.now() }),
+    };
   }
 
   setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult> {
@@ -321,9 +371,8 @@ export class UserService {
   }
 
   async setLangyCodeAccessPreference(input: UserIdInput & UserCodeAccessPreference): Promise<void> {
-    const parsed = userIdInputSchema.parse(input);
-
-    await this.repository.setLangyCodeAccessPreference(parsed.id, input.preference);
+    const parsed = setUserCodeAccessPreferenceInputSchema.parse(input);
+    await this.repository.setLangyCodeAccessPreference(parsed.id, parsed.preference);
   }
 
   dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference> {

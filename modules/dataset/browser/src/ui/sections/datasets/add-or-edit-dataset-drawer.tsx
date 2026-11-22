@@ -8,8 +8,9 @@ import { datasetClient } from "@langwatch/dataset-client";
 import {
   type DatasetApiUpsertOutput,
   type DatasetColumns,
-  type DatasetRecordForm,
+  type DrawerDatasetColumn,
   datasetRecordFormSchema,
+  drawerDatasetColumnSchema,
   type InMemoryDataset,
 } from "@langwatch/dataset-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
@@ -26,14 +27,17 @@ import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useEffect } from "react";
 import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, type Resolver, useFieldArray, useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { useDatasetSlugValidation } from "../../../behavior/datasets/use-dataset-slug-validation.ts";
+import { columnRenamesOf, recordsBySource, withSources } from "../../../model/column-renames.ts";
 import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
-import { tryToMapPreviousColumnsToNewColumns } from "../../../model/workflow/studio-dataset.utils.ts";
 import { DatasetSlugDisplay } from "./dataset-slug-display.tsx";
 
 export interface AddDatasetDrawerProps {
-  datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
+  datasetToSave?: Omit<InMemoryDataset, "datasetRecords" | "columnTypes"> & {
+    /** A column's `id` is the caller's; it comes back on the column edited from it. */
+    columnTypes: DrawerDatasetColumn[];
     datasetId?: string;
     // IDs are optional for new records - backend generates them with nanoid()
     datasetRecords?: ({ id?: string } & Record<string, unknown>)[];
@@ -44,7 +48,11 @@ export interface AddDatasetDrawerProps {
    * Optional: a bare-URL open (`?drawer.open=addOrEditDataset`) has no
    * caller to hand one in, so it must create and close via `onClose` alone.
    */
-  onSuccess?: (dataset: { datasetId: string; name: string; columnTypes: DatasetColumns }) => void;
+  onSuccess?: (dataset: {
+    datasetId: string;
+    name: string;
+    columnTypes: DrawerDatasetColumn[];
+  }) => void;
   /**
    * When true, skip saving to DB and just call onSuccess with the form data.
    * Useful for editing inline/in-memory datasets that shouldn't be persisted yet.
@@ -67,10 +75,14 @@ export interface AddDatasetDrawerProps {
   isColumnsLocked?: boolean;
 }
 
-type FormValues = {
-  name: string;
-  columnTypes: DatasetColumns;
-};
+/** A form column also keeps the stored name it was loaded as, which names a rename. */
+const drawerFormSchema = z.object({
+  ...datasetRecordFormSchema.shape,
+  columnTypes: z.array(
+    z.object({ ...drawerDatasetColumnSchema.shape, source: z.string().optional() }),
+  ),
+});
+type FormValues = z.infer<typeof drawerFormSchema>;
 
 type SavedDataset = { datasetId?: string } | undefined;
 
@@ -135,8 +147,8 @@ function columnTypesError(columns: FormValues["columnTypes"]): string | undefine
 
 /** The schema's verdict, plus a required name and a column list that can be saved. */
 const validateDatasetForm: Resolver<FormValues> = async (data, context, options) => {
-  const result = await zodResolver(datasetRecordFormSchema)(data, context, options);
-  const errors = result.errors as FieldErrors<DatasetRecordForm>;
+  const result = await zodResolver(drawerFormSchema)(data, context, options);
+  const errors = result.errors as FieldErrors<FormValues>;
 
   if (!data.name || data.name.trim() === "") {
     errors.name = { type: "required", message: "Name is required" };
@@ -155,26 +167,46 @@ function upsertInputOf({
 }: {
   projectId: string;
   datasetToSave: AddDatasetDrawerProps["datasetToSave"];
-  data: DatasetRecordForm;
+  data: FormValues;
 }) {
+  const columnTypes = withoutCallerIds(data.columnTypes);
   const base = {
     projectId,
     datasetId: datasetToSave?.datasetId,
     name: data.name,
-    columnTypes: data.columnTypes,
+    columnTypes,
+    ...(datasetToSave?.datasetId ? { columnRenames: columnRenamesOf(data.columnTypes) } : {}),
   };
   if (!datasetToSave?.datasetRecords) return base;
 
-  const remapped = tryToMapPreviousColumnsToNewColumns(
-    datasetToSave.datasetRecords,
-    datasetToSave.columnTypes,
-    data.columnTypes,
-  );
+  const remapped = recordsBySource(datasetToSave.datasetRecords, data.columnTypes);
   return {
     ...base,
-    datasetRecords: convertDatasetRecordsToColumnTypes(remapped, data.columnTypes),
+    datasetRecords: convertDatasetRecordsToColumnTypes(remapped, columnTypes),
   };
 }
+
+const withoutCallerIds = (columns: DrawerDatasetColumn[]): DatasetColumns =>
+  columns.map(({ name, type }) => ({ name, type }));
+
+/** The form's columns as the caller sees them: its ids kept, the loaded names dropped. */
+const withoutSources = (columns: FormValues["columnTypes"]): DrawerDatasetColumn[] =>
+  columns.map(({ source: _source, ...column }) => column);
+
+/** The saved columns, in submitted order, each with the caller's id it was saved from. */
+const withCallerIds = ({
+  saved,
+  submitted,
+}: {
+  saved: DatasetColumns;
+  submitted: DrawerDatasetColumn[];
+}): DrawerDatasetColumn[] => {
+  if (saved.length !== submitted.length) return saved;
+  return saved.map((column, index) => {
+    const id = submitted[index]?.id;
+    return id === undefined ? column : { ...column, id };
+  });
+};
 
 /** Resets the form to the edited dataset (after layout) or a blank one; answers the cancel. */
 function resetDrawerForm({
@@ -191,7 +223,7 @@ function resetDrawerForm({
     return () => undefined;
   }
   const timeout = setTimeout(() => {
-    reset({ name: datasetToSave.name ?? "", columnTypes: datasetToSave.columnTypes });
+    reset({ name: datasetToSave.name ?? "", columnTypes: withSources(datasetToSave.columnTypes) });
   }, 0);
   return () => clearTimeout(timeout);
 }
@@ -216,7 +248,9 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   } = useForm<FormValues>({
     defaultValues: {
       name: props.datasetToSave?.name ?? "",
-      columnTypes: props.datasetToSave?.columnTypes ?? initialColumns,
+      columnTypes: props.datasetToSave
+        ? withSources(props.datasetToSave.columnTypes)
+        : initialColumns,
     },
     resolver: validateDatasetForm,
   });
@@ -249,15 +283,22 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
 
   const trpc = datasetClient.useUtils();
 
-  const performUpsert = (data: DatasetRecordForm) => {
+  const performUpsert = (submitted: FormValues) => {
     upsertDataset.mutate(
-      upsertInputOf({ projectId: project?.id ?? "", datasetToSave: props.datasetToSave, data }),
+      upsertInputOf({
+        projectId: project?.id ?? "",
+        datasetToSave: props.datasetToSave,
+        data: submitted,
+      }),
       {
         onSuccess: (data: WireOf<DatasetApiUpsertOutput>) => {
           props.onSuccess?.({
             datasetId: data.id,
             name: data.name,
-            columnTypes: data.columnTypes as DatasetColumns,
+            columnTypes: withCallerIds({
+              saved: data.columnTypes as DatasetColumns,
+              submitted: submitted.columnTypes,
+            }),
           });
           toaster.create({
             title: datasetSavedTitle(props.datasetToSave),
@@ -291,13 +332,13 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
     );
   };
 
-  const onSubmit = (data: DatasetRecordForm) => {
+  const onSubmit = (data: FormValues) => {
     // For localOnly mode, skip DB save and just call onSuccess
     if (props.localOnly) {
       props.onSuccess?.({
         datasetId: props.datasetToSave?.datasetId ?? "",
         name: data.name,
-        columnTypes: data.columnTypes,
+        columnTypes: withoutSources(data.columnTypes),
       });
       reset();
       onClose();

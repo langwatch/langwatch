@@ -353,6 +353,13 @@ Feature: Evaluation service boundary
     And an unmapped or empty contexts field is sent as no contexts rather than one empty string
 
   @unit
+  Scenario: A conversation mapping that resolves to nothing reaches langevals as no turns
+    Given a monitor whose conversation mapping resolves to an empty string
+    When the evaluator request is built for langevals
+    Then the conversation is sent as an empty list, not as one empty turn
+    And an empty turn beside real ones is dropped
+
+  @unit
   Scenario: Invalid evaluator settings are refused even when generation parameters ride along
     Given an evaluator whose settings carry a temperature
     And the evaluator's own settings fail its settings schema
@@ -407,6 +414,21 @@ Feature: Evaluation service boundary
     When an evaluation calls an evaluator
     Then the failure is retryable, answers 503 and keeps the code evaluator_execution_error
     And a queued evaluation sends its next attempt, delayed, instead of being recorded as an error
+
+  @unit
+  Scenario: An evaluator service that timed out is recorded as an error and not called again
+    Given the evaluator service answers 504 because it did not finish in time, or our own call to it times out
+    When an evaluation calls an evaluator
+    Then the evaluator service is called once and not again
+    And the failure is not retryable and its message says the evaluator timed out
+    And a queued evaluation is recorded as an error with that message, not skipped and not sent again
+
+  @unit
+  Scenario: An evaluator service that is briefly unavailable is called again a bounded number of times
+    Given the evaluator service answers 503 because its queue is full, or 502
+    When an evaluation calls an evaluator
+    Then the evaluator service is called again, at most the configured number of retries
+    And a 503 that persists fails retryable, so the queue retries it inside the retry window
 
   @unit
   Scenario: Each failed attempt records an attempt event with its number, error and next try

@@ -485,6 +485,119 @@ describe("POST /api/experiments/:slug/run", () => {
     });
   });
 
+  describe("when the body names a concurrency", () => {
+    /** @scenario "A run call that names a concurrency runs that many cells at once" */
+    it("plans the run with that concurrency, reading the saved experiment only", async () => {
+      const { request, starts } = await harness({ experiments: found(savedState()), redis: true });
+
+      const response = await request("/checkout-eval/run", runOf('{"concurrency":1}'));
+
+      expect(response.status).toBe(200);
+      expect(starts).toMatchObject([{ plan: { concurrency: 1 } }]);
+    });
+  });
+
+  describe("when the body names a concurrency and the experiment saved another", () => {
+    /** @scenario "A per-run concurrency is answered by the run API and leaves the saved setting alone" */
+    it("answers the run's concurrency on start and poll, leaving the saved one at 10", async () => {
+      const saved = { ...savedState(), concurrency: 10 };
+      const { request } = await harness({
+        experiments: { ...found(saved), isActive: async () => true },
+        redis: true,
+        registers: false,
+      });
+
+      const response = await request("/checkout-eval/run", runOf('{"concurrency":1}'));
+      const body = await response.json();
+      const poll = await (await request(`/runs/${body.runId}`)).json();
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({ status: "running", concurrency: 1 });
+      expect(poll).toMatchObject({ runId: body.runId, status: "running", concurrency: 1 });
+      expect(saved.concurrency).toBe(10);
+    });
+  });
+
+  describe("when the body names no concurrency", () => {
+    /** @scenario "A run call that names no concurrency uses the deployment's default" */
+    it("plans the run with the deployment's concurrency", async () => {
+      const { request, starts } = await harness({ experiments: found(savedState()), redis: true });
+
+      const response = await request("/checkout-eval/run", runOf("{}"));
+
+      expect(response.status).toBe(200);
+      expect(starts).toMatchObject([{ plan: { concurrency: 10 } }]);
+    });
+  });
+
+  describe("when the body names a concurrency outside 1 to 24", () => {
+    for (const concurrency of [0, 25, 1.5]) {
+      /** @scenario "A run call with a concurrency outside 1 to 24 is refused" */
+      it(`refuses ${concurrency} with 400 and starts nothing`, async () => {
+        const { request, starts } = await harness({
+          experiments: found(savedState()),
+          redis: true,
+        });
+
+        const response = await request(
+          "/checkout-eval/run",
+          runOf(JSON.stringify({ concurrency })),
+        );
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({
+          code: "experiment_evaluation_input_invalid",
+        });
+        expect(starts).toEqual([]);
+      });
+    }
+  });
+
+  describe("when the body names a repeat of 3", () => {
+    /** @scenario "A run call that names a repeat plans the repeated run and keeps the workbench as it is" */
+    it("plans the run with that repeat and no write-back into the workbench", async () => {
+      const { request, starts } = await harness({ experiments: found(savedState()), redis: true });
+
+      const response = await request("/checkout-eval/run", runOf('{"repeat":3}'));
+
+      expect(response.status).toBe(200);
+      expect(starts).toMatchObject([{ plan: { repeat: 3, persistResults: false } }]);
+    });
+  });
+
+  describe("when the body names a repeat of 1", () => {
+    /** @scenario "A run call with a repeat of 1 runs every row once, as before" */
+    it("plans the run with no repeat, writing back as an unrepeated run does", async () => {
+      const { request, starts } = await harness({ experiments: found(savedState()), redis: true });
+
+      const response = await request("/checkout-eval/run", runOf('{"repeat":1}'));
+
+      expect(response.status).toBe(200);
+      expect(starts).toMatchObject([{ plan: { persistResults: true } }]);
+      expect((starts[0] as { plan: { repeat?: number } }).plan.repeat).toBeUndefined();
+    });
+  });
+
+  describe("when the body names a repeat outside 1 to 5", () => {
+    for (const repeat of [0, 6, 1.5]) {
+      /** @scenario "A run call with a repeat outside 1 to 5 is refused" */
+      it(`refuses ${repeat} with 400 and starts nothing`, async () => {
+        const { request, starts } = await harness({
+          experiments: found(savedState()),
+          redis: true,
+        });
+
+        const response = await request("/checkout-eval/run", runOf(JSON.stringify({ repeat })));
+
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({
+          code: "experiment_evaluation_input_invalid",
+        });
+        expect(starts).toEqual([]);
+      });
+    }
+  });
+
   describe("when the caller asks for JSON", () => {
     /** @scenario "A polled saved run starts on the run's pipeline and answers at once" */
     /** @scenario "Default response returns runId for polling" */
@@ -503,6 +616,7 @@ describe("POST /api/experiments/:slug/run", () => {
         runId: expect.any(String),
         status: "running",
         total: 0,
+        concurrency: 10,
         runUrl: `https://app.test/acme/experiments/checkout-eval?runId=${body.runId}`,
       });
       expect(starts).toMatchObject([
@@ -565,6 +679,7 @@ describe("POST /api/experiments/:slug/run", () => {
         status: "running",
         progress: 0,
         total: 0,
+        concurrency: 10,
         startedAt: expect.any(Number),
       });
     });
@@ -1297,6 +1412,7 @@ describe("/api/evaluations/v3/*, the SDKs' older name for the workbench doors", 
       runId: expect.any(String),
       status: "running",
       total: 0,
+      concurrency: 10,
       runUrl: `https://app.test/acme/experiments/checkout-eval?runId=${body.runId}`,
     });
     expect(starts).toHaveLength(1);

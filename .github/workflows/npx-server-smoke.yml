@@ -8,7 +8,7 @@
 #
 # Trigger policy:
 # - workflow_dispatch (manual, with optional `port_base` input)
-# - nightly schedule (04:00 UTC)
+# - nightly, called from .github/workflows/nightly.yml (01:00 UTC)
 # - push to main, when key files change
 #
 # Branch pushes no longer run it: it is a signal, not a gate, and it ran on
@@ -28,8 +28,14 @@ on:
         description: "Port base to test (default 5560)"
         required: false
         default: "5560"
-  schedule:
-    - cron: "0 4 * * *"
+  # The nightly suite (.github/workflows/nightly.yml) calls this; it owns the schedule.
+  workflow_call:
+    inputs:
+      port_base:
+        description: "Port base to test (default 5560)"
+        type: string
+        required: false
+        default: "5560"
   push:
     branches: [main]
     paths:
@@ -68,10 +74,13 @@ on:
       - "apps/*/package.json"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  # A newer commit supersedes an older run, on main too: the newest verdict
-  # covers the commits before it. Image and release builds keep their own rule.
-  cancel-in-progress: true
+  # A literal name, not github.workflow: called from the nightly, that is the
+  # nightly's name. The event is in the group so a nightly run and a push run
+  # never share one.
+  group: npx-server-smoke-${{ github.ref }}-${{ github.event_name }}
+  # A newer push supersedes an older run, on main too: the newest verdict covers
+  # the commits before it. A nightly or manual run is never cancelled.
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 permissions:
   contents: read

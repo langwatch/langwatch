@@ -53,6 +53,24 @@
     "CapturedInput <- SpanAttributes [input]",
     "CapturedOutput <- SpanAttributes [output]"
   ],
+  "span_metrics <- span_analytics": [
+    "TenantId <- TenantId",
+    "TraceId <- TraceId",
+    "SpanId <- SpanId",
+    "ParentSpanId <- ParentSpanId",
+    "StartTime <- StartTime",
+    "EndTime <- EndTime",
+    "DurationMs <- DurationMs",
+    "SpanName <- SpanName",
+    "SpanKind <- SpanKind",
+    "StatusCode <- StatusCode",
+    "Cost <- Cost [cost:view]",
+    "NonBilledCost <- NonBilledCost [cost:view]",
+    "SpanType <- SpanType",
+    "ErrorType <- ErrorType",
+    "RagContextCount <- RagContextCount",
+    "DeploymentEnvironment <- DeploymentEnvironment"
+  ],
   "evaluations <- evaluation_runs": [
     "TenantId <- TenantId",
     "EvaluationId <- EvaluationId",
@@ -107,6 +125,7 @@
     "ConversationId <- ConversationId",
     "CustomerId <- CustomerId",
     "Origin <- Origin",
+    "Source <- Origin",
     "Models <- Models",
     "Labels <- Labels",
     "TotalCost <- TotalCost [cost:view]",
@@ -121,7 +140,19 @@
     "CacheReadTokens <- CacheReadTokens",
     "CacheWriteTokens <- CacheWriteTokens",
     "ReasoningTokens <- ReasoningTokens",
-    "HasError <- HasError"
+    "HasError <- HasError",
+    "MetadataOutputAction <- MetadataOutputAction",
+    "MetadataOutcome <- MetadataOutcome",
+    "MetadataSentToReview <- MetadataSentToReview",
+    "MetadataDocumentType <- MetadataDocumentType",
+    "MetadataFlow <- MetadataFlow",
+    "MetadataLanguage <- MetadataLanguage",
+    "MetadataSegment <- MetadataSegment",
+    "MetadataTeam <- MetadataTeam",
+    "MetadataTopic <- MetadataTopic",
+    "MetadataOutcomeReason <- MetadataOutcomeReason",
+    "MetadataPromptVersion <- MetadataPromptVersion",
+    "MetadataEnvironment <- MetadataEnvironment"
   ],
   "trace_metrics_by_minute <- trace_analytics_rollup": [
     "TenantId <- TenantId",
@@ -170,6 +201,7 @@
     "ConversationId <- ConversationId",
     "CustomerId <- CustomerId",
     "Origin <- Origin",
+    "Source <- Origin",
     "DurationMs <- DurationMs",
     "TotalCost <- TotalCost [cost:view]",
     "NonBilledCost <- NonBilledCost [cost:view]",
@@ -190,6 +222,43 @@
     "DurationSum <- DurationSum",
     "CostSum <- CostSum [cost:view]",
     "NonBilledCostSum <- NonBilledCostSum [cost:view]"
+  ],
+  "trace_evaluation_metrics <- trace_evaluation_analytics": [
+    "TenantId <- TenantId",
+    "TraceId <- TraceId",
+    "EvaluationId <- EvaluationId",
+    "OccurredAt <- OccurredAt",
+    "UpdatedAt <- UpdatedAt",
+    "TraceOccurredAt <- TraceOccurredAt",
+    "EvaluatorName <- EvaluatorName",
+    "Status <- Status",
+    "IsGuardrail <- IsGuardrail",
+    "Passed <- Passed",
+    "Label <- Label",
+    "Source <- Origin",
+    "TraceSource <- TraceOrigin",
+    "CustomerId <- CustomerId",
+    "TopicId <- TopicId",
+    "Labels <- Labels",
+    "MetadataTopic <- MetadataTopic",
+    "MetadataDocumentType <- MetadataDocumentType",
+    "MetadataLanguage <- MetadataLanguage",
+    "MetadataTeam <- MetadataTeam",
+    "MetadataFlow <- MetadataFlow",
+    "MetadataSegment <- MetadataSegment",
+    "MetadataPromptVersion <- MetadataPromptVersion"
+  ],
+  "trace_evaluation_checks <- trace_evaluation_analytics": [
+    "TenantId <- TenantId",
+    "TraceId <- TraceId",
+    "OccurredAt <- OccurredAt",
+    "TraceOccurredAt <- TraceOccurredAt",
+    "EvaluatorName <- EvaluatorName",
+    "Passed <- Passed",
+    "IsGuardrail <- IsGuardrail",
+    "Source <- Origin",
+    "TraceSource <- TraceOrigin",
+    "Evaluations <- Sign"
   ],
   "coding_sessions <- coding_agent_sessions": [
     "TenantId <- TenantId",
@@ -460,7 +529,8 @@
     "_retention_days <- _retention_days",
     "_size_bytes <- _size_bytes",
     "ExpectedTargetResults <- ExpectedTargetResults",
-    "ExpectedEvaluatorResults <- ExpectedEvaluatorResults"
+    "ExpectedEvaluatorResults <- ExpectedEvaluatorResults",
+    "Concurrency <- Concurrency"
   ],
   "gateway_budget_ledger <- gateway_budget_ledger_events": [
     "TenantId <- TenantId",
@@ -543,7 +613,8 @@
     "TokensOutputAudio <- TokensOutputAudio",
     "TokensInputImage <- TokensInputImage",
     "TokensOutputImage <- TokensOutputImage",
-    "ImageCount <- ImageCount"
+    "ImageCount <- ImageCount",
+    "WebSearchRequests <- WebSearchRequests"
   ],
   "governance_cost_restatements <- governance_cost_rollup_restatement_index": [
     "TenantId <- TenantId",

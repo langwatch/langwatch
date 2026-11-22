@@ -42,13 +42,13 @@ moving the work.
 
 Reading discipline:
 
-- Never read a large file whole. `tslsp-cli outline FILE`, then read the one
+- Never read a large file whole. `rush ts outline --file F`, then read the one
   range you need, at most about 120 lines, once.
-- A framework signature is `tslsp-cli hover --symbol X`, never a read of the
+- A framework signature is `rush ts hover --file F --line N --symbol X`, never a read of the
   framework's source.
 - An exemplar is one outline plus one handler, not the whole file.
 - Write the new file from the exemplar's shape first, then let
-  `tslsp-cli diagnostics --file` tell you what the types want. That is cheaper
+  `rush ts diagnostics --file F` tell you what the types want. That is cheaper
   than reading the types.
 
 ## 2. The rules that bind you

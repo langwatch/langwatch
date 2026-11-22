@@ -25,6 +25,8 @@ export interface QueryRunResponse {
   };
   truncated: boolean;
   diagnostics: { code: string; message: string }[];
+  /** Each placeholder the SQL declares by its name, plus `period`; absent on an older platform. */
+  params?: Record<string, unknown>;
 }
 
 /** One published dataset. */
@@ -101,10 +103,14 @@ export interface QueryReferenceResponse {
 export async function runQuery(params: {
   sql: string;
   parameters?: Record<string, string | number | boolean | null>;
+  projects?: string[] | string;
+  sources?: string[];
 }): Promise<QueryRunResponse> {
   return makeRequest("POST", "/api/v1/query", {
     sql: params.sql,
     ...(params.parameters ? { parameters: params.parameters } : {}),
+    ...(params.projects ? { projects: params.projects } : {}),
+    ...(params.sources ? { sources: params.sources } : {}),
   }) as Promise<QueryRunResponse>;
 }
 

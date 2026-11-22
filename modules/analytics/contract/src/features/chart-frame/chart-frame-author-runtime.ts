@@ -67,6 +67,15 @@ export function buildAuthorRuntimeScript(): string {
     return ErrorBoundary;
   }
 
+  // authorMounted is set synchronously in this effect; the heartbeat is a timer, so the
+  // pending-query registration microtask of the widget's first LW.query always wins.
+  function AuthorMounted() {
+    window.React.useEffect(function () {
+      if (typeof window.__lwAuthorMounted === "function") window.__lwAuthorMounted();
+    }, []);
+    return null;
+  }
+
   function mount(Component) {
     if (Component == null || (typeof Component !== "function" && typeof Component !== "object")) {
       showError("No default export", "The widget file must export default a React component.");
@@ -79,7 +88,8 @@ export function buildAuthorRuntimeScript(): string {
         window.React.createElement(
           ErrorBoundary,
           null,
-          window.React.createElement(Component)
+          window.React.createElement(Component),
+          window.React.createElement(AuthorMounted)
         )
       );
     } catch (renderError) {

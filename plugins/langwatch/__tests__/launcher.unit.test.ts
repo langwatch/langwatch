@@ -259,6 +259,23 @@ describe("the launcher's exit-zero guarantee", () => {
     });
   });
 
+  describe("given Grok running the plugin's hook, with the Claude markers it sets", () => {
+    /** @scenario The Claude plugin's hook run by Grok posts nothing */
+    it("runs nothing and exits zero", async () => {
+      const bin = fakePathCli();
+
+      const run = await runLauncher({
+        hook: "session-context",
+        path: [bin],
+        env: { CLAUDE_PROJECT_DIR: "/repo", GROK_HOOK_EVENT: "session_start" },
+      });
+
+      expect(run.exitCode).toBe(0);
+      expect(run.stdout).toBe("");
+      expect(readProbe()).toBeNull();
+    });
+  });
+
   describe("given a config file that is not JSON", () => {
     it("falls through to PATH and exits zero", async () => {
       mkdirSync(join(home, ".langwatch"), { recursive: true });

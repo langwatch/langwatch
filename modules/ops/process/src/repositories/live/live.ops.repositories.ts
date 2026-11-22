@@ -19,12 +19,15 @@ import { RedisAnomalyStateRepository } from "../redis/redis.anomaly-state.reposi
 import { BlobStoreRedisRepository } from "../redis/redis.blob-store.repository.ts";
 import { RedisBugReportRateLimitRepository } from "../redis/redis.bug-report-rate-limit.repository.ts";
 import { RedisCloudLatestReleaseRepository } from "../redis/redis.cloud-latest-release.repository.ts";
+import { RedisCloudNoticeRepository } from "../redis/redis.cloud-notice.repository.ts";
 import { RedisRedisHealthRepository } from "../redis/redis.datastore-health.repository.ts";
 import { RedisGroupQueueReaperRepository } from "../redis/redis.group-queue-reaper.repository.ts";
 import { RedisMigrationLeaseRepository } from "../redis/redis.migration-lease.repository.ts";
 import { RedisOpsMetricsRepository } from "../redis/redis.ops-metrics.repository.ts";
 import { RedisOpsSnapshotRepository } from "../redis/redis.ops-snapshot.repository.ts";
+import { RedisProcessFleetReadingsRepository } from "../redis/redis.process-fleet-readings.repository.ts";
 import { ReplayRedisRepository } from "../redis/redis.replay.repository.ts";
+import { RedisSeatSharingCheckRepository } from "../redis/redis.seat-sharing-check.repository.ts";
 import { RedisStorageStatsReadingsRepository } from "../redis/redis.storage-stats-readings.repository.ts";
 import { LiveReplayRuntimeRepository } from "./live.replay-runtime.repository.ts";
 
@@ -73,7 +76,10 @@ export const LiveOpsRepositories = {
       anomalyState: RedisAnomalyStateRepository.create(redis),
       rateTracker: RedisAnomalyRateTrackerRepository.create({ redis }),
       storageReadings: RedisStorageStatsReadingsRepository.create({ redis }),
+      processFleetReadings: RedisProcessFleetReadingsRepository.create({ redis }),
       cloudLatestRelease: RedisCloudLatestReleaseRepository.create({ redis }),
+      cloudNotices: RedisCloudNoticeRepository.create({ redis }),
+      seatSharingChecks: RedisSeatSharingCheckRepository.create({ redis }),
       redisHealth: RedisRedisHealthRepository.create(redis),
       clickhouseHealth: ClickHouseClickHouseHealthRepository.create({ clickhouse }),
       events: EventingClickHouseEventExplorer.create({ clickhouse }),

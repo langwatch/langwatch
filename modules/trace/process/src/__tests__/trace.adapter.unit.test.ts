@@ -34,7 +34,7 @@ class NullSummaryReaderRepository extends TraceSummaryReaderRepository {
 }
 
 class EmptyPayloads extends TracePayloadReaderRepository {
-  async read(): Promise<string> {
+  async readFields(): Promise<ReadonlyMap<string, string>> {
     throw new Error("no offloaded payloads");
   }
 }
@@ -197,6 +197,8 @@ describe("TraceModule.composeTree", () => {
         cacheReadTokens: null,
         cacheCreationTokens: null,
         updatedAtMs: 30,
+        agentName: null,
+        isA2aCall: false,
       },
     ]);
     expect(modelProviders.costInputs).toEqual([

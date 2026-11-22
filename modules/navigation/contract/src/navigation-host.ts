@@ -101,6 +101,8 @@ export type NavigationOpsAccess = {
 /** Scope change through host; written to app shell's localStorage, not package's */
 export type NavigationScopeWrite = {
   organizationId?: string;
+  /** The remembered team, which belongs to one organization and nowhere else. */
+  teamId?: string;
   projectSlug?: string;
 };
 

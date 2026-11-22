@@ -3,6 +3,10 @@
  * @see specs/self-hosting/connected-services/connect-settings.feature
  */
 
+import {
+  ASK_ADMIN_TO_ACTIVATE,
+  LICENSE_SETTINGS_HREF,
+} from "@langwatch/browser-host/enterprise-lock";
 import { Link } from "@langwatch/browser-host/link";
 import { Banner } from "@langwatch/design-system/banner";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -24,7 +28,7 @@ export default function ConnectScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Connect</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start">
         <Text color="fg.muted">
           Which LangWatch-hosted services this install may call, what they send and what they cost.
         </Text>
@@ -107,16 +111,28 @@ function DeploymentOff() {
   );
 }
 
+/** Only an organization admin may activate a license, so a member is told who can. */
 function NoLicense() {
+  const canManage = useLicensingHost().canManageOrganization();
+  if (!canManage) {
+    return (
+      <NoDataInfoBlock
+        testId="connect-no-license"
+        icon={<KeyRound />}
+        title="Hosted services need a license"
+        description={`A license that includes hosted services lets this install call them. ${ASK_ADMIN_TO_ACTIVATE}`}
+      />
+    );
+  }
   return (
     <NoDataInfoBlock
       testId="connect-no-license"
       icon={<KeyRound />}
       title="Hosted services need a license"
-      description="Activate a license, then come back to choose which hosted services this install may call."
+      description="Activate a license that includes hosted services, then come back to choose which ones this install may call. An offline license includes none."
     >
       <Button asChild size="sm" variant="outline" colorPalette="orange">
-        <Link unstyled href="/settings/license">
+        <Link unstyled href={LICENSE_SETTINGS_HREF}>
           Open the License page
         </Link>
       </Button>

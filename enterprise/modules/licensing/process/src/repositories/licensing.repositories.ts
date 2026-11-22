@@ -6,6 +6,7 @@ import type { LicensingRateLimitRepository } from "./licensing-rate-limit.reposi
 import type { MemberSeatRepository } from "./member-seat.repository.ts";
 import type { OrganizationLicenseRepository } from "./organization-license.repository.ts";
 import type { SelfHostedInstanceRepository } from "./self-hosted-instance.repository.ts";
+import type { SelfHostedNoticeRepository } from "./self-hosted-notice.repository.ts";
 import type { SignInProviderMountRepository } from "./sign-in-provider-mount.repository.ts";
 import type { UpgradeDiagnosticBundleRepository } from "./upgrade-diagnostic-bundle.repository.ts";
 import type { UpgradeDiagnosticRepository } from "./upgrade-diagnostic.repository.ts";
@@ -19,6 +20,8 @@ export interface LicensingRepositories {
   readonly issuedLicenses: IssuedLicenseRepository;
   readonly activationCodes: ActivationCodeRepository;
   readonly selfHostedInstances: SelfHostedInstanceRepository;
+  /** Cloud's notices to self-hosted installs, sent in the usage report reply. */
+  readonly selfHostedNotices: SelfHostedNoticeRepository;
   readonly connectOrganizations: ConnectOrganizationRepository;
   readonly instanceIdentity: InstanceIdentityRepository;
   readonly rateLimits: LicensingRateLimitRepository;

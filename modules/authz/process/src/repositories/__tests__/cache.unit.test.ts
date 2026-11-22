@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthzService, type AuthzServiceOptions } from "../../services/authz.service.ts";
 import type { AuthzReadRepository } from "../authz-read.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../memory/memory.authz-organization-policy.repository.ts";
 import { StubAuthzEpoch } from "./support/authz-epoch.stub.ts";
 import { StubAuthzListingRepository } from "./support/authz-listing.stub.ts";
 import { StubAuthzManagedGrantRepository } from "./support/authz-managed-grant.stub.ts";
@@ -45,6 +46,7 @@ function makeService({
   const epochPort = new StubAuthzEpoch();
   epochPort.findEpoch.mockImplementation(() => epoch());
   return AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     // These suites exercise the engine path, which is what the absent
     // gate used to default to.
     isOnEngine: async () => true,
@@ -61,6 +63,7 @@ function makeService({
  *  service that has never cached anything. */
 function makeUncachedService(reader: AuthzReadRepository) {
   return AuthzService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     // These suites exercise the engine path, which is what the absent
     // gate used to default to.
     isOnEngine: async () => true,

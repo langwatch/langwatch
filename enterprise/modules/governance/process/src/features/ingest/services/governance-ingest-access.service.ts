@@ -1,17 +1,21 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The gate every push-mode receiver shares: throttle, then the bearer secret,
- * then the path's own source id, which must be the one the secret resolved to.
+ * then the path's own source id, which must be the one the secret resolved to,
+ * then whether that source is live.
  */
-import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
+import {
+  ingestionSourceIsLive,
+  type GovernanceIngestionSource,
+} from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { GovernanceRateLimitRepository } from "../../../repositories/governance-rate-limit.repository.ts";
 import type { IngestionSourceService } from "../../ingestion-source/services/ingestion-source.service.ts";
 import {
-  extractClientIp,
   INGEST_RATE_LIMIT_MAX_REQUESTS,
   INGEST_RATE_LIMIT_WINDOW_SECONDS,
+  ingestRateLimitKey,
 } from "../rules/governance-ingest-rate-limit.rules.ts";
 
 const logger = createLogger("langwatch:ingest");
@@ -19,6 +23,7 @@ const logger = createLogger("langwatch:ingest");
 export type GovernanceIngestAuthorization =
   | Readonly<{ outcome: "authorized"; source: GovernanceIngestionSource }>
   | Readonly<{ outcome: "unauthorized" }>
+  | Readonly<{ outcome: "disabled" }>
   | Readonly<{ outcome: "rate-limited"; retryAfterSec: number }>;
 
 export type GovernanceIngestAccessMembers = Readonly<{
@@ -34,6 +39,7 @@ export interface GovernanceIngestAccessApi {
   authorize: (input: {
     headers: Headers;
     sourceId: string;
+    callerAddress: string | null;
   }) => Promise<GovernanceIngestAuthorization>;
 }
 
@@ -47,29 +53,33 @@ export class GovernanceIngestAccessService implements GovernanceIngestAccessApi 
   /**
    * The id check is what stops a valid secret from being pointed at another
    * source's endpoint, and it reports the same bare refusal an unknown secret
-   * gets, so the answer never confirms that some other id exists.
+   * gets, so the answer never confirms that some other id exists. Liveness is
+   * asked after it, once the caller has proved it holds this source's secret.
    */
   async authorize(input: {
     headers: Headers;
     sourceId: string;
+    callerAddress: string | null;
   }): Promise<GovernanceIngestAuthorization> {
-    const throttled = await this.throttle(input.headers);
+    const throttled = await this.throttle(input.callerAddress);
 
     if (throttled) return throttled;
 
     const source = await this.resolveSource(input.headers);
 
     if (!source || source.id !== input.sourceId) return { outcome: "unauthorized" };
+    if (!ingestionSourceIsLive(source)) return { outcome: "disabled" };
 
     return { outcome: "authorized", source };
   }
 
   /** Wedged BEFORE the secret lookup, so scanners shed at the edge. */
-  private async throttle(headers: Headers): Promise<GovernanceIngestAuthorization | null> {
+  private async throttle(
+    callerAddress: string | null,
+  ): Promise<GovernanceIngestAuthorization | null> {
     if (this.members.rateLimitDisabled) return null;
 
-    const ip = extractClientIp(headers);
-    const decision = await this.members.rateLimits.check(`ingest:${ip}`, {
+    const decision = await this.members.rateLimits.check(ingestRateLimitKey(callerAddress), {
       requests: INGEST_RATE_LIMIT_MAX_REQUESTS,
       seconds: INGEST_RATE_LIMIT_WINDOW_SECONDS,
     });
@@ -77,7 +87,10 @@ export class GovernanceIngestAccessService implements GovernanceIngestAccessApi 
     if (decision.allowed) return null;
 
     const retryAfterSec = decision.retryAfterSeconds ?? INGEST_RATE_LIMIT_WINDOW_SECONDS;
-    logger.warn({ ip, retryAfterSec }, "ingest rate-limit exceeded; rejecting with 429");
+    logger.warn(
+      { ip: callerAddress, retryAfterSec },
+      "ingest rate-limit exceeded; rejecting with 429",
+    );
 
     return { outcome: "rate-limited", retryAfterSec };
   }

@@ -9,6 +9,7 @@ import type { z } from "zod";
 
 import {
   CONNECT_KEY_KINDS,
+  CONNECT_LEGACY_KEY_SCOPE,
   CONNECT_PERMISSION,
   connectCallerOf,
 } from "../rules/agent-connect-caller.rules.ts";
@@ -25,7 +26,12 @@ export function createAgentWebSocketProtocol(
     maxPayloadBytes: relayPayloadCaps(relayMaxPayloadMb).frameBytes,
     middlewareContext: agentConnectHeadersSchema,
     headers: { instanceToken: "x-agent-instance-token" },
-    door: { credential: "project", permission: CONNECT_PERMISSION, keyKinds: CONNECT_KEY_KINDS },
+    door: {
+      credential: "project",
+      permission: CONNECT_PERMISSION,
+      keyKinds: CONNECT_KEY_KINDS,
+      legacyKeyScopes: [CONNECT_LEGACY_KEY_SCOPE],
+    },
     handle: (
       app: AgentApi,
       connection: ProtocolConnection,

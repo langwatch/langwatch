@@ -1,8 +1,12 @@
+import type {
+  AvailableSource,
+  FieldMapping,
+  RenderSourceIcon,
+} from "@langwatch/design-system/variable-mapping";
 import type { LlmConfigInputType } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
-import type { AvailableSource, FieldMapping, RenderSourceIcon } from "./variable-mapping-input.tsx";
 import { type Variable, VariablesSection } from "./variables-section.tsx";
 
 /**
