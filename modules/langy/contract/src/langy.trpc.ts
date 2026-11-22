@@ -54,7 +54,7 @@ import {
   langyUiActionCompletedSchema,
   langyWarmedWorkerSchema,
 } from "./langy.dtos.ts";
-import { langyStreamEntrySchema } from "./langy.stream-entry.ts";
+import { langyStreamFrameSchema } from "./langy.stream-entry.ts";
 
 export const langyTrpc = defineTrpcContract("langy")
   .query("list")
@@ -191,7 +191,7 @@ export const langyTrpc = defineTrpcContract("langy")
 
   .subscription("onTurnStream")
   .withInput(langyTurnStreamInputSchema)
-  .withOutput(langyStreamEntrySchema)
+  .withOutput(langyStreamFrameSchema)
   .build();
 
 /** The project's egress allow-list editor; `set` wants `langy:manage`, behind the same gate. */

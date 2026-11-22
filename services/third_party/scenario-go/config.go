@@ -8,9 +8,12 @@ import (
 
 // Defaults, matching the JS SDK.
 const (
-	DefaultMaxTurns          = 10
-	DefaultTraceWaitTimeout  = 30 * time.Second
-	DefaultTraceQuietPeriod  = 2 * time.Second
+	DefaultMaxTurns         = 10
+	DefaultTraceWaitTimeout = 30 * time.Second
+	// DefaultTraceQuietPeriod: OTel BatchSpanProcessor exports every 5s by
+	// default (JS, Python, Go, Java and the LangWatch SDKs), plus about 2s
+	// for ingest and network.
+	DefaultTraceQuietPeriod  = 7 * time.Second
 	DefaultLangWatchEndpoint = "https://app.langwatch.ai"
 	defaultScenarioSetID     = "default"
 	eventBusDrainTimeout     = 300 * time.Second

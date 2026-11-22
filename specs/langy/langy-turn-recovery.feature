@@ -239,7 +239,7 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     And the user does not see a red error card
     And Langy offers a Connect button in the conversation, where the turn stopped
     And Langy does not retry on its own, because only the user can connect it
-    And the stalled turn gives back the daily pull-request permit it reserved
+    And the stalled turn counts nothing against the daily pull-request cap
 
   # The false-positive guard, and the reason this is not a blanket pre-flight:
   # most turns never touch GitHub, and stopping them all to demand a connection
@@ -258,13 +258,30 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Then the turn completes normally
     And the user is never asked to connect anything
 
+  # A failed command is the agent's to read and work around: a missing label,
+  # file or tool also prints "not found". Only git or gh saying the GitHub App
+  # cannot reach the repository ends the turn on the repository card.
+  @unit
+  Scenario: A failed GitHub command that is not about repository access keeps the turn going
+    Given the user has connected GitHub
+    When Langy runs a GitHub command that fails because a label, file or tool is missing
+    Then the turn keeps going and Langy sees the failure
+    And the user is not told the repository isn't available to Langy
+
+  @unit
+  Scenario: Git or gh saying the repository cannot be reached ends the turn on the repository card
+    Given the user has connected GitHub
+    When git or gh reports the repository is not found or not writable for the GitHub App
+    Then the turn stops
+    And the user is told the repository isn't available to Langy
+
   @integration
   Scenario: Connecting GitHub resumes the turn without a duplicate message
     Given a turn stopped because GitHub was not connected
     When the user connects their GitHub account from the card
     Then Langy re-drives the turn without the user retyping anything
     And the conversation holds exactly one copy of the user's message
-    And the resumed turn does not consume a second daily pull-request permit
+    And the resumed turn counts against the daily pull-request cap only the pull requests it opens
     And the resumed turn runs with the GitHub token in place
 
   @unit
@@ -527,6 +544,33 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When the conversation's record shows that turn failed
     Then the error card stays
 
+  # The turn runs on the server whether or not the panel's connection to it
+  # holds. A connection that gave up (a deploy, a flaky network, a proxy drop)
+  # used to end the panel's stream with an unnamed error, so a turn that went on
+  # to open a pull request showed "Something went wrong", and "Try again" started
+  # a second turn. A lost connection is followed, not reported.
+  @unit
+  Scenario: A lost connection follows the running turn instead of failing it
+    Given Langy is answering a question
+    When the panel's connection to the turn is lost and does not come back on its own
+    Then the panel reattaches to the same turn and keeps showing it as it runs
+    And what the panel already showed is not shown twice
+    And no error card or "Try again" appears while the record holds the turn as running
+
+  @unit
+  Scenario: A reattach to a turn longer than its buffer drops nothing it had not shown
+    Given Langy is answering a question with more entries than the turn's buffer keeps
+    When the panel's connection to the turn is lost and the panel reattaches
+    Then the panel skips only the replayed entries it already showed, by their buffer id
+    And every entry after those is shown once
+
+  @unit
+  Scenario: A stream the server refused by name still fails the turn
+    Given Langy is answering a question
+    When the server refuses the turn's stream with a named error
+    Then the panel does not reattach
+    And the card names that refusal
+
   @unit
   Scenario: The previous turn's completion never clears an error about a new message
     Given the last turn had already completed when a new message failed to send
@@ -551,3 +595,40 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     When the live error carries only the code langy_agent_errored
     Then the card is chosen from the durable record's reasons
     But a turn-start refusal with a different code is shown ahead of an older durable failure
+
+  # A reply ends for the person when its end frame reaches the panel. Its terminal event is folded
+  # and the conversation's admission released a moment later, by subscribers in the worker.
+  @unit @integration
+  Scenario: A message sent right after a reply ends waits for the reply to be saved
+    Given Langy's reply has ended on the panel
+    And the conversation's admission is still held by that reply
+    When the person sends a follow-up or clicks a card
+    Then the send waits for the reply to release the conversation, up to 10 seconds
+    And the follow-up runs without a "Langy is still replying" card
+
+  @unit
+  Scenario: A fold that still reads running for an ended turn does not refuse the send
+    Given Langy's reply has ended on the panel
+    And the conversation's record still says that reply is running
+    When the person sends a follow-up
+    Then the send waits for the record to catch up instead of refusing it as busy
+
+  @unit
+  Scenario: A reply whose save outlasts the wait answers retry shortly, not still replying
+    Given Langy's reply has ended on the panel
+    And the conversation is still held after 10 seconds
+    When the person sends a follow-up
+    Then the send is refused as temporarily unavailable, which the panel retries on its own
+    And it is never refused as "Langy is still replying"
+
+  @unit
+  Scenario: A send while Langy is still replying is refused at once
+    Given Langy is still writing its reply
+    When a second message is sent to the conversation
+    Then it is refused as "Langy is still replying" without waiting
+
+  @unit
+  Scenario: A turn handoff written during a rolling deploy parses on either release
+    Given replicas on the previous release and on this one serve together
+    When one release stashes a turn handoff and the other reads it
+    Then the handoff is found, never treated as missing

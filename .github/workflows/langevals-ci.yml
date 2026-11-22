@@ -162,12 +162,19 @@ jobs:
         # down. Neither needs a provider. These two files stub every call, so
         # they pin the client shape and the token accounting that prices each
         # evaluation, and they fail loudly at import if that surface moves again.
+        #
+        # The two topic_clustering files are named for the same reason: the step
+        # above ignores `evaluators/topic_clustering/tests/`, and these two stub
+        # the provider. They pin concurrent embedding batches, the rate-limit,
+        # auth and fallback paths, and topic names surviving an unpriced model.
         working-directory: services/langevals
         run: |
           uv run pytest -x -v \
             evaluators/langevals/tests/test_llm_answer_match_threading.py \
             evaluators/ragas/tests/test_model_to_langchain.py \
             evaluators/ragas/tests/test_token_usage.py \
+            evaluators/topic_clustering/tests/test_embedding_batches.py \
+            evaluators/topic_clustering/tests/test_unpriced_naming_model.py \
             tests/deterministic/ \
             langevals_core/tests/
 

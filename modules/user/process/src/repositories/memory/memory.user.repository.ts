@@ -173,6 +173,22 @@ export class MemoryUserRepository implements UserRepository {
     return row ? userProfileSchema.parse(profileOf(row)) : null;
   }
 
+  async searchProfiles({ query, limit }: { query: string; limit: number }): Promise<UserProfile[]> {
+    const needle = query.toLowerCase();
+
+    return this.#database
+      .rows()
+      .filter((row) =>
+        [row.id, row.name, row.email].some((value) => value?.toLowerCase().includes(needle)),
+      )
+      .toSorted(
+        (left, right) =>
+          (left.email ?? "").localeCompare(right.email ?? "") || left.id.localeCompare(right.id),
+      )
+      .slice(0, limit)
+      .map((row) => userProfileSchema.parse(profileOf(row)));
+  }
+
   async findByEmail(email: string): Promise<UserProfile[]> {
     return this.#database
       .usersWithEmail(email)
@@ -197,6 +213,10 @@ export class MemoryUserRepository implements UserRepository {
     await this.#appendMintFacts({ row });
 
     return userProfileSchema.parse(profileOf(row));
+  }
+
+  async appendCreatedFact(id: string): Promise<void> {
+    await this.#appendMintFacts({ row: this.#require(id) });
   }
 
   async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser> {

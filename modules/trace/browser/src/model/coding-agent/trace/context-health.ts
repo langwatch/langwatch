@@ -47,3 +47,28 @@ export function contextHealthBand(ratio: number): ContextHealthBand {
   }
   return { tone: "danger", label: "Irrecoverable" };
 }
+
+export type ContextHeatLabel = "large" | "growing";
+
+const CONTEXT_GROWING_MIN_TOKENS = 50_000;
+const CONTEXT_LARGE_MIN_TOKENS = 300_000;
+const CONTEXT_LARGE_WINDOW_SHARE = 0.6;
+
+/**
+ * The replay's context-size note for one model call: "large" from 300K, or from 60% of the
+ * model's window when that is wider; "growing" from 50K.
+ * Spec: specs/coding-agent/terminal-view.feature
+ */
+export function contextHeatLabel({
+  contextTokens,
+  model,
+}: {
+  contextTokens: number;
+  model: string | null;
+}): ContextHeatLabel | null {
+  const window = model ? contextWindowCeiling([model]) : 0;
+  const largeMin = Math.max(CONTEXT_LARGE_MIN_TOKENS, window * CONTEXT_LARGE_WINDOW_SHARE);
+  if (contextTokens >= largeMin) return "large";
+  if (contextTokens >= CONTEXT_GROWING_MIN_TOKENS) return "growing";
+  return null;
+}

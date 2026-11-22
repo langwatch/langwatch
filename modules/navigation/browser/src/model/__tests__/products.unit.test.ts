@@ -52,8 +52,14 @@ describe("product registry", () => {
       ]);
     });
 
+    /** @scenario The product switcher names the personal workspace Coding agents */
+    it("labels the personal product Coding agents", () => {
+      expect(productById("me").label).toBe("Coding agents");
+    });
+
+    /** @scenario The product switcher names the personal workspace Coding agents */
     it("points the org and personal products at fixed homes", () => {
-      expect(productById("me").homeHref({})).toBe("/me");
+      expect(productById("me").homeHref({})).toBe("/coding-agents");
       expect(productById("gateway").homeHref({})).toBe("/gateway/virtual-keys");
       expect(productById("governance").homeHref({})).toBe("/governance");
     });
@@ -62,8 +68,11 @@ describe("product registry", () => {
 
 describe("productFromPathname", () => {
   it("maps product pages to their product", () => {
+    expect(productFromPathname("/coding-agents")).toBe("me");
+    expect(productFromPathname("/coding-agents/configure")).toBe("me");
+    // The retired address, for the one render its redirect takes.
     expect(productFromPathname("/me")).toBe("me");
-    expect(productFromPathname("/me/configure")).toBe("me");
+    expect(productFromPathname("/me/sessions")).toBe("me");
     expect(productFromPathname("/gateway")).toBe("gateway");
     expect(productFromPathname("/gateway/virtual-keys/vk_1")).toBe("gateway");
     expect(productFromPathname("/governance")).toBe("governance");

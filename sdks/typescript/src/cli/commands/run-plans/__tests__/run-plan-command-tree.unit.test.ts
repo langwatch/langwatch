@@ -66,7 +66,17 @@ describe("the run plan and test suite commands, given the CLI command tree", () 
 
     expect(testSuite).toBeDefined();
     const subcommands = testSuite!.commands.map((command) => command.name());
-    expect(subcommands).toEqual(["list", "create", "update", "get", "rename", "archive", "run"]);
+    expect(subcommands).toEqual([
+      "list",
+      "create",
+      "update",
+      "get",
+      "rename",
+      "archive",
+      "templates",
+      "apply-template",
+      "run",
+    ]);
     expect(
       subcommands
         .filter((name) => name !== "run")

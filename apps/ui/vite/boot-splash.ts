@@ -14,6 +14,8 @@ import {
 } from "@langwatch/design-system/logo-paths";
 import { build, type Plugin } from "vite";
 
+import { BOOT_REPORT_EVENTS, BOOT_REPORT_HEAD } from "./boot-report.ts";
+
 // The values of bg.page and logo.* in each mode, and the ground's static floor from
 // ambient-ground.css: no stylesheet has loaded yet, so they are written out here.
 const STYLE = `<style data-boot-splash>
@@ -89,7 +91,7 @@ const HAND_OFF_SCRIPT = `<script data-boot-splash>(function () {
   function leave() {
     observer.disconnect();
     clearInterval(countdown);
-    document.dispatchEvent(new Event("lw-boot:done"));
+    document.dispatchEvent(new Event("${BOOT_REPORT_EVENTS.done}"));
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return splash.remove();
     requestAnimationFrame(function () { requestAnimationFrame(function () {
       splash.classList.add("lw-boot--out");
@@ -114,12 +116,22 @@ const HAND_OFF_SCRIPT = `<script data-boot-splash>(function () {
     note.textContent = text;
     note.setAttribute("data-on", "");
   }
+  // The boot report (vite/boot-report.ts) reads each answer and how long it took.
+  function told(state, startedAt) {
+    var ms = startedAt === undefined ? undefined : Math.round(performance.now() - startedAt);
+    var detail = { state: state, ms: ms };
+    try { document.dispatchEvent(new CustomEvent("${BOOT_REPORT_EVENTS.health}", { detail: detail })); }
+    catch (e) {}
+  }
   function probe() {
     if (!splash.isConnected) return;
     say("Connecting to the server\\u2026");
+    var startedAt = performance.now();
+    told("pending");
     fetch("${HEALTH_PATH}", { cache: "no-store" })
       .then(function (response) { return response.ok; }, function () { return false; })
       .then(function (answered) {
+        told(answered ? "ok" : "failed", startedAt);
         if (answered) return say("Connected. Opening LangWatch\\u2026");
         var left = Math.round(wait / 1000);
         clearInterval(countdown);
@@ -247,7 +259,7 @@ export function bootSplash({
         // A function replacement, so a `$` pattern in the bundled script stays literal text.
         const ground = groundTag(await groundScript());
         return html
-          .replace("</head>", () => `${BOOT_SPLASH_HEAD}\n  </head>`)
+          .replace("</head>", () => `${BOOT_SPLASH_HEAD}\n  ${BOOT_REPORT_HEAD}\n  </head>`)
           .replace(
             '<div id="root"></div>',
             () =>

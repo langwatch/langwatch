@@ -174,7 +174,7 @@ describe("exchange", () => {
   });
 
   it("attaches client_info (hostname, uname, platform) to the exchange POST body", async () => {
-    // Drives the /me/devices device-label fix (Ariana QA): without
+    // Drives the Devices-tab device-label fix (Ariana QA): without
     // client_info on /exchange, every CLI session falls back to
     // "Unknown device" in the inventory, blocking selective revoke
     // for multi-device users.
@@ -399,6 +399,23 @@ describe("logout", () => {
       const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(status));
       await expect(logout({ baseUrl: "http://x", fetchImpl }, "rt")).resolves.toBeUndefined();
     }
+  });
+
+  it("sends only the access token when the session has no refresh token", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(emptyResponse(200));
+
+    await logout({ baseUrl: "http://x", fetchImpl }, undefined, "lw_at_pasted");
+
+    const [, init] = fetchImpl.mock.calls[0]!;
+    expect(JSON.parse(String(init.body))).toEqual({ access_token: "lw_at_pasted" });
+  });
+
+  it("calls nothing when it holds no token at all", async () => {
+    const fetchImpl = vi.fn();
+
+    await logout({ baseUrl: "http://x", fetchImpl }, undefined, undefined);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("propagates other failures", async () => {

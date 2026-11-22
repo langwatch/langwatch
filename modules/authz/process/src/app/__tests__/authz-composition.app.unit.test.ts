@@ -14,6 +14,7 @@ import type { AuthzRepositories } from "../../repositories/authz.repositories.ts
 import { MemoryAuthzRepositories } from "../../repositories/memory/memory.authz.repositories.ts";
 import { authzEngineGateReadFailuresTotal } from "../../services/authz-cutover-gate.service.ts";
 import { AuthzModule, type AuthzSetup } from "../authz.app.ts";
+import { memoryAuthzChannels } from "./authz-channels.fixture.ts";
 
 const CONFIG = {
   epochCacheEnabled: false,
@@ -28,6 +29,7 @@ function compose(repositories: AuthzRepositories = MemoryAuthzRepositories.creat
     config: CONFIG,
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: createApiFixture<AuthzSetup["secrets"]>(),
+    channels: memoryAuthzChannels(),
     repositories,
   });
 }
@@ -45,7 +47,7 @@ describe("AuthzModule.create", () => {
     const pipeline = app.eventingPipeline();
     expect(pipeline.metadata.name).toBe(AUTHZ_GRANT_PIPELINE_NAME);
     expect([...pipeline.mapProjections.keys()]).toEqual(["authzGrantsWrite"]);
-    expect([...pipeline.eventSubscribers.keys()]).toEqual(["auditTrail"]);
+    expect([...pipeline.eventSubscribers.keys()]).toEqual(["auditTrail", "braidChangeRevoke"]);
     expect([...pipeline.mapSubscribers.keys()]).toEqual(["sessionVersion"]);
     expect(app.engineMigration().name).toBe(AUTHZ_ENGINE_MIGRATION_NAME);
     expect(audited).toEqual([]);

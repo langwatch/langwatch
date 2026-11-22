@@ -361,6 +361,7 @@ const organizationAuditLogEntrySchema = z
     source: z.enum(["platform", "gateway"]),
     targetKind: z.string().nullable(),
     targetId: z.string().nullable(),
+    targetName: z.string().nullable(),
     before: z.unknown(),
     after: z.unknown(),
     actorUserId: z.string().nullable(),

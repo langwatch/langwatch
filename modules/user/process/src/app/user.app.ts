@@ -299,6 +299,10 @@ export class UserModule implements UserApi {
     return this.#users.getProfiles(input);
   }
 
+  searchForOperators(input: { query: string; limit: number }): Promise<UserProfile[]> {
+    return this.#users.searchForOperators(input);
+  }
+
   findByEmail(input: UserEmailInput): Promise<UserProfile | null> {
     return this.#users.findByEmail(input);
   }
@@ -306,6 +310,11 @@ export class UserModule implements UserApi {
   /** The directory mint: an account row with no sign-in method attached yet. */
   create(input: CreateUserInput): Promise<UserProfile> {
     return this.#users.create(input);
+  }
+
+  /** An account Better Auth wrote itself: its created fact joins the outbox a mint uses. */
+  recordCreated(input: UserIdInput): Promise<void> {
+    return this.#users.recordCreated(input);
   }
 
   /** Everything the account screen reads about one user. */

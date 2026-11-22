@@ -294,9 +294,10 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And the router flag is not read
 
   @unit
-  Scenario: A routed result says who answered it
+  Scenario: A routed result names the LangWatch Judge, never a backend
     Given a routed judgement that the decision model answered and the LLM leg escalated
     When the evaluation result is built
-    Then its details name the LangWatch Judge and the backends that answered
+    Then its details name the LangWatch Judge
     And they say how many questions were escalated
+    And they name no backend that answered
     And an unrouted result's details read exactly as before

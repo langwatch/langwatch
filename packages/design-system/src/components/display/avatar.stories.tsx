@@ -1,7 +1,7 @@
 import { HStack, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { Avatar } from "./avatar.tsx";
+import { Avatar, UserAvatar } from "./avatar.tsx";
 
 const meta = {
   title: "Data display/Avatar",
@@ -84,5 +84,16 @@ export const Variants: Story = {
         </HStack>
       ))}
     </Stack>
+  ),
+};
+
+/** A person with no photo, filled with the hue hashed from their name, as projects are. */
+export const ColorFromName: Story = {
+  render: () => (
+    <HStack gap="3">
+      {["Ada Lovelace", "Grace Hopper", "Alan Turing"].map((name) => (
+        <UserAvatar key={name} name={name} size="sm" colorFromName />
+      ))}
+    </HStack>
   ),
 };

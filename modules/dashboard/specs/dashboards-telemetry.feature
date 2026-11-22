@@ -22,10 +22,10 @@ Feature: Dashboards telemetry: product events and query telemetry
 
   @unit
   Scenario: Telemetry: making a board sends dashboards.created.dashboard with where it came from
-    Given a member makes a board blank, from a template, as a copy of a board, or as a copy of a From LangWatch board
+    Given a member makes a board blank, from a template, as a copy of a board, or as a copy of a From LangWatch board, or from one widget picked on a From LangWatch board
     When the board is made
-    Then "dashboards.created.dashboard" is sent with createdFrom "blank", "template", "duplicate" or "duplicate_curated"
-    And a board from a template also carries its templateId
+    Then "dashboards.created.dashboard" is sent with createdFrom "blank", "template", "duplicate", "duplicate_curated" or "widget_curated"
+    And a board from a template, or from a widget picked on a From LangWatch board, also carries its templateId
     And a board that fails to be made sends nothing
 
   @unit
@@ -99,6 +99,25 @@ Feature: Dashboards telemetry: product events and query telemetry
     Given analytics kept projectId from an earlier page load
     When the app loads with no project in scope
     Then analytics unregisters projectId straight away
+
+  # Retired in S6 by "Telemetry: boards made, moved or pinned outside a project name their owning project" in modules/dashboard/specs/dashboards-telemetry.feature.
+  @integration
+  Scenario: Telemetry: a board made or unpinned from Gateway or Coding agents names its project
+    Given the Dashboards section in Gateway or Coding agents works in the project "Shop"
+    When I make a dashboard from it, or pin or unpin one there
+    Then "dashboards.created.dashboard" and "dashboards.favourited.dashboard" go out
+    And each goes out with the registered projectId set to "Shop", not the page's project
+    And the page's projectId is registered again straight after
+
+  # Boards now have a home product (ADR-002, amended; dashboards-organization-area.feature).
+  @integration @unimplemented
+  Scenario: Telemetry: boards made, moved or pinned outside a project name their owning project
+    Given "Dashboards in every product" is on
+    When I make a board in the create dialog, move one, move a widget, or pin or unpin one, in the library or in a product section
+    Then "dashboards.created.dashboard", "dashboards.moved.dashboard", "dashboards.moved.widget" or "dashboards.favourited.dashboard" goes out
+    And each carries projectId set to the board's owning project (none for a personal board), and the home product
+    And the page's own projectId, or none on an org-level page, is registered again straight after
+    # Evidence: the captured events from analyticssim
 
   # ---------------------------------------------------------------------------
   # Engagement events: what a member does on a board after opening it

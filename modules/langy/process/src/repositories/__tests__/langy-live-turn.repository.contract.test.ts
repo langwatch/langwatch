@@ -41,7 +41,6 @@ function handoffFor(actorUserId: string): LangyTurnHandoff {
       organizationId: "org_1",
     },
     runToken: "run_1",
-    permitReserved: true,
   };
 }
 
@@ -224,13 +223,13 @@ describe("given the langy repository registry", () => {
         "deleteConfirmations",
         "feedbackPrompts",
         "frameDedup",
-        "githubPrCounts",
         "localCalls",
         "localControlRequests",
         "localPresence",
         "localUserWaits",
         "messageStorage",
         "messages",
+        "pullRequests",
         "rateLimits",
         "resourceLinks",
         "sessionKeys",

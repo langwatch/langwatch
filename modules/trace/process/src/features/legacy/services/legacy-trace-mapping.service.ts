@@ -23,12 +23,12 @@ import {
   mapTraceEvaluationsToLegacyEvaluations,
   type ClickHouseEvaluationRunRow,
 } from "../../../rules/trace-evaluation-mapping.rules.ts";
+import type { ResolvedTraceSpans } from "../../../services/trace-offload-resolution.service.ts";
 import {
   applyEventProtections,
   applyTraceProtections,
   extractRedactionsForObject,
-} from "../../../rules/trace-read-redaction.rules.ts";
-import type { ResolvedTraceSpans } from "../../../services/trace-offload-resolution.service.ts";
+} from "../../read/rules/trace-read-redaction.rules.ts";
 import type {
   ResolveTraceSpansBatchFn,
   ResolveTraceSpansFn,
@@ -100,6 +100,45 @@ export class LegacyTraceMappingService {
       resolveBlobs: opts?.resolveBlobs,
       failure: "Failed to fetch traces with spans",
     });
+  }
+
+  /** One trace built from its stored spans while its summary is not written yet. */
+  async findTraceFromStoredSpans({
+    projectId,
+    authorization,
+    traceId,
+    protections,
+    opts,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    traceId: string;
+    protections: Protections;
+    opts?: { resolveBlobs?: boolean | undefined };
+  }): Promise<Trace[]> {
+    const rows = await this.repository.findTraceFromStoredSpans({
+      authorization,
+      projectId,
+      traceId,
+      retentionDays: this.retentionDays,
+    });
+    return this.resolveAndMerge({
+      projectId,
+      rows,
+      protections,
+      resolveBlobs: opts?.resolveBlobs,
+      failure: "Failed to build a trace from its stored spans",
+    });
+  }
+
+  /** The traces holding a span with this id, since the project's retention floor. */
+  findTraceIdsBySpanId(input: {
+    authorization: Authorization;
+    projectId: string;
+    spanId: string;
+    limit: number;
+  }): Promise<string[]> {
+    return this.repository.resolveTraceIdsBySpanId({ ...input, retentionDays: this.retentionDays });
   }
 
   async findTracesByThreadId({

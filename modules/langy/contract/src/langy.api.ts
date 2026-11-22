@@ -78,7 +78,7 @@ import type {
   LangyConversationMessagesDto,
   langyConversationUpdateFrameSchema,
 } from "./langy.dtos.ts";
-import type { LangyStreamEntry } from "./langy.stream-entry.ts";
+import type { LangyStreamFrame } from "./langy.stream-entry.ts";
 import type { LangyCredentialSession, LangyEgressAllowlist, LangyStopTurnInput } from "./langy.ts";
 
 /**
@@ -468,7 +468,7 @@ export interface LangyApi {
   ): AsyncIterable<z.infer<typeof langyConversationUpdateFrameSchema>>;
   watchTurnStream(
     input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal },
-  ): AsyncIterable<LangyStreamEntry>;
+  ): AsyncIterable<LangyStreamFrame>;
   getPanelLocalRecord(
     input: LangyPanelCall<typeof langyPanelConversationInputSchema>,
   ): Promise<LangyLocalRecord>;

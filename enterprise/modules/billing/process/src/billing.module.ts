@@ -13,6 +13,7 @@ import { composeHttpBillingStripe } from "./channels/http/http.billing-stripe.ch
 import { billingLifecycleEventing } from "./eventing/billing-lifecycle.pipeline.ts";
 import { billingReportingEventing } from "./eventing/billing-reporting.pipeline.ts";
 import { connectedBillingEventing } from "./eventing/connected-billing.pipeline.ts";
+import { paymentRecoveryEventing } from "./eventing/payment-recovery.pipeline.ts";
 import { seatLineRepairEventing } from "./eventing/seat-line-repair.pipeline.ts";
 import { SeatChangeOrganizationBackfillService } from "./features/connected-billing/services/seat-change-organization-backfill.service.ts";
 import type { BillingOrganizationCacheRepository } from "./repositories/billing-organization-cache.repository.ts";
@@ -55,6 +56,7 @@ export const billingProcessModule: PublishedProcessModule<
   .withEventing(billingReportingEventing)
   .withEventing(billingLifecycleEventing)
   .withEventing(seatLineRepairEventing)
+  .withEventing(paymentRecoveryEventing)
   // Background, after old writers are gone: an older image records no usage-billed fact.
   .withMigrations(({ app, repositories }) => [
     defineMigrationStep({

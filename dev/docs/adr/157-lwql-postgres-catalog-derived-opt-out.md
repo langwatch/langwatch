@@ -166,6 +166,28 @@ change and is a known manual step, not an oversight.
   layer downstream of the application code that can still enforce it once the
   data is reachable through LWQL.
 
+## Amendment, 2026-11-20: a fanned-out row counts once
+
+This reverses the double count accepted under "Why the fan-out lives in the
+view's join chain". The join chain still stamps one copy of a team- or
+organization-scoped row per project, and the predicate and policy still filter
+those copies as before. The view then keeps one copy of each row across the
+projects read, the one under the lowest project id (langwatch/tasks#1212). A
+`COUNT(*)` on such a view counts each row once.
+
+- **Project filters see the lowest project only.** In a multi-project read, a
+  `TenantId` filter or grouping finds such a row under the lowest project id
+  and under no other, so a filter on a sibling's id misses it. Scenario "A
+  multi-project read filters and groups an organization-level row under the
+  lowest project only" in `specs/lwql/postgres-catalog.feature` tests it.
+- **The grain says so.** The generated grain and description name the row by
+  its own key, not by `(TenantId, …)`, and state the point above.
+- **A key that holds the scope field keeps its fan-out.** A model whose
+  primary key includes its own `teamId` or `organizationId` names a row only
+  together with that scope. `TenantId` no longer carries it, so collapsing on
+  the rest would merge rows of different scopes. Such a view keeps one row per
+  project, and its grain still says so.
+
 ## References
 
 - Issue: [#8207](https://github.com/langwatch/langwatch/issues/8207)

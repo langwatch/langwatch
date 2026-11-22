@@ -11,10 +11,20 @@ export interface DiscoveredAgentRow {
   lastSeenAt: Instant;
 }
 
+/** One agent row as the registry reads it: the provider's id and descriptive fields too. */
+export interface DiscoveredAgentRegistryRow extends DiscoveredAgentRow {
+  rawAgentId: string;
+  metadata: Readonly<Record<string, unknown>>;
+}
+
 /** Provider-side agents a source listed; no kind, no match, no erasure state — not a person. */
 export abstract class DiscoveredAgentRepository {
   /** The agents screen's read, newest-seen first. */
   abstract findByOrganization(input: { organizationId: string }): Promise<DiscoveredAgentRow[]>;
+  /** The agent registry's read: every row with its provider id and metadata. */
+  abstract findForRegistry(input: {
+    organizationId: string;
+  }): Promise<DiscoveredAgentRegistryRow[]>;
   /** A listing is a presence fact: widens both dates; merges text and metadata, never blanks. */
   abstract recordAgentSighting(input: {
     organizationId: string;

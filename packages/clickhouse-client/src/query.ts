@@ -84,6 +84,11 @@ export interface InsertRequest {
    * copying every row.
    */
   rows: readonly Readonly<Record<string, unknown>>[];
+  /**
+   * The columns the rows carry, named in the statement. Needed to write a MATERIALIZED column
+   * (with `insert_allow_materialized_columns`); absent, ClickHouse takes the insertable ones.
+   */
+  columns?: readonly [string, ...string[]] | undefined;
   /** Skips the one-tenant batch check; counted and logged like a statement's skip. */
   SKIP_TENANT_CHECK?: true | undefined;
   /** Per-insert ClickHouse settings, e.g. `async_insert`. */
