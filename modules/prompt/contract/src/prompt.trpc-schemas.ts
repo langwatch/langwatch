@@ -10,6 +10,7 @@ import {
   promptingTechniqueSchema,
   responseFormatSchema,
   runtimeParametersSchema,
+  runtimeParametersUpdateSchema,
 } from "./prompt.field-schemas.ts";
 import { promptScopeSchema } from "./prompt.ts";
 import type { PromptTagAssignment, VersionedPrompt } from "./prompt.ts";
@@ -144,7 +145,7 @@ export function createPromptUpdateTrpcInputSchema<TDemonstrations extends z.ZodT
     promptingTechnique: z.ZodOptional<typeof promptingTechniqueSchema>;
     responseFormat: z.ZodOptional<typeof responseFormatSchema>;
     demonstrations: z.ZodOptional<TDemonstrations>;
-    parameters: z.ZodOptional<typeof runtimeParametersSchema>;
+    parameters: z.ZodOptional<typeof runtimeParametersUpdateSchema>;
   }>;
 }> {
   return z.object({
@@ -175,7 +176,7 @@ export function createPromptUpdateTrpcInputSchema<TDemonstrations extends z.ZodT
       promptingTechnique: promptingTechniqueSchema.optional(),
       responseFormat: responseFormatSchema.optional(),
       demonstrations: demonstrationsSchema.optional(),
-      parameters: runtimeParametersSchema.optional(),
+      parameters: runtimeParametersUpdateSchema.optional(),
     }),
   });
 }
