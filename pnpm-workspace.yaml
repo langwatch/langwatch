@@ -38,7 +38,7 @@ catalog:
   '@emotion/react': ^11.14.0
   '@hono/node-server': ^2.0.6
   '@hookform/resolvers': ^5.4.0
-  '@langwatch/scenario': 1.8.0
+  '@langwatch/scenario': 1.8.1
   '@mdx-js/react': ^3.1.0
   '@mdx-js/rollup': ^3.1.0
   '@modelcontextprotocol/sdk': 1.32.0
@@ -284,8 +284,8 @@ overrides:
   '@hono/node-server@>=2.0.0 <2.0.10': '>=2.0.10'
   '@langchain/community>fast-xml-parser': ^5.7.0
   '@langchain/core@<0.3.80': '>=0.3.80'
-  '@langwatch/scenario': 1.8.0
-  '@langwatch/scenario@1.8.0>langwatch': workspace:*
+  '@langwatch/scenario': 1.8.1
+  '@langwatch/scenario@1.8.1>langwatch': workspace:*
   '@modelcontextprotocol/client@>=2.0.0 <2.2.0': '>=2.2.0 <3'
   '@modelcontextprotocol/sdk>@hono/node-server': '>=2.0.10'
   '@modelcontextprotocol/sdk@>=1.10.0 <1.32.0': '>=1.32.0 <2'

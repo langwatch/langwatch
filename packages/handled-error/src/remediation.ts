@@ -1130,7 +1130,7 @@ const registry = {
   },
   langy_agent_errored: {
     tips: [
-      "The model call was rejected upstream; check meta/reasons for the provider's typed failure, then retry",
+      "The reply failed before it finished; when meta/reasons name a cause, fix that first, then retry",
     ],
   },
   langy_turn_timeout: {

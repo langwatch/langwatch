@@ -384,6 +384,61 @@ describe("searchTracesCommand()", () => {
       );
     });
 
+    describe("when the search had a free-text query", () => {
+      /** @scenario An empty text search says which fields it matched and how to look inside spans */
+      it("names the matched fields and the way into spans, as JSON", async () => {
+        await searchTracesCommand({ query: "54 soldiers", format: "json" });
+
+        const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string) as {
+          searched: { queryFields: string[] };
+          inSpans: string;
+        };
+        expect(printed.searched.queryFields).toEqual(["input", "output", "name", "span names"]);
+        expect(printed.inSpans).toContain("langwatch trace get <traceId>");
+        expect(printed.inSpans).toContain('grep its spans for "54 soldiers"');
+      });
+
+      it("names the matched fields and the way into spans in the table", async () => {
+        await searchTracesCommand({ query: "cease-fire" });
+
+        const printed = vi
+          .mocked(console.log)
+          .mock.calls.map((c) => String(c[0]))
+          .join("\n");
+        expect(printed).toContain(
+          "Query:   cease-fire (matched against input, output, name, span names)",
+        );
+        expect(printed).toContain("not span content");
+        expect(printed).toContain("langwatch trace get <traceId>");
+      });
+    });
+
+    describe("when the query is blank", () => {
+      it("reads as no query, with no span suggestion", async () => {
+        await searchTracesCommand({ query: "", format: "json" });
+
+        const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string) as {
+          searched: { query: unknown; queryFields: unknown };
+          inSpans?: unknown;
+        };
+        expect(printed.searched.query).toBeNull();
+        expect(printed.searched.queryFields).toBeNull();
+        expect(printed.inSpans).toBeUndefined();
+      });
+    });
+
+    describe("when the search had no query", () => {
+      it("carries no span suggestion", async () => {
+        await searchTracesCommand({ errorsOnly: true, format: "json" });
+
+        const printed = JSON.parse(
+          vi.mocked(console.log).mock.calls.at(-1)![0] as string,
+        ) as Record<string, unknown>;
+        expect(printed.inSpans).toBeUndefined();
+        expect((printed.searched as { queryFields: unknown }).queryFields).toBeNull();
+      });
+    });
+
     it("names the project, window and widen command in the table", async () => {
       await searchTracesCommand({ query: "late refund", project: "acme-app" });
 
