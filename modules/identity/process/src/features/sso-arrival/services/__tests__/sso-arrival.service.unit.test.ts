@@ -136,7 +136,9 @@ function serviceOver({
   const applyPendingInvite = vi
     .fn()
     .mockResolvedValue(
-      pendingInvite ? { applied: true, inviteId: pendingInvite.inviteId } : { applied: false },
+      pendingInvite
+        ? { applied: true, inviteId: pendingInvite.inviteId, role: "MEMBER" }
+        : { applied: false },
     );
   const findOrganization = vi.fn().mockResolvedValue(ORG);
   const joinedAutomatically = vi.fn<() => Promise<void>>().mockResolvedValue();

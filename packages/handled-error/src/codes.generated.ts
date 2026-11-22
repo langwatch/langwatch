@@ -278,6 +278,11 @@ export const goErrorCodes = {
    * ErrJSONPathNoMatch — signals an HTTP block's output_path matched no
    * element of the upstream response.
    *
+   * Also produced as a workflow NodeError type, so this one entry is the copy
+   * for both the HTTP failure and the node error event. Its node sites are
+   * among the @source files below.
+   *
+   * @source services/nlpgo/app/engine/engine.go
    * @source services/nlpgo/domain/errors.go
    */
   jsonpath_no_match: { service: "nlpgo", httpStatus: 422 },

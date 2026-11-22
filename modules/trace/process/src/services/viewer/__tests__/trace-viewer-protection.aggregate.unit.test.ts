@@ -91,9 +91,9 @@ describe("resolving a viewer's protections", () => {
         projectId: A,
       });
 
-      expect(
-        await policyProjectsFor({ projectId: AGG, authorization: narrowed ?? undefined }),
-      ).toEqual([[AGG, A]]);
+      expect(await policyProjectsFor({ projectId: AGG, authorization: narrowed })).toEqual([
+        [AGG, A],
+      ]);
     });
   });
 

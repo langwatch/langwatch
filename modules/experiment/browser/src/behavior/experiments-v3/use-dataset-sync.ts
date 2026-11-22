@@ -36,6 +36,14 @@ export const useDatasetSyncProps = (): DatasetRecordSyncProps => {
     [datasets],
   );
 
+  const resolveColumns = useCallback(
+    (dbDatasetId: string) =>
+      datasets
+        .find((d) => d.type === "saved" && d.datasetId === dbDatasetId)
+        ?.columns.map((column) => column.name),
+    [datasets],
+  );
+
   const onStatus = useCallback(
     (state: AutosaveState, error?: string) => {
       setAutosaveStatus("dataset", state, error);
@@ -47,6 +55,7 @@ export const useDatasetSyncProps = (): DatasetRecordSyncProps => {
     projectId: project?.id,
     pendingSavedChanges,
     resolveFullRecord,
+    resolveColumns,
     clearPendingChange,
     onStatus,
   };

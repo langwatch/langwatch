@@ -16,6 +16,7 @@ import {
   TeamMembershipNotFoundError,
   TeamNotFoundError,
   UserNotInOrganizationError,
+  type DocsPlaygroundPolicy,
   type OrganizationBillingProfile,
   type OrganizationIdPage,
   type OrganizationTeam,
@@ -56,6 +57,10 @@ class StubRepository extends OrganizationRepository {
     return [];
   }
 
+  async findOperatorRows(): Promise<[]> {
+    return [];
+  }
+
   async countUsage(): Promise<{ members: number; teams: number; ssoProviders: string[] }> {
     return { members: 0, teams: 0, ssoProviders: [] };
   }
@@ -78,6 +83,12 @@ class StubRepository extends OrganizationRepository {
   }
 
   async saveSessionPolicy(): Promise<void> {}
+
+  async getDocsPlaygroundPolicy(): Promise<DocsPlaygroundPolicy> {
+    return { docsPlaygroundSessionsEnabled: true, docsPlaygroundSessionsDisabledAt: null };
+  }
+
+  async saveDocsPlaygroundPolicy(): Promise<void> {}
 
   async getSignInSecurityPolicy(): Promise<never> {
     throw new Error("not used");

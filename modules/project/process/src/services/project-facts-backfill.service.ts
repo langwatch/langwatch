@@ -3,19 +3,9 @@
  * page's created facts, then department assignments, then presence settings sent as one batch
  * each. Spec: modules/project/specs/project-service.feature
  */
-import { nowInstant } from "@langwatch/time";
-
-import type {
-  ProjectBackfillEntry,
-  ProjectBackfillRow,
-  ProjectRepository,
-} from "../repositories/project.repository.ts";
+import type { ProjectRepository } from "../repositories/project.repository.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
-
-const PAGE_SIZE = 2000;
-
-/** How many skipped project ids the report names; the count covers the rest. */
-const ORPHAN_IDS_REPORTED = 20;
+import { ProjectTablePagingService } from "./project-table-paging.service.ts";
 
 export type ProjectFactsBackfillReport = {
   projects: number;
@@ -50,7 +40,11 @@ type Dependencies = Readonly<{
  * A project left without a team or organization is skipped and counted, never retried.
  */
 export class ProjectFactsBackfillService {
-  private constructor(private readonly deps: Dependencies) {}
+  readonly #table: ProjectTablePagingService;
+
+  private constructor(private readonly deps: Dependencies) {
+    this.#table = ProjectTablePagingService.create(deps);
+  }
 
   static create(deps: Dependencies): ProjectFactsBackfillService {
     return new ProjectFactsBackfillService(deps);
@@ -67,53 +61,24 @@ export class ProjectFactsBackfillService {
       ...countedBefore,
       orphanProjectIds: [...countedBefore.orphanProjectIds],
     };
-    let cursor = afterProjectId;
-    while (!signal.aborted) {
-      // Taken before the read, so a change saved meanwhile is the newer fact.
-      const occurredAt = nowInstant().epochMilliseconds;
-      const page = await this.deps.projects.findBackfillPage({ afterId: cursor, limit: PAGE_SIZE });
-      const last = page.at(-1);
-      if (!last) break;
-      const { projects, orphanIds } = splitEntries(page);
-      const live: ProjectBackfillRow[] = projects.filter((project) => !project.isArchived);
-      if (!dryRun && projects.length > 0) {
-        await this.deps.lifecycle.recordBackfillPage({ created: projects, live, occurredAt });
-      }
-      this.warnSkipped(orphanIds);
-      report.projects += projects.length;
-      report.departmentAssignments += live.length;
-      report.presenceSettings += live.length;
-      report.skippedOrphans += orphanIds.length;
-      report.orphanProjectIds = [...report.orphanProjectIds, ...orphanIds].slice(
-        0,
-        ORPHAN_IDS_REPORTED,
-      );
-      cursor = last.kind === "whole" ? last.project.id : last.id;
-      if (!dryRun) await onPageDone({ afterProjectId: cursor, report: { ...report } });
-    }
+    await this.#table.walk({
+      stepName: "the project facts step",
+      afterProjectId,
+      orphans: report,
+      signal,
+      onPage: async ({ projects, orphans, afterProjectId: cursor, occurredAt }) => {
+        const live = projects.filter((project) => !project.isArchived);
+        if (!dryRun && projects.length > 0) {
+          await this.deps.lifecycle.recordBackfillPage({ created: projects, live, occurredAt });
+        }
+        report.projects += projects.length;
+        report.departmentAssignments += live.length;
+        report.presenceSettings += live.length;
+        report.skippedOrphans = orphans.skippedOrphans;
+        report.orphanProjectIds = orphans.orphanProjectIds;
+        if (!dryRun) await onPageDone({ afterProjectId: cursor, report: { ...report } });
+      },
+    });
     return report;
   }
-
-  private warnSkipped(orphanIds: readonly string[]): void {
-    for (const projectId of orphanIds) {
-      this.deps.logger.warn(
-        { projectId },
-        "the project facts step skipped a project whose team or organization no longer exists",
-      );
-    }
-  }
-}
-
-/** A page's whole projects and the ids of its orphans, each in id order. */
-function splitEntries(page: readonly ProjectBackfillEntry[]): {
-  projects: ProjectBackfillRow[];
-  orphanIds: string[];
-} {
-  const projects: ProjectBackfillRow[] = [];
-  const orphanIds: string[] = [];
-  for (const entry of page) {
-    if (entry.kind === "whole") projects.push(entry.project);
-    else orphanIds.push(entry.id);
-  }
-  return { projects, orphanIds };
 }

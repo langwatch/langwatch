@@ -90,6 +90,7 @@ function buildPipeline({
     summaryStore: createApiFixture<Options["summaryStore"]>(),
     derivedStore: createApiFixture<Options["derivedStore"]>(),
     rollupStore: createApiFixture<Options["rollupStore"]>(),
+    spanAnalyticsStore: createApiFixture<Options["spanAnalyticsStore"]>(),
     canonicalisation: collaborators.canonicalisation,
     ioExtraction: collaborators.ioExtraction,
     mediaReferences: collaborators.mediaReferences,

@@ -210,8 +210,9 @@ None: feature-flag declares no pipeline, process manager, subscriber or task.
 
 | Kind   | Leaf          | Environment variable                                                                           | Declared at                                 |
 | ------ | ------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| config | `forceEnable` | `FEATURE_FLAG_FORCE_ENABLE`                                                                    | `../contract/src/feature-flag.config.ts:56` |
-| config | `overrides`   | ≈ `Object.fromEntries( FEATURE_FLAGS.filter(isEnvOverridable).map((definition) => [ definiti…` | `../contract/src/feature-flag.config.ts:57` |
-| config | `legacy`      | ≈ `Object.fromEntries( FEATURE_FLAGS.flatMap((definition: FeatureFlagDefinition) => definiti…` | `../contract/src/feature-flag.config.ts:63` |
+| config | `isSaas`      | `IS_SAAS`                                                                                      | `../contract/src/feature-flag.config.ts:57` |
+| config | `forceEnable` | `FEATURE_FLAG_FORCE_ENABLE`                                                                    | `../contract/src/feature-flag.config.ts:58` |
+| config | `overrides`   | ≈ `Object.fromEntries( FEATURE_FLAGS.filter(isEnvOverridable).map((definition) => [ definiti…` | `../contract/src/feature-flag.config.ts:59` |
+| config | `legacy`      | ≈ `Object.fromEntries( FEATURE_FLAGS.flatMap((definition: FeatureFlagDefinition) => definiti…` | `../contract/src/feature-flag.config.ts:65` |
 
 <!-- readme:generated:end -->

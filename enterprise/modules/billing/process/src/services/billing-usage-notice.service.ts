@@ -7,10 +7,12 @@ import type {
   SubscriptionNotificationPayload,
 } from "@langwatch/enterprise-billing-contract";
 import {
+  accountPaymentFailedNotice,
   billingThresholdFailureNotice,
   licensePurchaseNotice,
   planLimitReachedNotice,
   resourceLimitReachedNotice,
+  seatRequestedNotice,
   selfHostedSignalNotice,
   subscriptionActivatedNotice,
   subscriptionCancelledNotice,
@@ -236,9 +238,54 @@ export class NotificationService {
     });
   }
 
+  /** The account team hears an Enterprise charge failed; such an organization is never paused. */
+  async sendSlackAccountPaymentFailed(input: {
+    organizationId: string;
+    organizationName: string;
+    stripeInvoiceId: string;
+    amount: string;
+  }): Promise<void> {
+    await this.sendSlackMessage({
+      channelUrl: this.config.slackSubscriptionsChannel,
+      message: (origin) =>
+        accountPaymentFailedNotice.render({
+          props: { ...input, stripeTestMode: this.config.stripeTestMode ?? false },
+          origin,
+        }),
+      missingConfigLog:
+        "SLACK_CHANNEL_SUBSCRIPTIONS is not configured; skipping Enterprise payment failed alert",
+      errorLog: "Failed to send Slack Enterprise payment failed notification",
+    });
+  }
+
   /**
    * Sends a Slack notification for subscription events (prospective, confirmed or cancelled).
    */
+  /** Sales hear that a person waits for a seat only they can sell. */
+  async sendSlackSeatRequest(payload: {
+    organizationId: string;
+    organizationName: string;
+    plan: string;
+    seats: number;
+    requestedSeats: number;
+  }): Promise<void> {
+    await this.sendSlackMessage({
+      channelUrl: this.config.slackSubscriptionsChannel,
+      message: (origin) =>
+        seatRequestedNotice.render({
+          props: {
+            organizationName: payload.organizationName,
+            plan: payload.plan,
+            seats: payload.seats,
+            requestedSeats: payload.requestedSeats,
+            adminUrl: this.getAdminLink(payload.organizationId),
+          },
+          origin,
+        }),
+      errorLog: "Failed to send Slack seat request notification",
+    });
+  }
+
   async sendSlackSubscriptionEvent(payload: SubscriptionNotificationPayload): Promise<void> {
     const adminUrl = this.getAdminLink(payload.organizationId);
 

@@ -4,6 +4,7 @@ import { MoreVertical } from "lucide-react";
 import type React from "react";
 
 import type { SessionListRow } from "../../behavior/session-list-row.ts";
+import { sessionDisplayName } from "../../model/session-display-name.ts";
 
 /**
  * Everything a reader can do with a row other than choose it — choosing
@@ -29,7 +30,7 @@ export const SessionRowActions: React.FC<{
           data-testid="coding-agent-session-actions"
           size="xs"
           variant="ghost"
-          aria-label={`Actions for ${row.title ?? "untitled session"}`}
+          aria-label={`Actions for ${sessionDisplayName(row).text}`}
         >
           <MoreVertical size={14} />
         </Button>

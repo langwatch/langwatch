@@ -1,12 +1,18 @@
 import {
+  datasetColumnsSchema,
   datasetRecordSchema,
+  type DatasetColumns,
   DatasetRecordNotFoundError,
   type DatasetRecord,
   type DatasetRecordInput,
 } from "@langwatch/dataset-contract";
 import { toDate } from "@langwatch/time";
 
-import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
+import { lockedView } from "../../rules/dataset-record-lock.rules.ts";
+import type {
+  DatasetRecordRepository,
+  LockedDatasetRecords,
+} from "../dataset-record.repository.ts";
 import type { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
 
 /** Ids compare by code unit, never by locale: Postgres matches it with COLLATE "C". */
@@ -31,6 +37,39 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     input: Readonly<{ database: MemoryDatasetDatabase }>,
   ): MemoryDatasetRecordRepository {
     return new MemoryDatasetRecordRepository(input.database);
+  }
+
+  /** Each dataset's lock as the tail of the work queued on it. */
+  #locks = new Map<string, Promise<unknown>>();
+
+  async withDatasetLock<T>(
+    input: { datasetId: string; projectId: string },
+    work: (locked: LockedDatasetRecords) => Promise<T>,
+  ): Promise<T> {
+    const database = this.#database;
+    const locked = lockedView({
+      records: this,
+      columns: {
+        columnTypes: async (): Promise<DatasetColumns> =>
+          datasetColumnsSchema.parse(
+            database.getDataset(input.projectId, input.datasetId).columnTypes,
+          ),
+        setColumnTypes: async (columnTypes: DatasetColumns): Promise<void> => {
+          const row = database.getDataset(input.projectId, input.datasetId);
+          database.putDataset({ ...row, columnTypes });
+        },
+      },
+    });
+    const previous = this.#locks.get(input.datasetId) ?? Promise.resolve();
+    const run = previous.then(
+      () => work(locked),
+      () => work(locked),
+    );
+    this.#locks.set(
+      input.datasetId,
+      run.catch(() => undefined),
+    );
+    return run;
   }
 
   async count(input: { datasetId: string; projectId: string }): Promise<number> {

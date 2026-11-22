@@ -1,5 +1,5 @@
 /**
- * Recent activity card on /me (placeholder, awaiting trace-web table surface).
+ * Recent activity card on /coding-agents (placeholder, awaiting trace-web table surface).
  */
 
 import { PersonalTracesEmptyState } from "../blocks/personal-traces-empty-state.tsx";

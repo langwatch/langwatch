@@ -53,12 +53,14 @@ function evaluatorWire(params: {
   evaluator: unknown;
 }): z.infer<typeof evaluatorWireSchema> {
   const parsed = apiResponseEvaluatorSchema.parse(params.evaluator);
+  // The evaluators page opens a code evaluator in its own editor, so the link must too.
+  const drawer = parsed.type === "code" ? "codeEvaluatorEditor" : "evaluatorEditor";
 
   return {
     ...parsed,
     platformUrl: params.app.platformUrl({
       projectSlug: params.projectSlug,
-      path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsed.id}`,
+      path: `/evaluators?drawer.open=${drawer}&drawer.evaluatorId=${parsed.id}`,
     }),
   };
 }
@@ -84,8 +86,8 @@ async function readEvaluator(params: {
 }
 
 /**
- * Creates the evaluator against the project's resolved models, then reads it
- * back with the fields its type derives, which is what the wire publishes.
+ * Creates the evaluator of whichever kind the body names, then reads it back
+ * with the fields its type derives, which is what the wire publishes.
  */
 async function createEvaluator(params: {
   app: EvaluatorApi;
@@ -100,7 +102,9 @@ async function createEvaluator(params: {
   const created = await app.createWithResolvedDefaults({
     projectId,
     name: params.input.name,
+    type: params.input.type,
     config: params.input.config,
+    ...(params.input.workflowId !== void 0 && { workflowId: params.input.workflowId }),
     caller: params.caller,
   });
   const enriched = await app.findByIdOrSlugWithFields({ idOrSlug: created.id, projectId });
@@ -247,7 +251,10 @@ export function createEvaluatorRest(): Readonly<{
       .withCredential("project", { key: true })
       .withPermission("evaluations:create")
       .withOutput(evaluatorWireSchema)
-      .withDocs({ description: "Create a new evaluator" })
+      .withDocs({
+        description:
+          'Create a new evaluator: a built-in one, a custom code evaluator (`type: "code"`) or one that wraps a workflow (`type: "workflow"`)',
+      })
       .withMiddlewareContext(projectRequestContext)
       .handle(({ app, input, scope, actor, key }, project) =>
         createEvaluator({

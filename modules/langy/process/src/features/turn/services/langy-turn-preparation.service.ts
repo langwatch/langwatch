@@ -8,9 +8,9 @@ import {
   type LangyMessageRow,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { Temporal } from "@langwatch/time";
 import { trace } from "@opentelemetry/api";
 
+import { langyPrCapReachedNote } from "../../../rules/langy-ci-follow-up.rules.ts";
 import {
   extractLangyConversationMemory,
   LANGY_REFERENT_POLICY,
@@ -22,6 +22,8 @@ import {
   startsWithGuidedKickoff,
 } from "../../../rules/langy-conversation-title.rules.ts";
 import { mintRunToken } from "../../../rules/langy-frame-auth.rules.ts";
+import { langyDispatchIntentOf } from "../../../rules/langy-worker-runtime.rules.ts";
+import { LangyEndedTurnService } from "./langy-ended-turn.service.ts";
 import type { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnOverrideService } from "./langy-turn-override.service.ts";
 import {
@@ -40,7 +42,13 @@ const logger = createLogger("langwatch:langy:turn-start");
 export class LangyTurnPreparationService {
   private readonly override: LangyTurnOverrideService;
 
+  private readonly endedTurns: LangyEndedTurnService;
+
   private constructor(private readonly deps: LangyTurnServiceDependencies) {
+    this.endedTurns = LangyEndedTurnService.create({
+      tokenBuffer: deps.tokenBuffer,
+      ...deps.endedTurnWait,
+    });
     this.override = LangyTurnOverrideService.create({
       prompts: deps.prompts,
       projectId: deps.promptProjectId,
@@ -64,6 +72,7 @@ export class LangyTurnPreparationService {
     /** Keeps the unattended ceiling: an allowlisted key, no GitHub token, no UI action. */
     readOnly: boolean;
     unattended?: Pick<NonNullable<StartConversationTurnInput["unattended"]>, "title">;
+    ciFollowUp?: Omit<NonNullable<StartConversationTurnInput["ciFollowUp"]>, "countTurn">;
     worker: NonNullable<LangyTurnServiceDependencies["worker"]>;
     accessStore: LangyTurnServiceDependencies["accessStore"];
     handoffStore: LangyTurnServiceDependencies["handoffStore"];
@@ -83,17 +92,18 @@ export class LangyTurnPreparationService {
     });
     const needsOwnKey = Boolean(args.credentials.githubToken) || args.readOnly;
     const earlyWorkerProbe = needsOwnKey ? null : this.probeWorker(args, disabledSkillsPromise);
-    const results = await this.readPreparation(args, mintedRunToken);
+    const read = await this.readPreparation(args, mintedRunToken);
+    const results = await this.settleEndedTurnFold(args, read);
     const disabledSkills = await disabledSkillsPromise;
     if (disabledSkills.length > 0) {
       args.credentials.disabledSkillIds = disabledSkills;
     }
     const runToken = this.requireRunnableTurn(args, results);
-    const permit = await this.reservePermit(args);
+    const capReachedNote = await this.checkPrCap(args);
     const lateProbe = () => earlyWorkerProbe ?? this.probeWorker(args, disabledSkills);
     await this.ensureWorkerAccess(args, lateProbe);
-    const prepared = this.buildPreparedTurn(args, results, permit.capReachedNote);
-    await this.stashPreparedTurn({ args, prepared, runToken, permitReserved: permit.reserved });
+    const prepared = this.buildPreparedTurn(args, results, capReachedNote);
+    await this.stashPreparedTurn({ args, prepared, runToken });
     await this.acceptPreparedTurn(args, prepared, mintedRunToken);
     await this.dispatchPreparedTurn(args, prepared, runToken);
     this.deps.metrics.count({ outcome: "accepted" });
@@ -138,15 +148,32 @@ export class LangyTurnPreparationService {
             projectId,
           }),
       this.override.resolve(),
-      // The live UI-action channel is flagged (`release_langy_ui_actions`), and
-      // the turn block may only advertise it while the dispatch route would
-      // answer.
+      // The live UI-action channel is flagged (`release_langy_ui_actions`), and the turn block
+      // may only advertise it while the dispatch route would answer.
       this.deps.uiActionSurface.resolve({
         userId,
         projectId,
         organizationId: credentials.organizationId,
       }),
     ]);
+  }
+
+  /** A RUNNING read for a turn whose live edge already ended waits for its fold. */
+  private async settleEndedTurnFold(
+    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
+    results: Awaited<ReturnType<LangyTurnPreparationService["readPreparation"]>>,
+  ): Promise<Awaited<ReturnType<LangyTurnPreparationService["readPreparation"]>>> {
+    const [current, ...rest] = results;
+    if (current.status !== "fulfilled") return results;
+    const { conversation, projectId, userId, turnId } = args;
+    const value = await this.endedTurns.settleHeldRead({
+      conversationId: conversation.id,
+      admittedTurnId: turnId,
+      read: current.value,
+      reread: () =>
+        this.deps.conversations.findByIdVisible({ id: conversation.id, projectId, userId }),
+    });
+    return [{ status: "fulfilled", value }, ...rest];
   }
 
   private requireRunnableTurn(
@@ -203,34 +230,15 @@ export class LangyTurnPreparationService {
     return runTokenResult.value;
   }
 
-  private async reservePermit(
+  /** Reads today's opened pull requests; only one that opened counts (the PR count subscriber). */
+  private async checkPrCap(
     args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-  ) {
-    const permit = args.credentials.githubToken
-      ? await this.deps.permits.reserve({ userId: args.userId })
-      : { reserved: false, allowed: true, resetAt: 0 };
-    args.attempt.retainPermit(permit.reserved);
-    const capReachedNote = permit.allowed
-      ? ""
-      : [
-          "",
-          "USER PR CAP REACHED — the user has already opened the per-day maximum",
-          "of",
-          String(this.deps.perDayPrCap),
-          "GitHub pull requests via Langy today.",
-          "If the user asks you to open a PR, refuse politely, say the daily cap",
-          "is reached, and that it resets at",
-          Temporal.Instant.fromEpochMilliseconds(permit.resetAt).toString({
-            fractionalSecondDigits: 3,
-          }),
-          "UTC.",
-          "Do not call any tool that opens a PR.",
-        ].join(" ");
-    if (!permit.allowed) {
-      stripGithubCredentials(args.credentials);
-    }
-
-    return { reserved: permit.reserved, capReachedNote };
+  ): Promise<string> {
+    if (!args.credentials.githubToken) return "";
+    const permit = await this.deps.permits.check({ userId: args.userId });
+    if (permit.allowed) return "";
+    stripGithubCredentials(args.credentials);
+    return langyPrCapReachedNote({ perDayPrCap: this.deps.perDayPrCap, resetAt: permit.resetAt });
   }
 
   private async probeWorker(
@@ -341,12 +349,10 @@ export class LangyTurnPreparationService {
     args,
     prepared,
     runToken,
-    permitReserved,
   }: {
     args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0];
     prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>;
     runToken: string;
-    permitReserved: boolean;
   }) {
     try {
       await Promise.all([
@@ -367,7 +373,7 @@ export class LangyTurnPreparationService {
           modelOverride: args.turnModel,
           credentials: args.credentials,
           runToken,
-          permitReserved,
+          permitReserved: false,
           ...(prepared.pendingHandoff ? { resumeToken: prepared.pendingHandoff.token } : {}),
         }),
       ]);
@@ -420,6 +426,7 @@ export class LangyTurnPreparationService {
                 role: args.lastUserMessage.role,
                 parts: args.lastUserMessage.parts,
                 title,
+                ...(args.ciFollowUp ? { ciFollowUp: args.ciFollowUp } : {}),
               },
             }
           : {}),
@@ -453,7 +460,7 @@ export class LangyTurnPreparationService {
 
     void args.worker
       .dispatch({
-        intent: dispatchIntentOf({
+        intent: langyDispatchIntentOf({
           resumable: Boolean(prepared.pendingHandoff),
           hasApiKey: Boolean(args.credentials.langwatchApiKey),
         }),
@@ -484,15 +491,4 @@ export class LangyTurnPreparationService {
         );
       });
   }
-}
-
-function dispatchIntentOf({
-  resumable,
-  hasApiKey,
-}: {
-  resumable: boolean;
-  hasApiKey: boolean;
-}): "create" | "revive" | "continue" {
-  if (resumable) return "revive";
-  return hasApiKey ? "create" : "continue";
 }

@@ -1,5 +1,5 @@
 import type { FeatureFlagRuleMatch, FeatureFlagRules } from "@langwatch/feature-flag-contract";
-import { emailDomainsOf, projectIdsOf } from "@langwatch/feature-flag-contract";
+import { emailDomainsOf, projectIdsOf, userIdsOf } from "@langwatch/feature-flag-contract";
 import { toEpochMs, readableDate } from "@langwatch/time";
 
 /**
@@ -16,7 +16,9 @@ export type ScopeKind =
   /** A stable share of users, in percent — shown as "Percentage of users". */
   | "PERCENTAGE"
   /** Signed-in users at one or more email domains — shown as "Email domain". */
-  | "EMAIL_DOMAIN";
+  | "EMAIL_DOMAIN"
+  /** Signed-in users named by id — shown as "User". */
+  | "USER";
 
 export interface UIRule {
   /**
@@ -27,7 +29,7 @@ export interface UIRule {
   id: string;
   scopeKind: ScopeKind;
   /**
-   * An organization id, comma-separated project ids for `PROJECT`, a date for
+   * An organization id, comma-separated project ids for `PROJECT` (user ids for `USER`), a date for
    * `NEW_USERS`, a percent for `PERCENTAGE`, or comma-separated domains for `EMAIL_DOMAIN`.
    */
   target: string;
@@ -80,6 +82,14 @@ export function rulesToUI(rules: FeatureFlagRules): UIRule[] {
         otherConditions: without({ match: rule.match, key: "projectId" }),
       };
     }
+    if (userIdsOf(rule.match.userId).length > 0) {
+      return {
+        ...base,
+        scopeKind: "USER" as const,
+        target: userIdsOf(rule.match.userId).join(", "),
+        otherConditions: without({ match: rule.match, key: "userId" }),
+      };
+    }
     if (rule.match.organizationCreatedAfter) {
       return {
         ...base,
@@ -120,7 +130,13 @@ export function uiToRules(rules: UIRule[]): FeatureFlagRules {
     }
     if (rule.scopeKind === "PROJECT") {
       return {
-        match: { ...rest, projectId: singleOrList(parseProjectIds(target)) },
+        match: { ...rest, projectId: singleOrList(parseTargetIds(target)) },
+        enabled: rule.enabled,
+      };
+    }
+    if (rule.scopeKind === "USER") {
+      return {
+        match: { ...rest, userId: singleOrList(parseTargetIds(target)) },
         enabled: rule.enabled,
       };
     }
@@ -149,8 +165,8 @@ export function parseEmailDomains(target: string): string[] {
     .filter((domain) => domain !== "");
 }
 
-/** Project ids typed into the field: split on commas, unpadded, empties dropped. */
-export function parseProjectIds(target: string): string[] {
+/** Ids held in the field, project or user: split on commas, unpadded, empties dropped. */
+export function parseTargetIds(target: string): string[] {
   return target
     .split(",")
     .map((id) => id.trim())
@@ -214,7 +230,9 @@ export function findUnfillableRule(rules: UIRule[]): UIRule | undefined {
     if (target === "") return true;
     if (rule.scopeKind === "PERCENTAGE") return !isPercentage(target);
     if (rule.scopeKind === "EMAIL_DOMAIN") return !areEmailDomains(target);
-    if (rule.scopeKind === "PROJECT") return parseProjectIds(target).length === 0;
+    if (rule.scopeKind === "PROJECT" || rule.scopeKind === "USER") {
+      return parseTargetIds(target).length === 0;
+    }
     return false;
   });
 }

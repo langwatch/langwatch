@@ -37,6 +37,13 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     })
     .handle(({ app, input, actor }) => app.listCallerBindings(input, { id: actor.id }))
 
+    .procedure("grantablePermissions")
+    .noPermission({
+      reason: OWN_KEYS_REASON,
+      allow: MEMBER_ONLY,
+    })
+    .handle(({ app, input, actor }) => app.listGrantablePermissions(input, { id: actor.id }))
+
     .procedure("nameById")
     .noPermission({
       reason: OWN_KEYS_REASON,
@@ -52,7 +59,7 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     .handle(({ app, input, actor }) => app.listKeys(input, { id: actor.id }))
 
     .procedure("create")
-    .mintsCredential("organization:view")
+    .mintsCredential()
     .noPermission({
       reason: OWN_KEYS_REASON,
       allow: MEMBER_ONLY,
@@ -91,6 +98,23 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
       return { success: true };
     })
 
+    .procedure("rotate")
+    .mintsCredential()
+    .noPermission({
+      reason: OWN_KEYS_REASON,
+      allow: MEMBER_ONLY,
+    })
+    // The second answer that carries a plaintext token: the new secret, once, with the same
+    // identity `create` answers beside it.
+    .handle(async ({ app, input, actor }) => {
+      const { token, apiKey } = await app.rotateKey(input, actor);
+
+      return {
+        token,
+        apiKey: { id: apiKey.id, name: apiKey.name, createdAt: apiKey.createdAt },
+      };
+    })
+
     .procedure("orgProjects")
     .noPermission({
       reason: KEY_ASSIGNMENT_REASON,
@@ -118,7 +142,7 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     .procedure("mintDocsSessionKey")
     .refusedOnAggregate()
     .withMiddlewareContext(browserSessionWindowContext)
-    .mintsCredential("project:view")
+    .mintsCredential()
     .withPermission("project:view", { via: "projectId" })
     .handle(({ app, input, actor }, browserSession) =>
       app.mintDocsSessionKey({
@@ -127,7 +151,14 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
         browserSession,
         projectId: input.projectId,
         docsOrigin: input.docsOrigin,
+        access: input.access,
+        lifetimeMinutes: input.lifetimeMinutes,
       }),
     )
+
+    // The consent page's first read: whether the project's organization turned the flow off.
+    .procedure("docsSessionAvailability")
+    .withPermission("project:view", { via: "projectId" })
+    .handle(({ app, input }) => app.getDocsSessionAvailability({ projectId: input.projectId }))
 
     .build();

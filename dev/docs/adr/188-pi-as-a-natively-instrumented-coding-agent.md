@@ -12,37 +12,39 @@
 > over the standard `OTEL_EXPORTER_OTLP_*` environment, dual-written to GenAI semantic conventions. The
 > server side is one declarative definition beside `codex.ts`. The extension is a shim with a death date:
 > when pi wires its native `TelemetryContext` into the CLI, the file is deleted and the receiver does not
-> change. Every version claim in this record is pinned to pi `0.84.2`, the version this workspace resolves.
+> change. Every schema and type claim in this record is pinned to pi `0.84.2`, the version this workspace
+> resolves; the version range the shim supports was read from the npm registry (Constants).
 
 ## Context
 
 pi (`@earendil-works/pi-coding-agent`) is a coding agent with a terminal UI, a TypeScript extension API
-and its own provider abstraction. It is not tracked today: it is absent from `codingAgentSchema`
+and its own provider abstraction. At framing it was not tracked: it was absent from `codingAgentSchema`
 (`modules/coding-agent/contract/src/telemetry/coding-agent-definition.ts`), from the definition registry
 (`telemetry/index.ts`), from the wrapper subcommands (`sdks/typescript/src/cli/utils/governance/tool-env.ts`),
 from the assistant presets and from `specs/coding-agent/`.
 
-A separate, merged use of pi exists and is **out of scope here**. Both of the earlier drafts described it
-wrongly, in opposite directions, so here is the shape as the code has it. Go's `langyagent` does not spawn
-the pi CLI. It spawns our own first-party binary: `services/langyagent/adapters/pi/spawn.go` runs
+A separate, merged use of pi exists and is **out of scope here**. Go's `langyagent` does not spawn the pi
+CLI. It spawns our own first-party binary: `services/langyagent/adapters/pi/spawn.go` runs
 `in.BinaryPath` (`:329`) and names the failure `start langy-worker` (`:342`), and that binary is
 `services/langyworker` compiled to one file (`package.json:48`, output `.bin/langy-worker/langy-worker`).
 That worker **does** embed pi in-process, as a library: it depends on `@earendil-works/pi-coding-agent`
 and `@earendil-works/pi-ai`, both pinned `0.84.2` (`package.json:17-18`), and builds sessions against pi's
 extension API directly (`services/langyworker/src/session.ts:73`, `factory: (pi: ExtensionAPI) => {`).
-Paths in this paragraph are relative to `services/langyworker` unless given in full. So the first draft's
-"embeds pi's telemetry contract in-process" was half right and the correction that replaced it was half
-wrong: pi is embedded, but its _telemetry_ contract is not. Nothing under `services/langyworker/src`
-references `pi-telemetry`, `TelemetryContext`, `OTEL_*` or `@opentelemetry`, and the Go adapter spells the
-reason out in a comment before it builds the child environment: "NO OTLP export variables: pi exports no
-OTLP (the LLM relay synthesizes the gen_ai spans instead)" (`spawn.go:382-383`). A test holds the environment
-to it ("No OTLP export (pi exports none)", `services/langyagent/adapters/pi/spawn_test.go:403`, which
-fails on any key with an `OTEL_` prefix).
+Paths in this paragraph are relative to `services/langyworker` unless given in full. pi is embedded, but
+its _telemetry_ contract is not. Nothing under `services/langyworker` references `pi-telemetry`,
+`TelemetryContext`, `OTEL_*`, `otlp` or `@opentelemetry`, its `package.json` carries no OpenTelemetry
+dependency, and the Go adapter spells the reason out in a comment before it builds the child environment:
+"NO OTLP export variables: pi exports no OTLP (the LLM relay synthesizes the gen_ai spans instead)"
+(`spawn.go:382-383`). A test holds the environment to it ("No OTLP export (pi exports none)",
+`services/langyagent/adapters/pi/spawn_test.go:403`, which fails on any key with an `OTEL_` prefix). The
+worker also loads no extension from disk: its resource loader passes `noExtensions: true`
+(`src/session.ts:153`) and registers its own extensions as inline factories, so our shim cannot load into
+it even when the file sits in the worker's home.
 
 That is our own product internals, not a customer's coding agent, and nothing in this record touches
 `modules/langy` or `services/langy*`: pi's telemetry contract was read from the published packages, not
-from Langy's dependency on them. The residual risk is sharper than "if Langy's worker ever gains an
-exporter", though, and it is worth stating plainly. Langy's worker is a Node process that already holds
+from Langy's dependency on them. The residual risk is worth stating plainly. Langy's worker is a Node
+process that already holds
 `LANGWATCH_API_KEY`, `LANGWATCH_ENDPOINT` and `LANGWATCH_PROJECT_ID` in its environment
 (`spawn.go:409-415`), so the day anything in that process starts an OTel SDK (a pi release that wires its
 own `TelemetryContext`, a dependency that auto-instruments, or someone adding tracing to the worker for
@@ -71,11 +73,11 @@ Research (2026-10-26, read from the packages this workspace resolves, pi `0.84.2
   `pi.ai.response.{model,id,stop_reason}`,
   `pi.ai.usage.{input,output,cache_read,cache_write,reasoning,total}_tokens`, `pi.ai.usage.cost`,
   `pi.ai.stream.{chunk_count,time_to_first_chunk_ms}`, `pi.ai.error.type`).
-  Two details the first draft of this record got wrong, both load-bearing below. `pi.harness.turn`
-  declares `endAttributes: {}` (`dist/harness/telemetry.js:280`): it carries no outcome of its own, and the
-  outcome in pi's schema is `pi.operation.outcome` on `pi.harness.run` (`:178`). And `pi.harness.navigation`
-  (`:209`) is a real declared span, which the earlier inventory omitted; it is one of the four parents
-  `pi.harness.step` declares (`:285-288`), where `pi.harness.turn` is the first.
+  Two details are load-bearing below. `pi.harness.turn` declares `endAttributes: {}`
+  (`dist/harness/telemetry.js:280`): it carries no outcome of its own, and the outcome in pi's schema is
+  `pi.operation.outcome` on `pi.harness.run` (`:178`). And `pi.harness.navigation` (`:209`) is a real
+  declared span, one of the four parents `pi.harness.step` declares (`:285-288`), where
+  `pi.harness.turn` is the first.
 - **The provider dialects are already flattened, upstream of us.** There is one `pi.ai.request` span with
   provider as an _attribute_, one closed cross-provider `stop_reason` enum
   (`stop|length|tool_use|error|aborted|deferred`), and one token taxonomy with cache and reasoning tokens
@@ -91,18 +93,19 @@ Research (2026-10-26, read from the packages this workspace resolves, pi `0.84.2
   CLI's public surface; the only pi-owned telemetry variable is `PI_TELEMETRY`, the install-analytics
   opt-out (`dist/core/telemetry.js`, `dist/cli/args.js`). In-process embedders can pass a context to
   `startHarnessSpan`; a CLI user cannot.
-- **No published pi line adds OTel export, as far as we checked.** The 2.x versions seen in the wild
-  belong to a third-party plugin bundle. **UNVERIFIED:** the npm registry was not queried while writing
-  this record, so the latest published version and its changelog are not established here. Everything
-  below is pinned to 0.84.2, and the min-warned version in the Constants table is the one claim that a
-  registry check has to settle before this record leaves Proposed.
-- **The extension API is observe-only where we need it, and thinner than the first draft assumed.**
-  Extensions are TypeScript files in `~/.pi/agent/extensions/`, default-exporting a function that
-  receives the API and registers `pi.on(event, handler)`. The documented order is
+- **No published pi release adds OTel export.** The npm registry, queried 2026-11-05, lists
+  `@earendil-works/pi-coding-agent` from `0.74.0` (2026-05-07) to `1.5.0` (2026-11-02, the `latest` tag);
+  releases up to `0.73.1` were published as `@mariozechner/pi-coding-agent`. The `1.5.0` tarball's `dist`
+  holds no `OTEL_`, `otlp` or `opentelemetry` string and no `TelemetryContext` on the CLI's surface, so the
+  shim's death date (Decision 12) has not arrived. The 2.x versions seen in the wild belong to a
+  third-party plugin bundle.
+- **The extension API is observe-only where we need it, and thin.** Extensions are TypeScript files in
+  `~/.pi/agent/extensions/`, default-exporting a function that receives the API and registers
+  `pi.on(event, handler)`. The documented order is
   `input → before_agent_start → agent_start → (turn_start → message_* → tool_call → tool_execution_* → tool_result → turn_end)× → agent_end → agent_settled`.
   Read against the shipped types (`@earendil-works/pi-coding-agent`
-  `dist/core/extensions/types.d.ts` at 0.84.2), three of the first draft's claims are false and they
-  change what the shim can emit:
+  `dist/core/extensions/types.d.ts` at 0.84.2), three events carry less than their names suggest, and
+  that bounds what the shim can emit:
   - `turn_end` carries **no outcome**. `TurnEndEvent` (`:556`) is `{ type, turnIndex, message, toolResults }`.
   - `after_provider_response` carries **no usage**. `AfterProviderResponseEvent` (`:519`) is
     `{ type, status, headers }`.
@@ -130,12 +133,10 @@ developer's session by us (ADR-039 §7 and the claude/opencode plugin precedent,
 plugins); customer trace routing is never configured through LangWatch's own `OTEL_*` namespace
 (ADR-175 §1 governs LangWatch processes; wrapped children are a separate, existing injection path).
 
-A note on scale, because reviews of this work have quoted the wrong half of it, and because the earlier
-figure of "roughly 46 hand edits" could not be reconstructed from the text that asserted it. Here is a
-count anyone can repeat. Take the files that name **both** `opencode` and `copilot` by hand: that is the
-signature of a per-tool literal list, as opposed to a file that happens to mention one agent for a
-quirk of its own. Excluding tests, there are **32** such files, and each is a candidate site for a `pi`
-entry:
+A note on scale, as a count anyone can repeat. Take the files that name **both** `opencode` and
+`copilot` by hand: that is the signature of a per-tool literal list, as opposed to a file that happens to
+mention one agent for a quirk of its own. Excluding tests, there were **32** such files at framing, and
+each is a candidate site for a `pi` entry:
 
 | Tree                            | Files | What they are                                                                                                                                                                                                                                                                                                                                                                              |
 | ------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -157,11 +158,11 @@ does **not** give away.
 ## Decision
 
 1. **Tool integration on the ingestion path only; no gateway path for pi.** `langwatch pi` registers
-   alongside the other seven in `sdks/typescript/src/cli/program.ts` → `wrap.ts` → `runWrapped("pi")`.
-   The subcommand list is one hand-written literal, `TOOL_WRAPPER_COMMANDS` (`program.ts:40-48`, today
-   `claude`, `codex`, `copilot`, `code`, `cursor`, `gemini`, `opencode`), consumed once at `:787`. An
-   earlier draft said "the other five" and left this constant out of its site list entirely; it is the
-   first edit, and without it `langwatch pi` is not a command at all.
+   alongside the other wrapped tools in `sdks/typescript/src/cli/program.ts` → `wrap.ts` →
+   `runWrapped("pi")`. The subcommand list is one hand-written literal, `TOOL_WRAPPER_COMMANDS`
+   (`program.ts:43-53`: `claude`, `codex`, `copilot`, `code`, `cursor`, `gemini`, `opencode`, `grok`,
+   `pi`), consumed once at `:836`. It is the first edit: without `pi` in it, `langwatch pi` is not a
+   command at all.
    `PLATFORM_TOOL_POLICY_DEFAULTS.pi` is `allowVk: false, allowOtelDirect: true`, so
    `resolveWrapperPath` finds a single allowed path and never prompts. Rejects a gateway path: every
    model's address is fixed in pi's own build, so there is no base-URL swap to make, and a half-wired
@@ -174,10 +175,9 @@ does **not** give away.
    `PLATFORM_TOOL_SLUGS` (`enterprise/modules/governance/process/src/services/ai-tool-catalog.service.ts:305`).
    The SDK then carries its own copy of the policy table
    (`sdks/typescript/src/cli/utils/governance/platform-tool-policy.ts`), and its fallback for a slug it
-   does not know is `{ allowVk: true, allowOtelDirect: true }` (`:28`), the opposite of what this decision
-   chooses. pi therefore gets an explicit entry in `PLATFORM_TOOL_POLICIES` (`:33`) and in the
-   hand-written `PlatformToolSlug` union (`:7`); relying on the default would silently offer pi a virtual
-   key.
+   does not know is `{ allowVk: true, allowOtelDirect: true }`, the opposite of what this decision
+   chooses. pi therefore has an explicit entry in `PLATFORM_TOOL_POLICIES` (`:55`) and in the
+   hand-written `PlatformToolSlug` union; relying on the default would silently offer pi a virtual key.
 
 2. **The coding-agent id is `pi`; the ingestion sourceType slug is `pi_cli`.** `pi` joins
    `codingAgentSchema` and gets `telemetry/pi.ts` in the definition registry. The slug follows the
@@ -187,10 +187,10 @@ does **not** give away.
    the day a pi IDE extension ships, and widening a source-type slug after keys are minted against it
    means rewriting provenance on rows already stored.
 
-   Four names therefore coexist, each belonging to a different reader, and two earlier passes of this
-   record conflated them. The **wrapper command** is `langwatch pi`. The **ingestion slug** is `pi_cli`,
-   and that is also the argument `langwatch ingest install` takes: `SUPPORTED_TOOLS`
-   (`sdks/typescript/src/cli/commands/ingestion/install.ts:30`) is a list of source types, not of
+   Four names therefore coexist, each belonging to a different reader, and they are easy to conflate.
+   The **wrapper command** is `langwatch pi`. The **ingestion slug** is `pi_cli`, and that is also the
+   argument `langwatch ingest install` takes: `SUPPORTED_TOOLS`
+   (`sdks/typescript/src/cli/commands/ingestion/install.ts:37`) is a list of source types, not of
    commands, which is why it reads `claude_code` and `copilot_cli` rather than `claude` and `copilot`, and
    `normaliseTool` (`:120`) only lowercases and maps `-` to `_` before demanding exact membership, so
    `langwatch ingest install pi` exits with "Unknown tool 'pi'". The **session-context hook argument** is
@@ -204,47 +204,51 @@ does **not** give away.
    minted for.
 
 3. **`matches()` tests pi's own record namespace and nothing else.** pi's definition is
-   `matches: (signal) => signal.name.startsWith("pi.")`. The shared `signalSays` helper
-   (`contract/src/telemetry/coding-agent-definition.ts:94-100`) is deliberately **not** used, and the
-   reason is in its body: besides the namespaced-name test it also runs `signal.scope.includes(needle)`
-   (`:97`) and `signal.service.includes(needle)` (`:98`). `pi` is a substring of `copilot` and of
-   `anthropic`, so `signalSays(signal, "pi")` claims every Copilot span (scope `github.copilot.*`) and
-   every record whose scope is `com.anthropic.claude_code.events`
-   (`coding-agent-definition.ts:196-197`). Registry order would not save us: copilot is registered
-   **last** (`telemetry/index.ts:21-28`), so a pi record placed anywhere ahead of it wins the Copilot
-   spans. One correction to an earlier draft of this record: `openai` does **not** contain `pi`, so the
-   substring hazard is two agents, not three.
+   `matches: (signal) => signal.name.startsWith("pi.")` (`contract/src/telemetry/pi.ts:13`). The shared
+   `signalSays` helper (`contract/src/telemetry/coding-agent-definition.ts:121-127`) is deliberately
+   **not** used, and the reason is in its body: besides the namespaced-name test it also runs
+   `signal.scope.includes(needle)` (`:124`) and `signal.service.includes(needle)` (`:125`). `pi` is a
+   substring of `copilot` and of `anthropic`, so `signalSays(signal, "pi")` claims every Copilot span
+   (scope `github.copilot.*`) and every record whose scope is `com.anthropic.claude_code.events`
+   (`coding-agent-definition.ts:232`). Registry order is no safeguard: pi is registered last
+   (`telemetry/index.ts:28-37`), but a substring predicate would still claim any Copilot or Claude Code
+   signal a record ahead of it misses, and any reorder would hand it the rest. `openai` does **not**
+   contain `pi`, so the substring hazard is two agents.
    The namespaced-name test is exact where the substring test is not: `startsWith("pi.")` matches
    `pi.harness.run` and `pi.ai.request` and no `github.copilot.*` or `claude_code.*` name. It is also the
    only shape available, because the other two signal members are not ours to trust: `service.name` is
    what our own wrapper stamps (`OTEL_RESOURCE_ATTRIBUTES`, Constants), so testing it is a tautology, and
-   the instrumentation scope our shim would set is not written down anywhere in the codebase yet.
+   the instrumentation scope the shim sets, `langwatch.pi-extension`
+   (`PI_EXTENSION_SCOPE_NAME`, `sdks/typescript/src/cli/utils/governance/pi-extension-source.ts:21`), is
+   ours and dies with the shim: pi's native exporter will set a scope of its own.
    Rejects `signalSays(signal, "pi")`: it claims copilot's and Claude Code's spans, for the reason above.
    Rejects requiring the name namespace **and** a recognised instrumentation scope: no record in the
    registry requires two conditions to both hold. claude_code's is the only other two-part predicate and
    it is an OR that widens (`signalSays(signal, "claude_code") || signal.scope.includes("anthropic")`,
-   `:201`), never an AND that narrows. The scope string such a condition would test does not exist today,
-   so it would be written against a spelling that is still a guess (Decision 13 carries the full argument).
+   `:237`), never an AND that narrows. The only scope such a condition could test today is the shim's
+   own, so the day the shim is deleted every customer's pi spans would stop matching (Decision 13 carries
+   the full argument).
    This test says which product a span is **about** and nothing at all about who emitted it, which is what
    makes Decision 13 necessary.
 
 4. **We ship our own extension, as a first-party shim, and install no third-party package.** The file goes
    into pi's extension directory and is registered in `telemetry-targets.ts` so `langwatch logout` removes
    it, exactly as `claude-plugin.ts` and `opencode-plugin.ts` are.
-   **Both `langwatch pi` and `langwatch ingest install pi_cli` write it.** pi ships no exporter, so the
+   **`langwatch pi`, `langwatch instrument pi` and `langwatch ingest install pi_cli` all write it.** pi ships no exporter, so the
    env the wrapper injects reaches nothing without the extension; a live run proved `langwatch pi` alone
    sent no span while the file was absent, and most users never run the install command. The wrapper
    therefore keeps the file in place on every launch (`ensurePiTelemetryExtension` in
-   `governance/pi-plugin.ts`, called from `reportIngestionSetup`), quiet when unchanged, one line when it
-   writes, and one line naming the lost telemetry when the write fails; pi still starts. The other seam is
-   `langwatch ingest install`
-   (`sdks/typescript/src/cli/commands/ingestion/install.ts:198`, the function at `:203-233`), which
-   resolves the row by key source type (`:225`) and then branches on a hard-coded id, `opencode` taking
-   the plugin path and everything else the hook-entries path (`:227-230`). pi therefore needs `pi_cli` in
-   `SUPPORTED_TOOLS` (`:30`, today `codex`, `claude_code`, `gemini`, `opencode`, `copilot_cli`) and an arm
-   in that branch, or `langwatch ingest install pi_cli` installs no extension and silently writes hook entries
-   into a file pi never reads. For every other agent the wrapper installs no session-context seam; pi is
-   the exception because its seam is also its only exporter.
+   `governance/pi-plugin.ts:79`, called from `governance/wrapper.ts:573`), quiet when unchanged, one line
+   when it writes, and one line naming the lost telemetry when the write fails; pi still starts.
+   `langwatch instrument pi` writes it beside the scoped shell function, for the same reason, and reports
+   a failed write as a required failure, as opencode's flag is. The other seam is
+   `langwatch ingest install`, which resolves the row by key source type
+   (`sdks/typescript/src/cli/commands/ingestion/install.ts:244`) and then branches on the agent id in
+   `installSeamFor` (`:256`): `opencode` takes its plugin path, `pi` its extension (`:263`), and everything
+   else the hook-entries path. pi therefore has `pi_cli` in `SUPPORTED_TOOLS` (`:37-47`) and its own arm in
+   that branch; without the arm, `langwatch ingest install pi_cli` would install no extension and silently
+   write hook entries into a file pi never reads. For most agents the wrapper installs no session-context
+   seam; pi is an exception because its seam is also its only exporter.
    Rejects adopting a community extension: it would export logs rather than
    pi's span tree (reopening the problem this record closes), and `langwatch pi` installing someone
    else's code in-process into a session holding live credentials is a supply-chain hop we would be
@@ -271,13 +275,12 @@ does **not** give away.
    `pi.step.outcome` on `pi.harness.step` (`:321`, an end attribute), written `succeeded` because
    `session_compact` only fires for a compaction that finished.
 
-   **The outcome goes on the run, not the turn.** An earlier draft told the shim to end `pi.harness.turn`
-   "on the documented outcome". There is no such attribute: `pi.harness.turn` declares `endAttributes: {}`
-   (`dist/harness/telemetry.js:280`), and the only outcome in pi's schema is `pi.operation.outcome` on
-   `pi.harness.run`, a closed enum of `completed|aborted|failed|suspended` (`:178`). `TurnEndEvent` carries
-   no outcome either (`dist/core/extensions/types.d.ts:556`), so there is nothing to read and nowhere
-   declared to put it. The shim closes the turn with its timing and status only, and writes
-   `pi.operation.outcome` once, on the run, from `agent_end`.
+   **The outcome goes on the run, not the turn.** The turn has no outcome attribute: `pi.harness.turn`
+   declares `endAttributes: {}` (`dist/harness/telemetry.js:280`), and the only outcome in pi's schema
+   is `pi.operation.outcome` on `pi.harness.run`, a closed enum of `completed|aborted|failed|suspended`
+   (`:178`). `TurnEndEvent` carries no outcome either (`dist/core/extensions/types.d.ts:556`), so there
+   is nothing to read and nowhere declared to put it. The shim closes the turn with its timing and status
+   only, and writes `pi.operation.outcome` once, on the run, from `agent_end`.
 
    **The required keys are what make the shim conformant, and eight of them have no source.** pi's schema
    marks attributes `required`, so a conformance test (Invariants) that only checks "every key we emit is
@@ -301,8 +304,8 @@ does **not** give away.
    | `pi.harness.event_handler` (`:444`) | `pi.event.type` (`:448`)                                                                                                                                         | not emitted. `pi.lane.name` (`:455`) is `required: false`                                                                                                                                                                                                                                                                                                                                              |
    | `pi.session.write` (`:465`)         | `pi.lane.name` (`:469`), `pi.session.mutation` (`:481`)                                                                                                          | not emitted. `pi.operation.id` (`:475`) and `pi.session.item_type` (`:487`) are `required: false`                                                                                                                                                                                                                                                                                                      |
 
-   Two readings of this schema in earlier passes of the record were wrong. `pi.session.id`,
-   `pi.lane.name`, `pi.operation.id` and `pi.operation.recovery` are not "required on all harness spans":
+   Two readings of this schema are easy to get wrong. `pi.session.id`, `pi.lane.name`, `pi.operation.id`
+   and `pi.operation.recovery` are not "required on all harness spans":
    they are one shared object, `operationStartAttributes` (`:125-149`), spread into three spans only, so
    eight of the twelve declared spans never ask for `pi.operation.recovery` at all. And `pi.lane.name` and
    `pi.operation.id` are required much more widely than that object, each being re-declared per span.
@@ -327,12 +330,15 @@ does **not** give away.
    every one of them for real, because pi's harness is where they originate. The conformance test asserts
    the required set is _present_, not that it is faithful, and this table is what a reader compares it
    against. No attribute on the span marks the stand-ins: every span the shim writes carries at least
-   one, so a per-span marker would say nothing, and no reader acts on one. This list is the record.
+   one, so a per-span marker would say nothing. The eight are kept so pi's declared schema stays whole
+   (#9301), and a test proves no fold, rule or reader acts on them
+   (`packages/span-normalisation/src/__tests__/piCanonicaliser.unit.test.ts`, "The shim's stand-in
+   values are never read as facts", `pi-cli-otlp.feature`). This list is the record.
 
-   **Which declared spans are emitted follows the event surface, not the parentage.** An earlier draft
-   said pi 0.84.2 fires no compaction or navigation event. That is wrong: the extension API types declare
-   `session_before_compact` and `session_compact` (the latter carrying `reason: "manual" | "threshold" |
-"overflow"`) and `session_before_tree` and `session_tree`. So the shim emits `pi.harness.compaction`
+   **Which declared spans are emitted follows the event surface, not the parentage.** pi 0.84.2's
+   extension API types declare `session_before_compact` and `session_compact` (the latter carrying
+   `reason: "manual" | "threshold" | "overflow"`) and `session_before_tree` and `session_tree`, so the
+   shim emits `pi.harness.compaction`
    and `pi.harness.navigation` from those pairs. pi declares `pi.compaction.reason` on `pi.harness.step`
    (`:313-318`), not on `pi.harness.compaction` (`:187-208`), so a compaction also carries one child
    `pi.harness.step` with `pi.step.kind = "compaction"`; its `pi.step.attempt` is a stand-in, listed
@@ -346,13 +352,13 @@ does **not** give away.
    on are allowlisted by hand.** The shim writes `gen_ai.operation.name`, `gen_ai.request.model`,
    `gen_ai.response.model`, `gen_ai.system` and `gen_ai.usage.{input,output}_tokens` beside the `pi.ai.*`
    keys on the same span.
-   What the dual write buys is narrower than two earlier drafts said, and the narrowing is worth stating
-   because the wrong reason would send someone to the wrong file. It does **not** buy the span's role.
+   What the dual write buys is narrow, and the wrong reason would send someone to the wrong file. It does
+   **not** buy the span's role.
    `genAiOperationRoleOf` compares a record's `genAiOperations` against `name.split(" ", 1)[0]`
    (`modules/coding-agent/contract/src/telemetry/gen-ai-operations.ts:38`), the first space-delimited word
    of the **span name**, not any `gen_ai.*` attribute. Copilot's names are `{operation} {target}` pairs, so
    its triple reads as GenAI operations (`chat`, `invoke_agent`, `execute_tool`,
-   `coding-agent-definition.ts:233`); pi's names are single words with no space, so `split(" ", 1)[0]`
+   `coding-agent-definition.ts:269`); pi's names are single words with no space, so `split(" ", 1)[0]`
    returns the whole name and pi's `genAiOperations` must be its own span names verbatim:
    `{ session: "pi.harness.run", modelCall: "pi.ai.request", toolRun: "pi.harness.tool" }`. The role still
    comes from the registry record and still needs no hand-maintained list elsewhere, which is the property
@@ -360,20 +366,28 @@ does **not** give away.
    What the dual write actually buys is the fold. `CODING_AGENT_CONTRIBUTION_KEYS` already carries
    `gen_ai.request.model` (`coding-agent-normalization.ts:264`), `gen_ai.response.model` (`:269`) and
    `gen_ai.usage.{input,output}_tokens` (`:270-271`), so the model and the two headline token counts reach
-   the fold on the day pi's definition lands, before anyone adds a single `pi.` key to that list. The
-   `pi.*` keys then extend what the GenAI conventions have no name for.
-   It does not make the server side branch-free, and an earlier draft of this record claimed that it did.
-   Fact lifting copies an allowlist rather than the span: `liftSpanFacts` iterates
-   `CODING_AGENT_CONTRIBUTION_KEYS` and silently drops every attribute that is not in it
-   (`modules/coding-agent/process/src/rules/coding-agent-span-facts.rules.ts:82`, the list itself at
-   `modules/coding-agent/contract/src/telemetry/coding-agent-normalization.ts:215-327`, 87 quoted
-   literals, no spreads, and not one of them a `pi.` key). Every `pi.*` attribute this record depends on
-   is added to that list or it never reaches the fold, and the failure is quiet: the span is stored, the
-   session simply learns nothing from it. One edit covers both lanes, because the log canonicaliser reads
-   the same list (`:403`). In the event only `pi.ai.usage.cost` was added: the fold reads pi's model,
-   tokens and tool name through the `gen_ai.*` mirrors and the session key off the raw span, and a pi
-   key with no reader stays out of the list.
-   Two further corrections to the same claim. The noise filter's generic GenAI arm will never see a pi
+   the fold without a single `pi.` key in that list. The `pi.*` keys then extend what the GenAI
+   conventions have no name for.
+   It does not make the server side branch-free. Fact lifting copies an allowlist rather than the span:
+   `liftSpanFacts` iterates `CODING_AGENT_CONTRIBUTION_KEYS` and silently drops every attribute that is
+   not in it (`modules/coding-agent/process/src/rules/coding-agent-span-facts.rules.ts:121`, the list
+   itself at `modules/coding-agent/contract/src/telemetry/coding-agent-normalization.ts:215-336`, quoted
+   literals with no spreads). Every `pi.*` attribute the fold reads is in that list or it never reaches
+   the fold, and the failure is quiet: the span is stored, the session simply learns nothing from it. One
+   edit covers both lanes, because the log canonicaliser reads the same list. The list holds one pi key,
+   `pi.ai.usage.cost` (`:335`): the fold reads pi's model, tokens and tool name through the `gen_ai.*`
+   mirrors and the session key off the raw span, and a pi key with no reader stays out of the list.
+   What the shim does not mirror takes a second path. A pi canonicaliser
+   (`packages/span-normalisation/src/piCanonicaliser.ts`) runs after the GenAI adapter: it lifts
+   `pi.ai.usage.{total,cache_read,cache_write,reasoning}_tokens` onto their canonical `gen_ai.usage.*`
+   keys, consuming the `pi.*` spellings (which is why none of the four is in the allowlist), maps pi's
+   span names to span types, copies the stop reason (as the one-element list
+   `gen_ai.response.finish_reasons`), the error type, the session id and the tool name onto canonical
+   keys, and never reads `pi.ai.usage.cost`. The error class is read on the span pi declares it for:
+   `pi.ai.error.type` on `pi.ai.request`, `pi.error.type` on harness spans (`piCanonicaliser.ts:101`).
+   It is the one pi-shaped canonicaliser, and it reads only pi's declared names, so it survives the
+   shim's deletion unchanged.
+   Two further facts bound the claim. The noise filter's generic GenAI arm will never see a pi
    span at all: `shouldFilterCodingAgentSpan` returns false for any scope that is not a known noise scope
    before it reaches that arm (`contract/src/telemetry/coding-agent-span-filter.ts:95`, the scope set at
    `:36`), so there is nothing to change there and nothing should be asserted of it. And the `pi.*` keys
@@ -387,23 +401,22 @@ does **not** give away.
 
 7. **Both cost figures are kept, and neither silently replaces the other.** pi reports `pi.ai.usage.cost`
    on a span, which is a combination the pipeline has not met: span-fed agents are priced from the
-   catalogue, log-fed agents report their own cost. An earlier draft resolved that by letting the reported
-   figure win, which contradicts the convention the repo already holds. Here the computed figure is the
-   cost and the agent's own number is a drift signal kept beside it, because the two disagreeing is the
-   alarm that either our price registry or the agent's pricing has gone stale
-   (`specs/trace-processing/coding-agent-cost.feature:58` and `:61`; the split the drift subscriber reads
-   at `modules/coding-agent/process/src/eventing/coding-agent-cost-drift.subscriber.ts:64` and `:81`). So
-   `costUsd` stays catalogue-computed for pi and `agentReportedCostUsd` accumulates `pi.ai.usage.cost`,
-   exactly as Claude Code's reported cost already behaves on the log lane.
+   catalogue, log-fed agents report their own cost. The convention the repo already holds settles it: the
+   computed figure is the cost and the agent's own number is a drift signal kept beside it, because the
+   two disagreeing is the alarm that either our price registry or the agent's pricing has gone stale
+   (`specs/trace-processing/coding-agent-cost.feature:58` and `:61`). Letting the reported figure win would
+   contradict that convention. So `costUsd` stays catalogue-computed for pi and `agentReportedCostUsd`
+   accumulates `pi.ai.usage.cost`, exactly as Claude Code's reported cost behaves on the log lane.
 
-   **The span lane cannot do this today, and it takes two edits, not one branch.** An earlier draft said
-   the seam was "one branch and not a new projection", and that is wrong in a way worth being precise
-   about, because each missing edit fails silently on its own.
+   **The span lane takes two edits, not one branch**, and each one, missing, fails silently on its own.
+   Before them, the only place `agentReportedCostUsd` accumulated was the **log** projection
+   (`coding-agent-session-log.projection.ts:254`), and the drift subscriber split by lane, recording a
+   span event as computed only.
 
-   | Edit                                            | Where                                                                                                                    | Why it is needed                                                                                                                                                                                                                                                                                             |
-   | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-   | accumulate the reported figure on the span lane | `coding-agent-session-span.projection.ts`, the declared-GenAI arm at `:299` and the `chargePricedCall` it calls (`:205`) | `chargePricedCall` writes **only** `costUsd` (`:220`). Nothing anywhere on the span lane touches `agentReportedCostUsd`; the one place it accumulates is the **log** projection (`coding-agent-session-log.projection.ts:254`). Without this edit the reported figure for a pi session is always zero        |
-   | record the reported figure from a span event    | `coding-agent-cost-drift.subscriber.ts`, the span branch at `:49-69`                                                     | the subscriber splits by **lane**, not by what the fold holds: a span event calls `recordComputed` only (`:64`) and a log event calls `recordReported` only (`:81`). Even with the fold edit above, a pi session's reported cost reaches no drift metric, so the alarm this decision is built on never fires |
+   | Edit                                            | Where (as shipped)                                                                                                                                                                                                   | Without it                                                                                                                             |
+   | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+   | accumulate the reported figure on the span lane | `coding-agent-session-span.projection.ts`: `chargePricedCall` (`:217`) adds every `SPAN_REPORTED_COST_KEYS` value (`:41`, today `pi.ai.usage.cost`) to `agentReportedCostUsd` (`:226`) beside the computed `costUsd` | the span lane writes only `costUsd`, and the reported figure for a pi session is always zero                                           |
+   | record the reported figure from a span event    | `coding-agent-cost-drift.subscriber.ts`: the span branch calls `recordComputed` (`:64`) and then `recordReported` (`:70`) for the same event; a zero records nothing                                                 | a pi session's reported cost reaches no drift metric even with the fold edit above, so the alarm this decision is built on never fires |
 
    The two together are what make the drift signal real for an agent that is span-fed _and_
    self-reporting, which pi is the first of. Rejects the cheaper alternative of routing pi's reported cost
@@ -420,35 +433,36 @@ does **not** give away.
    `SPAN_FED_MODEL_CALL_AGENT_IDS` against the catalogue, and returns a null cost rather than a zero
    (`:329`).
 
-   Joining that set takes **one** declaration, not two, and an earlier draft had this backwards.
-   `SPAN_FED_MODEL_CALL_AGENT_IDS` is derived from `modelCallsOnSpansOnly === true` and nothing else
-   (`contract/src/telemetry/index.ts:89`), so the flag alone puts pi in the set that `isPricedAs` reads.
+   Joining that set takes **one** declaration, not two. `SPAN_FED_MODEL_CALL_AGENT_IDS` is derived from
+   `modelCallsOnSpansOnly === true` and nothing else (`contract/src/telemetry/index.ts:114`), so the flag
+   alone puts pi in the set that `isPricedAs` reads.
    What takes two declarations is the other predicate: `isSpanFedModelCall` requires the flag **and** a
    `modelCall` role resolved from `genAiOperations` (`contract/src/telemetry/gen-ai-operations.ts:46`),
    and that is the one deciding whether a span writes a per-call fact row. pi's record therefore declares
    its `genAiOperations` triple beside the flag, as copilot's does
-   (`contract/src/telemetry/coding-agent-definition.ts:233`, with `modelCallsOnSpansOnly: true` at
-   `:235`), but spelled with pi's own span names rather than GenAI operation names, for the reason
+   (`contract/src/telemetry/coding-agent-definition.ts:269`, with `modelCallsOnSpansOnly: true` at
+   `:271`), but spelled with pi's own span names rather than GenAI operation names, for the reason
    Decision 6 gives; declaring only the flag would put pi in the set, satisfy the read side, and still
    write no per-call rows. Separately,
    `isModelCallSpan` (`contract/src/telemetry/coding-agent-span.ts:1`) is a hard-coded set of span names
    with no registry hook at all, and it is what the terminal banner
    (`modules/trace/browser/src/model/coding-agent/trace/terminal-session-banner.ts:91`) and the transcript
-   (`contract/src/coding-agent-transcript-span.ts:40`) read, so `pi.ai.request` is added to
-   `MODEL_CALL_SPAN_NAMES` by hand or pi's calls render as ordinary spans with correct costs behind them.
+   (`contract/src/coding-agent-transcript-span.ts:40`) read, so `pi.ai.request` is in
+   `MODEL_CALL_SPAN_NAMES` by hand (`coding-agent-span.ts:8`); without it pi's calls render as ordinary
+   spans with correct costs behind them.
    pi declares no `nanoAiUnitAttributes`, because pi sells no unit of its own.
 
 8. **The session key is pi's own session id, and carrying it on every span we emit is our one deliberate
    extension of pi's schema.** `deriveSessionKeyFromSpan` reads `pi.session.id`, which the shim writes on
    every span it emits, not only on the root. That is forced: the hook takes `{ name, attrs }` for one span
-   and nothing else (`contract/src/telemetry/coding-agent-definition.ts:146-149`), so it cannot walk up to
+   and nothing else (`contract/src/telemetry/coding-agent-definition.ts:173`), so it cannot walk up to
    the run, and with `spansRequireSessionKey` true a turn or tool span without the key is dropped.
-   An earlier draft justified this by saying pi's own schema makes the attribute required on every harness
-   span. It does not. `pi.session.id` is declared in exactly one object, `operationStartAttributes`
+   pi's own schema does not make the attribute required on every harness span: `pi.session.id` is
+   declared in exactly one object, `operationStartAttributes`
    (`dist/harness/telemetry.js:126`), and that object is spread into three spans only: `pi.harness.run`
    (`:169`), `pi.harness.compaction` (`:191`) and `pi.harness.navigation` (`:213`). `pi.harness.turn`
    (`:257`), `pi.harness.tool` (`:329`), `pi.harness.step` (`:283`) and `pi.ai.request` (`:4`) do not
-   declare it at all. A live run before this was enforced proved the cost of skipping it: only the run
+   declare it at all. A live run without it proved the cost of skipping it: only the run
    span reached the fold, and no session row was ever built. So the shim writes one key pi declares
    on spans pi does not declare it on, and the conformance test (Invariants) is scoped accordingly: the
    emitted keys are a subset of what pi declares **somewhere in the schema**, with `pi.session.id` named as
@@ -466,14 +480,14 @@ does **not** give away.
    root and not under `telemetry/`), and `admitsCodingAgentSpan` (`:29`) lets a span through when it is
    self-namespaced (`:33`), when the registry gives it a GenAI role (`:35`), or when its name is declared
    and detection resolved an agent (`:36-37`, `return agent !== "unknown"`). There is no hand edit to make
-   in that file, which an earlier draft asked for, because pi's declared names are reached through
-   `sessionSpanNames` like every other agent's.
-   What that gate does **not** do is separate the two uses of pi, and an earlier draft of this record said
-   it did. Admission calls `detectCodingAgent({ recordName: name, scopeName })` with no `serviceName`
+   in that file, because pi's declared names are reached through `sessionSpanNames` like every other
+   agent's.
+   What that gate does **not** do is separate the two uses of pi. Admission calls
+   `detectCodingAgent({ recordName: name, scopeName })` with no `serviceName`
    (`:34`), and under Decision 3 pi matches on the record name alone, so every `pi.harness.run` is admitted
    whatever emitted it. Decision 13's guard sits in the registry's ORDER, and the record listed ahead of
    pi's would have to match on the scope name for the refusal to happen here at all; on a `service.name`
-   marker it bites only later, at fact lifting (`process/src/rules/coding-agent-span-facts.rules.ts:26-32`),
+   marker it bites only later, at fact lifting (`process/src/rules/coding-agent-span-facts.rules.ts:28`),
    which re-attributes the span rather than keeping it out.
 
    **`SELF_NAMESPACED_SPAN_NAMES` stays Claude-only.** The five names in that set (`:8-14`) are all
@@ -485,7 +499,7 @@ does **not** give away.
 
    The trap `sessionSpanNames` leaves is the gap in the role enum:
    `GenAiOperationRole` has three members only, `session`, `modelCall` and `toolRun`
-   (`contract/src/telemetry/coding-agent-definition.ts:192`), and pi's tree has a level they do not cover.
+   (`contract/src/telemetry/coding-agent-definition.ts:228`), and pi's tree has a level they do not cover.
    `pi.harness.turn` resolves to no role, so it is admitted only because `sessionSpanNames` lists it.
    `sessionSpanNames` is therefore `["pi.harness.run", "pi.harness.turn", "pi.harness.compaction",
 "pi.harness.step", "pi.harness.navigation"]`, every harness span the shim emits, because a span not
@@ -500,41 +514,47 @@ does **not** give away.
    in `sessionSpanNames`, and this paragraph is the thing to revisit.
 
 9. **Short runs are flushed before exit.** A non-interactive `pi -p` run can finish well inside a batch
-   window, so the shim force-flushes the span processor on `agent_end` and again on `agent_settled`,
-   under a bounded timeout, and never blocks pi's exit on a slow endpoint. Rejects relying on the
+   window, so the shim force-flushes its span buffer on `agent_end`, again on `agent_settled` and on
+   `session_shutdown`, under a bounded timeout (`FLUSH_TIMEOUT_MS`, 5 s), and never blocks pi's exit on a
+   slow endpoint. `agent_settled` first ships in pi `0.80.5` (Constants); on an older pi the `agent_end`
+   flush is the one that lands. Rejects relying on the
    default periodic flush, which is the whole "pi shows nothing" failure class for one-shot runs.
 
 10. **Repository, branch and pull requests ride the existing paths, but pi has to declare itself on the
     log lane to reach them.** Git context arrives through the session context hook that copilot already
     uses (`specs/ai-governance/cli-wrappers/session-context-hook.feature`), and pull-request linkage
-    follows from sessions plus that context (`specs/coding-agent/pull-request-linkage.feature`). What the
-    earlier draft left out is that the linkage is driven from fold state rather than from spans:
-    `shouldMapPullRequests` reads only the repository host, owner and name and the branch that the fold
-    holds (`modules/coding-agent/process/src/eventing/pull-request-mapping.subscriber.ts:41`), and the
-    only thing that fills those is a `langwatch.session_context` OTLP **log** record
-    (`contract/src/telemetry/coding-agent-normalization.ts:334`, folded at
+    follows from sessions plus that context (`specs/coding-agent/pull-request-linkage.feature`). The
+    linkage is driven from fold state rather than from spans: `shouldMapPullRequests` reads only the
+    repository host, owner and name and the branch that the fold holds
+    (`modules/coding-agent/process/src/eventing/pull-request-mapping.subscriber.ts:41`), and the only
+    thing that fills those is a `langwatch.session_context` OTLP **log** record
+    (`contract/src/telemetry/coding-agent-normalization.ts:343`, folded at
     `process/src/eventing/coding-agent-session-log.projection.ts:273`); the span lane only reads the memo
     that record leaves (`process/src/services/contribute-span-facts.service.ts:17`).
 
-    **One answer, because only one of the two candidate mechanisms can work.** pi gets a row in
-    `SESSION_CONTEXT_AGENTS` (`sdks/typescript/src/cli/utils/governance/session-context-agents.ts:79`,
-    beside claude at `:80`, codex at `:96`, opencode at `:117` and copilot at `:124`) with
-    `hookTarget: { kind: "plugin", resolve: () => piExtensionTarget() }`, and the **extension is the thing
-    that runs the hook**: it shells out to `langwatch ingest hook pi` and the CLI builds and posts the
-    record. That is not two mechanisms, it is the opencode shape exactly: opencode's row is
-    `{ kind: "plugin", resolve: () => opencodePluginTarget() }` (`:122`), and the plugin file we write runs
+    **One answer, because only one of the two candidate mechanisms can work.** pi has a row in
+    `SESSION_CONTEXT_AGENTS` (`sdks/typescript/src/cli/utils/governance/session-context-agents.ts:159`,
+    beside claude at `:83`, codex at `:100`, opencode at `:122`, copilot at `:130` and grok at `:146`)
+    with `hookTarget: { kind: "plugin", resolve: () => piExtensionTarget() }` (`:167`), and the
+    **extension is the thing that runs the hook**: it shells out to `langwatch ingest hook pi` and the CLI
+    builds and posts the record. That is not two mechanisms, it is the opencode shape exactly: opencode's
+    row is `{ kind: "plugin", resolve: () => opencodePluginTarget() }` (`:128`), and the plugin file we
+    write runs
     `langwatch ingest hook opencode` fire-and-forget (`governance/opencode-plugin.ts:22`, the spawn at
     `:153-159`) with a payload of `{ session_id, cwd, hook_event_name }` (`:144-148`). pi's extension can
     fill that payload from the API it already holds: `sessionManager.getSessionId()` and
     `sessionManager.getCwd()` (`dist/core/session-manager.d.ts:207` and `:204`, both in
-    `ReadonlySessionManager` at `:140`).
+    `ReadonlySessionManager` at `:140`), falling back to `ctx.cwd` (`pi-extension-source.ts:302`). On
+    every `agent_start` the payload also carries `session_title` from `sessionManager.getSessionName()`,
+    the name pi's `/name` sets (`:376`), and `langwatch ingest hook` takes a reported `session_title`
+    from any seam, not only Claude's (`commands/ingestion/hook.ts:558`, `hook-pi.unit.test.ts`).
 
     The row is not optional, and neither is its hook target. `hookTarget` is a required field on
-    `SessionContextAgent` (`:50`), so "a row with no hook" does not type-check, and `kind: "plugin"`
-    (`:28`) is the member that means precisely this: our own file, not entries merged into one of the
-    user's. Without a row at all, `isSessionContextAgentId` (`:172-174`) rejects the slug and
-    `sessionContextAgentFor` returns null (`:180-186`), so `langwatch ingest hook pi` has no agent to
-    resolve and posts nothing.
+    `SessionContextAgent` (`:53`), so "a row with no hook" does not type-check, and `kind: "plugin"`
+    (`:29`) is the member that means precisely this: our own file, not entries merged into one of the
+    user's. Without a row at all, `isSessionContextAgentId` (`:205`) rejects the slug and
+    `sessionContextAgentFor` (`:213`) returns null, so `langwatch ingest hook pi` has no agent to resolve
+    and posts nothing.
 
     Rejects the alternative, the extension building its own `langwatch.session_context` log record and
     exporting it over the OTLP connection it already has: it would duplicate, in a file we want deletable,
@@ -546,17 +566,16 @@ does **not** give away.
     `pi.session.id`, which is why both read `getSessionId()`. If the two ever differ, the context folds
     onto a session that does not exist, the repository fields stay empty, no pull request is ever linked,
     and nothing anywhere reports an error.
-    The billing claim in the earlier draft was wrong on its own terms. `ingestSourceType`
+    Billing needs no arm either. `ingestSourceType`
     (`process/src/features/pull-requests/services/coding-agent-pull-request-usage.service.ts:74`) does not
     return the ingest-key source type at all; it returns the AI-tool-catalogue slug that
     `billing.isSourceNonBillable` is keyed on
     (`process/src/services/coding-agent-session-candidates.service.ts:110`), which is why `copilot` maps
     to `github_copilot` rather than to `copilot_cli`. Its fallthrough returns the agent id unchanged, so
-    pi already resolves to `pi` and needs no arm. Writing a `pi_cli` arm there would break the very lookup
-    it was meant to fix. Rejects having the shim emit the repository and branch as span attributes instead
-    of reusing the context hook: the linkage subscriber reads fold state filled from the log record, so
-    span attributes would arrive at a reader that never looks at them, and we would be maintaining two
-    sources for one fact.
+    pi resolves to `pi`. A `pi_cli` arm there would break that lookup. Rejects having the shim emit the
+    repository and branch as span attributes instead of reusing the context hook: the linkage subscriber
+    reads fold state filled from the log record, so span attributes would arrive at a reader that never
+    looks at them, and we would be maintaining two sources for one fact.
 
 11. **Community extensions are accepted as compatibility, never as a dependency.** pi's definition
     is to carry `eventAliases` and `metricAliases` entries for the signal names the two maintained community
@@ -567,17 +586,18 @@ does **not** give away.
     is the double trace. Rejects normalising them in the canonicaliser instead, which would put
     third-party vocabulary into code rather than into one data field.
 
-    Aliases are matched on the raw signal name, before normalisation: pi's `matches()` admits a name
-    that starts with `pi.` **or** is an alias key, so a community name that does not start with `pi.`
-    still reaches pi's definition. Not shipped yet: no alias names are recorded until they are read from
-    each extension's own source, so the scenario stays `@unimplemented` and today only `pi.` names match.
+    Aliases are matched on the raw signal name, before normalisation: pi's `matches()` is to admit a
+    name that starts with `pi.` **or** is an alias key, so a community name that does not start with
+    `pi.` still reaches pi's definition. Not shipped: no alias names are recorded until they are read from
+    each extension's own source, so the scenario stays `@unimplemented` and only `pi.` names match.
 
 12. **The shim has a death date.** When pi wires its native `TelemetryContext` into the CLI, or ships
-    `OTEL_*` support, `buildOtelEnvBlock("pi")` keeps its standard variables, `pi-plugin.ts` is deleted,
-    and the definition, the canonicalisation, the projections and the billing arm do not change, because
-    they were only ever reading pi's own declared names. Deleting the shim is also what fixes the eight
-    required attributes it can only guess at, and retires the one key it writes where pi declares none
-    (Decisions 5 and 8). Rejects keeping the shim as the supported path
+    `OTEL_*` support, `buildOtelEnvBlock("pi")` keeps its standard variables, the extension and its writer
+    (`pi-extension-source.ts`, `pi-plugin.ts`) are deleted, and the definition, the canonicaliser, the
+    projections and the billing lookup do not change, because they only ever read pi's own declared
+    names. pi `1.5.0`, the latest release on 2026-11-05, still ships neither (Context). Deleting the shim
+    is also what fixes the eight required attributes it can only guess at, and retires the one key it
+    writes where pi declares none (Decisions 5 and 8). Rejects keeping the shim as the supported path
     after that point, on the grounds that it is ours and therefore more predictable: two emitters of the
     same span names is the double trace the Invariants forbid, and the native one carries the lane and
     operation identity the shim invents.
@@ -586,76 +606,84 @@ does **not** give away.
     registry ORDER rather than a stricter pi predicate.** Detection is first-match-wins over a
     `CodingAgentSignal` of `{ name, scope, service }` and nothing else
     (`contract/src/telemetry/coding-agent-normalization.ts:17`, the signal at
-    `contract/src/telemetry/coding-agent-definition.ts:80`), and Decision 3's predicate tests the name
+    `contract/src/telemetry/coding-agent-definition.ts:107`), and Decision 3's predicate tests the name
     namespace, so pi's record claims every `pi.*` span that reaches the pipeline, including one emitted by
     our own in-house worker. A customer's session list would then grow rows for our product's internals.
     Today that cannot happen: that worker's environment carries no `OTEL_*` variable and a Go test keeps it
     that way (`services/langyagent/adapters/pi/spawn_test.go:403-407`, which fails on any key with an
-    `OTEL_` prefix), so this is a guard against a later change rather than a fix for a live leak.
+    `OTEL_` prefix), the worker's source and dependencies hold no exporter, and its resource loader loads
+    no extension from disk (Context), so this is a guard against a later change rather than a fix for a
+    live leak.
 
     The shape of the guard is the one the repo already uses for two products on one runtime. Claude Cowork
     and Claude Code share an event vocabulary and are told apart by a **separate record listed first**, not
     by making Claude Code's predicate stricter: the registry comment says so in as many words
     ("claude_cowork before claude_code because only service identity distinguishes them",
-    `contract/src/telemetry/index.ts:19-20`, the array at `:21-28`), and cowork's own record matches on its
-    distinguishing marker alone (`signalSays(signal, "cowork")`, `coding-agent-definition.ts:209`, with the
-    ordering rationale at `:205-206`). So our worker gets its own record, listed **before** pi's, matching
-    on whatever identifies it, and pi's predicate stays exactly as Decision 3 writes it.
+    `contract/src/telemetry/index.ts:26-27`, the array at `:28-37`), and cowork's own record matches on
+    its distinguishing marker alone (`signalSays(signal, "cowork")`, `coding-agent-definition.ts:245`, with
+    the ordering rationale at `:241-242`). So our worker gets its own record, listed **before** pi's,
+    matching on whatever identifies it, and pi's predicate stays exactly as Decision 3 writes it.
 
-    **UNVERIFIED: what that marker is.** Nothing in the worker sets one today. It exports no telemetry at
-    all, so there is no scope name and no `service.name` to match, and this record changes nothing under
-    `services/langy*` or `modules/langy`, so it cannot create one. The marker therefore has to be chosen by
-    whoever wires an exporter there, and the natural choice is a distinct `service.name` set at that point.
-    Two facts constrain that choice and both have to be read before the guard is written:
+    **Still open: what that marker is.** Checked 2026-11-05: nothing under `services/langyworker`
+    references `OTEL_`, `otlp`, `@opentelemetry`, `pi-telemetry` or `TelemetryContext`, its
+    `package.json` has no OpenTelemetry dependency, and `spawn.go` hands it no `OTEL_*` variable. It
+    exports no telemetry at all, so there is no scope name and no `service.name` to match, and this record
+    changes nothing under `services/langy*` or `modules/langy`, so it cannot create one. The marker
+    therefore has to be chosen by whoever wires an exporter there, and the natural choice is a distinct
+    `service.name` set at that point. It must differ from the shim's scope, `langwatch.pi-extension`
+    (Decision 3), which marks a customer's capture. Two facts constrain that choice and both have to be
+    read before the guard is written:
     - `service.name` is not available at **admission**. `admitsCodingAgentSpan` calls
       `detectCodingAgent({ recordName, scopeName })` with no `serviceName`
       (`contract/src/coding-agent-span-admission.ts:34`), and the signal's missing members read as empty
       strings, so a service-identity marker cannot refuse a span at the gate. The one call that passes all
-      three members is fact lifting (`process/src/rules/coding-agent-span-facts.rules.ts:26-32`). A
+      three members is fact lifting (`process/src/rules/coding-agent-span-facts.rules.ts:28`). A
       service-identity marker therefore re-attributes the span after it is admitted; it does not keep it
       out.
     - An instrumentation-scope marker **is** available at admission, since `scopeName` is passed there. If
       the guard has to bite at the gate rather than at attribution, the marker must be the scope name.
 
-    What settles it: the commit that gives that worker an OTel exporter also decides the marker, and this
-    record should be revisited then rather than guessing the spelling now. `specs/coding-agent/pi-sessions.feature`
-    therefore carries no scenario for this guard and says so in its header: a scenario naming a marker
-    nobody has chosen could not be written, let alone bound. This paragraph is where the hazard lives
-    until then.
+    What settles it: the commit that gives that worker an OTel exporter (its own tracing, a dependency
+    that auto-instruments, or a pi release that wires `TelemetryContext` for in-process embedders) also
+    chooses the marker, adds the record listed before pi's and its registry-order test, and revisits this
+    paragraph. Until then the spelling is not guessed. `specs/coding-agent/pi-sessions.feature` therefore
+    carries no scenario for this guard and says so in its header: a scenario naming a marker nobody has
+    chosen could not be written, let alone bound. This paragraph is where the hazard lives until then.
 
     Rejects making pi's own predicate stricter (name namespace **and** a recognised scope): it would be the
-    only two-part condition in the registry, it would test a scope string that does not exist yet, and it
-    would put the discriminator in the wrong record, so the day our worker changes its scope the customer's
-    pi sessions break rather than our own rows leaking. Rejects discriminating on the ingestion source
-    type, which is the natural answer and is not available here: the source type arrives later as the
-    `langwatch.source` resource attribute (`contract/src/telemetry/gen-ai-operations.ts:17`), read well
-    after `matches()` has run.
+    only two-part condition in the registry, the only scope it could test today is the shim's, which dies
+    with the shim, and it would put the discriminator in the wrong record, so the day our worker changes
+    its scope the customer's pi sessions break rather than our own rows leaking. Rejects discriminating on
+    the ingestion source type, which is the natural answer and is not available here: the source type
+    arrives later as the `langwatch.source` resource attribute
+    (`contract/src/telemetry/gen-ai-operations.ts:18`), read well after `matches()` has run.
 
 ## Constants
 
-| Name                                          | Value                                                                                                    | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Tool command                                  | `pi`                                                                                                     | `langwatch pi` wrapper subcommand; child binary name                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Coding-agent id                               | `pi`                                                                                                     | `codingAgentSchema`; the id of the definition in a new `modules/coding-agent/contract/src/telemetry/pi.ts`, beside the seven that exist                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| sourceType slug                               | `pi_cli`                                                                                                 | ingest-key provenance; `SOURCE_TYPE_BY_TOOL.pi`; added to `CODING_AGENT_SOURCES` (`enterprise/modules/governance/contract/src/features/ingestion/otlp-receiver-policy.ts:15`, module-private rather than exported, so the edit is inside that file and its only reader is `:37`) or the origin reads `ai_tool`, not `coding_agent`                                                                                                                                                                                                                                 |
-| Catalogue slug for billing                    | `pi`                                                                                                     | what `ingestSourceType("pi")` already returns by fallthrough, and the key `isSourceNonBillable` takes (Decision 10)                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Assistant kind                                | `pi`                                                                                                     | `KnownAssistantKind`, `ASSISTANT_PRESETS`, icon and tile; `assistant-presets.ts` exists as three byte-identical copies (`enterprise/modules/governance/browser/src/model/coding-agent/`, `modules/coding-agent/browser/src/model/`, `modules/user/browser/src/model/coding-agent/`, all md5 `c14cafe9b5305844ec95f0dafd53596d` at framing), so each tile edit is made three times                                                                                                                                                                                  |
-| Platform tool slug                            | `pi`                                                                                                     | `PLATFORM_TOOL_SLUGS`; policy defaults below                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `OTEL_RESOURCE_ATTRIBUTES`                    | `service.name=pi`                                                                                        | analytics grouping only; never the match test (Decision 3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `OTEL_EXPORTER_OTLP_PROTOCOL`                 | `http/protobuf`                                                                                          | the receiver's own default branch (`packages/otlp/src/body.ts:336` decodes protobuf unless the content type is `application/json`), and what every wrapper but gemini already pins (`otel-env-block.ts:64`, `:76`, `:103`, `:118`, `:132`; gemini alone is `http/json` at `:94`). An earlier draft chose `http/json` and justified it as "matches the receiver default, as for copilot", which is wrong twice: copilot pins `http/protobuf` with a comment that grpc falls back silently (`:110-113`), and JSON is the receiver's fallback branch, not its default |
-| `OTEL_TRACES_EXPORTER`                        | `otlp`                                                                                                   | spans are pi's only signal                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `OTEL_LOGS_EXPORTER`, `OTEL_METRICS_EXPORTER` | `none`                                                                                                   | pi emits neither; an unset value would start idle exporters                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Session root span                             | `pi.harness.run`                                                                                         | `sessionSpanNames`; carries `pi.session.id`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Declared span names                           | `pi.harness.run`, `pi.harness.turn`, `pi.harness.compaction`, `pi.harness.step`, `pi.harness.navigation` | `sessionSpanNames` is also the admission list; an unlisted harness span with no GenAI role is dropped (Decision 8)                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Session key attribute                         | `pi.session.id`                                                                                          | `deriveSessionKeyFromSpan`, and the `session.id` the context record must repeat (Decision 10). Written on every span the shim emits, including turn, tool, step and model-call spans, where pi does not declare it: the schema's single documented exception (Decision 8)                                                                                                                                                                                                                                                                                          |
-| Model call span                               | `pi.ai.request`                                                                                          | span-fed model calls, dual-written to `gen_ai.*`; also added to `MODEL_CALL_SPAN_NAMES` by hand (Decision 7)                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Reported cost attribute                       | `pi.ai.usage.cost`                                                                                       | folded into `agentReportedCostUsd` as a drift signal, never as the session's cost (Decision 7)                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Extension file                                | `langwatch-pi-telemetry.ts` in pi's extension directory                                                  | first-party shim, written by both `langwatch ingest install pi_cli` and every `langwatch pi` launch (Decision 4); a file without our marker at that path is left alone and reported; registered in `telemetry-targets.ts`                                                                                                                                                                                                                                                                                                                                          |
-| Session context seam                          | a row in `SESSION_CONTEXT_AGENTS` with `hookTarget: { kind: "plugin" }`                                  | the extension shells out to `langwatch ingest hook pi`, the opencode shape; `hookTarget` is a required field, so there is no row without one (Decision 10)                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Platform policy defaults                      | `allowVk: false, allowOtelDirect: true`                                                                  | ingestion only (Decision 1)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Declared but not emitted                      | `pi.harness.checkpoint`                                                                                  | declared (`dist/harness/telemetry.js:231`) and pi 0.84.2's extension API fires no event for it. Compaction, navigation and the compaction step are emitted from `session_compact` and `session_tree` (Decision 5)                                                                                                                                                                                                                                                                                                                                                  |
-| Verified against                              | pi `0.84.2`                                                                                              | the version this workspace resolves (`node_modules/.pnpm/@earendil-works+pi-*@0.84.2/`), read at framing. Every schema, type and attribute claim in this record is pinned to it                                                                                                                                                                                                                                                                                                                                                                                    |
-| Min. warned version                           | **UNVERIFIED**                                                                                           | the npm registry was not queried while writing this record, so neither the latest published version nor the first line carrying these extension events is established. Settle this before the record leaves Proposed. No version check exists: the shim installs against any pi, and a session was proven end to end on pi `0.73.1`                                                                                                                                                                                                                                |
+| Name                                          | Value                                                                                                    | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tool command                                  | `pi`                                                                                                     | `langwatch pi` wrapper subcommand; child binary name                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Coding-agent id                               | `pi`                                                                                                     | `codingAgentSchema`; the id of the definition in `modules/coding-agent/contract/src/telemetry/pi.ts`, registered last of eight (`telemetry/index.ts:28-37`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| sourceType slug                               | `pi_cli`                                                                                                 | ingest-key provenance; `SOURCE_TYPE_BY_TOOL.pi`; added to `CODING_AGENT_SOURCES` (`enterprise/modules/governance/contract/src/features/ingestion/otlp-receiver-policy.ts:15`, module-private rather than exported, so the edit is inside that file and its only reader is `:37`) or the origin reads `ai_tool`, not `coding_agent`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Catalogue slug for billing                    | `pi`                                                                                                     | what `ingestSourceType("pi")` already returns by fallthrough, and the key `isSourceNonBillable` takes (Decision 10)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Assistant kind                                | `pi`                                                                                                     | `KnownAssistantKind`, `ASSISTANT_PRESETS`, icon and tile; `assistant-presets.ts` exists as three byte-identical copies (`enterprise/modules/governance/browser/src/model/coding-agent/`, `modules/coding-agent/browser/src/model/`, `modules/user/browser/src/model/coding-agent/`, all md5 `c14cafe9b5305844ec95f0dafd53596d` at framing), so each tile edit is made three times                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Platform tool slug                            | `pi`                                                                                                     | `PLATFORM_TOOL_SLUGS`; policy defaults below                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `OTEL_RESOURCE_ATTRIBUTES`                    | `service.name=pi`                                                                                        | analytics grouping only; never the match test (Decision 3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `OTEL_EXPORTER_OTLP_PROTOCOL`                 | `http/protobuf`                                                                                          | what the shim speaks, the receiver's default branch (`packages/otlp/src/body.ts` decodes protobuf unless the content type is `application/json`), and what every wrapper but gemini pins (`otel-env-block.ts:69`, `:81`, `:108`, `:123`, `:137`, `:149`, `:165`; gemini alone is `http/json` at `:99`, its built-in exporter speaking nothing else). Rejects `http/json`: JSON is the receiver's fallback branch, not its default, and copilot pins `http/protobuf` because grpc falls back silently (`:116`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `OTEL_TRACES_EXPORTER`                        | `otlp`                                                                                                   | spans are pi's only signal                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `OTEL_LOGS_EXPORTER`, `OTEL_METRICS_EXPORTER` | `none`                                                                                                   | pinned off rather than left unset: any OTel SDK that autoconfigures from these names starts an exporter when they are unset. The shim reads only the traces names; the pins keep the block correct for pi's own exporter when pi ships one (`pi-env-injection.feature` header)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Session root span                             | `pi.harness.run`                                                                                         | `sessionSpanNames`; carries `pi.session.id`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Declared span names                           | `pi.harness.run`, `pi.harness.turn`, `pi.harness.compaction`, `pi.harness.step`, `pi.harness.navigation` | `sessionSpanNames` is also the admission list; an unlisted harness span with no GenAI role is dropped (Decision 8)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Session key attribute                         | `pi.session.id`                                                                                          | `deriveSessionKeyFromSpan`, and the `session.id` the context record must repeat (Decision 10). Written on every span the shim emits, including turn, tool, step and model-call spans, where pi does not declare it: the schema's single documented exception (Decision 8)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Model call span                               | `pi.ai.request`                                                                                          | span-fed model calls, dual-written to `gen_ai.*`; also added to `MODEL_CALL_SPAN_NAMES` by hand (Decision 7)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Reported cost attribute                       | `pi.ai.usage.cost`                                                                                       | folded into `agentReportedCostUsd` as a drift signal, never as the session's cost (Decision 7)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Extension file                                | `langwatch-pi-telemetry.ts` in pi's extension directory                                                  | `PI_EXTENSION_FILE_NAME` (`governance/pi-plugin.ts:14`); first-party shim, written by `langwatch ingest install pi_cli`, `langwatch instrument pi` and every `langwatch pi` launch (Decision 4); ownership is the first-line marker `// langwatch:pi-telemetry-extension`, and a file without it at that path is left alone and reported; registered in `telemetry-targets.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Extension scope                               | `langwatch.pi-extension`                                                                                 | `PI_EXTENSION_SCOPE_NAME` (`governance/pi-extension-source.ts:21`), the instrumentation scope of every span the shim emits. Ours, not pi's (pi declares names and keys, never a scope), so it is never the match test and it dies with the shim (Decisions 3, 13)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Session context seam                          | a row in `SESSION_CONTEXT_AGENTS` with `hookTarget: { kind: "plugin" }`                                  | the extension shells out to `langwatch ingest hook pi`, the opencode shape; `hookTarget` is a required field, so there is no row without one (Decision 10)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Platform policy defaults                      | `allowVk: false, allowOtelDirect: true`                                                                  | ingestion only (Decision 1)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Declared but not emitted                      | `pi.harness.checkpoint`                                                                                  | declared (`dist/harness/telemetry.js:231`), and no pi release up to `1.5.0` fires an extension event for it. Compaction, navigation and the compaction step are emitted from `session_compact` and `session_tree` (Decision 5)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Verified against                              | pi `0.84.2`                                                                                              | the version this workspace resolves (`services/langyworker/package.json:17-18`), read at framing. Every schema, type and attribute claim in this record is pinned to it. Registry state, queried 2026-11-05: `latest` is `1.5.0` (2026-11-02); releases from `0.74.0` are `@earendil-works/pi-coding-agent`, earlier ones `@mariozechner/pi-coding-agent` (last `0.73.1`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Min. warned version                           | `0.80.5`                                                                                                 | the first release whose extension types carry every event the shim registers: `agent_settled` is absent from `dist/core/extensions/types.d.ts` up to `0.80.3` and present from `0.80.5` (`0.80.4` was never published), and its `pi-ai` dependency (`^0.80.5`) carries `Usage.reasoning`, which `pi-ai` `0.79.0` lacks. Every other registered event, `sessionManager.getSessionId()`/`getCwd()` and the `AssistantMessage` fields the shim reads are present at `0.73.1`; `after_provider_response` is absent at `0.60.0`. Read from `npm pack` tarballs of `0.60.0`, `0.70.0`, `0.73.1`, `0.74.0`, `0.76.0`, `0.79.0`, every `0.80.x`, `0.81.0` to `0.84.0`, `0.84.2` and `1.5.0`. Below it the shim still captures, losing the `agent_settled` flush and reasoning tokens, so the CLI warns and never refuses: `PI_MIN_VERSION` (`governance/pi-prespawn.ts:12`) prints one warning naming both versions and pi starts as usual (`pi-extension-install.feature`, "An installed pi below the minimum version gets a warning and the run continues"; `pi-prespawn.unit.test.ts`). A session was proven end to end on pi `0.73.1` |
 
 ## Invariants
 
@@ -664,15 +692,15 @@ does **not** give away.
 | No double trace                                      | A pi run never produces both our shim's spans and a second capture of the same calls                      | no gateway path exists for pi (Decision 1); the shim is idempotent on install and a second install does not double-register handlers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | We never author pi's names                           | Every span name and `pi.*` key we emit is one pi declares; the only other keys are the `gen_ai.*` mirrors | a conformance test asserts two directions against the resolved `AI_TELEMETRY_SCHEMA` and `HARNESS_TELEMETRY_SCHEMA`: the shim's emitted `pi.*` keys are a subset of what pi declares **somewhere in the schema**, and every key pi marks `required: true` on a span we emit is present on that span (the set Decision 5 tabulates). The test names one exception by hand, `pi.session.id` on the spans pi does not declare it on (turn, tool, step, model call), and fails on any second one. Until pi's schema package is reachable from the SDK this test is parked (`pi-extension-install.feature`); the extension's own unit test pins the emitted set meanwhile. An upstream rename or a newly required key fails the build rather than silently drifting |
 | No agent claims another's spans                      | `matches()` admits a record named `pi.*` and nothing else                                                 | unit test: a `copilot` signal (scope `github.copilot.*`) and a Claude Code signal (scope `com.anthropic.claude_code.events`) are not matched as pi, which a `signalSays(signal, "pi")` test would fail on both, `pi` being a substring of `copilot` and of `anthropic` (Decision 3)                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Logout symmetry                                      | Every persisted artifact is discoverable and removable                                                    | `langwatch-pi-telemetry.ts` registered in `scanTelemetryTargets()`; env vars via `telemetryEnvVarNames("pi")`; extend `specs/ai-governance/cli-wrappers/logout.feature`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Logout symmetry                                      | Every persisted artifact is discoverable and removable                                                    | `langwatch-pi-telemetry.ts` is registered in `scanTelemetryTargets()` and removed by its marker, a file at that path without the marker staying in place (`specs/ai-governance/cli-wrappers/pi-extension-install.feature`, "Logout removes the extension by its marker"); pi's injected OTel env names are stripped from the persisted block, and pi is among the targets logout scans (`specs/ai-governance/cli-wrappers/pi-env-injection.feature`, "Logout strips pi's injected env names")                                                                                                                                                                                                                                                                  |
 | Ingestion is wired, not fallthrough                  | `SOURCE_TYPE_BY_TOOL.pi` exists                                                                           | unit test: pi resolves to ingestion and mints a `pi_cli` key, and never returns a gateway shape                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Billing resolves to a real source                    | `ingestSourceType("pi")` returns `pi`, the catalogue slug `isSourceNonBillable` is keyed on               | unit test on the pull-request usage service: a pi session's billable lookup resolves through the fallthrough, and a span-fed call the catalogue cannot price reports as unpriced rather than as zero                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| The two cost figures stay separate                   | catalogue pricing lands on `costUsd`, `pi.ai.usage.cost` on `agentReportedCostUsd`                        | two tests, one per missing edit in Decision 7. On the session span projection: a pi call the catalogue cannot price grows the reported figure and leaves the computed one alone, which fails today because `chargePricedCall` writes only `costUsd` (`coding-agent-session-span.projection.ts:220`). On the cost-drift subscriber: a pi session records both a computed and a reported figure, which fails today because the span branch calls only `recordComputed` (`coding-agent-cost-drift.subscriber.ts:64`)                                                                                                                                                                                                                                              |
-| Every attribute we rely on survives canonicalisation | each `pi.*` key the fold reads is in `CODING_AGENT_CONTRIBUTION_KEYS`                                     | unit test on fact lifting: a `pi.ai.request` span yields the usage, cost and model facts, which fails loudly today because the allowlist holds no `pi.` key (Decision 6)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| The two cost figures stay separate                   | catalogue pricing lands on `costUsd`, `pi.ai.usage.cost` on `agentReportedCostUsd`                        | one test per edit in Decision 7. The span projection: a call is charged the catalogue price whatever pi reported, pi's amounts accumulate beside it, and a model the catalogue does not price reads as unpriced while pi's amount still lands (`modules/coding-agent/process/src/eventing/__tests__/pi-session.unit.test.ts`, "pi model calls"). The drift subscriber: one pi span event records the computed and the reported figure, each on its own counter (`modules/coding-agent/process/src/eventing/__tests__/coding-agent-cost-drift.subscriber.redelivery.test.ts`, "The two figures disagreeing is readable, not reconciled away")                                                                                                                   |
+| Every attribute we rely on survives canonicalisation | each `pi.*` key the fold reads is in `CODING_AGENT_CONTRIBUTION_KEYS`, and no other                       | `modules/coding-agent/contract/src/telemetry/__tests__/pi.unit.test.ts`, "given the canonicalisation allowlist": the list holds every pi key the fold reads (`pi.ai.usage.cost`), no pi key the fold does not read, and none of the token counts the pi canonicaliser consumes (Decision 6). The fold side is `pi-session.unit.test.ts`: tokens, cache reads and cache writes and the reported cost reach the session row from a `pi.ai.request` span                                                                                                                                                                                                                                                                                                          |
 | Session context folds onto the pi session            | the `langwatch.session_context` record's `session.id` equals the `pi.session.id` the shim emits           | both read `sessionManager.getSessionId()`. Unit test: a pi session's repository and branch are set from the record the extension's `langwatch ingest hook pi` call posts, so pull-request linkage fires (Decision 10)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Nothing identifies pi by substring                   | no reader decides "this is pi" by testing whether a name contains `pi`                                    | `pi` sits inside `copilot` and `anthropic`: the ordered fragment lists at `modules/trace/browser/src/model/terminal-origin.ts:17` and `modules/trace/browser/src/model/coding-agent/trace/terminal-session-banner.ts:31` gain no `pi` entry, and the terminal view marks a pi trace from `origin === "coding_agent"` instead (`terminal-origin.ts:41`)                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Our own pi worker is never a customer session        | a `pi.*` span our in-house worker emits is not folded as a customer's coding-agent session                | registry order, not a stricter pi predicate: a record for our own agent is listed before pi's and claims the signal first, as claude_cowork does before claude_code (`telemetry/index.ts:19-28`). The test is a registry-order test, the same shape as cowork's. **UNVERIFIED** until that worker exports anything to match on, which is also when the test can be written (Decision 13); zero edits under `services/langy*` either way                                                                                                                                                                                                                                                                                                                        |
-| A one-shot run is not lost                           | `pi -p` exports before the process ends                                                                   | test anchor: a run whose spans close inside one flush window still exports, and a dead endpoint does not delay exit past the bounded timeout                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Nothing identifies pi by substring                   | no reader decides "this is pi" by testing whether a name contains `pi`                                    | `pi` sits inside `copilot` and `anthropic`: the ordered fragment lists at `modules/trace/browser/src/model/terminal-origin.ts:17` and `modules/trace/browser/src/model/coding-agent/trace/terminal-session-banner.ts:29` hold no `pi` entry, and the terminal view marks a pi trace from `origin === "coding_agent"` instead (`terminal-origin.ts:42`)                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Our own pi worker is never a customer session        | a `pi.*` span our in-house worker emits is not folded as a customer's coding-agent session                | registry order, not a stricter pi predicate: a record for our own agent is listed before pi's and claims the signal first, as claude_cowork does before claude_code (`telemetry/index.ts:26-37`). The test is a registry-order test, the same shape as cowork's. **Still open** (Decision 13): the worker exports no telemetry, so there is no marker to match and no test to write; the commit that gives it an exporter writes both. Zero edits under `services/langy*` either way                                                                                                                                                                                                                                                                           |
+| A one-shot run is not lost                           | `pi -p` exports before the process ends                                                                   | `sdks/typescript/src/cli/utils/governance/__tests__/pi-extension-source.unit.test.ts`: "A non-interactive run flushes its spans at agent end" and "An unreachable endpoint does not hold pi's exit open"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | The shim is deletable                                | Removing the extension changes no server code                                                             | the definition, canonicaliser and projections read only pi's declared names; no test references `pi-plugin.ts` from the server side                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 ## Alternatives considered
@@ -693,10 +721,13 @@ does **not** give away.
 ## Consequences
 
 **Positive.** pi becomes the first agent tracked without us authoring a single fact about it: the span
-tree, the attribute keys and the cost figure are all pi's own, so an upstream rename fails a conformance
-test rather than degrading data quietly. The dual write means the generic GenAI canonicaliser and the
-generic fold carry pi with no pi-shaped branch in either, and the day pi wires its own `TelemetryContext`
-the shim is deleted and nothing server-side changes. pi is also the first agent to exercise the
+tree, the attribute keys and the cost figure are all pi's own, so an upstream rename is caught by
+comparing the shim's output with pi's declared schema rather than by degraded data. That conformance test
+is parked until pi's schema package is reachable from the SDK; the extension's own unit test pins the
+emitted set meanwhile. The dual write carries pi's model and headline tokens through the generic GenAI
+adapter and the generic fold; the pi-shaped code on the read side is one canonicaliser and one reported-cost
+key list, both reading only pi's declared names, so the day pi wires its own `TelemetryContext` the shim
+is deleted and nothing server-side changes. pi is also the first agent to exercise the
 span-fed-and-self-reporting combination, which makes the cost drift signal real on the span lane for every
 agent that follows.
 
@@ -705,33 +736,93 @@ its extension API gives no source for, so the conformance test can prove the req
 cannot prove it is true. One span pi declares, `pi.harness.checkpoint`, is given up until pi fires an
 event for it. Three hand-maintained lists grow
 (`SUPPORTED_TOOLS`, `CODING_AGENT_CONTRIBUTION_KEYS`, `MODEL_CALL_SPAN_NAMES`) and each one fails silently
-when it is missed: the span is stored and the session simply learns nothing from it. Two edits are needed
-before the reported cost figure is anything but zero, and either one alone leaves no error behind.
+when it is missed: the span is stored and the session simply learns nothing from it. The reported cost
+figure needs two edits to be anything but zero, and either one alone leaves no error behind.
+
+**Known limitations.**
+
+- The shim opens one trace per pi process, so a session of several prompts shows the last run's input
+  and output as the trace headline and one Conversation turn. The session row counts every prompt.
+  Tracked in #9348.
+- Lines added and removed stay zero for pi: no pi or GenAI key carries a count, and `edit`'s patch sits
+  in `result.details`, which no convention names.
+- The trace name is the root span name verbatim, for every agent. Tracked across agents in #9346.
+- With content capture off, Input, Output and Conversation are empty, and no copy says why. Tracked in
+  #9347.
 
 **Obligations this creates.** Whoever gives our in-house worker an OTel exporter also chooses its
 telemetry marker and writes the registry-order guard; until then our own `pi.*` spans would fold as
-customer sessions if that worker ever exported anything, which no code prevents today. Whoever takes this
-record out of Proposed first settles the minimum pi version against the npm registry and the worker marker
-above, both marked UNVERIFIED here. And whoever deletes the shim owns the death-date check: the extension
+customer sessions if that worker ever exported anything, which no code prevents today (Decision 13, still
+open). And whoever deletes the shim owns the death-date check: the extension
 exists only while pi's CLI has no exporter, and nothing expires it on its own.
+
+## Revisions
+
+- **v1 (2026-10-26)**: framed and proposed with the implementation (#9203).
+- **v2 (2026-11-05)**: accuracy pass against what shipped (#9300, #9258). The minimum pi version is
+  pinned from the npm registry, and the in-house worker's marker is restated as still open with the
+  evidence checked. The Invariants rows describe the shipped behaviour and name their binding tests,
+  and the spec references list only the specs the change edited. Decision 6 records the pi
+  canonicaliser and the shim's own instrumentation scope. Line references are refreshed where touched.
+  Passages that corrected earlier drafts are restated as the decision and its evidence. No decision
+  changed.
+- **v3 (pending, #9350)**: the follow-ups to #9203.
+  - Content capture (#9330). With `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` on, the shim
+    writes `gen_ai.input.messages` (the prompt from `before_agent_start`) and `gen_ai.output.messages`
+    (the final reply) on `pi.harness.run`, `gen_ai.output.messages` (text and `tool_call` parts) on each
+    `pi.ai.request`, and `gen_ai.tool.call.arguments` and `gen_ai.tool.call.result` on each
+    `pi.harness.tool`. pi's env block sets the switch to `"true"`, as Copilot's does
+    (`otel-env-block.ts:164`). The session title comes from the existing `declaredSpanSessionFacts`
+    rule (`modules/coding-agent/contract/src/telemetry/gen-ai-operations.ts:54`), so the server needs
+    no change. Tests: `pi-extension-source.unit.test.ts`, `pi-env-block.unit.test.ts`.
+  - Content size cap. The server caps each value at 256 KiB (`DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES`,
+    `packages/span-normalisation/src/tracePayloadCap.ts:6`), but only once it has the body, and the
+    shim posts a run as one batch against a 10 MiB `bodyLimitBulkBytes`
+    (`packages/plans/src/request-bounds.ts:206`). So the shim cuts each content string at the same
+    256 KiB with the server's marker `…[langwatch: truncated, N bytes total]`
+    (`pi-extension-source.ts:325`; `pi-extension-install.feature`, "A message too large for the server
+    is cut as the server cuts it").
+  - Session columns (#9331). The fold counts one prompt per `pi.harness.run`
+    (`PROMPT_SESSION_SPAN_NAMES`, `coding-agent-session-span.projection.ts:48`). Peak context for
+    `pi.ai.request` is fresh input plus cache read plus cache write (`:46`, read at
+    `coding-agent-session-state.projection.ts:501`); other agents are unchanged. The agent version is
+    the resource's `service.version`, which the shim reads from pi's own `VERSION`
+    (`pi-extension-source.ts:213`, lifted at `coding-agent-span-facts.rules.ts:58`). Files touched come
+    from the `path` argument of `read`, `edit` and `write` (`:89`). Test: `pi-session.unit.test.ts`.
+  - Stand-in values (#9301). The eight constants are kept and proven inert (Decision 5).
+    `pi.harness.checkpoint` stays unemitted, since pi has no event for it.
+  - Extension fixes (#9258). The hook cwd is `sessionManager.getCwd()`, then `ctx.cwd`. The compaction
+    and tree handlers adopt the context's session id and return early while there is none.
+    The canonicaliser now writes `gen_ai.response.finish_reasons` as a one-element list, a change of
+    shape on that stored key (`piCanonicaliser.ts:95`). The error class is
+    read per span (Decision 6); both keys are pi's own, so the fallback is scoped, not dropped.
+  - Session name. The hook payload carries `session_title` from pi's `/name` on every `agent_start`,
+    and the hook command accepts it from any seam (Decision 10).
+  - Terminal transcript. `deriveToolName` reads `gen_ai.tool.name` on any agent's declared tool-run
+    span, not only `execute_tool` (`contract/src/telemetry/coding-agent-normalization.ts:511`), and
+    `collectSpanEntries` takes the prompt from a declared session-role span when no model call carries
+    one (`contract/src/coding-agent-transcript-span.ts`). Scenarios: `terminal-view.feature`.
+  - Minimum version. `langwatch pi` warns below `0.80.5` and pi still starts (Constants).
+  - Wrapper. `langwatch <tool>` checks the tool can start before any write and exits 127 with a link
+    to the tool's docs; a shell-lookup timeout counts as found
+    (`sdks/typescript/src/cli/utils/governance/tool-presence.ts`). `langwatch instrument <tool>` still
+    writes its setup when the tool is missing, since pre-provisioning is valid. The billing map stays
+    an explicit list, now with copilot and grok, and `lockedToggles`
+    (`enterprise/modules/governance/browser/src/features/ai-tools/model/coding-assistant-toggles.ts:10`)
+    is the one source for tools with no gateway path.
+  - Known limitations are listed under Consequences (#9346, #9347, #9348).
 
 ## References
 
 - Related ADRs: ADR-039 (copilot as a tracked coding assistant, the integration shape), ADR-018
   (unified observability substrate), ADR-056 (coding-agent pipeline and session aggregate), ADR-132
   (secrets are not config), ADR-161 (an agent session is a principal), ADR-175 (standard OTel environment)
-- `specs/coding-agent/pi-sessions.feature`, `specs/coding-agent/pi-model-calls.feature`,
+- Added: `specs/coding-agent/pi-sessions.feature`, `specs/coding-agent/pi-model-calls.feature`,
   `specs/ai-governance/cli-wrappers/pi-env-injection.feature`,
   `specs/ai-governance/cli-wrappers/pi-extension-install.feature`,
   `specs/ai-governance/ingestion-sources/pi-cli-otlp.feature`
-- Extended rather than added: `specs/ai-governance/cli-wrappers/logout.feature`,
-  `specs/ai-governance/cli-wrappers/wrap-path-choice.feature`,
-  `specs/ai-governance/cli-wrappers/cli-mints-ingest-key.feature`,
-  `specs/ai-governance/cli-wrappers/wrapper-help-passthrough.feature`,
-  `specs/ai-governance/cli-wrappers/session-context-hook.feature`,
+- Extended rather than added: `specs/ai-governance/cli-wrappers/session-context-hook.feature`,
   `specs/coding-agent/terminal-view.feature`, `specs/coding-agent/sessions-screen.feature`,
-  `specs/coding-agent/pull-request-linkage.feature`, `specs/coding-agent/personal-usage.feature`,
-  `specs/api-keys/unified-api-keys.feature`, `specs/trace-processing/coding-agent-cost.feature`,
   `modules/coding-agent/specs/session-git-context.feature`
 - `@earendil-works/pi-telemetry` (span contract and schema system),
   `@earendil-works/pi-agent-core` `dist/harness/telemetry.d.ts` (the declared tree)

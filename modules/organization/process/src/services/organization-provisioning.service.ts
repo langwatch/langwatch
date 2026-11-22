@@ -108,6 +108,7 @@ export class OrganizationProvisioningService {
     await this.dependencies.creations.created({
       organizationId: result.organization.id,
       organizationName: result.organization.name,
+      userId: params.userId,
     });
 
     return result;

@@ -9,6 +9,9 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.patch_api_dataset_by_slug_or_id_body_column_renames_item import (
+        PatchApiDatasetBySlugOrIdBodyColumnRenamesItem,
+    )
     from ..models.patch_api_dataset_by_slug_or_id_body_column_types_item import (
         PatchApiDatasetBySlugOrIdBodyColumnTypesItem,
     )
@@ -23,10 +26,14 @@ class PatchApiDatasetBySlugOrIdBody:
     Attributes:
         name (str | Unset):
         column_types (list[PatchApiDatasetBySlugOrIdBodyColumnTypesItem] | Unset):
+        column_renames (list[PatchApiDatasetBySlugOrIdBodyColumnRenamesItem] | Unset): Which existing column each
+            renamed column came from, as `{ from, to }` names. Sent, values move by these renames and by unchanged names
+            only. Omitted, columns left over after matching names pair by position.
     """
 
     name: str | Unset = UNSET
     column_types: list[PatchApiDatasetBySlugOrIdBodyColumnTypesItem] | Unset = UNSET
+    column_renames: list[PatchApiDatasetBySlugOrIdBodyColumnRenamesItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -39,6 +46,13 @@ class PatchApiDatasetBySlugOrIdBody:
                 column_types_item = column_types_item_data.to_dict()
                 column_types.append(column_types_item)
 
+        column_renames: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.column_renames, Unset):
+            column_renames = []
+            for column_renames_item_data in self.column_renames:
+                column_renames_item = column_renames_item_data.to_dict()
+                column_renames.append(column_renames_item)
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
@@ -46,11 +60,16 @@ class PatchApiDatasetBySlugOrIdBody:
             field_dict["name"] = name
         if column_types is not UNSET:
             field_dict["columnTypes"] = column_types
+        if column_renames is not UNSET:
+            field_dict["columnRenames"] = column_renames
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.patch_api_dataset_by_slug_or_id_body_column_renames_item import (
+            PatchApiDatasetBySlugOrIdBodyColumnRenamesItem,
+        )
         from ..models.patch_api_dataset_by_slug_or_id_body_column_types_item import (
             PatchApiDatasetBySlugOrIdBodyColumnTypesItem,
         )
@@ -67,9 +86,19 @@ class PatchApiDatasetBySlugOrIdBody:
 
                 column_types.append(column_types_item)
 
+        _column_renames = d.pop("columnRenames", UNSET)
+        column_renames: list[PatchApiDatasetBySlugOrIdBodyColumnRenamesItem] | Unset = UNSET
+        if _column_renames is not UNSET:
+            column_renames = []
+            for column_renames_item_data in _column_renames:
+                column_renames_item = PatchApiDatasetBySlugOrIdBodyColumnRenamesItem.from_dict(column_renames_item_data)
+
+                column_renames.append(column_renames_item)
+
         patch_api_dataset_by_slug_or_id_body = cls(
             name=name,
             column_types=column_types,
+            column_renames=column_renames,
         )
 
         patch_api_dataset_by_slug_or_id_body.additional_properties = d

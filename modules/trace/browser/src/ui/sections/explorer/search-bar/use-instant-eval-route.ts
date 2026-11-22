@@ -12,7 +12,9 @@ import {
   type ExplorerInstantEvalOptInAccess,
   combineQueries,
   instantEvalChipText,
+  instantEvalChipsOf,
   instantEvalRunKey,
+  queryWithInstantEvalChipRetargeted,
   queryWithoutInstantEvalChips,
 } from "@langwatch/trace-contract";
 import { type RefObject, useCallback, useRef, useState } from "react";
@@ -70,6 +72,10 @@ interface InstantEvalRouteState {
   /** Throws the organization's switch, then routes the held submit. */
   enableInstantEvals: () => void;
   isEnabling: boolean;
+  /** Saves a decision model as the project's Instant Evals default, then routes the held submit. */
+  pickDecisionModel: (model: string) => void;
+  /** The model being saved, or null. */
+  pickingDecisionModel: string | null;
   isEstimating: boolean;
   isStarting: boolean;
 }
@@ -118,8 +124,38 @@ function routeRunKey({
   });
 }
 
+/**
+ * The typed text, its chip re-spelled for the run's target when a lens switch
+ * since Enter would read it as another one; undefined when no chip reads so.
+ */
+function typedQueryForLens({
+  payload,
+  lensId,
+}: {
+  payload: InstantEvalRoutePayload;
+  lensId: string | undefined;
+}): string | undefined {
+  const { typedQuery, target } = payload;
+  if (typedQuery === undefined) return undefined;
+  const question = payload.question.instructions;
+  const wanted = question.replace(/\s+/g, " ").trim();
+  const readsAsTarget = (queryText: string) =>
+    instantEvalChipsOf({ queryText, lensId }).some(
+      (chip) => chip.target === target && chip.question.replace(/\s+/g, " ").trim() === wanted,
+    );
+  if (readsAsTarget(typedQuery)) return typedQuery;
+  const respelled = queryWithInstantEvalChipRetargeted({
+    queryText: typedQuery,
+    question,
+    target,
+    lensId,
+  });
+  return readsAsTarget(respelled) ? respelled : undefined;
+}
+
 /** The bar's query with the route's eval chip in it: what a refusal leaves for the reader. */
 function pendingChipQuery(payload: InstantEvalRoutePayload): string {
+  if (payload.typedQuery !== undefined) return payload.typedQuery;
   return combineQueries({
     base: payload.otherQuery,
     addition: instantEvalChipText({
@@ -250,15 +286,17 @@ function useInstantEvalStarter({
     ({ payload, key, runId }: PendingRoute & { runId: string }) => {
       const lensId = useViewStore.getState().activeLensId;
       registerEvalRun({ key, runId });
+      // A chip typed by hand goes back as typed, so a `NOT` in front of it stays.
       applyQueryText(
-        combineQueries({
-          base: payload.otherQuery,
-          addition: instantEvalChipText({
-            question: payload.question.instructions,
-            target: payload.target,
-            lensId,
+        typedQueryForLens({ payload, lensId }) ??
+          combineQueries({
+            base: payload.otherQuery,
+            addition: instantEvalChipText({
+              question: payload.question.instructions,
+              target: payload.target,
+              lensId,
+            }),
           }),
-        }),
       );
       if (!payload.modelTrouble) return;
       // Against the text the store settled on: the strip shows while the bar holds it.
@@ -294,6 +332,43 @@ function useInstantEvalStarter({
   return { isStarting: start.isPending, applyChip, startRun };
 }
 
+/** A switch or a pick landed: drop the popover and route the held submit, unless dismissed. */
+function resumeHeld({
+  seq,
+  seqRef,
+  held,
+  heldRef,
+  setRefusal,
+  route,
+}: {
+  seq: number;
+  seqRef: RefObject<number>;
+  held: InstantEvalRoutePayload;
+  heldRef: RefObject<InstantEvalRoutePayload | null>;
+  setRefusal: (refusal: InstantEvalRefusal | null) => void;
+  route: (args: { payload: InstantEvalRoutePayload; seq: number }) => void;
+}): void {
+  if (seq !== seqRef.current) return;
+  heldRef.current = null;
+  setRefusal(null);
+  route({ payload: held, seq });
+}
+
+/** A refused switch or pick is a warning and the popover stays, unless dismissed since. */
+function warnIfCurrent({
+  seq,
+  seqRef,
+  error,
+}: {
+  seq: number;
+  seqRef: RefObject<number>;
+  error: unknown;
+}): void {
+  if (seq !== seqRef.current) return;
+  const { title, description } = explainAnyError(error);
+  toaster.create({ title, ...(description ? { description } : {}), type: "warning" });
+}
+
 /**
  * The organization's switch from the `opt_in` popover: on success the access read is primed and
  * the held submit is routed; a refusal is a warning and the popover stays. Dismissing drops the
@@ -310,21 +385,44 @@ function useInstantEvalSwitch({
   route: (args: { payload: InstantEvalRoutePayload; seq: number }) => void;
   outcome: Pick<
     ReturnType<typeof useInstantEvalOutcome>,
-    "setRefusal" | "pendingRef" | "refusedRef"
+    "refusal" | "setRefusal" | "pendingRef" | "refusedRef"
   >;
 }): {
   enableInstantEvals: () => void;
+  pickDecisionModel: (model: string) => void;
+  pickingDecisionModel: string | null;
   dismissRefusal: () => void;
   skipRefusal: () => InstantEvalRoutePayload | null;
   isEnabling: boolean;
 } {
   const enable = api.instantEval.enable.useMutation();
+  const assign = api.modelProvider.setRoleAssignmentForScope.useMutation();
   const utils = api.useUtils();
-  const { setRefusal, pendingRef, refusedRef } = outcome;
+  const { refusal, setRefusal, pendingRef, refusedRef } = outcome;
 
+  const pickDecisionModel = useCallback(
+    (model: string) => {
+      const held = heldRef.current;
+      if (!held || refusal?.kind !== "unreleased") return;
+      const seq = ++seqRef.current;
+      assign.mutate(
+        { scopeType: "PROJECT", scopeId: held.projectId, role: "INSTANT_EVALS", model },
+        {
+          onSuccess: () => {
+            void utils.instantEval.access.invalidate();
+            resumeHeld({ seq, seqRef, held, heldRef, setRefusal, route });
+          },
+          onError: (error) => warnIfCurrent({ seq, seqRef, error }),
+        },
+      );
+    },
+    [assign, heldRef, refusal, route, seqRef, setRefusal, utils],
+  );
+
+  // The switch answers the opt-in popover only; the picker answers the unreleased one.
   const enableInstantEvals = useCallback(() => {
     const held = heldRef.current;
-    if (!held) return;
+    if (!held || refusal?.kind !== "opt_in") return;
     const seq = ++seqRef.current;
     enable.mutate(
       { projectId: held.projectId },
@@ -332,19 +430,21 @@ function useInstantEvalSwitch({
         onSuccess: (access) => {
           utils.instantEval.access.setData({ projectId: held.projectId }, access);
           void utils.instantEval.access.invalidate();
-          if (seq !== seqRef.current) return;
-          heldRef.current = null;
-          setRefusal(null);
-          route({ payload: held, seq });
+          resumeHeld({ seq, seqRef, held, heldRef, setRefusal, route });
         },
         onError: (error) => {
+          // The cached offer may be stale (the hosted switch went off since the page loaded).
+          void utils.instantEval.access.invalidate();
+          warnIfCurrent({ seq, seqRef, error });
           if (seq !== seqRef.current) return;
-          const { title, description } = explainAnyError(error);
-          toaster.create({ title, ...(description ? { description } : {}), type: "warning" });
+          // No switch is offered any more: the popover asks for an own decision model instead.
+          if (readHandledError(error)?.code === "instant_eval_opt_in_not_offered") {
+            setRefusal({ kind: "unreleased" });
+          }
         },
       },
     );
-  }, [enable, heldRef, route, seqRef, setRefusal, utils]);
+  }, [enable, heldRef, refusal, route, seqRef, setRefusal, utils]);
 
   const skipRefusal = useCallback(() => {
     seqRef.current += 1;
@@ -360,7 +460,14 @@ function useInstantEvalSwitch({
     skipRefusal();
   }, [skipRefusal]);
 
-  return { enableInstantEvals, dismissRefusal, skipRefusal, isEnabling: enable.isPending };
+  return {
+    enableInstantEvals,
+    pickDecisionModel,
+    pickingDecisionModel: assign.isPending ? (assign.variables?.model ?? null) : null,
+    dismissRefusal,
+    skipRefusal,
+    isEnabling: enable.isPending,
+  };
 }
 
 /** The refusal an organization without Instant Evals meets; a self-hosted install, its reason. */
@@ -375,7 +482,7 @@ function unreleasedRefusalOf(
 
 /**
  * Refused before any estimate goes out; with nothing pending, closing only closes. Only the switch
- * has a submit to run afterwards, so only it holds the payload.
+ * and the decision model picker have a submit to run afterwards, so only they hold the payload.
  */
 function refuseUnreleased({
   payload,
@@ -394,7 +501,8 @@ function refuseUnreleased({
   outcome.pendingRef.current = null;
   outcome.setConfirmation(null);
   const refusal = unreleasedRefusalOf(optInOffer);
-  heldRef.current = refusal.kind === "opt_in" ? payload : null;
+  const resumes = refusal.kind === "opt_in" || refusal.kind === "unreleased";
+  heldRef.current = resumes ? payload : null;
   outcome.holdRefused(payload);
   outcome.setRefusal(refusal);
 }
@@ -501,7 +609,14 @@ export function useInstantEvalRoute({
     ],
   );
 
-  const { enableInstantEvals, dismissRefusal, skipRefusal, isEnabling } = useInstantEvalSwitch({
+  const {
+    enableInstantEvals,
+    pickDecisionModel,
+    pickingDecisionModel,
+    dismissRefusal,
+    skipRefusal,
+    isEnabling,
+  } = useInstantEvalSwitch({
     heldRef,
     seqRef,
     route,
@@ -519,6 +634,8 @@ export function useInstantEvalRoute({
     skipRefusal,
     enableInstantEvals,
     isEnabling,
+    pickDecisionModel,
+    pickingDecisionModel,
     isEstimating: estimate.isPending,
     isStarting,
   };

@@ -99,6 +99,14 @@ Feature: pi CLI OTLP spans canonicalise on the unified substrate
       Given a pi.ai.request span that ended with a stop reason and an error type
       When the canonicalisation chain runs
       Then the canonical span carries both as pi reported them
+      And the stop reason is a one-element list, as every other producer writes it
+
+    # The shim writes eight required pi keys as constants (ADR-188 Decision 5).
+    @unit
+    Scenario: The shim's stand-in values are never read as facts
+      Given a pi span carrying the eight stand-in values the shim writes
+      When the canonicalisation chain runs
+      Then each stays under pi's own key and no canonical key takes its value
 
     # The trace's conversation is read from gen_ai.conversation.id, and the
     # sessions screen opens a session's replay by looking its traces up by it.

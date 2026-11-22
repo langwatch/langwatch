@@ -143,6 +143,17 @@ const revokeApiKeyInputSchemaDefinition = z
 export interface RevokeApiKeyInputSchema extends Named<typeof revokeApiKeyInputSchemaDefinition> {}
 export const revokeApiKeyInputSchema: RevokeApiKeyInputSchema = revokeApiKeyInputSchemaDefinition;
 export type RevokeApiKeyInput = z.infer<typeof revokeApiKeyInputSchema>;
+const rotateApiKeyInputSchemaDefinition = z
+  .object({
+    id: z.string().min(1),
+    organizationId: z.string().min(1),
+    callerUserId: z.string().min(1).nullable(),
+    callerIsAdmin: z.boolean(),
+  })
+  .strict();
+export interface RotateApiKeyInputSchema extends Named<typeof rotateApiKeyInputSchemaDefinition> {}
+export const rotateApiKeyInputSchema: RotateApiKeyInputSchema = rotateApiKeyInputSchemaDefinition;
+export type RotateApiKeyInput = z.infer<typeof rotateApiKeyInputSchema>;
 const apiKeyVerificationSchemaDefinition = z
   .object({ ...apiKeySchema.shape, tokenType: z.literal("apiKey") })
   .strict();

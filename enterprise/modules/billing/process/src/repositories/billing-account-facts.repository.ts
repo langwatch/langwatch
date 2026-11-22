@@ -26,6 +26,11 @@ export abstract class BillingAccountFactsRepository {
   abstract findWithAdministrators(
     organizationId: string,
   ): Promise<OrganizationWithAdministrators | null>;
+  /** The address of each named person still on an enabled membership of the organization. */
+  abstract findMemberEmails(input: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<{ userId: string; email: string }[]>;
   /** Members neither disabled nor deactivated, by user id (C2 B). */
   abstract findActiveMemberIds(organizationId: string): Promise<string[]>;
   /** Organizations an operator marked connected self-hosted customers, oldest first. */

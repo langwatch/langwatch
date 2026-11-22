@@ -343,23 +343,11 @@ type Output = z.infer<typeof explorerInstantEvalProgressSchema>; // ../contract/
 interface Input {
   projectId: string;
 }
-// Output: instantEvalOptInAccessSchema, ../contract/src/instant-eval.schemas.ts:583
-interface Output {
-  released: boolean;
-  offer:
-    | "enable"
-    | "ask_admin"
-    | "contact_us"
-    | "not_in_license"
-    | "switched_off"
-    | "not_connected"
-    | "ask_operator";
-  viaConnect: boolean;
-}
+type Output = z.infer<typeof instantEvalOptInAccessSchema>; // ../contract/src/instant-eval.schemas.ts:585
 
 // instantEval.enable
 type Input = z.infer<typeof explorerInstantEvalProjectSchema>; // ../contract/src/instant-eval-explorer.schemas.ts:49
-type Output = z.infer<typeof instantEvalOptInAccessSchema>; // ../contract/src/instant-eval.schemas.ts:583
+type Output = z.infer<typeof instantEvalOptInAccessSchema>; // ../contract/src/instant-eval.schemas.ts:585
 
 // instantEval.classifySearch
 // Input: explorerSearchClassificationInputSchema, ../contract/src/instant-eval-explorer.schemas.ts:107

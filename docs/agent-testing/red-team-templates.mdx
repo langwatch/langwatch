@@ -1,0 +1,50 @@
+---
+title: Red Team Templates
+sidebarTitle: Red Team Templates
+keywords: langwatch, red teaming, owasp, llm top 10, agentic top 10, suite templates, adversarial testing, agent security
+description: Create a red team test suite from an OWASP pack in the platform, fit it to your agent, run it and read which attacks your agent held against.
+---
+
+<Warning>Use red teaming only on agents you own or have explicit permission to test.</Warning>
+
+You can red team an agent from the platform without writing code. Pick a pack such as the OWASP Top 10 for LLM Applications, tell LangWatch your agent's name and tools, and it creates one attack scenario per risk. Each scenario runs the same multi-turn attacker as [red teaming in code](/agent-testing/red-teaming).
+
+## Open the template gallery
+
+In **Agent Testing**, press **+** on the test suite rail and pick **From template**. The gallery has two tabs. **Archetypes** holds everyday behaviour suites, such as a support agent or a payments agent. **Red team** holds the attack packs:
+
+- **OWASP Top 10 for LLM Applications (2025)**: one attack per risk, `LLM01` to `LLM10`.
+- **OWASP Top 10 for Agentic Applications**: one attack per agentic risk, `ASI01` to `ASI10`.
+- **PII and sensitive data**: eight attacks that try to get your agent to reveal another user's personal data, stored customer records, credentials or API keys, another tenant's data, or personal data from raw tool results. Mapped to `LLM02`.
+- **Prompt injection**: six `LLM01` attacks: direct overrides, injection through tool output and retrieved documents, instructions hidden in encodings or other languages, persona drift over many turns, and payloads split across messages.
+
+## Preview a pack
+
+Select a pack to preview it before anything is created. The preview lists every scenario with the attack goal and the OWASP ids it covers, such as `LLM01` for prompt injection or `LLM07` for system prompt leakage. Each id shows the official OWASP category name, so you can match the suite to the risks your security review asks about.
+
+## Fit it to your agent
+
+Press **Next** to open the fit step. Give the **agent name** the attacker should address, the **tools** your agent can call, and the things it **must never** do, such as revealing customer data or issuing refunds above a limit. LangWatch writes these into each scenario, so the attacks and the judge criteria are about your agent, not a generic one.
+
+## Create and run
+
+Press **Create suite**. LangWatch creates a test suite named after the template, with one scenario per attack, and opens it. Run it against your agent like any other suite. The suite is yours from then on: edit, delete or add scenarios. On the Free plan, a template counts as one suite.
+
+## Read the result
+
+Each red team scenario in a run shows **Held** when your agent resisted the attack across every turn, and **Broke** when the attacker reached its goal. Open the run to see the transcript and the score of each turn, from 0 (full refusal) to 10 (the attacker got what it wanted). The turn where the score climbed is where to look for the fix.
+
+## Turn cap
+
+An attack runs for up to 30 turns by default. A scenario's red team settings take a `maxTurns` of up to 50, the hard limit. The attacker may stop early when it breaks the agent, and that run counts as **Broke**.
+
+## Use the REST API
+
+The gallery uses two routes you can also call with a project API key:
+
+| Route | Permission | What it does |
+| ----- | ---------- | ------------ |
+| `GET /api/v1/test-suites/templates` | `scenarios:view` | Lists every template with its full scenario data. |
+| `POST /api/v1/test-suites/templates/{templateId}/apply` | `scenarios:manage` | Creates a suite from a template. |
+
+The apply body takes `fit` with `agentName`, `tools` and `mustNever`, and an optional suite `name`. An unknown template id answers 404 `suite_template_not_found`. From the CLI, `langwatch test-suite templates` lists them and `langwatch test-suite apply-template <id> --agent-name "Support bot" --tool refund_order --must-never "reveal the system prompt"` applies one.

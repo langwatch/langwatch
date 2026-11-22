@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.post_api_evaluators_body_type import PostApiEvaluatorsBodyType
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
     from ..models.post_api_evaluators_body_config import PostApiEvaluatorsBodyConfig
 
@@ -18,17 +21,31 @@ class PostApiEvaluatorsBody:
     """
     Attributes:
         name (str):
-        config (PostApiEvaluatorsBodyConfig):
+        config (PostApiEvaluatorsBodyConfig): For a built-in evaluator: { evaluatorType, settings }. For a code
+            evaluator: { code, inputs: [{ identifier, type }] }; outputs are the fixed passed, score, label and details. For
+            a workflow evaluator: {}.
+        type_ (PostApiEvaluatorsBodyType | Unset): The kind of evaluator. "evaluator" (the default) is a built-in type
+            named by config.evaluatorType; "code" is a custom Python evaluator whose config carries code and inputs;
+            "workflow" wraps the workflow named by workflowId. Default: PostApiEvaluatorsBodyType.EVALUATOR.
+        workflow_id (str | Unset): The workflow a "workflow" evaluator wraps. Only for type "workflow".
     """
 
     name: str
     config: PostApiEvaluatorsBodyConfig
+    type_: PostApiEvaluatorsBodyType | Unset = PostApiEvaluatorsBodyType.EVALUATOR
+    workflow_id: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
 
         config = self.config.to_dict()
+
+        type_: str | Unset = UNSET
+        if not isinstance(self.type_, Unset):
+            type_ = self.type_.value
+
+        workflow_id = self.workflow_id
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -38,6 +55,10 @@ class PostApiEvaluatorsBody:
                 "config": config,
             }
         )
+        if type_ is not UNSET:
+            field_dict["type"] = type_
+        if workflow_id is not UNSET:
+            field_dict["workflowId"] = workflow_id
 
         return field_dict
 
@@ -50,9 +71,20 @@ class PostApiEvaluatorsBody:
 
         config = PostApiEvaluatorsBodyConfig.from_dict(d.pop("config"))
 
+        _type_ = d.pop("type", UNSET)
+        type_: PostApiEvaluatorsBodyType | Unset
+        if isinstance(_type_, Unset):
+            type_ = UNSET
+        else:
+            type_ = PostApiEvaluatorsBodyType(_type_)
+
+        workflow_id = d.pop("workflowId", UNSET)
+
         post_api_evaluators_body = cls(
             name=name,
             config=config,
+            type_=type_,
+            workflow_id=workflow_id,
         )
 
         post_api_evaluators_body.additional_properties = d

@@ -1,4 +1,4 @@
-import { type Authorization, ownProjectIdReadBy } from "@langwatch/authorization";
+import { type Authorization, ownProjectIdReadBy, readScopeKeyOf } from "@langwatch/authorization";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -16,30 +16,34 @@ import type {
   TraceListPage,
   TraceListRead,
   TraceRef,
+  TraceWithholding,
   Protections,
 } from "@langwatch/trace-contract";
 
 import type { FacetCatalog } from "#features/facet/rules/trace-facet-registry.rules";
 
 import type { TraceEvaluationRunsReadRepository } from "../../../repositories/trace-evaluation-runs.repository.ts";
-import type {
-  DiscoverParams,
-  FacetValuesParams,
-} from "../../../rules/trace-list-cache-key.rules.ts";
 import {
-  cursorForTraceRow,
-  mapToTraceListItem,
-  SORT_COLUMN_MAP,
-} from "../../../rules/trace-list-row.rules.ts";
+  facetCountWindowKey,
+  type DiscoverParams,
+  type FacetValuesParams,
+} from "../../../rules/trace-list-cache-key.rules.ts";
+import { clampToWithheld } from "../../../rules/trace-withholding.rules.ts";
 import { TraceDiscoverService } from "../../../services/trace-discover.service.ts";
 import type { FacetFilterResolver } from "../../facet/rules/trace-facet-filter.rules.ts";
 import { TraceFacetValuesService } from "../../facet/services/trace-facet-values.service.ts";
 import type { TraceTopicNamesReadRepository } from "../../topic/repositories/trace-topic-names.repository.ts";
 import { TraceTopicNamingService } from "../../topic/services/trace-topic-naming.service.ts";
+import {
+  cursorForTraceRow,
+  mapToTraceListItem,
+  SORT_COLUMN_MAP,
+} from "../rules/trace-list-row.rules.ts";
 
 interface ListParams {
   authorization: Authorization;
-  timeRange: { from: number; to: number };
+  /** `live` (a rolling preset) reads without an upper bound. */
+  timeRange: { from: number; to: number; live?: boolean };
   sort: { columnId: string; direction: "asc" | "desc" };
   /** 1-based offset compatibility for non-cursor callers. */
   page?: number;
@@ -52,6 +56,8 @@ interface ListParams {
    * input/output previews teaser-redacted. Omitted/null = ungated.
    */
   visibilityCutoffMs?: number | null;
+  /** Over-plan withholding: rows started at or after `fromMs` are left out and only counted. */
+  withholding?: TraceWithholding;
 }
 
 interface FacetParams {
@@ -60,6 +66,12 @@ interface FacetParams {
   timeRange: { from: number; to: number; live?: boolean };
   /** The predicate each facet is counted under. */
   filterFor: FacetFilterResolver;
+  /**
+   * Names everything `filterFor` was built from beyond the proof and window
+   * (the query, the eval runs, the viewer's protections): two requests with
+   * the same key count the same facets.
+   */
+  filterKey: string;
 }
 
 interface NewCountParams {
@@ -67,6 +79,8 @@ interface NewCountParams {
   timeRange: { from: number; to: number };
   since: number;
   filterWhere?: { sql: string; params: Record<string, unknown> };
+  /** Withheld traces never count as new: the list would not show them. */
+  withholding?: TraceWithholding;
 }
 
 interface TraceIdsParams {
@@ -205,6 +219,50 @@ export class TraceListService {
       throw new PageTooDeepError(TRACE_LIST_MAX_OFFSET_ROWS);
     }
 
+    const withholding = params.withholding;
+    if (withholding?.kind !== "over_plan") return this.#readPage({ params, sortColumn, offset });
+
+    const [page, withheldCount] = await Promise.all([
+      withholding.fromMs <= params.timeRange.from
+        ? Promise.resolve<TraceListPage>({ items: [], totalHits: 0, nextCursor: null })
+        : this.#readPage({
+            params: {
+              ...params,
+              timeRange: clampToWithheld({ timeRange: params.timeRange, withholding }),
+            },
+            sortColumn,
+            offset,
+          }),
+      withholding.fromMs > params.timeRange.to
+        ? Promise.resolve(0)
+        : this.repository.findCount({
+            authorization: params.authorization,
+            timeRange: params.timeRange,
+            // The count reads `OccurredAt > since`: one millisecond back includes the cutoff.
+            since: withholding.fromMs - 1,
+            filterWhere: params.filterWhere,
+          }),
+    ]);
+
+    return {
+      ...page,
+      withheld: {
+        count: withheldCount,
+        members: withholding.members,
+        maxMembers: withholding.maxMembers,
+      },
+    };
+  }
+
+  async #readPage({
+    params,
+    sortColumn,
+    offset,
+  }: {
+    params: ListParams;
+    sortColumn: (typeof SORT_COLUMN_MAP)[string];
+    offset: number;
+  }): Promise<TraceListPage> {
     const result = await this.repository.listAll({
       authorization: params.authorization,
       timeRange: params.timeRange,
@@ -257,16 +315,35 @@ export class TraceListService {
    * warm start stay with `getDiscover`.
    */
   getFacets(params: FacetParams): Promise<FacetDescriptor[]> {
-    return this.discover.getFilteredFacets({
-      params: { authorization: params.authorization, timeRange: params.timeRange },
-      filterFor: params.filterFor,
-    });
+    // A repeat of a request still counting shares its run, a live window's by
+    // its span since its bounds roll: each repeat used to start another full
+    // scan beside it. Nothing is kept once it answers.
+    const key = JSON.stringify([
+      readScopeKeyOf(params.authorization),
+      ...facetCountWindowKey(params.timeRange),
+      params.filterKey,
+    ]);
+    const running = this.#facetsInFlight.get(key);
+    if (running) return running;
+
+    const run = this.discover
+      .getFilteredFacets({
+        params: { authorization: params.authorization, timeRange: params.timeRange },
+        filterFor: params.filterFor,
+      })
+      .finally(() => this.#facetsInFlight.delete(key));
+    this.#facetsInFlight.set(key, run);
+    return run;
   }
 
+  readonly #facetsInFlight = new Map<string, Promise<FacetDescriptor[]>>();
+
   async getNewCount(params: NewCountParams): Promise<number> {
+    const withholding = params.withholding;
+    if (withholding?.kind === "over_plan" && withholding.fromMs <= params.timeRange.from) return 0;
     return this.repository.findCount({
       authorization: params.authorization,
-      timeRange: params.timeRange,
+      timeRange: clampToWithheld({ timeRange: params.timeRange, withholding }),
       since: params.since,
       filterWhere: params.filterWhere,
     });

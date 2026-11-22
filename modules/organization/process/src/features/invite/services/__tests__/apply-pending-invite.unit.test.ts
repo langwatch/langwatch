@@ -46,7 +46,7 @@ describe("given a pending invitation for the arriving address", () => {
           organizationId: ORGANIZATION_ID,
           email: EMAIL,
         }),
-      ).resolves.toEqual({ applied: true, inviteId: "invite-1" });
+      ).resolves.toEqual({ applied: true, inviteId: "invite-1", role: "ADMIN" });
 
       expect(invites.hasMembershipState({ userId: USER_ID, organizationId: ORGANIZATION_ID })).toBe(
         true,

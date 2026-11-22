@@ -594,6 +594,18 @@ export type EvaluationsV3Actions = {
    * `targetId`, only that target's own and the evaluators' mappings for it.
    */
   removeMappingsToMissingColumns: (args: { datasetId: string; targetId?: string }) => void;
+  /**
+   * Apply the columns drawer's edit. A column's `id` names the column it was
+   * edited from, so values, queued saved edits and mappings follow a rename.
+   */
+  applyDatasetColumnsEdit: (args: {
+    datasetId: string;
+    edited: {
+      datasetId: string;
+      name: string;
+      columnTypes: { name: string; type: string; id?: string }[];
+    };
+  }) => void;
   updateColumnType: (datasetId: string, columnId: string, type: DatasetColumnType) => void;
 
   // Target actions
@@ -816,6 +828,8 @@ export const createInitialResults = (): EvaluationResults => ({
 export const DEFAULT_CONCURRENCY = 10;
 /** The most cells a run may hold in flight at once. */
 export const MAX_CONCURRENCY = 24;
+/** The most times a run may repeat every dataset row. */
+export const MAX_RUN_REPEAT = 5;
 
 export const createInitialUIState = (): UIState => ({
   selectedRows: new Set(),

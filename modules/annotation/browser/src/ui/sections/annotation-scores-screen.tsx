@@ -259,7 +259,7 @@ export default function AnnotationScoresScreen() {
           </PageLayout.HeaderButton>
         )}
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start">
         <Text color="fg.muted">
           The score metrics reviewers fill in when they annotate a trace.
         </Text>

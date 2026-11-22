@@ -45,10 +45,32 @@ async function fetchPage({ url }: { url: URL }) {
   }
 }
 
+/** Whether a page may be fetched ahead of a click: never offline or for a reader saving data. */
+function mayFetchAhead() {
+  const saveData = (navigator as { connection?: { saveData?: boolean } }).connection?.saveData;
+  return navigator.onLine && !saveData;
+}
+
+/* A hover or visible-link prefetch from the reading island passes the same policy as a press. */
 function prefetch({ event }: { event: Event }) {
   const request = (event as CustomEvent<PrefetchRequest>).detail;
   const url = pageUrl({ anchor: request.anchor });
-  if (url) request.result = fetchPage({ url }).then(() => {});
+  if (url && mayFetchAhead()) request.result = fetchPage({ url }).then(() => {});
+}
+
+/* The shared sheet of a page that has not finished loading names its address in `data-href`. */
+function sheetHref(link: HTMLLinkElement) {
+  const pending = link.dataset.href;
+  return pending ? new URL(pending, document.baseURI).href : link.href;
+}
+
+/** Asks for every shared sheet still named only by `data-href`. The page paints from its inlined
+    rules, so the bootstrap calls this once the window has loaded (`afterLoad`). */
+export function loadSharedSheets() {
+  document.querySelectorAll<HTMLLinkElement>("link[data-docs-style][data-href]").forEach((link) => {
+    link.href = sheetHref(link);
+    link.removeAttribute("data-href");
+  });
 }
 
 async function installStyles({ next }: { next: Document }) {
@@ -59,9 +81,14 @@ async function installStyles({ next }: { next: Document }) {
   const pending = [...next.querySelectorAll<HTMLLinkElement>("link[data-docs-style]")].map(
     (source) => {
       const present = [...document.querySelectorAll<HTMLLinkElement>("link[data-docs-style]")].find(
-        (link) => link.href === source.href,
+        (link) => sheetHref(link) === sheetHref(source),
       );
-      /* The shared sheet loads without blocking; wait if it is still on its way. */
+      /* The shared sheet loads after the page. A click before that asks for it now rather than
+         waiting for the rest of the page; either way, wait while it is on its way. */
+      if (present?.dataset.href !== undefined) {
+        present.href = sheetHref(present);
+        present.removeAttribute("data-href");
+      }
       if (present)
         return present.sheet
           ? Promise.resolve()
@@ -72,7 +99,7 @@ async function installStyles({ next }: { next: Document }) {
       return new Promise<void>((resolve, reject) => {
         const link = document.createElement("link");
         link.rel = "stylesheet";
-        link.href = source.href;
+        link.href = sheetHref(source);
         link.dataset.docsStyle = "";
         link.onload = () => resolve();
         link.onerror = () => {
@@ -95,10 +122,10 @@ function updateHead({ next }: { next: Document }) {
     .querySelectorAll(selector)
     .forEach((node) => document.head.append(node.cloneNode(true)));
   const hrefs = new Set(
-    [...next.querySelectorAll<HTMLLinkElement>("link[data-docs-style]")].map((link) => link.href),
+    [...next.querySelectorAll<HTMLLinkElement>("link[data-docs-style]")].map(sheetHref),
   );
   document.querySelectorAll<HTMLLinkElement>("link[data-docs-style]").forEach((link) => {
-    if (!hrefs.has(link.href)) link.remove();
+    if (!hrefs.has(sheetHref(link))) link.remove();
   });
 }
 
@@ -116,6 +143,9 @@ function finishNavigation({ url, restored }: { url: URL; restored: boolean }) {
 async function navigate({ url, restored = false }: { url: URL; restored?: boolean }) {
   const sequence = ++navigating;
   positions.set(current, scrollY);
+  /* The page answers at once: it dims while the next one is fetched (docs.css). */
+  const leaving = document.querySelector(".docs-layout");
+  leaving?.setAttribute("data-docs-loading", "");
   try {
     const fetched = await fetchPage({ url });
     const next = new DOMParser().parseFromString(fetched.html, "text/html");
@@ -131,6 +161,8 @@ async function navigate({ url, restored = false }: { url: URL; restored?: boolea
     document
       .querySelectorAll<HTMLDialogElement>("dialog[open]")
       .forEach((dialog) => dialog.close());
+    /* From the first swap on, a page swapped in rises in; a full load never does. */
+    document.documentElement.setAttribute("data-docs-navigated", "");
     document.querySelector(".docs-layout")?.replaceWith(layout);
     document
       .querySelector("header")
@@ -147,8 +179,18 @@ async function navigate({ url, restored = false }: { url: URL; restored?: boolea
     current = address.href;
     finishNavigation({ url: address, restored });
   } catch {
-    if (sequence === navigating) location.assign(url);
+    if (sequence !== navigating) return;
+    /* Undimmed first, or the back button could restore the dimmed page from the cache. */
+    leaving?.removeAttribute("data-docs-loading");
+    location.assign(url);
   }
+}
+
+/** The page a plain main-button press or click on an internal link leads to, if any. */
+function followedPage({ event }: { event: MouseEvent }) {
+  if (event.button !== 0 || modifiedClick({ event })) return null;
+  const anchor = event.target instanceof Element ? event.target.closest("a") : null;
+  return anchor ? pageUrl({ anchor }) : null;
 }
 
 export function startNavigation() {
@@ -159,14 +201,21 @@ export function startNavigation() {
   status.setAttribute("aria-live", "polite");
   document.body.append(status);
   document.addEventListener("click", (event) => {
-    if (event.defaultPrevented || event.button !== 0 || modifiedClick({ event })) return;
-    const anchor = event.target instanceof Element ? event.target.closest("a") : null;
-    if (!anchor) return;
-    const url = pageUrl({ anchor });
+    const url = event.defaultPrevented ? null : followedPage({ event });
     if (!url) return;
     event.preventDefault();
     void navigate({ url });
   });
+  /* A press comes some 100ms before its click, more on touch, where no hover prefetches: the
+     fetch starts there and the click reuses it from the page cache. */
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      const url = followedPage({ event });
+      if (url && mayFetchAhead()) fetchPage({ url }).catch(() => {});
+    },
+    { passive: true },
+  );
   document.addEventListener("docs:prefetch", (event) => prefetch({ event }));
   window.addEventListener("popstate", () => {
     void navigate({ url: new URL(location.href), restored: true });

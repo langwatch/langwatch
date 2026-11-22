@@ -15,6 +15,7 @@ import { drainHttpServer } from "./lifecycle/http-drain.ts";
 import {
   HEARTBEAT_INTERVAL_MS,
   LIVENESS_PATH,
+  PUBLIC_LISTENER_TIMEOUTS,
   READINESS_PATH,
   startHeartbeat,
   startLivenessThread,
@@ -22,7 +23,18 @@ import {
   type LivenessThread,
   type UpgradeConsole,
 } from "./lifecycle/liveness-thread.ts";
-import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./lifecycle/shutdown-deadline.ts";
+import { NOT_HANDLED_DRAINING, NOT_HANDLED_HEADER } from "./lifecycle/not-handled.ts";
+import {
+  holdRequestBody,
+  listenerRequestTimeoutMs,
+  REQUEST_BODY_TIMEOUT_MS,
+  type LongRequestBody,
+} from "./lifecycle/request-body-deadline.ts";
+import {
+  HANDLER_UNWIND_MS,
+  HTTP_CLOSE_PHASE_MS,
+  HTTP_DRAIN_GRACE_MS,
+} from "./lifecycle/shutdown-deadline.ts";
 import { ResourceScope } from "./resource-scope.ts";
 
 /** A parse failure as Node reports it on `clientError`. */
@@ -55,6 +67,10 @@ export type ServerOptions = Readonly<{
    * door is on for every process regardless of whether it configured one.
    */
   healthPort?: number;
+  /** Routes whose body may outlast the short bound; every other body is held to it (#9666). */
+  longRequestBodies?: readonly LongRequestBody[];
+  /** The short bound, Node's 300s unless a test shortens it. */
+  requestBodyTimeoutMs?: number;
 }>;
 
 /**
@@ -120,6 +136,8 @@ export class Server {
       // An embedded server's process stays up, so a timed-out drain must still release the door.
       terminating: options.ownsProcess !== false,
     });
+    server.longRequestBodies = options.longRequestBodies ?? [];
+    server.requestBodyTimeoutMs = options.requestBodyTimeoutMs ?? REQUEST_BODY_TIMEOUT_MS;
     // Hosted first, so it stops LAST: the health door outlives every drain
     // phase, and a probe during shutdown still sees the process as alive.
     server.health = server.createHealthComponent(options.healthPort);
@@ -146,6 +164,8 @@ export class Server {
   private served: ApplicationHandler | undefined;
   private applicationExpected = false;
   private healthListener: http.Server | undefined;
+  private longRequestBodies: readonly LongRequestBody[] = [];
+  private requestBodyTimeoutMs = REQUEST_BODY_TIMEOUT_MS;
   /** Set by `run`: a process with no HTTP surface answers liveness off its main loop. */
   private livenessOffLoop = false;
   private livenessThread: LivenessThread | undefined;
@@ -158,6 +178,8 @@ export class Server {
   private readonly inFlight = new Set<ServerResponse>();
   /** Event streams: they end only when closed, so the drain closes them rather than waits. */
   private readonly streams = new Set<ServerResponse>();
+  /** Application handlers not yet settled: one may still run after its response closed. */
+  private readonly handlers = new Set<Promise<unknown>>();
   private onIdle: (() => void) | undefined;
   /** 1 once every component started and answered ready; shared with the liveness thread. */
   private readonly readiness = new Int32Array(new SharedArrayBuffer(4));
@@ -252,6 +274,25 @@ export class Server {
     await this.livenessThread?.liftConsole();
   }
 
+  /** Node's own answer to a body that outlived its route's bound: a 408, then the socket closes. */
+  private cutSlowBody({
+    request,
+    response,
+    allowedMs,
+  }: {
+    request: IncomingMessage;
+    response: ServerResponse;
+    allowedMs: number;
+  }): void {
+    const path = (request.url ?? "").split("?")[0];
+    const fields = { path, timeoutMs: allowedMs, door: "main" };
+    if (this.logger.warn)
+      this.logger.warn(fields, "request body took longer than its route allows");
+    else this.logger.info(fields, "request body took longer than its route allows");
+    if (response.headersSent) request.socket.destroy();
+    else answerClientError({ code: "ERR_HTTP_REQUEST_TIMEOUT", socket: request.socket });
+  }
+
   /** Node's own answer to a request it could not parse, with one line saying what it was. */
   private refuseUnparsed(error: ClientError, socket: Duplex): void {
     if (isLoggedClientError(error.code)) {
@@ -284,9 +325,10 @@ export class Server {
         listener.on("clientError", (error: ClientError, socket: Duplex) =>
           this.refuseUnparsed(error, socket),
         );
-        // Outlives any proxy's idle reuse, as the liveness thread's public listener does.
-        listener.keepAliveTimeout = PUBLIC_KEEP_ALIVE_MS;
-        listener.headersTimeout = PUBLIC_KEEP_ALIVE_MS + 1_000;
+        // The liveness thread's public listener takes the same timeouts (#9666).
+        Object.assign(listener, PUBLIC_LISTENER_TIMEOUTS, {
+          requestTimeout: listenerRequestTimeoutMs(this.longRequestBodies),
+        });
         if (this.livenessOffLoop) {
           this.livenessThread = await this.startOffLoop(listener, port ?? 0);
         }
@@ -331,6 +373,7 @@ export class Server {
         readiness: this.readiness.buffer as SharedArrayBuffer,
         proxyPort: loopback.port,
         logger: this.logger,
+        requestTimeoutMs: listener.requestTimeout,
       });
       this.heartbeat = heartbeat;
       return thread;
@@ -346,6 +389,12 @@ export class Server {
   }
 
   private handleHealthRequest(request: IncomingMessage, response: ServerResponse): void {
+    holdRequestBody({
+      request,
+      longBodies: this.longRequestBodies,
+      timeoutMs: this.requestBodyTimeoutMs,
+      onExpired: (allowedMs) => this.cutSlowBody({ request, response, allowedMs }),
+    });
     if (request.url === LIVENESS_PATH) {
       response.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
       return;
@@ -362,10 +411,17 @@ export class Server {
     }
 
     // A draining process still answers its probes — that is why the health
-    // door stops last — but it takes no new work, and says so by name.
+    // door stops last — but it takes no new work, and says so by name. It
+    // closes the connection too: a proxy reuses a pooled one for up to a
+    // minute and would keep sending work here until it did.
     if (this.draining) {
       response
-        .writeHead(503, { "Content-Type": "text/plain", [NOT_HANDLED_HEADER]: "draining" })
+        .writeHead(503, {
+          "Content-Type": "text/plain",
+          "Retry-After": "5",
+          Connection: "close",
+          [NOT_HANDLED_HEADER]: NOT_HANDLED_DRAINING,
+        })
         .end(`${this.name} is shutting down`);
       return;
     }
@@ -387,29 +443,45 @@ export class Server {
       return;
     }
 
-    this.track(request, response);
-    void this.answer(
+    const kind = this.track(request, response);
+    const handling = this.answer(
       "application",
       () => this.whenStarted(application, request, response),
       response,
     );
+    // An event stream is closed, not waited on, so its handler does not hold the drain either.
+    if (kind === "request") this.holdUntilSettled(handling);
   }
 
-  private track(request: IncomingMessage, response: ServerResponse): void {
+  /** A closed response is not a finished handler: the drain waits on both. */
+  private holdUntilSettled(handling: Promise<unknown>): void {
+    this.handlers.add(handling);
+    void handling.finally(() => {
+      this.handlers.delete(handling);
+      this.notifyIfIdle();
+    });
+  }
+
+  private notifyIfIdle(): void {
+    if (this.inFlight.size === 0 && this.handlers.size === 0) this.onIdle?.();
+  }
+
+  private track(request: IncomingMessage, response: ServerResponse): "stream" | "request" {
     if (request.headers.accept?.includes("text/event-stream")) {
       this.streams.add(response);
       response.once("close", () => this.streams.delete(response));
-      return;
+      return "stream";
     }
     this.inFlight.add(response);
     response.once("close", () => {
       this.inFlight.delete(response);
-      if (this.inFlight.size === 0) this.onIdle?.();
+      this.notifyIfIdle();
     });
+    return "request";
   }
 
   private whenIdle(): Promise<void> {
-    if (this.inFlight.size === 0) return Promise.resolve();
+    if (this.inFlight.size === 0 && this.handlers.size === 0) return Promise.resolve();
     return new Promise((resolve) => {
       this.onIdle = resolve;
     });
@@ -431,12 +503,29 @@ export class Server {
     const drained = await Promise.race([this.whenIdle().then(() => true as const), graceExpired]);
     if (!drained) {
       this.logger.info(
-        { graceMs: HTTP_DRAIN_GRACE_MS, requests: this.inFlight.size },
+        {
+          graceMs: HTTP_DRAIN_GRACE_MS,
+          requests: this.inFlight.size,
+          handlers: this.handlers.size,
+        },
         `${this.name}: requests outlived the drain grace, cutting them before the stores close`,
       );
+      // A cut response aborts its handler's request signal; the stores stay open while it unwinds.
       for (const response of this.inFlight) response.destroy();
+      await this.whenHandlersSettle();
     }
     await sessions;
+  }
+
+  private async whenHandlersSettle(): Promise<void> {
+    if (this.handlers.size === 0) return;
+    const settled = Promise.allSettled(this.handlers).then(() => true as const);
+    const unwindExpired = delay(HANDLER_UNWIND_MS, false as const, { ref: false });
+    if (await Promise.race([settled, unwindExpired])) return;
+    const fields = { unwindMs: HANDLER_UNWIND_MS, handlers: this.handlers.size };
+    const line = `${this.name}: handlers still running after their requests were cut; the stores close under them`;
+    if (this.logger.warn) this.logger.warn(fields, line);
+    else this.logger.info(fields, line);
   }
 
   /**
@@ -720,11 +809,7 @@ function installFatalHandlers(options: {
  * handover: the outgoing process drains in-flight work before it lets go.
  */
 const BIND_HANDOVER_MS = 10_000;
-/** Above the 60s idle reuse of ALB and nginx, so Node never closes a socket a proxy reuses. */
-const PUBLIC_KEEP_ALIVE_MS = 65_000;
 const BIND_RETRY_MS = 250;
-/** Marks a 503 answered before any handler ran, so a client may resend it (browser wire). */
-const NOT_HANDLED_HEADER = "x-langwatch-not-handled";
 
 function isAddressInUse(error: unknown): boolean {
   return (error as { code?: unknown } | null)?.code === "EADDRINUSE";

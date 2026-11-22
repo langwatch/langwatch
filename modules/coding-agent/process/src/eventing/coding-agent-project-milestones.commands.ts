@@ -12,8 +12,9 @@ import {
 } from "./coding-agent-project-milestones.events.ts";
 
 /**
- * Records a stored session; one event per project, session and instant, so a busy
- * project's facts never queue behind one another in a single group.
+ * Records a stored session; one event per project, session, instant, terminal type and repo, so a
+ * busy project's facts never queue behind one another in a single group and a session that names
+ * its repo at an instant already recorded is not dropped as a redelivery.
  */
 export class RecordCodingAgentSessionStoredCommand implements CommandHandler<
   Command<RecordCodingAgentSessionStoredCommandData>,
@@ -38,7 +39,7 @@ export class RecordCodingAgentSessionStoredCommand implements CommandHandler<
         version: CODING_AGENT_PROJECT_MILESTONES_EVENT_VERSION,
         data,
         occurredAt: data.occurredAt,
-        idempotencyKey: `${data.projectId}:${data.sessionId}:session_stored:${data.occurredAt}`,
+        idempotencyKey: `${data.projectId}:${data.sessionId}:session_stored:${data.occurredAt}:${data.terminalType ?? ""}:${data.repositoryKey ?? ""}`,
       }),
     ];
   }

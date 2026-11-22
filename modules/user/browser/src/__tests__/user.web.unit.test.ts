@@ -28,35 +28,35 @@ describe("given a browser that installs user", () => {
 
   describe("when a screen the declaration names is asked for", () => {
     it("answers with the personal overview component", async () => {
-      const screen = userWeb.installation.screens["pages/me/index"];
+      const screen = userWeb.installation.screens["pages/coding-agents/index"];
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
     }, 30_000);
 
     it("answers with the personal configure component", async () => {
-      const screen = userWeb.installation.screens["pages/me/configure"];
+      const screen = userWeb.installation.screens["pages/coding-agents/configure"];
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
     }, 30_000);
 
     it("answers with the personal pull requests component", async () => {
-      const screen = userWeb.installation.screens["pages/me/pull-requests"];
+      const screen = userWeb.installation.screens["pages/coding-agents/pull-requests"];
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
     }, 30_000);
 
     it("answers with the personal sessions component", async () => {
-      const screen = userWeb.installation.screens["pages/me/sessions"];
+      const screen = userWeb.installation.screens["pages/coding-agents/sessions"];
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
     }, 30_000);
 
     it("answers with the personal budget request component", async () => {
-      const screen = userWeb.installation.screens["pages/me/budget/request"];
+      const screen = userWeb.installation.screens["pages/coding-agents/budget/request"];
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");

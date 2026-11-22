@@ -7,7 +7,7 @@
 import { lazyRoute, type LazyRouteModule } from "@langwatch/browser-host/navigation";
 import type { RouteObject } from "react-router";
 
-import { withUiPageGuard } from "../page/ui-page-guard.tsx";
+import { withUiPageGuard, type UiPageGuardFallbacks } from "../page/ui-page-guard.tsx";
 import type { UiPageLoader, UiPageLoaderRegistry } from "../page/ui-page-loaders.ts";
 import { UI_PAGE_FALLBACKS } from "../page/ui-page.tsx";
 import type { UiWebRouteParent } from "../ui-web-installation.ts";
@@ -70,11 +70,23 @@ function screenLoader({
     if (screen.requires === void 0 && screen.flags === void 0) return loaded;
     const guard = withUiPageGuard({
       ...(screen.requires === void 0 ? {} : { permission: screen.requires }),
+      ...(screen.requiresAt === void 0 ? {} : { permissionAt: screen.requiresAt }),
       ...(screen.flags === void 0 ? {} : { flags: screen.flags }),
-      fallbacks: UI_PAGE_FALLBACKS,
+      fallbacks: { ...UI_PAGE_FALLBACKS, forbidden: forbiddenOf(loaded) },
     });
     return { default: guard(loaded.default) };
   };
+}
+
+/**
+ * A screen chunk exporting `Forbidden` answers a missing grant itself, such as with an
+ * Enterprise lock.
+ */
+function forbiddenOf(loaded: LazyRouteModule): UiPageGuardFallbacks["forbidden"] {
+  const own = (loaded as { Forbidden?: unknown }).Forbidden;
+  return typeof own === "function"
+    ? (own as UiPageGuardFallbacks["forbidden"])
+    : UI_PAGE_FALLBACKS.forbidden;
 }
 
 function isLazyRouteModule(value: unknown): value is LazyRouteModule {

@@ -29,7 +29,10 @@ import type {
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
-import { assertNoUnsupportedTableModifiers } from "../rules/langwatch-ql-query-scope.rules.ts";
+import {
+  assertNoUnsupportedTableModifiers,
+  readableMemberWindows,
+} from "../rules/langwatch-ql-query-scope.rules.ts";
 import { assertNoReservedNameAssigned } from "../rules/langwatch-ql-reserved-names.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { runNotes } from "../rules/langwatch-ql-run-notes.rules.ts";
@@ -49,6 +52,8 @@ import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.
 import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLExecutionService } from "./langwatch-ql-execution.service.ts";
 import { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
+import type { LangWatchQLPlacementGateService } from "./langwatch-ql-placement-gate.service.ts";
+import type { LangWatchQLRunTelemetryService } from "./langwatch-ql-run-telemetry.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
 import { LangWatchQLTimeWindowService } from "./langwatch-ql-time-window.service.ts";
 import { LangWatchQLValidationErrorService } from "./langwatch-ql-validation-errors.service.ts";
@@ -71,6 +76,8 @@ export interface LangWatchQLServiceDependencies {
    * with weaker guarantees.
    */
   readonly executor: LangWatchQLExecutorRepository | null;
+  /** Every run passes this before the executor (ADR-200): placement, then provisioning. */
+  readonly placement: Pick<LangWatchQLPlacementGateService, "admit">;
   /** Database the LangWatchQL views live in, and what unqualified names resolve to. */
   readonly database: string;
   readonly views?: readonly LangWatchQLViewDefinition[];
@@ -91,6 +98,8 @@ export interface LangWatchQLServiceDependencies {
   readonly judging?: Pick<InstantEvalApi, "judgeQuery" | "getJudgeLimits">;
   /** Milliseconds on a monotonic clock, for the elapsed time hydration and judging add. */
   readonly stopwatch?: () => number;
+  /** Counts each answered run: the instance the app's doors count refused runs on. */
+  readonly runTelemetry: Pick<LangWatchQLRunTelemetryService, "recordAnswered" | "fieldsFor">;
 }
 
 export class LangWatchQLService {
@@ -117,6 +126,7 @@ export class LangWatchQLService {
         hydration: deps.hydration,
         judging: deps.judging,
       }),
+      runTelemetry: deps.runTelemetry,
     });
   }
 
@@ -276,6 +286,29 @@ export class LangWatchQLService {
     return validation;
   }
 
+  /**
+   * The executor, once placement admits the run. Fails closed, per request rather than at boot, so
+   * a deployment with no LangWatchQL identity still answers the schema endpoint.
+   */
+  private async admit({
+    projectIds,
+    run,
+  }: {
+    projectIds: readonly string[];
+    run: "query" | "pass";
+  }): Promise<LangWatchQLExecutorRepository> {
+    const { executor } = this.deps;
+    if (!executor) {
+      logger.error(
+        { projectIds },
+        `LangWatchQL ${run} refused: no restricted identity is provisioned`,
+      );
+      throw new LangWatchQLUnavailableError();
+    }
+    await this.deps.placement.admit({ projectIds });
+    return executor;
+  }
+
   /** The result with what the run was bound to, and the notes on what limited or ignored it. */
   private withRunNotes({
     result,
@@ -351,15 +384,7 @@ export class LangWatchQLService {
     // A pass is not scoped, so the FINAL/SAMPLE refusal runs here too.
     assertNoUnsupportedTableModifiers({ sql, views: this.views, database: this.deps.database });
 
-    const { executor } = this.deps;
-    if (!executor) {
-      logger.error(
-        { projectIds: [project.id] },
-        "LangWatchQL pass refused: no restricted identity is provisioned",
-      );
-
-      throw new LangWatchQLUnavailableError();
-    }
+    const executor = await this.admit({ projectIds: [project.id], run: "pass" });
 
     const composed = langWatchQLPassSql({ sql, pass: wrapper });
     const executionParameters = { ...validation.boundParameters, ...composed.parameters };
@@ -367,6 +392,7 @@ export class LangWatchQLService {
       sql: composed.sql,
       ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
       tenantCapability: lwqlCapability.tenantCapability({ secret: project.lwqlKey }),
+      projectIds: [project.id],
     });
 
     return {
@@ -389,13 +415,17 @@ export class LangWatchQLService {
     granularitySeconds,
     onBudgetOverflow,
     sources,
-    memberWindows,
+    memberWindows: requestedWindows,
     isInstantEvalsEnabled,
     signal,
+    telemetry,
   }: LangWatchQLProjectSetExecuteInput &
     LangWatchQLEvalGate &
     LangWatchQLMemberScope): Promise<LangWatchQLQueryResult> {
     const projectIds = projects.map((project) => project.id);
+    // Both the run and its completeness read take their windows from here, never the request's.
+    const memberWindows =
+      requestedWindows && readableMemberWindows({ projects, memberWindows: requestedWindows });
     const boundSources = resolveRunSources(sources);
     const validation = this.validate({
       projectId: projectIds.join(",") || "(none)",
@@ -415,19 +445,7 @@ export class LangWatchQLService {
       awaitingTimeWindow: validation.awaitingTimeWindow,
     });
 
-    // Fail closed. The check is here rather than in the constructor so that a
-    // deployment with no LangWatchQL identity still answers the schema endpoint,
-    // and so that the refusal is a per-request handled error rather than a
-    // boot-time crash of an app that mostly does other things.
-    const { executor } = this.deps;
-    if (!executor) {
-      logger.error(
-        { projectIds },
-        "LangWatchQL query refused: no restricted identity is provisioned",
-      );
-
-      throw new LangWatchQLUnavailableError();
-    }
+    const executor = await this.admit({ projectIds, run: "query" });
 
     const tenantCapability = lwqlCapability.tenantCapabilitySet({
       secrets: projects.map((project) => project.lwqlKey),
@@ -446,11 +464,13 @@ export class LangWatchQLService {
       ...(memberWindows ? { memberWindows } : {}),
       ...(followedWindow ? { timeWindow: followedWindow } : {}),
       ...(signal ? { signal } : {}),
+      telemetry,
     });
     // After the main query, never beside it: a refused or failed query costs no second read.
     const completeness = await lwqlCompleteness.assess({
       executor,
       tenantCapability,
+      projectIds,
       validation,
       database: this.deps.database,
       views: this.views,

@@ -14,6 +14,7 @@ import {
   clearConfig,
   isLoggedIn,
   isCanonicalVkSecret,
+  configWriteProblem,
 } from "../config";
 
 const tmpFile = (): string => {
@@ -315,5 +316,45 @@ describe("governance config persistence", () => {
     expect(fs.existsSync(p)).toBe(false);
     // Second call must not throw
     expect(() => clearConfig()).not.toThrow();
+  });
+});
+
+describe("configWriteProblem", () => {
+  let prev: string | undefined;
+  let root: string;
+
+  beforeEach(() => {
+    prev = process.env.LANGWATCH_CLI_CONFIG;
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "lw-cfg-probe-"));
+  });
+
+  afterEach(() => {
+    if (prev === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+    else process.env.LANGWATCH_CLI_CONFIG = prev;
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  describe("when the config folder is missing", () => {
+    /** @scenario "The check writes and removes a probe beside the config" */
+    it.skipIf(process.platform === "win32")(
+      "creates it owner-only and leaves no probe behind",
+      () => {
+        const dir = path.join(root, "missing");
+        process.env.LANGWATCH_CLI_CONFIG = path.join(dir, "config.json");
+
+        expect(configWriteProblem()).toBeUndefined();
+        expect(fs.statSync(dir).mode & 0o777).toBe(0o700);
+        expect(fs.readdirSync(dir)).toEqual([]);
+      },
+    );
+  });
+
+  describe("when a file sits where the config folder belongs", () => {
+    it("names the reason the config cannot be saved", () => {
+      fs.writeFileSync(path.join(root, "blocked"), "");
+      process.env.LANGWATCH_CLI_CONFIG = path.join(root, "blocked", "config.json");
+
+      expect(configWriteProblem()).toMatch(/^E(EXIST|NOTDIR): /);
+    });
   });
 });

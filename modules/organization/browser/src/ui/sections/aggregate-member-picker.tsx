@@ -7,6 +7,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ProjectAvatar } from "@langwatch/design-system/project-avatar";
 import { Select } from "@langwatch/design-system/select";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { AggregateRule } from "@langwatch/project-contract";
@@ -15,7 +16,6 @@ import { useMemo } from "react";
 
 import { HandledErrorAlert } from "../../behavior/handled-error-form.tsx";
 import { api } from "../../behavior/organization-api.ts";
-import { ProjectAvatar } from "../elements/project-avatar.tsx";
 
 type Candidate = {
   id: string;

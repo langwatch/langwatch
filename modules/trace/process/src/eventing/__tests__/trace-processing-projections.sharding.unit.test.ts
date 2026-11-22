@@ -44,6 +44,7 @@ function pipeline({ spanCommandShardCount }: { spanCommandShardCount: number }) 
     summaryStore: createApiFixture<Options["summaryStore"]>(),
     derivedStore: createApiFixture<Options["derivedStore"]>(),
     rollupStore: createApiFixture<Options["rollupStore"]>(),
+    spanAnalyticsStore: createApiFixture<Options["spanAnalyticsStore"]>(),
     canonicalisation,
     ioExtraction: createApiFixture<Options["ioExtraction"]>(),
     mediaReferences: createApiFixture<Options["mediaReferences"]>(),

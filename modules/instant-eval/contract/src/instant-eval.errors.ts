@@ -36,28 +36,31 @@ export class InstantEvalQueryBudgetExceededError extends HandledError {
   }
 }
 
+/** What each refusal of the switch says, by who refused it. */
+const NOT_OFFERED_MESSAGES = {
+  enterprise: "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
+  self_hosted:
+    "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has judging turned off, never from this switch. Contact us to add them to your license.",
+  hosted_off:
+    "LangWatch's hosted model is turned off for this organization. Run Instant Evals on your own decision model: pick one in the Instant Evals column of Default models.",
+} as const;
+
 /**
- * The organization's own switch was thrown where the popover does not offer it.
- * `meta.deployment` says which refused, since each reads differently: an enterprise
- * plan is switched on by us; a self-hosted install by its license, or by its operator.
+ * The organization's own switch was thrown where the popover does not offer it. `meta.deployment`
+ * says which refused: an enterprise plan is switched on by us; a self-hosted install by its
+ * license or operator; `hosted_off` is an organization LangWatch keeps on its own models.
  * @see modules/instant-eval/specs/instant-eval-opt-in.feature
  */
 export class InstantEvalOptInNotOfferedError extends HandledError {
   declare readonly code: "instant_eval_opt_in_not_offered";
 
-  constructor({ deployment }: { readonly deployment: "enterprise" | "self_hosted" }) {
-    super(
-      "instant_eval_opt_in_not_offered",
-      deployment === "self_hosted"
-        ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has judging turned off, never from this switch. Contact us to add them to your license."
-        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
-      {
-        httpStatus: 403,
-        fault: "customer",
-        meta: { deployment },
-        ...remediation("instant_eval_opt_in_not_offered"),
-      },
-    );
+  constructor({ deployment }: { readonly deployment: keyof typeof NOT_OFFERED_MESSAGES }) {
+    super("instant_eval_opt_in_not_offered", NOT_OFFERED_MESSAGES[deployment], {
+      httpStatus: 403,
+      fault: "customer",
+      meta: { deployment },
+      ...remediation("instant_eval_opt_in_not_offered"),
+    });
     this.name = "InstantEvalOptInNotOfferedError";
   }
 }
@@ -118,6 +121,28 @@ export class InstantEvalClassifierNotConfiguredError extends HandledError {
       },
     );
     this.name = "InstantEvalClassifierNotConfiguredError";
+  }
+}
+
+/**
+ * Every row of a run's page was refused for the project's own decision model's key: refused by
+ * the provider, no key, or the provider row off. Failed rather than recorded as skips, which a
+ * caller would read as nothing matching. Names no provider and no key.
+ */
+export class InstantEvalDecisionModelKeyInvalidError extends HandledError {
+  declare readonly code: "instant_eval_decision_model_key_invalid";
+
+  constructor() {
+    super(
+      "instant_eval_decision_model_key_invalid",
+      "The key for this project's Instant Evals model could not be used. Check it in Settings > Model Providers.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("instant_eval_decision_model_key_invalid"),
+      },
+    );
+    this.name = "InstantEvalDecisionModelKeyInvalidError";
   }
 }
 
@@ -272,5 +297,48 @@ export class InstantEvalEstimateUnavailableError extends HandledError {
       { httpStatus: 503, fault: "platform", ...options },
     );
     this.name = "InstantEvalEstimateUnavailableError";
+  }
+}
+
+/** Whose budget a gateway refusal names, by the gateway's own lower-case scope. */
+const GATEWAY_BUDGET_OWNERS: Readonly<Record<string, string>> = {
+  organization: "This organization's",
+  team: "This team's",
+  project: "This project's",
+};
+
+/**
+ * A gateway budget set to block has been reached. Refused before anything is judged, and
+ * between pages of a run under way, so the budget is a ceiling as it is for gateway traffic.
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
+ */
+export class InstantEvalGatewayBudgetExceededError extends HandledError {
+  declare readonly code: "instant_eval_gateway_budget_exceeded";
+
+  constructor({
+    budgetId,
+    scope,
+    window,
+    limitUsd,
+    spentUsd,
+  }: {
+    readonly budgetId: string;
+    readonly scope: string;
+    readonly window: string;
+    readonly limitUsd: number;
+    readonly spentUsd: number;
+  }) {
+    const owner = Object.hasOwn(GATEWAY_BUDGET_OWNERS, scope) ? GATEWAY_BUDGET_OWNERS[scope] : "A";
+    super(
+      "instant_eval_gateway_budget_exceeded",
+      `${owner} gateway budget is used up. Raise or remove it under AI Gateway, Budgets to keep judging.`,
+      {
+        httpStatus: 402,
+        fault: "customer",
+        meta: { budgetId, scope, window, limitUsd, spentUsd },
+        ...remediation("instant_eval_gateway_budget_exceeded"),
+      },
+    );
+    this.name = "InstantEvalGatewayBudgetExceededError";
   }
 }

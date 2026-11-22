@@ -6,6 +6,7 @@
 
 import type { AgentType } from "@langwatch/agent-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { AuthzOwnStanding, AuthzOwnStandingInput } from "@langwatch/authz-contract";
 import type { identityTrpc } from "@langwatch/identity-contract";
 import type { OpsApiGetBadgeCountsOutput } from "@langwatch/ops-contract";
 
@@ -97,6 +98,10 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
             type?: string;
             free: boolean;
             maxMessagesPerMonth: number;
+            /** A failed payment's banner outranks the seat banner while this is true. */
+            paymentFailed?: boolean;
+            /** Set while the organization is over its plan and new traces are withheld. */
+            overPlan?: { sinceMs: number; members: number; maxMembers: number } | null;
           };
           currentMonthMessagesCount: number | null;
           currentMonthCost: number;
@@ -121,7 +126,7 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
     /**
      * Which library entries the reader unlocked in their personal workspace. Default-empty
      * rather than default-on: an existing reader sees Traces alone until the bundle is turned
-     * on in `/me/configure`.
+     * on in `/coding-agents/configure`.
      */
     get: {
       query: {
@@ -147,6 +152,13 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
         input: { flag: string; organizationIds: string[] };
         output: { enabledByOrganizationId?: Record<string, boolean> };
       };
+    };
+  };
+
+  authz: {
+    /** The reader's own permissions in a named project, as the server resolves them. */
+    effectivePermissions: {
+      query: { input: AuthzOwnStandingInput; output: AuthzOwnStanding };
     };
   };
 

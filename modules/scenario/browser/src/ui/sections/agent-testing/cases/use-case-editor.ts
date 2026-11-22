@@ -17,6 +17,7 @@ import {
   type ScenarioFieldValues,
   type ScenarioParameterDefinition,
   type SuiteFieldDefinition,
+  type RedTeamConfig,
 } from "@langwatch/scenario-contract";
 import { type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -27,6 +28,13 @@ import {
   formatParameterLine,
   toParameterDefinitions,
 } from "../../../../model/agent-testing/run/parameter-line.ts";
+import {
+  EMPTY_JUDGE_TRACE_WAIT_INPUT,
+  type JudgeTraceWaitInput,
+  judgeTraceWaitInputOf,
+  judgeTraceWaitMsOf,
+  judgeTraceWaitProblemOf,
+} from "../../../../model/judge-trace-wait.ts";
 import { type CaseCustomizeBlocks, useCaseCustomizeBlocks } from "./use-case-customize-blocks.ts";
 
 /** What a person types into the editor. */
@@ -46,6 +54,8 @@ export type CaseDraft = {
   testSuiteId: string | null;
   simulatorModel: string | null;
   judgeModel: string | null;
+  /** How long the judge waits for the agent's trace, in seconds as typed. */
+  traceWait: JudgeTraceWaitInput;
   maxTurns: number | null;
   minTurns: number | null;
   /** The simulated caller's voice for a voice target. Null follows the
@@ -63,6 +73,7 @@ const EMPTY_DRAFT: CaseDraft = {
   testSuiteId: null,
   simulatorModel: null,
   judgeModel: null,
+  traceWait: EMPTY_JUDGE_TRACE_WAIT_INPUT,
   maxTurns: null,
   minTurns: null,
   callerVoice: null,
@@ -95,6 +106,7 @@ function draftFromScenario(scenario: Scenario): CaseDraft {
     testSuiteId: scenario.testSuiteId,
     simulatorModel: scenario.simulatorModel,
     judgeModel: scenario.judgeModel,
+    traceWait: judgeTraceWaitInputOf(scenario),
     maxTurns: scenario.maxTurns,
     minTurns: scenario.minTurns,
     callerVoice: callerVoiceFromScenario(scenario.callerVoice),
@@ -170,6 +182,8 @@ export type CaseEditorState = {
   save: (options: { shouldRunAfterSave: boolean }) => void;
   /** The optional blocks the chips of the dialog open. */
   customize: CaseCustomizeBlocks;
+  /** The attack a red team scenario runs, or null for a standard one. */
+  redTeam: RedTeamConfig | null;
 };
 
 /**
@@ -328,6 +342,7 @@ function savePayload({
     testSuiteId: draft.testSuiteId,
     simulatorModel: draft.simulatorModel,
     judgeModel: draft.judgeModel,
+    ...judgeTraceWaitMsOf(draft.traceWait),
     maxTurns: draft.maxTurns,
     minTurns: draft.minTurns,
     // The column is not nullable, so the removed block sends the default
@@ -342,7 +357,7 @@ function useCaseProblem(draft: CaseDraft): string | null {
   return useMemo(() => {
     if (!draft.title.trim()) return "A scenario needs a title.";
     if (criteriaOf(draft).length === 0) return "A scenario needs at least one criterion.";
-    return null;
+    return judgeTraceWaitProblemOf(draft.traceWait);
   }, [draft]);
 }
 
@@ -581,5 +596,6 @@ export function useCaseEditor({
     problem,
     save,
     customize,
+    redTeam: scenario?.kind === "red_team" ? (scenario.redTeam ?? null) : null,
   };
 }

@@ -1,7 +1,9 @@
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { fromTokenFile } from "@aws-sdk/credential-providers";
+import { GatewayApi } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
+import type { BoundApis } from "@langwatch/process";
 import { nlpInternalSecret, type ScopedSecrets } from "@langwatch/secrets";
 import {
   nlpLambdaFleetFromSecret,
@@ -52,13 +54,17 @@ function fleetClientCredentials(credentials: NlpLambdaFleetCredentials) {
  */
 export class HttpWorkflowChannels {
   static readonly requires = [] as const;
+  /** Bound to gateway, not a peer, so gateway may keep depending on workflow (record §5). */
+  static readonly binds = { spend: GatewayApi } as const;
 
   static async create({
     config,
     secrets,
+    bound,
   }: {
     config: WorkflowServerConfig;
     secrets: ScopedSecrets;
+    bound: BoundApis<typeof HttpWorkflowChannels.binds>;
   }): Promise<WorkflowChannels> {
     const named = await secrets.into(nlpLambdaFleetSecret, (raw) =>
       nlpLambdaFleetFromSecret.safeParse(raw),
@@ -69,6 +75,7 @@ export class HttpWorkflowChannels {
       logger.error({ reason }, "the named NLP Lambda fleet is unusable; studio runs will refuse");
 
       return {
+        spend: bound.spend,
         engine: {
           kind: "single",
           stream: UnconfiguredWorkflowStudioStreamAdapter.create({ reason }),
@@ -114,6 +121,7 @@ export class HttpWorkflowChannels {
       const logs = new CloudWatchLogsClient({ region: lambdaConfig.region, credentials });
 
       return {
+        spend: bound.spend,
         engine: {
           kind: "lambda",
           resolver: AwsNlpLambdaArnResolverChannel.create({
@@ -144,6 +152,7 @@ export class HttpWorkflowChannels {
     const serviceUrl = config.nlpServiceUrl;
     if (!serviceUrl) {
       return {
+        spend: bound.spend,
         engine: {
           kind: "single",
           stream: UnconfiguredWorkflowStudioStreamAdapter.create(),
@@ -154,6 +163,7 @@ export class HttpWorkflowChannels {
     }
 
     return {
+      spend: bound.spend,
       engine: {
         kind: "single",
         stream: HttpWorkflowStudioStreamAdapter.create({

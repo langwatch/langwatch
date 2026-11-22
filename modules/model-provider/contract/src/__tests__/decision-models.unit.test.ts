@@ -7,7 +7,9 @@ import { describe, expect, it } from "vitest";
 import {
   azureResourceOf,
   DECISION_MODELS,
+  decisionModelPickerTitle,
   isOwnDecisionModelId,
+  LANGWATCH_DECISION_MODEL_ID,
 } from "../catalog/decision-models.ts";
 import { findModelProviderDefinition } from "../model-provider-registry.ts";
 
@@ -37,6 +39,39 @@ describe("DECISION_MODELS", () => {
       for (const field of rowFields) expect(shape?.shape?.[field]).toBeDefined();
     },
   );
+
+  /** @scenario "A decision model's full name opens with its provider" */
+  it.each(OWN_ENTRIES.map((entry) => [entry.id, entry] as const))(
+    "%s's full name opens with its provider's name",
+    (_, entry) => {
+      const providerName = findModelProviderDefinition(entry.provider)?.name ?? "";
+      const firstWord = providerName.split(" ")[0] ?? "";
+      expect(firstWord).not.toBe("");
+      expect(entry.label.startsWith(firstWord)).toBe(true);
+    },
+  );
+
+  it("names LangWatch's hosted model for what it is optimized for", () => {
+    const hosted = DECISION_MODELS.find((entry) => entry.id === LANGWATCH_DECISION_MODEL_ID);
+    expect(hosted).toMatchObject({ label: "Evals Preview", description: "Optimized for evals" });
+  });
+
+  it("never gives two models the same full name, while the picker title (pickerLabel) may repeat", () => {
+    const labels = DECISION_MODELS.map((entry) => entry.label);
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels).toEqual(expect.arrayContaining(["OpenAI Decisions", "Azure OpenAI Decisions"]));
+  });
+
+  /** @scenario "A decision model's full name opens with its provider" */
+  it("titles OpenAI's and Azure OpenAI's Decisions models Decisions API in a picker", () => {
+    const titles = ["openai/decisions:gpt-6-luna", "azure/decisions:gpt-6-luna"].map((id) => {
+      const entry = DECISION_MODELS.find((candidate) => candidate.id === id);
+      return entry ? decisionModelPickerTitle(entry) : id;
+    });
+    expect(titles).toEqual(["Decisions API", "Decisions API"]);
+    const inception = DECISION_MODELS.find((entry) => entry.provider === "inception");
+    expect(inception && decisionModelPickerTitle(inception)).toBe("Inception Mercury Decide");
+  });
 
   it("never repeats an id", () => {
     const ids = DECISION_MODELS.map((entry) => entry.id);
