@@ -740,14 +740,21 @@ func TestApp_Turn_AgentErrorWithRetryableCauseIsRetryable(t *testing.T) {
 	relay := &fakeRelay{}
 	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
 
+	var errorFrames []herr.ErrorBody
 	for _, f := range relay.stream.emitted {
 		var e struct {
 			Type string         `json:"type"`
 			Herr herr.ErrorBody `json:"herr"`
 		}
 		_ = json.Unmarshal([]byte(f.JSON()), &e)
-		if e.Type == "error" && !e.Herr.Retryable {
-			t.Errorf("a retryable captured cause must make the agent_error herr retryable")
+		if e.Type == "error" {
+			errorFrames = append(errorFrames, e.Herr)
 		}
+	}
+	if len(errorFrames) != 1 || errorFrames[0].Type != "agent_error" {
+		t.Fatalf("want exactly one agent_error frame, got %+v", errorFrames)
+	}
+	if !errorFrames[0].Retryable {
+		t.Errorf("a retryable captured cause must make the agent_error herr retryable")
 	}
 }
