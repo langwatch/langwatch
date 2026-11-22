@@ -519,9 +519,7 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
         projectPermissions: { "proj-shop": [] },
       });
 
-      await expect(
-        screen.findByRole("region", { name: "Dashboards · Shop" }, { timeout: 300 }),
-      ).rejects.toThrow("Unable to find");
+      expect(screen.queryByRole("region", { name: "Dashboards · Shop" })).not.toBeInTheDocument();
       expect(inputsTo(calls, "boards.listStarred")).toEqual([]);
     });
   });
