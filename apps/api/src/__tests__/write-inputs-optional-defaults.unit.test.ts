@@ -37,7 +37,7 @@ function optionalDefaults(schema: unknown, path: string, seen: Visited, under = 
   }
   if (def.type === "optional") return walk(def.innerType, path, true);
   if (PASS_THROUGH.has(def.type ?? "")) return walk(def.innerType, path, under);
-  if (def.type === "pipe") return walk(def.in, path, under);
+  if (def.type === "pipe") return [...walk(def.in, path, under), ...walk(def.out, path, under)];
   if (def.type === "array") return walk(def.element, `${path}[]`);
   if (def.type === "record") return walk(def.valueType, `${path}{}`);
   if (def.type === "intersection") return [...walk(def.left, path), ...walk(def.right, path)];
