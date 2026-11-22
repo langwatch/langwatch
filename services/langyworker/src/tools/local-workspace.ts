@@ -926,17 +926,17 @@ function runBashOrDelegate({
 export function createLocalWorkspaceExtension({
   turnContext,
   sandboxCwd,
-  folder = { connected: false },
 }: {
   turnContext: TurnContext;
   /** Where the sandbox shell runs when no folder is connected. */
   sandboxCwd: string;
-  /** The folder's state as of the start of the turn in flight, shared with other extensions. */
-  folder?: { connected: boolean };
 }): InlineExtension {
   return {
     name: "langy-local-workspace",
     factory: (pi: ExtensionAPI) => {
+      /** The folder's state as of the start of the turn in flight. */
+      const folder = { connected: false };
+
       // The folder's state is read at the start of every turn, and the turn's
       // tool set follows it. A turn that starts because the folder connected
       // is a new prompt, so it already runs without the sandbox file tools;

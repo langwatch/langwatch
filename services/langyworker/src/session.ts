@@ -23,7 +23,6 @@ import { guidedSkillRefusal } from "./guided-kickoff.js";
 import { closingLineRefusal, midSetupLineRefusal } from "./guided-turn-end.js";
 import { MODEL_RETRY_MAX_ATTEMPTS, installModelRetry } from "./model-retry.js";
 import { writeModelsJson } from "./models.js";
-import { createEvalOverlapGateExtension } from "./tools/eval-overlap-gate.js";
 import {
   CODE_ACCESS_TOOL_NAME,
   LOCAL_TOOL_NAMES,
@@ -149,8 +148,6 @@ export async function createLangySession({
     retry: { enabled: true, maxRetries: MODEL_RETRY_MAX_ATTEMPTS },
   });
 
-  // Whether the developer's folder is connected, read at each turn's start.
-  const folder = { connected: false };
   const resourceLoader = new DefaultResourceLoader({
     cwd: home,
     agentDir,
@@ -177,9 +174,8 @@ export async function createLangySession({
       createNotifyExtension({ ledger: notifyLedgerFromEntries(sessionManager.getEntries()) }),
       // Registers `bash` in place of pi's built-in: the extension's tool wins
       // the name in the session's registry.
-      createLocalWorkspaceExtension({ turnContext, sandboxCwd: home, folder }),
+      createLocalWorkspaceExtension({ turnContext, sandboxCwd: home }),
       createSandboxPathsExtension({ home }),
-      createEvalOverlapGateExtension({ home, folder }),
     ],
   });
   await resourceLoader.reload();
