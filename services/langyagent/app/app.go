@@ -581,12 +581,19 @@ func (a *App) atCapacity(ctx context.Context) {
 
 // agentErrorHerr is the wire herr for a turn the agent reported failed. With
 // no captured cause nothing says the provider refused the call, and a resend
-// often works, so the error is retryable; with a cause, the cause decides.
+// often works, so the error is retryable; with causes, any retryable one decides.
 func agentErrorHerr(ctx context.Context, reasons []error) herr.E {
 	he := herr.NewLight(ctx, domain.ErrAgentError,
 		herr.M{"message": "the agent hit an error before finishing"}, reasons...)
-	if len(reasons) == 0 {
-		he = he.WithRetryable(true)
+	return he.WithRetryable(len(reasons) == 0 || anyRetryable(reasons))
+}
+
+func anyRetryable(reasons []error) bool {
+	for _, reason := range reasons {
+		var he herr.E
+		if errors.As(reason, &he) && he.Retryable {
+			return true
+		}
 	}
-	return he
+	return false
 }

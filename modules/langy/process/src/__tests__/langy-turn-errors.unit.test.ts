@@ -161,6 +161,21 @@ describe("LangyTurnErrors.fromFrame", () => {
         });
       });
 
+      it("is retryable when a captured cause is retryable", () => {
+        const cause = handledErrorFromHerr({
+          type: "agent_error",
+          message: "the agent hit an error before finishing",
+          reasons: [
+            { type: "upstream_rate_limited", message: "rate limited", meta: {}, retryable: true },
+          ],
+        });
+
+        const serialized = JSON.parse(
+          LangyTurnErrors.serialize(LangyTurnErrors.fromErrorFrame({ code: "agent_error", cause })),
+        ) as { retryable: boolean };
+        expect(serialized.retryable).toBe(true);
+      });
+
       it("keeps a captured cause non-retryable unless the frame says otherwise", () => {
         const cause = handledErrorFromHerr({
           type: "agent_error",

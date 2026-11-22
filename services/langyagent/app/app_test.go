@@ -728,3 +728,26 @@ func TestApp_Turn_ResumeFromHandoffEmitsPickingUpStatus(t *testing.T) {
 		t.Errorf("resume readiness status = %q, want the picking-up line", got)
 	}
 }
+
+func TestApp_Turn_AgentErrorWithRetryableCauseIsRetryable(t *testing.T) {
+	worker := &fakeWorker{
+		claimOK:   true,
+		streamErr: herr.NewLight(context.Background(), domain.ErrAgentError, nil, errors.New("raw prose")),
+		llmErr: herr.NewLight(context.Background(), "upstream_rate_limited",
+			herr.M{"message": "rate limited"}).WithRetryable(true),
+		llmErrOK: true,
+	}
+	relay := &fakeRelay{}
+	runTurn(t, newTestApp(&fakePool{worker: worker}, relay), req())
+
+	for _, f := range relay.stream.emitted {
+		var e struct {
+			Type string         `json:"type"`
+			Herr herr.ErrorBody `json:"herr"`
+		}
+		_ = json.Unmarshal([]byte(f.JSON()), &e)
+		if e.Type == "error" && !e.Herr.Retryable {
+			t.Errorf("a retryable captured cause must make the agent_error herr retryable")
+		}
+	}
+}

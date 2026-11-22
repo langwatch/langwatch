@@ -280,7 +280,10 @@ export class LangyTurnErrors {
       }
 
       if (cause.code === "agent_error") {
-        return new LangyAgentErroredError({ reasons, retryable: cause.retryable });
+        // Any retryable captured cause makes the failure worth another try.
+        const retryable =
+          cause.retryable || reasons.some((r) => r instanceof HandledError && r.retryable);
+        return new LangyAgentErroredError({ reasons, retryable });
       }
     }
 
