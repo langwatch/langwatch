@@ -141,7 +141,7 @@ Rule: A session is named by its generated title, else by its first prompt
   @unit
   Scenario: A session with no generated title is named by the first thing the user asked
     Given a session whose agent never generated a title
-    When its first prompt event arrives
+    When its first prompt event arrives with the user's own words on its first line
     Then the session is named by the prompt's first line
     And a later prompt does not rename it
 

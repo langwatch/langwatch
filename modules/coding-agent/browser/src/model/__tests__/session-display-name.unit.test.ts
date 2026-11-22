@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { sessionDisplayName } from "../session-display-name.ts";
 
-const NOV_21 = Date.UTC(2026, 10, 21, 12);
+/** Noon on 21 November in the host zone, so the formatted day is the 21st anywhere. */
+const NOV_21 = new Date(2026, 10, 21, 12).getTime();
 
 describe("sessionDisplayName", () => {
   describe("given a session with a name a person gave or typed", () => {
