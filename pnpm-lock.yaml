@@ -225,8 +225,8 @@ catalogs:
       specifier: ^11.14.0
       version: 11.14.0
     '@hono/node-server':
-      specifier: ^2.0.6
-      version: 2.0.10
+      specifier: ^2.1.6
+      version: 2.1.11
     '@hookform/resolvers':
       specifier: ^5.4.0
       version: 5.4.0
@@ -17095,7 +17095,7 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: 'catalog:'
-        version: 2.0.10(hono@4.13.13)
+        version: 2.1.11(hono@4.13.13)
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../authorization
@@ -20811,6 +20811,12 @@ packages:
 
   '@hono/node-server@2.0.10':
     resolution: {integrity: sha512-ZcnNVhKTmyDJeg0UlnZjvM73JBsTAuhrH/J4fjwGOw59PwOW51r4J+p6CsKZWXdKSme4MFqU62CZMOsdDrU4CA==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      hono: '>=4.13.5 <5'
+
+  '@hono/node-server@2.1.11':
+    resolution: {integrity: sha512-KzKz9vl4vvr1vgLHamj+g5uonbrj5NwAdO3yzOS6cd2HjALVeOgTgeZOyAzNxejbkfOOPIcvuf/Tg8l1pEFLog==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: '>=4.13.5 <5'
@@ -32978,6 +32984,10 @@ snapshots:
   '@hexagon/base64@1.1.28': {}
 
   '@hono/node-server@2.0.10(hono@4.13.13)':
+    dependencies:
+      hono: 4.13.13
+
+  '@hono/node-server@2.1.11(hono@4.13.13)':
     dependencies:
       hono: 4.13.13
 
