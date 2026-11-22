@@ -62,6 +62,7 @@ import {
   gatePullRequestSessionTitles,
   gateSessionListCost,
   gateSessionListTitles,
+  gateSessionTitle,
 } from "../rules/coding-agent-gates.rules.ts";
 import { repositoryKeyOfWith } from "../rules/coding-agent-repository-key.rules.ts";
 import {
@@ -348,11 +349,28 @@ export class CodingAgentModule implements CodingAgentApi {
     return this.#codingAgents.findBySessionId(input);
   }
 
-  findSessionForTrace(input: {
-    projectId: string;
-    traceId: string;
-  }): Promise<CodingAgentSession | null> {
-    return this.#codingAgents.findSessionForTrace(input);
+  /** The session one trace belongs to; its name follows content visibility, as on the list. */
+  async findSessionForTraceForViewer(
+    input: { projectId: string; traceId: string; authorization: Authorization },
+    by: CodingAgentViewer,
+  ): Promise<CodingAgentSession | null> {
+    const [visibility, session] = await Promise.all([
+      this.#visibility.readVisibility({
+        userId: by.id,
+        projectId: input.projectId,
+        authorization: input.authorization,
+      }),
+      this.#codingAgents.findSessionForTrace({
+        projectId: input.projectId,
+        traceId: input.traceId,
+      }),
+    ]);
+
+    if (session === null) return null;
+    return gateSessionTitle({
+      session,
+      canReadCapturedContent: visibility.canReadCapturedContent,
+    });
   }
 
   findLastTurnOfSession(input: {

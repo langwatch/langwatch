@@ -78,6 +78,16 @@ describe("readCodeModeScriptResults", () => {
     ]);
   });
 
+  /** @scenario "A poll's result is read from the settled script event" */
+  it("keeps a script's own printed <event> markup as plain text", () => {
+    const printed =
+      '<event kind="deploy" status="done">\n<result>acme.example.com</result>\n</event>';
+
+    expect(readCodeModeScriptResults(printed)).toEqual([
+      { evalNumber: null, status: null, durationMs: null, text: printed, isError: false },
+    ]);
+  });
+
   it("reads plain text a script returned as one result", () => {
     expect(readCodeModeScriptResults("4 notes.txt")).toEqual([
       { evalNumber: null, status: null, durationMs: null, text: "4 notes.txt", isError: false },

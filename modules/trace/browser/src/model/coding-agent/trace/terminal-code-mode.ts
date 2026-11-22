@@ -72,12 +72,13 @@ export interface CodeModeScriptResult {
 const DISPATCH_RECEIPT = /^\(dispatched #\d+\)$/;
 /** Harness text around the events: the nonce notice and the tool summary. */
 const HARNESS_ELEMENTS = /<(system|tools-used-before-summary)>[\s\S]*?<\/\1>/g;
-const EVENT_ELEMENT = /<event\b([^>]*)>([\s\S]*?)<\/event>/g;
+/** Only the harness's own script event, never an `<event>` a script printed. */
+const SCRIPT_EVENT_ELEMENT = /<event\b([^>]*\bkind="repl-eval"[^>]*)>([\s\S]*?)<\/event>/g;
 const EVENT_ATTRIBUTE = /([\w-]+)="([^"]*)"/g;
 
 /**
  * The results a REPL or Poll output carries, oldest first: each settled script event's
- * `<result>` or `<error>` body, or the plain text a script returned. Null when the output is
+ * `<result>` or `<error>` body, or the whole text a script returned. Null when the output is
  * the span's status summary, a dispatch receipt, or empty: none of those is a result.
  */
 export function readCodeModeScriptResults(output: unknown): CodeModeScriptResult[] | null {
@@ -85,10 +86,10 @@ export function readCodeModeScriptResults(output: unknown): CodeModeScriptResult
   if (text === null || DISPATCH_RECEIPT.test(text.trim())) return null;
 
   const withoutHarness = text.replace(HARNESS_ELEMENTS, "");
-  const results = [...withoutHarness.matchAll(EVENT_ELEMENT)].map(([, attrs = "", body = ""]) =>
-    readScriptEvent({ attrs, body }),
-  );
-  if (results.length > 0) return results;
+  const events = [...withoutHarness.matchAll(SCRIPT_EVENT_ELEMENT)];
+  if (events.length > 0) {
+    return events.map(([, attrs = "", body = ""]) => readScriptEvent({ attrs, body }));
+  }
 
   const plain = withoutHarness.trim();
   if (plain === "") return null;

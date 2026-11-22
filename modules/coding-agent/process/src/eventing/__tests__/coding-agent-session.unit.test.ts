@@ -842,7 +842,8 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario A first prompt that opens with a markdown heading does not name the session */
     it("lets the user's own words replace a stored heading-led name", () => {
       const projection = makeProjection();
-      let state = { ...projection.init(), title: "## Your skills", titleSource: "prompt" as const };
+      let state = projection.init();
+      state = { ...state, title: "## Your skills", titleSource: "prompt" };
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({ facts: promptFacts("Draft the changelog for this week") }),

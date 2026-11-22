@@ -62,10 +62,11 @@ export interface CodingAgentUsageCount {
 
 export interface CodingAgentApi {
   findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null>;
-  findSessionForTrace(input: {
-    projectId: string;
-    traceId: string;
-  }): Promise<CodingAgentSession | null>;
+  /** The session one trace belongs to, its name blanked unless the viewer may read content. */
+  findSessionForTraceForViewer(
+    input: { projectId: string; traceId: string; authorization: Authorization },
+    by: CodingAgentViewer,
+  ): Promise<CodingAgentSession | null>;
   findLastTurnOfSession(input: {
     projectId: string;
     sessionId: string;

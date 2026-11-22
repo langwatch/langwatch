@@ -513,6 +513,7 @@ Rule: A Code Mode session reads like the real CLI, not like REPL and Poll
     Then it is the result text with the script's number, status and duration
     And the harness preamble is not part of it
     And an event carrying an error is read as a failed result
+    And an <event> element the script printed itself, without the harness's kind, stays plain text
 
   @unit
   Scenario: A status summary or a dispatch receipt is never read as a result

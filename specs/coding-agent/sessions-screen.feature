@@ -177,6 +177,13 @@ Rule: A session is named by its generated title, else by its first prompt
     Then no row carries a title
     And the rest of the row is intact
 
+  @unit
+  Scenario: A viewer who may not read captured content gets no title on a trace's session
+    Given a viewer who may not read the project's captured content
+    When the session a trace belongs to is read for its terminal view
+    Then the session carries no title
+    And the rest of the session is intact
+
   @integration
   Scenario: A session with no title is named by its agent and the day it started
     Given a Claude Code session whose agent never generated a title or received a prompt
