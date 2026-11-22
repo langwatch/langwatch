@@ -393,7 +393,7 @@ describe("searchTracesCommand()", () => {
           searched: { queryFields: string[] };
           inSpans: string;
         };
-        expect(printed.searched.queryFields).toEqual(["input", "output", "name"]);
+        expect(printed.searched.queryFields).toEqual(["input", "output", "name", "span names"]);
         expect(printed.inSpans).toContain("langwatch trace get <traceId>");
         expect(printed.inSpans).toContain('grep its spans for "54 soldiers"');
       });
@@ -405,9 +405,25 @@ describe("searchTracesCommand()", () => {
           .mocked(console.log)
           .mock.calls.map((c) => String(c[0]))
           .join("\n");
-        expect(printed).toContain("Query:   cease-fire (matched against input, output, name)");
+        expect(printed).toContain(
+          "Query:   cease-fire (matched against input, output, name, span names)",
+        );
         expect(printed).toContain("not span content");
         expect(printed).toContain("langwatch trace get <traceId>");
+      });
+    });
+
+    describe("when the query is blank", () => {
+      it("reads as no query, with no span suggestion", async () => {
+        await searchTracesCommand({ query: "", format: "json" });
+
+        const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string) as {
+          searched: { query: unknown; queryFields: unknown };
+          inSpans?: unknown;
+        };
+        expect(printed.searched.query).toBeNull();
+        expect(printed.searched.queryFields).toBeNull();
+        expect(printed.inSpans).toBeUndefined();
       });
     });
 
