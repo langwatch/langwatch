@@ -457,6 +457,9 @@ func TestApp_Turn_AgentErrorFrameCarriesTypedCauseChain(t *testing.T) {
 		if len(e.Herr.Reasons) != 1 || e.Herr.Reasons[0].Type != "no_provider_configured" {
 			t.Fatalf("frame herr reasons = %+v, want the captured gateway herr", e.Herr.Reasons)
 		}
+		if e.Herr.Retryable {
+			t.Errorf("a captured cause decides retry, want the agent_error herr not retryable")
+		}
 		if e.Herr.Reasons[0].Message != "no model provider configured" {
 			t.Errorf("gateway reason message = %q", e.Herr.Reasons[0].Message)
 		}
@@ -492,6 +495,9 @@ func TestApp_Turn_AgentErrorWithoutCapturedCauseStillEmitsTypedFrame(t *testing.
 			}
 			if len(e.Herr.Reasons) != 0 {
 				t.Errorf("no captured LLM error ⇒ no reasons on the wire, got %+v", e.Herr.Reasons)
+			}
+			if !e.Herr.Retryable {
+				t.Errorf("no captured cause ⇒ nothing says a resend fails the same way, want retryable")
 			}
 		}
 	}

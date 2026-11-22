@@ -589,6 +589,16 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Given a turn refused with langy_not_enabled, langy_skill_not_available or langy_dispatch_rejected
     Then the card shows that code's registered copy and no "Try again" action
 
+  # A 502 agent_error with empty reasons once read "rejected upstream" and was
+  # marked non-retryable, while a plain resend worked.
+  @unit
+  Scenario: A failed reply with no recorded cause does not claim an upstream rejection
+    Given the agent reported the turn failed and no cause was captured for it
+    When the failure reaches the control plane with no reasons
+    Then the error is retryable and is not blamed on the provider
+    And its tips say the reply failed and the message can be sent again, without claiming an upstream rejection
+    And the card offers "Try again"
+
   @unit
   Scenario: A bare failure code still reads the reasons on the durable record
     Given a turn failed and its typed failure is on the durable record
