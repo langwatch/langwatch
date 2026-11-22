@@ -10,8 +10,10 @@ import {
   emptyUserWeek,
   MAX_EVALUATORS,
   MAX_SERIES,
+  projectWeekStateSchema,
   type ProjectWeekState,
   type UserWeekState,
+  userWeekStateSchema,
   userWeekTotals,
 } from "../../rules/digest-week.rules.ts";
 import type { ProjectActivity, UserActivity } from "../digest-activity.events.ts";
@@ -80,6 +82,42 @@ describe("applyUserActivity()", () => {
       expect(userWeekTotals(week)).toMatchObject({ tokens: MAX_SERIES * 10, atLeast: false });
     });
   });
+
+  describe("when a session's facts name its repository", () => {
+    const metric: UserActivity = { ...seriesActivity("cost"), repository: null };
+    const span: UserActivity = { ...metric, series: null, repository: "acme/api" };
+    const fold = (activities: UserActivity[], state = emptyUserWeek()) =>
+      activities.reduce((week, activity) => applyUserActivity({ state: week, activity }), state);
+
+    it("counts the repository once when a metric fact without one lands first", () => {
+      expect(fold([metric, span]).repositories).toEqual({ "acme/api": 1 });
+    });
+
+    it("counts the repository once when the span lands first", () => {
+      expect(fold([span, metric]).repositories).toEqual({ "acme/api": 1 });
+    });
+
+    it("counts the repository once when two facts of the session name it", () => {
+      expect(fold([span, span]).repositories).toEqual({ "acme/api": 1 });
+    });
+
+    it("counts the repository for a week folded before sessions were bound to repositories", () => {
+      const storedRow = {
+        userId: "user-1",
+        organizationId: "org-1",
+        isoWeek: "2026-W47",
+        sessions: [metric.sessionId],
+        sessionOverflow: 0,
+        series: {},
+        seriesOverflow: 0,
+        repositories: {},
+      };
+
+      const week = fold([span], userWeekStateSchema.parse(storedRow));
+
+      expect(week.repositories).toEqual({ "acme/api": 1 });
+    });
+  });
 });
 
 const evaluationActivity = (evaluatorType: string): ProjectActivity => ({
@@ -121,6 +159,23 @@ describe("applyProjectActivity()", () => {
       });
 
       expect(week.evaluators["evaluator-0"]).toEqual({ runs: 2, passed: 2, failed: 0 });
+    });
+  });
+
+  describe("when a week was folded while it still kept failures per scenario", () => {
+    const storedRow = { ...emptyProjectWeek(), scenarioFailures: { "scenario-1": 2 } };
+
+    it("loads the week without the retired field and folds a scenario run onto it", () => {
+      const week = applyProjectActivity({
+        state: projectWeekStateSchema.parse(storedRow),
+        activity: {
+          ...evaluationActivity("unused"),
+          fact: { kind: "scenario", scenarioId: "scenario-1", outcome: "failed" },
+        },
+      });
+
+      expect(Object.hasOwn(week, "scenarioFailures")).toBe(false);
+      expect(week.scenarios).toEqual({ runs: 1, passed: 0, failed: 1 });
     });
   });
 });

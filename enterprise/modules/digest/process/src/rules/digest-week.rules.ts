@@ -16,7 +16,6 @@ export const BASELINE_WEEKS = 4;
 export const LATENCY_BUCKETS_MS = [100, 250, 500, 1_000, 2_000, 5_000, 10_000, 30_000, 60_000];
 export const MAX_MODELS = 20;
 export const MAX_EVALUATORS = 20;
-export const MAX_SCENARIOS = 50;
 export const MAX_SESSIONS = 200;
 export const MAX_SERIES = 500;
 export const MAX_REPOSITORIES = 20;
@@ -116,7 +115,6 @@ export const projectWeekStateSchema = z.object({
   evaluations: outcomeCountsSchema,
   evaluators: z.record(z.string(), outcomeCountsSchema),
   scenarios: outcomeCountsSchema,
-  scenarioFailures: z.record(z.string(), z.number()),
 });
 export type ProjectWeekState = z.infer<typeof projectWeekStateSchema>;
 
@@ -134,6 +132,11 @@ export const userWeekStateSchema = z.object({
   /** Series readings seen after the capped set filled; counted, not kept or summed. */
   seriesOverflow: z.number(),
   repositories: z.record(z.string(), z.number()),
+  /**
+   * The repository each session was counted for, so a session counts once however its facts
+   * arrive; capped at MAX_SESSIONS. Absent on weeks folded before it existed.
+   */
+  sessionRepositories: z.record(z.string(), z.string()).default({}),
 });
 export type UserWeekState = z.infer<typeof userWeekStateSchema>;
 
@@ -154,7 +157,6 @@ export function emptyProjectWeek(): ProjectWeekState {
     evaluations: noOutcomes(),
     evaluators: {},
     scenarios: noOutcomes(),
-    scenarioFailures: {},
   };
 }
 
@@ -168,6 +170,7 @@ export function emptyUserWeek(): UserWeekState {
     series: {},
     seriesOverflow: 0,
     repositories: {},
+    sessionRepositories: {},
   };
 }
 

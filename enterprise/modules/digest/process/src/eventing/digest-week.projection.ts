@@ -11,7 +11,6 @@ import {
   MAX_EVALUATORS,
   MAX_MODELS,
   MAX_REPOSITORIES,
-  MAX_SCENARIOS,
   MAX_SERIES,
   MAX_SESSIONS,
   type ProjectWeekState,
@@ -114,17 +113,7 @@ function applyScenario({
   state: ProjectWeekState;
   fact: FactOf<"scenario">;
 }): ProjectWeekState {
-  const scenarios = addOutcome({ counts: state.scenarios, outcome: fact.outcome });
-  if (fact.outcome !== "failed" || !fact.scenarioId) return { ...state, scenarios };
-  return {
-    ...state,
-    scenarios,
-    scenarioFailures: countCapped({
-      counts: state.scenarioFailures,
-      key: fact.scenarioId,
-      cap: MAX_SCENARIOS,
-    }),
-  };
+  return { ...state, scenarios: addOutcome({ counts: state.scenarios, outcome: fact.outcome }) };
 }
 
 export function applyUserActivity({
@@ -157,14 +146,34 @@ export function applyUserActivity({
     // Counted, never summed: the fold cannot tell a delta point from a cumulative reading, and
     // re-adding a cumulative reading would over-count. The email reads the totals as floors.
     seriesOverflow: state.seriesOverflow + (series !== null && !seriesFits ? 1 : 0),
-    repositories:
-      activity.repository && !seen
-        ? countCapped({
-            counts: state.repositories,
-            key: activity.repository,
-            cap: MAX_REPOSITORIES,
-          })
-        : state.repositories,
+    ...applyRepository({ state, sessionId: activity.sessionId, repository: activity.repository }),
+  };
+}
+
+/**
+ * Counts a session's repository once, on the first fact that names one: a metric fact carries
+ * none, so it may well land before the span that does.
+ */
+function applyRepository({
+  state,
+  sessionId,
+  repository,
+}: {
+  state: UserWeekState;
+  sessionId: string;
+  repository: string | null;
+}): Pick<UserWeekState, "repositories" | "sessionRepositories"> {
+  const { repositories, sessionRepositories } = state;
+  if (!repository || Object.hasOwn(sessionRepositories, sessionId)) {
+    return { repositories, sessionRepositories };
+  }
+  const bindingFits = Object.keys(sessionRepositories).length < MAX_SESSIONS;
+  return {
+    repositories: countCapped({ counts: repositories, key: repository, cap: MAX_REPOSITORIES }),
+    // Past the cap, a session's repository counts per fact, as sessionOverflow does.
+    sessionRepositories: bindingFits
+      ? { ...sessionRepositories, [sessionId]: repository }
+      : sessionRepositories,
   };
 }
 
