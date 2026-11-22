@@ -1,9 +1,12 @@
 import {
   findAuditLogByTargetKindInputSchema,
+  findAuditLogForOrganizationInputSchema,
   recordAuditLogCommandSchema,
+  type AuditLogExportEntry,
   type AuditLogHistoryEntry,
   type AuditLogTargetEntry,
   type FindAuditLogByTargetKindInput,
+  type FindAuditLogForOrganizationInput,
   type AuditLogJsonValue,
   type ListAuditLogEntityHistoryInput,
   type RecordAuditLogCommand,
@@ -68,7 +71,7 @@ export class AuditLogService {
   }
 
   async record(command: RecordAuditLogCommand): Promise<RecordedAuditLogEntry> {
-    const { idempotencyKey, ...parsed } = recordAuditLogCommandSchema.parse(command);
+    const { idempotencyKey, occurredAt, ...parsed } = recordAuditLogCommandSchema.parse(command);
     const entry = {
       ...parsed,
       args:
@@ -77,13 +80,24 @@ export class AuditLogService {
           : AuditLogService.boundJson(AuditLogService.redact(parsed.args), this.maxArgsBytes),
       metadata: parsed.metadata === undefined ? undefined : AuditLogService.redact(parsed.metadata),
     };
-    if (idempotencyKey === undefined) return this.repository.create(entry);
+    if (idempotencyKey === undefined) {
+      if (occurredAt !== undefined)
+        throw new Error("an audit moment comes with its idempotency key");
+      return this.repository.create(entry);
+    }
     // The key was minted when the producer committed, so the row keeps the action's moment.
     const key = parse(idempotencyKey);
     if (key.resource !== AUDIT_KEY_RESOURCE) {
       throw new Error(`an audit idempotency key is an "${AUDIT_KEY_RESOURCE}" KSUID`);
     }
-    return this.repository.createOnce({ entry, idempotencyKey, occurredAt: key.date.getTime() });
+    if (occurredAt !== undefined && Math.floor(occurredAt / 1000) !== key.timestamp) {
+      throw new Error("an audit moment falls inside its idempotency key's second");
+    }
+    return this.repository.createOnce({
+      entry,
+      idempotencyKey,
+      occurredAt: occurredAt ?? key.date.getTime(),
+    });
   }
 
   /** Who, what and which target stay; only secret-bearing values are replaced. */
@@ -131,6 +145,12 @@ export class AuditLogService {
 
   async findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]> {
     return this.repository.findByTargetKind(findAuditLogByTargetKindInputSchema.parse(input));
+  }
+
+  async findForOrganization(
+    input: FindAuditLogForOrganizationInput,
+  ): Promise<AuditLogExportEntry[]> {
+    return this.repository.findForOrganization(findAuditLogForOrganizationInputSchema.parse(input));
   }
 
   private static truncateString(value: string, maxLength: number): string {

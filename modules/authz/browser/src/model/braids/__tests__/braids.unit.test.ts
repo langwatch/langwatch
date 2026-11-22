@@ -5,11 +5,13 @@ import { describe, expect, it } from "vitest";
 import {
   braidAffordances,
   braidAuditHref,
-  braidFromText,
+  braidRowActionsLabel,
   braidProject,
+  braidsPauses,
   braidsPlanState,
   braidsSigningKeysHref,
-  braidsTabOf,
+  braidsStatus,
+  braidsSectionOf,
   organizationBraidRows,
   projectBraidRows,
 } from "../braids.ts";
@@ -61,6 +63,38 @@ describe("plan state", () => {
     expect(braidsPlanState({ isEnterprise: false, braidCount: 0 })).toBe("upsell");
     expect(braidsPlanState({ isEnterprise: false, braidCount: 2 })).toBe("paused");
   });
+
+  /** @scenario With release_braids off below Enterprise the pages say the braids are paused by the plan */
+  it("pauses kept braids by the plan whatever the organisation's setting", () => {
+    for (const turnedOff of [false, true]) {
+      expect(braidsPauses({ planState: "paused", turnedOff })).toEqual({
+        byPlan: true,
+        byOrganization: false,
+      });
+    }
+    for (const settingRead of [false, true]) {
+      expect(braidsStatus({ byPlan: true, byOrganization: false, settingRead })).toBe("plan");
+    }
+  });
+
+  it("pauses an Enterprise organisation's braids only when its setting is off", () => {
+    expect(braidsPauses({ planState: "enterprise", turnedOff: true })).toEqual({
+      byPlan: false,
+      byOrganization: true,
+    });
+    expect(braidsStatus({ byPlan: false, byOrganization: true, settingRead: true })).toBe(
+      "organization",
+    );
+    expect(braidsStatus({ byPlan: false, byOrganization: false, settingRead: true })).toBe(
+      "applying",
+    );
+  });
+
+  it("never says braids apply while the setting is unread and the plan pauses nothing", () => {
+    expect(braidsStatus({ byPlan: false, byOrganization: false, settingRead: false })).toBe(
+      "unknown",
+    );
+  });
 });
 
 describe("what the viewer may do", () => {
@@ -94,29 +128,69 @@ describe("what the viewer may do", () => {
       braidAffordances({ canManage: true, planState: "paused", keptToOrganizationAdmins: false }),
     ).toMatchObject({ canCreate: false, canEditInto: false, canRemove: true });
   });
+
+  it("offers only removal while the organisation has Braids turned off", () => {
+    expect(
+      braidAffordances({
+        canManage: true,
+        planState: "enterprise",
+        keptToOrganizationAdmins: false,
+        turnedOn: false,
+      }),
+    ).toMatchObject({ canCreate: false, canEditInto: false, canRemove: true });
+  });
 });
 
 describe("braidAuditHref", () => {
-  it("opens the audit log on the braid as its target", () => {
-    expect(braidAuditHref("grant_1")).toBe("/settings/audit-log?targetKind=braid&targetId=grant_1");
+  it("opens the audit log on the braid, labelled by its two projects", () => {
+    const href = braidAuditHref({
+      braidId: "rolebinding_1",
+      ownerName: "payments-agent",
+      readerName: "checkout-web",
+    });
+    const query = new URLSearchParams(href.split("?")[1]);
+    expect(href.startsWith("/settings/audit-log?")).toBe(true);
+    expect(Object.fromEntries(query)).toEqual({
+      targetKind: "braid",
+      targetId: "rolebinding_1",
+      targetLabel: "payments-agent → checkout-web",
+    });
+  });
+
+  describe("when the owner's slug is known", () => {
+    /** @scenario View in audit log from the reader's side opens the owner's project */
+    it("switches to the owner's project, then opens the log on the braid", () => {
+      const href = braidAuditHref({
+        braidId: "rolebinding_1",
+        ownerName: "payments-agent",
+        readerName: "checkout-web",
+        ownerSlug: "payments-agent-x1",
+      });
+      const [path, search] = href.split("?");
+      const returnTo = new URLSearchParams(search).get("return_to") ?? "";
+
+      expect(path).toBe("/payments-agent-x1");
+      expect(returnTo.startsWith("/settings/audit-log?")).toBe(true);
+      expect(new URLSearchParams(returnTo.split("?")[1]).get("targetId")).toBe("rolebinding_1");
+    });
   });
 });
 
-describe("the Braids page's tab in the URL", () => {
-  /** @scenario A link opens the Braids page on its Signing keys tab */
+describe("the Braids page's section in the URL", () => {
+  /** @scenario A link opens the Braids page at its Signing keys */
   it.each([
     ["keys", "keys"],
     ["from", "from"],
-    [undefined, "into"],
-    ["nonsense", "into"],
-  ] as const)("opens %s as %s", (value, tab) => {
-    expect(braidsTabOf(value)).toBe(tab);
+    [undefined, undefined],
+    ["nonsense", undefined],
+  ] as const)("reads %s as %s", (value, section) => {
+    expect(braidsSectionOf(value)).toBe(section);
   });
 
-  /** @scenario A link opens the Braids page on its Signing keys tab */
-  it("links another project's Signing keys tab through the project switch", () => {
+  /** @scenario A link opens the Braids page at its Signing keys */
+  it("links another project's Signing keys through the project switch", () => {
     expect(braidsSigningKeysHref({ projectSlug: "checkout-web-x1" })).toBe(
-      "/checkout-web-x1?return_to=%2Fsettings%2Fbraids%3Ftab%3Dkeys",
+      "/checkout-web-x1?return_to=%2Fsettings%2Fbraids%3Fsection%3Dkeys",
     );
   });
 });
@@ -156,9 +230,34 @@ describe("when two braids on one pair start the same day", () => {
         projects: [],
       }).map((row) => row.fromShowsTime),
     ).toEqual([true, true]);
-    expect(braidFromText({ fromMs: morning, showsTime: true })).toMatch(
-      /^From 1 Oct 2026, \d\d:\d\d$/,
+  });
+});
+
+describe("braidRowActionsLabel", () => {
+  const row = {
+    braidId: "b-1",
+    side: "into" as const,
+    otherProject: { id: "p-orch", name: "orchestrator" },
+    where: 'attributes["orchestrator"] == "web"',
+    fromMs: Date.UTC(2026, 10, 18, 9, 5),
+    fromShowsTime: false,
+    expiresAtMs: null,
+    createdAtMs: 0,
+  };
+
+  /** @scenario Each braid row shows where it goes, its condition, its access and its activity */
+  it("names each row's menu by its reader, condition and start, so no two read alike", () => {
+    const labels = [
+      row,
+      { ...row, braidId: "b-2", where: 'attributes["orchestrator"] == "cli"' },
+      { ...row, braidId: "b-3", fromMs: Date.UTC(2026, 10, 18, 10, 0) },
+      { ...row, braidId: "b-4", where: null },
+    ].map(braidRowActionsLabel);
+
+    expect(labels[0]).toBe(
+      'Actions for the braid into orchestrator, attributes["orchestrator"] == "web", from 2026-11-18 09:05 UTC',
     );
-    expect(braidFromText({ fromMs: morning, showsTime: false })).toBe("From 1 Oct 2026");
+    expect(labels[3]).toContain("every span");
+    expect(new Set(labels).size).toBe(labels.length);
   });
 });

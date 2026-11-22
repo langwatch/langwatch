@@ -8,7 +8,6 @@ import {
   type PlanTypes as PlanType,
   PlanTypes,
   SeatBillingUnavailableError,
-  SeatQuantityBelowInUseError,
   stripePricesFile,
   type StripePriceName,
   SubscriptionAlreadyActiveError,
@@ -30,6 +29,7 @@ import type {
 } from "../repositories/subscription.repository.ts";
 import type { SubscriptionItemUpdate } from "../rules/billing-stripe-shapes.rules.ts";
 import type { SeatEventProrationQuote } from "../rules/seat-event-quote.rules.ts";
+import { assertSeatsCoverUse } from "../rules/seat-floor.rules.ts";
 import { BillingInvoicesService } from "./billing-invoices.service.ts";
 import type { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
 import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
@@ -143,7 +143,7 @@ export class BillingSubscriptionService {
   }): Promise<{ success: boolean }> {
     const effectiveMembers = upgradeMembers ? totalMembers : 0;
     const effectiveTraces = upgradeTraces ? totalTraces : 0;
-    await this.assertSeatsCoverUse({ organizationId, requested: effectiveMembers });
+    await this.assertFullSeatsCoverUse({ organizationId, requested: effectiveMembers });
 
     if (this.seatEventService) {
       const pricingModel = await this.organizationRepository.findPricingModel(organizationId);
@@ -187,7 +187,7 @@ export class BillingSubscriptionService {
   }
 
   /** Refuses a seat count below the full seats in use, and below one, before any charge. */
-  private async assertSeatsCoverUse({
+  private async assertFullSeatsCoverUse({
     organizationId,
     requested,
   }: {
@@ -195,10 +195,7 @@ export class BillingSubscriptionService {
     requested: number;
   }): Promise<void> {
     const inUse = await this.seatsInUse.countFullSeatsInUse({ organizationId });
-    const minimum = Math.max(1, inUse);
-    if (requested < minimum) {
-      throw new SeatQuantityBelowInUseError({ requested, minimum });
-    }
+    assertSeatsCoverUse({ seat: "full", requested, inUse });
   }
 
   async createOrUpdateSubscription({
@@ -211,6 +208,7 @@ export class BillingSubscriptionService {
     currency,
     billingInterval,
     startedByUserId,
+    retentionDays,
   }: {
     organizationId: string;
     baseUrl: string;
@@ -222,6 +220,8 @@ export class BillingSubscriptionService {
     billingInterval?: BillingInterval;
     /** Carried on the checkout so its completion can give this person the Billing role. */
     startedByUserId?: string;
+    /** Only a Growth seat checkout offers a retention choice. */
+    retentionDays?: number;
   }): Promise<{ url: string | null }> {
     if (isGrowthSeatEventPlan(plan) && this.seatEventService) {
       const pricingModel = await this.organizationRepository.findPricingModel(organizationId);
@@ -236,6 +236,7 @@ export class BillingSubscriptionService {
         membersToAdd,
         isUpgradeFromTiered: pricingModel === "TIERED",
         ...(startedByUserId ? { startedByUserId } : {}),
+        ...(retentionDays === undefined ? {} : { retentionDays }),
       });
       return { url };
     }
@@ -315,6 +316,7 @@ export class BillingSubscriptionService {
     customerId,
     currency,
     billingInterval,
+    retentionDays,
   }: {
     organizationId: string;
     baseUrl: string;
@@ -322,6 +324,7 @@ export class BillingSubscriptionService {
     customerId: string;
     currency?: Currency;
     billingInterval?: BillingInterval;
+    retentionDays?: number;
   }): Promise<{ url: string | null; subscriptionId: string }> {
     if (!this.seatEventService) {
       throw new SeatBillingUnavailableError();
@@ -337,6 +340,7 @@ export class BillingSubscriptionService {
       billingInterval: billingInterval ?? "monthly",
       membersToAdd,
       isUpgradeFromTiered: pricingModel === "TIERED",
+      ...(retentionDays === undefined ? {} : { retentionDays }),
     });
   }
 

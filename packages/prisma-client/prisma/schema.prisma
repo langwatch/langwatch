@@ -1285,6 +1285,15 @@ model Organization {
   /// session, ever. Turning it on signs nobody out.
   /// Spec: specs/identity/mfa-and-session-shape.feature.
   mfaRequired                Boolean              @default(false)
+  /// Whether members may connect the documentation playground to their own access with a
+  /// short-lived docs session key (ADR-185, amendment of 2026-11-13). On by default; turned off,
+  /// no key is minted and live ones stop authenticating. The pasted-key path is untouched.
+  /// Spec: modules/api-key/specs/docs-session-keys.feature.
+  docsPlaygroundSessionsEnabled Boolean           @default(true)
+  /// When the docs playground was last turned off, written in the same update as the switch. A
+  /// docs session key minted at or before it never authenticates again, nor any key minted under
+  /// one, so turning it back on revives none of them (ADR-185, amendment of 2026-11-14).
+  docsPlaygroundSessionsDisabledAt DateTime?
   /// How many consecutive failed sign-ins lock an account (GAC-09).
   /// 0 = never lock, which is the default and what every organization that
   /// has not asked for this keeps. Counts EVERY credential together - a
@@ -1462,6 +1471,8 @@ model IssuedLicense {
   maxMembersLite   Int?
   /// True when the license sells unlimited lite seats; maxMembersLite is then null.
   liteSeatsUnlimited Boolean   @default(false)
+  /// The Developer seats sold: null when not stated, which sells none.
+  maxMembersDeveloper Int?
   issuedAt         DateTime
   expiresAt        DateTime
 
@@ -1562,6 +1573,8 @@ model ActivationCode {
   maxMembersLite   Int?     @default(0)
   /// True when the minted license carries unlimited lite seats; maxMembersLite is then null.
   liteSeatsUnlimited Boolean @default(false)
+  /// The Developer seats the minted license carries: null when not stated, which sells none.
+  maxMembersDeveloper Int?
   /// How long the license this code mints runs for.
   licenseTermDays  Int
   /// Hosted services the minted license may call.
@@ -3553,6 +3566,8 @@ model LangyConversationProjection {
   /// Per-conversation HMAC key for worker stream frames; server-side only.
   RunToken             String?                    @map("runToken")
   ArchivedAt           Float?                     @map("archivedAt")
+  /// Messages CI started on a pull request since the person last wrote.
+  CiFollowUpsInARow    Int                        @default(0) @map("ciFollowUpsInARow")
   CreatedAt            Float                      @map("createdAt")
   UpdatedAt            Float                      @map("updatedAt")
   /// Business time of the latest applied event.
@@ -3640,6 +3655,27 @@ model LangyConversationTurnProjection {
 
   @@unique([projectId, ConversationId, TurnId])
   @@index([projectId, ConversationId, UpdatedAt])
+}
+
+/// One pull request Langy opened, from the answer whose `gh pr create` printed it. Finished
+/// checks look it up by repository and number to wake the conversation; the daily pull request
+/// cap counts a person's rows by day. Rebuilt by a projection replay.
+model LangyPullRequest {
+  id                 String @id @default(nanoid())
+  projectId          String
+  /// `owner/repo`, lowercased: GitHub matches repository names without case.
+  RepositoryFullName String @map("repositoryFullName")
+  PrNumber           Int    @map("prNumber")
+  ConversationId     String @map("conversationId")
+  /// The conversation's owner, who opened it through Langy.
+  UserId             String @map("userId")
+  /// When the answer that opened it was recorded (epoch ms).
+  OpenedAt           Float  @map("openedAt")
+  /// The agent_responded event it came from.
+  SourceEventId      String @map("sourceEventId")
+
+  @@unique([RepositoryFullName, PrNumber])
+  @@index([UserId, OpenedAt])
 }
 
 /// Rebuildable operational message fact. One source event produces one row.
@@ -4573,6 +4609,11 @@ model Scenario {
   // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.
   simulatorModel  String?
   judgeModel      String?
+  // The judge's verdict-time trace wait: how long the span set must hold still
+  // and the first wait budget, in ms. Null resolves the project's measured
+  // value. See specs/scenarios/judge-trace-wait-settings.feature.
+  traceQuietPeriodMs Int?
+  traceWaitTimeoutMs Int?
   maxTurns        Int?
   minTurns        Int?
   // The value this scenario carries for each field its test suite declares,
@@ -4593,6 +4634,14 @@ model Scenario {
   // See specs/suites/test-suite-membership-invariant.feature.
   testSuiteId     String?
   testSuite       SimulationSuite?  @relation("TestSuiteScenarios", fields: [testSuiteId], references: [id], onDelete: SetNull)
+  // "standard" | "red_team" (scenarioKindSchema in the scenario contract). A
+  // red team scenario runs an attacker in place of the user simulator and
+  // carries its config in redTeam. See modules/scenario/contract/src/scenario.ts.
+  kind            String            @default("standard")
+  redTeam         Json?
+  // The suite template whose apply created this scenario. The Free scenario
+  // cap leaves these out; a copy or a later create in that suite stays null.
+  sourceTemplateId String?
   // Counts one up on every save of the editable fields. Each number has a
   // ScenarioVersion row holding the state as saved; the unique constraint
   // there is what keeps two concurrent saves from sharing a number. See
@@ -4665,6 +4714,10 @@ model SimulationSuite {
   // specs/suites/suite-model-selection.feature.
   simulatorModel     String?
   judgeModel         String?
+  // The plan-wide judge trace wait in ms, winning over each scenario's own
+  // the way the models do. See specs/scenarios/judge-trace-wait-settings.feature.
+  traceQuietPeriodMs Int?
+  traceWaitTimeoutMs Int?
   // "test_suite" | "run_plan" (see SUITE_KINDS in server/suites/types.ts). A
   // test suite groups scenarios through Scenario.testSuiteId; a run plan is
   // hand-assembled. String rather than a Prisma enum so a new kind needs no
@@ -4691,6 +4744,10 @@ model SimulationSuite {
   // reads as none. See server/scenarios/evaluator-attachments.ts.
   evaluators         Json?
   testSuiteScenarios Scenario[] @relation("TestSuiteScenarios")
+  // The suite template this test suite was created from, and its version.
+  // Null for a suite built by hand. See modules/suite/specs/suite-templates.feature.
+  templateId         String?
+  templateVersion    Int?
   archivedAt         DateTime?
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @default(now()) @updatedAt
@@ -4757,6 +4814,15 @@ model Subscription {
   /// The lease a seat change or seat line repair holds while it reads and moves the seat line.
   seatLineLeaseToken    String?
   seatLineLeaseUntil    DateTime?
+  /// An open failed payment recovery case: the unpaid renewal invoice, day 0 (its first failed
+  /// charge) and the last notice sent (3, 7, 14 or 21). Cleared when the case closes.
+  paymentRecoveryInvoiceId String?
+  paymentRecoveryStartedAt DateTime?
+  paymentRecoveryNoticeDay Int?
+  /// The over-plan mark: traces recorded from overPlanSince are withheld while it is open and the
+  /// organization is on Free with more members than Free allows; ended once that no longer holds.
+  overPlanSince         DateTime?
+  overPlanEndedAt       DateTime?
 
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]
@@ -4859,8 +4925,29 @@ model AuthzEngineSwitch {
 model AuthzOrganizationPolicy {
   organizationId               String   @id
   braidsOrganizationAdminsOnly Boolean  @default(false)
+  braidsEnabled                Boolean  @default(false)
   updatedByUserId              String
   updatedAt                    DateTime @updatedAt
+}
+
+// ADR-201 §1: every braid write the authz service sent, recorded before its attach command and
+// outside the reader lock's transaction. A retry with the same command id answers the braid it
+// saved; a write the grant projection has not landed still counts in the reader's checks.
+model AuthzBraidWrite {
+  organizationId  String
+  commandId       String
+  grantId         String
+  readerProjectId String
+  ownerProjectId  String
+  termsKey        String
+  condition       Json
+  expiresAt       DateTime?
+  replacesGrantId String?
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+
+  @@id([organizationId, commandId])
+  @@index([organizationId, readerProjectId, createdAt])
 }
 
 model RoleBinding {
@@ -7351,6 +7438,167 @@ model DiscoveredAgent {
 
   @@unique([organizationId, provider, rawAgentId])
   @@index([organizationId, lastSeenAt])
+}
+
+/// One agent in the organisation's governance registry, from any source governance reads
+/// (enterprise/modules/governance/specs/agent-registry.feature). `entry` is the latest
+/// machine-readable snapshot; `version` grows by one on every material change.
+model AgentRegistryEntry {
+  id             String    @id @default(nanoid())
+  organizationId String
+  /// Where the agent came from and its id there, e.g. `langwatch:<agentId>`.
+  sourceKey      String
+  source         String
+  status         String
+  version        Int
+  fingerprint    String
+  entry          Json
+  firstSeenAt    DateTime
+  lastSeenAt     DateTime?
+  removedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
+
+  @@unique([organizationId, sourceKey])
+  @@index([organizationId, updatedAt])
+}
+
+/// The registry's append-only change feed: one row per registered, versioned, removed or
+/// tool-deprecated fact. `sequence` is the pull cursor; `deliveryRecordedAt` marks the webhook
+/// fan-out as recorded in governance's outbox.
+model AgentRegistryEvent {
+  id                 String    @id @default(nanoid())
+  organizationId     String
+  sequence           BigInt    @default(autoincrement())
+  type               String
+  entryId            String
+  fromVersion        Int?
+  toVersion          Int?
+  payload            Json
+  occurredAt         DateTime
+  deliveryRecordedAt DateTime?
+
+  @@unique([organizationId, sequence])
+  @@index([organizationId, deliveryRecordedAt])
+  @@index([organizationId, entryId])
+}
+
+/// An organisation's registry baseline: its first reconcile, written as already pushed so the
+/// agents it already had are not announced. Every reconcile after it pushes its changes.
+model AgentRegistryBaseline {
+  organizationId String   @id
+  baselinedAt    DateTime
+}
+
+/// One target of a registry agent's kill switch stop plan (enterprise/modules/governance/specs/
+/// agent-kill-switch.feature): a Databricks serving endpoint, a Bedrock agent alias or a gateway
+/// virtual key. A plan write replaces every row of the agent at once.
+model AgentStopPlanTarget {
+  id             String   @id
+  organizationId String
+  /// The AgentRegistryEntry the plan belongs to.
+  agentId        String
+  position       Int
+  label          String
+  target         Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@index([organizationId, agentId])
+}
+
+/// One agent's stop plan version: bumped by every save, so a save over a plan someone else saved
+/// since it was read is refused. No row means the plan was never saved (version 0).
+model AgentStopPlan {
+  organizationId String
+  /// The AgentRegistryEntry the plan belongs to.
+  agentId        String
+  version        Int
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@id([organizationId, agentId])
+}
+
+/// An AWS credential a Bedrock kill switch target signs with: a static key pair, a role to assume,
+/// or both. The secret access key and the external id are stored sealed.
+model GovernanceAwsConnection {
+  id                       String   @id
+  organizationId           String
+  name                     String
+  accessKeyId              String?
+  encryptedSecretAccessKey String?
+  roleArn                  String?
+  encryptedExternalId      String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @default(now()) @updatedAt
+
+  @@index([organizationId])
+}
+
+/// The `agent_stop` aggregate's Postgres projection: one row per kill switch stop, its status and
+/// every target's outcome, folded from the stop's events.
+model AgentStop {
+  id                  String    @id
+  organizationId      String
+  agentId             String
+  agentName           String
+  status              String
+  severity            String
+  approval            String
+  trigger             String
+  reason              String
+  requestedByUserId   String?
+  requestedByApiKeyId String?
+  decidedByUserId     String?
+  decidedByApiKeyId   String?
+  restoredByUserId    String?
+  restoredByApiKeyId  String?
+  targets             Json
+  requestedAt         DateTime
+  decidedAt           DateTime?
+  quarantinedAt       DateTime?
+  restoreRequestedAt  DateTime?
+  restoredAt          DateTime?
+  lastAppliedEventId  String
+  lastAcceptedAt      BigInt
+  lastOccurredAt      BigInt
+  projectionVersion   String
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @default(now()) @updatedAt
+
+  @@index([organizationId, agentId])
+  @@index([organizationId, status])
+}
+
+/// The one open stop an agent may have: the api takes this row before it sends a stop's request,
+/// so two requests at once cannot both open one. A later request takes it over once the stop it
+/// names has closed.
+/// `sentAt` is set once the request command was sent: from then on the claim passes on only after
+/// its stop closed, never on age. `decision` is taken by the one approve or deny that wins.
+/// `decisionTakenAt` is set while that decision is in flight and cleared once its command was
+/// sent; a decision left in flight is taken over once abandoned.
+model AgentStopClaim {
+  organizationId  String
+  agentId         String
+  stopId          String
+  claimedAt       DateTime
+  sentAt          DateTime?
+  decision        String?
+  decisionTakenAt DateTime?
+
+  @@id([organizationId, agentId])
+}
+
+/// Whether a target was already stopped before a stop first touched it, recorded once before the
+/// stop's platform call, so a retried call after a success still knows the change is the stop's own.
+model AgentStopTargetPriorState {
+  organizationId String
+  stopId         String
+  targetId       String
+  wasStopped     Boolean
+  recordedAt     DateTime
+
+  @@id([organizationId, stopId, targetId])
 }
 
 /// The dated match table: "`user_abc123` on Anthropic is platform user #42,

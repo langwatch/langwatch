@@ -175,6 +175,17 @@ Feature: Platform administration package boundary
     And no user row is written and nothing is audited
     And an account holding no operator grant is still edited
 
+  # On the hosted service only staff operate, and the grant checked the staff rule against
+  # the operator's address, so it stays fixed there (modules/auth/specs/account-lifecycle.feature).
+  @unit
+  Scenario: Where operating is not kept to staff, an operator changes their own address
+    Given a self-hosted installation
+    And an operator holding the manage grant
+    When they change only their own email through the Back office
+    Then the new address is stored through auth
+    And any other edit to their own account, or an email change of another operator, is still refused
+    And on the hosted service their own email change is refused too
+
   # An address is verified by its owner; a changed address starts unverified
   # (modules/user/specs/user.feature).
   @unit

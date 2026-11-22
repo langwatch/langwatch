@@ -516,8 +516,16 @@ export type GatewaySpendEventAcrossTenantsQuery = {
   statuses: readonly SpendEventStatus[];
 };
 
+/**
+ * A key found by a presented secret: `presentedPreviousSecret` when it is the one a
+ * rotation replaced.
+ */
+export type GatewayPresentedVirtualKey = GatewayVirtualKeyRecord & {
+  presentedPreviousSecret: boolean;
+};
+
 export interface GatewayInternalProtocol {
-  findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null>;
+  findVirtualKeyBySecret(secret: string): Promise<GatewayPresentedVirtualKey | null>;
   /** Resolves an `lwl_` token by the facts licensing wrote onto its managed key. */
   resolveLicenseToken(input: {
     token: string;

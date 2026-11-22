@@ -5,8 +5,8 @@ import {
   type DashboardWidgetDefinitionInput,
 } from "@langwatch/analytics-contract";
 import {
+  BOARD_WIDGET_DEFAULT_ROW_SPAN,
   CHART_GRID_DEFAULT_COL_SPAN,
-  CHART_GRID_DEFAULT_ROW_SPAN,
   chartGridBottomRow,
 } from "@langwatch/analytics-contract/chart-grid";
 import {
@@ -121,7 +121,7 @@ export class PrismaDashboardWidgetRepository
           gridColumn: 0,
           gridRow: chartGridBottomRow(existing),
           colSpan: CHART_GRID_DEFAULT_COL_SPAN,
-          rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
+          rowSpan: BOARD_WIDGET_DEFAULT_ROW_SPAN,
         },
       });
     });

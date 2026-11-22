@@ -1,4 +1,6 @@
+import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities";
 import { Link } from "@langwatch/browser-host/link";
+import type { OrganizationStorageEstimate } from "@langwatch/data-retention-contract";
 /**
  * Cloud-only Subscription Page; lets org admins manage plans and users.
  * @see specs/licensing/subscription-page.feature
@@ -9,7 +11,7 @@ import { StatusChip } from "@langwatch/design-system/settings-card";
 import { CONTACT_SALES_URL, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { planSeatsAndVolume } from "@langwatch/plans";
 import { nowInstant } from "@langwatch/time";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { billingApi, type UsageRead } from "../../behavior/billing-api.ts";
 import { useBillingPricingService } from "../../behavior/use-billing-pricing-service.ts";
@@ -26,6 +28,7 @@ import {
   parseGrowthSeatPlanType,
 } from "../../model/billing-plans.ts";
 import { shouldShowPlanLimits } from "../../model/plan-management-url.ts";
+import type { RetentionEstimateState } from "../../model/retention-choice.ts";
 import { billedSeatsWhileKept } from "../../model/seat-change-summary.ts";
 import type { SeatPrice } from "../../model/seat-purchase.ts";
 import {
@@ -40,13 +43,18 @@ import {
   subscriptionPlanFlags,
   type SubscriptionPlanFlags,
 } from "../../model/subscription-page-state.ts";
-import { countFullMembers, formatPlanTypeLabel } from "../../model/subscription-types.ts";
+import {
+  countDevelopers,
+  countFullMembers,
+  formatPlanTypeLabel,
+} from "../../model/subscription-types.ts";
 import { UpgradePlanBlock } from "../../ui/blocks/upgrade-plan-block.tsx";
 import { UpgradeSeatsDialog } from "../../ui/blocks/upgrade-seats-dialog.tsx";
 import { SeatLimitCallout } from "../../ui/elements/seat-limit-callout.tsx";
 import { ContactSalesBlock } from "./contact-sales/index.ts";
 import { CurrentPlanBlock } from "./current-plan-block.tsx";
 import { InvoicesBlock } from "./invoices-block.tsx";
+import { PayOpenInvoiceButton } from "./pay-open-invoice-button.tsx";
 import { SubscriptionPageHeader } from "./subscription-page-header.tsx";
 import { useCheckoutIntent } from "./use-checkout-intent.ts";
 import { useSeatPurchase } from "./use-seat-purchase.ts";
@@ -58,6 +66,14 @@ import {
   type SeatDrawerMode,
   UserManagementDrawer,
 } from "./user-management-drawer.tsx";
+
+function retentionEstimateOf(query: {
+  data?: OrganizationStorageEstimate | undefined;
+  isError: boolean;
+}): RetentionEstimateState {
+  if (query.data) return { status: "ready", estimate: query.data };
+  return query.isError ? { status: "failed" } : { status: "loading" };
+}
 
 function deploymentIsSaaS(host: ReturnType<typeof useBillingHost>): boolean {
   return host.isDeploymentSettled() && host.isSaaS();
@@ -94,12 +110,15 @@ function currentPlanFeaturesFor({
   isEnterprisePlan,
   isHeldCapabilityPlan,
   isDeveloperPlan,
+  retentionDays,
 }: {
   plan: PlanInfo;
   currency: Currency;
   isEnterprisePlan: boolean;
   isHeldCapabilityPlan: boolean;
   isDeveloperPlan: boolean;
+  /** The traces retention the organization keeps; the card says 90 days until it loads. */
+  retentionDays?: number;
 }): string[] | undefined {
   if (isEnterprisePlan) return buildEnterprisePlanFeatures(plan);
   if (isHeldCapabilityPlan) {
@@ -114,7 +133,7 @@ function currentPlanFeaturesFor({
   }
   // The Growth offer below the card lists what the upgrade adds; the Free card shows usage instead.
   if (isDeveloperPlan) return undefined;
-  return getGrowthFeatures(currency);
+  return getGrowthFeatures(currency, retentionDays);
 }
 
 /**
@@ -236,6 +255,53 @@ function seatDrawerModeFor({
   return { kind: "free", includedSeats: includedSeats ?? 1 };
 }
 
+/**
+ * What the plan card may offer while a payment recovery case is open: the open invoice's
+ * page instead of the upgrade, and no seat drawer on Free, where it plans a Growth checkout.
+ */
+function recoveryAwareActionsFor({
+  isPaymentRecoveryOpen,
+  isDeveloperPlan,
+  isEnterprisePlan,
+  drawerKind,
+  onManageSeats,
+  organizationId,
+  isFree,
+  canPay,
+}: {
+  isPaymentRecoveryOpen: boolean;
+  isDeveloperPlan: boolean;
+  isEnterprisePlan: boolean;
+  drawerKind: SeatDrawerMode["kind"];
+  onManageSeats: (() => void) | undefined;
+  organizationId: string;
+  isFree: boolean;
+  /** Holds subscription:manage; anyone else gets no action, so the card shows no footer. */
+  canPay: boolean;
+}): {
+  cardCarriesUpgrade: boolean;
+  onUserCountClick: (() => void) | undefined;
+  paymentAction: ReactNode;
+} {
+  if (!isPaymentRecoveryOpen) {
+    return {
+      cardCarriesUpgrade: isDeveloperPlan && !isEnterprisePlan,
+      onUserCountClick: onManageSeats,
+      paymentAction: undefined,
+    };
+  }
+  return {
+    cardCarriesUpgrade: false,
+    onUserCountClick: drawerKind === "free" ? undefined : onManageSeats,
+    paymentAction: canPay ? (
+      <PayOpenInvoiceButton
+        organizationId={organizationId}
+        label={isFree ? "Pay now" : "Update card"}
+      />
+    ) : undefined,
+  };
+}
+
 /** The plan, seat usage and members have all answered. */
 function pageDataSettled({ waiting, hasPlan }: { waiting: boolean[]; hasPlan: boolean }) {
   return hasPlan && !waiting.some(Boolean);
@@ -246,6 +312,7 @@ function pageDataSettled({ waiting, hasPlan }: { waiting: boolean[]; hasPlan: bo
  */
 export function SubscriptionPage() {
   const host = useBillingHost();
+  const session = useOptionalUiHostServices()?.session;
   const organization = host.organization();
   const activeTeamId = host.activeTeamId();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -307,8 +374,15 @@ export function SubscriptionPage() {
     plannedFullMembers: 0,
     pageCount: existingCoreMembers + countFullMembers(pendingInvitesWithMemberType),
   });
+  // The Developer seat floor, as the server counts it once it answered; the page's own until then.
+  const developersInUse =
+    usage.data?.membersDeveloperCount ??
+    countDevelopers(users) + countDevelopers(pendingInvitesWithMemberType);
   const seatUsageM = plan?.maxMembers;
   const isOverPlanSeats = usage.data?.seatLimitInfo?.status === "exceeded";
+  // An open payment recovery case: paying the open invoice brings the plan back, so the page
+  // starts no new checkout (enterprise/modules/billing/specs/payment-recovery.feature).
+  const isPaymentRecoveryOpen = plan?.paymentFailed === true;
 
   const { seatPricePerPeriodCents, periodSuffix, totalFullMembers, monthlyEquivalent } =
     useBillingPricing({
@@ -359,6 +433,16 @@ export function SubscriptionPage() {
     onChanged: refreshSeats,
   });
   const openUpgrade = () => setIsUpgradeDialogOpen(true);
+  // Read only while the dialog is open: the first read of a cold organization can take seconds.
+  const storageEstimate = billingApi.dataRetention.getOrganizationStorageEstimate.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: isUpgradeDialogOpen && !!organization?.id, retry: false, staleTime: 300_000 },
+  );
+  const retentionEstimate = retentionEstimateOf(storageEstimate);
+  const organizationRetention = billingApi.dataRetention.getOrganizationRetention.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization?.id, retry: false },
+  );
 
   const isPlanLoading = !organization || activePlan.isLoading || isCurrencyLoading;
   const { isUpgradePlanRequired, updateRequired } = subscriptionChangesRequired({
@@ -366,12 +450,13 @@ export function SubscriptionPage() {
     hasSeatChanges: false,
     isOverPlanSeats,
   });
+  const offersGrowth = isUpgradePlanRequired && !isPaymentRecoveryOpen;
   useCheckoutIntent({
     isReady: pageDataSettled({
       waiting: [isPlanLoading, usage.isLoading, organizationWithMembers.isLoading],
       hasPlan: !!plan,
     }),
-    isUpgradeAvailable: isUpgradePlanRequired,
+    isUpgradeAvailable: offersGrowth,
     billingPeriod,
     currency,
     setBillingPeriod,
@@ -414,6 +499,9 @@ export function SubscriptionPage() {
     isEnterprisePlan,
     isHeldCapabilityPlan: isLicenseOverride || isTieredLegacyPaidPlan,
     isDeveloperPlan,
+    ...(organizationRetention.data
+      ? { retentionDays: organizationRetention.data.retentionDays }
+      : {}),
   });
 
   const isSelfManagedPaidPlan = !isDeveloperPlan && !isEnterprisePlan && !isLicenseOverride;
@@ -434,7 +522,16 @@ export function SubscriptionPage() {
     periodSuffix,
   };
   const drawerMode = seatDrawerModeFor({ drawerSeatChange, includedSeats: seatUsageM });
-  const cardCarriesUpgrade = isDeveloperPlan && !isEnterprisePlan;
+  const { cardCarriesUpgrade, onUserCountClick, paymentAction } = recoveryAwareActionsFor({
+    isPaymentRecoveryOpen,
+    isDeveloperPlan,
+    isEnterprisePlan,
+    drawerKind: drawerMode.kind,
+    onManageSeats,
+    organizationId: organization.id,
+    isFree: plan.free,
+    canPay: session?.hasOrganizationPermission("subscription:manage") ?? false,
+  });
   const eventUsage = currentPlanEventUsage({
     usage: usage.data,
     flags,
@@ -453,7 +550,7 @@ export function SubscriptionPage() {
         currency={currency}
         onCurrencyChange={setSelectedCurrency}
       />
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         <Text color="fg.muted">
           Your plan, your usage, your seats and your invoices. Questions about billing?{" "}
           <Link href="mailto:sales@langwatch.ai" color="orange.fg">
@@ -468,6 +565,8 @@ export function SubscriptionPage() {
           isUpgradePlanRequired={isUpgradePlanRequired}
           isEnterprisePlan={isEnterprisePlan}
           onAddSeats={() => setIsDrawerOpen(true)}
+          isOverPlan={!!usage.data?.activePlan?.overPlan}
+          isPaymentRecoveryOpen={isPaymentRecoveryOpen}
         />
 
         <CurrentPlanBlock
@@ -479,7 +578,8 @@ export function SubscriptionPage() {
           maxSeats={isTieredPricingModel ? undefined : seatUsageM}
           upgradeRequired={updateRequired}
           isOverPlanSeats={isOverPlanSeats}
-          onUserCountClick={onManageSeats}
+          onUserCountClick={onUserCountClick}
+          paymentAction={paymentAction}
           onUpgrade={cardCarriesUpgrade ? openUpgrade : undefined}
           isUpgradeLoading={isUpgradeLoading}
           onManageSubscription={isSelfManagedPaidPlan ? handleManageSubscription : undefined}
@@ -492,7 +592,7 @@ export function SubscriptionPage() {
           fixedSeatsContactUrl={CONTACT_SALES_URL}
         />
 
-        {isUpgradePlanRequired && (
+        {offersGrowth && (
           <UpgradePlanBlock
             planName={
               <>
@@ -534,6 +634,7 @@ export function SubscriptionPage() {
         isLoading={organizationWithMembers.isLoading}
         mode={drawerMode}
         inUse={seatUsageN}
+        developersInUse={developersInUse}
         held={heldSeats}
         price={seatPrice}
         onInvite={seatPurchase.invite}
@@ -547,7 +648,8 @@ export function SubscriptionPage() {
         onClose={() => setIsUpgradeDialogOpen(false)}
         minimumSeats={upgradeBillingSeats}
         price={seatPrice}
-        onContinue={(seats) => void handleUpgrade({ seats })}
+        retentionEstimate={retentionEstimate}
+        onContinue={({ seats, retentionDays }) => void handleUpgrade({ seats, retentionDays })}
         isLoading={isUpgradeLoading}
       />
     </>
@@ -577,7 +679,7 @@ function SubscriptionPagePlaceholder({
         currency={currency}
         onCurrencyChange={onCurrencyChange}
       />
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         {isLoading ? (
           <>
             <SkeletonText noOfLines={1} width="320px" />

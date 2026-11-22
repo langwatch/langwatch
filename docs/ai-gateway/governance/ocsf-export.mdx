@@ -1,100 +1,175 @@
 ---
 title: OCSF / SIEM export
-description: Pull governance events into your SIEM as OCSF 1.1 records through a cursor-paginated read procedure.
+description: Send AI activity and audit events to your SIEM as OCSF 1.9.0 events, pulled with an API key or pushed to a signed webhook, and push OCSF events from other tools into LangWatch.
 sidebarTitle: OCSF / SIEM export
 ---
 
-## What the export contains
+## What is exported
 
-LangWatch writes one OCSF record per trace that arrives through an [ingestion source](/ai-governance/ingestion-sources/index), and one per admin view of a member's or a team's workspace (`actionName` `governance.viewWorkspaceAs`). Each record is an OCSF 1.1 API Activity event (`class_uid` 6003, `category_uid` 6). A record linked to an anomaly alert has `severity_id` 4 (Medium); every other record has `severity_id` 1 (Informational).
+LangWatch exports three streams of OCSF 1.9.0 API Activity events (`class_uid` 6003, `category_uid` 6):
 
-Records are stored with no expiry. Your SIEM pulls them by cursor, on its own schedule, and keeps its own watermark.
+| Stream | Route | Contains |
+|---|---|---|
+| Governance events | `GET /api/governance/ocsf/events` | Traces from [ingestion sources](/ai-governance/ingestion-sources/index), events pulled from provider audit APIs, admin views of a member's or team's workspace, and OCSF events pushed in from other tools |
+| Project traces | `GET /api/governance/ocsf/traces` | One event per trace in the organization's projects |
+| Audit log | `GET /api/governance/ocsf/audit` | Admin and configuration actions: who did what, on which target, from which address, and whether it failed |
 
-## Endpoint and auth
+Every event LangWatch builds sets `metadata.version` to `1.9.0`, `metadata.uid` to a stable event id and `metadata.tenant_uid` to the organization id. An LLM call is `activity_id` 99 (Other) with `activity_name` `Invoke`, since OCSF API Activity has no invoke activity.
 
-The export is the tRPC query `governance.ocsfExport`. Call it as a `GET` on `/api/trpc/governance.ocsfExport` with the input JSON in the `input` query parameter.
+## AI fields
+
+Each event carries the OCSF 1.9 AI objects when LangWatch knows their values:
+
+| Field | Source |
+|---|---|
+| `ai_model.name`, `ai_model.ai_provider` | The model the call used. A `provider/model` name is split; an unknown provider is `Unknown` |
+| `ai_agent.name`, `ai_agent.uid` | `gen_ai.agent.name` and `gen_ai.agent.id` on the trace |
+| `message_context.prompt_tokens`, `completion_tokens`, `total_tokens` | The trace's or the provider event's token counts |
+| `message_context.uid`, `metadata.correlation_uid` | The trace id |
+| `unmapped.langwatch.cost_usd` | The cost in USD. Provider events priced in another currency carry `cost_amount` and `cost_currency` instead |
+
+Prompt and response text are never exported, and neither is the raw provider payload. `unmapped.langwatch` also carries `source_type`, `source_id`, `trace_id` and `project_id` so you can pivot back to LangWatch.
+
+## Auth
 
 | Requirement | Value |
 |---|---|
 | Plan | Enterprise |
-| Permission | `complianceExport:view`. Organization admins hold it; grant it to another role through a custom role. See [RBAC](/ai-gateway/rbac) |
-| Auth | The session cookie of a signed-in user. API keys and virtual keys are not accepted |
-| Tenancy | The permission is checked against `organizationId`. A call for an organization where the caller does not hold it is refused |
+| Credential | An organization API key, sent as `Authorization: Bearer <key>` |
+| Permission | `complianceExport:view` for the three export routes, `governance:manage` for the ingest route |
 
-## Input
+A key without the permission gets a 403. An organization below Enterprise gets a 402 `enterprise_plan_required`.
 
-| Field | Type | Default | Purpose |
-|---|---|---|---|
-| `organizationId` | string | required | The organization to export |
-| `sinceMs` | integer | `0` | Return records with `eventTimeMs` after this UNIX millisecond watermark |
-| `sinceEventId` | string | none | Paired with `sinceMs`: the `eventId` of the last record you received, so records that share a millisecond are neither skipped nor repeated |
-| `limit` | integer | `500` | Page size, 1 to 1000 |
+## Pulling events
 
-## Output
+All three routes take the same paging parameters:
 
-The HTTP response wraps the procedure result under `result.data.json`. The result is:
+| Parameter | Default | Purpose |
+|---|---|---|
+| `limit` | `500` | Page size, 1 to 1000 |
+| `cursor` | none | The `next_cursor` of the previous page |
+| `since` | none | ISO 8601 start of the first read. A cursor carries its own position |
+| `until` | none | ISO 8601 end bound. The cursor does not carry it, so send it again with every page |
+
+`/events` also takes `source_type` and `source_id`. `/traces` takes `project_id` to read one project. `/audit` returns an entry once it is ten minutes old, so an entry written late is not skipped by a cursor that already passed its time.
+
+Every page answers `next_cursor`, which is always set, and `has_more`. Store `next_cursor` after each page. While `has_more` is true, read again at once; when it is false, wait for your next scheduled run and pass the stored cursor. A trace updated after it was exported is exported again with the same `metadata.uid`, so deduplicate on it.
+
+```bash
+curl -s "https://app.langwatch.ai/api/governance/ocsf/events?limit=500" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY"
+```
 
 ```json
 {
-  "events": [
+  "ocsf_version": "1.9.0",
+  "data": [
     {
-      "eventId": "evt_01HZX9N...",
-      "ocsfSchemaVersion": "1.1.0",
-      "traceId": "trace_...",
-      "sourceId": "src_...",
-      "sourceType": "otel_generic",
-      "classUid": 6003,
-      "categoryUid": 6,
-      "activityId": 6,
-      "typeUid": 600306,
-      "severityId": 1,
-      "eventTimeMs": 1748678421123,
-      "actorUserId": "user_...",
-      "actorEmail": "jane@acme.com",
-      "actorEnduserId": "",
-      "actionName": "web_search",
-      "targetName": "anthropic/claude-sonnet-4",
-      "anomalyAlertId": "",
-      "rawOcsfJson": "{...}"
+      "class_uid": 6003,
+      "class_name": "API Activity",
+      "category_uid": 6,
+      "activity_id": 99,
+      "activity_name": "Invoke",
+      "type_uid": 600399,
+      "severity_id": 1,
+      "time": 1763114521123,
+      "status_id": 0,
+      "actor": { "user": { "uid": "user_01H...", "email_addr": "jane@acme.com" } },
+      "api": { "operation": "trace.recorded", "service": { "name": "LangWatch" } },
+      "src_endpoint": { "name": "otel_generic" },
+      "cloud": { "provider": "openai" },
+      "osint": [],
+      "ai_model": { "name": "gpt-5-mini", "ai_provider": "openai" },
+      "ai_agent": { "name": "billing-agent" },
+      "message_context": {
+        "uid": "trace_01H...",
+        "prompt_tokens": 120,
+        "completion_tokens": 30,
+        "total_tokens": 150
+      },
+      "metadata": {
+        "version": "1.9.0",
+        "uid": "trace_01H...",
+        "product": { "name": "LangWatch", "vendor_name": "LangWatch" },
+        "tenant_uid": "organization_01H...",
+        "log_name": "governance",
+        "correlation_uid": "trace_01H..."
+      },
+      "unmapped": {
+        "langwatch": {
+          "source_type": "otel_generic",
+          "source_id": "src_01H...",
+          "trace_id": "trace_01H...",
+          "cost_usd": 0.0042
+        }
+      }
     }
   ],
-  "nextCursor": 1748678421123,
-  "nextCursorCompound": { "eventTimeMs": 1748678421123, "eventId": "evt_01HZX9N..." }
+  "next_cursor": "eyJ0IjoxNzYzMTE0NTIxMTIzLCJlIjoidHJhY2VfMDFIIn0",
+  "has_more": false
 }
 ```
 
-`rawOcsfJson` is the full OCSF 1.1 event as a JSON string. The other fields are the columns your SIEM filters on. `actionName` is the tool the trace invoked, or `trace.recorded` for a trace with no tool call. An organization with no ingestion source yet returns `{ "events": [], "nextCursor": null, "nextCursorCompound": null }`.
+## Pushing events to your SIEM
 
-`anomalyAlertId` is returned on every record and is **always empty**. No attribute sets it, so no exported record is ever linked to an anomaly alert, and `severityId` is always 1 (Informational). Anomaly alerts are not exported as OCSF rows at all. They are delivered by webhook, described in [Anomaly rules](/ai-governance/anomaly-rules).
-
-## Pagination
-
-Persist `nextCursorCompound` after each page. On the next pull, pass its `eventTimeMs` as `sinceMs` and its `eventId` as `sinceEventId`. Records are ordered by `eventTimeMs` ascending.
-
-A page that returns `limit` records may be followed by more. Pull again at once until a page returns fewer than `limit` records, then wait for your next scheduled run.
-
-## Example
-
-Write the cookie into a curl config file that only the job user can read, and pass the file rather than the value. A `-H` argument puts the cookie in the process argument list, where every other user on the host can read it out of `ps`.
+Create a [webhook endpoint](/features/webhooks) subscribed to `ocsf.event`, pointing at your SIEM's HTTP collector or a forwarder in front of it:
 
 ```bash
-conf="$(mktemp)"
-trap 'rm -f "$conf"' EXIT
-printf 'header = "Cookie: %s"\n' "$SESSION_COOKIE" > "$conf"
+curl -s "https://app.langwatch.ai/api/webhooks/v1/endpoints" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://siem-forwarder.acme.com/langwatch", "enabled_events": ["ocsf.event"]}'
 ```
 
-`mktemp` makes a new file each run, owned by the job user and readable only by them. Writing to a fixed path instead would reuse whatever file or symlink is already there, and keep its permissions.
+LangWatch queues each governance event when it is written. Deliveries use the standard webhook envelope: a POST holds a `batch` of up to `max_batch_size` webhook events (100 by default), each with `type: "ocsf.event"` and one OCSF 1.9.0 event as its `data`:
+
+```json
+{
+  "batch": [
+    {
+      "id": "evt_f905578f982aee17650a4616b89ad219",
+      "type": "ocsf.event",
+      "created": "2026-11-16T16:47:29.124Z",
+      "schema_version": "1",
+      "data": { "class_uid": 6003, "activity_name": "Invoke", "metadata": { "uid": "47c84f48...", "version": "1.9.0" } }
+    }
+  ]
+}
+```
+
+Deliveries are signed with `X-LangWatch-Signature: t=<unix seconds>,v1=<hmac-sha256>`, retried with backoff, and logged per endpoint; see [verifying signatures](/features/webhooks#verifying-signatures). An event written again, for example when a trace is processed twice, keeps its idempotency key, so it is queued once per endpoint. A retry after a lost acknowledgement can deliver it again, so deduplicate on `metadata.uid`.
+
+OCSF events go only to endpoints that name `ocsf.event` or `ocsf.*`. An endpoint subscribed to `*` does not receive them. The push carries the governance events stream. Project traces and the audit log are pulled.
+
+## Pushing OCSF events into LangWatch
+
+`POST /api/governance/ocsf/ingest` stores OCSF events from another tool, such as your identity provider or an AI platform's own audit feed, next to LangWatch's events:
 
 ```bash
-INPUT='{"json":{"organizationId":"YOUR_ORGANIZATION_ID","sinceMs":0,"limit":500}}'
-
-curl -G "https://app.langwatch.ai/api/trpc/governance.ocsfExport" \
-  --data-urlencode "input=$INPUT" \
-  --config "$conf"
+curl -s "https://app.langwatch.ai/api/governance/ocsf/ingest" \
+  -H "Authorization: Bearer $LANGWATCH_ORG_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": "okta",
+    "events": [
+      {
+        "class_uid": 3002,
+        "activity_id": 1,
+        "severity_id": 1,
+        "time": 1763114521123,
+        "metadata": { "uid": "okta-evt-1", "version": "1.4.0", "product": { "name": "Okta" } },
+        "user": { "name": "jane@acme.com" }
+      }
+    ]
+  }'
 ```
 
-`$SESSION_COOKIE` is the cookie of a browser session signed in as a user who holds `complianceExport:view`. Read it from your secrets store into the job environment. The `trap` deletes the config file when the shell exits, on a failed run as well as a clean one. Forward `events[]` to your SIEM's ingest API, then store `nextCursorCompound` for the next run.
+The answer is `{ "accepted": 1 }`. A request holds up to 500 events. Each needs `class_uid`, `severity_id`, `time` (epoch milliseconds) and `metadata.uid` and `metadata.version`, and is at most 64 KiB as JSON. An invalid event is a 422 naming the field.
 
-<Warning>The session cookie is a full browser credential for that user, and this endpoint takes no other credential. It is not scoped to `complianceExport:view`, and it expires on the session's own schedule rather than the job's. Keep it out of shell history, out of the process argument list, and out of any script committed to a repository, and rotate the session when the job host changes.</Warning>
+An event is identified by `source` and `metadata.uid`: sending it again replaces the stored copy. Stored events are read back from `/events` with `source_type=ocsf_push`, exactly as received, and are not pushed to webhook endpoints.
 
-**Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for how a fired alert reaches you, which is by webhook rather than through this export, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.
+## Session export
+
+The tRPC query `governance.ocsfExport` still returns the governance events in their stored OCSF 1.1 row shape, for the signed-in UI. Use the REST routes above for a SIEM job.
+
+**Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for how a fired alert reaches you, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.

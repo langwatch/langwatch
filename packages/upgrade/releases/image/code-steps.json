@@ -219,6 +219,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "governance:seed-agent-registry",
+    "kind": "data",
+    "mode": "background",
+    "owner": "governance",
+    "description": "Builds each organisation's agent registry from its agents, sources and traffic.",
+    "needsOldWritersGone": false
+  },
+  {
     "id": "governance:replay-cost-charges",
     "kind": "data",
     "mode": "background",

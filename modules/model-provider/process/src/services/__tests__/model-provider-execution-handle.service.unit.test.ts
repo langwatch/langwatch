@@ -117,7 +117,53 @@ function getTitleModel() {
   }).resolve({ projectId: project.id, featureKey: "langy.conversation_title" });
 }
 
+/** A model asked for by name, against the project's provider rows. */
+function getNamedModel(providers: Record<string, ModelProviderExecution>) {
+  return ModelProviderExecutionHandleService.getVercelAIModel({
+    projectId: project.id,
+    model: "openai/gpt-5-mini",
+    featureKey: "langy.conversation_title",
+    modelProviders: createApiFixture<ModelProviderApi>({
+      getExecutionProviders: async () => providers,
+    }),
+    projects: createApiFixture<ProjectApi>({ findWithTeam: async () => project }),
+    executionProxyBaseUrl: "https://nlp.example.test/go/proxy/v1",
+  });
+}
+
 describe("ModelProviderExecutionHandleService", () => {
+  describe("given a model named outright", () => {
+    describe("when the project has no row for its provider", () => {
+      /** @scenario "A named model whose provider is not set up is refused with a typed code" */
+      it("refuses with model_provider_unavailable, reason not_configured", async () => {
+        await expect(getNamedModel({})).rejects.toMatchObject({
+          code: "model_provider_unavailable",
+          fault: "customer",
+          httpStatus: 400,
+          meta: { reason: "not_configured" },
+        });
+      });
+    });
+
+    describe("when the project's row for its provider is disabled", () => {
+      /** @scenario "A named model whose provider is turned off is refused with a typed code" */
+      it("refuses with model_provider_unavailable, reason disabled", async () => {
+        const openai = {
+          ...codexProvider,
+          id: "provider-openai",
+          provider: "openai",
+          enabled: false,
+        };
+
+        await expect(getNamedModel({ openai })).rejects.toMatchObject({
+          code: "model_provider_unavailable",
+          fault: "customer",
+          meta: { reason: "disabled" },
+        });
+      });
+    });
+  });
+
   describe("given the feature resolves to a codex model and no codex handle is composed", () => {
     describe("when the handle is asked for", () => {
       /** @scenario "A codex model this process cannot execute is refused with a typed code" */

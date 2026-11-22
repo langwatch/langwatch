@@ -2,22 +2,61 @@
 
 import { describe, expect, it } from "vitest";
 
+import type { LwqlCatalogue, LwqlColumnEntry } from "../../../../rules/lwql-catalogue.rules.ts";
 import {
   LWQL_PRISMA_MANIFEST,
   prismaManifestModel,
 } from "../../../../rules/lwql-prisma-manifest.rules.ts";
 import {
+  defineCatalogModel,
   type DerivedPostgresView,
   detectDefaultStripReason,
   resolveTenantScope,
   sanitizeDescription,
 } from "../lwql-postgres-catalog-model.rules.ts";
-import { LWQL_POSTGRES_CATALOG } from "../lwql-postgres-view-catalog.rules.ts";
+import {
+  LWQL_POSTGRES_CATALOG,
+  LWQL_POSTGRES_CATALOGUE,
+} from "../lwql-postgres-view-catalog.rules.ts";
+import type { PrismaField, PrismaManifest } from "../lwql-prisma-schema.rules.ts";
 import { organizationTenantPath, teamTenantPath } from "../lwql-tenant-paths.rules.ts";
 
 const catalog = LWQL_POSTGRES_CATALOG as readonly DerivedPostgresView[];
 const byModel = new Map(catalog.map((view) => [view.postgres!.baseRelation, view]));
 const byName = new Map(catalog.map((view) => [view.name, view]));
+const SCOPE_FIELDS = new Set(["organizationId", "teamId", "projectId"]);
+const POSTGRES_CATALOGUE: LwqlCatalogue = LWQL_POSTGRES_CATALOGUE;
+
+/** The Prisma field an exposed column reads: its `source`, else its own name. */
+function sourceField(exposed: string, entry: LwqlColumnEntry | undefined): string {
+  if (entry === undefined || entry === "omit") throw new Error(`${exposed} is not exposed`);
+  return entry === "inherit" ? exposed : (entry.source ?? exposed);
+}
+
+/** A one-model manifest whose fields are all required strings. */
+function fakeManifest({
+  name,
+  primaryKey,
+  fields,
+}: {
+  name: string;
+  primaryKey: readonly string[];
+  fields: readonly string[];
+}): PrismaManifest {
+  const field = (fieldName: string): PrismaField => ({
+    name: fieldName,
+    columnName: fieldName,
+    type: "String",
+    kind: "scalar",
+    isList: false,
+    isOptional: false,
+    documentation: "",
+  });
+  return {
+    enums: [],
+    models: [{ name, tableName: name, documentation: "", primaryKey, fields: fields.map(field) }],
+  };
+}
 
 describe("given the derived Postgres catalog", () => {
   describe("when a model carries a projectId column", () => {
@@ -48,7 +87,7 @@ describe("given the derived Postgres catalog", () => {
       const view = byName.get("virtual_keys")!;
       expect(view.postgres!.tenantPath).toEqual(organizationTenantPath());
       expect(view.dedup.keyColumns[0]).toBe("TenantId");
-      expect(view.grain).toContain("once per project");
+      expect(view.grain).toContain("counted once across the projects read");
       // The helper is shared: every organization-scoped view carries the same path.
       for (const orgView of ["virtual_keys", "model_providers", "departments"]) {
         expect(byName.get(orgView)!.postgres!.tenantPath).toEqual(organizationTenantPath());
@@ -62,7 +101,61 @@ describe("given the derived Postgres catalog", () => {
       const view = byName.get("ingestion_sources")!;
       expect(view.postgres!.tenantPath).toEqual(teamTenantPath());
       expect(view.dedup.keyColumns[0]).toBe("TenantId");
-      expect(view.grain).toContain("once per project");
+      expect(view.grain).toContain("counted once across the projects read");
+    });
+  });
+
+  describe("when a view's rows fan out to one per project", () => {
+    /** @scenario "A fanned-out view keeps one row per entity across the projects read" */
+    it("names the exposed primary key as the entity a multi-project read keeps once", () => {
+      const entityKeys = (name: string) => byName.get(name)!.postgres!.entityKeyColumns;
+      expect(entityKeys("gateway_budgets")).toEqual(["GatewayBudgetId"]);
+      expect(entityKeys("ingestion_sources")).toEqual(["IngestionSourceId"]);
+      expect(entityKeys("topics")).toBeUndefined();
+    });
+
+    /** @scenario "A fanned-out view collapses only on a key that names one row in its table" */
+    it("keys each collapsing view by its model's whole primary key, with no scope field", () => {
+      const collapsing = catalog.filter((view) => view.postgres!.entityKeyColumns !== undefined);
+      expect(collapsing.length).toBeGreaterThan(0);
+      for (const view of collapsing) {
+        const { baseRelation, entityKeyColumns } = view.postgres!;
+        const { primaryKey } = prismaManifestModel(LWQL_PRISMA_MANIFEST, baseRelation);
+        const { columns } = POSTGRES_CATALOGUE[view.name]!;
+        const keyFields = entityKeyColumns!.map((key) => sourceField(key, columns[key]));
+        expect({ view: view.name, keyFields }).toEqual({ view: view.name, keyFields: primaryKey });
+        expect(
+          primaryKey.filter((field) => SCOPE_FIELDS.has(field)),
+          view.name,
+        ).toEqual([]);
+      }
+    });
+
+    /** @scenario "A fanned-out view keyed on its scope field keeps its fan-out" */
+    it("names no entity key when the primary key holds the consumed scope field", () => {
+      const membership = (name: string, primaryKey: readonly string[]) => {
+        const view = defineCatalogModel({
+          name,
+          table: {
+            sourceTable: "FakeOrgMembership",
+            columns: {
+              TenantId: { source: "organizationId" },
+              FakeOrgMembershipId: { source: "id" },
+              UserId: { source: "userId" },
+            },
+          },
+          override: {},
+          manifest: fakeManifest({
+            name: "FakeOrgMembership",
+            primaryKey,
+            fields: ["id", "organizationId", "userId"],
+          }),
+        });
+        return view.postgres!.entityKeyColumns;
+      };
+
+      expect(membership("fake_by_scope", ["organizationId", "userId"])).toBeUndefined();
+      expect(membership("fake_by_id", ["id"])).toEqual(["FakeOrgMembershipId"]);
     });
   });
 

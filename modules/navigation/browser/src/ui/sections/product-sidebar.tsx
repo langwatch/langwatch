@@ -1,18 +1,23 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
-import { EnterprisePill } from "@langwatch/design-system/enterprise-pill";
+import type { StarredDashboardsProject } from "@langwatch/analytics-client";
+import { permissionSatisfiedBy } from "@langwatch/authorization";
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
+import { navigationApi } from "../../behavior/navigation-api.ts";
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
-import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
+import { useLlmOpsProject, useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
 import { useOpsAttentionCount } from "../../behavior/use-ops-attention-count.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
+import { useSettingsEntryHref } from "../../behavior/use-settings-entry-href.ts";
 import { useSettingsMenu } from "../../behavior/use-settings-menu.ts";
 import { useVisibleSectionNavItems } from "../../behavior/use-visible-section-nav-items.ts";
 import { featureIcons } from "../../model/feature-icons.ts";
@@ -45,6 +50,7 @@ import {
 import { SideMenuItem, SideMenuLink } from "../blocks/side-menu-link.tsx";
 import { SupportMenu } from "../blocks/support-menu.tsx";
 import { ThemeToggle } from "../blocks/theme-toggle.tsx";
+import { featureMenuIcon } from "../elements/feature-menu-icon.tsx";
 import { SideMenuDensityProvider } from "../elements/side-menu-density.tsx";
 import { MainMenuSections } from "./main-menu.tsx";
 import { PersonalSidebarLinks } from "./personal-sidebar.tsx";
@@ -116,6 +122,7 @@ function SidebarBottomBlock({
 }) {
   const host = useNavigationHost();
   const pathname = host.pathname();
+  const settingsHref = useSettingsEntryHref();
 
   return (
     <VStack
@@ -137,7 +144,7 @@ function SidebarBottomBlock({
         <SideMenuLink
           icon={featureIcons.settings.icon}
           label="Settings"
-          href="/settings"
+          href={settingsHref}
           isActive={isPathUnder({ pathname, base: "/settings" })}
           showLabel={showExpanded}
         />
@@ -200,7 +207,7 @@ function DetourMenuBody({
           {group.items.map((item) => (
             <SideMenuLink
               key={item.href}
-              icon={item.icon}
+              icon={item.feature ? featureMenuIcon(item.feature) : item.icon}
               label={item.label}
               href={item.href}
               isActive={isSettingsMenuItemActiveAmong({
@@ -212,7 +219,6 @@ function DetourMenuBody({
               showLabel={showExpanded}
               badgeNumber={badgeFor?.(item.href)}
               isLocked={item.isLocked}
-              rightElement={item.isEnterprise ? <EnterpriseChip /> : undefined}
             />
           ))}
         </SidebarSection>
@@ -329,9 +335,15 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
   return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
 }
 
+/** The sidebars that may show the Dashboards section only with every product's flag on. */
+const DASHBOARDS_SECTION_FLAGGED_SURFACES: ReadonlySet<SidebarSurface> = new Set(["gateway", "me"]);
+
+/** Main's cadence: a role changed elsewhere reaches the section within a focus. */
+const GRANTS_STALE_TIME_MS = 30_000;
+
 /**
- * The Dashboards section analytics lends, in the LLM Ops sidebar only and for a member who can
- * reach Dashboards: the owner wants it in the project's sidebar, not everywhere.
+ * The Dashboards section analytics lends, for a member who can reach Dashboards: in LLM Ops,
+ * and with `release_dashboards_in_every_product` in Gateway and Coding agents too.
  */
 function StarredDashboardsGroup({
   surface,
@@ -340,10 +352,41 @@ function StarredDashboardsGroup({
   surface: SidebarSurface;
   showExpanded: boolean;
 }) {
+  const host = useNavigationHost();
   const { reachableProducts } = useReachableProducts();
-  if (!showExpanded || surface !== "llm-ops") return null;
-  if (!reachableProducts.includes("dashboards")) return null;
-  return <StarredDashboards />;
+  const llmOpsProject = useLlmOpsProject();
+  const everyProduct = host.featureFlag(FrontendFlags.release_dashboards_in_every_product);
+  if (!showExpanded) return null;
+  if (surface === "llm-ops") {
+    return reachableProducts.includes("dashboards") ? <StarredDashboards /> : null;
+  }
+  if (!everyProduct.enabled || !DASHBOARDS_SECTION_FLAGGED_SURFACES.has(surface)) return null;
+  // These pages are about no project: the section works in the one LLM Ops would open.
+  if (!llmOpsProject) return null;
+  const { id, slug, name } = llmOpsProject;
+  return <StarredDashboardsInProject project={{ id, slug, name }} />;
+}
+
+/** Released and granted per project: the section follows the one it works in, not the page's. */
+function StarredDashboardsInProject({ project }: { project: StarredDashboardsProject }) {
+  // LLM Ops only opens a project in the page's organization, so that organization targets it;
+  // until it is known an organization rollout can only answer no, so the read waits for it.
+  const organizationId = useNavigationHost().organization()?.id;
+  const released = useFeatureFlag(FrontendFlags.release_dashboards, {
+    projectId: project.id,
+    organizationId,
+    enabled: organizationId !== undefined,
+  });
+  const standing = navigationApi.authz.effectivePermissions.useQuery(
+    { projectId: project.id },
+    { staleTime: GRANTS_STALE_TIME_MS },
+  );
+  const granted = standing.data?.permissions;
+  if (!released.enabled || !granted) return null;
+  if (!permissionSatisfiedBy({ granted: new Set(granted), requested: "analytics:view" })) {
+    return null;
+  }
+  return <StarredDashboards project={project} />;
 }
 
 function ProductSidebarBody({
@@ -534,9 +577,4 @@ export function ProductSidebar({
 /** Marks an entry that leaves the current section. */
 function OutboundArrow() {
   return <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />;
-}
-
-/** The "ENT" chip on an Enterprise entry the plan includes; a locked entry shows a lock. */
-function EnterpriseChip() {
-  return <EnterprisePill />;
 }

@@ -234,6 +234,19 @@ export function extractUnknownIdentifier(error: unknown): string | undefined {
   return undefined;
 }
 
+/** ClickHouse's sentence for a `FROM name(...)` that is neither a table function nor a view. */
+const TABLE_FUNCTION_PATTERN = /Unknown table function [`'"]?((?:[A-Za-z_]\w*\.)?[A-Za-z_]\w*)/;
+
+/**
+ * The relation an UNKNOWN_FUNCTION (46) refusal names as an unknown table function, bare or
+ * database-qualified, or `undefined` for any other refusal. Fails closed on identifier shape.
+ */
+export function extractUnknownTableFunction(error: unknown): string | undefined {
+  if (!isClickHouseUnknownFunctionError(error) || !(error instanceof Error)) return undefined;
+  const candidate = TABLE_FUNCTION_PATTERN.exec(error.message)?.[1];
+  return candidate !== undefined && IDENTIFIER_SHAPE.test(candidate) ? candidate : undefined;
+}
+
 /** True when a bound parameter's value did not parse as its declared type (457). */
 export function isClickHouseBadQueryParameterError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;

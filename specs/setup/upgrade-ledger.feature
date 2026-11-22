@@ -178,3 +178,19 @@ Feature: The upgrade ledger records every step an installation has taken
   Scenario: A step declared without a description is refused
     When a declared step with an empty description is registered
     Then registering fails before anything is written
+
+  # A projection replay step counts each paged attempt at an aggregate that starts and does not
+  # finish; a worker roll counts too. A failed step set pending again by a run or by a Retry keeps
+  # the aggregates it pages but clears those counts, so each deploy or Retry has fresh attempts.
+
+  @integration
+  Scenario: A run setting a failed replay step pending again clears its paged attempts
+    Given a failed projection replay step whose report lists aggregates with unfinished paged attempts
+    When a run sets the failed background steps pending again
+    Then the step is pending and its report still lists each aggregate, with no unfinished attempt
+
+  @integration
+  Scenario: An operator Retry of a failed replay step clears its paged attempts
+    Given a failed projection replay step whose report lists aggregates with unfinished paged attempts
+    When an operator retries the step
+    Then the step is pending and its report still lists each aggregate, with no unfinished attempt

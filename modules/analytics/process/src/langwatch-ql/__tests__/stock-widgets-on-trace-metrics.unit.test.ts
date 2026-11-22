@@ -87,6 +87,7 @@ describe("given the trace_metrics view", () => {
       versionColumn: "UpdatedAt",
       strategy: "latest-in-order",
       tieBreakColumns: ["Version"],
+      floorColumn: "OccurredAt",
     });
   });
 

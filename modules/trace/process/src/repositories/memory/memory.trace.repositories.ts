@@ -22,6 +22,7 @@ import { MemoryNullTraceListRepository } from "./memory.null-trace-list.reposito
 import { MemorySpanAnalyticsFloorRepository } from "./memory.span-analytics-floor.repository.ts";
 import { MemorySpanAnalyticsRepository } from "./memory.span-analytics.repository.ts";
 import { MemorySpanStorageRepository } from "./memory.span-storage.repository.ts";
+import { MemoryTraceAgentTrafficRepository } from "./memory.trace-agent-traffic.repository.ts";
 import { MemoryTraceAnalyticsRepository } from "./memory.trace-analytics-projection.repository.ts";
 import { MemoryTraceAnalyticsRollupRepository } from "./memory.trace-analytics-rollup.repository.ts";
 import { MemoryTraceAnnotationScoresRepository } from "./memory.trace-annotation-scores.repository.ts";
@@ -179,6 +180,7 @@ export class MemoryTraceRepositories {
       eventPayloads: MemoryTracePayloadReaderRepository.create(),
       clusteringSample: MemoryNullTraceClusteringSampleRepository.create(),
       usageCount: MemoryTraceUsageCountRepository.create(),
+      agentTraffic: MemoryTraceAgentTrafficRepository.create(),
       indexMaterialisation: MemoryTraceIndexMaterialisationRepository.create(),
       modelSpend: MemoryTraceModelSpendRepository.create(),
       attributeSpend: MemoryTraceAttributeSpendRepository.create(),

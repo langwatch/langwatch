@@ -8,6 +8,7 @@ import { useCallback } from "react";
 import { useAgents } from "../../../../behavior/agents/use-agents.ts";
 import { useAllPromptsForProject } from "../../../../behavior/prompts/use-all-prompts-for-project.ts";
 import type { toLineRunParameters } from "../../../../model/agent-testing/run/parameter-line.ts";
+import type { JudgeTraceWaitMs } from "../../../../model/judge-trace-wait.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import type { ParameterFieldError } from "../run-parameters/parameter-suggestions.ts";
 import type { RunScope } from "./run-configuration.ts";
@@ -79,6 +80,8 @@ export type RunDialogSubmitInput = {
   repeatCount: number;
   simulatorModel: string | null;
   judgeModel: string | null;
+  /** The judge's trace wait in milliseconds; null leaves it to the scenario or project. */
+  traceWait: JudgeTraceWaitMs;
   note: string;
   runParameters: RunParameters;
   /** The overrides the suite may remember: everything but the secrets. */

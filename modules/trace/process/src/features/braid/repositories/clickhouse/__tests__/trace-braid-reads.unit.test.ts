@@ -37,7 +37,12 @@ const WEB: CompiledWhere = {
   tree: { kind: "attributeEquals", on: "span", key: "orchestrator", value: "web" },
 };
 
-type Statement = { sql: string; params: Record<string, unknown> };
+type Statement = {
+  sql: string;
+  params: Record<string, unknown>;
+  settings?: Record<string, string | number> | undefined;
+  retryOnTimeout?: false | undefined;
+};
 
 function braidReads(rows: Record<string, unknown>[] = []) {
   const statements: Statement[] = [];
@@ -47,7 +52,12 @@ function braidReads(rows: Record<string, unknown>[] = []) {
         indexes: TRACE_ID_INDEXES,
         driver: {
           execute: vi.fn<ScriptedStatements["execute"]>(async (request) => {
-            statements.push({ sql: request.sql, params: request.params ?? {} });
+            statements.push({
+              sql: request.sql,
+              params: request.params ?? {},
+              settings: request.settings,
+              retryOnTimeout: request.retryOnTimeout,
+            });
             return { rows: /FROM (stored_spans|trace_summaries)/.test(request.sql) ? rows : [] };
           }),
         },
@@ -239,6 +249,27 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
   });
 
   describe("when the reader's Braids page counts each braid's activity", () => {
+    it("stops the count at its time and memory caps and never retries it", async () => {
+      const { repo, read } = braidReads([]);
+
+      await repo.countReaderBraidActivity({
+        authorization: braidedProof({
+          projectId: READER,
+          braids: [{ owner: OWNER, compiledWhere: WEB }],
+        }),
+        braids: [activityRead({ compiledWhere: WEB })],
+        sinceMs: 1_700_000_000_000,
+      });
+
+      expect(read().settings).toMatchObject({
+        max_execution_time: 10,
+        timeout_overflow_mode: "throw",
+        max_memory_usage: String(4 * 1024 * 1024 * 1024),
+      });
+      expect(read().retryOnTimeout).toBe(false);
+      expect(read().sql).not.toContain("SETTINGS");
+    });
+
     /** @scenario "A braid's activity counts only spans in traces the reader holds" */
     it("counts owner spans only in traces the reader holds since the same lower bound", async () => {
       const { repo, read } = braidReads([]);
@@ -253,13 +284,22 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
       });
 
       const [outer = ""] = read().sql.split("SELECT TenantId, TraceId, SpanId, max(UpdatedAt)");
+      const UNSET = "ifNull(ParentSpanId, '') IN ('', '0000000000000000')";
+      const UP = `(if(${UNSET}, 'unparented-port', 'up'), ifNull(ParentSpanId, ''))`;
+      const DOWN = `(if(${UNSET}, 'unparented-probe', 'down'), ifNull(ParentSpanId, ''))`;
+      const LINKABLE = " AND SpanId NOT IN ('', '0000000000000000')";
+      const since = " AND StartTime >= fromUnixTimestamp64Milli({sinceMs:Int64})";
+      const readerPorts =
+        `SELECT TraceId, arrayJoin([('down', SpanId), ${UP}])` +
+        " FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})" +
+        ` AND StartTime >= fromUnixTimestamp64Milli({tenantScope_heldFrom:Int64})${since}${LINKABLE}`;
       expect(outer).toContain(
-        "TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN ({tenantScope_own:Array(String)})" +
-          " AND StartTime >= fromUnixTimestamp64Milli({tenantScope_heldFrom:Int64})" +
-          " AND StartTime >= fromUnixTimestamp64Milli({sinceMs:Int64}))",
+        `(TraceId, arrayJoin([${DOWN}, ('up', SpanId), ('self', TenantId)])) IN (${readerPorts})`,
       );
+      expect(outer).not.toContain("TraceId IN (SELECT TraceId FROM stored_spans");
       expect(read().params).toMatchObject({
         tenantScope_own: [READER],
+        tenantScope_heldOwners: [OWNER],
         sinceMs: 1_700_000_000_000,
       });
     });
@@ -362,7 +402,9 @@ describe("ClickHouseTraceBraidReadsRepository", () => {
       expect(read().sql).not.toMatch(/TenantId\s*(=|IN)\s*\{(?!tenantScope)/);
       expect(read().sql).not.toMatch(/'(web|orchestrator)'/);
       expect(read().params).toMatchObject({ traceId: "trace-1", tenantScope_own: [READER] });
-      expect(read().sql).toContain("AND TraceId = {traceId:String})");
+      expect(read().sql).toContain(
+        "AND TraceId = {traceId:String} AND SpanId NOT IN ('', '0000000000000000'))",
+      );
       expect(groups.filter((group) => group.tenantId === OWNER)).toEqual([
         expect.objectContaining({ spanCount: 2, explicitCost: 0.2, costInput: null }),
         expect.objectContaining({
