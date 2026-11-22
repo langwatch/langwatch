@@ -372,6 +372,30 @@ Feature: Weekly digest emails
     When they enrol an organization
     Then the call is refused with not_found
 
+  @unit
+  Scenario: Someone who is not staff is answered not-found by the digest admin door
+    Given a signed-in person who is not Cloud admin staff
+    When they enrol an organization, arm the send or send a test
+    Then each call is refused with not_found and the digest is never reached
+
+  @unit
+  Scenario: A digest admin write needs ops:manage, not ops:view
+    Given Cloud admin staff who hold ops:view but not ops:manage
+    When they enrol an organization, arm the send or send a test
+    Then each call is refused with permission_denied and the digest is never reached
+
+  @unit
+  Scenario: Staff holding ops:manage reach the digest as themselves
+    Given Cloud admin staff who hold ops:manage
+    When they enrol an organization, arm the send or send a test
+    Then each call reaches the digest, naming them as the operator
+
+  @unit
+  Scenario: The digest asks ops to admit the operator behind every admin control
+    Given Cloud admin staff the platform door admits, where ops's cloud-ops capability is off
+    When they enrol an organization, arm the send or send a test
+    Then each call is refused with not_found and nothing is enrolled, armed or sent
+
   @integration @unimplemented
   Scenario: The gallery previews a person's email for every eligible template
     Given an organization's folds for last week

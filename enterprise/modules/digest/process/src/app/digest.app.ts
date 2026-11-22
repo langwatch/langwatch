@@ -72,6 +72,7 @@ export class DigestModule implements DigestApiContract {
   readonly #commands: DigestCommandsService;
   readonly #settings: DigestSettingsService;
   readonly #sends: DigestSendService;
+  readonly #weeks: DigestWeekService;
   readonly #unsubscribes: DigestUnsubscribeService;
   readonly #pipeline: DigestPipeline;
 
@@ -80,6 +81,7 @@ export class DigestModule implements DigestApiContract {
     commands: DigestCommandsService;
     settings: DigestSettingsService;
     sends: DigestSendService;
+    weeks: DigestWeekService;
     unsubscribes: DigestUnsubscribeService;
     pipeline: DigestPipeline;
   }) {
@@ -87,6 +89,7 @@ export class DigestModule implements DigestApiContract {
     this.#commands = parts.commands;
     this.#settings = parts.settings;
     this.#sends = parts.sends;
+    this.#weeks = parts.weeks;
     this.#unsubscribes = parts.unsubscribes;
     this.#pipeline = parts.pipeline;
   }
@@ -119,16 +122,15 @@ export class DigestModule implements DigestApiContract {
       recordUser: (activity) => commands.recordUser(activity),
       now: nowEpochMs,
     });
+    const weeks = DigestWeekService.create({
+      projectWeeks: repositories.projectWeeks,
+      userWeeks: repositories.userWeeks,
+      entitlement: dependencies.entitlement,
+    });
     const sends = DigestSendService.create({
       audience: repositories.audience,
       sends: repositories.sends,
-      projectWeeks: repositories.projectWeeks,
-      userWeeks: repositories.userWeeks,
-      weeks: DigestWeekService.create({
-        projectWeeks: repositories.projectWeeks,
-        userWeeks: repositories.userWeeks,
-        entitlement: dependencies.entitlement,
-      }),
+      weeks,
       organizations: dependencies.organizations,
       projects: dependencies.projects,
       access: dependencies.authz,
@@ -145,6 +147,7 @@ export class DigestModule implements DigestApiContract {
       commands,
       settings: DigestSettingsService.create({ audience: repositories.audience }),
       sends,
+      weeks,
       unsubscribes,
       pipeline: buildDigestPipeline({
         projectWeeks: repositories.projectWeeks,
@@ -170,7 +173,7 @@ export class DigestModule implements DigestApiContract {
 
   /** The send pipeline `digest_send`. */
   sendPipeline(): DigestSendPipeline {
-    return buildDigestSendPipeline({ runner: this.#sends });
+    return buildDigestSendPipeline({ runner: this.#sends, weeks: this.#weeks });
   }
 
   connectSendCommands(commands: EventingCommands<DigestSendPipeline>): void {

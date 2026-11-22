@@ -12,7 +12,7 @@ import { DigestApi, digestTrpc } from "@langwatch/enterprise-digest-contract";
 import { opsOperatorSchema } from "@langwatch/ops-contract";
 
 /** The signed-in operator, bound by the process under the name ops reads it by. */
-const operatorContext = defineMiddlewareContext("opsOperator", opsOperatorSchema.nullable());
+export const operatorContext = defineMiddlewareContext("opsOperator", opsOperatorSchema.nullable());
 
 /** Cloud admin staff hold ops:view at the platform; anyone else is answered not-found. */
 const STAFF = { at: "platform", hiddenWithout: "ops:view" } as const;

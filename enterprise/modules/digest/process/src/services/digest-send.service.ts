@@ -18,16 +18,13 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { DigestMailChannel } from "../channels/digest-mail.channel.ts";
-import { type DigestSendRequest, digestSendKey } from "../eventing/digest-send.events.ts";
+import type { DigestSendRequest } from "../eventing/digest-send.events.ts";
 import type { DigestAudienceRepository } from "../repositories/digest-audience.repository.ts";
 import type { DigestSendRepository } from "../repositories/digest-send.repository.ts";
-import type {
-  DigestProjectWeekRepository,
-  DigestUserWeekRepository,
-} from "../repositories/digest-week.repository.ts";
 import {
   buildDigestTemplateProps,
   digestMessageId,
+  digestSendKey,
   digestTemplateInput,
   type DigestTemplateProps,
   type OrganizationWeek,
@@ -43,7 +40,7 @@ import {
   type DigestTemplatePick,
   eligibleDigestTemplates,
 } from "../rules/digest-template.rules.ts";
-import { oldestKeptWeek, plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
+import { plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
 import {
   DigestHomeOrganizationService,
   type HomeRanking,
@@ -107,8 +104,6 @@ const MEMBER_PAGE = 500;
 type Deps = Readonly<{
   audience: DigestAudienceRepository;
   sends: DigestSendRepository;
-  projectWeeks: Pick<DigestProjectWeekRepository, "deleteBefore">;
-  userWeeks: Pick<DigestUserWeekRepository, "deleteBefore">;
   weeks: DigestWeekService;
   /** Who an organization's members are, which are admins, and the organization's name. */
   organizations: Readonly<{
@@ -165,15 +160,10 @@ export class DigestSendService {
   }
 
   /**
-   * The hourly wake's work: sweep old folds, then, for the week the slot may send, armed and not
-   * yet planned, ask the sends.
+   * The hourly wake's plan, after the week service's sweep: for the week the slot may send, armed
+   * and not yet planned, ask the sends.
    */
   async planWeek({ isoWeek, at }: { isoWeek: string; at: number }): Promise<void> {
-    const oldest = oldestKeptWeek(at);
-    await Promise.all([
-      this.deps.projectWeeks.deleteBefore({ isoWeek: oldest }),
-      this.deps.userWeeks.deleteBefore({ isoWeek: oldest }),
-    ]);
     // Only the week the plan's own slot may send: before Monday 08:00 that is none (ADR-001).
     const plannable = plannableWeek(at);
     if (plannable.kind === "closed" || plannable.isoWeek !== isoWeek) return;

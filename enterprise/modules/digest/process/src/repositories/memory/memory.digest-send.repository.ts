@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { digestSendKey } from "../../rules/digest-email.rules.ts";
 import type { DigestSendRecord, DigestSendRepository } from "../digest-send.repository.ts";
 
 export class MemoryDigestSendRepository implements DigestSendRepository {
@@ -10,12 +11,12 @@ export class MemoryDigestSendRepository implements DigestSendRepository {
 
   private constructor() {}
 
-  isSent({ userId, isoWeek }: { userId: string; isoWeek: string }): Promise<boolean> {
-    return Promise.resolve(this.#sends.has(`${userId}:${isoWeek}`));
+  isSent(week: { userId: string; isoWeek: string }): Promise<boolean> {
+    return Promise.resolve(this.#sends.has(digestSendKey(week)));
   }
 
   claim(record: DigestSendRecord): Promise<boolean> {
-    const key = `${record.userId}:${record.isoWeek}`;
+    const key = digestSendKey(record);
     if (this.#sends.has(key)) return Promise.resolve(false);
     this.#sends.set(key, record);
     return Promise.resolve(true);

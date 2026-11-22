@@ -6,14 +6,11 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import { digestSendKey } from "../../rules/digest-email.rules.ts";
 import type { DigestSendRecord, DigestSendRepository } from "../digest-send.repository.ts";
 
 /** The send rows, plus the raw SQL clearing one person's rows across organizations needs. */
 type PrismaDigestSendDatabase = PrismaModelClient<"DigestSend"> & Pick<PrismaClient, "$executeRaw">;
-
-/** One row per person and week; its id is the pair, so only the first insert of a week lands. */
-const sendIdOf = ({ userId, isoWeek }: { userId: string; isoWeek: string }) =>
-  `${userId}:${isoWeek}`;
 
 export class PrismaDigestSendRepository
   extends PrismaRepository.for("DigestSend")
@@ -30,7 +27,7 @@ export class PrismaDigestSendRepository
 
   async isSent(input: { userId: string; isoWeek: string }): Promise<boolean> {
     const row = await this.database.digestSend.findUnique({
-      where: { id: sendIdOf(input) },
+      where: { id: digestSendKey(input) },
       select: { id: true },
     });
     return row !== null;
@@ -39,7 +36,7 @@ export class PrismaDigestSendRepository
   async claim({ sentAt, ...send }: DigestSendRecord): Promise<boolean> {
     // ON CONFLICT DO NOTHING: two racing attempts both return, and only one counts a row.
     const { count } = await this.database.digestSend.createMany({
-      data: [{ id: sendIdOf(send), ...send, sentAt: new Date(sentAt) }],
+      data: [{ id: digestSendKey(send), ...send, sentAt: new Date(sentAt) }],
       skipDuplicates: true,
     });
     return count === 1;

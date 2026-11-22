@@ -62,9 +62,17 @@ const TOP_ROWS = 3;
 const percentOf = ({ part, whole }: { part: number; whole: number }): number =>
   whole > 0 ? (part * 100) / whole : 0;
 
+/**
+ * A person's week: the `DigestSend` row's id, so only the first claim of a week lands, the send
+ * aggregate's id, and the send an unsubscribe records it came from.
+ */
+export function digestSendKey({ userId, isoWeek }: { userId: string; isoWeek: string }): string {
+  return `${userId}:${isoWeek}`;
+}
+
 /** The idempotency key a member's week is sent under: a retry is not a second email. */
-export function digestMessageId({ userId, isoWeek }: { userId: string; isoWeek: string }): string {
-  return `digest:${userId}:${isoWeek}`;
+export function digestMessageId(week: { userId: string; isoWeek: string }): string {
+  return `digest:${digestSendKey(week)}`;
 }
 
 /** An uncapped plan reports its limit as MAX_SAFE_INTEGER (entitlement's contract). */

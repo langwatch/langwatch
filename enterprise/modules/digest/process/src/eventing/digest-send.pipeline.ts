@@ -47,7 +47,12 @@ export interface DigestSendRunner {
   sendDigest(input: SendDigestIntent): Promise<void>;
 }
 
-function digestSend(deps: { runner: DigestSendRunner }) {
+/** The week folds' retention, which the hourly plan runs first; owned by the week service. */
+export interface DigestWeekSweeper {
+  sweep(input: Pick<PlanWeekIntent, "at">): Promise<void>;
+}
+
+function digestSend(deps: { runner: DigestSendRunner; weeks: DigestWeekSweeper }) {
   return definePipeline({
     name: DIGEST_SEND_PIPELINE_NAME,
     aggregate: defineAggregate({ type: DIGEST_SEND_AGGREGATE_TYPE }),
@@ -60,7 +65,10 @@ function digestSend(deps: { runner: DigestSendRunner }) {
         .schedule({ everyMs: DIGEST_PLAN_INTERVAL_MS })
         .onWake(digestPlanWake)
         // Its dispatched rows are reaped by the platform's process retention sweep.
-        .intent("planWeek", planWeekIntentSchema, (plan) => deps.runner.planWeek(plan))
+        .intent("planWeek", planWeekIntentSchema, async (plan) => {
+          await deps.weeks.sweep(plan);
+          await deps.runner.planWeek(plan);
+        })
         .outbox({ leaseDurationMs: PLAN_LEASE_MS, concurrency: 1, batchSize: 1, maxAttempts: 3 }),
     )
     .withProcessManager(DIGEST_MEMBER_SEND_PROCESS_NAME, (pm) =>

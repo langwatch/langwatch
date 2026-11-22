@@ -233,19 +233,18 @@ export function installDigest(
     return [];
   };
   const knownProject = (id: string) => world.projects.includes(id) || id === OTHER_PROJECT;
+  const weeks = DigestWeekService.create({
+    projectWeeks: repositories.projectWeeks,
+    userWeeks: repositories.userWeeks,
+    entitlement: createApiFixture<WeekDeps["entitlement"]>(
+      { getUsage: async () => world.usage },
+      "EntitlementApi",
+    ),
+  });
   const sends = DigestSendService.create({
     audience: repositories.audience,
     sends: repositories.sends,
-    projectWeeks: repositories.projectWeeks,
-    userWeeks: repositories.userWeeks,
-    weeks: DigestWeekService.create({
-      projectWeeks: repositories.projectWeeks,
-      userWeeks: repositories.userWeeks,
-      entitlement: createApiFixture<WeekDeps["entitlement"]>(
-        { getUsage: async () => world.usage },
-        "EntitlementApi",
-      ),
-    }),
+    weeks,
     organizations: createApiFixture<SendDeps["organizations"]>(
       {
         listMembers: async ({ organizationId, offset = 0, limit = Number.POSITIVE_INFINITY }) => {
@@ -313,7 +312,7 @@ export function installDigest(
     }),
   );
   commands.connectActivity(fold.commands);
-  const sendDefinition = buildDigestSendPipeline({ runner: sends });
+  const sendDefinition = buildDigestSendPipeline({ runner: sends, weeks });
   commands.connectSend(eventing.register(sendDefinition).commands);
   const owner = eventing.register(ownerStandIn());
 
