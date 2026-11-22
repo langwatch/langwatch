@@ -672,7 +672,9 @@ function RoleRow({
             onChange={(m) => onSetOverride(role, m)}
             inheritOption={unsetDefault && !current ? undefined : roleInherit}
             disabled={unsupportedAtScope}
-            labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
+            labelFor={(fullModelId) =>
+              modelDisplayLabel({ fullModelId: canonicalModelId(fullModelId), displayNames })
+            }
           />
         </Box>
         {canExpand ? (
@@ -785,7 +787,7 @@ function FeatureRow({
       <Box flex={1} />
       <Box width="240px" flexShrink={0}>
         <ProviderModelSelector
-          model={override || unsetDefault || ""}
+          model={canonicalModelId(override || unsetDefault || "")}
           query={{
             data: featureRowModelOptions({
               options: modelOptions,
@@ -795,7 +797,9 @@ function FeatureRow({
           }}
           onChange={(m) => onSetOverride(feature.key, m)}
           inheritOption={unsetDefault && !override ? undefined : inheritOption}
-          labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
+          labelFor={(fullModelId) =>
+            modelDisplayLabel({ fullModelId: canonicalModelId(fullModelId), displayNames })
+          }
         />
       </Box>
       <Box width="24px" flexShrink={0} />

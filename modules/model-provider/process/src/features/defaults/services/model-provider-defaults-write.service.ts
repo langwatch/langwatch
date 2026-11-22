@@ -58,6 +58,7 @@ export class ModelProviderDefaultsWriteService {
       id: this.options.ids.generate({ type: "default" }),
       organizationId,
       ...parsed,
+      model: parsed.model === null ? null : (config[parsed.key] ?? parsed.model),
       authorId: parsed.authorId ?? null,
     });
   }

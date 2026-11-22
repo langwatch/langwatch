@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import { createModelProviderTestProjects } from "../../../../app/__tests__/model-provider.fixture.ts";
 import { MemoryModelProviderRepositories } from "../../../../repositories/memory/memory.model-provider.repositories.ts";
+import type { ModelProviderRepositories } from "../../../../repositories/model-provider.repositories.ts";
 import { ModelProviderAuthorizationService } from "../../../../services/model-provider-authorization.service.ts";
 import { ModelProviderDecisionModelService } from "../../../../services/model-provider-decision-model.service.ts";
 import { ModelProviderScopeService } from "../../../../services/model-provider-scope.service.ts";
@@ -82,6 +83,7 @@ function unused(member: string) {
 }
 
 async function writerOver({
+  defaults = MemoryModelProviderRepositories.create().defaults,
   stored,
   storedScopes = [SCOPE],
   isFlagOn,
@@ -92,8 +94,8 @@ async function writerOver({
   isFlagOn: boolean;
   /** The scopes whose own chain holds an enabled Inception key. */
   keyedScopes?: ModelDefaultScope[];
+  defaults?: ModelProviderRepositories["defaults"];
 }) {
-  const { defaults } = MemoryModelProviderRepositories.create();
   if (stored) {
     await defaults.save({
       id: CONFIG_ID,
@@ -186,6 +188,22 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
       });
 
       expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/evals-preview" });
+    });
+
+    /** @scenario "Saving a config that holds an earlier id stores the new id" */
+    it("stores an earlier id set as one default under the new id", async () => {
+      const { defaults } = MemoryModelProviderRepositories.create();
+      const writer = await writerOver({ isFlagOn: false, defaults });
+
+      await writer.set({
+        scope: SCOPE,
+        key: "INSTANT_EVALS",
+        model: "langwatch/instant-evals",
+        authorId: null,
+      });
+
+      const [stored] = await defaults.findForOrganization(ORGANIZATION);
+      expect(stored?.config).toEqual({ INSTANT_EVALS: "langwatch/evals-preview" });
     });
   });
 

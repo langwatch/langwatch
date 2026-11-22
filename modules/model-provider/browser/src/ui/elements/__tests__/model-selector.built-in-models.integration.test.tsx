@@ -36,7 +36,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
 import { LLMModelDisplay } from "../llm-model-display.tsx";
 import { ModelSelector } from "../model-selector.tsx";
 
-const BUILT_IN = { value: "langwatch/evals-preview", label: "Instant Evals" };
+const BUILT_IN = { value: "langwatch/evals-preview", label: "Evals Preview" };
 const OWN_DECISION_BUILT_IN = {
   value: "openai/decisions:gpt-6-luna",
   label: "gpt-6-luna",
@@ -78,7 +78,7 @@ describe("<ModelSelector/>", () => {
         );
 
         const listbox = screen.getByRole("listbox", { hidden: true });
-        expect(within(listbox).getByText("Instant Evals")).toBeInTheDocument();
+        expect(within(listbox).getByText("Evals Preview")).toBeInTheDocument();
         expect(screen.queryByTestId("no-models-configured-callout")).not.toBeInTheDocument();
       });
     });
@@ -221,7 +221,7 @@ describe("<LLMModelDisplay/>", () => {
         <LLMModelDisplay model="langwatch/evals-preview" builtInModels={[BUILT_IN]} />,
       );
 
-      expect(await screen.findByText("Instant Evals")).toBeInTheDocument();
+      expect(await screen.findByText("Evals Preview")).toBeInTheDocument();
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
     });
   });
@@ -233,7 +233,7 @@ describe("<LLMModelDisplay/>", () => {
         <LLMModelDisplay model="langwatch/instant-evals" builtInModels={[BUILT_IN]} />,
       );
 
-      expect(await screen.findByText("Instant Evals")).toBeInTheDocument();
+      expect(await screen.findByText("Evals Preview")).toBeInTheDocument();
       expect(screen.queryByText("langwatch/instant-evals")).not.toBeInTheDocument();
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
     });
