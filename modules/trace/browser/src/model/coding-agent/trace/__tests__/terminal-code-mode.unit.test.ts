@@ -79,6 +79,14 @@ describe("readCodeModeScriptResults", () => {
   });
 
   /** @scenario "A poll's result is read from the settled script event" */
+  it("keeps an event whose attribute only ends in kind as plain text", () => {
+    const printed = 'before <event data-kind="repl-eval">payload</event> after';
+
+    expect(readCodeModeScriptResults(printed)).toEqual([
+      { evalNumber: null, status: null, durationMs: null, text: printed, isError: false },
+    ]);
+  });
+
   it("keeps a script's own printed <event> markup as plain text", () => {
     const printed =
       '<event kind="deploy" status="done">\n<result>acme.example.com</result>\n</event>';

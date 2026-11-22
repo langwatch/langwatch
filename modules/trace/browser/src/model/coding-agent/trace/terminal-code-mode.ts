@@ -73,7 +73,7 @@ const DISPATCH_RECEIPT = /^\(dispatched #\d+\)$/;
 /** Harness text around the events: the nonce notice and the tool summary. */
 const HARNESS_ELEMENTS = /<(system|tools-used-before-summary)>[\s\S]*?<\/\1>/g;
 /** Only the harness's own script event, never an `<event>` a script printed. */
-const SCRIPT_EVENT_ELEMENT = /<event\b([^>]*\bkind="repl-eval"[^>]*)>([\s\S]*?)<\/event>/g;
+const SCRIPT_EVENT_ELEMENT = /<event\b([^>]*(?<![\w-])kind="repl-eval"[^>]*)>([\s\S]*?)<\/event>/g;
 const EVENT_ATTRIBUTE = /([\w-]+)="([^"]*)"/g;
 
 /**
