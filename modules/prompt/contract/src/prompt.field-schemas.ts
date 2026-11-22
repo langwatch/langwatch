@@ -208,7 +208,7 @@ const runtimeParametersSchemaDefinition = z.record(z.string(), jsonValue).defaul
 export interface RuntimeParametersSchema extends Named<typeof runtimeParametersSchemaDefinition> {}
 export const runtimeParametersSchema: RuntimeParametersSchema = runtimeParametersSchemaDefinition;
 
-/** Runtime parameters on an update: no default, so omitting them keeps the stored ones. */
+/** Runtime parameters with no default: an update that omits them keeps the stored ones. */
 const runtimeParametersUpdateSchemaDefinition = z.record(z.string(), jsonValue);
 export interface RuntimeParametersUpdateSchema extends Named<
   typeof runtimeParametersUpdateSchemaDefinition

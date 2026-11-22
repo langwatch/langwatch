@@ -60033,7 +60033,6 @@
                     "type": "object",
                     "properties": {
                       "modelsAllowed": {
-                        "default": null,
                         "anyOf": [
                           {
                             "type": "array",
@@ -60047,7 +60046,6 @@
                         ]
                       },
                       "providersAllowed": {
-                        "default": null,
                         "anyOf": [
                           {
                             "type": "array",
@@ -60061,10 +60059,6 @@
                         ]
                       },
                       "cache": {
-                        "default": {
-                          "mode": "respect",
-                          "ttlS": 3600
-                        },
                         "type": "object",
                         "properties": {
                           "mode": {
@@ -60085,9 +60079,6 @@
                         }
                       },
                       "fallback": {
-                        "default": {
-                          "maxAttempts": 3
-                        },
                         "type": "object",
                         "properties": {
                           "maxAttempts": {
@@ -60099,7 +60090,6 @@
                         }
                       },
                       "guardrailAttachments": {
-                        "default": [],
                         "type": "array",
                         "items": {
                           "type": "object",
@@ -60126,11 +60116,6 @@
                         }
                       },
                       "rateLimits": {
-                        "default": {
-                          "rpm": null,
-                          "tpm": null,
-                          "rpd": null
-                        },
                         "type": "object",
                         "properties": {
                           "rpm": {
@@ -60175,9 +60160,6 @@
                         }
                       },
                       "realtime": {
-                        "default": {
-                          "maxOpenSessions": null
-                        },
                         "type": "object",
                         "properties": {
                           "maxOpenSessions": {
@@ -61467,7 +61449,6 @@
                     "type": "object",
                     "properties": {
                       "modelsAllowed": {
-                        "default": null,
                         "anyOf": [
                           {
                             "type": "array",
@@ -61481,7 +61462,6 @@
                         ]
                       },
                       "providersAllowed": {
-                        "default": null,
                         "anyOf": [
                           {
                             "type": "array",
@@ -61495,10 +61475,6 @@
                         ]
                       },
                       "cache": {
-                        "default": {
-                          "mode": "respect",
-                          "ttlS": 3600
-                        },
                         "type": "object",
                         "properties": {
                           "mode": {
@@ -61519,9 +61495,6 @@
                         }
                       },
                       "fallback": {
-                        "default": {
-                          "maxAttempts": 3
-                        },
                         "type": "object",
                         "properties": {
                           "maxAttempts": {
@@ -61533,7 +61506,6 @@
                         }
                       },
                       "guardrailAttachments": {
-                        "default": [],
                         "type": "array",
                         "items": {
                           "type": "object",
@@ -61560,11 +61532,6 @@
                         }
                       },
                       "rateLimits": {
-                        "default": {
-                          "rpm": null,
-                          "tpm": null,
-                          "rpd": null
-                        },
                         "type": "object",
                         "properties": {
                           "rpm": {
@@ -61609,9 +61576,6 @@
                         }
                       },
                       "realtime": {
-                        "default": {
-                          "maxOpenSessions": null
-                        },
                         "type": "object",
                         "properties": {
                           "maxOpenSessions": {
@@ -110593,7 +110557,6 @@
                     }
                   },
                   "parameters": {
-                    "default": {},
                     "type": "object",
                     "propertyNames": {
                       "type": "string"

@@ -687,14 +687,14 @@ Contract `../contract/src/prompt.trpc.ts:58`, router `src/transport/prompt.trpc.
 
 ```typescript
 // prompts.getAllPromptsForProject
-// Input: promptProjectTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:24
+// Input: promptProjectTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:23
 interface Input {
   projectId: string;
 }
 // Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:65)
 
 // prompts.getCopies
-// Input: promptIdOrHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:39
+// Input: promptIdOrHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:38
 interface Input {
   projectId: string;
   idOrHandle: string;
@@ -712,7 +712,7 @@ type Output = {
 }[];
 
 // prompts.restoreVersion
-// Input: promptRestoreVersionTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:49
+// Input: promptRestoreVersionTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:48
 interface Input {
   versionId: string;
   projectId: string;
@@ -728,7 +728,7 @@ type Input = z.infer<typeof promptUpdateTrpcInputSchema>; // ../contract/src/pro
 type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:167
 
 // prompts.updateHandle
-// Input: promptUpdateHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:197
+// Input: promptUpdateHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:196
 interface Input {
   projectId: string;
   id: string;
@@ -740,7 +740,7 @@ interface Input {
 type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:167
 
 // prompts.getByIdOrHandle
-// Input: promptGetByIdOrHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:213
+// Input: promptGetByIdOrHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:212
 interface Input {
   idOrHandle: string;
   projectId: string;
@@ -751,7 +751,7 @@ interface Input {
 // Output: versionedPromptSchema.nullable() (inline, ../contract/src/prompt.trpc.ts:94)
 
 // prompts.checkHandleUniqueness
-// Input: promptHandleUniquenessTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:224
+// Input: promptHandleUniquenessTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:223
 interface Input {
   handle: string;
   projectId: string;
@@ -761,7 +761,7 @@ interface Input {
 type Output = boolean;
 
 // prompts.checkModifyPermission
-type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:39
+type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:38
 // Output: promptModifyPermissionSchema, ../contract/src/prompt.ts:185
 interface Output {
   hasPermission: boolean;
@@ -769,15 +769,15 @@ interface Output {
 }
 
 // prompts.getAllVersionsForPrompt
-type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:39
+type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:38
 // Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:106)
 
 // prompts.delete
-type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:39
+type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:38
 type Output = z.infer<typeof promptDeleteResultSchema>; // ../contract/src/prompt.ts:175
 
 // prompts.copy
-// Input: promptCopyTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:235
+// Input: promptCopyTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:234
 interface Input {
   idOrHandle: string;
   projectId: string;
@@ -786,15 +786,15 @@ interface Input {
 type Output = z.infer<typeof copiedPromptSchema>; // ../contract/src/prompt.ts:280
 
 // prompts.duplicate
-type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:39
+type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:38
 type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:167
 
 // prompts.syncFromSource
-type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:39
+type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:38
 type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:167
 
 // prompts.pushToCopies
-// Input: promptPushToCopiesTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:246
+// Input: promptPushToCopiesTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:245
 interface Input {
   projectId: string;
   idOrHandle: string;
@@ -803,7 +803,7 @@ interface Input {
 type Output = z.infer<typeof promptPushToCopiesResultSchema>; // ../contract/src/prompt.ts:308
 
 // prompts.getTagsForConfig
-// Input: promptConfigTagsTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:256
+// Input: promptConfigTagsTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:255
 interface Input {
   projectId: string;
   configId: string;
@@ -811,7 +811,7 @@ interface Input {
 // Output: promptTagAssignmentSchema.array() (inline, ../contract/src/prompt.trpc.ts:132)
 
 // prompts.assignTag
-// Input: promptAssignTagTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:268
+// Input: promptAssignTagTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:267
 interface Input {
   projectId: string;
   configId: string;
