@@ -20,12 +20,10 @@ import {
   STRICT_ADDED_PII_ENTITY_LABELS,
   STRICT_ADDED_PII_SUMMARY,
 } from "../../model/pii-entity-labels.ts";
-import {
-  type PiiRedactionModelOffer,
-  STRICT_RULE_BASED_NOTE,
-} from "../../model/pii-redaction-level-offer.ts";
+import { type PiiRedactionModelOffer } from "../../model/pii-redaction-level-offer.ts";
 import { PatternListField } from "../elements/pattern-list-field.tsx";
 import { PiiEntityToggleGroup } from "../elements/pii-entity-toggle-group.tsx";
+import { StrictRuleBasedNote } from "../elements/strict-rule-based-note.tsx";
 import { PiiRedactionLevelDetail } from "./pii-redaction-level-detail.tsx";
 
 type PiiFields = Pick<RuleFormState, "piiChoice" | "piiEntities" | "piiExceptPatterns">;
@@ -136,12 +134,14 @@ export function PiiRedactionFields({
         </Text>
       )}
       {piiRedactionModelOffer?.kind === "model" && (
-        <PiiRedactionLevelDetail level={effectiveLevel} free={piiRedactionModelOffer.free} />
+        <PiiRedactionLevelDetail
+          level={effectiveLevel}
+          free={piiRedactionModelOffer.free}
+          licensed={piiRedactionModelOffer.licensed}
+        />
       )}
       {piiRedactionModelOffer?.kind === "rule-based" && effectiveLevel === "strict" && (
-        <Text fontSize="xs" color="fg.muted">
-          {STRICT_RULE_BASED_NOTE}
-        </Text>
+        <StrictRuleBasedNote offer={piiRedactionModelOffer} />
       )}
       {form.piiChoice === "custom" && (
         <VStack align="stretch" gap={3} paddingLeft={6}>

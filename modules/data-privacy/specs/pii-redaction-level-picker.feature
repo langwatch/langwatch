@@ -10,8 +10,10 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
   # its PII level. Everything here is behind release_pii_redaction_model_enabled on
   # LangWatch Cloud: with the flag off for the organization the page and the drawer
   # are as they were. The browser cannot see whether the deployment names a model
-  # endpoint, so Cloud plus the flag is the gate; on a self-hosted deployment the
-  # drawer says Strict there is the rule-based detector (decision of 4 Nov).
+  # endpoint. On a self-hosted deployment the model comes with the Enterprise license,
+  # never priced: licensed with the flag (the chart forces it with the endpoint), the
+  # page offers the model; licensed without it, the drawer says to ask for it to be turned
+  # on; unlicensed, the drawer advertises the license. A self-hosted page never names Cloud.
   # The price shown is derived from the rate billing charges (ADR-201); organizations
   # on release_pii_redaction_model_free see Strict as included instead.
 
@@ -155,12 +157,44 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     Then the picker shows the organization on "Off" with neither level picked
 
   @integration
-  Scenario: A self-hosted deployment says Strict there is rule-based
-    Given a self-hosted deployment
+  Scenario: A self-hosted deployment without an Enterprise license advertises the license
+    Given a self-hosted deployment whose organization has no Enterprise license
     When an admin opens the Data Privacy page for project "web-app"
     Then the page shows no organization PII level picker and no price
     When the admin sets a rule's PII redaction to Strict in the drawer
-    Then the drawer says "Strict here uses the rule-based detector. The LangWatch PII Redaction Model is available on LangWatch Cloud."
+    Then the drawer says Strict here uses the rule-based detector
+    And it shows the Enterprise lock line: the LangWatch PII Redaction Model is part of LangWatch Enterprise
+    And it links to activating a license, or tells a reader who cannot manage it to ask an admin
+    And it does not mention LangWatch Cloud
+
+  @integration
+  Scenario: A licensed self-hosted deployment that runs the model offers Strict on it, included
+    Given a self-hosted deployment with an Enterprise license and release_pii_redaction_model_enabled forced on
+    When an admin opens the Data Privacy page for project "web-app"
+    Then the picker shows Strict as included with the Enterprise license, with no price
+    And the drawer does not say Strict is rule-based
+
+  @integration
+  Scenario: A licensed self-hosted deployment without the model says how to turn it on
+    Given a self-hosted deployment with an Enterprise license and no model configured
+    When an admin opens the Data Privacy page for project "web-app"
+    And the admin sets a rule's PII redaction to Strict in the drawer
+    Then the drawer says Strict here uses the rule-based detector and the license includes the model, and to ask whoever runs the deployment to turn it on
+
+  @unit
+  Scenario: The page reads the license only self-hosted, and only for a reader allowed to
+    Then the plan is read on a self-hosted deployment for a reader who may view the organization
+    And it is never read on LangWatch Cloud
+    And an Enterprise plan reads as the license, any other plan as none
+    And a read in flight is loading, and a refused or failed read is unknown
+
+  @unit
+  Scenario: The Strict offer on a self-hosted deployment follows the license and the model flag
+    Then a self-hosted deployment offers the model, never priced, only with an Enterprise license and the flag on
+    And with the license and no flag it says to ask for the model to be turned on
+    And without the license it advertises the license, whatever the flag says
+    And while the plan is not answered yet, or cannot be read, it offers nothing
+    And no self-hosted note names LangWatch Cloud
 
   @integration
   Scenario: A level changed elsewhere after a pick shows the stored level
