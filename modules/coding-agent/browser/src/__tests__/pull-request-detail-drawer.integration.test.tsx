@@ -281,7 +281,7 @@ describe("the pull request detail drawer", () => {
       expect(screen.getByText("Add the sessions screen")).toBeInTheDocument();
       // A session with no title, and one whose title this reader may not see,
       // read the same way: the row is still worth listing for what it cost.
-      expect(screen.getByText("Untitled session")).toBeInTheDocument();
+      expect(screen.getByText(/^Claude Code session/)).toBeInTheDocument();
     });
   });
 

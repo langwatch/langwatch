@@ -305,20 +305,20 @@ describe("the personal Sessions table", () => {
   });
 
   describe("given a session whose agent never generated a title", () => {
-    /** @scenario "A session with no title reads as untitled" */
-    it("names it as an untitled session and still says where it ran", () => {
+    /** @scenario "A session with no title is named by its agent and the day it started" */
+    it("names it by its agent and start day and still says where it ran", () => {
       pinSessions([sessionRow({ title: null })]);
 
       renderTable();
 
-      expect(screen.getByText("Untitled session")).toBeInTheDocument();
+      expect(screen.getByText(/^Claude Code session · \w{3} \d{1,2}/)).toBeInTheDocument();
       expect(screen.getByText("acme/widgets · feat/git-context")).toBeInTheDocument();
     });
   });
 
   describe("given a pi session, whose spans carry no prompt and no title", () => {
-    /** @scenario "A pi session falls back to untitled rather than to a span name" */
-    it("names it as an untitled session, never after a span name or pi's session id", () => {
+    /** @scenario "A pi session falls back to its agent's name rather than to a span name" */
+    it("names it by its agent, never after a span name or pi's session id", () => {
       const sessionId = "0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
       pinSessions([
         sessionRow({
@@ -332,7 +332,7 @@ describe("the personal Sessions table", () => {
 
       renderTable();
 
-      expect(screen.getByText("Untitled session")).toBeInTheDocument();
+      expect(screen.getByText(/^pi session/)).toBeInTheDocument();
       expect(screen.queryByText(/pi\.harness|pi\.ai\.request/)).not.toBeInTheDocument();
       expect(screen.queryByText(sessionId)).not.toBeInTheDocument();
     });

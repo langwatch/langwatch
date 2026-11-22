@@ -158,6 +158,19 @@ Rule: A session is named by its generated title, else by its first prompt
     Then the session stays unnamed
 
   @unit
+  Scenario: A first prompt that opens with a markdown heading does not name the session
+    Given a session whose first prompt opens with a markdown heading like "## Your skills"
+    When the prompt event arrives
+    Then the session stays unnamed
+    And the next prompt that opens with the user's own words names it
+
+  @unit
+  Scenario: A stored name that reads as a markdown heading or a tag is not shown
+    Given a session stored before this rule with the name "## Your skills"
+    When the user reads its row
+    Then the row does not show that name
+
+  @unit
   Scenario: A viewer who may not read captured content gets no session title
     Given a viewer who may not read the project's captured content
     When the sessions list is read
@@ -165,20 +178,20 @@ Rule: A session is named by its generated title, else by its first prompt
     And the rest of the row is intact
 
   @integration
-  Scenario: A session with no title reads as untitled
-    Given a session whose agent never generated a title or received a prompt
+  Scenario: A session with no title is named by its agent and the day it started
+    Given a Claude Code session whose agent never generated a title or received a prompt
     When the user reads its row
-    Then the row names it as an untitled session
+    Then the row names it "Claude Code session" with the day it started
 
   # A pi run carries its prompt only with content capture on, so a session sent
   # without it reaches this fallback. The risk is a fallback that reaches for the
   # nearest string it can find and prints a span name or a session id at a human.
 
   @integration
-  Scenario: A pi session falls back to untitled rather than to a span name
+  Scenario: A pi session falls back to its agent's name rather than to a span name
     Given a pi session folded from pi's own spans
     When the user reads its row
-    Then the row names it as an untitled session
+    Then the row names it as a pi session with the day it started
     And it is not named after a span name or pi's session id
 
 Rule: The session's own name outranks every derived title
