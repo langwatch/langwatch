@@ -172,7 +172,7 @@ describe("a login waiting on a device code", () => {
   describe("when another login saved its code while this one waited", () => {
     /** @scenario A finished login leaves another login's code alone */
     it("keeps the other login's code when this one finishes", async () => {
-      let finish: (value: typeof signedIn) => void = () => {};
+      let finish: ((value: typeof signedIn) => void) | undefined;
       startDeviceCode
         .mockResolvedValueOnce(deviceCode("FRST-CODE"))
         .mockResolvedValueOnce(deviceCode("SCND-CODE"));
@@ -184,7 +184,7 @@ describe("a login waiting on a device code", () => {
       await vi.waitFor(() => expect(pollUntilDone).toHaveBeenCalledTimes(1));
       controlPlane.url = "https://langwatch.other.test";
       await expect(runDeviceFlowLogin()).rejects.toThrow("killed");
-      finish(signedIn);
+      finish?.(signedIn);
       await first;
 
       const pending = JSON.parse(fs.readFileSync(pendingLoginPath(), "utf8")) as {
