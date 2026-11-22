@@ -113819,7 +113819,6 @@
                     }
                   },
                   "parameters": {
-                    "default": {},
                     "type": "object",
                     "propertyNames": {
                       "type": "string"
