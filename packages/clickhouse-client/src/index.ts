@@ -94,6 +94,7 @@ export {
   InsertCoalescer,
 } from "./insert-coalescing.ts";
 export type { CoalescedInsertRunner } from "./insert-coalescing.ts";
+export { INSERT_FAILURE_MARK, isInsertFailure, markInsertFailure } from "./insertFailure.ts";
 export type { RoutableStatementClient } from "./routingDriver.ts";
 export { PrivateTargetSchemaError, routingDriver } from "./routingDriver.ts";
 export type { PoolSizeSource, PoolSizingDecision, PoolSizingInput } from "./pool.ts";

@@ -99,6 +99,16 @@ const hasUserBound = (clause: unknown): boolean => {
   return typeof userId === "string" || isNonEmptyStringList(userId);
 };
 
+/** One named owner's personal teams: a non-empty `ownerUserId` beside `isPersonal: true`. */
+const isOwnPersonalTeam = (clause: unknown): boolean => {
+  const ownerUserId = clauseField(clause, "ownerUserId");
+  return (
+    typeof ownerUserId === "string" &&
+    ownerUserId.trim().length > 0 &&
+    clauseField(clause, "isPersonal") === true
+  );
+};
+
 const isOrganizationIdValue = (value: unknown): boolean =>
   typeof value === "string" && value.trim().length > 0;
 
@@ -178,7 +188,11 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   OrganizationAccessNotice: {},
   OrganizationSeatLease: {},
-  Team: {},
+  // "Which personal teams does this person own" is a READ bounded by the named owner: a personal
+  // team has exactly one. Any other Team query, and every write, still names its organization.
+  Team: {
+    extraBound: ({ clause, action }) => READ_ACTIONS.has(action) && isOwnPersonalTeam(clause),
+  },
   OrganizationInvite: {
     // inviteCode is a globally-unique acceptance token; the invite row it
     // names belongs to exactly one organization. "Is this address invited
@@ -196,6 +210,9 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   SigningKey: {},
   // ADR-201 §2: an organization's braid setting, one row keyed by organizationId.
   AuthzOrganizationPolicy: {},
+  // ADR-201 §1: the braid writes the authz service sent; every read and write names its
+  // organization.
+  AuthzBraidWrite: {},
   // A request to join one organization (D12), read by organization or row id,
   // plus one READ bounded by subject: "what am I waiting on" spans every
   // organization one named user asked. Writes keyed on userId stay refused.
@@ -245,6 +262,17 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // cost row, and there is no query shape that wants more than one tenant's.
   DiscoveredPerson: {},
   DiscoveredAgent: {},
+  // The governance agent registry and its feed: every read and write names one organization.
+  AgentRegistryEntry: {},
+  AgentRegistryEvent: {},
+  AgentRegistryBaseline: {},
+  // The kill switch: stop plans, AWS connections and stops, each read and written per organization.
+  AgentStopPlanTarget: {},
+  AgentStopPlan: {},
+  GovernanceAwsConnection: {},
+  AgentStop: {},
+  AgentStopClaim: {},
+  AgentStopTargetPriorState: {},
   IdentityMatch: {},
   // Candidate matches the suggestion job computed (ADR-128 §12). The job
   // rewrites one organization's rows per pass and the review surface reads one

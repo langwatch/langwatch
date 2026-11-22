@@ -339,3 +339,33 @@ func TestDashboardWidgetsSkill_TeachesBoardCommands(t *testing.T) {
 		}
 	}
 }
+
+// The clone starts with none of the repository's dependencies, so the skill
+// has to send Langy to install them before a test, and to CI when it cannot.
+//
+// @scenario "The github skill installs the clone's dependencies before running its tests"
+// @scenario "The github skill gives the file tools the clone's absolute path"
+func TestGithubSkill_InstallsDependenciesAndNamesAbsolutePaths(t *testing.T) {
+	dest := t.TempDir()
+	if err := MaterializeSkills(dest); err != nil {
+		t.Fatalf("MaterializeSkills: %v", err)
+	}
+	body, err := os.ReadFile(filepath.Join(dest, "github", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read github skill: %v", err)
+	}
+	skill := string(body)
+	for _, want := range []string{
+		"Install them first",
+		"`uv sync`",
+		"uv pip install -r requirements.txt",
+		"`npm ci`",
+		"When the install fails",
+		"`gh workflow run <file> --ref <branch>`",
+		"the absolute path `pwd` printed",
+	} {
+		if !strings.Contains(skill, want) {
+			t.Errorf("the github skill lacks %q", want)
+		}
+	}
+}

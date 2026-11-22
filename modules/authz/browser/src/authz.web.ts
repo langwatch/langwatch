@@ -1,7 +1,6 @@
 /**
- * What a browser installs when it installs authz: the Roles & access settings
- * page, whose Access tab /settings/role-bindings now redirects to, and the
- * project and organisation Braids pages (ADR-201).
+ * What a browser installs when it installs authz: the Roles & access page and the project and
+ * organisation Braids pages (ADR-201 §9; read-only with Remove while `release_braids` is off).
  */
 
 import { authzWebConfigSchema } from "@langwatch/authz-contract";
@@ -16,6 +15,10 @@ export const authzWeb = defineBrowserModule("authz")
   .withHosts({
     requires: ["AuthzHostApi"],
     mounts: { AuthzHostApi: { load: () => import("./behavior/authz-host-mount.tsx") } },
+  })
+  /** The settings menu's Braids entry while `release_braids` is off (Alex, 2026-11-18). */
+  .withCapabilities({
+    braidsPresence: { load: () => import("./behavior/braids-presence.ts") },
   })
   .withScreens({
     // Placed by the application's settings table until a settings anchor

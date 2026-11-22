@@ -6,7 +6,7 @@
 import type { InstantEvalRunReference, InstantEvalTarget } from "@langwatch/instant-eval-contract";
 import type { LiqeQuery } from "liqe";
 
-import { filterAST, walkAST } from "../query/trace-query-ast.ts";
+import { filterAST, tagsUnderOr, walkAST } from "../query/trace-query-ast.ts";
 import { isEmptyAST, parse, serialize } from "../query/trace-query-parser.ts";
 
 /** The bare field, whose target comes from the lens. */
@@ -145,6 +145,111 @@ export function queryWithoutInstantEvalChip({
   });
 }
 
+/** The field a chip for `target` is spelled with on this lens. */
+function instantEvalFieldFor({
+  target,
+  lensId,
+}: {
+  target: InstantEvalTarget;
+  lensId: string | undefined;
+}): string {
+  if (target === instantEvalTargetForLens(lensId)) return INSTANT_EVAL_FIELD;
+  return (
+    Object.entries(INSTANT_EVAL_TARGET_FIELDS).find(([, candidate]) => candidate === target)?.[0] ??
+    INSTANT_EVAL_FIELD
+  );
+}
+
+/**
+ * The query with each bare chip on `question` that this lens reads as another
+ * target spelled with the field forcing `target`; `NOT` and grouping are kept.
+ * A query that does not parse is returned as it came.
+ */
+export function queryWithInstantEvalChipRetargeted({
+  queryText,
+  question,
+  target,
+  lensId,
+}: {
+  queryText: string;
+  question: string;
+  target: InstantEvalTarget;
+  lensId: string | undefined;
+}): string {
+  const trimmed = queryText.trim();
+  if (instantEvalTargetForLens(lensId) === target) return trimmed;
+  let ast: LiqeQuery;
+  try {
+    // `parse` hands back a cached tree; the walk below writes to its nodes.
+    ast = structuredClone(parse(trimmed));
+  } catch {
+    return trimmed;
+  }
+  const wanted = question.replace(/\s+/g, " ").trim();
+  walkAST(ast, (node) => {
+    if (node.type !== "Tag" || node.field.type !== "Field") return;
+    if (node.field.name !== INSTANT_EVAL_FIELD) return;
+    if (node.expression.type !== "LiteralExpression") return;
+    const value = String(node.expression.value).replace(/\s+/g, " ");
+    if (value.trim() !== wanted) return;
+    node.field = { ...node.field, name: instantEvalFieldFor({ target, lensId }) };
+  });
+  return serialize(ast);
+}
+
+/** Every tag below a `NOT` whose operand holds more than that one tag. */
+function tagsUnderNegatedGroup(
+  ast: LiqeQuery,
+  inGroup = false,
+  found: Set<LiqeQuery> = new Set(),
+): Set<LiqeQuery> {
+  if (ast.type === "Tag") {
+    if (inGroup) found.add(ast);
+  } else if (ast.type === "UnaryOperator") {
+    let operand = ast.operand;
+    while (operand.type === "ParenthesizedExpression") operand = operand.expression;
+    tagsUnderNegatedGroup(ast.operand, inGroup || operand.type !== "Tag", found);
+  } else if (ast.type === "ParenthesizedExpression") {
+    tagsUnderNegatedGroup(ast.expression, inGroup, found);
+  } else if (ast.type === "LogicalExpression") {
+    tagsUnderNegatedGroup(ast.left, inGroup, found);
+    tagsUnderNegatedGroup(ast.right, inGroup, found);
+  }
+  return found;
+}
+
+/**
+ * Whether the chip `field:question` sits below an `OR`, or below a `NOT` that
+ * spans other terms too (`NOT (a AND b)` is `NOT a OR NOT b`). Its run judges
+ * only the other terms, so the text as typed would match rows it never judged.
+ */
+export function hasInstantEvalChipUnderOr({
+  queryText,
+  field,
+  question,
+}: {
+  queryText: string;
+  field: string;
+  question: string;
+}): boolean {
+  let tangled: LiqeQuery[];
+  try {
+    const ast = parse(queryText.trim());
+    tangled = [...tagsUnderOr(ast), ...tagsUnderNegatedGroup(ast)];
+  } catch {
+    return false;
+  }
+  const wanted = question.replace(/\s+/g, " ").trim();
+  return tangled.some(
+    (node) =>
+      node.type === "Tag" &&
+      node.field.type === "Field" &&
+      node.field.name === field &&
+      node.expression.type === "LiteralExpression" &&
+      String(node.expression.value).replace(/\s+/g, " ").trim() === wanted,
+  );
+}
+
 /**
  * The chip text for a question: the bare field when the target is what the lens
  * judges anyway, the forcing spelling when it is not. Always quoted — a chip
@@ -159,12 +264,7 @@ export function instantEvalChipText({
   target: InstantEvalTarget;
   lensId: string | undefined;
 }): string {
-  const field =
-    target === instantEvalTargetForLens(lensId)
-      ? INSTANT_EVAL_FIELD
-      : (Object.entries(INSTANT_EVAL_TARGET_FIELDS).find(
-          ([, candidate]) => candidate === target,
-        )?.[0] ?? INSTANT_EVAL_FIELD);
+  const field = instantEvalFieldFor({ target, lensId });
   const collapsed = question.replace(/\s+/g, " ").trim();
   return `${field}:"${collapsed.replace(/[\\"]/g, "\\$&")}"`;
 }

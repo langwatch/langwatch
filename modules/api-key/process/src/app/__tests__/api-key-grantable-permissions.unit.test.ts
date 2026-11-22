@@ -12,6 +12,7 @@ import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credentia
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryApiKeyChannels } from "../../channels/memory/memory.api-key.channels.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
@@ -37,6 +38,7 @@ async function appOver({ held }: { held: string[] }) {
       signingKeys: MemorySigningKeyRepository.create(),
       signingKeyUsage: MemorySigningKeyUsageRepository.create(),
     },
+    channels: MemoryApiKeyChannels.create(),
     dependencies: {
       authorization: createApiFixture<AuthzApi>({
         hasPermission: vi.fn(async () => true),

@@ -126,6 +126,7 @@ export {
   EventLogRetention,
   type EventLogRetentionClassification,
   type EventLogRetentionClient,
+  RETENTION_RAISE_ONLY_ROW_FILTER,
 } from "./tables/event-log-retention.ts";
 export {
   EVENT_TABLES,

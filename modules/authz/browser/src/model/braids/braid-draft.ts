@@ -23,12 +23,12 @@ export type BraidDraft = {
   ends: BraidEnds;
 };
 
-/** A new braid starts today, never ends, and braids every span until a condition is written. */
+/** A new braid starts now, never ends, and braids every span until a condition is written. */
 export function newBraidDraft({ nowMs }: { nowMs: number }): BraidDraft {
   return {
     readerProjectId: undefined,
     where: "",
-    fromMs: startOfDayMs(nowMs),
+    fromMs: nowMs,
     ends: { kind: "never" },
   };
 }
@@ -44,8 +44,9 @@ export function braidDraftOf(braid: AuthzBraid): BraidDraft {
   };
 }
 
-export function startOfDayMs(ms: number): number {
-  return Math.floor(ms / DAY_MS) * DAY_MS;
+/** "From now" is true only of a start the dialog set on opening; any other start is a moment. */
+export function braidStartsNow({ fromMs, nowMs }: { fromMs: number; nowMs: number }): boolean {
+  return fromMs === nowMs;
 }
 
 /** The end as the braid stores it; a relative end counts from now. */
@@ -80,6 +81,22 @@ export function braidDraftReady({ draft, nowMs }: { draft: BraidDraft; nowMs: nu
   if (!checkCondition(draft.where).ok) return false;
   const expiresAtMs = expiresAtMsOf({ ends: draft.ends, nowMs });
   return expiresAtMs === undefined || expiresAtMs > nowMs;
+}
+
+/** Whether the dialog holds work since it opened, so closing it would throw something away. */
+export function braidDraftTouched({
+  draft,
+  opened,
+}: {
+  draft: BraidDraft;
+  opened: BraidDraft;
+}): boolean {
+  return (
+    draft.readerProjectId !== opened.readerProjectId ||
+    draft.where.trim() !== opened.where.trim() ||
+    draft.fromMs !== opened.fromMs ||
+    JSON.stringify(draft.ends) !== JSON.stringify(opened.ends)
+  );
 }
 
 /** Whether an edit saves terms other than the braid it opened; a relative end always does. */
@@ -134,26 +151,6 @@ export function withSignedCalls({ where, on, key }: { where: string; on: boolean
     .trim();
 }
 
-/** Inserts `attributes["k"] == ""` at the cursor, joined by `and`; the caret in its quotes. */
-export function insertAttribute({
-  where,
-  cursor,
-  key,
-}: {
-  where: string;
-  cursor: number;
-  key: string;
-}) {
-  const at = Math.max(0, Math.min(cursor, where.length));
-  const before = where.slice(0, at);
-  const after = where.slice(at);
-  const needsAnd = before.trim().length > 0 && !/\b(and|not)\s*$/.test(before);
-  const lead = needsAnd ? `${before.replace(/\s*$/, "")} and ` : before;
-  const comparison = `attributes["${key.replace(/["\\]/g, "\\$&")}"] == ""`;
-  const tail = after.trim().length > 0 && !/^\s/.test(after) ? ` ${after}` : after;
-  return { where: `${lead}${comparison}${tail}`, caret: lead.length + comparison.length - 1 };
-}
-
 export type BraidTargetOption = {
   projectId: string;
   name: string;
@@ -167,7 +164,7 @@ const TARGET_REASONS = {
   aggregate: "Aggregate projects can't be braided",
 } as const;
 
-/** The picker's entries in the host's order, and whether any project was left out. */
+/** The picker's entries in the host's order, the braid's own project last; any left out? */
 export function braidTargetOptions({
   projects,
   targets,
@@ -176,18 +173,19 @@ export function braidTargetOptions({
   targets: AuthzBraidTargets;
 }): { options: BraidTargetOption[]; someLeftOut: boolean } {
   const decided = new Map(targets.map((target) => [target.projectId, target]));
-  const options = projects.flatMap((project): BraidTargetOption[] => {
+  const listed = projects.flatMap((project) => {
     const target = decided.get(project.id);
-    if (!target) return [];
-    return [
-      {
-        projectId: project.id,
-        name: project.name,
-        selectable: target.selectable,
-        ...(target.reason ? { reason: TARGET_REASONS[target.reason] } : {}),
-      },
-    ];
+    return target ? [{ project, target }] : [];
   });
+  const isOwn = ({ target }: (typeof listed)[number]) => target.reason === "this_project";
+  const options = [...listed.filter((entry) => !isOwn(entry)), ...listed.filter(isOwn)].map(
+    ({ project, target }): BraidTargetOption => ({
+      projectId: project.id,
+      name: project.name,
+      selectable: target.selectable,
+      ...(target.reason ? { reason: TARGET_REASONS[target.reason] } : {}),
+    }),
+  );
   return { options, someLeftOut: options.length < projects.length };
 }
 

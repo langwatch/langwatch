@@ -78,6 +78,12 @@ Feature: What a failed single sign-on is allowed to say
     # single sign-on shipped.
 
   @unit
+  Scenario: The logged cause names the provider's code
+    Given a sign-in that failed with a provider code we have not written down
+    When the failure is logged
+    Then the record's cause is a sign-in refusal carrying that code
+
+  @unit
   Scenario: A description supplied by the caller is never echoed
     Given somebody opens the sign-in error screen with an error description of their own
     When the screen renders

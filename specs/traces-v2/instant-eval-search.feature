@@ -40,6 +40,8 @@ Feature: Instant Evals inside the Trace Explorer
       And the run is estimated and started on the question as written, with the other terms as its filter
       And no model rewrites the question on the way, since the reader wrote it
       And a chip spelled `eval.conversation:` keeps judging conversations, whatever the lens shows
+      And a chip typed under NOT keeps its NOT, so the run lists the rows the judge did not match
+      And a chip under an OR, or under a NOT over other terms, is rebuilt beside them, as its run judges only those
       And the same question under another target is another chip, kept in the filter of the run that starts
       And a chip a run already answered is applied with no call at all
       And a refusal leaves the typed chip where it is rather than replacing it with a phrase search
@@ -357,6 +359,7 @@ Feature: Instant Evals inside the Trace Explorer
         | connect_license_revoked            | 0        | This license is no longer active, so Instant Evals are off. Nothing was charged. |
         | instant_eval_classifier_unavailable | 0       | The judge did not answer. Nothing was charged.                                   |
         | instant_eval_stalled               | 0.02     | This Instant Eval stopped before it finished. Only the rows judged were charged. |
+        | instant_eval_decision_model_key_invalid | 0  | Your model provider refused the key for this Instant Evals model. Check it in Settings > Model Providers. Nothing was charged. |
 
     @integration
     Scenario: Retry starts the same eval again

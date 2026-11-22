@@ -139,6 +139,7 @@ export class SpanStorageService {
       });
       const owned = resolved.map((span) => ({
         ...mapNormalizedSpanToSpan(span),
+        kind: span.kind,
         ...braidedOwnerOf({ authorization: params.authorization, tenantId: span.tenantId }),
       }));
       // The cutoff is the organisation's plan, and a braid joins projects of one organisation.
@@ -150,7 +151,11 @@ export class SpanStorageService {
       deps: this.blobResolutionDeps,
     });
 
-    return applyVisibilityGate(mapNormalizedSpansToSpans(resolvedSpans), params.visibilityCutoffMs);
+    const spans = mapNormalizedSpansToSpans(resolvedSpans).map((span, index) => ({
+      ...span,
+      kind: resolvedSpans[index]!.kind,
+    }));
+    return applyVisibilityGate(spans, params.visibilityCutoffMs);
   }
 
   /** A braided read's bodies, each resolved under the project that stored it (ADR-201 §5). */

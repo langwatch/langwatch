@@ -132,4 +132,37 @@ describe("BillableEventsMeterClickHouseRepository.insert", () => {
       expect(coalesceKeyOf(sent[0]!)).not.toBeNull();
     });
   });
+
+  describe("given one billable event", () => {
+    it("sends an insert the member may coalesce, with async deduplication off", async () => {
+      const inserts: InsertRequest[] = [];
+      const meter = BillableEventsMeterClickHouseRepository.create(
+        createApiFixture<ClickHouseQueryClient>({
+          insert: async (request) => {
+            inserts.push(request);
+          },
+        }),
+      );
+
+      await meter.insert({
+        organizationId: "org_1",
+        record: {
+          organizationId: "org_1",
+          tenantId: "project_1",
+          eventId: "event_1",
+          eventType: "span",
+          deduplicationKey: "trace_1",
+          eventTimestamp: 1_700_000_000_000,
+        },
+      });
+
+      expect(inserts).toHaveLength(1);
+      expect(inserts[0]?.settings).toEqual({
+        async_insert: 1,
+        wait_for_async_insert: 1,
+        async_insert_deduplicate: 0,
+      });
+      expect(inserts.map(coalesceKeyOf)).not.toContain(null);
+    });
+  });
 });

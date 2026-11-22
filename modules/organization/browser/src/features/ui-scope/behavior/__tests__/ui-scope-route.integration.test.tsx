@@ -12,8 +12,11 @@ import { isUiPublicRoute, useUiRouteReading, type UiRouteReading } from "../ui-s
 const ROUTE_PATHS = [
   "/",
   "/settings/api-keys",
+  "/coding-agents",
+  "/coding-agents/sessions",
+  // The retired address's redirect rows, as the application mounts them.
   "/me",
-  "/me/sessions",
+  "/me/*",
   "/mentions",
   "/share/:id",
   "/auth/signin",
@@ -74,30 +77,38 @@ describe("given an address the router matched", () => {
 
   describe("when it carries an org query", () => {
     it("reads it", () => {
-      expect(readAt("/me?org=beta").orgParam).toBe("beta");
+      expect(readAt("/coding-agents?org=beta").orgParam).toBe("beta");
     });
 
     it("reads no org when the query names none", () => {
-      expect(readAt("/me").orgParam).toBe("");
+      expect(readAt("/coding-agents").orgParam).toBe("");
     });
   });
 
   describe("when it is the personal workspace's own", () => {
     it("says so for the personal home", () => {
-      expect(readAt("/me").isPersonalScopeRoute).toBe(true);
+      expect(readAt("/coding-agents").isPersonalScopeRoute).toBe(true);
     });
 
     /** @scenario "Every personal-workspace sub-route gets the same treatment" */
     it("says so for every personal sub-route", () => {
+      expect(readAt("/coding-agents/sessions").isPersonalScopeRoute).toBe(true);
+    });
+
+    it("says so for the retired /me address while its redirect renders", () => {
+      expect(readAt("/me").isPersonalScopeRoute).toBe(true);
+    });
+
+    it("says so for a retired /me sub-route while its redirect renders", () => {
       expect(readAt("/me/sessions").isPersonalScopeRoute).toBe(true);
     });
   });
 
   describe("when it only looks like the personal workspace's own", () => {
-    it("reads a project named 'me' as a project, not as the personal workspace", () => {
-      const reading = readAt("/me/traces");
+    it("reads a project named 'coding-agents' as a project, not as the personal workspace", () => {
+      const reading = readAt("/coding-agents/traces");
 
-      expect(reading.projectParam).toBe("me");
+      expect(reading.projectParam).toBe("coding-agents");
       expect(reading.isPersonalScopeRoute).toBe(false);
     });
 
@@ -154,7 +165,7 @@ describe("given the addresses that render without a session", () => {
 
   it("holds every other address behind it", () => {
     expect(isUiPublicRoute("/")).toBe(false);
-    expect(isUiPublicRoute("/me")).toBe(false);
+    expect(isUiPublicRoute("/coding-agents")).toBe(false);
     expect(isUiPublicRoute("/acme-app/traces")).toBe(false);
     expect(isUiPublicRoute("/share")).toBe(false);
   });

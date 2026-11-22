@@ -18,7 +18,7 @@ import type { FoldReadAuthorizer } from "@langwatch/eventing";
 const TEST_ACTOR = { type: "user", id: "test-user" } as const;
 const TEST_ORGANIZATION_ID = "test-organization";
 const TEST_PERMISSIONS = ["traces:view", "analytics:view"] as const;
-const TEST_PROOF_LIFETIME_MS = 5 * 60 * 1000;
+export const TEST_PROOF_LIFETIME_MS = 5 * 60 * 1000;
 
 /** The proof a plain project's route mints: one own grant, nothing shared. */
 export function ownProof({

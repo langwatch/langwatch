@@ -261,6 +261,22 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
     return [...new Set(rows.map((row) => row.id))];
   }
 
+  async findStoredGrantIds({
+    organizationId,
+    grantIds,
+  }: {
+    organizationId: string;
+    grantIds: readonly string[];
+  }): Promise<string[]> {
+    if (grantIds.length === 0) return [];
+    // Not `liveGrants`: a revoked grant's id is the one a re-mint must reuse.
+    const rows = await this.prisma.grant.findMany({
+      where: { organizationId, id: { in: [...grantIds] } },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
   async findLiveRole({
     roleId,
     organizationId,

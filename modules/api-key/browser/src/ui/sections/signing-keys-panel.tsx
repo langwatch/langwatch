@@ -3,32 +3,23 @@
  * signed spans over 24 hours; create, rotate and revoke for whoever may braid out of the project.
  * A secret lives only in panel state. Spec: modules/api-key/specs/signing-keys.feature
  */
-import type { SigningKeysPanelProps } from "@langwatch/api-key-client";
+import { SIGNING_KEY_QUERY_KEY, type SigningKeysPanelProps } from "@langwatch/api-key-client";
 import type { SigningKey } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { AccessState } from "@langwatch/design-system/access-state";
+import { Banner } from "@langwatch/design-system/banner";
 import type { SnippetCopy } from "@langwatch/design-system/code-preview";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { EmptyValue } from "@langwatch/design-system/empty-value";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import {
-  Alert,
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { Key, Plus } from "lucide-react";
-import { useState } from "react";
+import { Badge, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Key } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import { useApiKeyHost } from "../../model/api-key-host.ts";
@@ -69,9 +60,11 @@ function StatusBadge({ signingKey }: { signingKey: SigningKeyRow }) {
 
 function SigningKeyTableRow({
   signingKey,
+  canIssue,
   onAction,
 }: {
   signingKey: SigningKeyRow;
+  canIssue: boolean;
   onAction: (action: PendingAction) => void;
 }) {
   return (
@@ -99,9 +92,11 @@ function SigningKeyTableRow({
       </ListTable.Cell>
       <ListTable.Cell nowrap>
         <VStack gap={0} align="start">
-          <Text textStyle="sm">{signingKey.passed24h.toLocaleString()} passed</Text>
+          <Text textStyle="sm">
+            <FormattedNumber value={signingKey.passed24h} /> passed
+          </Text>
           <Text textStyle="sm" color={signingKey.failed24h > 0 ? "fg.error" : "fg.muted"}>
-            {signingKey.failed24h.toLocaleString()} failed
+            <FormattedNumber value={signingKey.failed24h} /> failed
           </Text>
         </VStack>
       </ListTable.Cell>
@@ -114,12 +109,14 @@ function SigningKeyTableRow({
               </Button>
             </Menu.Trigger>
             <Menu.Content>
-              <Menu.Item
-                value="rotate"
-                onClick={() => onAction({ kind: "rotate", key: signingKey })}
-              >
-                Rotate
-              </Menu.Item>
+              {canIssue ? (
+                <Menu.Item
+                  value="rotate"
+                  onClick={() => onAction({ kind: "rotate", key: signingKey })}
+                >
+                  Rotate
+                </Menu.Item>
+              ) : null}
               <Menu.Item
                 value="revoke"
                 color="fg.error"
@@ -135,44 +132,15 @@ function SigningKeyTableRow({
   );
 }
 
-function SigningKeysHeading({ canManage, onCreate }: { canManage: boolean; onCreate: () => void }) {
-  return (
-    <HStack width="full" align="start" gap={4}>
-      <Box>
-        <Heading size="sm" as="h3">
-          Signing keys
-        </Heading>
-        <Text color="fg.muted" fontSize="sm">
-          Sign the tags on this project&apos;s calls so projects that braid into it can trust them.
-        </Text>
-      </Box>
-      <Spacer />
-      <Tooltip
-        content="Whoever may braid out of this project manages its signing keys."
-        disabled={canManage}
-      >
-        <Button
-          size="sm"
-          colorPalette="orange"
-          onClick={onCreate}
-          disabled={!canManage}
-          data-testid="signing-key-new"
-        >
-          <Plus size={14} aria-hidden />
-          New signing key
-        </Button>
-      </Tooltip>
-    </HStack>
-  );
-}
-
 function SigningKeysTable({
   rows,
   isLoading,
+  canIssue,
   onAction,
 }: {
   rows: readonly SigningKeyRow[];
   isLoading: boolean;
+  canIssue: boolean;
   onAction: (action: PendingAction) => void;
 }) {
   if (!isLoading && rows.length === 0) {
@@ -201,14 +169,19 @@ function SigningKeysTable({
       <ListTable.Body>
         {isLoading && <ListTable.LoadingRows rows={2} columns={COLUMNS} />}
         {rows.map((signingKey) => (
-          <SigningKeyTableRow key={signingKey.id} signingKey={signingKey} onAction={onAction} />
+          <SigningKeyTableRow
+            key={signingKey.id}
+            signingKey={signingKey}
+            canIssue={canIssue}
+            onAction={onAction}
+          />
         ))}
       </ListTable.Body>
     </ListTable>
   );
 }
 
-export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
+export function SigningKeysPanel({ projectId, canIssue = true }: SigningKeysPanelProps) {
   const host = useApiKeyHost();
   const utils = apiKeyApi.useUtils();
   const canManage = host.hasPermission(MANAGE_PERMISSION);
@@ -217,7 +190,18 @@ export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
   const rotate = apiKeyApi.signingKeys.rotate.useMutation(NO_CACHE);
   const revoke = apiKeyApi.signingKeys.revoke.useMutation();
 
+  const { query } = host.route();
+  const asked = canManage && canIssue && query[SIGNING_KEY_QUERY_KEY] === "new";
   const [creating, setCreating] = useState(false);
+  // The ask opens the dialog once, adjusted during render; the effect clears it from the address.
+  const [taken, setTaken] = useState(false);
+  if (asked !== taken) {
+    setTaken(asked);
+    if (asked) setCreating(true);
+  }
+  useEffect(() => {
+    if (asked) host.setQuery({ ...query, [SIGNING_KEY_QUERY_KEY]: undefined }, { replace: true });
+  }, [asked, host, query]);
   const [createRound, setCreateRound] = useState(0);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [issued, setIssued] = useState<IssuedSecret | null>(null);
@@ -278,7 +262,12 @@ export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
   };
 
   let body = (
-    <SigningKeysTable rows={keys.data ?? []} isLoading={keys.isLoading} onAction={setPending} />
+    <SigningKeysTable
+      rows={keys.data ?? []}
+      isLoading={keys.isLoading}
+      canIssue={canIssue}
+      onAction={setPending}
+    />
   );
   if (!canManage) {
     body = (
@@ -292,18 +281,20 @@ export function SigningKeysPanel({ projectId }: SigningKeysPanelProps) {
     );
   } else if (keys.isError) {
     body = (
-      <Alert.Root status="error" data-testid="signing-keys-error">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>Couldn&apos;t load this project&apos;s signing keys</Alert.Title>
-        </Alert.Content>
-      </Alert.Root>
+      <Banner
+        status="error"
+        title="Couldn't load this project's signing keys"
+        data-testid="signing-keys-error"
+      />
     );
   }
 
   return (
+    // The Braids page's section names it Signing keys, so the panel opens on its description.
     <VStack gap={4} align="stretch" data-testid="signing-keys-panel">
-      <SigningKeysHeading canManage={canManage} onCreate={() => setCreating(true)} />
+      <Text textStyle="sm" color="fg.muted">
+        Sign the tags on this project's calls so projects that braid into it can trust them.
+      </Text>
       {needsEnterprise && (
         <AccessState
           kind="upgrade"

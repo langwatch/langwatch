@@ -5,6 +5,7 @@
 import { createHash } from "node:crypto";
 
 import { memoryObjectStorage } from "@langwatch/process-stores";
+import { STORED_OBJECT_UPLOAD_REQUEST_BODY } from "@langwatch/stored-object-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -215,6 +216,17 @@ describe("StoredObjectService uploads", () => {
       expect(created.uploadUrl).toContain(
         `/api/stored-objects/uploads/${created.objectId}/content`,
       );
+    });
+  });
+
+  describe("when the account uploads through LangWatch", () => {
+    /** @scenario "The api allows a body up to two hours on the upload route only" */
+    it("hands out the route the api's long body allowance names", async () => {
+      const { service } = fixture();
+
+      const created = await createAttachmentUpload(service, {});
+
+      expect(new URL(created.uploadUrl).pathname).toMatch(STORED_OBJECT_UPLOAD_REQUEST_BODY.path);
     });
   });
 

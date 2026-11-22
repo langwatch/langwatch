@@ -33,6 +33,7 @@ Feature: Stock trace widgets read the light trace table
       When the trace_metrics catalogue is read
       Then it still deduplicates on TenantId, OccurredAt and TraceId by the latest UpdatedAt
       And it reads in sort-key order without FINAL, breaking UpdatedAt ties by Version
+      And its floored twin bounds OccurredAt, a column of that key
 
   Rule: The moved widget queries read trace_metrics and return the same rows
 

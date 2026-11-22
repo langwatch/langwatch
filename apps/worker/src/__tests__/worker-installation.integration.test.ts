@@ -193,6 +193,7 @@ describe("the worker process installation", () => {
       expect(pipelines).toContain("workflow_agent_archive_cascade");
       expect(pipelines).toContain("evaluator_workflow_archive_cascade");
       expect(pipelines).toContain("share_trace_sharing_revocation");
+      expect(pipelines).toContain("api_key_docs_playground_revocation");
       expect(pipelines).toContain("topic_clustering_processing");
       expect(pipelines).toContain("automations");
       expect(pipelines).toContain("evaluation_processing");

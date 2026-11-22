@@ -28,6 +28,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-agent": "catalog:",
     "@aws-sdk/client-s3": "catalog:",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
@@ -76,6 +77,7 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/automation-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/gateway-process": "workspace:*",

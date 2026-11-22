@@ -22,6 +22,7 @@ import { nowInstant, type Instant } from "@langwatch/time";
 import { instantEvalRunQuestions } from "../rules/instant-eval-run-questions.rules.ts";
 import { instantEvalQueryReservationId } from "../rules/instant-eval-spend-outcome.rules.ts";
 import type { InstantEvalFreeBudgetService } from "./instant-eval-free-budget.service.ts";
+import type { InstantEvalGatewayBudgetService } from "./instant-eval-gateway-budget.service.ts";
 import type {
   InstantEvalJudgeRowsService,
   InstantEvalJudgeUsage,
@@ -35,6 +36,7 @@ export class InstantEvalQueryJudgingService {
     private readonly options: {
       rows: Pick<InstantEvalJudgeRowsService, "judgeRows">;
       budget: Pick<InstantEvalFreeBudgetService, "reserve" | "release">;
+      gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
       spend: Pick<InstantEvalJudgedSpendService, "recordSpend">;
       holdPricing: () => Promise<InstantEvalPricing>;
       queryTokenBudget: number;
@@ -45,6 +47,7 @@ export class InstantEvalQueryJudgingService {
   static create({
     rows,
     budget,
+    gatewayBudget,
     spend,
     holdPricing,
     queryTokenBudget,
@@ -52,6 +55,7 @@ export class InstantEvalQueryJudgingService {
   }: {
     rows: Pick<InstantEvalJudgeRowsService, "judgeRows">;
     budget: Pick<InstantEvalFreeBudgetService, "reserve" | "release">;
+    gatewayBudget: Pick<InstantEvalGatewayBudgetService, "assertWithinGatewayBudget">;
     spend: Pick<InstantEvalJudgedSpendService, "recordSpend">;
     /** The judge's hold rates: the dearest input rate a routed call could reach. */
     holdPricing: () => Promise<InstantEvalPricing>;
@@ -62,6 +66,7 @@ export class InstantEvalQueryJudgingService {
     return new InstantEvalQueryJudgingService({
       rows,
       budget,
+      gatewayBudget,
       spend,
       holdPricing,
       queryTokenBudget,
@@ -79,7 +84,8 @@ export class InstantEvalQueryJudgingService {
     const questions = instantEvalRunQuestions(judgements);
     if (questions.length === 0) return { rows, skipped: {} };
 
-    const { budget, queryTokenBudget } = this.options;
+    const { budget, gatewayBudget, queryTokenBudget } = this.options;
+    await gatewayBudget.assertWithinGatewayBudget({ projectId });
     const reservationId = instantEvalQueryReservationId();
     const priceUsd = await this.#holdPriceOf(queryTokenBudget);
     await budget.reserve({ projectId, reservationId, priceUsd });

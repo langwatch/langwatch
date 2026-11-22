@@ -4,7 +4,7 @@ import { AgentApi } from "@langwatch/agent-contract";
 import { OrganizationInvalidCredentialsError } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { CliTokenIdentity } from "@langwatch/api/rest";
-import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuditLogApi, type AuditLogIntent } from "@langwatch/audit-log-contract";
 import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-contract";
 /**
  * The governance feature's application: what all three of its doors call.
@@ -27,7 +27,10 @@ import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-cont
  * That is what lets one operation serve a browser session, an API key and the
  * CLI without knowing which it is serving.
  */
-import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
+import {
+  type AuthzPermission,
+  ImpersonationCannotMintCredentialError,
+} from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
@@ -82,6 +85,16 @@ import {
   type GovernanceIngestWebhookInput,
   type GovernanceProjectCaller,
   GovernanceRestApi,
+  type AgentKillSwitchSummary,
+  type AgentStopCaller,
+  type AgentStopPlan,
+  type AgentStopSeverity,
+  type AgentStopStatus,
+  type AgentStopTarget,
+  type AgentStopPage,
+  type AgentStopView,
+  type AwsConnectionInput,
+  type AwsConnectionView,
   type IngestionTemplate,
   type AiToolEntry,
   type AiToolMemberInput,
@@ -120,7 +133,7 @@ import {
   type CloneIngestionTemplateInput,
   type CreateIngestionTemplateInput,
   type UpdateIngestionTemplateOttlInput,
-  type GovernanceActorWorkspace,
+  type GovernanceActorWorkspaceLookup,
   type MePersonalCredential,
   type MeUsage,
   type PersonalUsageQueryInput,
@@ -134,6 +147,13 @@ import {
   type IdentityMatchRun,
   type OrganizationSessionPolicyShape,
   type GovernanceAgentRow,
+  type AgentRegistryEntry,
+  type AgentRegistryEventPage,
+  type AgentRegistryPage,
+  type AgentRegistryStatus,
+  type ArdManifest,
+  type ArdSearchRequest,
+  type ArdSearchResponse,
   type GovernanceCostDayRecords,
   type GovernanceCostModelBreakdown,
   type GovernanceCostPeriodRecordsInput,
@@ -145,6 +165,10 @@ import {
   type PeopleScreenSuggestion,
   type SessionCeilingApplied,
   type GovernanceMcpSessionTools,
+  type OcsfEventsPage,
+  type OcsfExportWindow,
+  type OcsfIngestRequest,
+  type OcsfIngestResponse,
 } from "@langwatch/enterprise-governance-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import {
@@ -191,6 +215,7 @@ import {
 import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
+import { killSwitchChannels } from "../channels/kill-switch-channels.registry.ts";
 import {
   OutboxAnomalyAlertDelivery,
   requestAnomalyAlertDelivery,
@@ -284,11 +309,47 @@ import {
 import { IngestionSourceService } from "../features/ingestion-source/services/ingestion-source.service.ts";
 import { IngestionTemplateService } from "../features/ingestion-source/services/ingestion-template.service.ts";
 import { SourceCredentialAccessService } from "../features/ingestion-source/services/source-credential-access.service.ts";
+import type { AGENT_STOP_COMMANDS } from "../features/kill-switch/eventing/agent-stop.commands.ts";
+import {
+  type AgentStopPipelineDefinition,
+  buildAgentStopPipeline,
+} from "../features/kill-switch/eventing/agent-stop.pipeline.ts";
+import {
+  OutboxKillSwitchAudit,
+  recordKillSwitchAudit,
+} from "../features/kill-switch/eventing/kill-switch-audit.intent.ts";
+import { AgentStopClaimService } from "../features/kill-switch/services/agent-stop-claim.service.ts";
+import { AgentStopPlanService } from "../features/kill-switch/services/agent-stop-plan.service.ts";
+import { AgentStopTargetService } from "../features/kill-switch/services/agent-stop-target.service.ts";
+import {
+  type AgentStopCommandSend,
+  AgentStopService,
+} from "../features/kill-switch/services/agent-stop.service.ts";
+import { GovernanceAwsConnectionService } from "../features/kill-switch/services/governance-aws-connection.service.ts";
+import { KillSwitchAuditService } from "../features/kill-switch/services/kill-switch-audit.service.ts";
+import {
+  OutboxOcsfPushDelivery,
+  requestOcsfPushDelivery,
+} from "../features/ocsf/eventing/ocsf-push-delivery.intent.ts";
+import type { OcsfPushIntent } from "../features/ocsf/eventing/ocsf-push-delivery.process.ts";
+import { OcsfSiemExportService } from "../features/ocsf/services/ocsf-siem-export.service.ts";
+import { OcsfSiemIngestService } from "../features/ocsf/services/ocsf-siem-ingest.service.ts";
+import { OcsfSiemPushService } from "../features/ocsf/services/ocsf-siem-push.service.ts";
 import { PersonaHomeService } from "../features/personal/services/persona-home.service.ts";
 import { PersonalIngestionKeyService } from "../features/personal/services/personal-ingestion-key.service.ts";
 import { PersonalUsageDashboardService } from "../features/personal/services/personal-usage-dashboard.service.ts";
 import { PersonalUsageKeyService } from "../features/personal/services/personal-usage-key.service.ts";
 import { DefaultGovernancePersonalUsageService } from "../features/personal/services/personal-usage.service.ts";
+import {
+  OutboxAgentRegistryDelivery,
+  requestAgentRegistryDelivery,
+} from "../features/registry/eventing/agent-registry-delivery.intent.ts";
+import type { AgentRegistryDeliveryIntent } from "../features/registry/eventing/agent-registry-delivery.process.ts";
+import { AgentRegistryReadsService } from "../features/registry/services/agent-registry-reads.service.ts";
+import {
+  AgentRegistryService,
+  type AgentRegistryTrafficPass,
+} from "../features/registry/services/agent-registry.service.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
@@ -323,7 +384,7 @@ type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 /** The peers this application reads, resolved from {@link GovernanceModule.dependencies}. */
 interface GovernanceAppDependencies {
   /** Anomaly alerts to a rule's registered endpoints, and the endpoints W-11's step creates. */
-  webhooks: Pick<WebhookApi, "requestDelivery" | "create" | "archive">;
+  webhooks: Pick<WebhookApi, "requestDelivery" | "create" | "archive" | "getAll">;
   /**
    * The organization a project belongs to, for the project-scoped REST family,
    * and the organization's hidden governance project, which is the tenant an
@@ -351,9 +412,10 @@ interface GovernanceAppDependencies {
     | "findLiveAggregateIds"
     | "findPersonalProjectIds"
     | "findReadableProjectIds"
+    | "listNamesByIds"
   >;
   /** Agent owns the Agent table: the organization's connected agents, read by project. */
-  agents: Pick<AgentApi, "findConnectedInProjects">;
+  agents: Pick<AgentApi, "findConnectedInProjects" | "list" | "platformUrl">;
   /** The release flag that decides whether an organization's pulled usage carries a cost. */
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   /** Where a pulled Genie/Copilot conversation lands as a trace: the OTLP door main routed through. */
@@ -366,6 +428,7 @@ interface GovernanceAppDependencies {
     | "findModelSpend"
     | "hasTraceWithAttribute"
     | "findTraceCountsByAttribute"
+    | "findAgentsSeen"
     | "compileLangWatchQLTraceFilter"
     | "listTraceSummaries"
     | keyof ActivityMonitorTraces
@@ -392,6 +455,9 @@ interface GovernanceAppDependencies {
     | "getPrincipalSpendSummary"
     | "findPrincipalDailySpend"
     | "findPrincipalModelSpend"
+    | "findVirtualKeyById"
+    | "disableVirtualKey"
+    | "enableVirtualKey"
   >;
   enterpriseGateway: Pick<
     EnterpriseGatewayApi,
@@ -407,7 +473,7 @@ interface GovernanceAppDependencies {
   >;
   users: Pick<UserApi, "findById" | "findByEmail" | "findLastHomePath" | "personalCallerFor">;
   /** Audit-log owns the AuditLog table: workspace-view rows are written and deduped there. */
-  auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince">;
+  auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince" | "findForOrganization">;
   /** Where a push source's OTLP logs and webhook envelopes are collected. */
   logs: Pick<LogApi, "collectOtlpLogs">;
   /** Where a push source's OTLP metrics are collected. */
@@ -571,6 +637,7 @@ export class GovernanceModule implements GovernanceRestApi {
         allowedHosts: config?.allowedProxyHosts ?? [],
       },
       vendorBases: vendorBasesOf({ config }),
+      bedrockAgentEndpoint: config?.bedrockAgentEndpoint,
     });
   }
 
@@ -585,6 +652,7 @@ export class GovernanceModule implements GovernanceRestApi {
     ingestRateLimitDisabled,
     pullEgress,
     vendorBases,
+    bedrockAgentEndpoint,
   }: {
     ottl: GovernanceOttlGateway;
     ingestionSecrets: IngestionSecretService;
@@ -596,6 +664,7 @@ export class GovernanceModule implements GovernanceRestApi {
     ingestRateLimitDisabled: boolean;
     pullEgress: GovernanceEgressPolicy;
     vendorBases: VendorBases;
+    bedrockAgentEndpoint: string | undefined;
   }) {
     this.dependencies = dependencies;
     this.vendorBases = vendorBases;
@@ -605,6 +674,33 @@ export class GovernanceModule implements GovernanceRestApi {
       history: repositories.tenantHistory,
     });
     this.tenantHistory = tenantHistory;
+    const apiOcsfPushOutbox = repositories.ocsfPushIntents
+      ? OutboxOcsfPushDelivery.create(repositories.ocsfPushIntents)
+      : undefined;
+    this.ocsfPush = OcsfSiemPushService.create({
+      events: repositories.ocsfEvents,
+      projects: dependencies.projects,
+      webhooks: dependencies.webhooks,
+      entitlements: {
+        hasEnterprisePlan: async (organizationId) =>
+          isEnterpriseTier(
+            (await dependencies.entitlements.getActivePlan({ organizationId })).type,
+          ),
+      },
+      outbox: () => this.#ocsfPushOutbox ?? apiOcsfPushOutbox,
+    });
+    this.ocsfSiemIngest = OcsfSiemIngestService.create({
+      events: repositories.ocsfEvents,
+      projects: tenantHistory,
+      now: () => nowInstant().epochMilliseconds,
+    });
+    this.ocsfSiemExport = OcsfSiemExportService.create({
+      events: repositories.ocsfEvents,
+      projects: dependencies.projects,
+      traces: dependencies.traces,
+      auditLog: dependencies.auditLog,
+      now: () => nowInstant().epochMilliseconds,
+    });
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
     this.aggregateReconciler = AggregateReconcilerService.create({
       lock: repositories.aggregateReconcileLock,
@@ -680,6 +776,28 @@ export class GovernanceModule implements GovernanceRestApi {
       projects: dependencies.projects,
       organizations: dependencies.organizations,
       discoveredAgents: repositories.discoveredAgents,
+    });
+    this.agentRegistry = AgentRegistryService.create({
+      registry: repositories.agentRegistry,
+      discoveredAgents: repositories.discoveredAgents,
+      agents: dependencies.agents,
+      projects: dependencies.projects,
+      organizations: dependencies.organizations,
+      traces: dependencies.traces,
+      webhooks: dependencies.webhooks,
+      entitlements: {
+        hasEnterprisePlan: async (organizationId) =>
+          isEnterpriseTier(
+            (await dependencies.entitlements.getActivePlan({ organizationId })).type,
+          ),
+      },
+      outbox: () => this.#agentRegistryOutbox,
+      publicBaseUrl: publicBaseUrl ?? "",
+    });
+    this.agentRegistryReads = AgentRegistryReadsService.create({
+      registry: repositories.agentRegistry,
+      publicBaseUrl: publicBaseUrl ?? "",
+      now: nowInstant,
     });
     this.costSummary = GovernanceCostSummaryService.create({
       costRollup: repositories.costRollup,
@@ -763,7 +881,7 @@ export class GovernanceModule implements GovernanceRestApi {
       teams: dependencies.organizations,
       targets: dependencies.projects,
       projects: tenantHistory,
-      events: repositories.ocsfEvents,
+      events: this.ocsfPush,
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
     this.ocsfExport = DefaultGovernanceOcsfExportService.create({
@@ -779,7 +897,7 @@ export class GovernanceModule implements GovernanceRestApi {
     };
     this.traceFacts = GovernanceTraceFactsService.create({
       kpis: repositories.anomalySpend,
-      ocsf: repositories.ocsfEvents,
+      ocsf: this.ocsfPush,
       traces: dependencies.traces,
       projects: dependencies.projects,
       diagnostics: anomalyDiagnostics,
@@ -859,6 +977,7 @@ export class GovernanceModule implements GovernanceRestApi {
       signIn,
       genieSpaces: channels.genieSpaces.create({ http }),
       copilotBots: channels.copilotBots.create({ http, vendorBases }),
+      registry: this.agentRegistry,
     });
     this.personListing = PersonListingService.create({
       sourceCredentials,
@@ -868,6 +987,61 @@ export class GovernanceModule implements GovernanceRestApi {
       adminApiUsers: channels.adminApiUsers.create({ http, vendorBases }),
       microsoftDirectory: channels.microsoftDirectory.create({ http, vendorBases }),
       databricksScimUsers: channels.databricksScimUsers.create({ http }),
+    });
+    const servingEndpoints = killSwitchChannels.live.servingEndpoints.create({ http });
+    const bedrockAliases = killSwitchChannels.live.bedrockAliases.create({
+      endpoint: bedrockAgentEndpoint,
+    });
+    this.agentStopPlans = AgentStopPlanService.create({
+      plans: repositories.agentStopPlans,
+      registry: repositories.agentRegistry,
+      sources: repositories.ingestionSources,
+      awsConnections: repositories.awsConnections,
+      virtualKeys: dependencies.gateway,
+      sourceCredentials,
+      signIn,
+      servingEndpoints,
+      bedrock: bedrockAliases,
+    });
+    const killSwitchAudit = KillSwitchAuditService.create({
+      auditLog: dependencies.auditLog,
+      outbox: () => this.#killSwitchAuditOutbox,
+    });
+    this.awsConnections = GovernanceAwsConnectionService.create({
+      connections: repositories.awsConnections,
+      plans: repositories.agentStopPlans,
+      stops: repositories.agentStops,
+      audit: killSwitchAudit,
+    });
+    const sendAgentStop: AgentStopCommandSend = async (name, payload) => {
+      await this.agentStopSender(name).send(payload);
+    };
+    this.agentStops = AgentStopService.create({
+      stops: repositories.agentStops,
+      claims: AgentStopClaimService.create({
+        claims: repositories.agentStopClaims,
+        stops: repositories.agentStops,
+      }),
+      plans: this.agentStopPlans,
+      locks: repositories.killSwitchLock,
+      registry: repositories.agentRegistry,
+      audit: killSwitchAudit,
+      send: sendAgentStop,
+    });
+    this.agentStopTargets = AgentStopTargetService.create({
+      send: sendAgentStop,
+      sourceCredentials,
+      signIn,
+      servingEndpoints,
+      awsConnections: repositories.awsConnections,
+      priorStates: repositories.agentStopTargetPriorStates,
+      bedrock: bedrockAliases,
+      virtualKeys: dependencies.gateway,
+      registry: this.agentRegistry,
+      stops: repositories.agentStops,
+      plans: this.agentStopPlans,
+      locks: repositories.killSwitchLock,
+      auditLog: dependencies.auditLog,
     });
 
     this.personalUsageDashboards = PersonalUsageDashboardService.create({
@@ -980,6 +1154,14 @@ export class GovernanceModule implements GovernanceRestApi {
   readonly anomalyWebhookMigration: AnomalyWebhookDestinationMigrationService;
   private readonly people: GovernancePeopleScreenService;
   private readonly agentsScreen: GovernanceAgentsScreenService;
+  /** The organisation's agent registry, its ARD view and change feed (specs/agent-registry.feature). */
+  readonly agentRegistry: AgentRegistryService;
+  private readonly agentStopPlans: AgentStopPlanService;
+  private readonly agentStops: AgentStopService;
+  private readonly agentStopTargets: AgentStopTargetService;
+  private readonly awsConnections: GovernanceAwsConnectionService;
+  private agentStopCommands: EventingSenders | undefined;
+  private readonly agentRegistryReads: AgentRegistryReadsService;
   private readonly costBreakdown: GovernanceCostBreakdownService;
   private readonly costSummary: GovernanceCostSummaryService;
   private readonly aiTools: DefaultGovernanceAiToolCatalogService;
@@ -1067,6 +1249,29 @@ export class GovernanceModule implements GovernanceRestApi {
     this.ingestionPullCommands = commands;
   }
 
+  /** The kill switch's `agent_stop` pipeline; its process managers run only where it consumes. */
+  agentStopPipeline({
+    processStore,
+  }: {
+    processStore: Pick<ProcessStore, "deleteDispatchedBefore">;
+  }): AgentStopPipelineDefinition {
+    return buildAgentStopPipeline({
+      store: this.repositories.agentStops,
+      executors: this.agentStopTargets,
+      audit: { record: (intent) => this.recordKillSwitchAudit(intent), processStore },
+    });
+  }
+
+  connectAgentStop(commands: EventingSenders): void {
+    this.agentStopCommands = commands;
+  }
+
+  private agentStopSender(name: keyof typeof AGENT_STOP_COMMANDS) {
+    const sender = this.agentStopCommands?.[name];
+    if (!sender) throw new Error(`governance_agent_stop is not registered for ${name}`);
+    return sender;
+  }
+
   /** Main's `governanceKpisSync` + `governanceOcsfEventsSync`, pulled: the window's governance traces. */
   pullGovernanceTraceFacts(window: { fromMs: number; toMs: number }): Promise<{ written: number }> {
     return this.traceFacts.pull(window);
@@ -1078,6 +1283,77 @@ export class GovernanceModule implements GovernanceRestApi {
   }
 
   #anomalyAlertOutbox: OutboxAnomalyAlertDelivery | undefined;
+  #agentRegistryOutbox: OutboxAgentRegistryDelivery | undefined;
+  #killSwitchAuditOutbox: OutboxKillSwitchAudit | undefined;
+  #ocsfPushOutbox: OutboxOcsfPushDelivery | undefined;
+  private readonly ocsfPush: OcsfSiemPushService;
+  private readonly ocsfSiemExport: OcsfSiemExportService;
+  private readonly ocsfSiemIngest: OcsfSiemIngestService;
+
+  /** A built pipeline means an outbox: written OCSF batches fan out to SIEM endpoints from here on. */
+  connectOcsfPushOutbox({
+    processStore,
+  }: {
+    processStore: Pick<ProcessStore, "appendIntents">;
+  }): void {
+    this.#ocsfPushOutbox = OutboxOcsfPushDelivery.create(processStore);
+  }
+
+  /** The OCSF push intent's handler: one WebhookApi.requestDelivery per batch and endpoint. */
+  requestOcsfPushDelivery(intent: OcsfPushIntent, context: IntentContext): Promise<void> {
+    return requestOcsfPushDelivery(this.dependencies.webhooks)(intent, context);
+  }
+
+  listOcsfEvents(
+    input: OcsfExportWindow & { sourceType?: string; sourceId?: string },
+  ): Promise<OcsfEventsPage> {
+    return this.ocsfSiemExport.listEvents(input);
+  }
+
+  listOcsfProjectTraces(input: OcsfExportWindow & { projectId?: string }): Promise<OcsfEventsPage> {
+    return this.ocsfSiemExport.listProjectTraces(input);
+  }
+
+  listOcsfAudit(input: OcsfExportWindow): Promise<OcsfEventsPage> {
+    return this.ocsfSiemExport.listAudit(input);
+  }
+
+  ingestOcsfEvents(
+    input: OcsfIngestRequest & { organizationId: string },
+  ): Promise<OcsfIngestResponse> {
+    return this.ocsfSiemIngest.ingest(input);
+  }
+
+  /** A built pipeline means an outbox: registry change events fan out through it from here on. */
+  connectAgentRegistryOutbox({
+    processStore,
+  }: {
+    processStore: Pick<ProcessStore, "appendIntents">;
+  }): void {
+    this.#agentRegistryOutbox = OutboxAgentRegistryDelivery.create(processStore);
+  }
+
+  /** A built pipeline means an outbox: kill switch audit rows are recorded in it from here on. */
+  connectKillSwitchAuditOutbox({
+    processStore,
+  }: {
+    processStore: Pick<ProcessStore, "appendIntents">;
+  }): void {
+    this.#killSwitchAuditOutbox = OutboxKillSwitchAudit.create(processStore);
+  }
+
+  /** The kill switch audit intent's handler: one keyed AuditLogApi.record per intent. */
+  recordKillSwitchAudit(intent: AuditLogIntent): Promise<void> {
+    return recordKillSwitchAudit(this.dependencies.auditLog)(intent);
+  }
+
+  /** The registry delivery intent's handler: one WebhookApi.requestDelivery per intent. */
+  requestAgentRegistryDelivery(
+    intent: AgentRegistryDeliveryIntent,
+    context: IntentContext,
+  ): Promise<void> {
+    return requestAgentRegistryDelivery(this.dependencies.webhooks)(intent, context);
+  }
 
   /** A built pipeline means an outbox: endpoint deliveries are recorded in it from here on. */
   connectAnomalyAlertOutbox({
@@ -1228,7 +1504,7 @@ export class GovernanceModule implements GovernanceRestApi {
         ensureInternal: (input) => this.tenantHistory.ensureInternal(input),
         findWithTeam: (id) => dependencies.projects.findWithTeam(id),
       },
-      sink: repositories.ocsfEvents,
+      sink: this.ocsfPush,
       usageEntitlement: {
         isEnabled: (organizationId) =>
           dependencies.featureFlags.isEnabled("release_pulled_usage_cost_enabled", {
@@ -1535,11 +1811,7 @@ export class GovernanceModule implements GovernanceRestApi {
     const { impersonatorId, ...rotate } = input;
     // An operator acting as a member holds no grant to issue credentials as them (F05).
     if (impersonatorId) {
-      throw new PermissionDeniedError({
-        permission: "ingestionSources:manage",
-        scope: { type: "organization", id: rotate.organizationId },
-        denialReason: "no-grant",
-      });
+      throw new ImpersonationCannotMintCredentialError();
     }
     const rotated = await this.ingestionSources.rotateSecret(rotate);
     return {
@@ -1628,7 +1900,7 @@ export class GovernanceModule implements GovernanceRestApi {
     input: PersonalIngestionKeyMint & { impersonatorId?: string | undefined },
   ): Promise<IssuedIngestionKey> {
     const { impersonatorId, ...mint } = input;
-    refuseImpersonatedKeyMint({ impersonatorId, organizationId: mint.organizationId });
+    refuseImpersonatedKeyMint({ impersonatorId });
     return this.ingestionKeys.install(mint);
   }
 
@@ -1636,7 +1908,7 @@ export class GovernanceModule implements GovernanceRestApi {
     input: PersonalIngestionKeyMint & { impersonatorId?: string | undefined },
   ): Promise<RotatedIngestionKey> {
     const { impersonatorId, ...mint } = input;
-    refuseImpersonatedKeyMint({ impersonatorId, organizationId: mint.organizationId });
+    refuseImpersonatedKeyMint({ impersonatorId });
     return this.ingestionKeys.rotate(mint);
   }
 
@@ -1674,6 +1946,172 @@ export class GovernanceModule implements GovernanceRestApi {
   }): Promise<AgentListingRequestResult> {
     this.agentListingSender();
     return this.agentSync.requestListing(input);
+  }
+
+  /** An agent's lifecycle fact: its project's organisation is reconciled (worker only). */
+  async reconcileAgentRegistryForProject({ projectId }: { projectId: string }): Promise<void> {
+    const organizationId = await this.dependencies.projects.getOrganizationId(projectId);
+    await this.agentRegistry.reconcileOrganization({ organizationId });
+  }
+
+  /** The scheduled traffic pass: the organisations the registry holds, or a walk over every one. */
+  reconcileAgentRegistryTraffic(
+    input: AgentRegistryTrafficPass = {},
+  ): Promise<{ organizations: number; complete: boolean }> {
+    return this.agentRegistry.reconcileTraffic(input);
+  }
+
+  listRegistryAgents(input: {
+    organizationId: string;
+    limit: number;
+    cursor?: string;
+    updatedSince?: string;
+    status?: AgentRegistryStatus;
+  }): Promise<AgentRegistryPage> {
+    return this.agentRegistryReads.listEntries(input);
+  }
+
+  getRegistryAgent(input: { organizationId: string; id: string }): Promise<AgentRegistryEntry> {
+    return this.agentRegistryReads.getEntry(input);
+  }
+
+  listRegistryAgentVersions(input: {
+    organizationId: string;
+    id: string;
+    cursor?: string;
+    limit: number;
+  }): Promise<AgentRegistryEventPage> {
+    return this.agentRegistryReads.listVersions(input);
+  }
+
+  listRegistryEvents(input: {
+    organizationId: string;
+    after?: string;
+    limit: number;
+  }): Promise<AgentRegistryEventPage> {
+    return this.agentRegistryReads.listEvents({
+      organizationId: input.organizationId,
+      limit: input.limit,
+      ...(input.after ? { cursor: input.after } : {}),
+    });
+  }
+
+  getRegistryArdManifest(input: { organizationId: string }): Promise<ArdManifest> {
+    return this.agentRegistryReads.ardManifest(input);
+  }
+
+  searchRegistryArd(input: {
+    organizationId: string;
+    request: ArdSearchRequest;
+  }): Promise<ArdSearchResponse> {
+    return this.agentRegistryReads.ardSearch(input);
+  }
+
+  // ── The agent kill switch (specs/agent-kill-switch.feature) ──────────────
+
+  findAgentKillSwitchSummaries(input: {
+    organizationId: string;
+  }): Promise<AgentKillSwitchSummary[]> {
+    return this.agentStops.findSummaries(input);
+  }
+
+  findPendingAgentStops(input: { organizationId: string }): Promise<AgentStopView[]> {
+    return this.agentStops.findPendingApprovals(input);
+  }
+
+  getAgentStopPlan(input: { organizationId: string; agentId: string }): Promise<AgentStopPlan> {
+    return this.agentStopPlans.getPlan(input);
+  }
+
+  async setAgentStopPlan(input: {
+    organizationId: string;
+    agentId: string;
+    targets: readonly AgentStopTarget[];
+    expectedVersion?: number;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopPlan> {
+    return this.agentStops.setPlan(input);
+  }
+
+  findAwsConnections(input: { organizationId: string }): Promise<AwsConnectionView[]> {
+    return this.awsConnections.findConnections(input);
+  }
+
+  createAwsConnection(input: {
+    organizationId: string;
+    connection: AwsConnectionInput;
+    userId: string | null;
+    impersonatorId?: string;
+  }): Promise<AwsConnectionView> {
+    return this.awsConnections.createConnection(input);
+  }
+
+  deleteAwsConnection(input: {
+    organizationId: string;
+    connectionId: string;
+    userId: string | null;
+    impersonatorId?: string;
+  }): Promise<{ deleted: boolean }> {
+    return this.awsConnections.deleteConnection(input);
+  }
+
+  requestAgentStop(input: {
+    organizationId: string;
+    agentId: string;
+    reason: string;
+    severity: AgentStopSeverity;
+    expectedTargetIds?: readonly string[];
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView> {
+    return this.agentStops.requestStop(input);
+  }
+
+  approveAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    note?: string;
+    expectedTargetIds?: readonly string[];
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView> {
+    return this.agentStops.approveStop(input);
+  }
+
+  denyAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    note?: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView> {
+    return this.agentStops.denyStop(input);
+  }
+
+  restoreAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView> {
+    return this.agentStops.restore(input);
+  }
+
+  retryAgentStop(input: {
+    organizationId: string;
+    stopId: string;
+    caller: AgentStopCaller;
+  }): Promise<AgentStopView> {
+    return this.agentStops.retryStop(input);
+  }
+
+  getLatestAgentStop(input: { organizationId: string; agentId: string }): Promise<AgentStopView> {
+    return this.agentStops.getLatestStop(input);
+  }
+
+  listAgentStops(input: {
+    organizationId: string;
+    statuses?: readonly AgentStopStatus[];
+    limit: number;
+    cursor?: string;
+  }): Promise<AgentStopPage> {
+    return this.agentStops.listStops(input);
   }
 
   governanceAgentsList(input: { organizationId: string }): Promise<GovernanceAgentRow[]> {
@@ -2023,8 +2461,11 @@ export class GovernanceModule implements GovernanceRestApi {
     return this.templates.listForOrgAdmin(input);
   }
 
-  templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate> {
-    return this.templates.getByIdForOrg(input);
+  templateGetByIdForMember(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<IngestionTemplate> {
+    return this.templates.getByIdForMember(input);
   }
 
   /** An `otlp_token` credential is the default one, so it is stored as none, as on main. */
@@ -2210,30 +2651,28 @@ export class GovernanceModule implements GovernanceRestApi {
 
   /**
    * The personal workspace behind a CH-side `actor` token, for the bird's-eye
-   * "View their workspace →" link on `/governance/users/[id]`.
-   *
-   * Three refusals collapse to one `null`: the token names nobody, the person
-   * it names is not in this organization, or they have no personal workspace
-   * yet. Keeping them indistinguishable is deliberate — a caller who may read
-   * the governance surface still learns nothing about who else exists on the
-   * instance from the shape of the answer.
+   * "View their workspace" link on `/governance/users/[id]`. Every miss (the
+   * token names nobody, the person is not in this organization, or they have no
+   * personal workspace yet) answers one `undisclosed`, so the shape of the
+   * answer never tells who else exists on the instance.
    */
-  async findActorWorkspace(input: {
+  async getActorWorkspace(input: {
     organizationId: string;
     actor: string;
-  }): Promise<GovernanceActorWorkspace | null> {
+  }): Promise<GovernanceActorWorkspaceLookup> {
+    const undisclosed = { status: "undisclosed" } as const;
     const user =
       (await this.dependencies.users.findById({ id: input.actor })) ??
       (input.actor.includes("@")
         ? await this.dependencies.users.findByEmail({ email: input.actor })
         : null);
-    if (!user) return null;
+    if (!user) return undisclosed;
 
     const member = await this.isOrganizationMember({
       organizationId: input.organizationId,
       userId: user.id,
     });
-    if (!member) return null;
+    if (!member) return undisclosed;
 
     const workspace = await this.dependencies.organizations
       .getPersonalWorkspace({
@@ -2244,16 +2683,19 @@ export class GovernanceModule implements GovernanceRestApi {
         if (TeamNotFoundError.is(error)) return null;
         throw error;
       });
-    if (!workspace) return null;
+    if (!workspace) return undisclosed;
 
     return {
-      userId: user.id,
-      // The admin reading the link needs a person, and any of the three
-      // columns identifies one; the id is the last resort rather than a blank.
-      displayName: user.name ?? user.email ?? user.id,
-      teamId: workspace.team.id,
-      projectId: workspace.project.id,
-      projectSlug: workspace.project.slug,
+      status: "found",
+      workspace: {
+        userId: user.id,
+        // The admin reading the link needs a person, and any of the three
+        // columns identifies one; the id is the last resort rather than a blank.
+        displayName: user.name ?? user.email ?? user.id,
+        teamId: workspace.team.id,
+        projectId: workspace.project.id,
+        projectSlug: workspace.project.slug,
+      },
     };
   }
 
@@ -2272,16 +2714,9 @@ export class GovernanceModule implements GovernanceRestApi {
  * instead, and it has to be one string, decided once.
  */
 /** An operator acting as a member holds no grant to issue a key as them (F05). */
-function refuseImpersonatedKeyMint(input: {
-  impersonatorId: string | undefined;
-  organizationId: string;
-}): void {
+function refuseImpersonatedKeyMint(input: { impersonatorId: string | undefined }): void {
   if (!input.impersonatorId) return;
-  throw new PermissionDeniedError({
-    permission: "organization:view",
-    scope: { type: "organization", id: input.organizationId },
-    denialReason: "no-grant",
-  });
+  throw new ImpersonationCannotMintCredentialError();
 }
 
 function attributedUserId(by: GovernanceProjectCaller): string {

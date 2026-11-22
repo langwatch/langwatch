@@ -54,6 +54,9 @@ export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter
           ),
         },
       ],
+      // Async deduplication off, as the pinned server profile has it: the meter counts distinct
+      // deduplication keys, so a repeat never counts twice, and the insert may share a statement
+      // with others waiting for a slot (ADR-187).
       settings: COALESCABLE_ASYNC_INSERT_SETTINGS,
     });
   }

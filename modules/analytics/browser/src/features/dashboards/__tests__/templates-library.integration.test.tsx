@@ -108,12 +108,24 @@ describe("the templates finder", () => {
   });
 
   describe("given the flag is on", () => {
-    /** @scenario "AC3i The Dashboards pages do not point back to the old Analytics" */
-    it("does not point back to the old Analytics", () => {
+    /** @scenario "AC3i The Dashboards pages point back to the old Analytics" */
+    it("points back to the old Analytics", () => {
       openLibrary();
 
-      expect(screen.getByRole("heading", { level: 1, name: "Dashboard templates" })).toBeVisible();
-      expect(screen.queryByText(/Looking for the old Analytics/)).toBeNull();
+      expect(screen.getByTestId("old-analytics-banner")).toHaveTextContent(
+        "Looking for the old Analytics? It is still here.",
+      );
+      expect(screen.getByRole("link", { name: "Open Analytics" })).toHaveAttribute(
+        "href",
+        "/test-project/analytics",
+      );
+    });
+
+    /** @scenario "AC3s The Dashboards pages show no old-Analytics banner to a member without analytics:view" */
+    it("shows no banner to a member without analytics:view", () => {
+      openLibrary({ permissions: [] });
+
+      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
     });
   });
 

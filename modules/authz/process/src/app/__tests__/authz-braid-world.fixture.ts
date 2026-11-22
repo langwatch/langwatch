@@ -22,6 +22,7 @@ import { MemoryAuthzAdmissionRepository } from "../../repositories/memory/memory
 import { MemoryAuthzAuditTrailRepository } from "../../repositories/memory/memory.authz-audit-trail.repository.ts";
 import { MemoryAuthzBillingGrantRepository } from "../../repositories/memory/memory.authz-billing-grant.repository.ts";
 import { MemoryAuthzBraidLockRepository } from "../../repositories/memory/memory.authz-braid-lock.repository.ts";
+import { MemoryAuthzBraidWriteRepository } from "../../repositories/memory/memory.authz-braid-write.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../../repositories/memory/memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzLedgerReadRepository } from "../../repositories/memory/memory.authz-ledger-read.repository.ts";
 import { MemoryAuthzLineageEpochRepository } from "../../repositories/memory/memory.authz-lineage-epoch.repository.ts";
@@ -41,6 +42,7 @@ import {
 } from "../../repositories/memory/memory.authz.repositories.ts";
 import { authzTrpcTransport } from "../../transport/authz.trpc.ts";
 import { AuthzModule, type AuthzSetup } from "../authz.app.ts";
+import { memoryAuthzChannels } from "./authz-channels.fixture.ts";
 
 export const ORG = "org_acme";
 export const SPECIALISTS = "proj_specialists";
@@ -78,6 +80,7 @@ function repositoriesOver(memory: AuthzMemoryStore): AuthzRepositories {
     ledgerReads: MemoryAuthzLedgerReadRepository.create({ memory }),
     billingGrants: MemoryAuthzBillingGrantRepository.create({ memory }),
     braidLocks: MemoryAuthzBraidLockRepository.create(),
+    braidWrites: MemoryAuthzBraidWriteRepository.create(),
     organizationPolicies: MemoryAuthzOrganizationPolicyRepository.create(),
   };
 }
@@ -137,10 +140,26 @@ function faultable(commands: Readonly<Record<string, unknown>>) {
 export async function braidWorld({
   enterprise = true,
   epochCacheEnabled = false,
-}: { enterprise?: boolean; epochCacheEnabled?: boolean } = {}) {
+  braidsReleased = true,
+  braidsEnabled = true,
+}: {
+  enterprise?: boolean;
+  epochCacheEnabled?: boolean;
+  braidsReleased?: boolean;
+  /** The organisation's "Braids enabled" setting; a world turns it on unless a test says not. */
+  braidsEnabled?: boolean;
+} = {}) {
   const memory = AuthzMemoryStore.create();
   seedOrganisation(memory);
   const repositories = repositoriesOver(memory);
+  if (braidsEnabled) {
+    await repositories.organizationPolicies.setBraidsEnabled({
+      organizationId: ORG,
+      braidsEnabled: true,
+      updatedByUserId: "seed",
+    });
+  }
+  const channels = memoryAuthzChannels({ braidsReleasedFor: braidsReleased ? [ORG] : [] });
   const app = AuthzModule.create({
     dependencies: {},
     config: {
@@ -152,6 +171,7 @@ export async function braidWorld({
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: createApiFixture<AuthzSetup["secrets"]>(),
     repositories,
+    channels,
   });
   const eventStore = EventStoreMemory.createForTesting<AuthzGrantsEvent>();
   const eventing = new EventSourcing({ eventStore });
@@ -224,6 +244,8 @@ export async function braidWorld({
     memory,
     repositories,
     plan,
+    /** `release_braids` as the memory tier answers it: release or withhold it mid-test. */
+    flags: channels.flags,
     seat,
     /** The next sends of one ledger command fail, as a queue that is down would. */
     failNext: senders.failNext,

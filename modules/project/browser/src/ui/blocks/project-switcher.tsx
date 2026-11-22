@@ -1,94 +1,56 @@
 /**
- * Project's lent switcher (ARCHITECTURE §10), ported from main's
- * `ProjectSelector`: the current project as a ghost button, and a menu of
- * every project grouped by organization and team, as the graph arrives.
+ * Project's lent switcher (ARCHITECTURE §10) for pages that borrow it: the design
+ * system's one project picker, the top bar's, over the graph as it arrives. Picking
+ * keeps main's destination (`projectSwitchHref`). Spec: specs/navigation/one-project-picker.feature
  */
 
 import { useUiHostServices, useUiScope } from "@langwatch/browser-host/capabilities";
-import { Link } from "@langwatch/browser-host/link";
-import { Menu } from "@langwatch/design-system/menu";
-import { Button, HStack, Text } from "@langwatch/design-system/primitives";
-import { ChevronDown } from "lucide-react";
-import { useMemo, useState, type MouseEvent } from "react";
+import { ProjectPicker, type ProjectPickerGroup } from "@langwatch/design-system/project-picker";
+import { isAggregateProjectKind } from "@langwatch/project-contract";
 
 import { projectApi } from "../../behavior/project-api.ts";
 import { projectSwitchGroups, projectSwitchHref } from "../../model/project-switch.ts";
-import { ProjectAvatar } from "../elements/project-avatar.tsx";
 
 export default function ProjectSwitcher() {
-  const { navigation, route } = useUiHostServices();
-  const { projectId } = useUiScope().activeScope();
-  const [isOpen, setIsOpen] = useState(false);
+  const { navigation, route, session } = useUiHostServices();
+  const { organizationId, projectId } = useUiScope().activeScope();
   const organizations = projectApi.organization.getScopeGraph.useQuery({});
+  const graph = organizations.data ?? [];
 
-  const groups = useMemo(() => projectSwitchGroups(organizations.data ?? []), [organizations.data]);
-  const current = groups
-    .flatMap((group) => group.projects)
+  const current = graph
+    .flatMap((organization) => organization.teams.flatMap((team) => team.projects))
     .find((project) => project.id === projectId);
-
   if (!current) return null;
 
   const { pathname = "", query } = route.reading();
-  const follow = (href: string) => (event: MouseEvent<HTMLAnchorElement>) => {
-    const isModifiedClick = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
-    if (isModifiedClick || event.button !== 0) return;
-    event.preventDefault();
-    setIsOpen(false);
-    navigation.navigate(href);
-  };
+  const groups: ProjectPickerGroup[] = projectSwitchGroups(graph, {
+    userId: session.currentUser()?.id,
+    organizationId,
+  }).map((group) => ({
+    team: { teamId: group.key, orgId: group.organizationId, label: group.title },
+    projects: group.projects.map((project) => ({
+      projectId: project.id,
+      label: project.name,
+      isAggregate: isAggregateProjectKind(project.kind),
+      href: projectSwitchHref({
+        pathname,
+        query,
+        currentProjectSlug: current.slug,
+        targetSlug: project.slug,
+      }),
+    })),
+  }));
 
   return (
-    <Menu.Root open={isOpen} onOpenChange={({ open }) => setIsOpen(open)}>
-      <Menu.Trigger asChild>
-        <Button
-          variant="ghost"
-          textStyle="bodySm"
-          paddingX={2}
-          paddingY={1}
-          height="auto"
-          fontWeight="normal"
-          minWidth={0}
-          maxWidth="260px"
-          color="fg"
-          _hover={{ backgroundColor: "bg.muted" }}
-        >
-          <HStack gap={2} minWidth={0}>
-            <ProjectAvatar name={current.name} />
-            <Text truncate title={current.name}>
-              {current.name}
-            </Text>
-            <ChevronDown size={14} />
-          </HStack>
-        </Button>
-      </Menu.Trigger>
-      {isOpen && (
-        <Menu.Content maxWidth="320px">
-          {groups.map((group) => (
-            <Menu.ItemGroup key={group.key} title={group.title}>
-              {group.projects.map((project) => {
-                const href = projectSwitchHref({
-                  pathname,
-                  query,
-                  currentProjectSlug: current.slug,
-                  targetSlug: project.slug,
-                });
-                return (
-                  <Menu.Item key={project.id} value={project.id} textStyle="body" asChild>
-                    <Link href={href} onClick={follow(href)} _hover={{ textDecoration: "none" }}>
-                      <HStack gap={2} minWidth={0}>
-                        <ProjectAvatar name={project.name} />
-                        <Text truncate title={project.name}>
-                          {project.name}
-                        </Text>
-                      </HStack>
-                    </Link>
-                  </Menu.Item>
-                );
-              })}
-            </Menu.ItemGroup>
-          ))}
-        </Menu.Content>
-      )}
-    </Menu.Root>
+    <ProjectPicker
+      groups={groups}
+      currentProjectId={current.id}
+      currentProjectName={current.name}
+      currentProjectIsAggregate={isAggregateProjectKind(current.kind)}
+      showTeamHeaders={groups.length > 1}
+      onOpenProject={(href) => navigation.navigate(href)}
+      // Every borrowing page draws the chip at the right of its header.
+      align="end"
+    />
   );
 }

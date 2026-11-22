@@ -12,6 +12,7 @@ import type { Ora } from "ora";
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
 import { rememberProjectName } from "../identityNotice";
+import { writeSecretFile } from "../secret-file";
 import { createSpinner } from "../spinner";
 import {
   type BudgetOverviewResponse,
@@ -21,7 +22,13 @@ import {
   getCliBootstrap,
   listIngestionKeys,
 } from "./cli-api";
-import { type GovernanceConfig, displayConfigPath, loadConfig, saveConfig } from "./config";
+import {
+  assertConfigWritable,
+  type GovernanceConfig,
+  displayConfigPath,
+  loadConfig,
+  saveConfig,
+} from "./config";
 import {
   createProjectLoginKey,
   type CredentialType,
@@ -341,6 +348,9 @@ export async function runUnifiedLoginFlow(
     );
   }
 
+  // A device session is saved to the config; refuse before the server creates one that is lost.
+  if (kind === "device_session") assertConfigWritable();
+
   const dc = await startDeviceCode(
     { baseUrl },
     {
@@ -517,7 +527,7 @@ interface EnvWriteResult {
 function writeApiKeyToEnv(apiKey: string): EnvWriteResult {
   const envPath = path.join(process.cwd(), ".env");
   if (!fs.existsSync(envPath)) {
-    fs.writeFileSync(envPath, `LANGWATCH_API_KEY=${apiKey}\n`);
+    writeSecretFile(envPath, `LANGWATCH_API_KEY=${apiKey}\n`);
     return { created: true, updated: false, path: envPath };
   }
   const content = fs.readFileSync(envPath, "utf-8");

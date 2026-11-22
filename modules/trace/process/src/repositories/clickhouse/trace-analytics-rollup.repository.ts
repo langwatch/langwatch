@@ -9,6 +9,13 @@ import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-cli
 
 const TABLE_NAME = "trace_analytics_rollup" as const;
 
+/**
+ * Async deduplication off, as the pinned server profile has it: on, two spans with identical
+ * increments would collapse into one. The rollup already accepts a redelivered increment's
+ * over-count (00038), and an insert with it off may share a statement (ADR-187).
+ */
+const ROLLUP_INSERT_SETTINGS = COALESCABLE_ASYNC_INSERT_SETTINGS;
+
 const logger = createLogger("langwatch:trace:trace-analytics-rollup-repository");
 
 /**
@@ -94,7 +101,7 @@ export class TraceAnalyticsRollupClickHouseRepository extends TraceAnalyticsRoll
         table: TABLE_NAME,
         values: [toClickHouseRecord(row, retentionDays)],
         format: "JSONEachRow",
-        clickhouse_settings: COALESCABLE_ASYNC_INSERT_SETTINGS,
+        clickhouse_settings: ROLLUP_INSERT_SETTINGS,
       });
     } catch (error) {
       logger.warn(
@@ -145,7 +152,7 @@ export class TraceAnalyticsRollupClickHouseRepository extends TraceAnalyticsRoll
         table: TABLE_NAME,
         values: rows.map((row) => toClickHouseRecord(row, retentionDays)),
         format: "JSONEachRow",
-        clickhouse_settings: COALESCABLE_ASYNC_INSERT_SETTINGS,
+        clickhouse_settings: ROLLUP_INSERT_SETTINGS,
       });
     } catch (error) {
       logger.warn(

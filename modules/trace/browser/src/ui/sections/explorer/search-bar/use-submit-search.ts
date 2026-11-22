@@ -2,6 +2,7 @@ import { toaster } from "@langwatch/design-system/toaster";
 import type { ExplorerSearchClassification } from "@langwatch/instant-eval-contract";
 import {
   combineQueries,
+  hasInstantEvalChipUnderOr,
   isRouteKind,
   type ModelTrouble,
   queryWithoutInstantEvalChip,
@@ -186,6 +187,9 @@ function typedEvalRunOf({
       question: pending.question,
     }),
     fallbackQuery: queryText,
+    ...(hasInstantEvalChipUnderOr({ queryText, field: pending.field, question: pending.question })
+      ? {}
+      : { typedQuery: queryText }),
     timeRange: { from: timeRange.from, to: timeRange.to },
   };
 }

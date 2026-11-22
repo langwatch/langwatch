@@ -29,8 +29,8 @@ const state: {
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: {},
-    asPath: "/me",
-    pathname: "/me",
+    asPath: "/coding-agents",
+    pathname: "/coding-agents",
     push: vi.fn(),
     replace: vi.fn(),
   }),
@@ -85,7 +85,7 @@ function renderLinks() {
   return renderWithDesignSystem(
     <WithStubNavigationHost
       readings={{
-        pathname: "/me",
+        pathname: "/coding-agents",
         currentUserId: "user-1",
         openableTeams: state.organization?.teams ?? [],
       }}
@@ -166,10 +166,10 @@ describe("PersonalSidebarLinks", () => {
       renderLinks();
 
       expect(screen.getByRole("link", { name: "Sessions" }).getAttribute("href")).toBe(
-        "/me/sessions",
+        "/coding-agents/sessions",
       );
       expect(screen.getByRole("link", { name: "Configure" }).getAttribute("href")).toBe(
-        "/me/configure",
+        "/coding-agents/configure",
       );
     });
   });
