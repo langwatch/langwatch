@@ -14,7 +14,7 @@ import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { UserNotFoundError } from "@langwatch/user-contract";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { MemoryCliDeviceSettlementChannel } from "../../channels/memory/memory.cli-device-settlement.channel.ts";
@@ -116,6 +116,34 @@ describe("given a CLI starting a device login", () => {
       // unnormalized value would fail to match the previous login key on the
       // next login and leave credentials accumulating.
       expect(world.mintedKeys).toEqual([{ deviceLabel: "bobs-macbook-pro", userId: USER_ID }]);
+    });
+  });
+
+  describe("when the person opens the link minutes after the CLI asked for it", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario A device code lives 15 minutes */
+    it("answers a 15 minute lifetime and still finds the code 14 minutes later", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const world = deviceFlowWorld();
+      const api = mount(world);
+      const stored = vi.spyOn(world.store, "set");
+
+      const started = await api.post("/api/auth/cli/device-code", {});
+      const grant = (await started.json()) as { user_code: string; expires_in: number };
+
+      expect(grant.expires_in).toBe(900);
+      expect(stored.mock.calls.map(([input]) => input.ttlSeconds)).toEqual([900, 900]);
+
+      vi.setSystemTime(Date.now() + 14 * 60 * 1000);
+      const looked = await api.get(
+        `/api/auth/cli/lookup?user_code=${encodeURIComponent(grant.user_code)}`,
+      );
+
+      expect(looked.status).toBe(200);
+      await expect(looked.json()).resolves.toMatchObject({ status: "pending" });
     });
   });
 
@@ -1467,7 +1495,7 @@ class InMemoryDeviceSessionStore implements CliDeviceSessionRepository {
       : Promise.resolve(value);
   }
 
-  set(input: { key: string; value: string }): Promise<void> {
+  set(input: { key: string; value: string; ttlSeconds?: number }): Promise<void> {
     this.values.set(input.key, input.value);
 
     return Promise.resolve();

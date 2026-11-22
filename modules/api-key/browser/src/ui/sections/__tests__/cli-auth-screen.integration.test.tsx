@@ -161,6 +161,25 @@ describe("given a pending device code", () => {
       expect(screen.queryByText("What the CLI can access")).toBeNull();
     });
 
+    /** @scenario the primary action and Deny are the same height on a phone */
+    it("keeps the primary action at its own height while the actions stack", async () => {
+      const user = userEvent.setup();
+      state.bindings = [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" }];
+      renderWithApiKeyHost(<CliAuthScreen />, hostFor());
+
+      // jsdom applies only the base (phone) styles: a stacked `flex: 1` would
+      // set the button's height basis to zero and shrink it below Deny.
+      const keepsItsHeight = (button: HTMLElement) => {
+        const style = getComputedStyle(button);
+        expect(style.flexGrow).toBe("0");
+        expect(style.flexBasis).toBe("auto");
+      };
+      keepsItsHeight(await screen.findByRole("button", { name: "Confirm" }));
+
+      await confirmCode(user);
+      keepsItsHeight(await screen.findByRole("button", { name: "Approve" }));
+    });
+
     /** @scenario the CLI stamps itself as the acquisition source */
     it("records the lead source once, first-touch", async () => {
       const host = hostFor();

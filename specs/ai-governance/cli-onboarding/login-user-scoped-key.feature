@@ -40,6 +40,13 @@ Feature: CLI login mints a user-scoped API key that inherits the user's permissi
         action are not shown yet
 
     @integration
+    Scenario: the primary action and Deny are the same height on a phone
+      Given the user opened the authorize screen on a phone-width window
+      When the confirm and deny actions stack one above the other
+      Then the confirm action keeps its own height rather than shrinking to its label
+      And the same holds for the approve action after the code is confirmed
+
+    @integration
     Scenario: confirming the code reveals the access selection
       When the user confirms the code matches the one in their terminal
       Then the code section goes away
