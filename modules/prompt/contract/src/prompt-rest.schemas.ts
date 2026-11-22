@@ -32,7 +32,7 @@ const createPromptInputSchemaDefinition = z
     outputs: z.array(outputsSchema).optional(),
     schemaVersion: schemaVersionSchema.optional(),
     tags: z.array(nulFreeStringSchema.min(1)).optional(),
-    parameters: runtimeParametersSchema.optional(),
+    parameters: runtimeParametersUpdateSchema.optional(),
   })
   // `prompt` and `messages` are each optional but the handler needs one of
   // them, which a shape alone cannot say. The example is where a reader — and

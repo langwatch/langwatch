@@ -44739,8 +44739,8 @@ type PostApiGatewayV1VirtualKeysJSONBody struct {
 			Label *string   `json:"label,omitempty"`
 			Tags  *[]string `json:"tags,omitempty"`
 		} `json:"metadata,omitempty"`
-		ModelsAllowed    *PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed    `json:"modelsAllowed,omitempty"`
-		ProvidersAllowed *PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed `json:"providersAllowed,omitempty"`
+		ModelsAllowed    *[]string `json:"modelsAllowed,omitempty"`
+		ProvidersAllowed *[]string `json:"providersAllowed,omitempty"`
 		RateLimits       *struct {
 			Rpd *PostApiGatewayV1VirtualKeysJSONBody_Config_RateLimits_Rpd `json:"rpd,omitempty"`
 			Rpm *PostApiGatewayV1VirtualKeysJSONBody_Config_RateLimits_Rpm `json:"rpm,omitempty"`
@@ -44795,22 +44795,6 @@ type PostApiGatewayV1VirtualKeysJSONBodyConfigCacheMode string
 
 // PostApiGatewayV1VirtualKeysJSONBodyConfigGuardrailAttachmentsDirection defines parameters for PostApiGatewayV1VirtualKeys.
 type PostApiGatewayV1VirtualKeysJSONBodyConfigGuardrailAttachmentsDirection string
-
-// PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0 defines parameters for PostApiGatewayV1VirtualKeys.
-type PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0 = []string
-
-// PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed defines parameters for PostApiGatewayV1VirtualKeys.
-type PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed struct {
-	union json.RawMessage
-}
-
-// PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0 defines parameters for PostApiGatewayV1VirtualKeys.
-type PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0 = []string
-
-// PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed defines parameters for PostApiGatewayV1VirtualKeys.
-type PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed struct {
-	union json.RawMessage
-}
 
 // PostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0 defines parameters for PostApiGatewayV1VirtualKeys.
 type PostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0 = int
@@ -44944,8 +44928,8 @@ type PatchApiGatewayV1VirtualKeysByIdJSONBody struct {
 			Label *string   `json:"label,omitempty"`
 			Tags  *[]string `json:"tags,omitempty"`
 		} `json:"metadata,omitempty"`
-		ModelsAllowed    *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed    `json:"modelsAllowed,omitempty"`
-		ProvidersAllowed *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed `json:"providersAllowed,omitempty"`
+		ModelsAllowed    *[]string `json:"modelsAllowed,omitempty"`
+		ProvidersAllowed *[]string `json:"providersAllowed,omitempty"`
 		RateLimits       *struct {
 			Rpd *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_RateLimits_Rpd `json:"rpd,omitempty"`
 			Rpm *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_RateLimits_Rpm `json:"rpm,omitempty"`
@@ -44991,22 +44975,6 @@ type PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigCacheMode string
 
 // PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigGuardrailAttachmentsDirection defines parameters for PatchApiGatewayV1VirtualKeysById.
 type PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigGuardrailAttachmentsDirection string
-
-// PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0 defines parameters for PatchApiGatewayV1VirtualKeysById.
-type PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0 = []string
-
-// PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed defines parameters for PatchApiGatewayV1VirtualKeysById.
-type PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed struct {
-	union json.RawMessage
-}
-
-// PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0 defines parameters for PatchApiGatewayV1VirtualKeysById.
-type PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0 = []string
-
-// PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed defines parameters for PatchApiGatewayV1VirtualKeysById.
-type PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed struct {
-	union json.RawMessage
-}
 
 // PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigRateLimitsRpd0 defines parameters for PatchApiGatewayV1VirtualKeysById.
 type PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigRateLimitsRpd0 = int
@@ -85886,78 +85854,6 @@ func (t *PostApiGatewayV1VirtualKeysJSONBody_Budget_LimitUsd) UnmarshalJSON(b []
 	return err
 }
 
-// AsPostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0 returns the union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed as a PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0
-func (t PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed) AsPostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0() (PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0, error) {
-	var body PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromPostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0 overwrites any union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed as the provided PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0
-func (t *PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed) FromPostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0(v PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergePostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0 performs a merge with any union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed, using the provided PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0
-func (t *PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed) MergePostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0(v PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsPostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0 returns the union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed as a PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0
-func (t PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed) AsPostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0() (PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0, error) {
-	var body PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromPostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0 overwrites any union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed as the provided PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0
-func (t *PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed) FromPostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0(v PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergePostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0 performs a merge with any union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed, using the provided PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0
-func (t *PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed) MergePostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0(v PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
 // AsPostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0 returns the union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_RateLimits_Rpd as a PostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0
 func (t PostApiGatewayV1VirtualKeysJSONBody_Config_RateLimits_Rpd) AsPostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0() (PostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0, error) {
 	var body PostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0
@@ -86232,78 +86128,6 @@ func (t PatchApiGatewayV1VirtualKeysByIdJSONBody_Budget_LimitUsd) MarshalJSON() 
 }
 
 func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Budget_LimitUsd) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0 returns the union data inside the PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed as a PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0
-func (t PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed) AsPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0() (PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0, error) {
-	var body PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0 overwrites any union data inside the PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed as the provided PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0
-func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed) FromPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0(v PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergePatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0 performs a merge with any union data inside the PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed, using the provided PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0
-func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed) MergePatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0(v PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0 returns the union data inside the PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed as a PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0
-func (t PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed) AsPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0() (PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0, error) {
-	var body PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0 overwrites any union data inside the PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed as the provided PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0
-func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed) FromPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0(v PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergePatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0 performs a merge with any union data inside the PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed, using the provided PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0
-func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed) MergePatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0(v PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
