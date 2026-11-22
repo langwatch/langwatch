@@ -9,7 +9,6 @@ import {
   type PromptExecuteRequest,
 } from "@langwatch/prompt-contract";
 import {
-  LlmModelNotSetError,
   type WorkflowApi,
   type StudioServerEvent,
   type StudioClientEvent,
@@ -19,6 +18,7 @@ import {
   buildPromptExecutionEvent,
   outputConfigsFor,
 } from "../rules/prompt-execution-event.rules.ts";
+import { isEditorFixablePrepareError } from "../rules/prompt-execution-prepare.rules.ts";
 import { handleEngineEvent, llmErrorOf } from "../rules/prompt-execution-stream.rules.ts";
 import type { PromptExecuteBoundsService } from "./prompt-execute-bounds.service.ts";
 
@@ -185,8 +185,8 @@ export class PromptExecutionService {
       if (findHandledCode(error) === "dataset_not_ready") {
         throw error;
       }
-      // A node with no model is fixable in the editor, not a server fault.
-      if (error instanceof LlmModelNotSetError) {
+      // A node with no model, or a disabled provider, is the person's to fix.
+      if (isEditorFixablePrepareError(error)) {
         throw error;
       }
       logger.error({ error, projectId }, "could not prepare a playground run");
