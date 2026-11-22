@@ -11,7 +11,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -320,47 +320,50 @@ describe("given the retention policies page", () => {
     });
   });
 
-  describe("when the team's last change was applied to stored data", () => {
-    /** @scenario "The settings page says when a scope was applied" */
-    it("says on its row when it was applied", () => {
-      snapshotRef.current.storedApply = [
+  describe("when the organization's change was applied and the team's was not", () => {
+    const NINE = Date.UTC(2026, 10, 22, 9);
+    const rowOf = (name: string) => screen.getByRole("row", { name: new RegExp(name) });
+
+    beforeEach(() => {
+      snapshotRef.current.rules = [
+        ...snapshotRef.current.rules,
         {
-          scopeType: "TEAM",
-          scopeId: "team-1",
-          status: "applied",
-          at: Date.UTC(2026, 10, 22, 9),
+          scopeType: "ORGANIZATION",
+          scopeId: "org-1",
+          name: "Acme",
+          category: "traces",
+          retentionDays: 182,
         },
       ];
-      renderScreen(new TestRetentionHost());
-
-      expect(screen.getByTestId("stored-apply-status")).toHaveTextContent("Applied on 22 Nov 2026");
+      snapshotRef.current.storedApply = [
+        { scopeType: "ORGANIZATION", scopeId: "org-1", status: "applied", at: NINE },
+        { scopeType: "TEAM", scopeId: "team-1", status: "pending", at: NINE },
+      ];
     });
-  });
 
-  describe("when the team's period changed after its last apply", () => {
-    /** @scenario "The settings page says a scope is not applied yet" */
-    it("says on its row that stored data is not on it yet", () => {
-      snapshotRef.current.storedApply = [
-        {
-          scopeType: "TEAM",
-          scopeId: "team-1",
-          status: "pending",
-          at: Date.UTC(2026, 10, 22, 9),
-        },
-      ];
+    /** @scenario "The settings page says when a scope was applied" */
+    it("says on the organization's row when it was applied", () => {
       renderScreen(new TestRetentionHost());
 
-      expect(screen.getByTestId("stored-apply-status")).toHaveTextContent(
-        "Not applied to stored data yet",
-      );
+      expect(within(rowOf("Acme")).getByText("Applied on 22 Nov 2026")).toBeInTheDocument();
+      expect(within(rowOf("Platform")).queryByText(/Applied on/)).not.toBeInTheDocument();
+    });
+
+    /** @scenario "The settings page says a scope is not applied yet" */
+    it("says on the team's row that stored data is not on it yet", () => {
+      renderScreen(new TestRetentionHost());
+
+      expect(within(rowOf("Platform")).getByText("Not applied to stored data yet")).toBeInTheDocument();
+      expect(within(rowOf("Acme")).queryByText(/Not applied/)).not.toBeInTheDocument();
     });
   });
 
   describe("when no change was recorded for the team", () => {
-    it("leaves the stored data cell empty", () => {
+    it("leaves the team row's stored data cell empty", () => {
       renderScreen(new TestRetentionHost());
 
-      expect(screen.queryByTestId("stored-apply-status")).not.toBeInTheDocument();
+      const row = screen.getByRole("row", { name: /Platform/ });
+      expect(within(row).queryByText(/Applied on|Not applied/)).not.toBeInTheDocument();
     });
   });
 

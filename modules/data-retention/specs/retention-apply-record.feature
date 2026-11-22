@@ -52,6 +52,12 @@ Feature: Each retention change and each apply to stored data is recorded
     Then the scope reads as pending since 11:00
 
   @unit
+  Scenario: A save whose change was not recorded never reads as applied
+    Given a scope changed at 10:00 and applied at 11:00
+    And its rule was saved again at 12:00 without the change being recorded
+    Then the scope reads as pending since 12:00
+
+  @unit
   Scenario: An apply at a wider scope covers the scopes it holds
     Given a project rule changed at 10:00
     And the organization applied at 11:00

@@ -7,6 +7,9 @@ import type { RetentionScopeType, StoredApplyStatus } from "@langwatch/data-rete
 
 type ScopeRef = Readonly<{ scopeType: RetentionScopeType; scopeId: string }>;
 
+/** A saved rule row; its `updatedAt` counts as a change even when the record of it was lost. */
+type ScopeRule = ScopeRef & Readonly<{ updatedAt?: Date }>;
+
 /** What the status projection keeps per scope. */
 export type ScopeApplyRecord = ScopeRef &
   Readonly<{ changedAt: number | null; appliedAt: number | null }>;
@@ -32,7 +35,7 @@ export function storedApplyStatuses({
   teamOfProject,
 }: {
   organizationId: string;
-  scopes: readonly ScopeRef[];
+  scopes: readonly ScopeRule[];
   records: readonly ScopeApplyRecord[];
   teamOfProject: ReadonlyMap<string, string>;
 }): StoredApplyStatus[] {
@@ -52,13 +55,20 @@ export function storedApplyStatuses({
     ];
   };
 
+  const savedAt = new Map<string, number>();
+  for (const scope of scopes) {
+    const at = scope.updatedAt?.getTime();
+    if (at !== undefined) savedAt.set(refKey(scope), Math.max(at, savedAt.get(refKey(scope)) ?? at));
+  }
+
   const seen = new Set<string>();
   const statuses: StoredApplyStatus[] = [];
   for (const scope of scopes) {
     if (seen.has(refKey(scope))) continue;
     seen.add(refKey(scope));
-    const changedAt = byScope.get(refKey(scope))?.changedAt ?? null;
-    if (changedAt === null) continue;
+    const recorded = byScope.get(refKey(scope))?.changedAt ?? null;
+    if (recorded === null) continue;
+    const changedAt = Math.max(recorded, savedAt.get(refKey(scope)) ?? recorded);
     const covering = coveringScopes(scope)
       .map(appliedAt)
       .filter((at): at is number => at !== null && at >= changedAt);

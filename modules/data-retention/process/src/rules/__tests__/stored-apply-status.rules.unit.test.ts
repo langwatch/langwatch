@@ -127,6 +127,21 @@ describe("a scope's stored apply status", () => {
     });
   });
 
+  describe("when the rule was saved at noon but the record of that change was lost", () => {
+    /** @scenario "A save whose change was not recorded never reads as applied" */
+    it("reads as pending since the save, not applied by the older apply", () => {
+      const NOON = Date.UTC(2026, 10, 22, 12);
+      expect(
+        storedApplyStatuses({
+          organizationId,
+          scopes: [{ ...organization, updatedAt: new Date(NOON) }],
+          records: [{ ...organization, changedAt: TEN, appliedAt: ELEVEN }],
+          teamOfProject,
+        }),
+      ).toEqual([{ ...organization, status: "pending", at: NOON }]);
+    });
+  });
+
   describe("when a project rule changed at 10:00 and a wider scope applied at 11:00", () => {
     /** @scenario "An apply at a wider scope covers the scopes it holds" */
     it("reads the project as applied by the organization's apply", () => {
