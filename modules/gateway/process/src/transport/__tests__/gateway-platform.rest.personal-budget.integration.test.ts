@@ -12,15 +12,12 @@ import {
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { GatewayBudget } from "@langwatch/gateway-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { nowInstant, Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { GatewayModule } from "../../app/gateway.app.ts";
 import { MemoryGatewayChannels } from "../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../repositories/memory/memory.gateway.repositories.ts";
 import {
@@ -33,6 +30,7 @@ import {
   gatewayRestCredential,
   gatewayVirtualKeyCaller,
 } from "../gateway-platform.rest.ts";
+import { memoryGatewayApp } from "./support/gateway-memory-app.fixture.ts";
 
 const ORG_ID = "org_1";
 const PROJECT_ID = "project_1";
@@ -97,44 +95,20 @@ async function callAs({ apiKeyId }: { apiKeyId: ApiKeyId }) {
   const store = MemoryGatewayStore.create();
   store.budgets.set(BUDGET_ID, budgetOf({ ownerId: "usr_owner" }));
   const { repositories } = new MemoryGatewayRepositories(store);
-  const app = await GatewayModule.create({
+  const app = await memoryGatewayApp({
     channels: MemoryGatewayChannels.create(),
-    dependencies: {
-      authz: createApiFixture<AuthzApi>({
-        hasApiKeyPermission: async ({ apiKeyId: keyId, scope, permission }) => {
-          const held: readonly string[] = API_KEYS[keyId as ApiKeyId].atOrganization;
-          return scope.type === "org" && scope.id === ORG_ID && held.includes(permission);
-        },
-      }),
-      projects: createApiFixture<ProjectApi>({
-        listIdsByOrganization: async () => [PROJECT_ID],
-        listTraceDestinations: async () => [],
-      }),
-      evaluators: createApiFixture({}),
-      evaluations: createApiFixture({}),
-      monitors: createApiFixture({}),
-      organizations: createApiFixture<OrganizationApi>({ listGroupsForMember: async () => [] }),
-      featureFlags: createApiFixture({}),
-      modelProviders: createApiFixture({}),
-      traces: createApiFixture({}),
-      oneTimeReveals: createApiFixture({}),
-      apiKeys: createApiFixture({}),
-      licensing: createApiFixture({}),
-    },
     repositories,
-    config: {
-      foldCacheTtlSeconds: 300,
-      spendSettlementGraceMs: void 0,
-      internalUrl: void 0,
-      controlPlaneUrl: void 0,
-      publicBaseUrl: void 0,
-      baseUrl: void 0,
-      publicUrl: void 0,
-      isSaas: false,
-      allowLoopbackVoiceProviders: false,
-    },
-    resources: new ResourceScope(),
-    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    authz: createApiFixture<AuthzApi>({
+      hasApiKeyPermission: async ({ apiKeyId: keyId, scope, permission }) => {
+        const held: readonly string[] = API_KEYS[keyId as ApiKeyId].atOrganization;
+        return scope.type === "org" && scope.id === ORG_ID && held.includes(permission);
+      },
+    }),
+    projects: createApiFixture<ProjectApi>({
+      listIdsByOrganization: async () => [PROJECT_ID],
+      listTraceDestinations: async () => [],
+    }),
+    organizations: createApiFixture<OrganizationApi>({ listGroupsForMember: async () => [] }),
   });
   const caller = {
     kind: "apiKey",

@@ -10,16 +10,13 @@ import {
 import { type AuthzApi, permissionsConferred } from "@langwatch/authz-contract";
 import type { GatewayBudget, GatewayBudgetDebitRow } from "@langwatch/gateway-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { nowInstant, Temporal } from "@langwatch/time";
 import { getTRPCErrorFromUnknown, getTRPCErrorShape, initTRPC } from "@trpc/server";
 
 import { memoryVirtualKeySeed } from "../../../__tests__/support/gateway-memory-seeds.fixture.ts";
-import { GatewayModule } from "../../../app/gateway.app.ts";
 import { MemoryGatewayChannels } from "../../../channels/memory/memory.gateway.channels.ts";
 import { MemoryGatewayRepositories } from "../../../repositories/memory/memory.gateway.repositories.ts";
 import {
@@ -27,12 +24,16 @@ import {
   memoryGatewayDecimal,
 } from "../../../repositories/memory/memory.gateway.store.ts";
 import { gatewayBudgetTrpcTransport } from "../../gateway-budget.trpc.ts";
+import { memoryGatewayApp } from "./gateway-memory-app.fixture.ts";
 
 type GatewayTrpcTestContext = { actor: { id: string } };
 
 const ORG_ID = "org_1";
 const TENANT_PROJECT_ID = "project_1";
 export const BUDGET_ID = "bdg_1";
+
+/** What a refusal carries when the caller is told the budget does not exist. */
+export const BUDGET_NOT_FOUND = { data: { error: { code: "budget_not_found" } } } as const;
 
 /** Each caller's organization role; the permission answers come from the real role templates. */
 const ROLES = {
@@ -131,11 +132,60 @@ async function seededRepositories({
   return repositories;
 }
 
-const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
+/** Answers each permission from the caller's role template, noting every permission asked. */
+function authzByRole({ asked }: { asked: string[] }) {
+  return createApiFixture<AuthzApi>({
+    hasPermission: async ({ userId, permission }: { userId: string; permission: string }) => {
+      asked.push(permission);
+      const role = ROLES[userId as Caller];
+      return permissionsConferred({
+        role,
+        scopeType: "ORGANIZATION",
+        customPermissions: [],
+      }).includes(permission);
+    },
+  });
+}
 
 const sorted = (ids: readonly string[]) => ids.toSorted((left, right) => left.localeCompare(right));
 
-/** Boots the control plane over the seeded budget for one caller; `usr_erased` has no account. */
+/** The control plane over the seeded budget; `usr_erased` has no account. */
+async function seededGateway({
+  budget,
+  debits,
+  lookupOutage,
+  asked,
+}: {
+  budget: GatewayBudget;
+  debits: readonly GatewayBudgetDebitRow[];
+  lookupOutage: Error | undefined;
+  asked: string[];
+}) {
+  const channels = MemoryGatewayChannels.create();
+  channels.users.erase({ userId: "usr_erased" });
+  if (lookupOutage) channels.users.failWith({ error: lookupOutage });
+  const app = await memoryGatewayApp({
+    channels,
+    repositories: await seededRepositories({ budget, debits }),
+    authz: authzByRole({ asked }),
+    projects: createApiFixture<ProjectApi>({
+      listIdsByOrganization: async () => [TENANT_PROJECT_ID],
+      listNamesByIds: async () => [],
+      listTraceDestinations: async () => [],
+    }),
+    organizations: createApiFixture<OrganizationApi>({
+      findProvisioningSummary: async (organizationId) => ({
+        id: organizationId,
+        name: "Organization",
+        slug: "organization",
+        createdAt: nowInstant(),
+      }),
+    }),
+  });
+  return { app, channels };
+}
+
+/** Mounts the budget procedures over the seeded control plane for one caller. */
 export async function gatewayFor({
   caller,
   budget = ORGANIZATION_BUDGET,
@@ -148,61 +198,7 @@ export async function gatewayFor({
   lookupOutage?: Error;
 }) {
   const asked: string[] = [];
-  const channels = MemoryGatewayChannels.create();
-  channels.users.erase({ userId: "usr_erased" });
-  if (lookupOutage) channels.users.failWith({ error: lookupOutage });
-  const app = await GatewayModule.create({
-    channels,
-    dependencies: {
-      authz: createApiFixture<AuthzApi>({
-        hasPermission: async ({ userId, permission }: { userId: string; permission: string }) => {
-          asked.push(permission);
-          const role = ROLES[userId as Caller];
-          return permissionsConferred({
-            role,
-            scopeType: "ORGANIZATION",
-            customPermissions: [],
-          }).includes(permission);
-        },
-      }),
-      projects: createApiFixture<ProjectApi>({
-        listIdsByOrganization: async () => [TENANT_PROJECT_ID],
-        listNamesByIds: async () => [],
-        listTraceDestinations: async () => [],
-      }),
-      evaluators: createApiFixture({}),
-      evaluations: createApiFixture({}),
-      monitors: createApiFixture({}),
-      organizations: createApiFixture<OrganizationApi>({
-        findProvisioningSummary: async (organizationId) => ({
-          id: organizationId,
-          name: "Organization",
-          slug: "organization",
-          createdAt: nowInstant(),
-        }),
-      }),
-      featureFlags: createApiFixture({}),
-      modelProviders: createApiFixture({}),
-      traces: createApiFixture({}),
-      oneTimeReveals: createApiFixture({}),
-      apiKeys: createApiFixture({}),
-      licensing: createApiFixture({}),
-    },
-    repositories: await seededRepositories({ budget, debits }),
-    config: {
-      foldCacheTtlSeconds: 300,
-      spendSettlementGraceMs: void 0,
-      internalUrl: void 0,
-      controlPlaneUrl: void 0,
-      publicBaseUrl: void 0,
-      baseUrl: undefined,
-      publicUrl: undefined,
-      isSaas: false,
-      allowLoopbackVoiceProviders: false,
-    },
-    resources: new ResourceScope(),
-    secrets: noSecrets,
-  });
+  const { app, channels } = await seededGateway({ budget, debits, lookupOutage, asked });
   const trpc = initTRPC.context<GatewayTrpcTestContext>().create();
   const router = createTrpcRuntime<GatewayTrpcTestContext>({
     root: trpc,

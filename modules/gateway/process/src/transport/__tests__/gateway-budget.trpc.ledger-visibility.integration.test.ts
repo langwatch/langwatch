@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BUDGET_NOT_FOUND,
   debitsThrough,
   detailFor,
   gatewayFor,
@@ -116,9 +117,11 @@ describe("gatewayBudgets.get, the recent ledger of a budget", () => {
       });
 
       const refused = await refusalOf(gateway.open());
+      const unknown = await refusalOf(gateway.open("bdg_unknown"));
 
       expect(refused).not.toBeNull();
-      expect(refused).not.toEqual(await refusalOf(gateway.open("bdg_unknown")));
+      expect(unknown).toMatchObject(BUDGET_NOT_FOUND);
+      expect(refused).not.toEqual(unknown);
       expect(gateway.lookedUp()).toEqual(["usr_erased"]);
     });
   });

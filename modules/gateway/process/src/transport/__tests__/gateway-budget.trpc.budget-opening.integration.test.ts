@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BUDGET_ID,
+  BUDGET_NOT_FOUND,
   budgetScopedTo,
   gatewayFor,
   refusalOf,
@@ -40,7 +41,7 @@ describe("gatewayBudgets get, update and archive, a budget scoped to one member"
 
         const refused = await refusalOf(gateway.open());
 
-        expect(refused).not.toBeNull();
+        expect(refused).toMatchObject(BUDGET_NOT_FOUND);
         expect(refused).toEqual(await refusalOf(gateway.open("bdg_unknown")));
       });
 
@@ -51,8 +52,8 @@ describe("gatewayBudgets get, update and archive, a budget scoped to one member"
         const renamed = await refusalOf(gateway.rename());
         const archived = await refusalOf(gateway.archive());
 
-        expect(renamed).not.toBeNull();
-        expect(archived).not.toBeNull();
+        expect(renamed).toMatchObject(BUDGET_NOT_FOUND);
+        expect(archived).toMatchObject(BUDGET_NOT_FOUND);
         expect(renamed).toEqual(await refusalOf(gateway.rename("bdg_unknown")));
         expect(archived).toEqual(await refusalOf(gateway.archive("bdg_unknown")));
       });
