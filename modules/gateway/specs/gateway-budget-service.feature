@@ -74,7 +74,7 @@ Feature: Gateway budget decision service
     When they ask for the budget overview
     Then the answer reports access and the budget read is scoped to that organization
 
-  @unit
+  @integration
   Scenario: Personal-key usage on a budget's detail is visible only to its owner and to those allowed to see other members' personal keys
     Given a budget whose recent ledger holds a row spent through a shared key and one through a member's personal key
     When the key's owner, an organization admin, another member and a viewer each open the budget
@@ -82,7 +82,7 @@ Feature: Gateway budget decision service
     And the other member and the viewer see only the shared key's row
     And a caller whose newest rows are all another member's still sees older shared rows, at most 20
 
-  @unit
+  @integration
   Scenario: A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys
     Given a budget scoped to one member, and a budget scoped to that member's personal key
     When the member, an organization admin and a viewer each open, edit or archive it

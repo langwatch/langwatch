@@ -42,6 +42,14 @@ Feature: Erasing a user removes their personal data everywhere
     Then no srcdoc copy of either board is left, and Reports no longer holds the first board
     And the second board's Reports row keeps its chart at Only me with no author, so nobody sees it
 
+  # Deleting the account nulls each virtual key's principal; the mark keeps the key personal.
+  @integration
+  Scenario: Erasing a user keeps the keys minted for them marked personal
+    Given an admin minted a virtual key for a member, and the gateway has not marked it yet
+    When the member's erasure runs
+    Then the key no longer names the member, and is marked as minted for one member
+    And its last edit time is as it was
+
   @unit
   Scenario: Erasing a user with no blockers runs the erase transaction for the resolved user
     Given a user with no erasure blockers

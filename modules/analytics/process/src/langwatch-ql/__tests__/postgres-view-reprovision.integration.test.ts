@@ -34,7 +34,7 @@ class AllowTestQueries extends PrismaQueryGuard {
   }
 }
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl
   ? PrismaConnectionService.create({
       guard: new AllowTestQueries(),
@@ -56,7 +56,9 @@ const budgetLedgers = LangWatchQLCatalogShapesService.create()
   .find((view) => view.name === "gateway_budget_ledgers");
 
 function client() {
-  if (connection === null) throw new Error("DATABASE_URL is required for the re-provision test");
+  if (connection === null) {
+    throw new Error("A test database URL is required for the re-provision test");
+  }
   return connection.client;
 }
 

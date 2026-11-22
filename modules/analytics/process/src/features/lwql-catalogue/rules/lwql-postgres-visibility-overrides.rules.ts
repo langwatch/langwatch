@@ -99,7 +99,7 @@ const notOnBudgetScopedTo = (scopes: string) =>
 export const VISIBILITY_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = {
   GatewayBudget: {
     rowFilter: NOT_A_PERSONAL_BUDGET,
-    rowFilterNote: " Budgets scoped to one person or to a personal key are not queryable.",
+    rowFilterNote: " Budgets scoped to one member or to a personal key are not queryable.",
   },
   GatewayBudgetLedger: {
     rowFilter: allOf(
@@ -107,7 +107,7 @@ export const VISIBILITY_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverri
       notOnBudgetScopedTo(MEMBER_SCOPES),
     ),
     rowFilterNote:
-      " Spend through a personal key, or against a budget scoped to one person, is not queryable.",
+      " Spend through a personal key, or against a budget scoped to one member, is not queryable.",
   },
   Dashboard: {
     rowFilter: allOf(BOARD_NOT_ONLY_ME, NOT_A_BOARD_COPY),

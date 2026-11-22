@@ -286,7 +286,7 @@ describe("given the derived Postgres catalog's overrides", () => {
     });
 
     /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
-    it("leaves budgets scoped to one person or to a personal key out, for every caller", () => {
+    it("leaves budgets scoped to one member or to a personal key out, for every caller", () => {
       expect(statementOf("GatewayBudget")).toContain(
         `\nWHERE ("m"."scopeType" NOT IN ('PRINCIPAL') AND ` +
           `("m"."scopeType" <> 'VIRTUAL_KEY' OR NOT ${personalKeyOf(`"m"."scopeId"`)}))`,
@@ -322,10 +322,10 @@ describe("given the derived Postgres catalog's overrides", () => {
     /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
     it("says so in each view's description", () => {
       expect(byName.get("gateway_budget_ledgers")?.description).toContain(
-        "Spend through a personal key, or against a budget scoped to one person, is not queryable.",
+        "Spend through a personal key, or against a budget scoped to one member, is not queryable.",
       );
       expect(byName.get("gateway_budgets")?.description).toContain(
-        "Budgets scoped to one person or to a personal key are not queryable.",
+        "Budgets scoped to one member or to a personal key are not queryable.",
       );
     });
   });

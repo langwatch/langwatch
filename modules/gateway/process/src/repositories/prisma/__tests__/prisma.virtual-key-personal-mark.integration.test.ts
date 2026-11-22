@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createGatewayTestPrismaConnection } from "../../../app/__tests__/gateway-prisma.fixture.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../prisma.virtual-key.repository.ts";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 

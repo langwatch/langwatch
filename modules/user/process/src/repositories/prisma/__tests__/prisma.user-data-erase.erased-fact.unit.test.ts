@@ -53,6 +53,7 @@ function databaseRecording({ failOn }: { failOn?: string } = {}) {
     },
     account: { deleteMany: write("account.deleteMany") },
     session: { deleteMany: write("session.deleteMany") },
+    $executeRaw: write("virtualKey.markPersonal"),
     user: {
       delete: vi.fn(async () => {
         if (failOn === "user.delete") throw new Error("user.delete unavailable");

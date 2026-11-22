@@ -1,4 +1,5 @@
--- Whether a virtual key was minted for one person: set with its principal, never cleared, so the
--- key stays personal after erasure nulls the principal. Existing keys are marked by the gateway's
--- background step `gateway:mark-personal-virtual-keys`, never by an UPDATE here.
+-- IRREVERSIBLE: no down step. A rollback leaves the column, which the previous release ignores;
+-- dropping it loses which keys were minted for one member, so a drop is an operator step.
+-- Set with a key's principal and never cleared, so the key stays personal once erasure nulls it.
+-- Existing keys are marked by the background step `gateway:mark-personal-virtual-keys`.
 ALTER TABLE "VirtualKey" ADD COLUMN IF NOT EXISTS "mintedAsPersonal" BOOLEAN NOT NULL DEFAULT false;
