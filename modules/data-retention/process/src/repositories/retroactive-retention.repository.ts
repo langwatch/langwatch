@@ -5,6 +5,8 @@ import type {
 } from "@langwatch/data-retention-contract";
 import { z } from "zod";
 
+import type { RetentionDriftWindow, StoredRetentionStamp } from "../rules/retention-drift.rules.ts";
+
 /** One `system.mutations` row for the event log's keep-forever rewrite on one target. */
 export const keepForeverRewriteSchema = z.object({
   mutationId: z.string(),
@@ -57,6 +59,15 @@ export interface RetroactiveRetentionRepository {
   /** Re-stamps every never-expiring event-log row on one target to be kept forever. */
   startKeepForeverRewrite(input: ClickHouseTarget): Promise<void>;
   /** The id indexes among `indexes` that retention governs and the target already holds. */
+  /**
+   * The category's stamps in the given windows, with their row counts: a sample read over the
+   * tenant's primary key and the partitions the windows touch, never the whole table.
+   */
+  sampleStoredRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    windows: readonly RetentionDriftWindow[];
+  }): Promise<StoredRetentionStamp[]>;
   findHeldIdIndexes(input: ClickHouseTarget & { indexes: readonly string[] }): Promise<string[]>;
   /** The tenants with rows in any of the named id indexes on one target. */
   findIdIndexTenantIds(input: ClickHouseTarget & { indexes: readonly string[] }): Promise<string[]>;

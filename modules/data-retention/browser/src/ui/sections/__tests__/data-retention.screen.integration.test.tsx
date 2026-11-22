@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
- * Tests retention policy configuration: plan gating, scope filtering, removal,
- * and error handling. See {@link specs/data-retention/retention-policy-configuration.feature}
+ * Retention policy configuration: plan gating, scope filtering, removal, errors, stored data.
+ * See {@link specs/data-retention/retention-policy-configuration.feature} and
+ * modules/data-retention/specs/retention-apply-record.feature
  */
 
 import {
@@ -111,6 +112,12 @@ const {
           retentionDays: 91,
         },
       ],
+      storedApply: [] as {
+        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+        scopeId: string;
+        status: "applied" | "pending";
+        at: number;
+      }[],
     },
   },
 }));
@@ -257,6 +264,7 @@ describe("given the retention policies page", () => {
     snapshotRef.current.canConfigureRetention = true;
     snapshotRef.current.storageBilled = false;
     snapshotRef.current.effective = { traces: 49, scenarios: 49, experiments: 49 };
+    snapshotRef.current.storedApply = [];
     snapshotRef.current.rules = [
       {
         scopeType: "TEAM",
@@ -309,6 +317,50 @@ describe("given the retention policies page", () => {
       expect(
         screen.queryByRole("button", { name: "Add retention policy" }),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the team's last change was applied to stored data", () => {
+    /** @scenario "The settings page says when a scope was applied" */
+    it("says on its row when it was applied", () => {
+      snapshotRef.current.storedApply = [
+        {
+          scopeType: "TEAM",
+          scopeId: "team-1",
+          status: "applied",
+          at: Date.UTC(2026, 10, 22, 9),
+        },
+      ];
+      renderScreen(new TestRetentionHost());
+
+      expect(screen.getByTestId("stored-apply-status")).toHaveTextContent("Applied on 22 Nov 2026");
+    });
+  });
+
+  describe("when the team's period changed after its last apply", () => {
+    /** @scenario "The settings page says a scope is not applied yet" */
+    it("says on its row that stored data is not on it yet", () => {
+      snapshotRef.current.storedApply = [
+        {
+          scopeType: "TEAM",
+          scopeId: "team-1",
+          status: "pending",
+          at: Date.UTC(2026, 10, 22, 9),
+        },
+      ];
+      renderScreen(new TestRetentionHost());
+
+      expect(screen.getByTestId("stored-apply-status")).toHaveTextContent(
+        "Not applied to stored data yet",
+      );
+    });
+  });
+
+  describe("when no change was recorded for the team", () => {
+    it("leaves the stored data cell empty", () => {
+      renderScreen(new TestRetentionHost());
+
+      expect(screen.queryByTestId("stored-apply-status")).not.toBeInTheDocument();
     });
   });
 

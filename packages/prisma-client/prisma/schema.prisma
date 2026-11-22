@@ -4033,6 +4033,25 @@ model RetentionPolicy {
   @@index([scopeType, scopeId])
 }
 
+// Per retention scope, the latest change saved there and the latest apply to stored data it
+// asked for: data-retention's projection over retention_policy_changed and retention_applied.
+model RetentionApplyStatus {
+  id                String                   @id
+  organizationId    String
+  scopeType         RetentionPolicyScopeType
+  scopeId           String
+  changedAt         Float?
+  appliedAt         Float?
+  createdAt         Float
+  updatedAt         Float
+  occurredAt        Float
+  acceptedAt        Float
+  lastEventId       String
+  projectionVersion String
+
+  @@unique([organizationId, scopeType, scopeId])
+}
+
 enum DataPrivacyScopeType {
   ORGANIZATION
   DEPARTMENT

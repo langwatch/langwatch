@@ -10,6 +10,8 @@ import type {
 } from "@langwatch/data-retention-contract";
 
 import type { DataRetentionDirectoryReader } from "../app/data-retention.app.ts";
+import type { RetentionApplyStatusRepository } from "../repositories/retention-apply-status.repository.ts";
+import { storedApplyStatuses } from "../rules/stored-apply-status.rules.ts";
 import type {
   DataRetentionPolicyService,
   RetentionActor,
@@ -22,6 +24,7 @@ type DataRetentionSnapshotServiceOptions = Readonly<{
   directory: DataRetentionDirectoryReader;
   permissions: RetentionPermissionsService;
   policy: Pick<DataRetentionPolicyService, "canConfigureRetention" | "storageBilled">;
+  applyStatus: Pick<RetentionApplyStatusRepository, "findForOrganization">;
 }>;
 
 type OrganizationDirectory = Awaited<
@@ -87,6 +90,7 @@ export class DataRetentionSnapshotService {
       projectId,
       effective,
       rules: [],
+      storedApply: [],
       available: {
         organization: null,
         teams: [],
@@ -117,12 +121,14 @@ export class DataRetentionSnapshotService {
       canManageOrganization,
       canConfigureRetention,
       storageBilled,
+      applyRecords,
     ] = await Promise.all([
       directory.findOrganizationDirectory({ organizationId }),
       retention.listOrganizationRules({ organizationId }),
       permissions.canManageOrganization({ userId, organizationId }),
       policy.canConfigureRetention({ organizationId, actor }),
       policy.storageBilled({ organizationId, actor }),
+      this.options.applyStatus.findForOrganization({ organizationId }),
     ]);
 
     const [teamManage, projectUpdate] = await Promise.all([
@@ -146,18 +152,27 @@ export class DataRetentionSnapshotService {
       projectUpdate,
     });
 
+    const readableRows = rows.filter((row) => lens.canRead(row.scopeType, row.scopeId));
+    const storedApply = storedApplyStatuses({
+      organizationId,
+      scopes: readableRows,
+      records: applyRecords,
+      teamOfProject: new Map(
+        organizationDirectory.projects.map((project) => [project.id, project.teamId]),
+      ),
+    });
+
     return {
       projectId,
       effective,
-      rules: rows
-        .filter((row) => lens.canRead(row.scopeType, row.scopeId))
-        .map((row) => ({
-          scopeType: row.scopeType,
-          scopeId: row.scopeId,
-          name: lens.nameOf(row.scopeType, row.scopeId),
-          category: row.category,
-          retentionDays: row.retentionDays,
-        })),
+      storedApply,
+      rules: readableRows.map((row) => ({
+        scopeType: row.scopeType,
+        scopeId: row.scopeId,
+        name: lens.nameOf(row.scopeType, row.scopeId),
+        category: row.category,
+        retentionDays: row.retentionDays,
+      })),
       available: {
         organization: canManageOrganization
           ? { id: organizationId, name: organizationName ?? organizationId }

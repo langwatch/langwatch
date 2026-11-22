@@ -1488,6 +1488,20 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly RetentionApplyStatus: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly scopeType: "RetentionPolicyScopeType";
+    readonly scopeId: "String";
+    readonly changedAt: "Float?";
+    readonly appliedAt: "Float?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
+  };
   readonly DataPrivacyPolicy: {
     readonly id: "String";
     readonly organizationId: "String";

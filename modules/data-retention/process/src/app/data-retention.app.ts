@@ -39,6 +39,11 @@ import {
   buildDataRetentionSeatPolicyPipeline,
   type DataRetentionSeatPolicyPipeline,
 } from "../eventing/data-retention-seat-policy.pipeline.ts";
+import { CheckRetentionDriftCommand } from "../eventing/retention-drift.commands.ts";
+import {
+  buildRetentionDriftPipeline,
+  type RetentionDriftPipelineDefinition,
+} from "../eventing/retention-drift.pipeline.ts";
 import { ApplyRetentionExtensionCommand } from "../eventing/retention-extension.commands.ts";
 import {
   buildRetentionExtensionPipeline,
@@ -50,6 +55,7 @@ import {
   type RetentionStorageReportPipelineDefinition,
 } from "../eventing/retention-storage-report.pipeline.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
+import type { RetentionApplyStatusRepository } from "../repositories/retention-apply-status.repository.ts";
 import {
   DataRetentionPolicyService,
   type RetentionActor,
@@ -57,6 +63,10 @@ import {
 import { DataRetentionSnapshotService } from "../services/data-retention-snapshot.service.ts";
 import { DataRetentionService } from "../services/data-retention.service.ts";
 import { OrganizationStorageEstimateService } from "../services/organization-storage-estimate.service.ts";
+import {
+  RetentionDriftCheckService,
+  type RetentionDriftRequestOutcome,
+} from "../services/retention-drift-check.service.ts";
 import { RetentionExtensionService } from "../services/retention-extension.service.ts";
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
 import { RetentionPlanService } from "../services/retention-plan.service.ts";
@@ -145,6 +155,8 @@ export class DataRetentionModule implements DataRetentionApiContract {
   readonly #storageReport: RetentionStorageReportService;
   readonly #storageRequests: RetentionStorageReportRequestService;
   readonly #users: UserApi;
+  readonly #applyStatus: RetentionApplyStatusRepository;
+  readonly #driftCheck: RetentionDriftCheckService;
 
   private constructor(services: {
     retention: DataRetentionService;
@@ -157,6 +169,8 @@ export class DataRetentionModule implements DataRetentionApiContract {
     storageReport: RetentionStorageReportService;
     storageRequests: RetentionStorageReportRequestService;
     users: UserApi;
+    applyStatus: RetentionApplyStatusRepository;
+    driftCheck: RetentionDriftCheckService;
   }) {
     this.#retention = services.retention;
     this.#policy = services.policy;
@@ -168,6 +182,8 @@ export class DataRetentionModule implements DataRetentionApiContract {
     this.#storageReport = services.storageReport;
     this.#storageRequests = services.storageRequests;
     this.#users = services.users;
+    this.#applyStatus = services.applyStatus;
+    this.#driftCheck = services.driftCheck;
   }
 
   static create({ repositories, dependencies, config }: DataRetentionSetup): DataRetentionModule {
@@ -212,6 +228,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
         directory: repositories.directory,
         permissions,
         policy,
+        applyStatus: repositories.applyStatus,
       }),
       scopeMeter: StorageMeterScopeService.create({
         meter: storageMeter,
@@ -237,6 +254,12 @@ export class DataRetentionModule implements DataRetentionApiContract {
         organizations: storageReport,
       }),
       users: dependencies.users,
+      applyStatus: repositories.applyStatus,
+      driftCheck: RetentionDriftCheckService.create({
+        policies: repositories.policies,
+        projects: retention,
+        stamps: repositories.retroactive,
+      }),
     });
   }
 
@@ -252,6 +275,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     return buildRetentionExtensionPipeline({
       applyCommand: ApplyRetentionExtensionCommand.create({ retention: this.#retention }),
       extensions: this.#extensions,
+      applyStatusStore: this.#applyStatus,
       ...deps,
     });
   }
@@ -262,6 +286,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     this.#extensions.connect({
       record: (data) => commands.recordRetentionExtension.send(data),
       request: (data) => commands.requestStoredRetentionApply.send(data),
+      change: (data) => commands.recordRetentionPolicyChange.send(data),
       apply: (data) => commands.applyRetentionExtension.send(data),
     });
   }
@@ -284,6 +309,32 @@ export class DataRetentionModule implements DataRetentionApiContract {
     commands: EventingCommands<RetentionStorageReportPipelineDefinition>,
   ): void {
     this.#storageRequests.connect((data) => commands.reportRetentionStorage.send(data));
+  }
+
+  /** The `data_retention_drift_check` pipeline: daily clock and the per-organization check. */
+  driftCheckPipeline(deps: {
+    deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
+  }): RetentionDriftPipelineDefinition {
+    return buildRetentionDriftPipeline({
+      checkCommand: CheckRetentionDriftCommand.create({ checker: this.#driftCheck }),
+      sweep: {
+        request: ({ at }) => this.#driftCheck.requestAll({ at }),
+        deleteDispatchedBefore: deps.deleteDispatchedBefore,
+      },
+    });
+  }
+
+  connectDriftCheckCommands(commands: EventingCommands<RetentionDriftPipelineDefinition>): void {
+    this.#driftCheck.connect((data) => commands.checkRetentionDrift.send(data));
+  }
+
+  /** Sends a drift check now, for one organization or for every one with rules. */
+  requestRetentionDriftCheck(input: {
+    organizationId?: string;
+  }): Promise<RetentionDriftRequestOutcome> {
+    return input.organizationId
+      ? this.#driftCheck.requestOrganization({ organizationId: input.organizationId })
+      : this.#driftCheck.requestAll();
   }
 
   /** Sends today's measure command for one organization, or for every one with rules. */
@@ -463,6 +514,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
       retentionDays,
     });
     await this.#syncStorageLine({ organizationId, addLine: through === "billing" });
+    await this.#recordChange({ organizationId, scope, policy });
     if (lengthens) await this.#extendFromSave({ organizationId, scope, policy });
     return policy;
   }
@@ -497,6 +549,33 @@ export class DataRetentionModule implements DataRetentionApiContract {
       requestId: `apply:${scope.scopeType}:${scope.scopeId}:${at}`,
       at,
     });
+  }
+
+  /** The rule is saved; a change that cannot be recorded is logged and shows no status. */
+  async #recordChange({
+    organizationId,
+    scope,
+    policy,
+  }: {
+    organizationId: string;
+    scope: ScopeAssignment;
+    policy: RetentionPolicy;
+  }): Promise<void> {
+    try {
+      await this.#extensions.recordChange({
+        organizationId,
+        scope,
+        category: policy.category,
+        retentionDays: policy.retentionDays,
+        changeId: `save:${policy.id}:${policy.updatedAt.getTime()}`,
+        at: policy.updatedAt.getTime(),
+      });
+    } catch (error) {
+      logger.error(
+        { organizationId, error: error instanceof Error ? error.message : String(error) },
+        "Retention change could not be recorded",
+      );
+    }
   }
 
   /** The rule is saved; a failed record is logged, and an Apply on the page still reaches it. */
