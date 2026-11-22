@@ -767,7 +767,10 @@ const localBashParams = Type.Object({
 });
 
 const localGrepParams = Type.Object({
-  pattern: Type.String({ description: "The regular expression to look for." }),
+  pattern: Type.String({
+    description:
+      "The regular expression to look for. A pattern that is not a valid regular expression is searched as plain text.",
+  }),
   path: Type.Optional(Type.String({ description: "Where to search. Default is the folder root." })),
   glob: Type.Optional(Type.String({ description: "Only search files that match this glob." })),
   ignoreCase: Type.Optional(Type.Boolean({ description: "Ignore upper and lower case." })),

@@ -65,6 +65,9 @@ export type CliClientInfo = {
   session_started_at?: number;
 };
 
+/** A known app that may name itself on the approval page. */
+export type CliDeviceClient = "laze";
+
 export interface CliDeviceCodeRecord {
   device_code: string;
   user_code: string;
@@ -78,6 +81,11 @@ export interface CliDeviceCodeRecord {
    * Absent on records minted before the field, which read as not asked.
    */
   management?: boolean;
+  /**
+   * The known app connecting a project (`client` on the device-code request).
+   * Absent on CLI logins and on records minted before the field.
+   */
+  client?: CliDeviceClient;
   /** Set after browser-side approval. */
   user_id?: string;
   organization_id?: string;

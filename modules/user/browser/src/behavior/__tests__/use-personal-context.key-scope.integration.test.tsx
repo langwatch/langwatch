@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Personal-credentials card key scope: must name principal on /me (first-person
+ * Personal-credentials card key scope: must name principal on /coding-agents (first-person
  * surface) to prevent admin from seeing other members' keys as their own.
  */
 import { renderHook } from "@testing-library/react";
@@ -53,7 +53,7 @@ import { usePersonalContext } from "../use-personal-context.ts";
 
 const listCall = () => queryCalls.find((call) => call.path === "personalVirtualKeys.list");
 
-describe("given the personal-credentials card on /me", () => {
+describe("given the personal-credentials card on /coding-agents", () => {
   afterEach(() => {
     queryCalls.length = 0;
     mockSession.current = null;

@@ -1,8 +1,8 @@
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * Spec: modules/suite/specs/suite-templates.feature,
  * modules/scenario/specs/red-team-scenario.feature
  */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { ScenarioService, type ScenarioServiceOptions } from "../scenario.service.ts";

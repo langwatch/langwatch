@@ -189,7 +189,7 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
 
   Rule: the governance track provisions the signer's personal workspace
 
-    # Coding-agent usage lands in a personal workspace, so /me is empty until
+    # Coding-agent usage lands in a personal workspace, so /coding-agents is empty until
     # one exists. Waiting for the first CLI login meant the page the track
     # ends on could only tell the user to go install something. Provisioning
     # it with the organization means the destination is real on arrival.

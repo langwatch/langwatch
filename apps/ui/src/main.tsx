@@ -54,7 +54,7 @@ import {
   loadUiRootHostServices,
   type UiRootHostServices,
 } from "./shell/ui-root-host-services";
-import { uiRouteTable } from "./shell/ui-route-table";
+import { uiMountedRouteTable } from "./shell/ui-route-table";
 import { UiSaasFooter } from "./shell/ui-saas-footer";
 import { uiShellLayouts } from "./shell/ui-shell-layouts";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
@@ -233,7 +233,7 @@ class BrowserUiShell extends UiShell {
         },
         pages: {
           loaders: uiUnservedPageLoaders,
-          table: uiRouteTable,
+          table: uiMountedRouteTable,
           shellLayouts: uiShellLayouts({ root: rootHostServices, config }),
           errorFallback: errorPages.page,
           rootErrorBoundary: errorPages.route,
