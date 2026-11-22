@@ -36,10 +36,9 @@ import {
 } from "../rules/langwatch-ql-query-scope.rules.ts";
 import { assertNoReservedNameAssigned } from "../rules/langwatch-ql-reserved-names.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
-import { runNotes } from "../rules/langwatch-ql-run-notes.rules.ts";
-import { buildRunParams, resolveRunSources } from "../rules/langwatch-ql-run-params.rules.ts";
+import { withRunNotes } from "../rules/langwatch-ql-run-notes.rules.ts";
+import { resolveRunSources } from "../rules/langwatch-ql-run-params.rules.ts";
 import {
-  langWatchQLExecutionParameters,
   langWatchQLMissingParameters,
   type ValidatedLangWatchQL,
 } from "../rules/langwatch-ql-validation-shape.rules.ts";
@@ -310,49 +309,6 @@ export class LangWatchQLService {
     return executor;
   }
 
-  /** The result with what the run was bound to, and the notes on what limited or ignored it. */
-  private withRunNotes({
-    result,
-    validation,
-    granularity,
-    followedWindow,
-    memberWindows,
-    projectIds,
-    sources,
-  }: {
-    result: LangWatchQLQueryResult;
-    validation: ValidatedLangWatchQL;
-    granularity: Parameters<typeof langWatchQLExecutionParameters>[0]["granularity"];
-    followedWindow: LangWatchQLTimeWindow | undefined;
-    memberWindows: Parameters<typeof runNotes>[0]["memberWindows"];
-    projectIds: readonly string[];
-    sources: Parameters<typeof runNotes>[0]["sources"];
-  }): LangWatchQLQueryResult {
-    return {
-      ...result,
-      params: buildRunParams({
-        bound: langWatchQLExecutionParameters({ validation, granularity }),
-        followedWindow,
-      }),
-      diagnostics: [
-        ...result.diagnostics,
-        ...runNotes({
-          memberWindows,
-          projectIds,
-          collapsesSharedRows: collapsesSharedRows({
-            tables: validation.tables,
-            views: this.views,
-            database: this.deps.database,
-            projectIds,
-          }),
-          sources,
-          followsSources: validation.followsSources,
-          granularity,
-        }),
-      ],
-    };
-  }
-
   /**
    * Validates a submitted statement against this caller's permissions, then
    * executes it as the restricted identity, over the one project it is bound to.
@@ -489,13 +445,19 @@ export class LangWatchQLService {
       granularitySeconds: granularity.followsGranularity ? granularity.granularitySeconds : void 0,
     });
 
-    const limited = this.withRunNotes({
+    const limited = withRunNotes({
       result,
       validation,
       granularity,
       followedWindow,
       memberWindows,
       projectIds,
+      collapsesSharedRows: collapsesSharedRows({
+        tables: validation.tables,
+        views: this.views,
+        database: this.deps.database,
+        projectIds,
+      }),
       sources,
     });
     if (completeness.kind !== "reported") return limited;

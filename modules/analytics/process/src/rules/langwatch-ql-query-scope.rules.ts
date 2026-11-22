@@ -9,13 +9,10 @@ import {
 } from "@langwatch/analytics-contract";
 
 import type { LangWatchQLViewDefinition } from "../services/langwatch-ql-catalog-shapes.service.ts";
-import { LangWatchQLSqlTextService } from "../services/langwatch-ql-sql-text.service.ts";
 import { clickHouseSqlParser, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
-import { clickHouseLiteral } from "./langwatch-ql-sql-literal.rules.ts";
+import { clickHouseLiteral, quotedColumn } from "./langwatch-ql-sql-literal.rules.ts";
 import { METADATA_FIELDS } from "./langwatch-ql-validation-shape.rules.ts";
-
-const sqlText = LangWatchQLSqlTextService.create();
 
 /**
  * The strictest protections across a readable project set: a content category or a catalogue
@@ -310,10 +307,8 @@ function collapsedViews({
  * follows the window, so a row a sibling's window admits is never lost with the dropped copy.
  */
 function collapseClause(view: LangWatchQLViewDefinition): string {
-  const keys = (view.postgres?.entityKeyColumns ?? [])
-    .map((key) => sqlText.quotedColumn(key))
-    .join(", ");
-  return ` ORDER BY ${keys}, ${sqlText.quotedColumn(TENANT_COLUMN)} LIMIT 1 BY ${keys}`;
+  const keys = (view.postgres?.entityKeyColumns ?? []).map((key) => quotedColumn(key)).join(", ");
+  return ` ORDER BY ${keys}, ${quotedColumn(TENANT_COLUMN)} LIMIT 1 BY ${keys}`;
 }
 
 /**

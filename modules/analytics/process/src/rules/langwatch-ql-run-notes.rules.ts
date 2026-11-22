@@ -1,8 +1,16 @@
 import type {
   LangWatchQLDiagnostic,
   LangWatchQLMemberWindow,
+  LangWatchQLQueryResult,
+  LangWatchQLTimeWindow,
   RunSources,
 } from "@langwatch/analytics-contract";
+
+import { buildRunParams } from "./langwatch-ql-run-params.rules.ts";
+import {
+  langWatchQLExecutionParameters,
+  type ValidatedLangWatchQL,
+} from "./langwatch-ql-validation-shape.rules.ts";
 
 /** Says a named list of origins changed nothing because the statement never reads it (QP21). */
 export function sourcesIgnoredDiagnostics({
@@ -133,4 +141,28 @@ export function runNotes({
       granularitySeconds: granularity.granularitySeconds,
     }),
   ];
+}
+
+/** The result with what the run was bound to, and the notes on what limited or ignored it. */
+export function withRunNotes({
+  result,
+  validation,
+  followedWindow,
+  ...notes
+}: Omit<Parameters<typeof runNotes>[0], "followsSources"> & {
+  result: LangWatchQLQueryResult;
+  validation: ValidatedLangWatchQL;
+  followedWindow: LangWatchQLTimeWindow | undefined;
+}): LangWatchQLQueryResult {
+  return {
+    ...result,
+    params: buildRunParams({
+      bound: langWatchQLExecutionParameters({ validation, granularity: notes.granularity }),
+      followedWindow,
+    }),
+    diagnostics: [
+      ...result.diagnostics,
+      ...runNotes({ ...notes, followsSources: validation.followsSources }),
+    ],
+  };
 }
