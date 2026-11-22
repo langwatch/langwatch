@@ -1,5 +1,5 @@
 /**
- * Upgrade to Growth: the full seats and the data retention, then Stripe Checkout.
+ * Upgrade to Growth: the full seats, the price, then the data retention and Stripe Checkout.
  * @see specs/licensing/seat-buying.feature
  * @see specs/billing/retention-at-upgrade.feature
  */
@@ -152,6 +152,38 @@ export function UpgradeSeatsDialog({
             <Text textStyle="bodySm">{hint}</Text>
           </HStack>
         )}
+        <HStack
+          justify="space-between"
+          align="baseline"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="md"
+          paddingX={4}
+          paddingY={3}
+          data-testid="upgrade-seats-total"
+        >
+          <HStack gap={2} align="baseline">
+            <Text fontSize="2xl" fontWeight="semibold" fontVariantNumeric="tabular-nums">
+              {total}
+            </Text>
+            <Text textStyle="bodySm" color="fg.muted">
+              {note}
+            </Text>
+          </HStack>
+          <Text textStyle="bodySm" color="fg.muted" fontVariantNumeric="tabular-nums">
+            {breakdown}
+          </Text>
+        </HStack>
+        <VStack align="stretch" gap={1.5} color="fg.muted" data-testid="upgrade-seats-included">
+          <HStack gap={2}>
+            <Check size={14} />
+            <Text textStyle="bodySm">200,000 events a month included. Lite members free.</Text>
+          </HStack>
+          <HStack gap={2}>
+            <Users size={14} />
+            <Text textStyle="bodySm">Invite people after checkout.</Text>
+          </HStack>
+        </VStack>
         <VStack align="stretch" gap={1.5}>
           <HStack justify="space-between">
             <Text fontWeight="semibold">Data retention</Text>
@@ -187,38 +219,6 @@ export function UpgradeSeatsDialog({
           currency={price.currency}
           estimate={retentionEstimate}
         />
-        <HStack
-          justify="space-between"
-          align="baseline"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="md"
-          paddingX={4}
-          paddingY={3}
-          data-testid="upgrade-seats-total"
-        >
-          <HStack gap={2} align="baseline">
-            <Text fontSize="2xl" fontWeight="semibold" fontVariantNumeric="tabular-nums">
-              {total}
-            </Text>
-            <Text textStyle="bodySm" color="fg.muted">
-              {note}
-            </Text>
-          </HStack>
-          <Text textStyle="bodySm" color="fg.muted" fontVariantNumeric="tabular-nums">
-            {breakdown}
-          </Text>
-        </HStack>
-        <VStack align="stretch" gap={1.5} color="fg.muted" data-testid="upgrade-seats-included">
-          <HStack gap={2}>
-            <Check size={14} />
-            <Text textStyle="bodySm">200,000 events a month included. Lite members free.</Text>
-          </HStack>
-          <HStack gap={2}>
-            <Users size={14} />
-            <Text textStyle="bodySm">Invite people after checkout.</Text>
-          </HStack>
-        </VStack>
       </VStack>
     </Dialog>
   );
