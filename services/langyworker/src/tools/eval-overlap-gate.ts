@@ -1,6 +1,6 @@
 /**
- * Refuses `gh pr create` in the sandbox when the branch adds string literals the run's eval
- * material holds, unless the PR body discloses them under "Eval overlap".
+ * Refuses opening a pull request in the sandbox when the branch adds string literals the run's
+ * eval material holds, unless the PR body discloses them.
  * Spec: specs/langy/langy-github-prs.feature.
  */
 
@@ -11,6 +11,11 @@ import { isAbsolute, join, posix } from "node:path";
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
 
 import { BASH_TOOL_NAME } from "./local-workspace.js";
+import {
+  pullRequestBase,
+  pullRequestBodyFiles,
+  pullRequestCreationIndex,
+} from "./pull-request-command.js";
 import { expandSandboxHome } from "./sandbox-paths.js";
 
 /** The heading a PR body discloses matched literals under. */
@@ -69,9 +74,9 @@ export function normalise(text: string): string {
   return text.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-/** Is this a `gh pr create` invocation, alone or inside a compound command? */
+/** Does the command open a pull request: `gh pr create`, or a `gh api` or `curl` POST to pulls? */
 export function isPrCreateCommand(command: string): boolean {
-  return /(?:^|[;&|(\s])gh\s+pr\s+create\b/.test(command);
+  return pullRequestCreationIndex(command) >= 0;
 }
 
 /** Is this a langwatch read whose output is eval material? */
@@ -89,7 +94,7 @@ export function isEvalPath(path: string): boolean {
 
 /** The folder the command runs `gh` in: its last `cd` before the call, else the home. */
 export function commandCwd({ command, home }: { command: string; home: string }): string {
-  const beforeGh = command.slice(0, command.search(/gh\s+pr\s+create/));
+  const beforeGh = command.slice(0, Math.max(0, pullRequestCreationIndex(command)));
   let cwd = home;
   for (const match of beforeGh.matchAll(/(?:^|[;&|(]\s*|\s)cd\s+("[^"]*"|'[^']*'|[^\s;&|)]+)/g)) {
     const raw = (match[1] ?? "").replace(/^["']|["']$/g, "");
@@ -97,18 +102,6 @@ export function commandCwd({ command, home }: { command: string; home: string })
     cwd = isAbsolute(expanded) ? expanded : join(cwd, expanded);
   }
   return cwd;
-}
-
-/** The `--base`/`-B` value, when the command names one. */
-export function baseBranchOf(command: string): string | undefined {
-  const match = /(?:--base[=\s]+|-B\s+)("[^"]*"|'[^']*'|[^\s;&|]+)/.exec(command);
-  return match?.[1]?.replace(/^["']|["']$/g, "");
-}
-
-/** The `--body-file`/`-F` path, when the command names one. */
-export function bodyFileOf(command: string): string | undefined {
-  const match = /(?:--body-file[=\s]+|-F\s+)("[^"]*"|'[^']*'|[^\s;&|]+)/.exec(command);
-  return match?.[1]?.replace(/^["']|["']$/g, "");
 }
 
 const STRING_LITERAL = /(["'`])((?:\\.|(?!\1)[^\\\n])*)\1/g;
@@ -232,7 +225,7 @@ export function evalOverlapRefusal(overlaps: readonly EvalOverlap[]): string {
     ...rows,
     ...more,
     "Code that matches eval questions or returns their expected answers passes the evals without fixing anything, and the result does not hold on other inputs. If that is what these are, remove them, fix the class of failure, and measure again with the held-out cases.",
-    `If they belong in the code (for example a deliberate few-shot example or a domain term the product needs), add a section headed "${EVAL_OVERLAP_HEADING}" to the PR body that quotes each literal above and says why it is there, then run gh pr create again.`,
+    `If they belong in the code (for example a deliberate few-shot example or a domain term the product needs), add a section headed "${EVAL_OVERLAP_HEADING}" to the PR body that quotes each literal above and says why it is there, then run the command again.`,
   ].join("\n");
 }
 
@@ -352,7 +345,7 @@ export async function checkPullRequest({
   let diff: string;
   let repoText: string;
   try {
-    base = await mergeBase({ git, cwd, base: baseBranchOf(command) });
+    base = await mergeBase({ git, cwd, base: pullRequestBase(command) });
     diff = await git({
       cwd,
       args: ["diff", "--unified=0", "--no-color", "--no-ext-diff", base, "HEAD"],
@@ -376,13 +369,12 @@ export async function checkPullRequest({
   const refused = overlapsToRefuse(kept);
   if (refused.length === 0) return undefined;
 
-  const bodyFile = bodyFileOf(command);
   let body = command;
-  if (bodyFile !== undefined) {
+  for (const bodyFile of pullRequestBodyFiles(command)) {
     try {
       body += `\n${readBodyFile(isAbsolute(bodyFile) ? bodyFile : join(cwd, bodyFile))}`;
     } catch {
-      // A body file that is not there discloses nothing; gh reports it on its own.
+      // A body file that is not there discloses nothing; the command reports it on its own.
     }
   }
   return isDisclosed({ overlaps: refused, body }) ? undefined : evalOverlapRefusal(refused);

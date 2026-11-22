@@ -270,6 +270,28 @@ describe("createEvalOverlapGateExtension", () => {
     expect(result?.block).toBe(true);
   });
 
+  /** @scenario "Langy cannot open a pull request through the API that hardcodes the eval questions" */
+  it.each([
+    "cd ~/work/agent && gh api -X POST repos/acme/agent/pulls -f title=Fix -f head=langy/fix -f base=base-main",
+    "cd ~/work/agent && gh api --method POST repos/acme/agent/pulls -f title=Fix -f base=base-main",
+    "cd ~/work/agent && gh api repos/acme/agent/pulls -f title=Fix -f head=langy/fix -f base=base-main",
+    `cd ~/work/agent && curl -X POST https://api.github.com/repos/acme/agent/pulls -d '{"title":"Fix","base":"base-main"}'`,
+    `cd ~/work/agent && curl https://api.github.com/repos/acme/agent/pulls --data '{"title":"Fix","base":"base-main"}'`,
+  ])("blocks a pull request opened through the API: %s", async (command) => {
+    const home = cloneWithBranch(KEYED_ANSWER);
+    const handlers = installed({ home, connected: false });
+
+    const result = (await handlers.tool_call!({
+      type: "tool_call",
+      toolCallId: "c1",
+      toolName: "bash",
+      input: { command },
+    })) as { block: boolean; reason: string } | undefined;
+
+    expect(result?.block).toBe(true);
+    expect(result?.reason).toContain("54 soldiers");
+  });
+
   it("stands down while the developer's folder runs the command", async () => {
     const home = cloneWithBranch(KEYED_ANSWER);
     const handlers = installed({ home, connected: true });

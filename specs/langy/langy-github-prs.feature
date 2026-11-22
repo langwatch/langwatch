@@ -264,6 +264,14 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
     And it tells Langy to remove a keyed answer, or to disclose a deliberate one in the PR body under an "Eval overlap" heading
 
   @unit
+  Scenario: Langy cannot open a pull request through the API that hardcodes the eval questions
+    Given the branch adds a string literal that the run's eval material holds
+    When Langy opens the pull request with gh api as a POST to repos/<owner>/<repo>/pulls, through -X POST, --method POST or the implicit POST of -f and -F fields
+    Or with curl as a POST to the GitHub pulls endpoint
+    Then the command is refused before it runs, the same as gh pr create
+    And a read of the pulls endpoint, or a call to another endpoint, runs unchanged
+
+  @unit
   Scenario: A disclosed eval overlap opens the pull request
     Given the branch adds string literals that the eval material holds
     When the PR body has an "Eval overlap" section quoting each of them
