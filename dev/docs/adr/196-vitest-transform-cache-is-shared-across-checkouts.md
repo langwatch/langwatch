@@ -32,7 +32,7 @@ already relative to the module.
 ## Decision
 
 **One cache per user, keyed by what the transform depends on.** LangWatch's
-existing Vitest patch (`patches/vitest@5.0.1.patch`) changes `fsModuleCache`:
+existing Vitest patch (`patches/vitest@5.0.5.patch`) changes `fsModuleCache`:
 
 - The cache lives in `~/.cache/vitest/fs-module-cache` (`$XDG_CACHE_HOME` when
   set; `VITEST_FS_MODULE_CACHE_DIR` overrides it; a config's
@@ -130,9 +130,9 @@ not proposed.
 >
 > In a monorepo of about 150 packages, a new worktree's first run of a
 > 77-test suite fell from 88 to 95 CPU-seconds to 52 to 62, the same as a warm
-> run. A working patch against 5.0.1, with an integration test that runs two
+> run. A working patch against 5.0.5, with an integration test that runs two
 > checkouts against one cache, is at
-> `https://github.com/langwatch/langwatch/blob/main/patches/vitest@5.0.1.patch`.
+> `https://github.com/langwatch/langwatch/blob/main/patches/vitest@5.0.5.patch`.
 > We are glad to turn it into a pull request if the direction is welcome.
 
 ## Consequences
