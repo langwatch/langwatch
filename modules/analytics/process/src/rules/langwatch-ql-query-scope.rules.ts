@@ -477,37 +477,63 @@ export function scopeLangWatchQL({
     memberWindows !== undefined &&
     (memberWindows.some((window) => window.from > 0) ||
       !windowsCoverProjects({ memberWindows, projectIds }));
-  if (!isWindowed && !PLAIN_CHECK_WORDS.test(sql)) return sql;
-  const parsed = clickHouseSqlParser.parse(sql);
-  if (!isWindowed) {
-    // A statement that does not parse is left for the validator to refuse.
-    if (!parsed.ok) return sql;
-    assertNoNamedSetOperands(parsed.statements);
-    assertNoUnsupportedTableModifiersInStatements({
-      statements: parsed.statements,
-      views,
-      database,
-    });
-    return sql;
+  if (!isWindowed || memberWindows === undefined) {
+    return checkPlainStatement({ sql, views, database });
   }
+  return scopeWindowedStatement({ sql, database, views, timeWindow, memberWindows });
+}
 
+/**
+ * `sql` unchanged once its set tests and table modifiers pass, from one parse. A statement that
+ * does not parse is left for the validator to refuse.
+ * @throws {LangWatchQLNotPermittedError} on a set test holding a plain name.
+ * @throws {LangWatchQLTableModifierError} on a modifier the statement cannot carry.
+ */
+function checkPlainStatement({
+  sql,
+  views,
+  database,
+}: {
+  sql: string;
+  views: readonly LangWatchQLViewDefinition[];
+  database: string;
+}): string {
+  if (!PLAIN_CHECK_WORDS.test(sql)) return sql;
+  const parsed = clickHouseSqlParser.parse(sql);
+  if (!parsed.ok) return sql;
+  assertNoNamedSetOperands(parsed.statements);
+  assertNoUnsupportedTableModifiersInStatements({ statements: parsed.statements, views, database });
+  return sql;
+}
+
+/** `sql` with each view it reads replaced by that view kept to the members inside their windows. */
+function scopeWindowedStatement({
+  sql,
+  database,
+  views,
+  timeWindow,
+  memberWindows,
+}: {
+  sql: string;
+  database: string;
+  views: readonly LangWatchQLViewDefinition[];
+  timeWindow: LangWatchQLTimeWindow | undefined;
+  memberWindows: readonly LangWatchQLMemberWindow[];
+}): string {
+  const parsed = clickHouseSqlParser.parse(sql);
   if (!parsed.ok) {
     throw new Error("LangWatchQL scope: an accepted statement no longer parses");
   }
   assertNoNamedSetOperands(parsed.statements);
 
-  const windows =
-    isWindowed && memberWindows
-      ? buildWindowPredicates({ views, database, memberWindows, timeWindow })
-      : undefined;
+  const windows = buildWindowPredicates({ views, database, memberWindows, timeWindow });
   const withNames = findWithNames(parsed.statements);
   assertNoShadowedView({ withNames, views, windows });
   const references = findViewReferences({ statements: parsed.statements, database, withNames });
-  const rewrites = references.flatMap((reference) => {
-    const window =
-      windows === undefined ? undefined : (windows.get(reference.qualified) ?? NO_ROWS);
-    return window === undefined ? [] : [{ reference, predicate: window }];
-  });
+  const rewrites = references.map((reference) => ({
+    reference,
+    predicate: windows.get(reference.qualified) ?? NO_ROWS,
+  }));
   assertNoTableModifiers({
     statements: parsed.statements,
     references: [
