@@ -83,3 +83,16 @@ export class RoutingPolicyModelNotConcreteError extends HandledError {
     this.name = "RoutingPolicyModelNotConcreteError";
   }
 }
+
+export class RoutingPolicyProviderOutOfScopeError extends HandledError {
+  declare readonly code: "routing_policy_provider_scope";
+
+  constructor() {
+    super(
+      "routing_policy_provider_scope",
+      "One or more of those providers do not belong to this organization",
+      { httpStatus: 422 },
+    );
+    this.name = "RoutingPolicyProviderOutOfScopeError";
+  }
+}

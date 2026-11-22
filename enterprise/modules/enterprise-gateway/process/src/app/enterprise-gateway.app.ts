@@ -20,12 +20,6 @@ import {
   type PersonalContext,
   type PersonalVirtualKey,
   type RoutingPolicy,
-  RoutingPolicyModelMustBeConcreteError,
-  RoutingPolicyModelNotConcreteError,
-  RoutingPolicyMustHaveProviderError,
-  RoutingPolicyMustHaveScopeError,
-  RoutingPolicyProviderRequiredError,
-  RoutingPolicyScopeRequiredError,
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-gateway-contract";
@@ -42,6 +36,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import type { EnterpriseGatewayRepositories } from "../repositories/routing-policy.repository.ts";
+import { asHandledRoutingPolicyError } from "../rules/routing-policy-errors.rules.ts";
 import { PersonalContextService } from "../services/personal-context.service.ts";
 import { PersonalVirtualKeyAccessService } from "../services/personal-virtual-key-access.service.ts";
 import { PersonalVirtualKeyIssuerService } from "../services/personal-virtual-key-issuer.service.ts";
@@ -210,18 +205,4 @@ export class EnterpriseGatewayModule implements EnterpriseGatewayApiContract {
   personalVirtualKeyIssue(input: IssuePersonalVirtualKeyInput): Promise<IssuedPersonalVirtualKey> {
     return this.#personalKeys.issue(input);
   }
-}
-
-/** The three routing-policy guards as handled errors; anything else stays unknown (ADR-045). */
-function asHandledRoutingPolicyError(error: unknown): unknown {
-  if (error instanceof RoutingPolicyMustHaveProviderError) {
-    return new RoutingPolicyProviderRequiredError();
-  }
-  if (error instanceof RoutingPolicyMustHaveScopeError) {
-    return new RoutingPolicyScopeRequiredError();
-  }
-  if (error instanceof RoutingPolicyModelMustBeConcreteError) {
-    return new RoutingPolicyModelNotConcreteError(error.field, error.value);
-  }
-  return error;
 }
