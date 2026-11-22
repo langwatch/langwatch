@@ -247,3 +247,31 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
   Scenario: The github skill gives the file tools the clone's absolute path
     When the github skill is read
     Then it tells Langy to give the read, edit and write tools the absolute path pwd prints
+
+  # ── No pull request that answers the eval set by heart ─────────────────
+
+  # A pull request once rewrote the model's answer when the question carried
+  # keywords lifted from the eval set and returned canned answers. The evals
+  # passed and a neighbouring question regressed. Skill text alone did not stop it.
+  @unit
+  Scenario: Langy cannot open a pull request that hardcodes the eval questions
+    Given the run's eval material holds the question "How many soldiers were wounded near Kharkiv?" and the answer "54 soldiers were wounded"
+    And the eval material is the dataset rows, experiment and scenario reads of the turn, and the repository's eval files
+    And the branch adds the string literal "54 soldiers" to code outside the eval files
+    When Langy runs gh pr create in the sandbox
+    Then the command is refused before it runs and no pull request is opened
+    And the refusal names each matching literal with its file and line
+    And it tells Langy to remove a keyed answer, or to disclose a deliberate one in the PR body under an "Eval overlap" heading
+
+  @unit
+  Scenario: A disclosed eval overlap opens the pull request
+    Given the branch adds string literals that the eval material holds
+    When the PR body has an "Eval overlap" section quoting each of them
+    Then gh pr create runs and the reviewer reads the overlap in the body
+
+  @unit
+  Scenario: A change that shares no literal with the evals opens as usual
+    Given the branch adds no string literal that the eval material holds
+    When Langy runs gh pr create in the sandbox
+    Then the command runs unchanged
+    And a single common word, a literal the code already had before the branch, or a line added to an eval file is never a match
