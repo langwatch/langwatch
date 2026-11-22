@@ -10,8 +10,8 @@ import {
 } from "@langwatch/design-system/primitives";
 import { shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { lazy, Suspense, useMemo, useRef } from "react";
+import type { BraidedOwner, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
+import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
 import {
   LuChartGantt,
   LuChevronDown,
@@ -23,10 +23,12 @@ import {
   LuNetwork,
   LuPanelBottomOpen,
   LuPanelRightOpen,
+  LuWorkflow,
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 
 import { useVizHeight } from "../../../../behavior/explorer/trace-drawer/use-viz-height.ts";
+import type { AgentsTab } from "../../../../behavior/explorer/use-agents-tab.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 // PeerCursorOverlay used to wrap just the viz pane (scoped to the
 // active viz tab). It was lifted to the drawer level (TraceDrawerShell)
@@ -39,7 +41,9 @@ import {
 } from "../../../../behavior/presence/presence-store.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { drawerShortcut } from "../../../../features/trace-drawer/behavior/trace-drawer-shortcut-table.ts";
+import { a2aSpanIdsOf } from "../../../../model/agent-call-graph-layout.ts";
 import type { VizTab } from "../../../../model/trace-drawer-params.ts";
+import { AgentCallGraphPane } from "../../../blocks/agent-call-graph/agent-call-graph-pane.tsx";
 import { SequenceSkeleton } from "../../../blocks/sequence/sequence-skeleton.tsx";
 import { TopologySkeleton } from "../../../blocks/sequence/topology-skeleton.tsx";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
@@ -61,6 +65,8 @@ interface VizPlaceholderProps {
   trace: TraceHeader | null;
   spans: SpanTreeNode[];
   isLoading?: boolean;
+  /** The drawer's Agents tab; without one (a shared trace) the tab stays hidden. */
+  agentsTab?: AgentsTab;
   selectedSpanId: string | null;
   onSelectSpan: (spanId: string) => void;
   onClearSpan: () => void;
@@ -118,9 +124,9 @@ function VizTabContent({ tab, traceId }: { tab: VizTabDef; traceId: string | nul
   );
 }
 
-// The viz strip ships four tabs as of Round 3. Span List stays retired — it added
-// filter chrome but no fundamentally new data axis, and the waterfall + sidebar filter
-// together cover the same workflow.
+// The viz strip ships five tabs; Agents shows only for a trace with more than one agent.
+// Span List stays retired: it added filter chrome but no new data axis, and the waterfall
+// plus the sidebar filter cover the same workflow.
 const TABS: VizTabDef[] = [
   {
     value: "waterfall",
@@ -158,6 +164,15 @@ const TABS: VizTabDef[] = [
     description:
       "Chat-style turn order between actors: best for replaying multi-agent conversations.",
   },
+  {
+    value: "agents",
+    label: "Agents",
+    icon: LuWorkflow,
+    shortcut: "5",
+    palette: "green",
+    description:
+      "Which agent called which, across A2A hops, with calls, errors, latency and cost per agent.",
+  },
 ];
 
 /**
@@ -168,13 +183,19 @@ function VizTabStrip({
   vizTab,
   traceId,
   onVizTabChange,
+  showsAgents,
 }: {
   vizTab: VizTab;
   traceId: string | null;
   onVizTabChange: (tab: VizTab) => void;
+  showsAgents: boolean;
 }) {
   const tabScrollerRef = useRef<HTMLDivElement>(null);
-  const tabIds = useMemo(() => TABS.map((t) => t.value), []);
+  const tabs = useMemo(
+    () => (showsAgents ? TABS : TABS.filter((t) => t.value !== "agents")),
+    [showsAgents],
+  );
+  const tabIds = useMemo(() => tabs.map((t) => t.value), [tabs]);
   const hiddenTabIds = useOverflowVisibility({
     scrollerRef: tabScrollerRef,
     items: tabIds,
@@ -186,7 +207,7 @@ function VizTabStrip({
 
   return (
     <HStack ref={tabScrollerRef} gap={0} overflowX="hidden" flexWrap="nowrap" flex="1" minWidth={0}>
-      {TABS.map((tab) => (
+      {tabs.map((tab) => (
         <VizTabButton
           key={tab.value}
           tab={tab}
@@ -362,12 +383,21 @@ function ResizeHandle({ onStart }: { onStart: (e: React.MouseEvent | React.Touch
   );
 }
 
+const NO_AGENTS_TAB: AgentsTab = {
+  showsAgents: false,
+  isSettled: true,
+  graph: undefined,
+  isGraphError: false,
+  retryGraph: () => undefined,
+};
+
 export function VizPlaceholder({
   vizTab,
   onVizTabChange,
   trace,
   spans,
   isLoading = false,
+  agentsTab = NO_AGENTS_TAB,
   selectedSpanId,
   onSelectSpan,
   onClearSpan,
@@ -392,6 +422,14 @@ export function VizPlaceholder({
   // for when the user wants to see the trace summary again.
   const detailCollapsed = useTraceDrawer((s) => s.paneState.spanDetail.collapsed);
   const togglePaneCollapsed = useTraceDrawer((s) => s.togglePaneCollapsed);
+
+  const { showsAgents, isSettled: isAgentGraphSettled } = agentsTab;
+  const a2aSpanIds = useMemo(() => a2aSpanIdsOf({ spans }), [spans]);
+  const hidesAgentsTab = vizTab === "agents" && !showsAgents;
+  const effectiveVizTab: VizTab = hidesAgentsTab ? "waterfall" : vizTab;
+  useEffect(() => {
+    if (hidesAgentsTab && isAgentGraphSettled) onVizTabChange("waterfall");
+  }, [hidesAgentsTab, isAgentGraphSettled, onVizTabChange]);
 
   const viz = useVizHeight({ fillParent, hasData: spans.length > 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -428,7 +466,12 @@ export function VizPlaceholder({
           minHeight="38px"
           data-spotlight="viz-tabs"
         >
-          <VizTabStrip vizTab={vizTab} traceId={traceId} onVizTabChange={onVizTabChange} />
+          <VizTabStrip
+            vizTab={effectiveVizTab}
+            traceId={traceId}
+            onVizTabChange={onVizTabChange}
+            showsAgents={showsAgents}
+          />
           {!fillParent && (
             <ResizeCycleButton
               isMinimized={viz.isMinimized}
@@ -458,14 +501,17 @@ export function VizPlaceholder({
             style={fillParent ? { overflowAnchor: "none" } : undefined}
           >
             <VizBody
+              braidedOwners={trace?.braided?.owners}
               isCollapsed={viz.isCollapsed}
               isLoading={isLoading}
               onClearSpan={onClearSpan}
               onSelectSpan={onSelectSpan}
               promptSpanIds={promptSpanIds}
+              a2aSpanIds={a2aSpanIds}
+              agentsTab={agentsTab}
               selectedSpanId={selectedSpanId}
               spans={spans}
-              vizTab={vizTab}
+              vizTab={effectiveVizTab}
             />
             {/*
               The "Click to interact" scrim used to sit here. With the
@@ -584,20 +630,26 @@ function CollapsedOverview({ spans }: { spans: SpanTreeNode[] }) {
 
 /** Whichever visualisation the current tab asks for, once spans have arrived. */
 function VizBody({
+  braidedOwners,
   isCollapsed,
   isLoading,
   onClearSpan,
   onSelectSpan,
   promptSpanIds,
+  a2aSpanIds,
+  agentsTab,
   selectedSpanId,
   spans,
   vizTab,
 }: {
+  braidedOwners: readonly BraidedOwner[] | undefined;
   isCollapsed: boolean;
   isLoading: boolean;
   onClearSpan: () => void;
   onSelectSpan: (spanId: string) => void;
   promptSpanIds: Set<string>;
+  a2aSpanIds: ReadonlySet<string>;
+  agentsTab: AgentsTab;
   selectedSpanId: string | null;
   spans: SpanTreeNode[];
   vizTab: VizTab;
@@ -626,6 +678,16 @@ function VizBody({
       </Suspense>
     );
   }
+  if (vizTab === "agents") {
+    return (
+      <AgentCallGraphPane
+        graph={agentsTab.graph}
+        isError={agentsTab.isGraphError}
+        onRetry={agentsTab.retryGraph}
+        onSelectSpan={onSelectSpan}
+      />
+    );
+  }
   if (vizTab === "flame") {
     return (
       <FlameView
@@ -644,8 +706,10 @@ function VizBody({
   return (
     <WaterfallView
       spans={spans}
+      braidedOwners={braidedOwners}
       selectedSpanId={selectedSpanId}
       promptSpanIds={promptSpanIds}
+      a2aSpanIds={a2aSpanIds}
       onSelectSpan={onSelectSpan}
       onClearSpan={onClearSpan}
     />

@@ -70,6 +70,7 @@ import {
   type ListDatasetVersionsInput,
   type SaveDatasetVersionInput,
   SYSTEM_DATASET_VERSION_AUTHOR,
+  type DatasetColumnRenames,
 } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
@@ -94,6 +95,7 @@ import {
   type DatasetVersionsDefinition,
 } from "../eventing/dataset-versions.pipeline.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
+import { assertKnownColumns } from "../rules/dataset-columns.rules.ts";
 import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 import { versionAuthorUserIds, withAuthorNames } from "../rules/dataset-version-author.rules.ts";
 import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
@@ -173,6 +175,12 @@ interface DatasetUpsertInput {
   name?: string;
   columnTypes?: DatasetColumns;
   datasetRecords?: UpsertDatasetInput["datasetRecords"];
+  columnRenames?: UpsertDatasetInput["columnRenames"];
+  /**
+   * Refuse `datasetRecords` as an append does: above the plan's batch bound, or naming a
+   * column `columnTypes` lacks.
+   */
+  enforceBatchBound?: boolean;
 }
 
 export class DatasetModule implements DatasetApi {
@@ -328,6 +336,16 @@ export class DatasetModule implements DatasetApi {
    * backs up to existing row, or refuse.
    */
   async upsertDataset(input: DatasetUpsertInput & EditedBy): Promise<Dataset> {
+    if (input.enforceBatchBound && input.datasetRecords?.length) {
+      await this.#requestBounds.assertBatchSize(input.projectId, input.datasetRecords.length);
+      if (input.columnTypes) {
+        assertKnownColumns({
+          datasetName: input.name ?? "",
+          columns: input.columnTypes.map((column) => column.name),
+          entries: input.datasetRecords,
+        });
+      }
+    }
     const target = input.datasetId ?? input.slugOrId;
     if (target === undefined) {
       const created = await this.#upsertDataset(input);
@@ -357,6 +375,7 @@ export class DatasetModule implements DatasetApi {
       columnTypes: input.columnTypes ?? replacing?.columnTypes ?? [],
       datasetId: input.datasetId ?? replacing?.id,
       datasetRecords: input.datasetRecords,
+      columnRenames: input.columnRenames,
     });
   }
 
@@ -784,13 +803,17 @@ export class DatasetModule implements DatasetApi {
     return this.#repositories.versions.findRunLinks(input);
   }
 
-  /** The autosave a quiet dataset gets; a dataset archived meanwhile is skipped. */
+  /**
+   * The autosave a quiet dataset gets; a dataset archived meanwhile is skipped,
+   * and so is one still empty with no history, so its first rows become version 1.
+   */
   async autosaveVersion(input: {
     projectId: string;
     datasetId: string;
     editedBy: DatasetVersionAuthor;
   }): Promise<void> {
     try {
+      if (await this.#emptyWithoutHistory(input)) return;
       await this.#versions.snapshot({
         projectId: input.projectId,
         datasetId: input.datasetId,
@@ -845,8 +868,8 @@ export class DatasetModule implements DatasetApi {
   }
 
   /**
-   * Runs an edit: first gives a dataset with no history its version 1 of the
-   * content before the edit, then records the edit for the autosave.
+   * Runs an edit: first gives a dataset with no history and some rows its
+   * version 1 of the content before the edit, then records the edit for the autosave.
    */
   async #edited<T>(
     input: { projectId: string; slugOrId: string } & EditedBy,
@@ -865,11 +888,10 @@ export class DatasetModule implements DatasetApi {
   async #ensureFirstVersion(dataset: Dataset): Promise<void> {
     if (this.#versioned.has(dataset.id) || dataset.status !== "ready") return;
     try {
-      const has = await this.#repositories.versions.hasAny({
-        projectId: dataset.projectId,
-        datasetId: dataset.id,
-      });
-      if (!has) {
+      const address = { projectId: dataset.projectId, datasetId: dataset.id };
+      const has = await this.#repositories.versions.hasAny(address);
+      // An empty dataset has nothing to restore, so its first real save becomes version 1.
+      if (!has && (await this.#versions.hasRows(address))) {
         await this.#versions.snapshot({
           projectId: dataset.projectId,
           datasetId: dataset.id,
@@ -884,6 +906,11 @@ export class DatasetModule implements DatasetApi {
         "Could not save a dataset's first version before an edit; the edit goes ahead",
       );
     }
+  }
+
+  async #emptyWithoutHistory(input: { projectId: string; datasetId: string }): Promise<boolean> {
+    const has = await this.#repositories.versions.hasAny(input);
+    return !has && !(await this.#versions.hasRows(input));
   }
 
   #markVersioned(datasetId: string): void {
@@ -984,6 +1011,9 @@ export abstract class DatasetNormalizeQueue {
   abstract enqueueNormalize(input: { datasetId: string; projectId: string }): Promise<void>;
 }
 
+/** One row a new dataset is born with; without an id, the row gets a fresh one. */
+export type DatasetSeedRow = { id?: string | undefined; entry: Record<string, unknown> };
+
 /** Content-layout operations for s3_jsonl datasets. Keeps storage decisions
  * out of routes and process-globals out of service.
  */
@@ -1030,6 +1060,14 @@ export abstract class DatasetContent {
     dataset: Dataset;
     input: DeleteDatasetRecordsInput;
   }): Promise<{ count: number }>;
+  /** A new dataset born in object storage: chunks first, then its row (ADR-032 v13). */
+  abstract createDataset(input: {
+    projectId: string;
+    name: string;
+    slug: string;
+    columnTypes: Dataset["columnTypes"];
+    rows: AsyncIterable<DatasetSeedRow> | Iterable<DatasetSeedRow>;
+  }): Promise<Dataset>;
   abstract copyDataset(input: {
     source: Dataset;
     sourceProjectId: string;
@@ -1042,6 +1080,7 @@ export abstract class DatasetContent {
     name: string;
     slug: string;
     columnTypes: Dataset["columnTypes"];
+    columnRenames?: DatasetColumnRenames;
   }): Promise<Dataset>;
 }
 

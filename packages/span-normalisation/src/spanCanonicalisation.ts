@@ -21,6 +21,7 @@ import { CopilotCanonicaliserService } from "./copilotCanonicaliser.ts";
 import { FallbackCanonicaliserService } from "./fallbackCanonicaliser.ts";
 import { FreshInputCanonicaliserService } from "./freshInputCanonicaliser.ts";
 import { GenAICanonicaliserService } from "./genAiCanonicaliser.ts";
+import { GrokCanonicaliserService } from "./grokCanonicaliser.ts";
 import { HaystackCanonicaliserService } from "./haystackCanonicaliser.ts";
 import { canonicaliseLangWatchIdentity } from "./langwatch/langwatchIdentity.ts";
 import { canonicaliseLangWatchMetadata } from "./langwatch/langwatchMetadata.ts";
@@ -97,6 +98,7 @@ export function orderedSpanCanonicalisers({
     // pi dual-writes the convention keys, so it too runs after GenAI and lifts
     // only what the conventions cannot name.
     PiCanonicaliserService.create(),
+    GrokCanonicaliserService.create(),
     SpringAICanonicaliserService.create(),
     StrandsCanonicaliserService.create(),
     LogfireCanonicaliserService.create(),
@@ -170,11 +172,13 @@ export function canonicaliseLogRecord({
   scopeName,
   body,
   attributes,
+  resourceAttributes,
 }: {
   canonicalisers: readonly AttributeCanonicaliser[];
   scopeName: string;
   body: string;
   attributes: CanonicalAttributes;
+  resourceAttributes?: CanonicalAttributes;
 }): CanonicalisedLogRecord {
   const bag = canonicalLogRecordStore({
     scopeName,
@@ -201,7 +205,14 @@ export function canonicaliseLogRecord({
   };
 
   for (const canonicaliser of canonicalisers) {
-    canonicaliser.applyLog?.({ bag, out, recordRule, setAttr, setAttrIfAbsent });
+    canonicaliser.applyLog?.({
+      bag,
+      out,
+      resourceAttributes,
+      recordRule,
+      setAttr,
+      setAttrIfAbsent,
+    });
   }
 
   return { attributes: out, appliedRules };

@@ -5,6 +5,7 @@ import {
   HELD_ADDRESS_PROOF_MAX_AGE_MS,
   holdAddressProof,
   readHeldAddressProof,
+  takeHeldAddressProofOnReload,
 } from "../held-address-proof.ts";
 
 function memoryStorage(): Storage {
@@ -80,6 +81,30 @@ describe("given the held address proof", () => {
       window.sessionStorage.setItem("langwatch.auth.signUpAddressProof", "{not json");
 
       expect(readHeldAddressProof()).toBeNull();
+    });
+  });
+
+  describe("when the page arrived by a reload", () => {
+    /** @scenario "A reload on the create-your-account step stays on it" */
+    it("takes the held proof", () => {
+      vi.stubGlobal("performance", { getEntriesByType: () => [{ type: "reload" }] });
+      holdAddressProof({ email: "sam@acme.com", addressProof: "proof-1" });
+
+      expect(takeHeldAddressProofOnReload()).toEqual({
+        email: "sam@acme.com",
+        addressProof: "proof-1",
+      });
+    });
+  });
+
+  describe("when the page arrived by a fresh navigation", () => {
+    /** @scenario "A fresh visit to sign-up starts at the address step" */
+    it("takes nothing and lets the held proof go", () => {
+      vi.stubGlobal("performance", { getEntriesByType: () => [{ type: "navigate" }] });
+      holdAddressProof({ email: "sam@acme.com", addressProof: "proof-1" });
+
+      expect(takeHeldAddressProofOnReload()).toBeNull();
+      expect(window.sessionStorage.length).toBe(0);
     });
   });
 

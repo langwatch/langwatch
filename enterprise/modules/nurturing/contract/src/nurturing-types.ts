@@ -7,10 +7,56 @@ import type { NurturingSignal } from "./nurturing-signals.ts";
  */
 
 // ---------------------------------------------------------------------------
+// Per-email usage: an organization's, summed over its projects from nurturing's own rows. Sent on
+// the organization (/group) and mirrored onto each member whose latest organization it is
+// (/identify), since the onboarding emails are person-triggered and read person attributes.
+// ---------------------------------------------------------------------------
+
+export interface CioOrganizationUsageTraits {
+  // The trace traits below are null once, when the organization's trace counting window ends:
+  // Customer.io then removes them, so a rolling trait cannot stay "active" for ever.
+  prompt_count?: number;
+  evaluator_count?: number;
+  /** Only grows: no event records an archived scenario. */
+  scenario_count?: number;
+  /** User simulation sets the organization's projects ran, each once; platform sets left out. */
+  simulation_set_count?: number;
+  /** Traces (root spans) appended over the last 30 days, each counted once. */
+  trace_count?: number | null;
+  /** Traces over the last 30 days that trace recorded failed (lw.trace.trace_failed). */
+  error_count?: number | null;
+  /** Unix seconds; absent when no trace in the window failed. */
+  last_failed_trace_at?: number | null;
+  /** Whether any project ran a scenario. */
+  has_scenario_run?: boolean;
+  /** Whether a trace arrived on any of the last 7 UTC days. */
+  active_last_7_days?: boolean | null;
+  /** Whether a trace arrived on a UTC day after the signup day. */
+  back_since_day_0?: boolean | null;
+  /**
+   * Whether a trace arrived on the signup day (day 0) or the UTC day N days after it. Absent once
+   * that day has left the 30-day window, so Customer.io keeps the value it last had.
+   */
+  active_day_0?: boolean | null;
+  active_day_1?: boolean | null;
+  active_day_12?: boolean | null;
+  active_day_13?: boolean | null;
+  /** Unix seconds of the organization's newest trace; absent when none is in the window. */
+  last_trace_date?: number | null;
+  /**
+   * Active on 3 or more UTC days of the window spanning 7 or more days, or in 3 or more distinct
+   * ISO weeks; activity is a trace, a finished scenario run, an evaluation or a prompt version.
+   */
+  has_habit?: boolean | null;
+  /** Unix seconds: the organization's creation plus 14 days. */
+  window_end_date?: number;
+}
+
+// ---------------------------------------------------------------------------
 // Person traits (via /identify)
 // ---------------------------------------------------------------------------
 
-export interface CioPersonTraits {
+export interface CioPersonTraits extends CioOrganizationUsageTraits {
   // Onboarding
   email: string;
   name: string;
@@ -53,10 +99,21 @@ export interface CioPersonTraits {
   coding_last_session_at?: number;
   coding_active_days?: number;
   coding_agent_types?: string[];
+  coding_terminal_types?: string[];
+  coding_repo_count?: number;
+  coding_session_days_first_3?: number;
   uses_coding_agent?: boolean;
+  // Present: the person sent a session from their own personal project. Absent: not known.
+  // First recorded across orgs, set once.
+  own_coding_first_session_at?: number;
+  own_coding_last_session_at?: number;
 
   // The person's own last page open
   app_last_opened_at?: number;
+  // The person's own last open of a usage, cost or plan page
+  usage_page_viewed_at?: number;
+  // The person got an answer from Langy in a conversation they own; only ever set true
+  saw_langy_first_message?: boolean;
 
   // Evaluation milestones
   has_evaluations: boolean;
@@ -104,7 +161,7 @@ export interface CioPersonTraits {
 // Organization traits (via /group)
 // ---------------------------------------------------------------------------
 
-export interface CioOrgTraits {
+export interface CioOrgTraits extends CioOrganizationUsageTraits {
   name: string;
   plan: string;
   company_size: string;
@@ -146,8 +203,11 @@ export type CioEventName =
   | "first_simulation_ran"
   | "coding_agent_first_session"
   | "sessions_page_viewed"
+  | "usage_page_viewed"
   | "joined_via_invite"
   | "joined_via_sso"
+  /** Sent beside the two above, for invite and SSO alike; `join_method` tells them apart. */
+  | "joined_organization"
   | "onboarding_paths_selected"
   | "onboarding_path_llmops"
   | "onboarding_path_coding_agents"
@@ -178,6 +238,8 @@ export type CioBatchCall =
       userId: string;
       event: CioEventName;
       properties?: Record<string, unknown>;
+      /** Customer.io drops a second track with the same id, so a replay cannot double-send. */
+      messageId?: string;
     }
   | {
       type: "group";
@@ -187,8 +249,7 @@ export type CioBatchCall =
     };
 
 /**
- * Every owner tells nurturing through a subscriber on its own pipeline (§9);
- * nurturing names no peer.
+ * Nurturing learns from the owners' events (§9); an owner that pushes a fact calls this.
  */
 export interface NurturingApi {
   /** Records the signal on nurturing's pipeline; its subscriber sends what main sent, once. */

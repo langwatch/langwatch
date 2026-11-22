@@ -60,6 +60,35 @@ def relax_prompt_schema(node):
     return node
 
 
+def open_registry_event_type(item):
+    """A registry feed event's `type` reads a type a later release adds as a plain string.
+
+    The generator turns an enum into a closed Enum whose constructor raises on any other value,
+    so a client would fail on a whole feed page the day the server adds an event type. The
+    union keeps the Enum for known values and falls back to the string for the rest.
+    """
+    if not isinstance(item, dict):
+        return item
+    for operation in item.values():
+        if not isinstance(operation, dict):
+            continue
+        for response in operation.get("responses", {}).values():
+            for media in response.get("content", {}).values() if isinstance(response, dict) else []:
+                items = media.get("schema", {}).get("properties", {}).get("data", {}).get("items", {})
+                properties = items.get("properties", {})
+                known = properties.get("type")
+                if isinstance(known, dict) and "enum" in known:
+                    # The title keeps the Enum class name the closed field had.
+                    titled = {**known, "title": "type"}
+                    properties["type"] = {"anyOf": [titled, {"type": "string"}]}
+    return item
+
+
+def is_registry_event_feed(path):
+    """The change feed and an agent's versions: both answer pages of registry events."""
+    return "/governance/registry/" in path and path.endswith(("/events", "/versions"))
+
+
 def main() -> int:
     if len(sys.argv) != 3:
         print(
@@ -87,6 +116,8 @@ def main() -> int:
     for path, item in spec.get("paths", {}).items():
         if path.startswith("/api/v1/prompts"):
             spec["paths"][path] = relax_prompt_schema(item)
+        if is_registry_event_feed(path):
+            spec["paths"][path] = open_registry_event_type(item)
     if "SpanInputOutput" in schemas:
         schemas["SpanInputOutput"] = flatten_self_reference(
             schemas["SpanInputOutput"], "#/components/schemas/SpanInputOutput"

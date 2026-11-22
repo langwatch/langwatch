@@ -20,6 +20,7 @@ import {
   TestMetricSeries,
   createTestProjects,
   TestSessions,
+  storedTracesFixture,
   TestTraceSessions,
   session,
 } from "../../__tests__/fixtures/coding-agent.fixture.ts";
@@ -104,6 +105,7 @@ function backfillOverOneBranch(): {
   const service = CodingAgentFeatureService.create({
     sessions,
     traceSessions: new TestTraceSessions(),
+    storedTraces: storedTracesFixture(),
     metricSeries: new TestMetricSeries(),
     sessionEvents: new TestEvents(),
     github,

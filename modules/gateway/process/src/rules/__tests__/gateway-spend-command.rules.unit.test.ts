@@ -57,6 +57,7 @@ describe("pricedSpendCommandData", () => {
           "output_image_tokens": 0,
           "output_tokens": 0,
           "reasoning_tokens": 0,
+          "web_search_requests": 0,
         },
         "virtual_key_id": "",
       }

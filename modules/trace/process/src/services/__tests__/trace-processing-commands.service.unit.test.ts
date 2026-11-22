@@ -25,6 +25,7 @@ function connectedSenders(log: Sent[]): EventingCommands<TraceProcessingPipeline
     removeAnnotation: recording("removeAnnotation"),
     bulkSyncAnnotations: recording("bulkSyncAnnotations"),
     changeTraceName: recording("changeTraceName"),
+    recordEvaluationOutcome: recording("recordEvaluationOutcome"),
   };
 }
 

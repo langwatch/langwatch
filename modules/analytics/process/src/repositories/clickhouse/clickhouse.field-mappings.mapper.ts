@@ -5,6 +5,18 @@
 
 import { tenantSet } from "@langwatch/clickhouse-client";
 
+import { latestVersionKey } from "./clickhouse.latest-version-dedup.mapper.ts";
+
+/**
+ * The name the stored_spans join exposes `SpanAttributes` under, whole or narrowed: no alias may
+ * take a name the fence reads (ADR-201 §3), so an outer read writes `ss.JoinedSpanAttributes[…]`.
+ */
+export const JOINED_SPAN_ATTRIBUTES = "JoinedSpanAttributes";
+
+/** Reads of the joined span map counted as reads of `SpanAttributes`, for column detection. */
+const asSpanAttributes = (expressions: readonly string[]): string[] =>
+  expressions.map((expression) => expression.replaceAll(JOINED_SPAN_ATTRIBUTES, "SpanAttributes"));
+
 /**
  * Identity columns always included in trace_summaries dedup subqueries.
  * These are required for deduplication (TraceId, UpdatedAt),
@@ -491,7 +503,10 @@ export function buildJoinClause({
         ? mergeWithIdentity(requiredColumns, SPAN_IDENTITY_COLUMNS)
         : SPAN_ANALYTICS_COLUMNS;
       const timeBound = spanTimeFilter ? ` ${spanTimeFilter}` : "";
-      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE ${tenantSet()}${timeBound}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+      const projection = Array.from(columns, (column) =>
+        column === "SpanAttributes" ? `SpanAttributes AS ${JOINED_SPAN_ATTRIBUTES}` : column,
+      );
+      return `JOIN (SELECT ${projection.join(", ")} FROM stored_spans WHERE ${tenantSet()}${timeBound}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     }
     case "evaluation_runs": {
       const columns = requiredColumns
@@ -584,7 +599,7 @@ function buildColumnPattern(col: string, alias: string): RegExp {
  * expressions.
  */
 export function extractReferencedSpanColumns(expressions: string[]): ReadonlySet<string> {
-  const joined = expressions.join(" ");
+  const joined = asSpanAttributes(expressions).join(" ");
   const columns = new Set<string>();
   const alias = tableAliases.stored_spans;
 
@@ -604,17 +619,19 @@ export function extractReferencedSpanColumns(expressions: string[]): ReadonlySet
 function mapNarrowProjection({
   column,
   keys,
+  as = column,
 }: {
   column: string;
   keys: readonly string[];
+  as?: string;
 }): string {
   const entries = keys.map((key) => `'${key}', ${column}['${key}']`).join(", ");
-  return `map(${entries}) AS ${column}`;
+  return `map(${entries}) AS ${as}`;
 }
 
-/** {@link mapNarrowProjection} for stored_spans `SpanAttributes`. */
+/** {@link mapNarrowProjection} for stored_spans `SpanAttributes`, under the join's own name. */
 export function spanAttributesNarrowProjection(keys: readonly string[]): string {
-  return mapNarrowProjection({ column: "SpanAttributes", keys });
+  return mapNarrowProjection({ column: "SpanAttributes", keys, as: JOINED_SPAN_ATTRIBUTES });
 }
 
 /**
@@ -625,9 +642,11 @@ export function spanAttributesNarrowProjection(keys: readonly string[]): string 
 export function narrowMapColumnProjection({
   column,
   expressions,
+  as = column,
 }: {
   column: string;
   expressions: readonly string[];
+  as?: string;
 }): string {
   const joined = expressions.join(" ");
   const escaped = column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -639,7 +658,7 @@ export function narrowMapColumnProjection({
     return column;
   }
   const keys = [...new Set(keyMatches.map((match) => match[1]!))];
-  return mapNarrowProjection({ column, keys });
+  return mapNarrowProjection({ column, keys, as });
 }
 
 /**
@@ -658,7 +677,8 @@ export function narrowSpanAttributesColumns({
   }
   const projection = narrowMapColumnProjection({
     column: "SpanAttributes",
-    expressions,
+    expressions: asSpanAttributes(expressions),
+    as: JOINED_SPAN_ATTRIBUTES,
   });
   if (projection === "SpanAttributes") return columns;
   const narrowed = new Set(columns);
@@ -701,7 +721,8 @@ export function extractReferencedTraceColumns(expressions: string[]): ReadonlySe
 }
 
 /**
- * Build a qualified column reference with table alias
+ * Build a qualified column reference with table alias, under the name the deduped trace read or
+ * the span join exposes the column as.
  */
 export function qualifiedColumn(esField: string): string {
   const mapping = fieldMappings[esField];
@@ -718,10 +739,16 @@ export function qualifiedColumn(esField: string): string {
     // For map access, we need to prefix the table alias
     if (column.includes("[")) {
       const parts = column.split("[");
-      return `${alias}.${parts[0]}[${parts.slice(1).join("[")}`;
+      return `${alias}.${joinedName({ table: mapping.table, column: parts[0]! })}[${parts.slice(1).join("[")}`;
     }
     return column;
   }
 
-  return `${alias}.${column}`;
+  return `${alias}.${joinedName({ table: mapping.table, column })}`;
+}
+
+/** The name the deduped trace read or the span join exposes a column under. */
+function joinedName({ table, column }: { table: CHTable; column: string }): string {
+  if (table === "trace_summaries") return latestVersionKey(column);
+  return table === "stored_spans" && column === "SpanAttributes" ? JOINED_SPAN_ATTRIBUTES : column;
 }

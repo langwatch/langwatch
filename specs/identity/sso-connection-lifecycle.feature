@@ -444,6 +444,33 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     And they are told to give the issuer URL their provider publishes
     And nothing in the answer describes our network back to them
 
+  # Behind a corporate proxy the proxy is the only way out, so discovery travels
+  # through it. The address is still judged first, and NO_PROXY decides only how
+  # an admitted request travels, never whether it is admitted (ADR-195).
+
+  @unit
+  Scenario: Issuer discovery leaves through the deployment's outbound proxy
+    Given the deployment reaches the internet only through an outbound proxy
+    When an administrator saves an OpenID Connect connection
+    Then the issuer's discovery document is read through the proxy
+    And the issuer's address is still judged public before the request is sent
+
+  @unit
+  Scenario: An issuer origin an operator vouched for is reached directly, not through the proxy
+    Given the deployment has an outbound proxy configured
+    And SSO_TRUSTED_IDP_ORIGINS names an issuer origin inside the network
+    And NO_PROXY does not name it
+    When an administrator saves a connection with that issuer
+    Then the discovery document is read directly from the vouched origin
+    And a redirect out of that origin is judged again and travels through the proxy
+
+  @unit
+  Scenario: NO_PROXY does not lift the public-address check on discovery
+    Given NO_PROXY names an issuer's host
+    And that host resolves to a private address the operator has not trusted
+    When an administrator saves a connection with that issuer
+    Then discovery is refused, and nothing is fetched directly or through the proxy
+
   # D05: the way back in, and its expiry. Activation's precondition stops
   # being "this deployment still has a local door somewhere" and becomes "a
   # named person can get in on Monday" — the only failure that cannot be

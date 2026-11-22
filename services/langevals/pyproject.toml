@@ -66,15 +66,8 @@ packages = ["langevals"]
 
 [tool.uv]
 exclude-newer = "7 days"
-# Emergency exceptions to the 7-day age gate (dev/docs/best_practices/
-# dependency-age-gates.md), each scoped by timestamp to the one patched
-# release a CRITICAL advisory needs. Pillow 13.0.0 (uploaded 2026-10-16)
-# closes 28 advisories, three of them critical; certifi 2026.10.19 (uploaded
-# 2026-10-20) closes GHSA-6q48-6c7w-9gw2 (critical). Remove both entries once
-# those uploads are older than 7 days (Pillow from 2026-10-24, certifi from
-# 2026-10-28): a timestamp here then holds the package back, not forward.
+# uv 0.9.25+ supports the exclude-newer-package emergency exceptions (dev/docs/best_practices/dependency-age-gates.md).
 required-version = ">=0.9.25"
-exclude-newer-package = { pillow = "2026-10-17T00:00:00Z", certifi = "2026-10-21T00:00:00Z" }
 override-dependencies = [
   # The langchain family is on the 1.x line, where the advisories affecting it
   # are fixed. Each floor is the highest first-patched version across the
@@ -118,15 +111,18 @@ override-dependencies = [
   # covering <13.0.0, three of them critical.
   "pillow>=13.0.0",
   # nltk unsafe deserialization in the pickle loader path, plus the advisories
-  # closed in 3.10.1, 3.10.3 and 3.10.4 (#3259).
+  # closed in 3.10.1 and 3.10.3, then the critical and high advisories fixed in
+  # 3.10.4 (GHSA-x8q7-6c7m-52gw and others).
   "nltk>=3.10.4",
   # authlib (via arize-phoenix and fastmcp): JWS empty-signature validation
   # (CRITICAL) and further advisories, all fixed by 1.9.1.
   "authlib>=1.9.1",
-  # dnspython: GHSA-45c3-73f7-pv4m, fixed in 2.9.0.
-  "dnspython>=2.9.0",
-  # pyasn1 decoder DoS on crafted BER/DER input.
-  "pyasn1>=0.6.5", # also the quadratic decoding advisories fixed in 0.6.5 (#3366-#3369)
+  # dnspython: GHSA-45c3-73f7-pv4m, fixed in 2.9.0, then GHSA-vvf4-9x63-8xvv,
+  # fixed in 2.9.2.
+  "dnspython>=2.9.2",
+  # pyasn1 decoder DoS on crafted BER/DER input, then the decoder advisories
+  # fixed in 0.6.5.
+  "pyasn1>=0.6.5",
   # aiohttp request smuggling and header-parsing advisories, then no initial
   # request/header timeout and unbounded memory/CPU use (#2851-#2853).
   "aiohttp>=3.14.4",

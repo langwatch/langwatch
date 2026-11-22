@@ -3,7 +3,7 @@
  * Model resolution chain for runs.
  */
 
-import { findAliasTarget } from "@langwatch/model-provider-contract";
+import { findAliasTarget, findFeatureByKey } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -66,6 +66,22 @@ describe("the models a run resolves", () => {
         simulatorModel: `default-for/${SIMULATOR_MODEL_FEATURE_KEY}`,
         judgeModel: `default-for/${JUDGE_MODEL_FEATURE_KEY}`,
       });
+    });
+  });
+
+  describe("when the project's Judge column is set", () => {
+    /** @scenario "A scenario run judges with the Judge model" */
+    it("judges with the model the Judge role's feature resolves", async () => {
+      const resolveFeatureModel = vi.fn(async (featureKey: string) =>
+        findFeatureByKey(featureKey)[0]?.role === "JUDGE"
+          ? "anthropic/judge-pick"
+          : "openai/default",
+      );
+
+      const models = await resolveRunModels({ plan: {}, scenario: {}, resolveFeatureModel });
+
+      expect(models.judgeModel).toBe("anthropic/judge-pick");
+      expect(models.simulatorModel).toBe("openai/default");
     });
   });
 

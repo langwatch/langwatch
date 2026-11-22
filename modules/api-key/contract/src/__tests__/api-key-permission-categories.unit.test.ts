@@ -52,17 +52,24 @@ describe("PERMISSION_CATEGORIES", () => {
       "Permissions claimed by more than one category — granting one category would hand over the other's resources",
     ).toEqual([]);
 
-    // The only permissions outside the categories are the platform tier,
-    // which can never ride on an API key — so no category may name one.
+    // The only permissions outside the categories are the platform tier, braiding and
+    // the braid permission no grant confers; none may ride on an API key.
     const categorizable = new Set<string>(categorizablePermissions());
-    const platformOnly = ALL_PERMISSIONS.filter((permission) => !categorizable.has(permission));
-    expect(platformOnly).toEqual(["ops:view", "ops:manage"]);
+    const neverOnAKey = ALL_PERMISSIONS.filter((permission) => !categorizable.has(permission));
+    expect(neverOnAKey).toEqual(["ops:view", "ops:manage", "braids:manage", "spans:braided"]);
 
-    const platformInCategory = platformOnly.filter((permission) => owners.has(permission));
+    const neverOnAKeyInCategory = neverOnAKey.filter((permission) => owners.has(permission));
     expect(
-      platformInCategory,
-      "Platform-tier permissions cannot ride on an API key — remove them from the categories",
+      neverOnAKeyInCategory,
+      "Platform-tier permissions and braids:manage cannot ride on an API key — remove them from the categories",
     ).toEqual([]);
+  });
+
+  /** ADR-201 §2: braiding is a person's decision, made in the screen. */
+  it("never offers braids:manage on a key, nor on a CLI login key's defaults", () => {
+    expect(categorizablePermissions()).not.toContain("braids:manage");
+    expect(defaultCliKeyPermissions()).not.toContain("braids:manage");
+    expect(defaultCliKeyPermissions({ management: true })).not.toContain("braids:manage");
   });
 
   it("only names permissions that exist in the registry", () => {
@@ -101,6 +108,9 @@ describe("PERMISSION_CATEGORIES", () => {
       { category: "Team", accessLevels: "read, write" },
       { category: "Project", accessLevels: "read, write" },
       { category: "Organization", accessLevels: "read, write" },
+      { category: "Subscription", accessLevels: "write" },
+      { category: "Seat requests", accessLevels: "read, write" },
+      { category: "Members", accessLevels: "read" },
       {
         category: "Single sign-on and directory sync",
         accessLevels: "read, write",

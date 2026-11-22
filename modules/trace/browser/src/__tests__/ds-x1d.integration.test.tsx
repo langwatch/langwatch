@@ -125,6 +125,7 @@ function Drawer({
   useTraceDrawerShortcuts({
     trace,
     spanTree: spans,
+    showsAgents: false,
     conversationContext: CONVERSATION,
     navigateToTrace,
     goBack: vi.fn(),

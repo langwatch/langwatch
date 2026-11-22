@@ -17,6 +17,7 @@ import {
   type BindingPrincipalWhere,
   DuplicateBindingError,
 } from "../repositories/authz-grant.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { permissiveGrantGuards } from "../services/__tests__/support/grant-guards.stub.ts";
 import { AuthzGrantsService } from "../services/authz-grants.service.ts";
 import { AuthzService } from "../services/authz.service.ts";
@@ -115,6 +116,7 @@ function makeService(repository: RepositoryStub, ledger: LedgerStub = makeLedger
   const epoch = new StubAuthzEpoch();
   const offboarded = { memberOffboarded: vi.fn().mockResolvedValue(undefined) };
   const service = AuthzGrantsService.create({
+    policies: MemoryAuthzOrganizationPolicyRepository.create(),
     permissions: permissiveGrantGuards,
     repository,
     ledger,
@@ -683,6 +685,7 @@ describe("AuthzGrantsService.offboard", () => {
       // offboarding (nobody deleted the key), but its owner has nothing
       // left, and the §9 ceiling is what closes the hole.
       const authz = AuthzService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         // These suites exercise the engine path, which is what the absent
         // gate used to default to.
         isOnEngine: async () => true,
@@ -1022,6 +1025,7 @@ describe("AuthzGrantsService central caller ceiling", () => {
       scopeId: TEAM,
     });
     const service = AuthzGrantsService.create({
+      policies: MemoryAuthzOrganizationPolicyRepository.create(),
       permissions: { ...permissiveGrantGuards, findPermissionsBeyondCaller },
       repository: makeRepository(),
       ledger,
@@ -1122,6 +1126,7 @@ describe("when founder creation attaches its two admin grants", () => {
   it("hands the membership stamp and bootstrap marker to the ledger unchanged", async () => {
     const ledger = makeLedger();
     const service = AuthzGrantsService.create({
+      policies: MemoryAuthzOrganizationPolicyRepository.create(),
       permissions: permissiveGrantGuards,
       repository: makeRepository(),
       ledger,

@@ -1,4 +1,4 @@
-import { Config, type ConfigOf, nodeEnvironment } from "@langwatch/config";
+import { Config, type ConfigOf, isSaas, nodeEnvironment } from "@langwatch/config";
 import { langevalsEndpoint } from "@langwatch/evaluation-contract";
 import { z } from "zod";
 
@@ -18,6 +18,13 @@ export const dataPrivacyConfig = Config.define((c) => ({
   nodeEnvironment,
   /** Evaluation's leaf, held by instance: this module calls Presidio itself (R5, 2026-10-06). */
   langevalsEndpoint,
+  /**
+   * Where the PII redaction model is reached: its Lambda alias ARN (`arn:aws:lambda:...`) or its
+   * HTTP address, for a cluster or self-hosted service. Unset names no model.
+   */
+  piiRedactionModelEndpoint: c.env("PII_REDACTION_MODEL_ENDPOINT", z.string().optional()),
+  /** The shared deployment leaf: a self-hosted install runs the model and is never priced. */
+  isSaas,
 }));
 
 export type DataPrivacyServerConfig = ConfigOf<typeof dataPrivacyConfig>;

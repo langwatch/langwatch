@@ -11,7 +11,7 @@ import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { browserModules } from "../../browser-modules.generated.ts";
-import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
+import { uiRouteDescriptors, uiMountedRouteTable } from "../ui-route-table";
 
 const CATCH_ALL = "*";
 const PROJECT_INDEX = "/:project";
@@ -42,7 +42,7 @@ function featureMapUiAddresses(): string[] {
 
 /** Both halves of the surface: the application's table, and what modules declare. */
 const patterns = [
-  ...uiRouteDescriptors(uiRouteTable).map((descriptor) => descriptor.path),
+  ...uiRouteDescriptors(uiMountedRouteTable).map((descriptor) => descriptor.path),
   ...installedModuleScreens(browserModules).routes.project.map((route) => route.path),
 ].filter((path): path is string => typeof path === "string");
 

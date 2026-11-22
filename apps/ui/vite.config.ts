@@ -458,6 +458,12 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           changeOrigin: true,
           secure: false,
         },
+        // The docs-only MCP endpoint, which takes no credential.
+        "^/mcp/docs(?:\\?.*)?$": {
+          target: API_TARGET,
+          changeOrigin: true,
+          secure: false,
+        },
         "/sse": {
           target: API_TARGET,
           changeOrigin: true,

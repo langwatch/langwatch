@@ -13,6 +13,7 @@ import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.chann
 import { PostHogChannel } from "../../channels/posthog.channel.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
+import { unplacedMemberFacts } from "./nurturing-member-facts.test-helpers.ts";
 
 const scenarioCreated: NurturingSignal = {
   kind: "scenario_created",
@@ -67,6 +68,7 @@ function deliveryOverBothSinks() {
   const delivery = NurturingDeliveryService.create({
     claims: claims(),
     users: users(),
+    memberFacts: unplacedMemberFacts(),
     customerIo: cio.service,
     posthog,
   });
@@ -108,12 +110,13 @@ function claims() {
 describe("NurturingDeliveryService", () => {
   describe("when a created scenario is delivered", () => {
     /** @scenario "A created scenario reaches PostHog and Customer.io with main's attributes" */
-    it("tracks it in PostHog with the project and sends Customer.io its count and event", async () => {
+    it("tracks it in PostHog with the project and sends Customer.io its event, no count", async () => {
       const posthog = MemoryPostHogChannel.create();
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: cio.service,
         posthog,
       });
@@ -125,10 +128,6 @@ describe("NurturingDeliveryService", () => {
         { userId: "user-1", event: "scenario_created", properties: { projectId: "project-1" } },
       ]);
       expect(cio.sent).toEqual([
-        {
-          path: "/v1/identify",
-          body: expect.objectContaining({ userId: "user-1", traits: { scenario_count: 3 } }),
-        },
         {
           path: "/v1/track",
           body: expect.objectContaining({
@@ -149,6 +148,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: cio.service,
         posthog,
       });
@@ -158,7 +158,7 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(posthog.tracked).toHaveLength(1);
-      expect(cio.sent).toHaveLength(2);
+      expect(cio.sent).toHaveLength(1);
     });
   });
 
@@ -201,6 +201,18 @@ describe("NurturingDeliveryService", () => {
               project_id: "project-1",
             },
           }),
+        },
+        {
+          path: "/v1/batch",
+          body: {
+            batch: [
+              {
+                type: "identify",
+                userId: "admin-1",
+                traits: { has_traces: true, last_trace_at: 1_792_664_000 },
+              },
+            ],
+          },
         },
       ]);
     });
@@ -439,6 +451,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: cio.service,
         posthog: new ThrowingPostHogChannel(),
       });
@@ -521,6 +534,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -543,6 +557,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: undefined,
         posthog: new ThrowingPostHogChannel(),
       });
@@ -576,6 +591,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: service,
         posthog: undefined,
       });
@@ -635,9 +651,13 @@ describe("NurturingDeliveryService", () => {
       const { cio, delivery } = deliveryOverBothSinks();
       await delivery.deliver({ key: `${signal.kind}:${signal.sourceEventId}`, signal });
       await settle();
-      return cio.sent
-        .filter((call) => call.path === "/v1/identify" || call.path === "/v1/group")
-        .map((call) => (call.body as { traits: unknown }).traits);
+      return cio.sent.flatMap(({ path, body }) => {
+        if (path === "/v1/batch") {
+          return (body as { batch: { traits: unknown }[] }).batch.map(({ traits }) => traits);
+        }
+        if (path !== "/v1/identify" && path !== "/v1/group") return [];
+        return [(body as { traits: unknown }).traits];
+      });
     }
 
     /** @scenario "Customer.io date attributes are sent as Unix seconds" */
@@ -650,7 +670,7 @@ describe("NurturingDeliveryService", () => {
         projectId: "project-1",
       });
 
-      expect(traits).toEqual([{ last_trace_at: seconds }]);
+      expect(traits).toEqual([{ has_traces: true, last_trace_at: seconds }]);
     });
 
     /** @scenario "Customer.io date attributes are sent as Unix seconds" */
@@ -788,6 +808,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claim,
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: undefined,
         posthog: undefined,
       });
@@ -805,6 +826,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -824,6 +846,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -839,7 +862,7 @@ describe("NurturingDeliveryService", () => {
       await delivery.deliver({ key: "trace_received:event-2", signal: trace("event-2") });
       await settle();
 
-      expect(cio.sent.filter((call) => call.path === "/v1/identify")).toHaveLength(1);
+      expect(cio.sent.filter((call) => call.path === "/v1/batch")).toHaveLength(1);
     });
   });
 
@@ -965,6 +988,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -991,6 +1015,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1019,6 +1044,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1045,6 +1071,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1072,6 +1099,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1101,6 +1129,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: cio.service,
         posthog: undefined,
       });
@@ -1133,6 +1162,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: undefined,
         posthog: MemoryPostHogChannel.create(),
       });
@@ -1158,6 +1188,7 @@ describe("NurturingDeliveryService", () => {
       const delivery = NurturingDeliveryService.create({
         claims: claims(),
         users: users(),
+        memberFacts: unplacedMemberFacts(),
         customerIo: undefined,
         posthog,
       });

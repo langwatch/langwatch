@@ -45,12 +45,13 @@ export const scenarioAgentTestRest = defineRestRouter(ScenarioApi)
     app.testAgentRun({
       projectId: scope.id,
       agentId: input.id,
+      // A key that belongs to no person still names itself, so the run's key is minted under it.
       actor:
-        context.viewerUserId === null
+        context.viewerUserId === null && callerKey === null
           ? undefined
           : {
-              id: context.viewerUserId,
-              label: "user",
+              ...(context.viewerUserId === null ? {} : { id: context.viewerUserId }),
+              label: context.viewerUserId === null ? "api" : "user",
               ...(callerKey ? { apiKeyId: callerKey } : {}),
             },
     }),

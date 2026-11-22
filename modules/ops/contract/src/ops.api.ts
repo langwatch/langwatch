@@ -125,6 +125,11 @@ import type {
   ListBugReportsInput,
   SubmitBugReport,
 } from "./ops-bug-report.ts";
+import type {
+  OpsFeatureFlagTarget,
+  OpsFindFeatureFlagTargetsInput,
+  OpsSearchFeatureFlagTargetsInput,
+} from "./ops-feature-flag.ts";
 import type { OpsPlatformOperator } from "./ops-operators.ts";
 import type {
   ListInsightSchedulesInput,
@@ -149,6 +154,7 @@ import type {
   OpsOperatorPermission,
   OpsPipelineRegistrations,
   OpsScope,
+  SeatSharingCheck,
 } from "./ops.responses.ts";
 
 export type DiscoverAggregatesInput = {
@@ -629,6 +635,16 @@ export interface OpsApi {
   /** Revokes one holder; authz refuses the last holder. */
   revokePlatformOperator(input: { grantId: string; operator: OpsOperator | null }): Promise<void>;
   featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue>;
+  /** Targets a rule may name, by name, slug, id or email; at most ten. */
+  searchFeatureFlagTargets(
+    input: OpsSearchFeatureFlagTargetsInput,
+  ): Promise<OpsFeatureFlagTarget[]>;
+  /** The targets stored rules name by id; an id nothing answers for is left out. */
+  findFeatureFlagTargets(input: OpsFindFeatureFlagTargetsInput): Promise<OpsFeatureFlagTarget[]>;
+  /** The last seat sharing check, empty before the first; not found without Cloud admin. */
+  findSeatSharingChecks(): Promise<SeatSharingCheck[]>;
+  /** Runs the seat sharing check over every organization on a paid plan and keeps the result. */
+  runSeatSharingCheck(): Promise<void>;
   setFeatureFlagEnabled(input: {
     key: string;
     enabled: boolean;

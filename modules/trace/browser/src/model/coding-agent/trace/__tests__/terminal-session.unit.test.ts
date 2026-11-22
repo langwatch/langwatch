@@ -1,12 +1,140 @@
 import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import type { SpanDetail } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   buildEntryTimeline,
   extractDiffFromToolInput,
   isDiffTool,
+  promptLineText,
   toolPrimaryArg,
 } from "../terminal-session.ts";
+
+function rootSpan(name: string): SpanDetail {
+  return {
+    spanId: "run",
+    parentSpanId: null,
+    name,
+    type: "agent",
+    startTimeMs: 1,
+    endTimeMs: 2,
+    durationMs: 1,
+    status: "ok",
+    params: {},
+    events: [],
+  };
+}
+
+function prompt(atMs: number, text: string | null): TranscriptEntry {
+  return { kind: "user_prompt", atMs, text, chars: text?.length ?? 0 };
+}
+
+const TRACE_ID = "52a4e6ca13a6add98e17294539567017";
+
+describe("promptLineText", () => {
+  describe("given a trace named after its own root span", () => {
+    /** @scenario "The prompt line never shows a span name as if the user had typed it" */
+    it("shows the session's first prompt instead of the span name", () => {
+      expect(
+        promptLineText({
+          traceId: TRACE_ID,
+          sessionName: "pi.harness.run",
+          spans: [rootSpan("pi.harness.run")],
+          entries: [prompt(1, null), prompt(2, "fix the flaky test"), prompt(3, "and lint it")],
+        }),
+      ).toBe("fix the flaky test");
+    });
+
+    it("shows nothing rather than the span name when no prompt carries text", () => {
+      expect(
+        promptLineText({
+          traceId: TRACE_ID,
+          sessionName: "pi.harness.run",
+          spans: [rootSpan("pi.harness.run")],
+          entries: [modelCall(1, 10, 0), prompt(2, "   ")],
+        }),
+      ).toBeNull();
+    });
+  });
+
+  describe("given a logs-only trace named after its own id", () => {
+    /** @scenario "The prompt line never shows a trace id as if the user had typed it" */
+    it("shows the session's first prompt instead of the id", () => {
+      expect(
+        promptLineText({
+          traceId: TRACE_ID,
+          sessionName: TRACE_ID.slice(0, 8),
+          spans: [],
+          entries: [prompt(1, "Reply with just hi")],
+        }),
+      ).toBe("Reply with just hi");
+    });
+  });
+
+  describe("given a trace with no name of its own in a named session", () => {
+    /** @scenario "The prompt line shows the session's name when the trace has none of its own" */
+    it("shows the session's name, ahead of its first prompt", () => {
+      expect(
+        promptLineText({
+          traceId: TRACE_ID,
+          sessionName: "claude_code.llm_request",
+          declaredSessionName: " ACME release notes ",
+          spans: [rootSpan("claude_code.llm_request")],
+          entries: [prompt(1, null), prompt(2, "write the release notes")],
+        }),
+      ).toBe("ACME release notes");
+    });
+
+    /** @scenario "The prompt line shows the session's name when the trace has none of its own" */
+    it("shows nothing when the session's name is blank and no prompt carries text", () => {
+      expect(
+        promptLineText({
+          traceId: TRACE_ID,
+          sessionName: "claude_code.llm_request",
+          declaredSessionName: "  ",
+          spans: [rootSpan("claude_code.llm_request")],
+          entries: [prompt(1, null)],
+        }),
+      ).toBeNull();
+    });
+  });
+
+  describe("given a trace with a name of its own", () => {
+    it("keeps the name over the session's name", () => {
+      expect(
+        promptLineText({
+          traceId: TRACE_ID,
+          sessionName: "Fix the flaky CI job",
+          declaredSessionName: "ACME agent",
+          spans: [rootSpan("claude_code.interaction")],
+          entries: [],
+        }),
+      ).toBe("Fix the flaky CI job");
+    });
+
+    it("keeps the name", () => {
+      expect(
+        promptLineText({
+          traceId: TRACE_ID,
+          sessionName: "Fix the flaky CI job",
+          spans: [rootSpan("claude_code.interaction")],
+          entries: [prompt(1, "something else")],
+        }),
+      ).toBe("Fix the flaky CI job");
+    });
+
+    it("keeps a name shorter than an abbreviated id that the id happens to start with", () => {
+      expect(
+        promptLineText({
+          traceId: TRACE_ID,
+          sessionName: TRACE_ID.slice(0, 3),
+          spans: [],
+          entries: [prompt(1, "something else")],
+        }),
+      ).toBe(TRACE_ID.slice(0, 3));
+    });
+  });
+});
 
 function modelCall(atMs: number, tokens: number, costUsd: number): TranscriptEntry {
   return {

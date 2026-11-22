@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   startHeartbeat,
+  PUBLIC_LISTENER_TIMEOUTS,
   startLivenessThread,
   type Heartbeat,
   type LivenessThread,
@@ -39,6 +40,7 @@ async function bootThread(): Promise<LivenessThread> {
   const heartbeat = startHeartbeat({ intervalMs: 5 });
   heartbeats.push(heartbeat);
   const thread = await startLivenessThread({
+    requestTimeoutMs: PUBLIC_LISTENER_TIMEOUTS.requestTimeout,
     port: 0,
     heartbeat: heartbeat.buffer,
     proxyPort: address.port,
@@ -69,10 +71,10 @@ describe("the upgrade gate of an api that upgrades", () => {
       });
 
       await hosted.start?.();
-      const page = await fetch(`http://127.0.0.1:${thread.address.port}/settings`, {
+      const page = await fetch(`http://localhost:${thread.address.port}/settings`, {
         headers: { Accept: "text/html" },
       });
-      const ingest = await fetch(`http://127.0.0.1:${thread.address.port}/api/otel/v1/traces`, {
+      const ingest = await fetch(`http://localhost:${thread.address.port}/api/otel/v1/traces`, {
         method: "POST",
         body: "spans",
       });

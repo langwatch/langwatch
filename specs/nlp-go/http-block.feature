@@ -7,13 +7,9 @@ Feature: HTTP block — call an external endpoint with templated body and JSONPa
 
   See _shared/contract.md §5; Python parity: langwatch_nlp/langwatch_nlp/studio/execute/http_node.py
 
-  # All scenarios are @unimplemented because the TS feature-parity checker only
-  # scans TS test roots, so Go-side HTTP block scenarios in services/nlpgo/
-  # cannot be bound via @scenario JSDoc until the checker grows Go-side support
-  # (or a parallel Go-side binder ships). services/nlpgo/ exists; the gap is
-  # tooling/binding, not service stand-up. Python parity tests:
+  # Scenarios tagged @unimplemented have no Go test bound yet; a Go test binds
+  # one with a `// @scenario "<name>"` comment. Python parity tests:
   # langwatch_nlp/tests/studio/test_http_node_integration.py.
-  # Aspirational pending parity-binder coverage.
 
   Background:
     Given nlpgo is listening on :5562
@@ -71,13 +67,13 @@ Feature: HTTP block — call an external endpoint with templated body and JSONPa
       When the engine invokes the node
       Then the node's output equals {"value": "Alice"}
 
-    @integration @unimplemented
-    Scenario: an output_path that matches nothing returns a node-level error
+    @unit
+    Scenario: An HTTP agent reply with nothing at the output path names the output path
       Given an HTTP node with output_path "$.missing"
-      And the upstream returns {"present": "value"}
+      And the upstream answers 200 with {"present": "value"}
       When the engine invokes the node
-      Then the node's status is "error"
-      And the error.message contains "jsonpath_no_match"
+      Then the node fails with the code "jsonpath_no_match", not "http_error"
+      And the failure is attributed to the author, with the reply still recorded
 
     @integration @unimplemented
     Scenario: an output_path matching multiple values returns the array

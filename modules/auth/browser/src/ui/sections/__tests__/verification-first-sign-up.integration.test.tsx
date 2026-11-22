@@ -177,7 +177,36 @@ describe("given the sign-up screen", () => {
     window.sessionStorage.clear();
   });
 
+  describe("when sign-up is opened fresh in a tab that holds a proof", () => {
+    /** @scenario "A fresh visit to sign-up starts at the address step" */
+    it("shows the address step and drops the held proof", async () => {
+      holdAddressProof({ email: "sam@acme.com", addressProof: "proof-1" });
+
+      renderScreen();
+
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(screen.queryByTestId("signup-identifier")).toBeNull();
+      expect(enrollmentMock).not.toHaveBeenCalled();
+      expect(readHeldAddressProof()).toBeNull();
+    });
+  });
+
   describe("when the create-your-account step is reloaded", () => {
+    beforeEach(() => {
+      const reloadEntry = {
+        type: "reload",
+        name: "",
+        entryType: "navigation",
+        startTime: 0,
+        duration: 0,
+        toJSON: () => ({}),
+      };
+      vi.spyOn(performance, "getEntriesByType").mockReturnValue([reloadEntry]);
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
     /** @scenario "A reload on the create-your-account step stays on it" */
     it("shows the same step for the same address and asks for no new link", async () => {
       searchParamsRef.current = new URLSearchParams(
@@ -540,7 +569,7 @@ describe("given the sign-up screen", () => {
       expect(await screen.findByTestId("signed-in-handoff")).toHaveTextContent(
         "You're signed in as sam@acme.com. Taking you to LangWatch.",
       );
-      expect(hardRedirectMock).toHaveBeenCalledWith("/invite/accept");
+      await waitFor(() => expect(hardRedirectMock).toHaveBeenCalledWith("/invite/accept"));
       expect(screen.queryByTestId("account-ready")).toBeNull();
     });
 
@@ -777,7 +806,9 @@ describe("given the sign-up screen", () => {
       );
       expect(screen.queryByText("That confirmation link no longer works")).toBeNull();
       expect(screen.queryByRole("button", { name: /send a new link/i })).toBeNull();
-      expect(hardRedirectMock).toHaveBeenCalledWith("/invite/accept?inviteCode=abc");
+      await waitFor(() =>
+        expect(hardRedirectMock).toHaveBeenCalledWith("/invite/accept?inviteCode=abc"),
+      );
     });
   });
 

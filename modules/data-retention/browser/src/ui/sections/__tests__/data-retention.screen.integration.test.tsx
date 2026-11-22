@@ -4,6 +4,11 @@
  * and error handling. See {@link specs/data-retention/retention-policy-configuration.feature}
  */
 
+import {
+  UiHostServicesContextProvider,
+  type UiHostServices,
+} from "@langwatch/browser-host/capabilities";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -20,15 +25,50 @@ import {
 } from "../../../model/data-retention-host.ts";
 import DataRetentionScreen from "../data-retention.screen.tsx";
 
+type StoredPastRetention = {
+  projectCount: number;
+  traces: { rows: number; retentionDays: number | null };
+  scenarios: { rows: number; retentionDays: number | null };
+  experiments: { rows: number; retentionDays: number | null };
+};
+
+/** A count answer with every category at 90 days; a category left out holds nothing. */
+function storedPast({
+  traces = 0,
+  scenarios = 0,
+  experiments = 0,
+  projectCount = 1,
+}: Partial<Record<"traces" | "scenarios" | "experiments" | "projectCount", number>>) {
+  return {
+    projectCount,
+    traces: { rows: traces, retentionDays: 91 },
+    scenarios: { rows: scenarios, retentionDays: 91 },
+    experiments: { rows: experiments, retentionDays: 91 },
+  };
+}
+
 const {
   snapshotRef,
   invalidate,
   previewScopeRemoval,
   removeForScope,
   setForScope,
-  triggerUpdate,
+  setBilledForScope,
   killMutation,
+  storedPastRef,
+  fetchStoredPast,
+  applyScope,
 } = vi.hoisted(() => ({
+  storedPastRef: {
+    current: storedPast({ traces: 0 }),
+  },
+  fetchStoredPast: vi.fn(async (input: unknown): Promise<StoredPastRetention> => {
+    void input;
+    return storedPast({ traces: 1234, scenarios: 5, experiments: 0, projectCount: 3 });
+  }),
+  applyScope: vi.fn(async (input: unknown) => {
+    void input;
+  }),
   invalidate: vi.fn(async () => undefined),
   previewScopeRemoval: vi.fn((input: unknown) => {
     void input;
@@ -37,14 +77,19 @@ const {
   removeForScope: vi.fn(async (request: unknown) => {
     void request;
   }),
-  setForScope: vi.fn(async () => undefined),
-  triggerUpdate: vi.fn(async () => ({ appliedRetentionDays: 35 })),
+  setForScope: vi.fn(async (input: unknown) => {
+    void input;
+  }),
+  setBilledForScope: vi.fn(async (input: unknown) => {
+    void input;
+  }),
   killMutation: vi.fn(),
   snapshotRef: {
     current: {
       projectId: "proj-1",
       effective: { traces: 49, scenarios: 49, experiments: 49 },
       canConfigureRetention: true,
+      storageBilled: false,
       available: {
         organization: { id: "org-1", name: "Acme" },
         teams: [{ id: "team-1", name: "Platform" }],
@@ -72,9 +117,20 @@ const {
 
 vi.mock("../../../behavior/data-retention-api.ts", () => ({
   dataRetentionApi: {
-    useUtils: () => ({ dataRetention: { getRules: { invalidate } } }),
+    useUtils: () => ({
+      dataRetention: {
+        getRules: { invalidate },
+        getStoredPastRetention: { fetch: fetchStoredPast, invalidate },
+      },
+    }),
     dataRetention: {
       getRules: { useQuery: () => ({ data: snapshotRef.current, isLoading: false }) },
+      getStoredPastRetention: {
+        useQuery: () => ({ data: storedPastRef.current, isLoading: false }),
+      },
+      applyScopeRetentionToStoredData: {
+        useMutation: () => ({ mutateAsync: applyScope, isPending: false }),
+      },
       getScopeStorageUsage: {
         useQuery: () => ({ data: { totalBytes: 1024, projectCount: 1 }, isLoading: false }),
       },
@@ -83,11 +139,11 @@ vi.mock("../../../behavior/data-retention-api.ts", () => ({
         useQuery: () => ({ data: [], refetch: vi.fn() }),
       },
       setForScope: { useMutation: () => ({ mutateAsync: setForScope, isPending: false }) },
+      setBilledForScope: {
+        useMutation: () => ({ mutateAsync: setBilledForScope, isPending: false }),
+      },
       removeForScope: {
         useMutation: () => ({ mutateAsync: removeForScope, isPending: false }),
-      },
-      triggerRetroactiveUpdate: {
-        useMutation: () => ({ mutateAsync: triggerUpdate, isPending: false }),
       },
       killMutation: { useMutation: () => ({ mutate: killMutation, isPending: false }) },
     },
@@ -165,18 +221,41 @@ class TestRetentionHost extends DataRetentionHostApi {
   }
 }
 
-function renderScreen(host: TestRetentionHost) {
-  return renderWithDesignSystem(
+function renderScreen(host: TestRetentionHost, { isSaaS }: { isSaaS?: boolean } = {}) {
+  const screenUnderTest = (
     <DataRetentionHostProvider value={host}>
       <DataRetentionScreen />
-    </DataRetentionHostProvider>,
+    </DataRetentionHostProvider>
+  );
+  if (isSaaS === undefined) return renderWithDesignSystem(screenUnderTest);
+  const services: UiHostServices = {
+    ...createUiHostServicesFromHost({
+      route: () => ({ params: {}, query: {} }),
+      navigate: () => {},
+    }),
+    deployment: {
+      isDevelopment: false,
+      isSaaS,
+      appBaseUrl: "http://localhost",
+      hasNlpService: true,
+      hasLangevals: true,
+      hasEmailProvider: false,
+      hasCloudOps: false,
+    },
+  };
+  return renderWithDesignSystem(
+    <UiHostServicesContextProvider value={services}>
+      {screenUnderTest}
+    </UiHostServicesContextProvider>,
   );
 }
 
 describe("given the retention policies page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    storedPastRef.current = storedPast({ traces: 0 });
     snapshotRef.current.canConfigureRetention = true;
+    snapshotRef.current.storageBilled = false;
     snapshotRef.current.effective = { traces: 49, scenarios: 49, experiments: 49 };
     snapshotRef.current.rules = [
       {
@@ -198,11 +277,35 @@ describe("given the retention policies page", () => {
 
   describe("when the organization's plan does not unlock configurable retention", () => {
     /** @scenario A free plan sees the policies and is offered no way to change them */
-    it("says so and offers no way to add a policy", () => {
+    it("says so on Cloud and offers no way to add a policy", () => {
       snapshotRef.current.canConfigureRetention = false;
-      renderScreen(new TestRetentionHost());
+      renderScreen(new TestRetentionHost(), { isSaaS: true });
 
       expect(screen.getByText("Configurable retention is a paid-plan feature")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Add retention policy" }),
+      ).not.toBeInTheDocument();
+    });
+
+    /**
+     * @scenario A self-hosted admin without a license is led to the License page from data retention
+     * @scenario "Each Enterprise page names its feature in the shared lock"
+     */
+    it("leads a self-hosted admin to the License page and offers no way to add a policy", () => {
+      snapshotRef.current.canConfigureRetention = false;
+      renderScreen(new TestRetentionHost({}, new Set(["organization:manage"])), { isSaaS: false });
+
+      expect(
+        screen.getByText("Data retention is part of LangWatch Enterprise"),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Activate a license" })).toHaveAttribute(
+        "href",
+        "/settings/license",
+      );
+      expect(screen.getByRole("link", { name: "Get a license" })).toHaveAttribute(
+        "href",
+        "/settings/license",
+      );
       expect(
         screen.queryByRole("button", { name: "Add retention policy" }),
       ).not.toBeInTheDocument();
@@ -305,6 +408,165 @@ describe("given the retention policies page", () => {
         fallbackTitle: "Couldn't remove the retention policy",
       });
       expect(host.successes).toHaveLength(0);
+    });
+  });
+
+  describe("when a policy is saved", () => {
+    async function saveTeamPolicy(host: TestRetentionHost) {
+      const user = userEvent.setup();
+      renderScreen(host);
+      await user.click(screen.getByRole("button", { name: "Actions for Platform" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+      await user.click(await screen.findByRole("button", { name: "Save changes" }));
+      return user;
+    }
+
+    /** @scenario "A shorter period asks to apply it with a count" */
+    it("asks to apply it, naming each category with something to delete and how many projects", async () => {
+      await saveTeamPolicy(new TestRetentionHost());
+
+      expect(
+        await screen.findByText(
+          /1,234 traces older than 90 days and 5 scenario runs older than 90 days will be deleted within a day, across 3 projects\./,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/0 experiment runs/)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Apply now" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Not now" })).toBeInTheDocument();
+      // A fresh read: the cached count is still the old period's.
+      expect(fetchStoredPast).toHaveBeenCalledWith(
+        { projectId: "proj-1", scope: { scopeType: "TEAM", scopeId: "team-1" } },
+        { staleTime: 0 },
+      );
+    });
+
+    it("applies the saved scope's period when the admin chooses Apply now", async () => {
+      const host = new TestRetentionHost();
+      const user = await saveTeamPolicy(host);
+
+      await user.click(await screen.findByRole("button", { name: "Apply now" }));
+
+      await waitFor(() => expect(applyScope).toHaveBeenCalledTimes(1));
+      expect(applyScope).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        organizationId: "org-1",
+        scope: { scopeType: "TEAM", scopeId: "team-1" },
+      });
+      expect(host.successes.at(-1)?.title).toBe(
+        "Stored data past the new period will be deleted within a day",
+      );
+    });
+
+    it("asks nothing when no stored data is past the new period", async () => {
+      fetchStoredPast.mockResolvedValueOnce(storedPast({}));
+      await saveTeamPolicy(new TestRetentionHost());
+
+      await waitFor(() => expect(fetchStoredPast).toHaveBeenCalled());
+      expect(screen.queryByRole("button", { name: "Apply now" })).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A count that fails still offers the choice" */
+    it("says it could not count and still offers both choices", async () => {
+      fetchStoredPast.mockRejectedValueOnce(new Error("clickhouse down"));
+      await saveTeamPolicy(new TestRetentionHost());
+
+      expect(await screen.findByText(/We couldn't count the stored data/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Apply now" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Not now" })).toBeInTheDocument();
+      expect(applyScope).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when stored data under the scope in view is past its period", () => {
+    /** @scenario "Not now leaves a note with an Apply button" */
+    it("notes how many traces still use the old period and applies it after the prompt", async () => {
+      storedPastRef.current = storedPast({ traces: 1234, experiments: 2, projectCount: 2 });
+      const user = userEvent.setup();
+      renderScreen(new TestRetentionHost());
+
+      expect(
+        screen.getByText("1,234 traces and 2 experiment runs still use the old period"),
+      ).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Apply" }));
+      expect(
+        await screen.findByText(
+          /1,234 traces older than 90 days and 2 experiment runs older than 90 days will be deleted within a day, across 2 projects\./,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/scenario runs older than/)).not.toBeInTheDocument();
+      expect(applyScope).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Apply now" }));
+
+      await waitFor(() => expect(applyScope).toHaveBeenCalledTimes(1));
+      expect(applyScope).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        organizationId: "org-1",
+        scope: { scopeType: "ORGANIZATION", scopeId: "org-1" },
+      });
+    });
+  });
+});
+
+describe("given a plan that bills storage above 90 days", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storedPastRef.current = storedPast({});
+    fetchStoredPast.mockResolvedValue(storedPast({}));
+    snapshotRef.current.canConfigureRetention = true;
+    snapshotRef.current.storageBilled = true;
+  });
+
+  async function pickAndSave({ host, label }: { host: TestRetentionHost; label: string }) {
+    const user = userEvent.setup();
+    renderScreen(host);
+    await user.click(screen.getByRole("button", { name: "Actions for Platform" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+    await user.click(await screen.findByRole("combobox", { name: "Retention" }));
+    await user.click(await screen.findByRole("option", { name: label }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+  }
+
+  describe("when a reader with subscription:manage saves 1 year and then 90 days", () => {
+    /** @scenario "The settings page saves a billed length through the billed write" */
+    it("saves 1 year through the billed write and 90 days through the scope write", async () => {
+      const host = new TestRetentionHost({}, new Set(["project:view", "subscription:manage"]));
+      await pickAndSave({ host, label: "1 year" });
+
+      await waitFor(() => expect(setBilledForScope).toHaveBeenCalledTimes(3));
+      expect(setBilledForScope).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-1", retentionDays: 371 }),
+      );
+      expect(setForScope).not.toHaveBeenCalled();
+    });
+
+    it("saves 90 days through the scope write", async () => {
+      const host = new TestRetentionHost({}, new Set(["project:view", "subscription:manage"]));
+      await pickAndSave({ host, label: "90 days" });
+
+      await waitFor(() => expect(setForScope).toHaveBeenCalledTimes(3));
+      expect(setBilledForScope).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a reader without subscription:manage opens the retention menu", () => {
+    /** @scenario "A reader without subscription:manage is not offered a billed length" */
+    it("disables 180 days and 1 year, saying they need billing access", async () => {
+      const user = userEvent.setup();
+      renderScreen(new TestRetentionHost());
+      await user.click(screen.getByRole("button", { name: "Actions for Platform" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Edit" }));
+      await user.click(await screen.findByRole("combobox", { name: "Retention" }));
+
+      for (const label of ["180 days (needs billing access)", "1 year (needs billing access)"]) {
+        expect(await screen.findByRole("option", { name: label })).toHaveAttribute(
+          "aria-disabled",
+          "true",
+        );
+      }
+      expect(screen.getByRole("option", { name: "90 days" })).not.toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
     });
   });
 });

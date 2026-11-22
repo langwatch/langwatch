@@ -1,4 +1,5 @@
 import type { SignInMethodPolicy } from "@langwatch/identity-contract";
+import type { OrganizationUserRole } from "@langwatch/organization-contract";
 
 /**
  * The ONE Better Auth instance and its collaborators. Instance is a port (not
@@ -82,6 +83,7 @@ export abstract class BetterAuthAnnouncements {
     userId: string;
     organizationId: string;
     organizationName: string;
+    role: OrganizationUserRole;
   }): void;
 
   /** Nurturing, once per session a member of some organization mints. Ids only. */

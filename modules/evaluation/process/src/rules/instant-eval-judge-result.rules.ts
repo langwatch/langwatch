@@ -8,6 +8,7 @@ import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import {
   INSTANT_EVAL_SKIP_REASONS,
   type InstantEvalJudgeRefusalCode,
+  type InstantEvalJudgeRouting,
   type InstantEvalJudgement,
 } from "@langwatch/instant-eval-judge-contract";
 
@@ -40,6 +41,30 @@ const SKIPPED_REASONS: ReadonlySet<InstantEvalJudgeSkipReason> = new Set([
 ]);
 
 export function instantEvalJudgeResult({
+  judge,
+  judgement,
+  priceUsd,
+}: {
+  judge: InstantEvalJudge;
+  judgement: InstantEvalJudgement;
+  priceUsd: number;
+}): SingleEvaluationResult {
+  const result = verdictResultOf({ judge, judgement, priceUsd });
+  const { routing } = judgement;
+  if (!routing || result.status !== "processed") return result;
+  return { ...result, details: `${result.details ?? ""}. ${routedLine(routing)}` };
+}
+
+/**
+ * A routed judgement names the product and how many questions escalated, never a route table
+ * backend id; `answeredBy` stays on the judgement only (ADR-190 decision 10, amended).
+ */
+function routedLine({ escalated }: InstantEvalJudgeRouting): string {
+  const escalation = escalated > 0 ? `, ${escalated} escalated` : "";
+  return `LangWatch Judge${escalation}`;
+}
+
+function verdictResultOf({
   judge,
   judgement,
   priceUsd,

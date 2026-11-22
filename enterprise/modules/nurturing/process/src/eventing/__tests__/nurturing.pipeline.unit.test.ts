@@ -31,6 +31,7 @@ import {
 import {
   USER_AGGREGATE_TYPE,
   USER_DEACTIVATED_EVENT_TYPE,
+  USER_ERASED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
   USER_REACTIVATED_EVENT_TYPE,
   USER_CREATED_EVENT_TYPE,
@@ -47,6 +48,7 @@ import { describe, expect, it, vi } from "vitest";
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
 import { postHogUuidFor } from "../../rules/nurturing-guided-onboarding-service.rules.ts";
+import { unplacedMemberFacts } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
 import { RecordNurturingSignalCommand } from "../nurturing-signal.commands.ts";
@@ -95,6 +97,7 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
   );
   const seen = new Set<string>();
   const delivery = NurturingDeliveryService.create({
+    memberFacts: unplacedMemberFacts(),
     claims: {
       claim: async (key: string) => !seen.has(key) && Boolean(seen.add(key)),
       release: async (key: string) => void seen.delete(key),
@@ -116,6 +119,9 @@ function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async () => undefined,
+    recordPersonalOwner: async () => undefined,
+    recordTracedProject: async () => undefined,
+    forgetErasedUser: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<
@@ -198,7 +204,11 @@ describe("nurturing's userRegistered peer subscriber", () => {
         subscribers
           .filter(({ eventTypes }) => eventTypes.some((type) => type.startsWith("lw.user.")))
           .map(({ eventTypes }) => eventTypes),
-      ).toEqual([[USER_REGISTERED_EVENT_TYPE], [USER_CREATED_EVENT_TYPE]]);
+      ).toEqual([
+        [USER_REGISTERED_EVENT_TYPE],
+        [USER_CREATED_EVENT_TYPE],
+        [USER_ERASED_EVENT_TYPE],
+      ]);
     });
   });
 });
@@ -623,6 +633,7 @@ describe("nurturing's usageReportReceived peer subscriber", () => {
         customerIo: undefined,
         posthog: undefined,
         users: createApiFixture<UserApi>({}),
+        memberFacts: unplacedMemberFacts(),
       });
 
       await delivery.deliverUsageReport({

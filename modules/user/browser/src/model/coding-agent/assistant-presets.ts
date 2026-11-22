@@ -69,10 +69,11 @@ export const ASSISTANT_PRESETS: Record<Exclude<AssistantKind, "custom">, Assista
     iconUrl: "/images/external-icons/grok-lighttheme.svg",
     darkModeInvert: true,
   },
-  // pi spells its own name in lower case, and no mark of pi's ships in this build or its package.
+  // pi spells its own name in lower case; the mark is from pi's press kit
+  // (pi.dev/press-kit), full colour.
   pi: {
     label: "pi",
-    iconUrl: null,
+    iconUrl: "/images/external-icons/pi.svg",
     darkModeInvert: false,
   },
 };

@@ -4,6 +4,8 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
+
+import type { BilledSeatKind } from "./stripe-prices.ts";
 export { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
 /** Billing requires an email; 422 validates the account field, not auth. */
@@ -52,6 +54,42 @@ export class InvalidPlanError extends HandledError {
   }
 }
 
+/** A seat count below the minimum for its kind: the seats of that kind in use. */
+export class SeatQuantityBelowInUseError extends HandledError {
+  declare readonly code: "seat_quantity_below_in_use";
+
+  constructor({
+    seat,
+    requested,
+    minimum,
+  }: {
+    seat: BilledSeatKind;
+    requested: number;
+    minimum: number;
+  }) {
+    const label = seat === "developer" ? "Developer seats" : "Seats";
+    super("seat_quantity_below_in_use", `${label} can't go below ${minimum}`, {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { seat, requested, minimum },
+    });
+    this.name = "SeatQuantityBelowInUseError";
+  }
+}
+
+/** A failed payment is unpaid: buying seats would charge the same card, so it waits for payment. */
+export class SeatsHeldForPaymentError extends HandledError {
+  declare readonly code: "seats_held_for_payment";
+
+  constructor() {
+    super("seats_held_for_payment", "A payment failed. Update the card on file to add seats.", {
+      httpStatus: 402,
+      fault: "customer",
+    });
+    this.name = "SeatsHeldForPaymentError";
+  }
+}
+
 /** Seat billing not configured; platform fault, not provider. */
 export class SeatBillingUnavailableError extends HandledError {
   declare readonly code: "seat_billing_unavailable";
@@ -62,6 +100,35 @@ export class SeatBillingUnavailableError extends HandledError {
       fault: "platform",
     });
     this.name = "SeatBillingUnavailableError";
+  }
+}
+
+/** No Developer seat price is configured for this subscription's currency and interval. */
+export class DeveloperSeatsUnavailableError extends HandledError {
+  declare readonly code: "developer_seats_unavailable";
+
+  constructor() {
+    super("developer_seats_unavailable", "Developer seats are not sold on this plan yet", {
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "DeveloperSeatsUnavailableError";
+  }
+}
+
+/**
+ * Another seat change or a seat line repair held the subscription's seat line for the whole wait:
+ * the same code and copy as organization's seat lease.
+ */
+export class SeatChangeBusyError extends HandledError {
+  declare readonly code: "seat_change_busy";
+
+  constructor() {
+    super("seat_change_busy", "Another seat change is in progress. Try again in a moment.", {
+      httpStatus: 409,
+      retryable: true,
+    });
+    this.name = "SeatChangeBusyError";
   }
 }
 
@@ -167,6 +234,20 @@ export class SubscriptionCreationFailedError extends HandledError {
       { httpStatus: 500, fault: "platform" },
     );
     this.name = "SubscriptionCreationFailedError";
+  }
+}
+
+/** A checkout asked for on a live subscription: changing that one is the billing portal's. */
+export class SubscriptionAlreadyActiveError extends HandledError {
+  declare readonly code: "subscription_already_active";
+
+  constructor() {
+    super(
+      "subscription_already_active",
+      "This organization already has an active subscription; nothing was charged",
+      { httpStatus: 409, fault: "customer" },
+    );
+    this.name = "SubscriptionAlreadyActiveError";
   }
 }
 

@@ -261,6 +261,8 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // asserts it, so scenarios under specs/ci/ can only bind from this root.
   // Without it those feature files report "all bound" while binding nothing.
   "tools/ciguard",
+  // The review job's wait for the other checks (specs/ci/pr-review-bot.feature).
+  "tools/waitforchecks",
   "tools/deployimpact",
   "tools/operatornotes",
   "tools/cachesweep",
@@ -279,12 +281,15 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The docs deploy's redirect store and its job (specs/ci/docs-deploy.feature).
   "tools/docsdeploy",
   "tools/chartheap",
+  "tools/charts3region",
   // How the package-suites weights are measured from main's job logs
   // (specs/ci/package-suites-weights.feature).
   "tools/suiteweights",
   // The gateway-matrix seed: which providers it seeds from which credentials,
   // and that Bedrock stays keyless (specs/ci/gateway-matrix-seed.feature).
   "tools/matrixseed",
+  // Its command writes the bootstrapped step output the later steps gate on.
+  "cmd/matrixseed",
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",
@@ -362,6 +367,9 @@ const LEGACY_INERT: string[] = [
   "modules/authz/specs/access-reviews.feature",
   "modules/authz/specs/agent-principals.feature",
   "modules/authz/specs/authz-passports.feature",
+  // PR 9698's organization-wide Dashboards area (ADR-002, amended): specs land first, every
+  // scenario @unimplemented. Remove this entry with the file's first binding.
+  "modules/dashboard/specs/dashboards-organization-area.feature",
   // 2026-09-06 core-logic audit: these five ship ahead of the tests that
   // would bind them (packages/architecture-enforcer's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its
@@ -419,7 +427,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/wrapper-e2e/gemini.feature",
   "specs/ai-gateway/wrapper-e2e/opencode.feature",
   "specs/ai-governance/cli-wrappers/request-increase.feature",
-  "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
   "specs/ai-governance/dogfood-seed/scope-runner.feature",
   "specs/ai-governance/ingestion-sources/claude-code-otlp.feature",
   "specs/ai-governance/ingestion-sources/native-receiver-lift.feature",
@@ -511,7 +518,6 @@ const LEGACY_INERT: string[] = [
   "specs/features/trigger-cli.feature",
   "specs/features/workflow-cli.feature",
   "specs/home/onboarding-progress-ui.feature",
-  "specs/home/voice-agents-home-banner.feature",
   // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
   // specs ship ahead of the code, and the PR that builds each surface binds its
   // file as it lands. Remove each entry with its first binding.
@@ -548,7 +554,6 @@ const LEGACY_INERT: string[] = [
   "specs/model-config/anthropic-empty-content.feature",
   "specs/model-config/litellm-reasoning-params.feature",
   "specs/model-config/model-parameter-display.feature",
-  "specs/model-config/model-selector-ux.feature",
   "specs/model-config/unified-reasoning-ui.feature",
   "specs/model-providers/custom-model-max-tokens.feature",
   "specs/model-providers/default-provider.feature",
@@ -561,7 +566,6 @@ const LEGACY_INERT: string[] = [
   "specs/monitors/workflow-evaluator-checktype.feature",
   "specs/monitors/workflow-evaluator-mappings.feature",
   "specs/nlp-go/dataset-block.feature",
-  "specs/nlp-go/http-block.feature",
   "specs/nlp-go/proxy.feature",
   "specs/nlp-go/python-removal.feature",
   "specs/nlp-go/remove-execute-evaluation.feature",
@@ -682,6 +686,10 @@ const LEGACY_INERT: string[] = [
 
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when the not-found scenarios were bound: a tool
+  // that cannot start exits 127 with a docs link and no setup written. The
+  // login, env and routing scenarios stay untagged.
+  "specs/ai-governance/cli-wrappers/wrap-login-routing.feature",
   // Reason: left LEGACY_INERT when evaluator get gained name resolution; its
   // scenarios are enforced. The other CLI scenarios stay untagged.
   "specs/evaluators/evaluator-cli.feature",

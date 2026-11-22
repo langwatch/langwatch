@@ -20,6 +20,7 @@ export const datasetTrpcTransport: TrpcRouterDeclaration<DatasetApi, typeof data
         columnTypes: input.columnTypes,
         datasetId: input.datasetId,
         datasetRecords: input.datasetRecords,
+        columnRenames: input.columnRenames,
         editedBy: datasetAuthorOf({ actor }),
       }),
     )

@@ -28,12 +28,13 @@ function endpointRefusingBackupLog(failure: () => Error): MemoryStorageFootprint
   return storage;
 }
 
-function collectorOver(storage: MemoryStorageFootprintRepository) {
+function collectorOver(storage: MemoryStorageFootprintRepository, clusterName?: string) {
   const { logger, lines } = createTestLogger();
   const collector = StorageStatsCollectionService.create({
     resolveInstances: async () => [{ target: "shared", storage }],
     readings: MemoryStorageStatsReadingsRepository.create({ store: MemoryOpsStore.create() }),
     collectBackups: true,
+    clusterName,
     logger,
   });
   return { collector, lines };
@@ -70,5 +71,22 @@ describe("given a backup log that fails for any other reason", () => {
 
       expect(lines.filter((line) => line.level === WARN)).toHaveLength(1);
     });
+  });
+});
+
+describe("given a CLICKHOUSE_CLUSTER that is not a plain identifier", () => {
+  /** @scenario "A cluster name that is not a plain identifier reads the local node" */
+  it("warns once that backup history is read from one node", () => {
+    const { lines } = collectorOver(MemoryStorageFootprintRepository.create(), "x'); --");
+
+    const warnings = lines.filter((line) => line.level === WARN);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]?.msg).toContain("CLICKHOUSE_CLUSTER");
+  });
+
+  it("stays quiet for a plain cluster name", () => {
+    const { lines } = collectorOver(MemoryStorageFootprintRepository.create(), "default");
+
+    expect(lines.filter((line) => line.level === WARN)).toEqual([]);
   });
 });

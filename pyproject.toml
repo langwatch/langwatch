@@ -11,16 +11,9 @@ members = ["sdks/python", "packages/ksuid-python"]
 # root; a member's [tool.uv] block is silently ignored. They apply to every
 # member's resolution.
 [tool.uv]
-# exclude-newer-package below needs uv 0.9.25+ (dev/docs/best_practices/dependency-age-gates.md).
+# uv 0.9.25+ supports the exclude-newer-package emergency exceptions (dev/docs/best_practices/dependency-age-gates.md).
 required-version = ">=0.9.25"
 exclude-newer = "7 days"
-
-# Security fixes released inside the 7-day window above. Each entry admits one
-# package up to a fixed date, so the rest of the tree keeps the cooldown. Drop
-# an entry once its date is more than 7 days old (#8958). streamlit is here
-# because 1.66.1 is its first release that accepts Pillow 13. Each date sits
-# just after the patched release, so nothing newer slips in.
-exclude-newer-package = { certifi = "2026-10-21T00:00:00Z", pillow = "2026-10-17T00:00:00Z", pypdf = "2026-10-18T00:00:00Z", streamlit = "2026-10-22T00:00:00Z" }
 
 # Transitive-dependency security pins. Keep these even when the importing
 # package isn't a direct dependency, so a future re-resolution can't silently
@@ -51,10 +44,7 @@ constraint-dependencies = [
   "certifi>=2026.10.19", # security: certifi advisory covering <2026.10.19 (#2949)
   "pillow>=13.0.0", # security: Pillow advisories covering <13.0.0, three CRITICAL (#2955-#2963, #3038-#3075)
   "mcp>=1.30.0,!=2.0.*,!=2.1.*", # security: MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 and 2.2.0 (#2829)
-  # filelock 4.2.1 fixes the ReadWriteLock and SoftFileLock advisories covering 3.20.4-4.2.0 but needs
-  # Python 3.11; on 3.10, 3.20.3 sits below all of them and above the older symlink fixes.
-  "filelock>=4.2.1; python_full_version >= '3.11'", # security: filelock advisories covering 3.20.4-4.2.0 (#3208-#3210)
-  "filelock>=3.20.3,<3.20.4; python_full_version < '3.11'", # security: same advisories, on 3.10 (#3208-#3210); two later ones cover every release <=4.2.0 and have no 3.10 fix
-  "pyasn1>=0.6.5", # security: pyasn1 quadratic decoding advisories, four HIGH (#3370-#3373)
+  "pyasn1>=0.6.5", # security: pyasn1 decoder advisories covering <=0.6.4 (#3370-#3373)
+  "filelock>=4.2.1", # security: filelock advisories covering 3.20.4-4.2.0 (#3208)
   "setuptools>=84.1.0", # security: setuptools advisory covering <84.1.0 (#3207)
 ]
