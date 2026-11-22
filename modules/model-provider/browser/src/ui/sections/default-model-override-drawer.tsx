@@ -18,6 +18,7 @@ import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   buildCustomModelDisplayNames,
   isModelAllowedAsRoleDefault,
+  canonicalModelId,
   isModelAllowedForFeature,
   LANGWATCH_DECISION_MODEL_ID,
   LATEST_ALIAS_PROVIDERS,
@@ -624,7 +625,7 @@ function RoleRow({
   pickerFor: (llmOptions: ModelPickerOption[]) => ModelPickerOption[];
 }) {
   // A pinned Evals Preview the column no longer offers reads as unset, as the table cell does.
-  const stored = config[role] ?? "";
+  const stored = canonicalModelId(config[role] ?? "");
   const current =
     role === "INSTANT_EVALS" &&
     stored === LANGWATCH_DECISION_MODEL_ID &&

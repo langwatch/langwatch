@@ -124,7 +124,7 @@ export interface InstantEvalClassification {
 }
 
 /** The model a judge's settings name to be answered by Instant Evals (ADR-174 decision 11). */
-export const INSTANT_EVAL_JUDGE_MODEL_ID = "langwatch/instant-evals";
+export const INSTANT_EVAL_JUDGE_MODEL_ID = "langwatch/evals-preview";
 
 /**
  * Switches LangWatch's hosted judge off for an organization, whatever its plan, switch or license;

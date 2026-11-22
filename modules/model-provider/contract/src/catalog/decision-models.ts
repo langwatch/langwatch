@@ -7,7 +7,22 @@
 import type { ModelRole } from "./model-feature-registry.ts";
 
 /** Same id as `INSTANT_EVAL_JUDGE_MODEL_ID`; a contract never imports another module's contract. */
-export const LANGWATCH_DECISION_MODEL_ID = "langwatch/instant-evals";
+export const LANGWATCH_DECISION_MODEL_ID = "langwatch/evals-preview";
+
+/**
+ * Earlier public ids, still accepted wherever a stored or sent id is read: evaluator settings,
+ * project default models, API calls. Pickers never list them.
+ */
+export const LEGACY_LANGWATCH_MODEL_IDS: Readonly<Record<string, string>> = {
+  "langwatch/instant-evals": LANGWATCH_DECISION_MODEL_ID,
+  "langwatch/search-preview": "langwatch/instant-preview",
+  "langwatch/scenario-judge-preview": "langwatch/judge-preview",
+};
+
+/** The current id of a model: a legacy LangWatch id reads as its new one, any other id as is. */
+export function canonicalModelId(id: string): string {
+  return Object.hasOwn(LEGACY_LANGWATCH_MODEL_IDS, id) ? LEGACY_LANGWATCH_MODEL_IDS[id]! : id;
+}
 
 const EVALS_PREVIEW = { label: "Evals Preview", description: "Optimized for evals" } as const;
 
@@ -27,14 +42,14 @@ export type LangWatchDecisionPreview = Readonly<{
 export const LANGWATCH_DECISION_PREVIEWS: readonly LangWatchDecisionPreview[] = [
   { id: LANGWATCH_DECISION_MODEL_ID, ...EVALS_PREVIEW, fills: ["INSTANT_EVALS"] },
   {
-    id: "langwatch/scenario-judge-preview",
-    label: "Scenario Judge Preview",
+    id: "langwatch/judge-preview",
+    label: "Judge Preview",
     description: "Optimized for scenario judge",
     fills: [],
   },
   {
-    id: "langwatch/search-preview",
-    label: "Search Preview",
+    id: "langwatch/instant-preview",
+    label: "Instant Preview",
     description: "Optimized for search",
     fills: [],
   },
@@ -266,7 +281,8 @@ export function azureResourceOf(endpoint: string): AzureEndpointRead {
 }
 
 export function findDecisionModel(id: string): DecisionModelEntry | undefined {
-  return DECISION_MODELS.find((entry) => entry.id === id);
+  const canonical = canonicalModelId(id);
+  return DECISION_MODELS.find((entry) => entry.id === canonical);
 }
 
 /** A decision model's title in a picker row or chip, beside its provider icon. */
@@ -280,7 +296,7 @@ export function isDecisionModelId(id: string): boolean {
 
 /** Whether a stored column value runs on the organization's own key. */
 export function isOwnDecisionModelId(id: string): boolean {
-  return isDecisionModelId(id) && id !== LANGWATCH_DECISION_MODEL_ID;
+  return isDecisionModelId(id) && canonicalModelId(id) !== LANGWATCH_DECISION_MODEL_ID;
 }
 
 /** Why a project's own decision model cannot run; none of them falls back to LangWatch. */

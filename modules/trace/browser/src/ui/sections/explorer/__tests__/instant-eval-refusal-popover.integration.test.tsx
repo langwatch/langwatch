@@ -137,7 +137,7 @@ describe("given the Instant Evals flag is off for the project", () => {
         offersOwnModel
         canPickDecisionModel
         decisionModels={[
-          { value: "langwatch/instant-evals", label: "Evals Preview" },
+          { value: "langwatch/evals-preview", label: "Evals Preview" },
           { value: "azure/decisions:microsoft-decision-1", label: "Azure Microsoft Decision 1" },
         ]}
         onPickDecisionModel={onPickDecisionModel}
@@ -152,7 +152,7 @@ describe("given the Instant Evals flag is off for the project", () => {
     const user = userEvent.setup();
     await user.click(trigger);
     const options = pickerOptions(trigger);
-    expect(options.some((row) => row.dataset.value === "langwatch/instant-evals")).toBe(false);
+    expect(options.some((row) => row.dataset.value === "langwatch/evals-preview")).toBe(false);
     const keyless = optionFor(options, "openai/decisions:gpt-6-luna");
     expect(keyless.getAttribute("aria-disabled")).toBe("true");
     expect(keyless.textContent).toContain("Add an OpenAI key in Model Providers to use it.");

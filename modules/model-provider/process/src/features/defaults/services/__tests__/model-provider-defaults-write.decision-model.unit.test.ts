@@ -167,12 +167,25 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
       const writer = await writerOver({ isFlagOn: false });
 
       const saved = await writer.save({
+        config: { INSTANT_EVALS: "langwatch/evals-preview" },
+        scopes: [SCOPE],
+        authorId: null,
+      });
+
+      expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/evals-preview" });
+    });
+
+    /** @scenario "Saving a config that holds an earlier id stores the new id" */
+    it("stores an earlier Evals Preview id as the new one", async () => {
+      const writer = await writerOver({ isFlagOn: false });
+
+      const saved = await writer.save({
         config: { INSTANT_EVALS: "langwatch/instant-evals" },
         scopes: [SCOPE],
         authorId: null,
       });
 
-      expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/instant-evals" });
+      expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/evals-preview" });
     });
   });
 

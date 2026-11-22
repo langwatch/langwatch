@@ -94,7 +94,7 @@ const PAYLOAD = {
 
 const OWN_MODEL_FLAG = "release_instant_evals_own_decision_model";
 const JUDGE_ROUTER_FLAG = "release_instant_evals_judge_router";
-const HOSTED = { value: "langwatch/instant-evals", label: "Evals Preview" };
+const HOSTED = { value: "langwatch/evals-preview", label: "Evals Preview" };
 const OPENAI_DECISIONS = {
   value: "openai/decisions:gpt-6-luna",
   label: "OpenAI Decisions",
@@ -254,8 +254,8 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       const options = instantEvalsOptions();
       expect(options[0]).toHaveTextContent("Evals Preview");
       expect(options[0]).toHaveAttribute("aria-selected", "true");
-      expect(options[1]).toHaveTextContent("Scenario Judge Preview");
-      expect(options[2]).toHaveTextContent("Search Preview");
+      expect(options[1]).toHaveTextContent("Judge Preview");
+      expect(options[2]).toHaveTextContent("Instant Preview");
       expect(options[1]).toHaveAttribute("aria-disabled", "true");
       expect(options[1]).toHaveTextContent("Coming soon");
       expect(options[0]).toHaveTextContent("Optimized for evals, routed");
@@ -270,8 +270,8 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
 
       const listbox = instantEvalsListbox();
       expect(within(listbox).getByText("Evals Preview")).toBeInTheDocument();
-      expect(within(listbox).queryByText("Scenario Judge Preview")).not.toBeInTheDocument();
-      expect(within(listbox).queryByText("Search Preview")).not.toBeInTheDocument();
+      expect(within(listbox).queryByText("Judge Preview")).not.toBeInTheDocument();
+      expect(within(listbox).queryByText("Instant Preview")).not.toBeInTheDocument();
     });
 
     it("asks the own decision model flag of the organization, never the project", () => {

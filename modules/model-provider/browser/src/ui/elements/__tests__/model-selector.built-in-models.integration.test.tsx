@@ -36,7 +36,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
 import { LLMModelDisplay } from "../llm-model-display.tsx";
 import { ModelSelector } from "../model-selector.tsx";
 
-const BUILT_IN = { value: "langwatch/instant-evals", label: "Instant Evals" };
+const BUILT_IN = { value: "langwatch/evals-preview", label: "Instant Evals" };
 const OWN_DECISION_BUILT_IN = {
   value: "openai/decisions:gpt-6-luna",
   label: "gpt-6-luna",
@@ -218,10 +218,23 @@ describe("<LLMModelDisplay/>", () => {
   describe("given a chosen built-in model", () => {
     it("shows its label and asks for no update", async () => {
       renderWithDesignSystem(
+        <LLMModelDisplay model="langwatch/evals-preview" builtInModels={[BUILT_IN]} />,
+      );
+
+      expect(await screen.findByText("Instant Evals")).toBeInTheDocument();
+      expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a judge stored with an earlier LangWatch model id", () => {
+    /** @scenario "A judge stored with an earlier id shows as Evals Preview in the picker" */
+    it("shows the renamed model's label and asks for no update", async () => {
+      renderWithDesignSystem(
         <LLMModelDisplay model="langwatch/instant-evals" builtInModels={[BUILT_IN]} />,
       );
 
       expect(await screen.findByText("Instant Evals")).toBeInTheDocument();
+      expect(screen.queryByText("langwatch/instant-evals")).not.toBeInTheDocument();
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
     });
   });

@@ -18,6 +18,7 @@ import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type BuiltInModel,
+  canonicalModelId,
   type GroupedModelOptions,
   isServedOnlyAsBuiltIn,
   modelSelectionFrom,
@@ -36,7 +37,7 @@ import { api } from "../../behavior/model-provider-api.ts";
 
 export const useModelSelectionOptions = ({
   options,
-  model,
+  model: storedModel,
   mode = "chat",
   featureKey,
   builtInModels,
@@ -48,6 +49,7 @@ export const useModelSelectionOptions = ({
   /** Models LangWatch serves itself, listed first and needing no provider. */
   builtInModels?: readonly BuiltInModel[] | undefined;
 }) => {
+  const model = canonicalModelId(storedModel);
   const { project } = useOrganizationTeamProject();
   // `listAllForProjectForFrontend` returns only providers actually stored
   // against a scope reachable from this project, unlike the legacy
@@ -341,7 +343,7 @@ function ConfigureModelsAction({ size }: { size: SelectorSize }) {
 }
 
 export function ModelSelector({
-  model,
+  model: storedModel,
   options,
   onChange,
   size = "md",
@@ -370,6 +372,7 @@ export function ModelSelector({
   /** Models LangWatch serves itself, listed first even with no provider configured. */
   builtInModels?: readonly BuiltInModel[];
 }) {
+  const model = canonicalModelId(storedModel);
   const { selectOptions, groupedByProvider, isEmpty, isLoading } = useModelSelectionOptions({
     options,
     model,

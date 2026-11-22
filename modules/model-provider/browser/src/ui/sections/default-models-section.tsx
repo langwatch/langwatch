@@ -18,6 +18,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { SectionTitle } from "@langwatch/design-system/typography";
 import {
+  canonicalModelId,
   isOwnDecisionModelId,
   LANGWATCH_DECISION_MODEL_ID,
   MODEL_ROLES,
@@ -439,7 +440,9 @@ function DecisionModelChip({
   isHostedOffered: boolean;
 }) {
   const shown =
-    isShownDecisionModel(model) && (isHostedOffered || isOwnDecisionModelId(model)) ? model : null;
+    isShownDecisionModel(model) && (isHostedOffered || isOwnDecisionModelId(model))
+      ? canonicalModelId(model)
+      : null;
   if (!shown && !isHostedOffered) {
     return (
       <Badge colorPalette="gray" variant="subtle" data-testid="instant-evals-not-set">

@@ -260,7 +260,7 @@ describe("given the Default Models table", () => {
           data: {
             ...FAKE_PAYLOAD,
             configs: [
-              { ...FAKE_PAYLOAD.configs[0]!, config: { INSTANT_EVALS: "langwatch/instant-evals" } },
+              { ...FAKE_PAYLOAD.configs[0]!, config: { INSTANT_EVALS: "langwatch/evals-preview" } },
             ],
           },
           isLoading: false,

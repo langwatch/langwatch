@@ -16,7 +16,7 @@ const OWN_DECISION_MODEL = {
   label: "gpt-6-luna",
 };
 const HOSTED_DECISION_MODEL = {
-  value: "langwatch/instant-evals",
+  value: "langwatch/evals-preview",
   label: "Evals Preview",
 };
 
@@ -102,7 +102,7 @@ function renderField() {
 }
 
 function offersInstantEvals(): boolean {
-  return screen.queryByText("Instant Evals") !== null;
+  return screen.queryByText("Evals Preview") !== null;
 }
 
 function offeredLabels(): string[] {
@@ -160,7 +160,7 @@ describe("EvaluatorLLMConfigField", () => {
       it("offers Instant Evals first, then the own decision model", () => {
         renderField();
 
-        expect(offeredLabels()).toEqual(["Instant Evals", OWN_DECISION_MODEL.label]);
+        expect(offeredLabels()).toEqual(["Evals Preview", OWN_DECISION_MODEL.label]);
       });
     });
 
@@ -171,7 +171,7 @@ describe("EvaluatorLLMConfigField", () => {
         state.decisionModels = [HOSTED_DECISION_MODEL];
         renderField();
 
-        expect(offeredLabels()).toEqual(["Instant Evals"]);
+        expect(offeredLabels()).toEqual(["Evals Preview"]);
       });
     });
 

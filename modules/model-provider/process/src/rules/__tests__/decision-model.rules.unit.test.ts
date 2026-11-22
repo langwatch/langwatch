@@ -15,7 +15,7 @@ describe("decisionModelResolutionOf", () => {
   it("answers langwatch for the hosted entry", () => {
     expect(
       decisionModelResolutionOf({
-        model: "langwatch/instant-evals",
+        model: "langwatch/evals-preview",
         row: undefined,
       }),
     ).toEqual({ kind: "langwatch" });
@@ -184,7 +184,7 @@ describe("picksOwnDecisionModel", () => {
   });
 
   it("is false for the hosted model", () => {
-    expect(picksOwnDecisionModel({ config: { INSTANT_EVALS: "langwatch/instant-evals" } })).toBe(
+    expect(picksOwnDecisionModel({ config: { INSTANT_EVALS: "langwatch/evals-preview" } })).toBe(
       false,
     );
   });

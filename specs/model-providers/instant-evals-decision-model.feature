@@ -441,7 +441,7 @@ Feature: Instant Evals decision model column in Default models
     Given the flag is on for my organization
     When I edit the Instant Evals column
     Then "Evals Preview" is the first row, checked while the column is unset
-    And with the judge router flag on, "Scenario Judge Preview" and "Search Preview" follow it, listed but not pickable yet
+    And with the judge router flag on, "Judge Preview" and "Instant Preview" follow it, listed but not pickable yet
     And no row is a provider heading or a separate "Default" row
     And every row shows its provider icon, its title and a one-line description
 
@@ -494,3 +494,38 @@ Feature: Instant Evals decision model column in Default models
     When the icon for a decision model provider is drawn
     Then the LangWatch hosted model draws the LangWatch logo
     And Inception, Perplexity, Cloudflare, TypeSafe, OpenRouter and Fireworks each draw a mark of their own, not the generic one
+
+  # --- Model ids ---
+  # LangWatch's models share a -preview suffix: langwatch/evals-preview, langwatch/instant-preview
+  # and langwatch/judge-preview. Earlier ids stay accepted wherever a stored or sent id is read.
+
+  @unit
+  Scenario: Picking Evals Preview by its id finds the hosted model
+    When the decision model "langwatch/evals-preview" is looked up
+    Then it is LangWatch's hosted "Evals Preview"
+    And it is not an own decision model
+
+  @unit
+  Scenario: An earlier LangWatch model id still resolves to the renamed model
+    Given a value stored as "langwatch/instant-evals", "langwatch/search-preview" or "langwatch/scenario-judge-preview"
+    When the id is read
+    Then it reads as "langwatch/evals-preview", "langwatch/instant-preview" or "langwatch/judge-preview"
+    And the stored "langwatch/instant-evals" still runs on LangWatch's hosted model, never an own key
+
+  @unit
+  Scenario: Saving a config that holds an earlier id stores the new id
+    Given a Default models config that sends "langwatch/instant-evals" for the Instant Evals column
+    When it is saved
+    Then the config stores "langwatch/evals-preview"
+
+  @unit
+  Scenario: Pickers list only the new LangWatch model ids
+    When the Instant Evals picker lists LangWatch's decision models
+    Then every id it lists is one of "langwatch/evals-preview", "langwatch/instant-preview" or "langwatch/judge-preview"
+    And no earlier id is listed
+
+  @integration
+  Scenario: A judge stored with an earlier id shows as Evals Preview in the picker
+    Given an evaluator whose model is stored as "langwatch/instant-evals"
+    When its model picker is shown
+    Then it reads "Evals Preview", not an unknown model

@@ -9,10 +9,10 @@ import type { BuiltInModel } from "@langwatch/model-provider-contract";
 
 import { evaluatorApi } from "./evaluator-api.ts";
 
-/** How the picker names Instant Evals. */
+/** How the picker names LangWatch's hosted judge. */
 export const INSTANT_EVALS_BUILT_IN_MODEL: BuiltInModel = {
   value: INSTANT_EVAL_JUDGE_MODEL_ID,
-  label: "Instant Evals",
+  label: "Evals Preview",
 };
 
 const RELEASED: readonly BuiltInModel[] = [INSTANT_EVALS_BUILT_IN_MODEL];

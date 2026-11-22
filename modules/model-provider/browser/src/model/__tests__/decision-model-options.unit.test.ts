@@ -10,7 +10,7 @@ import {
 
 const HOSTED = { value: LANGWATCH_DECISION_MODEL_ID, label: "Evals Preview" };
 const OPENAI = { value: "openai/decisions:gpt-6-luna", label: "OpenAI Decisions" };
-const LANGWATCH_TITLES = ["Evals Preview", "Scenario Judge Preview", "Search Preview"];
+const LANGWATCH_TITLES = ["Evals Preview", "Judge Preview", "Instant Preview"];
 
 describe("decisionModelPickerOptions", () => {
   const hostedSubtitle = (isJudgeRouted: boolean) =>
