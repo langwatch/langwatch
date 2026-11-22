@@ -52,6 +52,7 @@ describe("gatewayBudgets get, update and archive, a budget scoped to one member"
         const archived = await refusalOf(gateway.archive());
 
         expect(renamed).not.toBeNull();
+        expect(archived).not.toBeNull();
         expect(renamed).toEqual(await refusalOf(gateway.rename("bdg_unknown")));
         expect(archived).toEqual(await refusalOf(gateway.archive("bdg_unknown")));
       });

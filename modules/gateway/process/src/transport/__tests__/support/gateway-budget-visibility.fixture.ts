@@ -2,7 +2,11 @@
  * The real control plane over memory twins, booted for one caller around one seeded budget, for
  * the suites on what a budget's detail shows and who may open it.
  */
-import { createTrpcRuntime } from "@langwatch/api/trpc";
+import {
+  createTrpcErrorFormatter,
+  createTrpcRuntime,
+  trpcFailureTraceIds,
+} from "@langwatch/api/trpc";
 import { type AuthzApi, permissionsConferred } from "@langwatch/authz-contract";
 import type { GatewayBudget, GatewayBudgetDebitRow } from "@langwatch/gateway-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -12,7 +16,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { nowInstant, Temporal } from "@langwatch/time";
-import { initTRPC } from "@trpc/server";
+import { getTRPCErrorFromUnknown, getTRPCErrorShape, initTRPC } from "@trpc/server";
 
 import { memoryVirtualKeySeed } from "../../../__tests__/support/gateway-memory-seeds.fixture.ts";
 import { GatewayModule } from "../../../app/gateway.app.ts";
@@ -235,12 +239,40 @@ export async function detailFor(input: {
   };
 }
 
-/** The code a read was refused with, so a refusal can be compared with an unknown id's. */
+/** The api host's error formatter, so a refusal reads as the body a tRPC client receives. */
+const clientWire = initTRPC.create({
+  errorFormatter: createTrpcErrorFormatter({
+    causePayload: { payloadFor: () => null },
+    traceIds: trpcFailureTraceIds,
+  }),
+});
+
+/** These name the request, not the answer, so two equal answers still differ in them. */
+const REQUEST_IDS: ReadonlySet<string> = new Set(["traceId", "spanId", "traceUrl", "logsUrl"]);
+
+function withoutRequestIds(value: object | null | undefined): Record<string, unknown> | null {
+  if (value == null) return null;
+  return Object.fromEntries(Object.entries(value).filter(([key]) => !REQUEST_IDS.has(key)));
+}
+
+/**
+ * The whole body a tRPC client receives for a refused read, so a refusal can be compared with an
+ * unknown id's: tRPC code, status, wire message, handled error and cause. Null when it succeeds.
+ */
 export async function refusalOf(read: Promise<unknown>): Promise<unknown> {
   try {
     await read;
     return null;
-  } catch (error) {
-    return { code: (error as { code?: unknown }).code };
+  } catch (thrown) {
+    const { data, ...wire } = getTRPCErrorShape({
+      config: clientWire._config,
+      error: getTRPCErrorFromUnknown(thrown),
+      type: "unknown",
+      path: undefined,
+      input: undefined,
+      ctx: undefined,
+    });
+
+    return { ...wire, data: { ...withoutRequestIds(data), error: withoutRequestIds(data.error) } };
   }
 }
