@@ -39,12 +39,14 @@ const LATENCY = {
 };
 
 /**
- * Keeps what is registered as PostHog does, and notes the projectId each event went out with.
- * Starts as the shell leaves it: `projectId` registered, "proj-1" (the page's) unless named.
+ * Keeps what is registered and sends each event as PostHog does: its own properties over the
+ * registered ones. Starts as the shell leaves it: `projectId` "proj-1" (the page's) unless named.
  */
 class RegisteringUiAnalytics extends RecordingUiAnalytics {
   registered: Readonly<Record<string, unknown>>;
-  readonly sent: { action?: string; attributes?: unknown; projectId: unknown }[] = [];
+  /** Every register and unregister call, so a test can see that none was made. */
+  readonly registrations: unknown[] = [];
+  readonly sent: { action?: string; properties: Readonly<Record<string, unknown>> }[] = [];
 
   constructor({ projectId = "proj-1" }: { projectId?: string } = {}) {
     super();
@@ -52,10 +54,12 @@ class RegisteringUiAnalytics extends RecordingUiAnalytics {
   }
 
   override register(properties: Readonly<Record<string, unknown>>): void {
+    this.registrations.push(properties);
     this.registered = { ...this.registered, ...properties };
   }
 
   override unregister(property: string): void {
+    this.registrations.push(property);
     this.registered = Object.fromEntries(
       Object.entries(this.registered).filter(([key]) => key !== property),
     );
@@ -64,7 +68,7 @@ class RegisteringUiAnalytics extends RecordingUiAnalytics {
   override track(event: UiAnalyticsEvent): void {
     super.track(event);
     const { action, attributes } = event;
-    this.sent.push({ action, attributes, projectId: this.registered.projectId });
+    this.sent.push({ action, properties: { ...this.registered, ...attributes } });
   }
 }
 
@@ -79,7 +83,6 @@ function renderSection({
   gate = Promise.resolve(),
   project,
   projectPermissions,
-  registeredProjectId,
   tracked,
 }: {
   stars: unknown[];
@@ -92,15 +95,12 @@ function renderSection({
   project?: StarredDashboardsProject;
   /** The member's grants in projects other than the page's, by project id. */
   projectPermissions?: Readonly<Record<string, readonly string[]>>;
-  /** The `projectId` the shell registered, when it is not the page's project in scope. */
-  registeredProjectId?: string;
   /** Records the product events the section sends. */
   tracked?: RecordingUiAnalytics;
 }) {
   const host = new StubAnalyticsHost({
     ...(permissions ? { permissions } : {}),
     ...(projectPermissions ? { projectPermissions } : {}),
-    ...(registeredProjectId ? { registeredProjectId } : {}),
   });
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall) => {
@@ -543,33 +543,34 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
 
   describe("given the shell registered a project other than the page's, then a board is made", () => {
     /** @scenario "Events from the Dashboards section in Gateway or Coding agents are about the named project" */
-    it("puts back the project the shell registered, not the page's", async () => {
+    it("sends it about that project, and later events still carry the shell's", async () => {
       const user = userEvent.setup();
       const tracked = new RegisteringUiAnalytics({ projectId: "proj-registered" });
       const { host } = renderSection({
         stars: [],
         project: SHOP,
         projectPermissions: SHOP_MEMBER,
-        registeredProjectId: "proj-registered",
         tracked,
       });
+      expect(host.project()?.id).toBe("proj-1");
 
       const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
       await user.click(group.getByRole("button", { name: "New dashboard" }));
       await waitFor(() => expect(host.navigations).toHaveLength(1));
+      await waitFor(() => expect(tracked.sent).toHaveLength(1));
+      tracked.track({ name: "page", action: "viewed" });
 
-      await waitFor(() =>
-        expect(tracked.sent).toEqual([
-          { action: "created", attributes: { createdFrom: "blank" }, projectId: "proj-shop" },
-        ]),
-      );
-      expect(tracked.registered).toEqual({ projectId: "proj-registered" });
+      expect(tracked.sent).toEqual([
+        { action: "created", properties: { createdFrom: "blank", projectId: "proj-shop" } },
+        { action: "viewed", properties: { projectId: "proj-registered" } },
+      ]);
+      expect(tracked.registrations).toEqual([]);
     });
   });
 
   describe("when the member makes a board, then unpins one", () => {
     /** @scenario "Telemetry: a board made or unpinned from Gateway or Coding agents names its project" */
-    it("sends each event with that project registered, then puts the page's back", async () => {
+    it("sends each event about that project, leaving the page's registered", async () => {
       const user = userEvent.setup();
       const tracked = new RegisteringUiAnalytics();
       const { host } = renderSection({
@@ -587,11 +588,12 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
 
       await waitFor(() =>
         expect(tracked.sent).toEqual([
-          { action: "created", attributes: { createdFrom: "blank" }, projectId: "proj-shop" },
-          { action: "favourited", attributes: { starred: false }, projectId: "proj-shop" },
+          { action: "created", properties: { createdFrom: "blank", projectId: "proj-shop" } },
+          { action: "favourited", properties: { starred: false, projectId: "proj-shop" } },
         ]),
       );
       expect(tracked.registered).toEqual({ projectId: "proj-1" });
+      expect(tracked.registrations).toEqual([]);
     });
   });
 

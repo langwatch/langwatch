@@ -59,19 +59,8 @@ class AnalyticsHostInProject extends AnalyticsHostApi {
     return this.host.hasPermissionIn({ projectId, permission });
   }
 
-  /** Unsettled until this project's own grants land, so no screen reads their absence as a no. */
   isSettled(): boolean {
-    if (!this.host.isSettled()) return false;
-    if (this.host.project()?.id === this.inProject.id) return true;
-    return this.host.isSettledIn({ projectId: this.inProject.id });
-  }
-
-  isSettledIn({ projectId }: { projectId: string }): boolean {
-    return this.host.isSettledIn({ projectId });
-  }
-
-  registeredProjectId(): string | undefined {
-    return this.host.registeredProjectId();
+    return this.host.isSettled();
   }
 
   featureFlag(flag: AnalyticsReleaseFlag): boolean | undefined {
@@ -127,40 +116,24 @@ export function analyticsHostInProject({
 }
 
 /**
- * Each event goes out with `projectId` registered as this project, and what the shell registered
- * is put back straight after: tracking is synchronous, so none slips by.
+ * Each event carries `projectId` as one of its own properties, which a destination puts over the
+ * one the shell registered, so what the shell registered is never touched.
  */
 class UiAnalyticsInProject extends UiAnalytics {
   private readonly analytics: UiAnalytics;
   private readonly projectId: string;
-  private readonly registeredProjectId: string | undefined;
 
-  constructor({
-    analytics,
-    projectId,
-    registeredProjectId,
-  }: {
-    analytics: UiAnalytics;
-    projectId: string;
-    registeredProjectId: string | undefined;
-  }) {
+  constructor({ analytics, projectId }: { analytics: UiAnalytics; projectId: string }) {
     super();
     this.analytics = analytics;
     this.projectId = projectId;
-    this.registeredProjectId = registeredProjectId;
   }
 
   track(event: UiAnalyticsEvent): void {
-    this.analytics.register({ projectId: this.projectId });
-    try {
-      this.analytics.track(event);
-    } finally {
-      if (this.registeredProjectId) {
-        this.analytics.register({ projectId: this.registeredProjectId });
-      } else {
-        this.analytics.unregister("projectId");
-      }
-    }
+    this.analytics.track({
+      ...event,
+      attributes: { ...event.attributes, projectId: this.projectId },
+    });
   }
 
   register(properties: Readonly<Record<string, unknown>>): void {
@@ -186,16 +159,14 @@ class UiAnalyticsInProject extends UiAnalytics {
 
 /**
  * `analytics`, sending every event about `projectId`: a board made from Gateway or Coding agents
- * belongs to it, not to `registeredProjectId`, the project the shell registered for the page.
+ * belongs to it, not to the project the shell registered for the page.
  */
 export function uiAnalyticsInProject({
   analytics,
   projectId,
-  registeredProjectId,
 }: {
   analytics: UiAnalytics;
   projectId: string;
-  registeredProjectId: string | undefined;
 }): UiAnalytics {
-  return new UiAnalyticsInProject({ analytics, projectId, registeredProjectId });
+  return new UiAnalyticsInProject({ analytics, projectId });
 }

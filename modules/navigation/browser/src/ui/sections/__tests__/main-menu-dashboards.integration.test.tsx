@@ -12,7 +12,8 @@ import {
 } from "@langwatch/analytics-client";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const declarations: { current: UiDeclarations | undefined } = vi.hoisted(() => ({
@@ -108,8 +109,30 @@ function LentList({ openPath }: SavedDashboardsProps) {
   return <div data-testid="saved-dashboards">Saved dashboards open:{openPath || "none"}</div>;
 }
 
-/** Stands in for analytics' lent Dashboards section, echoing the project it was handed. */
+/** The reader's own grants per project, as analytics reads them; `fallback` for one not named. */
+const lentGrants: {
+  byProject: Readonly<Record<string, readonly string[]>>;
+  fallback: readonly string[];
+} = { byProject: {}, fallback: [] };
+
+/** The projects whose grants, then whose pins, the lent section read. */
+const lentReads: { grants: string[]; pins: string[] } = { grants: [], pins: [] };
+
+/**
+ * Stands in for analytics' lent Dashboards section, echoing the project it was handed. As
+ * analytics does, handed one it reads the grants there, and without view draws and reads nothing.
+ */
 function LentStarred({ project }: StarredDashboardsProps) {
+  const projectId = project?.id;
+  const mayView =
+    projectId === undefined ||
+    (lentGrants.byProject[projectId] ?? lentGrants.fallback).includes("analytics:view");
+  useEffect(() => {
+    if (projectId === undefined) return;
+    lentReads.grants.push(projectId);
+    if (mayView) lentReads.pins.push(projectId);
+  }, [projectId, mayView]);
+  if (!mayView) return null;
   return (
     <div data-testid="starred-dashboards">
       {project ? `Pinned dashboards in ${project.name} (${project.id})` : "Pinned dashboards"}
@@ -143,11 +166,15 @@ function renderSidebar({
   openableTeams,
   rememberedProjectSlug,
   dashboardsFlagByProject = {},
+  permissionsByProject = {},
   organization = ORGANIZATION,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "governance" | "me" | "settings";
   pathname: string;
+  /** The page's own grants, and the grants in any project not named below. */
   permissions?: string[];
+  /** The reader's own grants in a named project, by project id. */
+  permissionsByProject?: Readonly<Record<string, readonly string[]>>;
   /** `release_dashboards` for the page's own scope, and for any project not named below. */
   dashboardsFlag?: boolean;
   /** `release_dashboards` resolved for a named project, by project id. */
@@ -166,6 +193,10 @@ function renderSidebar({
   declarations.current = analyticsLends;
   dashboardsRelease.byProject = dashboardsFlagByProject;
   dashboardsRelease.fallback = dashboardsFlag;
+  lentGrants.byProject = permissionsByProject;
+  lentGrants.fallback = permissions;
+  lentReads.grants = [];
+  lentReads.pins = [];
   return renderWithDesignSystem(
     <WithStubNavigationHost
       readings={{
@@ -457,6 +488,33 @@ describe("the Dashboards section with Dashboards in every product on", () => {
         expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
           "Pinned dashboards in Shop (project-shop)",
         );
+      });
+    });
+
+    describe("when Dashboards is not released for Shop", () => {
+      /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's release flag" */
+      it("reads no grants there", async () => {
+        renderSidebar({ ...codingAgents, dashboardsFlagByProject: { [SHOP.id]: false } });
+
+        await expectNoSection();
+        expect(lentReads.grants).toEqual([]);
+      });
+    });
+
+    describe("when Dashboards is released for Shop but the member may not view dashboards there", () => {
+      /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's view grant" */
+      it("draws nothing and reads no pins there, though the workspace lets them view", async () => {
+        renderSidebar({
+          ...codingAgents,
+          permissions: ["analytics:view"],
+          permissionsByProject: { [SHOP.id]: [] },
+          dashboardsFlagByProject: { [SHOP.id]: true },
+        });
+
+        await waitFor(() => expect(lentReads.grants).toContain(SHOP.id));
+        await expectNoSection();
+        expect(screen.queryByText(/Dashboards ·/)).toBeNull();
+        expect(lentReads.pins).toEqual([]);
       });
     });
 

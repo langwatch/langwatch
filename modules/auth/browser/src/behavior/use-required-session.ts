@@ -68,9 +68,9 @@ export const noOrgBouncerRoutes = [
   // happens before the org has any project.
   "/gateway/routing-policies",
   // `pages/index.tsx` already resolves the right home per persona (via
-  // api.governance.resolveHome, falling back to /coding-agents for org-less
-  // p1). The no-org bouncer must defer to it, or CommandBar wins the race and dumps
-  // p1 on /onboarding/welcome before the resolver effect fires.
+  // api.governance.resolveHome). The no-org bouncer must defer to it, or
+  // CommandBar wins the race and dumps the reader on /onboarding/welcome
+  // before the resolver effect fires.
   "/",
 ];
 

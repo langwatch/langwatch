@@ -63,7 +63,6 @@
       "ignoredDependencies": [
         "@langwatch/config",
         "@langwatch/feature-flag-client",
-        "@langwatch/user-contract",
         "@langwatch/vitest-config"
       ]
     }

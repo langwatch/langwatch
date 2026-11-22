@@ -122,12 +122,6 @@ export abstract class AnalyticsHostApi {
    */
   abstract isSettled(): boolean;
 
-  /** Whether the reader's own grants in `projectId` have landed. Asking starts the read. */
-  abstract isSettledIn({ projectId }: { projectId: string }): boolean;
-
-  /** The `projectId` the shell registers on every product event, or undefined for none. */
-  abstract registeredProjectId(): string | undefined;
-
   /** On, off, or `undefined` while the flag has not answered yet. */
   abstract featureFlag(flag: AnalyticsReleaseFlag): boolean | undefined;
 

@@ -65,11 +65,7 @@ function InProject({
   const scopedServices = services?.analytics
     ? {
         ...services,
-        analytics: uiAnalyticsInProject({
-          analytics: services.analytics,
-          projectId: id,
-          registeredProjectId: host.registeredProjectId(),
-        }),
+        analytics: uiAnalyticsInProject({ analytics: services.analytics, projectId: id }),
       }
     : void 0;
   const section = <AnalyticsHostProvider value={scoped}>{children}</AnalyticsHostProvider>;

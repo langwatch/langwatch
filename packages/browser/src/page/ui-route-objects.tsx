@@ -133,7 +133,7 @@ function materializeRoutes({
 }: MaterializeRoutesOptions): RouteObject[] {
   const routes = table.map((descriptor) => {
     if ("redirect" in descriptor) {
-      const { from, to, pinParams, renameParams, mapSegment, dropDeeperPath } = descriptor.redirect;
+      const { from, to, pinParams, renameParams, mapSegment } = descriptor.redirect;
       return {
         path: descriptor.path,
         element: (
@@ -143,7 +143,6 @@ function materializeRoutes({
             pinParams={pinParams}
             renameParams={renameParams}
             mapSegment={mapSegment}
-            dropDeeperPath={dropDeeperPath}
           />
         ),
       };

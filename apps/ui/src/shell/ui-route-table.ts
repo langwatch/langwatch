@@ -36,8 +36,6 @@ export type UiRedirectDescriptor = {
    * segment lands on the destination's own home.
    */
   readonly mapSegment?: Readonly<Record<string, string>>;
-  /** With `mapSegment`, the path below the renamed segment is dropped: it serves no page. */
-  readonly dropDeeperPath?: boolean;
 };
 
 /** A route that renders a page, or a pathless layout route that wraps others. */
@@ -1045,21 +1043,31 @@ function codingAgentsPages({ table }: { table: readonly UiRouteDescriptor[] }): 
 
 const codingAgentsPageList = codingAgentsPages({ table: uiRouteTable });
 
-/**
- * Old first segments with their own /coding-agents page land on it, without the path below it,
- * which no page serves; any other segment lands on the Coding agents home. The query and hash
- * still travel. Deeper pages such as `budget/request` get exact rows below.
- */
-const KEPT_SEGMENTS: Readonly<Record<string, string>> = Object.fromEntries(
-  codingAgentsPageList.filter((page) => !page.includes("/")).map((page) => [page, page]),
+/** The first segments with a /coding-agents page of their own. */
+const KEPT_SEGMENTS: ReadonlySet<string> = new Set(
+  codingAgentsPageList.filter((page) => !page.includes("/")),
 );
 
-const toCodingAgents = {
-  from: RETIRED_PERSONAL_PATH,
-  to: CODING_AGENTS_PATH,
-  mapSegment: KEPT_SEGMENTS,
-  dropDeeperPath: true,
-} as const;
+/**
+ * An old `/me/<segment>` lands on that segment's /coding-agents page, or on the Coding agents
+ * home when it has none; `mapSegment: {}` drops the path below, which no page serves. The query
+ * and hash still travel. Deeper pages such as `budget/request` get exact rows below.
+ */
+function toCodingAgents({ segment }: { segment?: string } = {}): UiRedirectDescriptor {
+  if (segment === void 0 || !KEPT_SEGMENTS.has(segment)) {
+    return { from: RETIRED_PERSONAL_PATH, to: CODING_AGENTS_PATH, mapSegment: {} };
+  }
+  return {
+    from: `${RETIRED_PERSONAL_PATH}/${segment}`,
+    to: `${CODING_AGENTS_PATH}/${segment}`,
+    mapSegment: {},
+  };
+}
+
+/** Every old first segment that gets rows of its own: each project page's, and each kept one. */
+const retiredSegments = [
+  ...new Set([...projectSegments({ paths: servedPaths }), ...KEPT_SEGMENTS]),
+];
 
 /**
  * Moved /me to /coding-agents; CLIs still print /me links. Mounted above the chrome, which would
@@ -1092,13 +1100,16 @@ export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] 
       path: `${RETIRED_PERSONAL_PATH}/${page}`,
       redirect: { from: RETIRED_PERSONAL_PATH, to: CODING_AGENTS_PATH },
     })),
-  ...projectSegments({ paths: servedPaths }).flatMap((segment) => [
-    { path: `${RETIRED_PERSONAL_PATH}/${segment}`, redirect: toCodingAgents },
-    { path: `${RETIRED_PERSONAL_PATH}/${segment}/*`, redirect: toCodingAgents },
+  ...retiredSegments.flatMap((segment) => [
+    { path: `${RETIRED_PERSONAL_PATH}/${segment}`, redirect: toCodingAgents({ segment }) },
+    { path: `${RETIRED_PERSONAL_PATH}/${segment}/*`, redirect: toCodingAgents({ segment }) },
   ]),
-  ...projectPageTwins({ paths: servedPaths }).map((path) => ({ path, redirect: toCodingAgents })),
-  { path: `${RETIRED_PERSONAL_PATH}/*`, redirect: toCodingAgents },
-  { path: RETIRED_PERSONAL_PATH, redirect: toCodingAgents },
+  ...projectPageTwins({ paths: servedPaths }).map((path) => ({
+    path,
+    redirect: toCodingAgents({ segment: path.split("/")[2] }),
+  })),
+  { path: `${RETIRED_PERSONAL_PATH}/*`, redirect: toCodingAgents() },
+  { path: RETIRED_PERSONAL_PATH, redirect: toCodingAgents() },
 ];
 
 /** What the router mounts: the /me redirect rows at the top level, then `uiRouteTable`. */
