@@ -283,7 +283,7 @@ curl -sS -X POST "$LW/api/gateway/v1/virtual-keys/$VK_ID/disable" \
   -d '{"reason": "payment overdue"}'
 ```
 
-Requests on the key are rejected with `403 virtual_key_disabled` until you call `/enable`. Budgets, scopes, key material and any running rotation grace stay intact. The gateway picks the change up on its next change-feed poll, a long poll of about 10 seconds. Both transitions emit `gateway.virtual_key.disabled` and `gateway.virtual_key.enabled` events.
+Requests on the key are rejected with `403 virtual_key_disabled` until you call `/enable`. Budgets, scopes, key material and any running rotation grace stay intact. The gateway picks the change up from its change feed, usually within a second or two. Both transitions emit `gateway.virtual_key.disabled` and `gateway.virtual_key.enabled` events.
 
 **The customer resets their API key in your UI.** `POST /api/gateway/v1/virtual-keys/{id}/rotate` returns a new secret; send it to the customer once. The old secret keeps authenticating for 24 hours, so a client you have not reached yet does not fail mid-rollout. The event is `gateway.virtual_key.rotated`.
 

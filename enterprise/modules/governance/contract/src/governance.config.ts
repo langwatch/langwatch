@@ -53,6 +53,8 @@ export const governanceConfig = Config.define((c) => ({
   databricksWorkspaceBase: c.env("DATABRICKS_WORKSPACE_BASE", optionalVendorBase),
   /** The one Dataverse environment address accepted beside the real Dynamics clouds. */
   dataverseEnvironmentBase: c.env("DATAVERSE_ENVIRONMENT_BASE", optionalVendorBase),
+  /** A Bedrock Agents control-plane endpoint in place of AWS's own, for tests and dogfood. */
+  bedrockAgentEndpoint: c.env("BEDROCK_AGENT_ENDPOINT", optionalVendorBase),
   /** The hosted product, whose default gateway is the SaaS one rather than the local one. */
   isSaas,
   /** This deployment's public origin (`BASE_HOST`), absent where it named none; the CLI's links lead back to it. */

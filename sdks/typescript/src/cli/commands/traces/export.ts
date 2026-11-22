@@ -10,9 +10,12 @@ import { createCommandEvents, type CommandEvents } from "../../telemetry/events.
 import { resolveCredentials } from "../../utils/apiKey.ts";
 import { cliAuthHeaders } from "../../utils/authHeaders.ts";
 import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { searchedProjectSlug } from "../../utils/searchedProject.ts";
 import { createSpinner } from "../../utils/spinner.ts";
 import { failSpinner } from "../../utils/spinnerError.ts";
+import { resolveTimeWindowOrExit, type TimeWindow } from "../../utils/timeWindow.ts";
 import { parseOriginOption } from "./origin-filter.ts";
+import { searchedDocument, searchedLines, widenCommand } from "./searched.ts";
 
 /** Rows are serialised in chunks so the progress bar moves as the file is built. */
 const PROGRESS_CHUNK = 25;
@@ -25,11 +28,10 @@ const PROGRESS_CHUNK = 25;
 const SERVER_PAGE_CAP = 1000;
 
 /**
- * Page size used when spans are requested. Each coding-agent trace's spans are joined with
- * a bounded but heavy per-trace log read server-side, so the CLI asks for smaller pages
- * and lets the cursor walk cover the rest — same total work, no long single request.
+ * Page size used when spans are requested: the server refuses a larger page with spans
+ * (422 `trace_page_size_too_large`). The cursor walk covers the rest.
  */
-const SPANS_PAGE_CAP = 200;
+const SPANS_PAGE_CAP = 100;
 
 /** Bound each page request so a quiet socket cannot hold the export open forever. */
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -61,6 +63,7 @@ interface SearchPage {
 export const exportTracesCommand = async (options: {
   startDate?: string;
   endDate?: string;
+  since?: string;
   query?: string;
   format?: string;
   output?: string;
@@ -81,11 +84,12 @@ export const exportTracesCommand = async (options: {
     process.exit(1);
   }
 
-  const now = Date.now();
-  const startDate = options.startDate
-    ? new Date(options.startDate).getTime()
-    : now - 7 * 24 * 60 * 60 * 1000; // 7 days ago
-  const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
+  const window = resolveTimeWindowOrExit({
+    startDate: options.startDate,
+    endDate: options.endDate,
+    since: options.since,
+    now: Date.now(),
+  });
 
   const limit = options.limit ? Number(options.limit) : 1000;
   if (!Number.isSafeInteger(limit) || limit <= 0) {
@@ -110,8 +114,8 @@ export const exportTracesCommand = async (options: {
         endpoint,
         apiKey,
         query: options.query,
-        startDate,
-        endDate,
+        startDate: window.from,
+        endDate: window.to,
         filters,
         includeSpans: options.includeSpans === true,
       },
@@ -136,6 +140,10 @@ export const exportTracesCommand = async (options: {
       process.stdout.write(output);
     }
 
+    if (traces.length === 0) {
+      await reportEmptyExport({ options, window, origin: originFilter });
+    }
+
     events.completed({
       count: traces.length,
       total: matched,
@@ -153,6 +161,38 @@ export const exportTracesCommand = async (options: {
     await events.flush();
   }
 };
+
+/**
+ * An empty export says what it read and how to read further back. On stderr:
+ * stdout is the exported file, and a note in it would corrupt the file.
+ */
+async function reportEmptyExport({
+  options,
+  window,
+  origin,
+}: {
+  options: { query?: string; errorsOnly?: boolean; project?: string };
+  window: TimeWindow;
+  origin: string[] | undefined;
+}): Promise<void> {
+  const searched = {
+    project: await searchedProjectSlug({ project: options.project }),
+    window,
+    query: options.query,
+    origin,
+    errorsOnly: options.errorsOnly,
+  };
+  console.error(chalk.yellow("No traces to export. Searched:"));
+  for (const line of searchedLines(searchedDocument(searched))) {
+    console.error(chalk.gray(`  ${line}`));
+  }
+  const widen = widenCommand({
+    base: "langwatch trace export",
+    searched,
+    project: options.project,
+  });
+  if (widen) console.error(chalk.gray(`Export further back: ${chalk.cyan(widen)}`));
+}
 
 type ExportSpinner = ReturnType<typeof createSpinner>;
 
@@ -184,17 +224,13 @@ async function fetchExportPages({
   let matched = 0;
   let scrollId: string | undefined;
 
-  // Page until the requested limit is met or the result set is exhausted.
-  // The cursor is authoritative for "there may be more"; a page shorter than
-  // requested only ends the walk when the shortfall is not accounted for by
-  // server-side `skipped` rows (traces dropped because they failed to
-  // serialize), since the cursor advances past those.
-  for (;;) {
-    const pageSize = Math.min(
-      limit - traces.length,
-      search.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP,
-    );
-
+  // One page of exactly the limit when it fits; past that, every page asks the cap (the
+  // server drops a cursor minted at another size) and the output is trimmed on write.
+  // A page may come back short (clamped, or rows skipped), so only a missing cursor or
+  // an empty page ends the walk.
+  const cap = search.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP;
+  const pageSize = Math.min(limit, cap);
+  for (let page = 0; ; page += 1) {
     const response = await requestSearchPage({ search, pageSize, scrollId });
 
     if (!response.ok) await failExport({ response, events, spinner });
@@ -206,7 +242,7 @@ async function fetchExportPages({
     traces.push(...pageTraces.slice(0, limit - traces.length));
     matched = data.pagination?.totalHits ?? traces.length;
 
-    if (traces.length === pageTraces.length) {
+    if (page === 0) {
       // First page: report the match count the moment it is known.
       events.count({
         count: matched,
@@ -219,8 +255,7 @@ async function fetchExportPages({
 
     scrollId = data.pagination?.scrollId;
     const consumed = pageTraces.length + (data.pagination?.skipped ?? 0);
-    const exhausted = pageTraces.length === 0 || consumed < pageSize;
-    if (!scrollId || exhausted || traces.length >= limit) break;
+    if (!scrollId || consumed === 0 || traces.length >= limit) break;
   }
 
   return { traces, matched };

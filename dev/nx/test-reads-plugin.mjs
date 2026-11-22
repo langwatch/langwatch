@@ -16,8 +16,15 @@ export const reads = {
     "docs/platform/**/*",
     "docs/pricing.mdx",
     "docs/self-hosting/connect.mdx",
+    "docs/self-hosting/configuration/environment-variables.mdx",
     "docs/features/instant-evals/limits-and-cost.mdx",
+    "docs/features/braids.mdx",
     "docs/self-hosting/data-and-telemetry.mdx",
+    "docs/workflows/overview.mdx",
+    "docs/governance/agent-registry.mdx",
+    "docs/governance/kill-switch.mdx",
+    "docs/ai-governance/ingestion-sources/index.mdx",
+    "docs/features/braids.mdx",
   ],
   "@langwatch/agent-process": [
     "modules/agent/**/*",
@@ -82,7 +89,11 @@ export const reads = {
   "@langwatch/webhook-process": ["specs/webhooks/**/*"],
   "@langwatch/egress": ["pkg/ssrf/testdata/**/*", "go.work"],
   "@langwatch/langy-browser": ["services/langyagent/**/*", "infra/docker/Dockerfile.langyagent"],
-  "@langwatch/langy-contract": ["services/langyagent/**/*", "pnpm-workspace.yaml"],
+  "@langwatch/langy-contract": [
+    "services/langyagent/**/*",
+    "pnpm-workspace.yaml",
+    "services/langyworker/src/tools/local-workspace.ts",
+  ],
   "@langwatch/insight-process": [
     "services/langyagent/internal/assets/skills/daily-insights/SKILL.md",
     "pnpm-workspace.yaml",
@@ -112,6 +123,10 @@ export const reads = {
     "apps/ui/src/shell/route-patterns.generated.json",
   ],
   "@langwatch/onboarding-browser": ["apps/ui/src/shell/route-patterns.generated.json"],
+  "@langwatch/ui": [
+    "modules/auth/browser/src/ui/elements/auth-front-door.css",
+    "packages/design-system/src/components/brand/langy-theme.css",
+  ],
   "@langwatch/analytics-browser": [
     "apps/ui/public/images/dashboards/templates/**/*",
     "pnpm-workspace.yaml",

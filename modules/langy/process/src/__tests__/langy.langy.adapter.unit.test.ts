@@ -79,7 +79,10 @@ function commands(): LangyConversationCommands {
 }
 
 function composition(
-  members: Omit<LangyTurnTechnicalMembers, "tokenBuffer" | "accessStore" | "handoffStore">,
+  members: Omit<
+    LangyTurnTechnicalMembers,
+    "tokenBuffer" | "accessStore" | "handoffStore" | "localWork"
+  >,
 ) {
   const rows = MemoryLangyRepositories.create();
   const turns: LangyTurnTechnicalMembers = {
@@ -87,6 +90,7 @@ function composition(
     tokenBuffer: rows.tokenBuffer.open(),
     accessStore: rows.turnAccess,
     handoffStore: rows.turnHandoff,
+    localWork: { cancelTurn: async () => undefined },
   };
   return {
     commands: commands(),
@@ -130,8 +134,6 @@ describe("LangyPostgresService", () => {
       projects: { findById: vi.fn() },
       worker: null,
       permits: {
-        reserve: vi.fn(),
-        release: vi.fn(),
         check: vi.fn(),
       },
       perDayPrCap: 0,
@@ -290,7 +292,7 @@ function compositionOptions() {
     models: { resolve: vi.fn() },
     projects: { findById: vi.fn() },
     worker: null,
-    permits: { reserve: vi.fn(), release: vi.fn(), check: vi.fn() },
+    permits: { check: vi.fn() },
     perDayPrCap: 0,
     sessionKeys: { mint: vi.fn(), revoke: vi.fn() },
     context: { render: vi.fn(() => null) },

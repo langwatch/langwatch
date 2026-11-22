@@ -3,9 +3,18 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  traceQuietPeriodMsSchema,
+  traceWaitTimeoutMsSchema,
+} from "./features/run/run-trace-wait.ts";
+import {
   scenarioParameterDefinitionSchema,
   scenarioParameterDefinitionsSchema,
 } from "./scenario.parameters.ts";
+import {
+  redTeamConfigSchema,
+  scenarioKindSchema,
+  scenarioTemplateMarkerRefusalSchema,
+} from "./scenario.ts";
 import { scenarioFieldValuesSchema } from "./suite-fields.ts";
 
 /** The shared bare `{ error }` body the pre-conversion scenario families answer a miss with. */
@@ -42,6 +51,22 @@ const scenarioRestResponseSchemaDefinition = z.object({
     .optional()
     .describe(
       "The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family.",
+    ),
+  traceQuietPeriodMs: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(
+      "Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
+    ),
+  traceWaitTimeoutMs: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(
+      "Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.",
     ),
   maxTurns: z
     .number()
@@ -182,6 +207,10 @@ const simulatorModelDescription =
   "Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the project default.";
 const judgeModelDescription =
   "Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.";
+const traceQuietPeriodDescription =
+  "Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation.";
+const traceWaitTimeoutDescription =
+  "Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation.";
 const maxTurnsDescription =
   "Maximum conversation turns for a run of this scenario. Null uses the default.";
 const minTurnsDescription =
@@ -195,6 +224,8 @@ const scenarioRestCreateSchemaDefinition = z.object({
   parameters: scenarioParameterDefinitionsSchema.optional().describe(parametersDescription),
   simulatorModel: modelOverrideSchema.nullish().describe(simulatorModelDescription),
   judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
+  traceQuietPeriodMs: traceQuietPeriodMsSchema.nullish().describe(traceQuietPeriodDescription),
+  traceWaitTimeoutMs: traceWaitTimeoutMsSchema.nullish().describe(traceWaitTimeoutDescription),
   maxTurns: z.number().int().min(1).max(100).nullish().describe(maxTurnsDescription),
   minTurns: z.number().int().min(0).max(100).nullish().describe(minTurnsDescription),
   testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
@@ -203,6 +234,15 @@ const scenarioRestCreateSchemaDefinition = z.object({
     .describe(
       "The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field.",
     ),
+  kind: scenarioKindSchema
+    .optional()
+    .describe(
+      'Absent or "standard" plays a user simulator. "red_team" plays an attacker and requires redTeam; a standard scenario with redTeam answers 422 scenario_red_team_config_mismatch.',
+    ),
+  redTeam: redTeamConfigSchema
+    .optional()
+    .describe("The attack a red_team scenario plays: goal, OWASP ids, strategy and turn budget."),
+  sourceTemplateId: scenarioTemplateMarkerRefusalSchema,
 });
 export interface ScenarioRestCreateSchema extends Named<
   typeof scenarioRestCreateSchemaDefinition
@@ -224,6 +264,8 @@ const scenarioRestUpdateSchemaDefinition = z
     parameters: scenarioParameterDefinitionsSchema.optional().describe(parametersDescription),
     simulatorModel: modelOverrideSchema.nullish().describe(simulatorModelDescription),
     judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
+    traceQuietPeriodMs: traceQuietPeriodMsSchema.nullish().describe(traceQuietPeriodDescription),
+    traceWaitTimeoutMs: traceWaitTimeoutMsSchema.nullish().describe(traceWaitTimeoutDescription),
     maxTurns: z.number().int().min(1).max(100).nullish().describe(maxTurnsDescription),
     minTurns: z.number().int().min(0).max(100).nullish().describe(minTurnsDescription),
     testSuiteId: z.string().nullish().describe(testSuiteIdDescription),

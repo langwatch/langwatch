@@ -50,6 +50,13 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     And the router is not asked again on the way
 
   @integration
+  Scenario: Leaving for the company sign-in says what to do if it refuses
+    When I enter an address the router sends to my organization's identity provider
+    Then the screen says at once that it is continuing to my company's sign-in
+    And it says to ask my IT team to assign me the LangWatch app if that sign-in says I have no access
+    And it names no organization and no administrator
+
+  @integration
   Scenario: A refused hand-off to the identity provider says so instead of waiting
     When I enter an address the router sends to my organization's identity provider
     And starting the provider sign-in is refused or fails on the network
@@ -1028,6 +1035,16 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then the refusal is on the auth screens' card, on the auth screens' ground
     And the words and the recovery action are the ones it always offered
     And the error code from the query string is never shown to me
+
+  # Linking GitHub from Settings > Security with an account whose email
+  # differs ends here. The server rule stays; the screen sends the person
+  # back to where they started and says what to do.
+  @integration
+  Scenario: Linking an account with a different email sends me back to Security and says what to do
+    Given I started linking a sign-in method from Settings > Security
+    When the account I picked uses a different email from my LangWatch address
+    Then the screen tells me to link an account that has my LangWatch address as a verified email, or to add that address to it first
+    And the button reads "Back to Settings" and opens Settings > Security, not the organization's sign-in policy
 
   @integration
   Scenario: The invitation and join screens stand on the same ground

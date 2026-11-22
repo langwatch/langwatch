@@ -1,13 +1,13 @@
 /* Publishes the authored media a build references under content-hashed names, so a host can cache
    each file for a year, and rewrites every page and export to name them. Media nothing references
    stays out of the output; a few files keep stable names because something outside the pages
-   (another site, the social card, a browser script) asks for them by name. */
+   (another site, a browser script) asks for them by name. */
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { FONT_SOURCE, SOCIAL_IMAGE } from "../features/discovery/compile.ts";
+import { FONT_SOURCE } from "../features/discovery/compile.ts";
 import { DOCS_URL, withBasePath } from "../lib/site-path.ts";
 import { STATIC_DIRS } from "./document.ts";
 
@@ -20,9 +20,9 @@ export const HASHED_FILE = new RegExp(
 );
 
 /* Brand marks are requested by name from browser scripts and the organisation's structured data;
-   the favicon and the social card are fetched by name from outside the site. */
+   the favicon is fetched by name from outside the site. */
 const STABLE = [/^\/logo\//, /^\/images\/logos\//, /^\/favicon\.svg$/];
-const STABLE_FILES = ["/favicon.svg", SOCIAL_IMAGE];
+const STABLE_FILES = ["/favicon.svg"];
 const STABLE_DIRS = ["logo", "images/logos"];
 
 const MEDIA_PATH = new RegExp(`^(?:/(?:${STATIC_DIRS.join("|")})|${FONT_SOURCE})/`);
@@ -32,7 +32,7 @@ const TEXT_URL =
 
 /** Whether a site path (without the base path) keeps its authored name in the output. */
 export function isStableAsset({ sitePath }: { sitePath: string }) {
-  return STABLE.some((pattern) => pattern.test(sitePath)) || sitePath === SOCIAL_IMAGE;
+  return STABLE.some((pattern) => pattern.test(sitePath));
 }
 
 /** Whether a published site path names its content, so a host may cache it immutably. */

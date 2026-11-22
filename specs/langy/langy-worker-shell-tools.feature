@@ -27,6 +27,14 @@ Feature: The worker box carries the shell tools the agent reaches for
     Then it names "python-is-python3"
     And an agent calling python reaches the same interpreter as python3
 
+  # A cloud replay's every "Searched the code" call failed with "ripgrep (rg)
+  # is not available and could not be downloaded": the harness's grep tool runs
+  # rg (its find tool runs fd) and downloads it when absent, which egress refuses.
+  @unit
+  Scenario: The worker image carries the harness's code search tools
+    Given the langyagent runtime image package list
+    Then it names "ripgrep" and "fd-find"
+
   @unit
   Scenario: The built-in filter names the shell tools when it is asked for more
     When an agent gives the CLI a --jq expression outside the supported subset

@@ -13,6 +13,8 @@ import { UpgradeLedgerSeedService } from "../ledger-seed.service.ts";
 import { createLedgerTables } from "../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { UpgradeClickHouse } from "../ports.ts";
+import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
+import { PROJECTION_REPLAY_PAGED } from "../step/projection-replay-step.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const CH_URL = process.env.LANGWATCH_TEST_CLICKHOUSE_URL;
@@ -397,6 +399,7 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
         "_langwatch_upgrade_step.description",
         "_langwatch_upgrade_step.owner",
         "_langwatch_upgrade_target.step_id",
+        "_langwatch_upgrade_tenant_state.step_id",
       ]);
     });
 
@@ -630,6 +633,67 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
       expect(registered).toEqual([
         expect.objectContaining({ status: "done", attempt: 2, description: "New text" }),
       ]);
+    });
+  });
+
+  describe("when a failed projection replay step is set pending again", () => {
+    const STEP = "trace:replay-trace-analytics-widget-columns";
+    const kept = { lane: "traceAnalytics", replayedThrough: "2026-11-14T00:00:00Z" };
+
+    /** The step failed, its report listing its paged aggregates and their unfinished attempts. */
+    async function givenFailedReplayStep(): Promise<void> {
+      const ledger = ledgerOf(scratch);
+      await ledger.createTables();
+      await ledger.registerDeclaredSteps({
+        steps: [
+          { id: STEP, kind: "data", mode: "background", owner: "trace", description: "Replay" },
+        ],
+      });
+      const report = {
+        ...kept,
+        [PROJECTION_REPLAY_PAGED]: { "tenant-1:trace:trace-a": 3, "tenant-1:trace:trace-b": 1 },
+      };
+      await scratch.postgres.query(
+        `UPDATE "_langwatch_upgrade_step" SET "status" = 'failed', "report" = $2::jsonb WHERE "id" = $1`,
+        [STEP, JSON.stringify(report)],
+      );
+    }
+
+    const stepAfter = async () =>
+      (await ledgerOf(scratch).findSteps()).find((step) => step.id === STEP);
+    const pagedAggregatesCleared = {
+      ...kept,
+      [PROJECTION_REPLAY_PAGED]: { "tenant-1:trace:trace-a": 0, "tenant-1:trace:trace-b": 0 },
+    };
+
+    /** @scenario "A run setting a failed replay step pending again clears its paged attempts" */
+    it("keeps each paged aggregate listed with no unfinished attempt", async () => {
+      await givenFailedReplayStep();
+
+      const reset = await UpgradeRunnerRepository.create({
+        postgres: scratch.postgres,
+      }).resetFailedSteps({ mode: "background", runId: "run_2" });
+
+      expect(reset).toEqual([STEP]);
+      expect(await stepAfter()).toMatchObject({
+        status: "pending",
+        report: pagedAggregatesCleared,
+      });
+    });
+
+    /** @scenario "An operator Retry of a failed replay step clears its paged attempts" */
+    it("keeps each paged aggregate listed with no unfinished attempt on a Retry", async () => {
+      await givenFailedReplayStep();
+
+      const retried = await UpgradeRunnerRepository.create({
+        postgres: scratch.postgres,
+      }).retryFailedStep({ id: STEP });
+
+      expect(retried).toBe(true);
+      expect(await stepAfter()).toMatchObject({
+        status: "pending",
+        report: pagedAggregatesCleared,
+      });
     });
   });
 });

@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
 
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import type { Cluster, Redis } from "ioredis";
 
 import {
@@ -73,7 +73,7 @@ function resolveFoldCacheTtlSeconds(configuredSeconds: number | undefined): numb
 
 function readUpdatedAt<State>(state: State): number {
   const value = (state as { UpdatedAt?: unknown })?.UpdatedAt;
-  return typeof value === "number" ? value : nowInstant().epochMilliseconds;
+  return typeof value === "number" ? value : nowEpochMs();
 }
 
 /**
@@ -253,14 +253,15 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     return { state: read.kind === "folded" ? read.state : null, appliedEventIds: [] };
   }
 
-  async store(state: State, context: ProjectionStoreContext): Promise<void> {
+  async store(state: State, context: ProjectionStoreContext): Promise<State> {
     const aggregateId = context.key ?? context.aggregateId;
     const startedAt = performance.now();
 
-    await this.inner.store(state, context);
-    await this.cache(state, aggregateId, context);
+    const persisted = (await this.inner.store(state, context)) ?? state;
+    await this.cache(persisted, aggregateId, context);
 
     observeEsFoldCacheStoreDuration(this.keyPrefix, performance.now() - startedAt);
+    return persisted;
   }
 
   /**

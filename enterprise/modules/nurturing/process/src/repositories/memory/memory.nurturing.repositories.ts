@@ -5,7 +5,15 @@ import { nowInstant } from "@langwatch/time";
 import type { NurturingClaimRepository } from "../nurturing-claim.repository.ts";
 import type { NurturingRepositories } from "../nurturing.repositories.ts";
 import { MemoryNurturingMilestonesRepository } from "./memory.nurturing-milestones.repository.ts";
+import { MemoryNurturingOrganizationCreatedRepository } from "./memory.nurturing-organization-created.repository.ts";
+import { MemoryNurturingOrganizationMemberRepository } from "./memory.nurturing-organization-member.repository.ts";
+import { MemoryNurturingPersonalProjectRepository } from "./memory.nurturing-personal-project.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "./memory.nurturing-project-directory.repository.ts";
+import { MemoryNurturingProjectPlacementRepository } from "./memory.nurturing-project-placement.repository.ts";
+import { MemoryNurturingProjectUsageRepository } from "./memory.nurturing-project-usage.repository.ts";
+import { MemoryNurturingTraceDayRepository } from "./memory.nurturing-trace-day.repository.ts";
+import { MemoryNurturingTracedProjectRepository } from "./memory.nurturing-traced-project.repository.ts";
+import { MemoryNurturingUncopiedProjectRepository } from "./memory.nurturing-uncopied-project.repository.ts";
 
 /** One claim per key, lapsing when its window does, as the Redis key expires. */
 export class MemoryNurturingClaimRepository implements NurturingClaimRepository {
@@ -35,6 +43,14 @@ export class MemoryNurturingRepositories {
     return {
       milestones: MemoryNurturingMilestonesRepository.create(),
       projects: MemoryNurturingProjectDirectoryRepository.create(),
+      placements: MemoryNurturingProjectPlacementRepository.create(),
+      organizationsCreated: MemoryNurturingOrganizationCreatedRepository.create(),
+      members: MemoryNurturingOrganizationMemberRepository.create(),
+      projectUsage: MemoryNurturingProjectUsageRepository.create(),
+      traceDays: MemoryNurturingTraceDayRepository.create(),
+      personalProjects: MemoryNurturingPersonalProjectRepository.create(),
+      tracedProjects: MemoryNurturingTracedProjectRepository.create(),
+      uncopiedProjects: MemoryNurturingUncopiedProjectRepository.create(),
       claims: MemoryNurturingClaimRepository.create(),
     };
   }

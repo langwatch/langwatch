@@ -1,5 +1,4 @@
-import { Link } from "@langwatch/browser-host/link";
-import { UpgradeRequired } from "@langwatch/design-system/access-state";
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
 /**
  * Groups an organization grants access through: the Directory's Groups tab. A
  * SCIM-synced group's deletion here only holds until the next sync.
@@ -75,13 +74,12 @@ export default function GroupsScreen() {
   if (!isEnterprise) {
     return (
       <VStack gap={6} align="start" width="full">
-        <UpgradeRequired
+        <EnterpriseLock
           feature="Groups"
-          actions={
-            <Button asChild colorPalette="orange" size="sm">
-              <Link href="/settings/plans">Compare plans</Link>
-            </Button>
-          }
+          description="Assign access to many people at once, by hand or synced from your identity provider."
+          canManage={canManage}
+          canSeePlans={host.hasPermission("organization:view")}
+          data-testid="groups-enterprise-upsell"
         />
       </VStack>
     );

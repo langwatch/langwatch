@@ -28,6 +28,7 @@ import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.t
 import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
+import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
@@ -52,6 +53,7 @@ import { BoardScopeControl } from "../blocks/board-scope-control.tsx";
 import { BoardUnavailable } from "../blocks/board-unavailable.tsx";
 import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
 import { LimitFailedWidgetsBanner } from "../blocks/limit-failed-widgets-banner.tsx";
+import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
 import { ScopeConfirmDialog } from "../blocks/scope-confirm-dialog.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { BoardWidgetEditor } from "./board-widget-editor.tsx";
@@ -117,6 +119,12 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const picker = useBlockPickerAddress();
   // What the ask bar had typed when it opened the picker, as the picker's first search.
   const { widgets } = boardWidgets;
+  useDashboardViewed({
+    dashboardId: board.id,
+    dashboardKind: "stored",
+    widgetCount: widgets.length,
+    isLoaded: boardWidgets.status === "success",
+  });
   const subject = boardSubject({ board, widgets });
   const langy = useLangyAsk();
   useBoardLangyChip(boardContextChip({ board: subject, range, period }));
@@ -306,7 +314,12 @@ function Board() {
   // A deleted board and one set to Only me read the same: the server tells neither apart.
   if (!board) return <BoardUnavailable />;
   // Keyed so a board's in-flight edits never leak into the next board.
-  return <OpenBoard key={board.id} board={board} />;
+  return (
+    <>
+      <OldAnalyticsBanner />
+      <OpenBoard key={board.id} board={board} />
+    </>
+  );
 }
 
 export default function DashboardBoardScreen() {

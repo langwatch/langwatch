@@ -8,6 +8,7 @@ import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { formatPrice } from "../../../model/billing-plans.ts";
 import { BillingPricingService } from "../../../model/billing-pricing.service.ts";
 import { PlansComparisonPage } from "../plans-comparison.tsx";
 
@@ -76,6 +77,47 @@ describe("PlansComparisonPage", () => {
     });
   });
 
+  describe("given the Growth column", () => {
+    describe("when EUR and then USD is selected", () => {
+      /** @scenario "Growth plan column shows seat and usage pricing in the selected currency" */
+      it("lists the seat price and every Growth feature in the selected currency", () => {
+        renderPlans();
+        const growthLines = ({ seat, events, retention }: Record<string, string>) => [
+          `${seat} per seat/month`,
+          "Everything in Free",
+          "200,000 events included",
+          `${events} per additional 100,000 events`,
+          `90 days retention (+ custom at ${retention}/GB)`,
+          "Volume discounts above 20 users",
+          "Unlimited lite users",
+          "Unlimited evals, simulations and prompts",
+          "Slack support",
+        ];
+
+        for (const line of growthLines({
+          seat: formatPrice({ cents: TEST_GROWTH_SEAT_PRICE_CENTS.EUR.monthly, currency: "EUR" }),
+          events: "€5",
+          retention: "€3",
+        })) {
+          expect(within(column("growth")).getByText(line)).toBeInTheDocument();
+        }
+        expect(within(column("growth")).getByText("excl. VAT")).toBeInTheDocument();
+        expect(within(column("free")).queryByText("excl. VAT")).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByTestId("currency-toggle"));
+
+        for (const line of growthLines({
+          seat: formatPrice({ cents: TEST_GROWTH_SEAT_PRICE_CENTS.USD.monthly, currency: "USD" }),
+          events: "$6",
+          retention: "$4",
+        })) {
+          expect(within(column("growth")).getByText(line)).toBeInTheDocument();
+        }
+        expect(within(column("growth")).queryByText("Up to 20 core users")).not.toBeInTheDocument();
+      });
+    });
+  });
+
   describe("given a member without administrative rights", () => {
     describe("when the comparison is opened", () => {
       /** @scenario "Non-admin members can access plans comparison" */
@@ -125,16 +167,16 @@ describe("PlansComparisonPage", () => {
         renderPlans({ activePlan: { type: "GROWTH_SEAT_EUR_MONTHLY", free: false } });
 
         expect(
-          within(column("growth")).getByText("30 days retention (+ custom at \u20AC3/GB)"),
+          within(column("growth")).getByText("90 days retention (+ custom at \u20AC3/GB)"),
         ).toBeInTheDocument();
 
         fireEvent.click(screen.getByTestId("currency-toggle"));
 
         expect(
-          within(column("growth")).getByText("30 days retention (+ custom at $4/GB)"),
+          within(column("growth")).getByText("90 days retention (+ custom at $4/GB)"),
         ).toBeInTheDocument();
         expect(
-          within(column("growth")).queryByText("30 days retention (+ custom at \u20AC3/GB)"),
+          within(column("growth")).queryByText("90 days retention (+ custom at \u20AC3/GB)"),
         ).not.toBeInTheDocument();
       });
     });

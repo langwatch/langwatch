@@ -53,6 +53,13 @@ class TestBillingHost extends BillingHostApi {
     return true;
   }
 
+  canReadMonthBreakdown(): boolean {
+    return true;
+  }
+  canReadHeldSeats(): boolean {
+    return true;
+  }
+
   routeQuery(): Readonly<Record<string, string | undefined>> {
     return {};
   }
@@ -119,6 +126,10 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
   const setup = await import("./subscription-test-setup.ts");
   return {
     billingApi: {
+      dataRetention: {
+        getOrganizationStorageEstimate: { useQuery: () => ({ data: undefined, isError: false }) },
+        getOrganizationRetention: { useQuery: () => ({ data: undefined, isError: false }) },
+      },
       limits: {
         getUsage: {
           useQuery: () => setup.mockGetUsage(),
@@ -133,6 +144,7 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         getOrganizationWithMembersAndTheirTeams: {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
+        listHeldSeats: { useQuery: () => setup.mockListHeldSeats() },
       },
       invite: {
         upgradeWithInvites: {
@@ -171,7 +183,25 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
           useQuery: () => setup.mockListInvoices(),
         },
         getLastSubscription: {
-          useQuery: () => setup.mockGetLastSubscription(),
+          useQuery: () => ({ ...setup.mockGetLastSubscription(), refetch: vi.fn() }),
+        },
+        developerSeats: {
+          useQuery: (_input: unknown, opts: { enabled: boolean }) => ({
+            ...(opts.enabled ? setup.mockDeveloperSeats() : { data: undefined }),
+            refetch: setup.mockDeveloperSeatsRefetch,
+          }),
+        },
+        previewDeveloperSeats: {
+          useQuery: (input: { quantity: number }, opts: { enabled: boolean }) =>
+            opts.enabled
+              ? setup.mockPreviewDeveloperSeats(input)
+              : { data: undefined, isLoading: false, isError: false },
+        },
+        setDeveloperSeats: {
+          useMutation: () => ({ mutateAsync: setup.mockSetDeveloperSeats, isPending: false }),
+        },
+        previewProration: {
+          useQuery: () => ({ data: undefined, isLoading: false, isError: false }),
         },
       },
       useUtils: vi.fn(() => ({
@@ -255,12 +285,59 @@ describe("<SubscriptionPage/> seat limit", () => {
       await waitFor(() => {
         expect(screen.getByText("3 / 2")).toBeInTheDocument();
       });
+      expect(screen.getByTestId("plan-seat-count")).toHaveAttribute("data-over-limit", "true");
       expect(screen.getByText("Upgrade required")).toBeInTheDocument();
+      expect(screen.getByTestId("upgrade-required-chip")).toHaveAttribute("data-tone", "bad");
       expect(screen.getByTestId("seat-limit-callout")).toHaveTextContent(
         "Your organization uses 3 member seats and your plan includes 2 member seats. Upgrade to the Growth plan below to keep everyone.",
       );
       expect(screen.getByTestId("upgrade-plan-block")).toHaveTextContent(
         "Your current plan doesn't cover these seats.",
+      );
+    });
+  });
+
+  describe("when a Free organization is over its plan, so new traces are held", () => {
+    beforeEach(() => {
+      givenMembers([{ id: "user-3", role: "MEMBER" }]);
+      mockGetUsage.mockReturnValue({
+        data: {
+          seatLimitInfo: {
+            status: "exceeded",
+            message: "Your organization uses 3 member seats and your plan includes 2 member seats.",
+          },
+          membersCount: 3,
+          activePlan: { overPlan: { sinceMs: 1, members: 3, maxMembers: 2 } },
+        },
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    /** @scenario "The plan page's seat note says new traces are held" */
+    it("says in the seat note that new traces are saved and will show after an upgrade", async () => {
+      renderSubscriptionPage();
+
+      expect(await screen.findByTestId("seat-limit-callout")).toHaveTextContent(
+        "New traces are saved and will show once you upgrade your plan or remove members.",
+      );
+    });
+  });
+
+  describe("when a Free organization is over its seats with no over-plan state", () => {
+    beforeEach(() => {
+      givenMembers([{ id: "user-3", role: "MEMBER" }]);
+      givenSeatLimitExceeded(
+        "Your organization uses 3 member seats and your plan includes 2 member seats.",
+      );
+    });
+
+    /** @scenario "The plan page's seat note says nothing about held traces when no trace is held" */
+    it("leaves held traces out of the seat note", async () => {
+      renderSubscriptionPage();
+
+      expect(await screen.findByTestId("seat-limit-callout")).not.toHaveTextContent(
+        "New traces are saved",
       );
     });
   });
@@ -343,6 +420,7 @@ describe("<SubscriptionPage/> seat limit", () => {
       expect(screen.queryByText(/doesn't cover these seats/)).toBeNull();
       expect(screen.queryByText("Upgrade required")).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: /Upgrade now/i }));
+      fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
       await waitFor(() => {
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 1 }));
@@ -406,6 +484,7 @@ describe("<SubscriptionPage/> seat limit", () => {
         expect(screen.getByText("3 / 2")).toBeInTheDocument();
       });
       fireEvent.click(screen.getByRole("button", { name: /Upgrade now/i }));
+      fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
       await waitFor(() => {
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 3 }));
@@ -509,6 +588,7 @@ describe("<SubscriptionPage/> seat limit", () => {
       renderSubscriptionPage();
 
       fireEvent.click(await screen.findByRole("button", { name: /Upgrade now/i }));
+      fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
       await waitFor(() => {
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 3 }));
@@ -554,6 +634,7 @@ describe("<SubscriptionPage/> seat limit", () => {
       renderSubscriptionPage();
 
       fireEvent.click(await screen.findByRole("button", { name: /Upgrade now/i }));
+      fireEvent.click(await screen.findByRole("button", { name: "Continue to checkout" }));
 
       await waitFor(() => {
         expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ membersToAdd: 3 }));

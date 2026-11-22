@@ -309,15 +309,21 @@ describe.each(storages)("a single-file dataset in $name", (storage) => {
   });
 
   describe("when it is copied", () => {
-    /** @scenario "A single-file dataset copies its records into the new dataset" */
+    /**
+     * @scenario "A single-file dataset copies its records into the new dataset"
+     * @scenario "Copying a legacy single-file dataset"
+     */
     it("copies every entry from the file", async () => {
-      const { app, datasetId } = await setup(storage);
+      const { app, repositories, datasetId } = await setup(storage);
 
       const copy = await app.copyDataset({
         sourceDatasetId: datasetId,
         sourceProjectId: projectId,
         targetProjectId: projectId,
       });
+
+      expect(copy).toMatchObject({ contentLayout: "s3_jsonl", useS3: false });
+      expect(await repositories.records.count({ datasetId: copy.id, projectId })).toBe(0);
 
       const page = await app.getDatasetPage({ slugOrId: copy.id, projectId, page: 1, limit: 10 });
       // The scenario promises the same entries, not their order (the read sorts by copied ids).

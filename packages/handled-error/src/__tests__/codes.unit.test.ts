@@ -89,6 +89,10 @@ const PARAMETERIZED_CODES = new Set([
   "upgrade_invalid_cursor",
   "upgrade_not_found",
   "upgrade_plan_unavailable",
+  // BraidConditionRefusedError raises the compiler's refusal code.
+  "braid_condition_syntax",
+  "braid_condition_too_large",
+  "braid_condition_unsupported",
 ]);
 
 /**
@@ -113,7 +117,12 @@ const CODE_PATTERNS = [
 /**
  * Strings that match a pattern above without being a raisable code.
  */
-const NON_CODE_LITERALS = new Set(["unknown"]);
+const NON_CODE_LITERALS = new Set([
+  "unknown",
+  // A kill switch target outcome code (KillSwitchPlatformError): recorded on the stop,
+  // never raised.
+  "source_not_configured",
+]);
 
 /**
  * One code per declaration shape, each chosen because the pattern for that shape is the

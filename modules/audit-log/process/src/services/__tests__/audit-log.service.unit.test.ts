@@ -27,6 +27,7 @@ function serviceWith(maxArgsBytes?: number) {
       throw new Error("this suite reads no history back");
     },
     findByTargetKind,
+    findForOrganization: async () => [],
   };
   const service = AuditLogService.create({
     repository,

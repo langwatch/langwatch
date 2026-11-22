@@ -272,9 +272,9 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
   # --- The LLM-judge caller (ADR-190 open question 2: one caller behind the flag) ---
 
   @unit
-  Scenario: An LLM judge on LangWatch Instant Preview is routed when the flag is on
+  Scenario: An LLM judge on LangWatch Evals Preview is routed when the flag is on
     Given the router flag is on for the project's organization
-    And the project's Instant Evals column is LangWatch Instant Preview
+    And the project's Instant Evals column is LangWatch Evals Preview
     When an LLM judge evaluation runs on Instant Evals
     Then the judge call carries the route for the "llm_judge" job
     And the flag is read for the project within its organization, so an organization rule applies
@@ -294,9 +294,10 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And the router flag is not read
 
   @unit
-  Scenario: A routed result says who answered it
+  Scenario: A routed result names the LangWatch Judge, never a backend
     Given a routed judgement that the decision model answered and the LLM leg escalated
     When the evaluation result is built
-    Then its details name the LangWatch Judge and the backends that answered
+    Then its details name the LangWatch Judge
     And they say how many questions were escalated
+    And they name no backend that answered
     And an unrouted result's details read exactly as before

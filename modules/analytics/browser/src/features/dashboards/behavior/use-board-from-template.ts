@@ -5,10 +5,12 @@
  */
 
 import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { type UiAnalyticsEvent, useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
+import { pickerWidgets } from "../catalogue/index.ts";
 import { boardCopyWidgets, boardWidgetsOf } from "../model/board-widgets.ts";
 import {
   boardCopyName,
@@ -17,6 +19,8 @@ import {
   templateBoardName,
 } from "../model/boards.ts";
 import type { CuratedBoard } from "../model/curated-boards.ts";
+import { dashboardCreated } from "../model/dashboard-usage-events.ts";
+import type { WidgetQuestion } from "../model/widget-questions.ts";
 import { catalogueSource } from "../model/widget-source.ts";
 import type { BoardTemplate, BoardTemplateWidget } from "../templates/index.ts";
 import type { SavedBoard } from "./use-saved-dashboards.ts";
@@ -43,6 +47,7 @@ export type CreatedBoard = {
 
 export function useBoardFromTemplate() {
   const host = useAnalyticsHost();
+  const analytics = useUiAnalytics();
   const project = host.project();
   const projectId = project?.id ?? "";
   const projectSlug = project?.slug ?? "";
@@ -86,10 +91,13 @@ export function useBoardFromTemplate() {
     source,
     existingNames,
     fallbackTitle,
+    made,
   }: {
     source: BoardSource;
     existingNames: readonly string[];
     fallbackTitle: string;
+    /** The product event a board made this way sends, once every widget has landed. */
+    made: UiAnalyticsEvent;
   }): Promise<CreatedBoard | undefined> => {
     if (creatingId !== void 0) return void 0;
     setCreatingId(source.id);
@@ -112,6 +120,7 @@ export function useBoardFromTemplate() {
         widgetSource: source.widgetSource,
         dashboardId,
       });
+      analytics.track(made);
       // Re-read first, so the new board is listed by the time its address opens.
       await refresh();
       host.navigate(dashboardsPath({ projectSlug, dashboardId }));
@@ -145,6 +154,7 @@ export function useBoardFromTemplate() {
       },
       existingNames,
       fallbackTitle: "Couldn't create the dashboard from the template",
+      made: dashboardCreated({ createdFrom: "template", templateId: template.id }),
     });
 
   /**
@@ -174,6 +184,7 @@ export function useBoardFromTemplate() {
       },
       existingNames,
       fallbackTitle: "Couldn't duplicate the dashboard",
+      made: dashboardCreated({ createdFrom: "duplicate" }),
     });
 
   /** "Duplicate to edit": the From LangWatch board's built widgets as "<name> (copy)". */
@@ -194,7 +205,36 @@ export function useBoardFromTemplate() {
       },
       existingNames,
       fallbackTitle: "Couldn't duplicate the dashboard",
+      made: dashboardCreated({ createdFrom: "duplicate_curated", templateId: board.templateId }),
     });
 
-  return { creatingId, createFromTemplate, duplicateBoard, duplicateCurated };
+  /** A From LangWatch board's picked widget as a board of its own, named after the widget. */
+  const createWithWidget = async ({
+    question,
+    templateId,
+    existingNames,
+  }: {
+    question: WidgetQuestion;
+    /** The From LangWatch board the widget was picked on. */
+    templateId: string;
+    existingNames: readonly string[];
+  }) => {
+    const widgets = pickerWidgets(question.id);
+    const [widget] = widgets;
+    const created = await createFrom({
+      source: {
+        id: question.id,
+        name: widget.name,
+        description: null,
+        widgets: () => Promise.resolve(widgets),
+        widgetSource: fromCatalogue,
+      },
+      existingNames,
+      fallbackTitle: "Couldn't create the dashboard from the widget",
+      made: dashboardCreated({ createdFrom: "widget_curated", templateId }),
+    });
+    return created !== void 0;
+  };
+
+  return { creatingId, createFromTemplate, duplicateBoard, duplicateCurated, createWithWidget };
 }

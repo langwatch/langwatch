@@ -62,8 +62,19 @@ function contrast(a: string, b: string): number {
 }
 
 describe("production main colour parity", () => {
-  it("preserves all 111 raw scale entries from main", () => {
-    expect(colorSystem).toEqual(mainColours.raw);
+  /* Dark raised steps went near-neutral (zinc 700 to 850): a panel on a card reads as a lift. */
+  const ZINC_DEPARTURES = { 700: "#2c2c33", 750: "#222228", 800: "#1c1c22", 850: "#16161c" };
+
+  it("preserves main's raw scale entries, but the departed zinc steps", () => {
+    const zinc = { ...mainColours.raw.zinc } as Record<string, { value: string }>;
+    for (const [step, value] of Object.entries(ZINC_DEPARTURES)) zinc[step] = { value };
+    expect(colorSystem).toEqual({ ...mainColours.raw, zinc });
+  });
+
+  it("pins the near-neutral raised zinc steps", () => {
+    for (const [step, value] of Object.entries(ZINC_DEPARTURES)) {
+      expect(resolve(`zinc.${step}`, "_dark")).toBe(value);
+    }
   });
 
   // Chosen departures from main, each pinned by its own test below.
@@ -142,10 +153,10 @@ describe("main palette contrast", () => {
     },
   );
 
-  it("retains main's inverted dark hierarchy", () => {
+  it("retains main's inverted dark hierarchy, on the near-neutral panel", () => {
     expect(resolve("bg.surface", "_dark")).toBe("#080812");
     expect(resolve("bg.page", "_dark")).toBe("#10101a");
-    expect(resolve("bg.panel", "_dark")).toBe("#1a1a24");
+    expect(resolve("bg.panel", "_dark")).toBe("#1c1c22");
     expect(luminance(resolve("bg.surface", "_dark"))).toBeLessThan(
       luminance(resolve("bg.page", "_dark")),
     );
@@ -155,31 +166,33 @@ describe("main palette contrast", () => {
   });
 });
 
-describe("terminal colour parity", () => {
-  it.each([
-    ["terminal.fg", "fg"],
-    ["terminal.bg", "bg.card"],
-    ["terminal.black", "fg.subtle"],
-    ["terminal.red", "red.fg"],
-    ["terminal.green", "green.fg"],
-    ["terminal.yellow", "yellow.fg"],
-    ["terminal.blue", "blue.fg"],
-    ["terminal.magenta", "purple.fg"],
-    ["terminal.cyan", "cyan.fg"],
-    ["terminal.white", "fg"],
-    ["terminal.brightBlack", "fg.muted"],
-    ["terminal.brightRed", "red.fg"],
-    ["terminal.brightGreen", "green.fg"],
-    ["terminal.brightYellow", "yellow.fg"],
-    ["terminal.brightBlue", "blue.fg"],
-    ["terminal.brightMagenta", "pink.fg"],
-    ["terminal.brightCyan", "cyan.fg"],
-    ["terminal.brightWhite", "fg"],
-  ])("preserves %s as %s in both modes", (terminal, previous) => {
+describe("terminal screen", () => {
+  const terminal = entry(semantic, "terminal") as TokenTree;
+  const names = leaves(terminal, "terminal.").map(([name]) => name);
+
+  /** @scenario "The terminal screen stays dark in both colour modes" */
+  it.each(names)("keeps %s identical in light and dark mode", (name) => {
+    expect(resolve(name, "_light")).toBe(resolve(name, "_dark"));
+  });
+
+  /** @scenario "The terminal screen stays dark in both colour modes" */
+  it("stays a dark screen whatever the app's colour mode", () => {
     for (const mode of ["_light", "_dark"] satisfies Mode[]) {
-      expect(resolve(terminal, mode)).toBe(resolve(previous, mode));
+      expect(luminance(resolve("terminal.bg", mode))).toBeLessThan(0.01);
     }
   });
+
+  /** @scenario "The terminal screen stays dark in both colour modes" */
+  it.each(["fg", "faint", "red", "green", "yellow", "blue", "accent"])(
+    "keeps terminal.%s readable on the terminal screen",
+    (role) => {
+      const ratio = contrast(
+        resolve(`terminal.${role}`, "_light"),
+        resolve("terminal.bg", "_light"),
+      );
+      expect(ratio).toBeGreaterThanOrEqual(4.5);
+    },
+  );
 });
 
 describe("avatar fills under white initials", () => {

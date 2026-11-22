@@ -19,6 +19,19 @@ export const inPeriod = (column: string) => `${column} >= ${START} AND ${column}
 export const inPeriodAndPrevious = (column: string) =>
   `${column} >= ${PREVIOUS_START} AND ${column} < ${END}`;
 
+/**
+ * Keeps each trace's first `trace_metrics` row: a row whose anchor moved (ADR-082) is a second
+ * row, which would put the trace in two buckets or halves. The lookup reaches one window back,
+ * so a trace that began before the period stays out of it, as on `traces`. `view` is the alias.
+ */
+export const firstTraceMetricsRow = ({ view }: { view?: string } = {}) => {
+  const of = view ? `${view}.` : "";
+  return `(${of}TraceId, ${of}OccurredAt) IN (SELECT TraceId, min(OccurredAt)
+    FROM trace_metrics
+    WHERE ${inPeriodAndPrevious("OccurredAt")}
+    GROUP BY TraceId)`;
+};
+
 export const bucketOf = (column: string) => {
   const shifted = `subtractSeconds(${column}, ${LWQL_BUCKET_ALIGNMENT_SECONDS})`;
   const bucket = `toStartOfInterval(${shifted}, INTERVAL ${GRAIN} SECOND)`;

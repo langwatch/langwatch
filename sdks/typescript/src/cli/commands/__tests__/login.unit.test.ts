@@ -185,6 +185,24 @@ describe("loginCommand", () => {
         }
       });
 
+      /** @scenario "A new .env carrying the project key is owner-only" */
+      it.skipIf(process.platform === "win32")(
+        "creates the .env readable by its owner only",
+        async () => {
+          const cwd = process.cwd();
+          const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-login-"));
+          process.chdir(dir);
+          try {
+            await loginCommand({ project: "checkout" });
+
+            expect(fs.statSync(path.join(dir, ".env")).mode & 0o777).toBe(0o600);
+          } finally {
+            process.chdir(cwd);
+            fs.rmSync(dir, { recursive: true, force: true });
+          }
+        },
+      );
+
       /** @scenario `langwatch login --project <slug>` writes a full-access key */
       it("says it saved the project's API key", async () => {
         const cwd = process.cwd();

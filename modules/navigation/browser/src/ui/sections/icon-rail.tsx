@@ -6,6 +6,8 @@ import { Settings as SettingsIcon } from "lucide-react";
 
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
+import { useSettingsEntryHref } from "../../behavior/use-settings-entry-href.ts";
+import { writeDashboardsSidebarHint } from "../../model/dashboards-sidebar-hint.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { PRODUCTS, type ProductDefinition, type ProductId } from "../../model/products.ts";
 import { NavigationLink } from "../elements/navigation-link.tsx";
@@ -21,6 +23,7 @@ export function ProductIconRail({
   isSettingsActive: boolean;
 }) {
   const host = useNavigationHost();
+  const settingsHref = useSettingsEntryHref();
   const { reachableProducts } = useReachableProducts();
   const projectSlug = useLlmOpsProjectSlug();
 
@@ -32,6 +35,9 @@ export function ProductIconRail({
     if (product.id === activeProductId && !isSettingsActive) return;
     const home = product.homeHref({ projectSlug });
     if (!home) return;
+    // Choosing Dashboards means its own sidebar, whatever page the reader left.
+    if (product.id === "dashboards")
+      writeDashboardsSidebarHint({ hint: "dashboards", projectId: host.project()?.id });
     host.navigate(home);
   };
 
@@ -49,7 +55,7 @@ export function ProductIconRail({
           label="Settings"
           title="Settings"
           isActive={isSettingsActive}
-          onOpen={() => host.navigate("/settings")}
+          onOpen={() => host.navigate(settingsHref)}
         />
       }
     >

@@ -61,14 +61,19 @@ const transcriptEntrySchemaDefinition = z.discriminatedUnion("kind", [
     failed: z.boolean(),
     agentId: z.string().nullable(),
     spanId: z.string(),
+    // True for a call Claude Code's Code Mode made from inside a REPL script: it left only a
+    // decision log, so it has no span and no recorded output.
+    inScript: z.boolean().optional(),
   }),
   z.object({
     kind: z.literal("tool_rejected"),
     atMs: z.number(),
     name: z.string().nullable(),
     reason: z.string().nullable(),
-    // A user who cancels a call did not refuse it; the line says which.
-    outcome: z.enum(["denied", "aborted"]),
+    // A user who cancels or answers instead did not refuse the call; the line says which.
+    outcome: z.enum(["denied", "redirected", "aborted"]),
+    // True only when the decision's source names the user; a policy denial is not theirs.
+    byUser: z.boolean(),
   }),
   z.object({
     kind: z.literal("note"),

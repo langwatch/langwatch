@@ -10,6 +10,7 @@ import {
   nulFreeStringSchema,
   outputsSchema,
   runtimeParametersSchema,
+  runtimeParametersUpdateSchema,
   schemaVersionSchema,
   scopeSchema,
   versionSchema,
@@ -52,6 +53,7 @@ const updatePromptInputSchemaDefinition = z.strictObject({
   commitMessage: commitMessageSchema,
   scope: scopeSchema.optional(),
   handle: handleSchema.optional(),
+  parameters: runtimeParametersUpdateSchema.optional(),
 });
 export interface UpdatePromptInputSchema extends Named<typeof updatePromptInputSchemaDefinition> {}
 export const updatePromptInputSchema: UpdatePromptInputSchema = updatePromptInputSchemaDefinition;

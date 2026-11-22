@@ -733,6 +733,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a template with a captured image of its board
     Then its preview shows the top of that image in a short inset frame
     And a template without an image shows faint blocks, with no text, where its widgets sit on the board
+    And a widget that is not built yet is sketched at the height a new widget takes on a board
     And the preview runs no query and cannot be focused
 
   @integration
@@ -806,6 +807,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then its scope is Project, and the project it was made in owns it
     And a member's My dashboard is made with the scope Only me
     And a board made with a project credential has the scope Project
+    # A board made in the create dialog will take the scope picked there
+    # (dashboards-organization-area.feature).
 
   @unit @integration
   Scenario: AC171 Scope: an Only me board exists for its author alone
@@ -849,6 +852,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a member with several boards of their own
     Then they can set every one of them to Only me, with no limit
     And they can set their My dashboard to Project or Organization, and back to Only me
+    # This holds for the earlier per-project My dashboards. The personal My dashboard is Only me
+    # and cannot be deleted (dashboards-organization-area.feature).
 
   @unit
   Scenario: AC176 Scope: a narrower scope keeps other members' pins
@@ -869,6 +874,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       their projects", with a tick on the current one
     And a reader who is not the author sees the same value as a badge that cannot be opened,
       whose hover says only the person who made the dashboard can change its scope
+    # A board homed outside LLM Ops will offer no Project (dashboards-organization-area.feature).
 
   @integration
   Scenario: AC178 Scope control: the sidebar menu offers the same three choices
@@ -876,6 +882,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then under "Scope" it offers Only me, Project and Organization with a tick on the current one
     And their My dashboard offers the same three
     And a board they did not make, or one another project owns, offers none
+    # A board homed outside LLM Ops will offer Only me and Organization, and no Project
+    # (dashboards-organization-area.feature).
 
   @unit @integration
   Scenario: AC179 Scope change: it asks first only when someone loses the board
@@ -908,6 +916,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       "All projects", and marks the project that owns the board "owner"
     And choosing one opens the same board under that project
     And a Project or Only me board has no such chip
+    # That holds in a project view. At org level the chip will also offer "All projects"
+    # (dashboards-organization-area.feature, @q1-all-projects).
 
   @integration
   Scenario: AC183 A board the reader may not open is not available
@@ -916,6 +926,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then the page reads "This dashboard is not available" and "It was deleted, or the person who
       made it set its scope to Only me. If you need it, ask them to set it to Project."
     And it shows nothing of the board's name, description or widgets
+    # That text holds with Dashboards in every product off. With it on, the page reads "This
+    # dashboard was deleted or isn't shared with you." with "Back to Dashboards" (dashboards-organization-area.feature).
 
   @unit @integration
   Scenario: AC184 View-only: a board the reader cannot edit offers no edit control
@@ -926,6 +938,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And the widget menu still offers "Copy widget id" and "Export CSV", which change nothing
     And the description cannot be edited, and the sidebar menu offers no Rename and no Delete
     And outside the owning project the header reads "<organization> · owned by <project>"
+    # When the reader cannot read the owner, it will read "<organization> · owned by another
+    # project" (dashboards-organization-area.feature).
 
   @integration
   Scenario: AC185 View-only: Duplicate to edit makes the reader's own copy
@@ -935,6 +949,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       with them as its author, and it opens
     And a reader without analytics:create is offered no copy
     And the board's header has no such button, as on a From LangWatch board
+    # At a project address. In the library, see "Duplicate and Delete from the library"
+    # (dashboards-organization-area.feature).
 
   @unit
   Scenario: AC186 Scope: the migration keeps today's audience
@@ -1344,7 +1360,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: Boards: every board has the ask bar
     Given any stored or From LangWatch board
     Then "What do you want to know?" sits under the header
-    And without Langy a stored board keeps it to find a widget, and a From LangWatch board has none
+    And without Langy a stored board keeps it to find a widget, and a From LangWatch board has none unless the member may create dashboards
 
   @integration
   Scenario: Boards: every empty board shows one view
@@ -1399,8 +1415,39 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And it opens, with the template's report prompt drafted in Langy, unsent
     # The board's header has no such button: the sidebar menu is the only place
 
+  @integration
+  Scenario: From LangWatch: the ask bar opens Add a widget for a member who may create dashboards
+    Given a member who may create dashboards
+    When the member clicks the ask bar on a From LangWatch board
+    Then "Add a widget" opens
+    And nothing is stored and Langy is asked nothing
+
+  @integration
+  Scenario: From LangWatch: picking a widget makes a new dashboard with only that widget
+    Given "Add a widget" is open on a From LangWatch board
+    When the member picks a widget
+    Then a dashboard named after that widget is made for the project, numbered from 2 when the name is taken
+    And it holds only that widget
+    And the member is taken to it
+    And "dashboards.created.dashboard" is sent with createdFrom "widget_curated" and the From LangWatch board's templateId
+
+  @integration
+  Scenario: From LangWatch: the picker waits for the member's dashboards to load
+    Given "Add a widget" is open on a From LangWatch board and the member's dashboards are still loading
+    Then the picker is not shown and Langy is asked nothing
+    When the dashboards have loaded
+    Then the picker shows, and a new dashboard's name does not repeat one of the loaded dashboards
+
+  @integration
+  Scenario: From LangWatch: the picker has no I'll build it myself
+    Given "Add a widget" is open on a From LangWatch board
+    Then there is no "I'll build it myself" button
+    And Langy stays reachable in the picker
+    And a search that matches nothing shows "No widget matches. Clear the search and filters to see them all."
+
   @unit @integration
-  Scenario: From LangWatch: a template board asks Langy with the board as context
+  Scenario: From LangWatch: the ask bar asks Langy for a member who may not create dashboards
+    Given a member who may not create dashboards
     When the member clicks the ask bar on a From LangWatch board
     Then Langy opens with the cursor in its composer and nothing asked yet
     And the board is attached as context, named as read-only and not stored
@@ -1900,8 +1947,12 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # and AC204b stand as written; the earlier text is in git at c5743d82.
   # The helper (decided): a `Source` column the LWQL views expose, computed at read time from
   # `Origin` (lwql-view-catalog.rules.ts sourceColumns); no ClickHouse migration. It reads: a missing, empty or NULL origin reads "application", an origin outside the ten
-  # listed reads "other", a listed origin reads as itself. A view keyed by TraceId is reached
-  # through `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {…})`. A view with
+  # listed reads "other", a listed origin reads as itself. A stock query over `traces` or `spans`
+  # leaves out the traces of other sources, `NOT IN (… WHERE Source NOT IN {…})`, while the list holds
+  # application, and keeps the traces of the list, `IN (… WHERE Source IN {…})`, while it does not; each
+  # set's own WHERE carries the switch, so only one is filled (AC202g). One over `evaluations` or `annotations` keeps
+  # `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {…})` (AC202h;
+  # why: analytics ADR-003). A view with
   # neither column carries no origin, so a query reading only such views stores no list (AC202f).
 
   @unit
@@ -1940,7 +1991,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC202d Stock widgets: a widget whose list did not change returns the same rows
     Given a From LangWatch board run over seeded traces of every origin before and after this change
     When a widget's declared list equals the origins it counted before
-    Then its rows are byte-equal to the rows before
+    Then its rows are byte-equal to the rows before, apart from the traces and spans AC202g names
     And a widget that changed differs only by rows of the origins its change-table row names
     # Evidence: the same board run on the before and after builds over seeded traces, the two answers diffed, and a haven browser screenshot of the board
 
@@ -1959,6 +2010,33 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then its queries store no sources list
     And its card reads "Sources don't apply: this widget reads a view that keeps no origin"
     # Evidence: a haven browser screenshot of the card
+
+  @unit @integration
+  Scenario: AC202g Stock widgets: a trace with no trace_metrics row counts as an application trace
+    # Changed (2026-11-06): a list without "application" now keeps only its own sources' traces,
+    # and the lookup reaches as far back as the query scans.
+    Given spans of a trace with no trace_metrics row, of an application trace, of a Langy trace and of a simulation trace
+    When a stock query over `traces` or `spans` reads those rows through their trace, bound to ["application"]
+    Then it counts the trace with no row and the application trace, and neither of the others
+    And a list of several sources that holds "application" keeps the trace with no row and the traces of each listed source
+    And a list holding every source keeps every trace
+    And a list without "application", such as ["langy"], keeps the traces of its sources and not the trace with no row
+    And a source name no trace has keeps no trace
+    And an empty list keeps no trace
+    And the lookup reaches as far back as the query scans: one window back plus a day, or N days when the query scans from "subtractDays({dashboard_context_period_start:DateTime}, N)" and N days reach further
+    And so a trace the query scans counts by its own source, such as an older prompt version's trace in the changes widget, which scans 90 days back
+    And under a list that holds "application", a trace or span older than the lookup's bound counts, whatever the trace's source, but no stock query scans that far back
+    And a trace with a trace_metrics row of "application" and one of another source counts under a list of that other source, and not under ["application"]
+    # Why: on a large project the application traces are most of them, so the set of other sources'
+    # traces is the small one while the list holds application, and the set of the list's traces is
+    # the small one while it does not. Measured on prod, 30 days: analytics ADR-003.
+
+  @unit @integration
+  Scenario: AC202h Stock widgets: evaluation and annotation widgets still read the traces of the chosen sources
+    Given a stock query over `evaluations` or `annotations`
+    Then it reads the origin through `IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {…})`
+    And an evaluation on a trace of the list counts, and one on a trace of another source does not
+    And an evaluation on a trace with no trace_metrics row, on a trace older than the lookup's bound, or with a NULL TraceId does not count
 
   @unit @integration
   Scenario: AC203 Sources: a query reading the parameter is kept to the list it stores
@@ -2010,6 +2088,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit @integration
   Scenario: AC206 Project: a card reads the board's project unless its query names others
+    # A board open in a project view. At org level see dashboards-organization-area.feature.
     Given a stored widget whose query stores no projects, on a board open in project "P"
     When the card runs
     Then the run reads project "P" alone and {dashboard_context_projects:Array(String)} is bound to ["P"]
@@ -2192,7 +2271,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # Guard rails
   # ---------------------------------------------------------------------------
 
-  @integration @unimplemented
+  @integration
   Scenario: AC11 Existing boards are unaffected
     Given a board created before this change
     Then its widgets keep their stored code, labels and number format

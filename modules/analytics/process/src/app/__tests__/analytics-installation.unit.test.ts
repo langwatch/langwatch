@@ -14,6 +14,7 @@ import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { testPeer } from "@langwatch/process/testing";
 import { ProjectApi } from "@langwatch/project-contract";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -52,6 +53,13 @@ const evaluationRow: AnalyticsEvaluationRow = {
   completedAtMs: null,
 };
 
+/** The deployment's session secret, which keys the query hash. */
+const resolver = SecretsResolver.over(
+  SecretsChain.start({
+    environment: { NEXTAUTH_SECRET: "analytics-test-session-secret" },
+  }).withEnv(),
+);
+
 /** Every peer, and the judge analytics' channel binds, stand in for their uninstalled owners. */
 function boot(role: "api" | "worker") {
   return bootInstalledProcess({
@@ -73,6 +81,7 @@ function boot(role: "api" | "worker") {
       },
     },
     stores: memoryStores(),
+    secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     peers: [
       testPeer({ token: FeatureFlagApi, instance: createApiFixture<FeatureFlagApi>() }),
       testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),

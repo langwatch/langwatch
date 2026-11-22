@@ -137,7 +137,7 @@ export function Expandable({
             Hide {label}
           </Box>
         </Accordion.ItemTrigger>
-        <Accordion.ItemContent data-docs-panel="">
+        <Accordion.ItemContent data-docs-panel="" data-docs-findable="">
           <Accordion.ItemBody
             paddingY="0"
             paddingInlineEnd="0"

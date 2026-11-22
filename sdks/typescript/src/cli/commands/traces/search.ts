@@ -5,11 +5,20 @@ import { TracesApiService } from "@/client-sdk/services/traces/traces-api.servic
 import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { parseInstantOrNull } from "../../utils/instant";
 import { printResult, resolveOutputOptions, type RawOutputFlags } from "../../utils/output";
+import { searchedProjectSlug } from "../../utils/searchedProject";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import {
+  DEFAULT_LOOKBACK,
+  resolveTimeWindow,
+  resolveTimeWindowOrExit,
+  type TimeWindow,
+  WIDENED_LOOKBACK,
+  windowDocument,
+} from "../../utils/timeWindow";
 import { parseOriginOption } from "./origin-filter";
+import { type SearchedDocument, searchedDocument, searchedLines, widenCommand } from "./searched";
 
 /** Traces are walked in chunks so the progress bar moves rather than jumping 0 → 1. */
 const PROGRESS_CHUNK = 5;
@@ -46,30 +55,63 @@ export function emptySearchHint({
   return undefined;
 }
 
+type SearchResult = Awaited<ReturnType<TracesApiService["search"]>>;
+
+type SearchOptions = {
+  query?: string;
+  filter?: string;
+  startDate?: string;
+  endDate?: string;
+  since?: string;
+  limit?: string;
+  origin?: string;
+  errorsOnly?: boolean;
+  project?: string;
+} & RawOutputFlags;
+
+/** What a search found, in which window, and whether the default window was widened. */
+interface WindowedSearch {
+  result: SearchResult;
+  window: TimeWindow;
+  widened: boolean;
+}
+
 /**
- * The window flags take an ISO-8601 instant or epoch milliseconds, which is
- * what the Trace Explorer's page context and its links carry. `new Date()`
- * reads an integer string as a calendar date and answers NaN.
+ * A trace seen "a while ago" sits outside the default week more often than it
+ * is missing, so an empty default window widens once. A window the caller
+ * named is the one they meant and never widens.
  */
-const parseInstantFlag = (value: string, flag: string): number => {
-  const parsed = parseInstantOrNull(value);
-  if (parsed !== null) return parsed;
-  console.error(`Invalid ${flag}: pass an ISO-8601 instant or epoch milliseconds.`);
-  process.exit(1);
+const searchWithWidening = async ({
+  search,
+  window,
+  spinner,
+}: {
+  search: (window: TimeWindow) => Promise<SearchResult>;
+  window: TimeWindow;
+  spinner: ReturnType<typeof createSpinner>;
+}): Promise<WindowedSearch> => {
+  const first = await search(window);
+  if (first.traces.length > 0 || window.isExplicit) {
+    return { result: first, window, widened: false };
+  }
+  spinner.text = `Nothing in the last ${DEFAULT_LOOKBACK}, searching the last ${WIDENED_LOOKBACK}...`;
+  const wider = {
+    ...resolveTimeWindow({ since: WIDENED_LOOKBACK, now: window.to }),
+    isExplicit: false,
+  };
+  return { result: await search(wider), window: wider, widened: true };
 };
 
-export const searchTracesCommand = async (
-  options: {
-    query?: string;
-    filter?: string;
-    startDate?: string;
-    endDate?: string;
-    limit?: string;
-    origin?: string;
-    errorsOnly?: boolean;
-    project?: string;
-  } & RawOutputFlags,
-): Promise<void> => {
+export const searchTracesCommand = async (options: SearchOptions): Promise<void> => {
+  // The window is checked before the credential: a bad date is the caller's to
+  // fix whether or not a key is configured.
+  const requested = resolveTimeWindowOrExit({
+    startDate: options.startDate,
+    endDate: options.endDate,
+    since: options.since,
+    now: Date.now(),
+  });
+
   await resolveCredentials({ project: options.project });
 
   const service = new TracesApiService();
@@ -77,35 +119,25 @@ export const searchTracesCommand = async (
   // A frozen no-op unless a transport is configured — see ../../telemetry/events.
   const events = createCommandEvents({ resource: "trace", verb: "search" });
 
-  let result: Awaited<ReturnType<TracesApiService["search"]>>;
-  try {
-    events.started("Searching traces…");
+  const pageSize = options.limit ? parseInt(options.limit, 10) : 25;
+  const originFilter = parseOriginOption(options.origin);
+  // "Show me my failed traces" has no text to search for: the error lives on
+  // the span, not in the trace's indexed text, so `-q error` returns nothing
+  // and reads like a clean project. `traces.error` is the same filter the
+  // Trace Explorer's error toggle uses.
+  const filters = {
+    ...(originFilter ? { "traces.origin": originFilter } : {}),
+    ...(options.errorsOnly ? { "traces.error": ["true"] } : {}),
+  };
 
-    const now = Date.now();
-    const oneDayAgo = now - 24 * 60 * 60 * 1000;
-
-    const startDate = options.startDate
-      ? parseInstantFlag(options.startDate, "--start-date")
-      : oneDayAgo;
-    const endDate = options.endDate ? parseInstantFlag(options.endDate, "--end-date") : now;
-    const pageSize = options.limit ? parseInt(options.limit, 10) : 25;
-    const originFilter = parseOriginOption(options.origin);
-    // "Show me my failed traces" has no text to search for: the error lives on
-    // the span, not in the trace's indexed text, so `-q error` returns nothing
-    // and reads like a clean project. `traces.error` is the same filter the
-    // Trace Explorer's error toggle uses.
-    const filters = {
-      ...(originFilter ? { "traces.origin": originFilter } : {}),
-      ...(options.errorsOnly ? { "traces.error": ["true"] } : {}),
-    };
-
-    // The `format` option controls CLI output (table vs json); the API's
-    // `format` parameter controls server response shape ("digest" | "json").
-    // Always request the richer "json" shape and render locally.
-    result = await service.search({
+  // The `format` option controls CLI output (table vs json); the API's
+  // `format` parameter controls server response shape ("digest" | "json").
+  // Always request the richer "json" shape and render locally.
+  const search = ({ from, to }: TimeWindow): Promise<SearchResult> =>
+    service.search({
       query: options.query,
-      startDate,
-      endDate,
+      startDate: from,
+      endDate: to,
       pageSize,
       format: "json",
       ...(Object.keys(filters).length > 0 ? { filters } : {}),
@@ -115,7 +147,12 @@ export const searchTracesCommand = async (
       ...(options.filter ? { filter: options.filter } : {}),
     });
 
-    const matched = result.pagination.totalHits;
+  let found: WindowedSearch;
+  try {
+    events.started("Searching traces…");
+
+    found = await searchWithWidening({ search, window: requested, spinner });
+    const matched = found.result.pagination.totalHits;
 
     // The stat card's number, and the first thing the panel can say that is not a
     // spinner: how many traces the query MATCHED — which is not how many came
@@ -127,7 +164,7 @@ export const searchTracesCommand = async (
     });
 
     spinner.succeed(
-      `Found ${result.pagination.totalHits} trace${result.pagination.totalHits !== 1 ? "s" : ""} (showing ${result.traces.length})`,
+      `Found ${matched} trace${matched !== 1 ? "s" : ""} (showing ${found.result.traces.length})`,
     );
   } catch (error) {
     events.failed({ error, message: "Trace search failed" });
@@ -143,30 +180,58 @@ export const searchTracesCommand = async (
     await events.flush();
   }
 
-  const traces = result.traces as Record<string, unknown>[];
-  const matched = result.pagination.totalHits;
-
   // Rendering stays OUTSIDE the search try: a printResult rejection is a
   // rendering failure, not a search failure.
+  await renderSearch({ options, found, events, origin: originFilter });
+};
+
+const renderSearch = async ({
+  options,
+  found,
+  events,
+  origin,
+}: {
+  options: SearchOptions;
+  found: WindowedSearch;
+  events: CommandEvents;
+  origin: string[] | undefined;
+}): Promise<void> => {
+  const { result, window, widened } = found;
+  const traces = result.traces as Record<string, unknown>[];
+  const matched = result.pagination.totalHits;
 
   // The machine branch comes FIRST: an empty `{ traces: [], pagination }` is
   // a parseable answer; prose on stdout is a corrupted one.
   if (resolveOutputOptions(options).format !== "table") {
     reportProgress({ events, total: traces.length, matched });
   }
-  // The hint rides on the document too, so a machine caller reading zero
-  // traces is told the cause the same way a person is.
+  // The hint, the window and what an empty read searched ride on the document
+  // too, so a machine caller reading zero traces is told what a person is.
   const hint = emptySearchHint({ query: options.query, found: traces.length });
-  await printResult(withHint({ document: result, hint }), {
-    ...options,
-    table: () => {
-      if (traces.length === 0) {
-        printEmptySearch({ hint, filter: options.filter });
-      } else {
-        printTable({ events, traces, matched });
-      }
-    },
+  const empty = traces.length === 0 ? await describeEmpty({ options, window, origin }) : undefined;
+  const windowDoc = windowDocument({
+    window,
+    lookback: widened ? WIDENED_LOOKBACK : DEFAULT_LOOKBACK,
+    widened,
   });
+  await printResult(
+    {
+      ...withHint({ document: result, hint }),
+      window: windowDoc,
+      ...(empty ? { searched: empty.searched, widen: empty.widen ?? null } : {}),
+    },
+    {
+      ...options,
+      table: () => {
+        if (empty) {
+          printEmptySearch({ hint, filter: options.filter, empty, widened });
+          return;
+        }
+        if (widened) printWidenedNote();
+        printTable({ events, traces, matched });
+      },
+    },
+  );
 
   events.completed({
     count: traces.length,
@@ -174,6 +239,48 @@ export const searchTracesCommand = async (
     message: `Returned ${traces.length} of ${matched.toLocaleString()} matching trace${matched === 1 ? "" : "s"}`,
   });
   await events.flush();
+};
+
+interface EmptySearch {
+  searched: SearchedDocument;
+  /** The exact command that searches a wider window, or undefined once a year was read. */
+  widen: string | undefined;
+}
+
+const describeEmpty = async ({
+  options,
+  window,
+  origin,
+}: {
+  options: { query?: string; filter?: string; errorsOnly?: boolean; project?: string };
+  window: TimeWindow;
+  origin: string[] | undefined;
+}): Promise<EmptySearch> => {
+  const input = {
+    project: await searchedProjectSlug({ project: options.project }),
+    window,
+    query: options.query,
+    filter: options.filter,
+    origin,
+    errorsOnly: options.errorsOnly,
+  };
+  return {
+    searched: searchedDocument(input),
+    widen: widenCommand({
+      base: "langwatch trace search",
+      searched: input,
+      project: options.project,
+    }),
+  };
+};
+
+const printWidenedNote = (): void => {
+  console.log();
+  console.log(
+    chalk.gray(
+      `Nothing in the last ${DEFAULT_LOOKBACK}, so this searched the last ${WIDENED_LOOKBACK}. Set the window with --since or --start-date.`,
+    ),
+  );
 };
 
 /**
@@ -285,12 +392,23 @@ function withHint<T extends object>({
 function printEmptySearch({
   hint,
   filter,
+  empty,
+  widened,
 }: {
   hint: string | undefined;
   filter: string | undefined;
+  empty: EmptySearch;
+  widened: boolean;
 }): void {
   console.log();
-  console.log(chalk.gray("No traces found matching your criteria."));
+  console.log(
+    chalk.gray(
+      widened
+        ? `No traces found in the last ${DEFAULT_LOOKBACK}, nor after widening to the last ${WIDENED_LOOKBACK}. Searched:`
+        : "No traces found. Searched:",
+    ),
+  );
+  for (const line of searchedLines(empty.searched)) console.log(chalk.gray(`  ${line}`));
   if (hint) console.log(chalk.gray(hint));
   if (filter) {
     // A filter that parses and matches nothing is almost always a value
@@ -302,5 +420,12 @@ function printEmptySearch({
       ),
     );
   }
-  console.log(chalk.gray("Try widening your date range or search query."));
+  if (empty.widen) {
+    console.log(chalk.gray(`Search further back: ${chalk.cyan(empty.widen)}`));
+  }
+  console.log(
+    chalk.gray(
+      `Another project: add ${chalk.cyan("--project <slug>")}. A known trace ID: ${chalk.cyan("langwatch trace get <traceId>")}.`,
+    ),
+  );
 }
