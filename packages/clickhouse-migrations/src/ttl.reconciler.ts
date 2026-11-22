@@ -33,7 +33,7 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     ttlColumn: "EventTimestamp",
     envVar: "CLICKHOUSE_COLD_STORAGE_BILLABLE_EVENTS_TTL_DAYS",
     hardcodedDefault: 49,
-    // The usage meter reads only the current and previous billing month (migration 00128).
+    // The usage meter reads only the current and previous billing month (migration 00132).
     deleteAfterMonths: 13,
   },
   {
