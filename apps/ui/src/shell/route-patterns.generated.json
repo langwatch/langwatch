@@ -46,6 +46,8 @@
   "/me/online-evaluations/*",
   "/me/prompts",
   "/me/prompts/*",
+  "/me/configure",
+  "/me/configure/*",
   "/me/chat/:workflow",
   "/me/studio/:workflow",
   "/me/automations/activity",
