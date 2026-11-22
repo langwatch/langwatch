@@ -49,6 +49,13 @@ Feature: Online Evaluation Drawer Complete Flow
     Then a monitor should be created with evaluatorId reference
     And the drawer should close
 
+  Scenario: Pressing Create before choosing a level names the level
+    Given the online evaluation drawer is open with nothing chosen
+    Then the Create button is available
+    When I press Create
+    Then the drawer says "Choose an evaluation level."
+    And no online evaluation is created
+
   @unimplemented
   Scenario: Create with pending mappings that need configuration
     Given I open the Online Evaluation drawer
@@ -69,7 +76,7 @@ Feature: Online Evaluation Drawer Complete Flow
     When I close the editor without completing mappings
     Then I should return to Online Evaluation drawer
     And a warning banner should appear: "1 field needs mapping"
-    And the Save button should be disabled
+    And pressing Save says "Complete all mappings first." and saves nothing
     When I click the warning banner
     Then the evaluator editor should re-open
 
@@ -79,7 +86,7 @@ Feature: Online Evaluation Drawer Complete Flow
     When I click the X button on the evaluator box
     Then the evaluator should be removed
     And the evaluator box should show "Select Evaluator"
-    And the Save button should be disabled
+    And pressing Save says "Select an evaluator."
     And a subtle message should say "Select an evaluator to continue"
 
   @unimplemented

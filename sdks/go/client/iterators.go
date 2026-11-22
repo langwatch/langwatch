@@ -128,7 +128,7 @@ func (s *DatasetsService) All(ctx context.Context, params ListDatasetsParams) it
 //		if err != nil {
 //			log.Fatal(err)
 //		}
-//		fmt.Println(*p.Id)
+//		fmt.Println(p.Id)
 //	}
 //
 // The page size defaults to the server maximum (1000) when params.Limit is
@@ -173,7 +173,7 @@ func (s *ProjectsService) All(ctx context.Context, params ListProjectsParams) it
 //		if err != nil {
 //			log.Fatal(err)
 //		}
-//		fmt.Println(*tr.TraceId)
+//		fmt.Println(tr.TraceId)
 //	}
 //
 // Pages are walked by the scroll cursor each response carries: the first

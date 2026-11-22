@@ -4,10 +4,14 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
+from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.register_connected_agent_instance_body_agents_item_hooks import (
+        RegisterConnectedAgentInstanceBodyAgentsItemHooks,
+    )
     from ..models.register_connected_agent_instance_body_agents_item_parameters import (
         RegisterConnectedAgentInstanceBodyAgentsItemParameters,
     )
@@ -26,6 +30,7 @@ class RegisterConnectedAgentInstanceBodyAgentsItem:
         concurrency (int | Unset):
         timeout_ms (int | Unset):
         sticky (bool | Unset):
+        hooks (RegisterConnectedAgentInstanceBodyAgentsItemHooks | Unset):
     """
 
     name: str
@@ -34,6 +39,8 @@ class RegisterConnectedAgentInstanceBodyAgentsItem:
     concurrency: int | Unset = UNSET
     timeout_ms: int | Unset = UNSET
     sticky: bool | Unset = UNSET
+    hooks: RegisterConnectedAgentInstanceBodyAgentsItemHooks | Unset = UNSET
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
@@ -50,8 +57,12 @@ class RegisterConnectedAgentInstanceBodyAgentsItem:
 
         sticky = self.sticky
 
-        field_dict: dict[str, Any] = {}
+        hooks: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.hooks, Unset):
+            hooks = self.hooks.to_dict()
 
+        field_dict: dict[str, Any] = {}
+        field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "name": name,
@@ -66,11 +77,16 @@ class RegisterConnectedAgentInstanceBodyAgentsItem:
             field_dict["timeoutMs"] = timeout_ms
         if sticky is not UNSET:
             field_dict["sticky"] = sticky
+        if hooks is not UNSET:
+            field_dict["hooks"] = hooks
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.register_connected_agent_instance_body_agents_item_hooks import (
+            RegisterConnectedAgentInstanceBodyAgentsItemHooks,
+        )
         from ..models.register_connected_agent_instance_body_agents_item_parameters import (
             RegisterConnectedAgentInstanceBodyAgentsItemParameters,
         )
@@ -93,6 +109,13 @@ class RegisterConnectedAgentInstanceBodyAgentsItem:
 
         sticky = d.pop("sticky", UNSET)
 
+        _hooks = d.pop("hooks", UNSET)
+        hooks: RegisterConnectedAgentInstanceBodyAgentsItemHooks | Unset
+        if isinstance(_hooks, Unset):
+            hooks = UNSET
+        else:
+            hooks = RegisterConnectedAgentInstanceBodyAgentsItemHooks.from_dict(_hooks)
+
         register_connected_agent_instance_body_agents_item = cls(
             name=name,
             environment=environment,
@@ -100,6 +123,24 @@ class RegisterConnectedAgentInstanceBodyAgentsItem:
             concurrency=concurrency,
             timeout_ms=timeout_ms,
             sticky=sticky,
+            hooks=hooks,
         )
 
+        register_connected_agent_instance_body_agents_item.additional_properties = d
         return register_connected_agent_instance_body_agents_item
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

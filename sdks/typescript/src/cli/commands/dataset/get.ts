@@ -1,10 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import type { CommandResult } from "../../utils/output";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { createDatasetService } from "./service-factory";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
 import { handleDatasetCommandError } from "./error-handler";
+import { createDatasetService } from "./service-factory";
 
 /** How many records the human table previews before it says "and N more". */
 const PREVIEW_LIMIT = 10;
@@ -13,12 +14,9 @@ const PREVIEW_LIMIT = 10;
 const MAX_CELL_LENGTH = 50;
 
 /**
- * The previewed records, shaped for `formatTable`.
- *
- * Dataset rows are free-form, so the header set is the UNION of every key seen
- * in the preview window rather than the first row's keys — otherwise a row with
- * an extra field renders that field nowhere. Cells are truncated because a
- * single oversized value would push every other column off the terminal.
+ * The previewed records, shaped for `formatTable`. Dataset rows are
+ * free-form, so headers are the UNION of every key seen in the window, not
+ * just the first row's -- otherwise an extra field renders nowhere.
  */
 const buildDatasetPreviewRows = (
   entries: readonly { entry: Record<string, unknown> }[],
@@ -35,14 +33,16 @@ const buildDatasetPreviewRows = (
     const row: Record<string, string> = {};
     headers.forEach((key) => {
       const value = entry.entry[key];
-      row[key] =
-        value === null || value === undefined
-          ? ""
-          : typeof value === "string"
-            ? value.length > MAX_CELL_LENGTH
-              ? value.substring(0, MAX_CELL_LENGTH - 3) + "..."
-              : value
-            : JSON.stringify(value).substring(0, MAX_CELL_LENGTH);
+      let cell: string;
+      if (value === null || value === undefined) {
+        cell = "";
+      } else if (typeof value === "string") {
+        cell =
+          value.length > MAX_CELL_LENGTH ? value.substring(0, MAX_CELL_LENGTH - 3) + "..." : value;
+      } else {
+        cell = JSON.stringify(value).substring(0, MAX_CELL_LENGTH);
+      }
+      row[key] = cell;
     });
     return row;
   });
@@ -72,23 +72,17 @@ export const getCommand = async (slugOrId: string): Promise<CommandResult | void
         console.log(`  ${chalk.bold("ID:")}         ${dataset.id}`);
 
         if (dataset.columnTypes.length > 0) {
-          const colStr = dataset.columnTypes
-            .map((c) => `${c.name}:${c.type}`)
-            .join(", ");
+          const colStr = dataset.columnTypes.map((c) => `${c.name}:${c.type}`).join(", ");
           console.log(`  ${chalk.bold("Columns:")}    ${colStr}`);
         }
 
         console.log(`  ${chalk.bold("Records:")}    ${dataset.entries.length}`);
 
         if (dataset.createdAt) {
-          console.log(
-            `  ${chalk.bold("Created:")}    ${formatRelativeTime(dataset.createdAt)}`,
-          );
+          console.log(`  ${chalk.bold("Created:")}    ${formatRelativeTime(dataset.createdAt)}`);
         }
         if (dataset.updatedAt) {
-          console.log(
-            `  ${chalk.bold("Updated:")}    ${formatRelativeTime(dataset.updatedAt)}`,
-          );
+          console.log(`  ${chalk.bold("Updated:")}    ${formatRelativeTime(dataset.updatedAt)}`);
         }
         const viewUrl = dataset.platformUrl;
         if (viewUrl) {
@@ -104,9 +98,7 @@ export const getCommand = async (slugOrId: string): Promise<CommandResult | void
 
           if (dataset.entries.length > PREVIEW_LIMIT) {
             console.log(
-              chalk.gray(
-                `  ... and ${dataset.entries.length - PREVIEW_LIMIT} more record(s)`,
-              ),
+              chalk.gray(`  ... and ${dataset.entries.length - PREVIEW_LIMIT} more record(s)`),
             );
           }
         }

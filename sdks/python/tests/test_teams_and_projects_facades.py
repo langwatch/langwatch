@@ -85,7 +85,7 @@ def test_teams_and_projects_resolve_from_the_package_entry_point(monkeypatch):
 def test_teams_create_and_list_routes():
     handler, calls = recorder(
         {
-            ("POST", "/api/teams"): {
+            ("POST", "/api/v1/teams"): {
                 "id": "team_1",
                 "name": "ACME Platform",
                 "slug": "acme-platform",
@@ -93,7 +93,7 @@ def test_teams_create_and_list_routes():
                 "createdAt": "2026-01-01T00:00:00Z",
                 "updatedAt": "2026-01-01T00:00:00Z",
             },
-            ("GET", "/api/teams"): {
+            ("GET", "/api/v1/teams"): {
                 "data": [{"id": "team_1", "name": "ACME Platform"}],
                 "pagination": {"page": 1, "limit": 50, "total": 1},
             },
@@ -148,7 +148,7 @@ def test_list_rejects_a_page_whose_data_is_not_a_list():
 def test_projects_create_serves_the_service_api_key():
     handler, calls = recorder(
         {
-            ("POST", "/api/projects"): {
+            ("POST", "/api/v1/projects"): {
                 "id": "proj_1",
                 "name": "ACME Tenant",
                 "slug": "acme-tenant",
@@ -187,7 +187,7 @@ def test_projects_create_serves_the_service_api_key():
 # @scenario "Creating a project from the SDK can open its team at the same time"
 def test_projects_create_can_open_a_team_alongside_the_project():
     handler, calls = recorder(
-        {("POST", "/api/projects"): {"id": "proj_2", "teamId": "team_new"}},
+        {("POST", "/api/v1/projects"): {"id": "proj_2", "teamId": "team_new"}},
         status=201,
     )
     facade = ProjectsFacade(FakeRestClient(handler))
@@ -211,11 +211,11 @@ def test_projects_create_can_open_a_team_alongside_the_project():
 def test_projects_list_and_archive_routes():
     handler, calls = recorder(
         {
-            ("GET", "/api/projects"): {
+            ("GET", "/api/v1/projects"): {
                 "data": [{"id": "proj_1"}],
                 "pagination": {"page": 1, "limit": 50, "total": 1},
             },
-            ("DELETE", "/api/projects/proj_1"): {
+            ("DELETE", "/api/v1/projects/proj_1"): {
                 "id": "proj_1",
                 "name": "ACME Tenant",
                 "archivedAt": "2026-02-01T00:00:00Z",
@@ -243,7 +243,7 @@ def test_projects_archive_quotes_the_project_id():
     facade = ProjectsFacade(FakeRestClient(handler))
     facade.archive("weird/id")
 
-    assert calls == [b"/api/projects/weird%2Fid"]
+    assert calls == [b"/api/v1/projects/weird%2Fid"]
 
 
 # @scenario "A refused project call raises the typed error for its status"

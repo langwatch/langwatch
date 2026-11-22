@@ -68,6 +68,8 @@ type Options struct {
 	// env). nil ⇒ unmediated fallback wiring — tests and partial wiring boot
 	// unchanged.
 	OTelRelay *otelrelay.Relay
+	// GithubHost is the GitHub host the worker's gh and git reach; blank is github.com.
+	GithubHost string
 }
 
 // agentCloser is the optional capability an agent implements when it owns a
@@ -143,6 +145,8 @@ type Pool struct {
 	egress    egress.Guard
 	revoker   CredentialRevoker
 	otelRelay *otelrelay.Relay
+
+	githubHost string
 
 	// baseCtx is the pool-lifetime context (carries the logger; canceled on
 	// Shutdown). Worker subprocesses bind to it at spawn so a pool shutdown /
@@ -227,6 +231,7 @@ func New(ctx context.Context, opts Options) (*Pool, error) {
 		egress:           guard,
 		revoker:          opts.Revoker,
 		otelRelay:        opts.OTelRelay,
+		githubHost:       opts.GithubHost,
 		baseCtx:          baseCtx,
 		baseCancel:       baseCancel,
 		workers:          make(map[string]*Worker),
@@ -439,8 +444,8 @@ func (p *Pool) revokeKeyOf(w *Worker, reason string) {
 // never drift. GitHub is the only capability today; it is inert when the turn
 // carried no token. (The probe path builds the equivalent set from its boolean —
 // see transport/rpc; both compute the same signature via app.SignatureKeys.)
-func capabilitiesFor(creds domain.Credentials) []app.Capability {
-	return []app.Capability{github.New(creds.GithubToken, creds.GithubLogin, creds.GithubRepoScope)}
+func (p *Pool) capabilitiesFor(creds domain.Credentials) []app.Capability {
+	return []app.Capability{github.New(creds.GithubToken, creds.GithubLogin, creds.GithubRepoScope).WithHost(p.githubHost)}
 }
 
 // Acquire returns the worker for conversationID, spawning one if needed. Two
@@ -474,7 +479,7 @@ func (p *Pool) AcquireWarm(ctx context.Context, conversationID string, creds dom
 }
 
 func (p *Pool) acquire(ctx context.Context, conversationID string, creds domain.Credentials, forTurn bool) (app.Worker, error) {
-	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.DisabledSkillIds, creds.MirrorTier)
+	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(p.capabilitiesFor(creds)), creds.DisabledSkillIds, creds.MirrorTier)
 
 	p.mu.Lock()
 	if w, ok := p.workers[conversationID]; ok {
@@ -848,7 +853,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		LLMBaseURL:     llmBaseURL,
 		// The turn's capabilities fold their own env into the worker: the
 		// SAME set that produced this worker's credential signature.
-		Capabilities: capabilitiesFor(creds),
+		Capabilities: p.capabilitiesFor(creds),
 	})
 	if err != nil {
 		piSpan.RecordError(err)

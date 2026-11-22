@@ -1,28 +1,10 @@
 /**
- * The one HTTP client every request to the LangWatch API goes through.
- *
- * A LangWatch endpoint configured as `http://app.langwatch.ai` answers with a
- * redirect to https. The global `fetch` follows it on its own and, for a 301
- * or 302, turns the POST into a GET and drops the body, so the event is lost
- * without an error. This client sends with `redirect: "manual"` and applies a
- * rule per method to the 3xx it gets back.
- *
- * GET and HEAD follow a 301, 302, 303, 307 or 308 with the same method, up to
- * five hops. A hop that keeps the origin, or only upgrades http to https on
- * the same host and port, keeps every header; any other hop drops the
- * credential headers first. A hop from https to http and a hop without a
- * Location are refused.
- *
- * Every other method follows exactly one redirect, and only when the target is
- * the same URL with the scheme changed from http to https (same host, port,
- * path and query). The replay uses the same method, headers and body bytes.
- *
- * Every refused redirect throws `LangWatchRedirectError`.
- *
- * This module depends on the SDK logger only, so the CLI boot graph and the
- * `agent` entry can import it without pulling anything else in.
+ * The one HTTP client every LangWatch API request goes through, with
+ * `redirect: "manual"` since the global `fetch` turns a POST into a GET on
+ * a redirect. GET/HEAD follow up to `MAX_FOLLOW_HOPS`; refusal throws.
  */
 import { ConsoleLogger, type Logger } from "../../logger";
+import { API_VERSION_HEADER, LANGWATCH_API_VERSION } from "../constants";
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
@@ -50,15 +32,7 @@ export class LangWatchRedirectError extends Error {
   readonly location: string | null;
   readonly status: number;
 
-  constructor({
-    url,
-    location,
-    status,
-  }: {
-    url: string;
-    location: string | null;
-    status: number;
-  }) {
+  constructor({ url, location, status }: { url: string; location: string | null; status: number }) {
     super(
       `LangWatch refused to follow a redirect from ${url} to ${location ?? "an unknown location"} (HTTP ${status}). Set the endpoint to the final URL.`,
     );
@@ -77,6 +51,32 @@ export interface CreateLangWatchFetchOptions {
   /** Receives the one warning per process about an http endpoint. */
   logger?: Logger;
 }
+
+const isPlainHeaders = (headers: HeadersInit): headers is Record<string, string> =>
+  !(headers instanceof Headers) && !Array.isArray(headers);
+
+/**
+ * `init` naming the client's API version, unless the caller already names one. A plain
+ * headers object stays plain, so a caller reading the headers back sees the shape it sent.
+ */
+const withApiVersion = ({
+  input,
+  init,
+}: {
+  input: RequestInfo | URL;
+  init: RequestInit | undefined;
+}): RequestInit => {
+  const sent =
+    init?.headers ??
+    (typeof Request !== "undefined" && input instanceof Request ? input.headers : undefined);
+  if (new Headers(sent).has(API_VERSION_HEADER)) return { ...init };
+  if (sent === undefined || isPlainHeaders(sent)) {
+    return { ...init, headers: { ...sent, [API_VERSION_HEADER]: LANGWATCH_API_VERSION } };
+  }
+  const headers = new Headers(sent);
+  headers.set(API_VERSION_HEADER, LANGWATCH_API_VERSION);
+  return { ...init, headers };
+};
 
 /** Origins that already produced the http-to-https warning in this process. */
 const warnedOrigins = new Set<string>();
@@ -102,27 +102,18 @@ const abortError = (signal: AbortSignal): Error => {
 };
 
 /**
- * Releases the unread copy of a request body.
- *
- * `Request.clone` tees the body stream, and a branch nobody reads holds every
- * chunk the other branch consumes in memory. Cancelling the copy the replay
- * never needs keeps a streamed upload from being buffered whole.
- *
- * The cancellation is never awaited: a tee only settles the promise its
- * `cancel` returns once both branches are cancelled, so waiting on the copy
- * while the sent branch is still live would never return.
+ * Releases the unread copy of a request body. `Request.clone` tees the
+ * stream, so the unused copy is cancelled without buffering a streamed
+ * upload whole. Never awaited -- `cancel` settles once both branches are done.
  */
 const discard = (spare: Request | null): void => {
   void spare?.body?.cancel().catch(() => undefined);
 };
 
 /**
- * The body bytes to replay, read under the caller's signal.
- *
- * A `Request` built from a stream hands its copy over as a stream too, and
- * reading one that never ends would leave the call pending for good, past an
- * abort the caller already made. The read races the signal and cancels the
- * copy it loses to, so an aborted call settles.
+ * The body bytes to replay, read under the caller's signal. A stream-backed
+ * `Request`'s copy is a stream too, so the read races the signal and
+ * cancels the copy it loses to, letting an aborted call settle.
  */
 const replayBody = async ({
   spare,
@@ -217,7 +208,7 @@ export const followTarget = ({
   return to.href;
 };
 
-/** A hop keeps its credential headers on the same origin and on an https upgrade of the same host. */
+/** A hop keeps credential headers on the same origin, or an https upgrade of the same host. */
 const keepsCredentials = ({ from, to }: { from: URL; to: URL }): boolean =>
   from.origin === to.origin || isSchemeUpgrade({ from, to });
 
@@ -250,11 +241,9 @@ const refusalOf = ({
   });
 
 /**
- * What `fetch(input, init)` would send, as one request both sends read from.
- * `init` wins over a `Request` input field by field, so reading the raw input
- * for the replay would resend a method, headers or body the caller overrode.
- * A plain URL input stays null: the non-Request path keeps `init` as it is, so
- * a stream body reaches the transport untouched.
+ * What `fetch(input, init)` would send, as one request both sends read
+ * from. `init` wins field-by-field over a `Request` input, so reading raw
+ * input would resend an overridden field. A plain URL input stays null.
  */
 const effectiveRequest = ({
   input,
@@ -324,7 +313,19 @@ const upgrade = async ({
   const location = first.headers.get("location");
   const refused = refusalOf({ url, response: first });
   const target = location === null ? null : schemeUpgradeTarget({ url, location });
-  if (location === null || first.status === 303 || target === null || isStream(init?.body)) {
+  if (location === null) {
+    discard(spare);
+    throw refused;
+  }
+  if (first.status === 303) {
+    discard(spare);
+    throw refused;
+  }
+  if (target === null) {
+    discard(spare);
+    throw refused;
+  }
+  if (isStream(init?.body)) {
     discard(spare);
     throw refused;
   }
@@ -356,11 +357,11 @@ export const createLangWatchFetch = ({
   fetch: fetchImpl,
   logger,
 }: CreateLangWatchFetchOptions = {}): LangWatchFetch => {
-  const send: LangWatchFetch =
-    fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
+  const send: LangWatchFetch = fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
   const log = logger ?? new ConsoleLogger({ level: "warn", prefix: "LangWatch" });
 
-  return async (input, init) => {
+  return async (input, given) => {
+    const init = withApiVersion({ input, init: given });
     const url = requestUrl(input);
     const effective = effectiveRequest({ input, init });
     const method = (effective?.method ?? init?.method ?? "GET").toUpperCase();

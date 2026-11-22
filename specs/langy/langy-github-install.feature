@@ -1,7 +1,7 @@
 # Langy's use of the organization GitHub connection
 #
 # The connection itself (install flow, webhooks, permissions, disconnect) is
-# specified in specs/integrations/github-connection.feature. This file keeps
+# specified in modules/integration/specs/github-connection.feature. This file keeps
 # only what is Langy-specific: how a turn consumes the connection.
 #
 # Attribution is bot-authored: PRs and commits are made by the app, with a

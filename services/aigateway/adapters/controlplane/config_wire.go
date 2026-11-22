@@ -57,6 +57,9 @@ type configWire struct {
 	// field a control plane older than it never sent, which are different
 	// answers: see keyExpiry.
 	ExpiresAt json.RawMessage `json:"expires_at"`
+	// Status is "active" or "revoked". Empty from a control plane older than
+	// the field, which reads as active.
+	Status string `json:"status"`
 }
 
 // keyExpiry reads the key's own expiration date off the wire as the tri-state
@@ -198,7 +201,7 @@ type cacheRuleWire struct {
 }
 
 // cacheMatchersWire mirrors the matchers shape emitted by the control-plane
-// materialiser (platform/app/src/server/gateway/config.materialiser.ts:121-128).
+// materialiser (modules/gateway/process/src/services/gateway-config-materialisation.service.ts:121-128).
 // Every recognized matcher must have an explicit field — silently dropping a
 // matcher at unmarshal collapses the rule's effective scope to "match all",
 // which has caused stripped `cache_control` on system blocks in matrix tests.
@@ -548,6 +551,12 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 			"account_id":      getString("account_id"),
 			"provider_row_id": getString("provider_row_id"),
 		}
+	case domain.ProviderLangWatch:
+		// The license token is the bearer and the instance id rides a header,
+		// because the registry binds a license to one install and refuses the
+		// token presented from anywhere else (ADR-139 section 4).
+		cred.APIKey = getString("api_key")
+		cred.Extra = map[string]string{"instance_id": getString("instance_id")}
 	case domain.ProviderGemini:
 		// Gemini's second door: a credential carrying project_id + region
 		// is an Agent Platform key, and mapProvider routes it to

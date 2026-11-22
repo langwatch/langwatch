@@ -6,7 +6,7 @@ description: "Rebuild projection state by replaying events from ClickHouse"
 **Projection Replay** (`/ops/projections`) lets operators rebuild derived state by reprocessing events from ClickHouse through one or more projections. This is the primary tool for recovering from projection bugs, backfilling new projections, or rebuilding state after a data migration.
 
 <Frame>
-<img src="/images/ops/projection-replay.png" alt="Projection Replay wizard" />
+  <img src="/images/ops/projection-replay.png" alt="Projection Replay wizard" />
 </Frame>
 
 ## How Replay Works
@@ -32,6 +32,7 @@ The main interface is a three-step wizard:
 ### Step 1: Select Tenants
 
 Choose which tenants (projects) to replay:
+
 - Select individual tenants from a searchable multi-select
 - Or check **"All tenants"** to replay across the entire platform
 
@@ -44,6 +45,7 @@ Once tenants and date are selected, the system automatically **discovers aggrega
 ### Step 3: Select Projections
 
 A table shows all available projections with:
+
 - **Projection name** and **pipeline**
 - **Aggregate count**: how many aggregates have data in the selected range
 - Projections with no matching data are disabled
@@ -53,10 +55,12 @@ Select individual projections or use **"Select all with data"** to check everyth
 ### Review & Start
 
 Before starting, a summary shows:
+
 - Total aggregates, projections, and tenants selected
 - A description field for audit logging
 
 Two action options:
+
 - **Start Full Replay**: runs the four-phase replay process
 - **Dry Run**: processes 5 sample aggregates in memory without writing, to verify the projection logic is correct
 
@@ -76,15 +80,15 @@ When a replay starts, a **progress drawer** slides open showing real-time metric
 
 Below the wizard, a **history table** shows all past replay runs with:
 
-| Column | Description |
-|---|---|
-| **Status** | Running, completed, failed, or cancelled |
-| **Description** | User-provided description |
-| **Projections** | Number of projections replayed |
-| **Duration** | Total wall-clock time |
-| **Aggregates** | Total aggregates processed |
-| **Events** | Total events replayed |
-| **When** | Start timestamp |
+| Column          | Description                              |
+| --------------- | ---------------------------------------- |
+| **Status**      | Running, completed, failed, or cancelled |
+| **Description** | User-provided description                |
+| **Projections** | Number of projections replayed           |
+| **Duration**    | Total wall-clock time                    |
+| **Aggregates**  | Total aggregates processed               |
+| **Events**      | Total events replayed                    |
+| **When**        | Start timestamp                          |
 
 Click any row to navigate to its detailed status page (`/ops/projections/{runId}`).
 

@@ -23,7 +23,7 @@ Feature: Sign-in flows (credentials, Google OAuth, enterprise OAuth)
   that customer identity-provider applications are configured against.
 
   # Exercised end-to-end by the BetterAuth smoke test
-  # (platform/app/e2e/auth-regression/better-auth-smoketest.ts, "Credentials
+  # ([gone] e2e/auth-regression/better-auth-smoketest.ts, "Credentials
   # signin with correct password" -> HTTP 200 + session cookie).
   Scenario: On-prem credentials signin works end-to-end
     Given the deployment's default method set offers email and password
@@ -36,7 +36,7 @@ Feature: Sign-in flows (credentials, Google OAuth, enterprise OAuth)
   # Full OAuth round-trip is verified via browser QA, not yet automated in
   # a parity-bound test. Provider selection/credential threading is covered
   # by the buildSocialProviders unit test in
-  # platform/app/src/server/better-auth/__tests__/index.test.ts.
+  # packages/ssrf/src/index.test.ts.
   Scenario: Google OAuth signin works end-to-end
     Given the deployment's default method set offers Google
     And GOOGLE_CLIENT_* envs are set
@@ -45,20 +45,20 @@ Feature: Sign-in flows (credentials, Google OAuth, enterprise OAuth)
     Then I am redirected to google.com
     And on callback I land signed in at /
 
-  # The regression-prone callback pins are covered by
-  # `legacyCallbackParity.test.ts` and `index.test.ts`. BetterAuth core serves
-  # the pinned path directly; there is no Next.js rewrite or plugin callback
-  # hop. Full provider round-trips are still browser-QA evidence, not an
-  # automated claim.
-  @unit
-  Scenario Outline: Enterprise OAuth keeps the callback path customers registered
-    Given NEXTAUTH_PROVIDER is "<provider>"
-    And that provider's client credentials and issuer are set
-    When the screen starts sign-in with "<provider>"
-    Then the authorization request uses "/api/auth/callback/<provider>" as its redirect URI
-    And BetterAuth core accepts the provider callback on that same path
-
-    Examples:
-      | provider |
-      | auth0    |
-      | okta     |
+  # The regression-prone part of this flow — the legacy redirect_uri pin
+  # (/api/auth/callback/auth0) that customer Auth0 apps depend on — is
+  # locked by a unit test in
+  # packages/ssrf/src/index.test.ts. The full OAuth
+  # round-trip is verified via browser QA, not yet automated.
+  Scenario: Auth0 OAuth signin works end-to-end
+    Given NEXTAUTH_PROVIDER is "auth0"
+    And AUTH0_* envs are set
+    When I POST to /api/auth/sign-in/social with provider="auth0"
+    Then the response contains an OAuth authorization URL pointing at Auth0
+    And the redirect_uri in that URL is the LEGACY /api/auth/callback/auth0 path
+      (pinned via the redirectURI override so customer Auth0 apps
+      don't need to update their allowed-callback list during cutover)
+    When Auth0 calls back to /api/auth/callback/auth0?code=X&state=Y
+    Then the Next.js rewrite in next.config.mjs routes the request to
+      BetterAuth's plugin handler at /api/auth/oauth2/callback/auth0
+    And on successful code exchange I land signed in at /

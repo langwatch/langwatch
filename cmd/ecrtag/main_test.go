@@ -1,0 +1,139 @@
+package main
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/langwatch/langwatch/tools/ecrtag"
+)
+
+func TestParse(t *testing.T) {
+	t.Run("-head defaults to -revision", func(t *testing.T) {
+		o, err := parse("published", []string{"-repository", "r", "-tag", "t", "-revision", "abc", "-custom=true", "-refuse-retag", "-built-from", "t-arm64"})
+		require.NoError(t, err)
+		assert.Equal(t, "abc", o.head)
+		assert.True(t, o.custom)
+		assert.True(t, o.refuseRetag)
+		assert.Equal(t, "t-arm64", o.builtFrom)
+		assert.Equal(t, "label", o.source)
+	})
+	t.Run("an explicit -head is kept", func(t *testing.T) {
+		o, err := parse("lambda", []string{"-repository", "r", "-tag", "t", "-revision", "abc", "-head", "HEAD", "-built"})
+		require.NoError(t, err)
+		assert.Equal(t, "HEAD", o.head)
+		assert.True(t, o.built)
+		assert.Equal(t, "r:t", o.ref().String())
+	})
+	for _, args := range [][]string{
+		{"-tag", "t", "-revision", "abc"},
+		{"-repository", "r", "-revision", "abc"},
+		{"-repository", "r", "-tag", "t"},
+		{"-repository", "r", "-tag", "t", "-revision", "abc", "-custom=maybe"},
+		{"-repository", "r", "-tag", "t", "-revision", "abc", "-retag", "accept"},
+	} {
+		_, err := parse("published", args)
+		assert.Error(t, err, args)
+	}
+}
+
+func TestAnUnknownCommandFails(t *testing.T) {
+	require.Error(t, run(t.Context(), "push", options{}))
+}
+
+// oneTag is a registry holding one ancestor tag, and the ancestry that picks it.
+type oneTag struct{}
+
+func (oneTag) Describe(context.Context, ecrtag.Ref) (ecrtag.Image, error) {
+	return ecrtag.Image{Digest: "sha256:ancestor"}, nil
+}
+func (oneTag) Tags(context.Context, string) ([]string, error) { return []string{"git-0000000"}, nil }
+func (oneTag) Manifest(context.Context, ecrtag.Ref) (ecrtag.Manifest, error) {
+	return ecrtag.Manifest{}, nil
+}
+func (oneTag) Put(context.Context, ecrtag.Ref, ecrtag.Manifest) error  { return nil }
+func (oneTag) ImageTags(context.Context, ecrtag.Ref) ([]string, error) { return nil, nil }
+func (oneTag) Label(context.Context, ecrtag.Ref, string) (string, error) {
+	return "", nil
+}
+func (oneTag) ImageLabel(context.Context, ecrtag.Ref, string) (string, error) {
+	return "", nil
+}
+func (oneTag) Nearest(_ context.Context, tags []string, _ string) (string, error) {
+	return tags[0], nil
+}
+
+func TestPublishedAsksAboutEveryFlag(t *testing.T) {
+	o, err := parse("published", []string{"-repository", "r", "-tag", "t", "-revision", "abc", "-source", "annotation", "-custom", "-refuse-retag", "-built-from", "t-arm64"})
+	require.NoError(t, err)
+
+	c, err := o.check(t.Context(), oneTag{}, oneTag{})
+
+	require.NoError(t, err)
+	assert.Equal(t, ecrtag.Check{
+		Ref: ecrtag.Ref{Repository: "r", Tag: "t"}, Source: ecrtag.Annotation, Revision: "abc",
+		Custom: true, RefuseDigest: "sha256:ancestor", BuiltFrom: "t-arm64",
+	}, c, "a re-tag is refused, never accepted")
+}
+
+func TestPublishedWithoutRefuseRetagReadsNoAncestor(t *testing.T) {
+	o, err := parse("published", []string{"-repository", "r", "-tag", "t", "-revision", "abc"})
+	require.NoError(t, err)
+
+	c, err := o.check(t.Context(), oneTag{}, oneTag{})
+
+	require.NoError(t, err)
+	assert.Empty(t, c.RefuseDigest)
+	assert.Empty(t, c.AcceptDigest)
+}
+
+func TestParseSelect(t *testing.T) {
+	images := `[{"image":"langwatch-app","dockerfile":"infra/docker/Dockerfile"}]`
+	o, err := parse("select", []string{"-images", images, "-workflow", "w.yml", "-tag", "git-abc", "-revision", "abc"})
+	require.NoError(t, err)
+	assert.Equal(t, []ecrtag.ImageSpec{{
+		Image: "langwatch-app", Dockerfile: "infra/docker/Dockerfile",
+		Row: `{"dockerfile":"infra/docker/Dockerfile","image":"langwatch-app"}`,
+	}}, o.images)
+	assert.Equal(t, "abc", o.head)
+
+	_, err = parse("select", []string{"-images", images, "-workflow", "w.yml", "-revision", "abc", "-all"})
+	require.NoError(t, err, "a dispatch needs no commit tag to compare with")
+
+	o, err = parse("select", []string{"-images", images, "-workflow", "w.yml", "-tag", "release", "-revision", "abc", "-custom=true"})
+	require.NoError(t, err)
+	assert.True(t, o.all, "a custom tag is a dispatch, which builds every image")
+
+	for _, args := range [][]string{
+		{"-tag", "git-abc", "-revision", "abc"},
+		{"-images", "[]", "-tag", "git-abc", "-revision", "abc"},
+		{"-images", `[{"image":"r"}]`, "-tag", "git-abc", "-revision", "abc"},
+		{"-images", images, "-workflow", "w.yml", "-revision", "abc"},
+		{"-images", images, "-tag", "git-abc"},
+		{"-images", images, "-tag", "git-abc", "-revision", "abc"},
+	} {
+		_, err := parse("select", args)
+		assert.Error(t, err, args)
+	}
+}
+
+func TestParseLwqlAccess(t *testing.T) {
+	o, err := parse("lwql-access", []string{"-repository", "langwatch-app", "-tag", "git-1", "-from", "git-1-arm64 git-0"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"git-1-arm64", "git-0"}, o.from)
+
+	o, err = parse("lwql-access", []string{"-repository", "langwatch-app", "-tag", "git-1-arm64", "-image", "registry/langwatch-app:git-1-arm64"})
+	require.NoError(t, err)
+	assert.Equal(t, "registry/langwatch-app:git-1-arm64", o.image)
+
+	for _, args := range [][]string{
+		{"-repository", "r", "-tag", "t"},
+		{"-repository", "r", "-tag", "t", "-image", "i", "-from", "a"},
+		{"-tag", "t", "-image", "i"},
+	} {
+		_, err := parse("lwql-access", args)
+		assert.Error(t, err, args)
+	}
+}

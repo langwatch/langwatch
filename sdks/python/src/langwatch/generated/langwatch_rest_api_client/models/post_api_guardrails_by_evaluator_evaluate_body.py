@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
+from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -11,8 +12,8 @@ if TYPE_CHECKING:
     from ..models.post_api_guardrails_by_evaluator_evaluate_body_data import (
         PostApiGuardrailsByEvaluatorEvaluateBodyData,
     )
-    from ..models.post_api_guardrails_by_evaluator_evaluate_body_settings import (
-        PostApiGuardrailsByEvaluatorEvaluateBodySettings,
+    from ..models.post_api_guardrails_by_evaluator_evaluate_body_settings_type_0 import (
+        PostApiGuardrailsByEvaluatorEvaluateBodySettingsType0,
     )
 
 
@@ -25,30 +26,33 @@ class PostApiGuardrailsByEvaluatorEvaluateBody:
     Attributes:
         data (PostApiGuardrailsByEvaluatorEvaluateBodyData): What the evaluator scores. Which fields are required
             depends on the evaluator; its own entry under Built-in Evaluators lists them.
-        settings (PostApiGuardrailsByEvaluatorEvaluateBodySettings | Unset): Per-call overrides of the evaluator's
-            settings. Anything omitted falls back to the saved evaluator or monitor, then to the evaluator's own defaults.
         trace_id (None | str | Unset): Attaches the result to a trace you already sent
         evaluation_id (None | str | Unset): Supply your own id to make the call idempotent
         evaluator_id (None | str | Unset):
         name (None | str | Unset): Overrides the name the result is recorded under
+        settings (None | PostApiGuardrailsByEvaluatorEvaluateBodySettingsType0 | Unset): Per-call overrides of the
+            evaluator's settings. Anything omitted falls back to the saved evaluator or monitor, then to the evaluator's own
+            defaults.
         as_guardrail (bool | None | Unset): Evaluate as a guardrail: a skipped or failed evaluation answers `passed`
-            rather than an error, so a caller can gate on one field. The /api/guardrails path sets this for you.
+            rather than an error, so a caller can gate on one field. The /api/guardrails path sets this for you. Default:
+            False.
     """
 
     data: PostApiGuardrailsByEvaluatorEvaluateBodyData
-    settings: PostApiGuardrailsByEvaluatorEvaluateBodySettings | Unset = UNSET
     trace_id: None | str | Unset = UNSET
     evaluation_id: None | str | Unset = UNSET
     evaluator_id: None | str | Unset = UNSET
     name: None | str | Unset = UNSET
-    as_guardrail: bool | None | Unset = UNSET
+    settings: None | PostApiGuardrailsByEvaluatorEvaluateBodySettingsType0 | Unset = UNSET
+    as_guardrail: bool | None | Unset = False
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        data = self.data.to_dict()
+        from ..models.post_api_guardrails_by_evaluator_evaluate_body_settings_type_0 import (
+            PostApiGuardrailsByEvaluatorEvaluateBodySettingsType0,
+        )
 
-        settings: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.settings, Unset):
-            settings = self.settings.to_dict()
+        data = self.data.to_dict()
 
         trace_id: None | str | Unset
         if isinstance(self.trace_id, Unset):
@@ -74,6 +78,14 @@ class PostApiGuardrailsByEvaluatorEvaluateBody:
         else:
             name = self.name
 
+        settings: dict[str, Any] | None | Unset
+        if isinstance(self.settings, Unset):
+            settings = UNSET
+        elif isinstance(self.settings, PostApiGuardrailsByEvaluatorEvaluateBodySettingsType0):
+            settings = self.settings.to_dict()
+        else:
+            settings = self.settings
+
         as_guardrail: bool | None | Unset
         if isinstance(self.as_guardrail, Unset):
             as_guardrail = UNSET
@@ -81,14 +93,12 @@ class PostApiGuardrailsByEvaluatorEvaluateBody:
             as_guardrail = self.as_guardrail
 
         field_dict: dict[str, Any] = {}
-
+        field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "data": data,
             }
         )
-        if settings is not UNSET:
-            field_dict["settings"] = settings
         if trace_id is not UNSET:
             field_dict["trace_id"] = trace_id
         if evaluation_id is not UNSET:
@@ -97,6 +107,8 @@ class PostApiGuardrailsByEvaluatorEvaluateBody:
             field_dict["evaluator_id"] = evaluator_id
         if name is not UNSET:
             field_dict["name"] = name
+        if settings is not UNSET:
+            field_dict["settings"] = settings
         if as_guardrail is not UNSET:
             field_dict["as_guardrail"] = as_guardrail
 
@@ -107,19 +119,12 @@ class PostApiGuardrailsByEvaluatorEvaluateBody:
         from ..models.post_api_guardrails_by_evaluator_evaluate_body_data import (
             PostApiGuardrailsByEvaluatorEvaluateBodyData,
         )
-        from ..models.post_api_guardrails_by_evaluator_evaluate_body_settings import (
-            PostApiGuardrailsByEvaluatorEvaluateBodySettings,
+        from ..models.post_api_guardrails_by_evaluator_evaluate_body_settings_type_0 import (
+            PostApiGuardrailsByEvaluatorEvaluateBodySettingsType0,
         )
 
         d = dict(src_dict)
         data = PostApiGuardrailsByEvaluatorEvaluateBodyData.from_dict(d.pop("data"))
-
-        _settings = d.pop("settings", UNSET)
-        settings: PostApiGuardrailsByEvaluatorEvaluateBodySettings | Unset
-        if isinstance(_settings, Unset):
-            settings = UNSET
-        else:
-            settings = PostApiGuardrailsByEvaluatorEvaluateBodySettings.from_dict(_settings)
 
         def _parse_trace_id(data: object) -> None | str | Unset:
             if data is None:
@@ -157,6 +162,23 @@ class PostApiGuardrailsByEvaluatorEvaluateBody:
 
         name = _parse_name(d.pop("name", UNSET))
 
+        def _parse_settings(data: object) -> None | PostApiGuardrailsByEvaluatorEvaluateBodySettingsType0 | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                settings_type_0 = PostApiGuardrailsByEvaluatorEvaluateBodySettingsType0.from_dict(data)
+
+                return settings_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | PostApiGuardrailsByEvaluatorEvaluateBodySettingsType0 | Unset, data)
+
+        settings = _parse_settings(d.pop("settings", UNSET))
+
         def _parse_as_guardrail(data: object) -> bool | None | Unset:
             if data is None:
                 return data
@@ -168,12 +190,29 @@ class PostApiGuardrailsByEvaluatorEvaluateBody:
 
         post_api_guardrails_by_evaluator_evaluate_body = cls(
             data=data,
-            settings=settings,
             trace_id=trace_id,
             evaluation_id=evaluation_id,
             evaluator_id=evaluator_id,
             name=name,
+            settings=settings,
             as_guardrail=as_guardrail,
         )
 
+        post_api_guardrails_by_evaluator_evaluate_body.additional_properties = d
         return post_api_guardrails_by_evaluator_evaluate_body
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

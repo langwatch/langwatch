@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -6,10 +6,6 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_dspy_log_steps_body_item import PostApiDspyLogStepsBodyItem
 from ...models.post_api_dspy_log_steps_response_200 import PostApiDspyLogStepsResponse200
-from ...models.post_api_dspy_log_steps_response_400 import PostApiDspyLogStepsResponse400
-from ...models.post_api_dspy_log_steps_response_401 import PostApiDspyLogStepsResponse401
-from ...models.post_api_dspy_log_steps_response_403 import PostApiDspyLogStepsResponse403
-from ...models.post_api_dspy_log_steps_response_500 import PostApiDspyLogStepsResponse500
 from ...types import Response, safe_http_status
 
 
@@ -21,7 +17,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/dspy/log_steps",
+        "url": "/api/v1/dspy/log_steps",
     }
 
     _kwargs["json"] = []
@@ -37,37 +33,34 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    PostApiDspyLogStepsResponse200
-    | PostApiDspyLogStepsResponse400
-    | PostApiDspyLogStepsResponse401
-    | PostApiDspyLogStepsResponse403
-    | PostApiDspyLogStepsResponse500
-    | None
-):
+) -> Any | PostApiDspyLogStepsResponse200 | None:
     if response.status_code == 200:
         response_200 = PostApiDspyLogStepsResponse200.from_dict(response.json())
 
         return response_200
 
     if response.status_code == 400:
-        response_400 = PostApiDspyLogStepsResponse400.from_dict(response.json())
-
+        response_400 = cast(Any, None)
         return response_400
 
     if response.status_code == 401:
-        response_401 = PostApiDspyLogStepsResponse401.from_dict(response.json())
-
+        response_401 = cast(Any, None)
         return response_401
 
     if response.status_code == 403:
-        response_403 = PostApiDspyLogStepsResponse403.from_dict(response.json())
-
+        response_403 = cast(Any, None)
         return response_403
 
-    if response.status_code == 500:
-        response_500 = PostApiDspyLogStepsResponse500.from_dict(response.json())
+    if response.status_code == 413:
+        response_413 = cast(Any, None)
+        return response_413
 
+    if response.status_code == 422:
+        response_422 = cast(Any, None)
+        return response_422
+
+    if response.status_code == 500:
+        response_500 = cast(Any, None)
         return response_500
 
     if client.raise_on_unexpected_status:
@@ -78,13 +71,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    PostApiDspyLogStepsResponse200
-    | PostApiDspyLogStepsResponse400
-    | PostApiDspyLogStepsResponse401
-    | PostApiDspyLogStepsResponse403
-    | PostApiDspyLogStepsResponse500
-]:
+) -> Response[Any | PostApiDspyLogStepsResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -100,13 +87,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: list[PostApiDspyLogStepsBodyItem],
-) -> Response[
-    PostApiDspyLogStepsResponse200
-    | PostApiDspyLogStepsResponse400
-    | PostApiDspyLogStepsResponse401
-    | PostApiDspyLogStepsResponse403
-    | PostApiDspyLogStepsResponse500
-]:
+) -> Response[Any | PostApiDspyLogStepsResponse200]:
     """Report DSPy optimizer steps
 
      Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores
@@ -121,7 +102,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiDspyLogStepsResponse200 | PostApiDspyLogStepsResponse400 | PostApiDspyLogStepsResponse401 | PostApiDspyLogStepsResponse403 | PostApiDspyLogStepsResponse500]
+        Response[Any | PostApiDspyLogStepsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -139,14 +120,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: list[PostApiDspyLogStepsBodyItem],
-) -> (
-    PostApiDspyLogStepsResponse200
-    | PostApiDspyLogStepsResponse400
-    | PostApiDspyLogStepsResponse401
-    | PostApiDspyLogStepsResponse403
-    | PostApiDspyLogStepsResponse500
-    | None
-):
+) -> Any | PostApiDspyLogStepsResponse200 | None:
     """Report DSPy optimizer steps
 
      Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores
@@ -161,7 +135,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiDspyLogStepsResponse200 | PostApiDspyLogStepsResponse400 | PostApiDspyLogStepsResponse401 | PostApiDspyLogStepsResponse403 | PostApiDspyLogStepsResponse500
+        Any | PostApiDspyLogStepsResponse200
     """
 
     return sync_detailed(
@@ -174,13 +148,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: list[PostApiDspyLogStepsBodyItem],
-) -> Response[
-    PostApiDspyLogStepsResponse200
-    | PostApiDspyLogStepsResponse400
-    | PostApiDspyLogStepsResponse401
-    | PostApiDspyLogStepsResponse403
-    | PostApiDspyLogStepsResponse500
-]:
+) -> Response[Any | PostApiDspyLogStepsResponse200]:
     """Report DSPy optimizer steps
 
      Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores
@@ -195,7 +163,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiDspyLogStepsResponse200 | PostApiDspyLogStepsResponse400 | PostApiDspyLogStepsResponse401 | PostApiDspyLogStepsResponse403 | PostApiDspyLogStepsResponse500]
+        Response[Any | PostApiDspyLogStepsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -211,14 +179,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: list[PostApiDspyLogStepsBodyItem],
-) -> (
-    PostApiDspyLogStepsResponse200
-    | PostApiDspyLogStepsResponse400
-    | PostApiDspyLogStepsResponse401
-    | PostApiDspyLogStepsResponse403
-    | PostApiDspyLogStepsResponse500
-    | None
-):
+) -> Any | PostApiDspyLogStepsResponse200 | None:
     """Report DSPy optimizer steps
 
      Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores
@@ -233,7 +194,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiDspyLogStepsResponse200 | PostApiDspyLogStepsResponse400 | PostApiDspyLogStepsResponse401 | PostApiDspyLogStepsResponse403 | PostApiDspyLogStepsResponse500
+        Any | PostApiDspyLogStepsResponse200
     """
 
     return (

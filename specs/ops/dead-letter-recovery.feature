@@ -33,6 +33,16 @@ Feature: Dead-letter recovery
     And the act reports that it did not apply
 
   @integration
+  Scenario: A redrive and a discard on one dead message: only the first lands
+    Given a dead outbox message
+    When one operator redrives it and another discards it at the same moment
+    Then the message is pending, as the redrive left it
+    And the discard reports that it did not apply
+    # The discard waits on the redrive's row lock and re-reads the status as
+    # the redrive left it, rather than deciding on the row as it read it
+    # before the wait. The reverse ordering keeps the discard the same way.
+
+  @integration
   Scenario: Discarded messages leave the dead-letter count
     Given dead messages on one process
     When the operator discards one of them
@@ -85,15 +95,24 @@ Feature: Dead-letter recovery
     When the retention sweep removes the message
     Then its attempt entries are removed with it
 
-  # A discarded row is terminal like a dead one, and no other family's
-  # predicate matches it. Left out of the sweep it would be the one state that
-  # never ages out, on the highest-volume table in the system.
+  # Discarded and dead age differently because they mean different things.
+  # Discarded is a decision an operator took; deleting it after the window is
+  # housekeeping on a closed case. Dead is undelivered work nobody agreed to
+  # lose — sweeping it would turn "stopped retrying" into "no longer exists"
+  # a month later, silently.
   @integration
   Scenario: Discarded messages age out on the dead-letter window
     Given a discarded outbox row older than the dead retention window
     And a discarded outbox row inside the dead retention window
     When the dead-letter retention batch is reaped
     Then only the row past the window is deleted
+
+  @integration
+  Scenario: Dead messages are retained until delivered or discarded
+    Given a dead outbox row older than the dead retention window
+    When the dead-letter retention batch is reaped
+    Then the dead row is still there
+    And discarding it is what starts its retention clock
 
   # Redrive resets the attempt counter, so the number stops being unique over
   # a message's life and only time orders the entries correctly.

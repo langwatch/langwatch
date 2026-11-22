@@ -1,40 +1,8 @@
 #!/usr/bin/env node
 /**
- * Screen Studio style polish for a docs screen recording.
- *
- *   node docs/scripts/video/polish-recording.mjs <timeline.json> [options]
- *
- * READ THE GUIDE BEFORE YOU AUTHOR A TIMELINE:
+ * Screen Studio style polish for a docs screen recording. Usage, options and
+ * format: README.md next to this file. Read the guide first:
  * https://nexus.langwatch.ai/wiki/recording-video-for-docs
- *
- * That page carries the rules this script cannot enforce: how many zooms a
- * video can take before it is unwatchable, which targets earn one, when to pan
- * instead of zooming out and back in, and how to record a take that the polish
- * step can use. `README.md` next to this file is the format reference. The
- * guide is the judgement.
- *
- * What it renders, per frame:
- *
- *   background image  ->  soft shadow  ->  the recording, as a rounded window
- *                     ->  the click ripple  ->  the cursor
- *
- * The camera puts the click target at the centre of the frame and zooms
- * uniformly around it, so the window slides off the canvas and the background
- * fills what is left. That is the point of the background: it is what lets the
- * camera track the cursor instead of being pinned inside the recording.
- *
- * It reads the take through ffmpeg, composites every frame in plain
- * JavaScript, and writes the result back through ffmpeg. The only external
- * programs are `ffmpeg`, `ffprobe` and `rsvg-convert`, so there is nothing to
- * install from npm.
- *
- * Options:
- *   --out PATH          write here instead of the timeline's `output`
- *   --background PATH   override the background image
- *   --preview A:B       render only seconds A to B of the result (fast loop)
- *   --stills "1,4,8.5"  after encoding, write a PNG per listed second
- *   --stills-dir DIR    where those PNGs go (default: next to the output)
- *   --crf N             override the encoder quality (lower is better)
  */
 
 import { spawn } from "node:child_process";
@@ -45,13 +13,16 @@ import path from "node:path";
 
 // --------------------------------------------------------------------- easing
 
-const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+const clamp = (v, lo, hi) => {
+  if (v < lo) return lo;
+  if (v > hi) return hi;
+  return v;
+};
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (x) => x * x * (3 - 2 * x);
 
 /** Slow at both ends, quick through the middle. The default for everything. */
-const easeInOutCubic = (x) =>
-  x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const easeInOutCubic = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 
 /** Quick start, long settle. Used for the click dip and the ripple. */
 const easeOutCubic = (x) => 1 - Math.pow(1 - x, 3);
@@ -77,7 +48,7 @@ function run(cmd, args) {
     );
     p.on("close", (code) => {
       if (code !== 0) {
-        reject(new Error(`${cmd} exited ${code}\n${Buffer.concat(err)}`));
+        reject(new Error(`${cmd} exited ${code}\n${Buffer.concat(err).toString("utf8")}`));
         return;
       }
       resolve(Buffer.concat(out));
@@ -87,10 +58,14 @@ function run(cmd, args) {
 
 async function probe(file) {
   const raw = await run("ffprobe", [
-    "-v", "error",
-    "-select_streams", "v:0",
-    "-show_entries", "stream=width,height,r_frame_rate:format=duration",
-    "-of", "json",
+    "-v",
+    "error",
+    "-select_streams",
+    "v:0",
+    "-show_entries",
+    "stream=width,height,r_frame_rate:format=duration",
+    "-of",
+    "json",
     file,
   ]);
   const j = JSON.parse(raw.toString());
@@ -107,12 +82,18 @@ async function probe(file) {
 /** Decodes any still image ffmpeg can read into an RGBA buffer of exactly w x h. */
 async function loadImageCover(file, w, h) {
   const data = await run("ffmpeg", [
-    "-v", "error",
-    "-i", file,
-    "-vf", `scale=${w}:${h}:force_original_aspect_ratio=increase:flags=lanczos,crop=${w}:${h}`,
-    "-frames:v", "1",
-    "-f", "rawvideo",
-    "-pix_fmt", "rgba",
+    "-v",
+    "error",
+    "-i",
+    file,
+    "-vf",
+    `scale=${w}:${h}:force_original_aspect_ratio=increase:flags=lanczos,crop=${w}:${h}`,
+    "-frames:v",
+    "1",
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "rgba",
     "-",
   ]);
   if (data.length !== w * h * 4) {
@@ -124,11 +105,9 @@ async function loadImageCover(file, w, h) {
 // ------------------------------------------------------------------- cursors
 
 /**
- * Renders an SVG to an RGBA bitmap of the requested height.
- *
- * rsvg-convert writes PNG, and node cannot decode PNG on its own, so ffmpeg
- * turns the PNG into raw RGBA. Both are already required by the rest of the
- * script, which is why this takes two processes instead of a library.
+ * Renders an SVG to an RGBA bitmap of the requested height. rsvg-convert
+ * writes PNG, and node can't decode PNG on its own, so ffmpeg turns that PNG
+ * into raw RGBA — both already required elsewhere, hence two processes not a library.
  */
 async function rasterize(svgPath, height) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "polish-cursor-"));
@@ -136,10 +115,47 @@ async function rasterize(svgPath, height) {
   await run("rsvg-convert", ["-h", String(Math.round(height)), svgPath, "-o", tmp]);
   const meta = await probe(tmp);
   const rgba = await run("ffmpeg", [
-    "-v", "error", "-i", tmp, "-f", "rawvideo", "-pix_fmt", "rgba", "-",
+    "-v",
+    "error",
+    "-i",
+    tmp,
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "rgba",
+    "-",
   ]);
   fs.rmSync(dir, { recursive: true, force: true });
   return { width: meta.width, height: meta.height, data: rgba };
+}
+
+/** One box pass along each row of `src` into `dst`. */
+function boxBlurRows({ src, dst, w, h, radius }) {
+  const norm = 1 / (radius * 2 + 1);
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let sum = 0;
+    for (let x = -radius; x <= radius; x++) sum += src[row + clamp(x, 0, w - 1)];
+    for (let x = 0; x < w; x++) {
+      dst[row + x] = sum * norm;
+      sum += src[row + clamp(x + radius + 1, 0, w - 1)];
+      sum -= src[row + clamp(x - radius, 0, w - 1)];
+    }
+  }
+}
+
+/** One box pass down each column of `src` into `dst`. */
+function boxBlurColumns({ src, dst, w, h, radius }) {
+  const norm = 1 / (radius * 2 + 1);
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let y = -radius; y <= radius; y++) sum += src[clamp(y, 0, h - 1) * w + x];
+    for (let y = 0; y < h; y++) {
+      dst[y * w + x] = sum * norm;
+      sum += src[clamp(y + radius + 1, 0, h - 1) * w + x];
+      sum -= src[clamp(y - radius, 0, h - 1) * w + x];
+    }
+  }
 }
 
 /** Three box passes approximate a Gaussian closely enough for a drop shadow. */
@@ -148,29 +164,10 @@ function blurAlpha(src, w, h, radius) {
   let a = src;
   let b = new Float32Array(w * h);
   for (let pass = 0; pass < 3; pass++) {
-    for (let y = 0; y < h; y++) {
-      const row = y * w;
-      let sum = 0;
-      for (let x = -radius; x <= radius; x++) sum += a[row + clamp(x, 0, w - 1)];
-      const norm = 1 / (radius * 2 + 1);
-      for (let x = 0; x < w; x++) {
-        b[row + x] = sum * norm;
-        sum += a[row + clamp(x + radius + 1, 0, w - 1)];
-        sum -= a[row + clamp(x - radius, 0, w - 1)];
-      }
-    }
+    boxBlurRows({ src: a, dst: b, w, h, radius });
     const t = a;
     a = new Float32Array(w * h);
-    for (let x = 0; x < w; x++) {
-      let sum = 0;
-      for (let y = -radius; y <= radius; y++) sum += b[clamp(y, 0, h - 1) * w + x];
-      const norm = 1 / (radius * 2 + 1);
-      for (let y = 0; y < h; y++) {
-        a[y * w + x] = sum * norm;
-        sum += b[clamp(y + radius + 1, 0, h - 1) * w + x];
-        sum -= b[clamp(y - radius, 0, h - 1) * w + x];
-      }
-    }
+    boxBlurColumns({ src: b, dst: a, w, h, radius });
     b = t;
   }
   return a;
@@ -184,8 +181,7 @@ function blurAlpha(src, w, h, radius) {
 function buildSprite(bitmap, hotspot, shadow) {
   const { width: cw, height: ch, data } = bitmap;
   const pad =
-    Math.ceil(shadow.blur * 2) +
-    Math.ceil(Math.abs(shadow.offsetX) + Math.abs(shadow.offsetY)) + 2;
+    Math.ceil(shadow.blur * 2) + Math.ceil(Math.abs(shadow.offsetX) + Math.abs(shadow.offsetY)) + 2;
   const w = cw + pad * 2;
   const h = ch + pad * 2;
 
@@ -351,27 +347,31 @@ function drawShadow(dst, dw, dh, win, cfg) {
   const x1 = Math.min(dw, Math.ceil(cx + hw + reach));
   const inv = 1 / (2 * cfg.blur);
 
-  for (let y = y0; y < y1; y++) {
-    const py = y + 0.5;
-    const skip = opaqueSpan(py, win.cy, win.cx, win.hw, win.hh, win.r);
-    const sk0 = skip ? Math.ceil(skip[0]) + 1 : Infinity;
-    const sk1 = skip ? Math.floor(skip[1]) - 1 : -Infinity;
-    for (let x = x0; x < x1; x++) {
-      if (x >= sk0 && x <= sk1) {
-        x = sk1;
-        continue;
-      }
-      const sd = sdRoundRect(x + 0.5, py, cx, cy, hw, hh, r);
-      if (sd >= cfg.blur) continue;
-      const u = sd <= -cfg.blur ? 1 : smooth(clamp((cfg.blur - sd) * inv, 0, 1));
-      const a = cfg.opacity * u;
-      if (a <= 0.002) continue;
-      const d = (y * dw + x) * 4;
-      const keep = 1 - a;
-      dst[d + 0] *= keep;
-      dst[d + 1] *= keep;
-      dst[d + 2] *= keep;
+  const shape = { cx, cy, hw, hh, r };
+  for (let y = y0; y < y1; y++) shadeShadowRow({ dst, dw, y, x0, x1, win, shape, cfg, inv });
+}
+
+/** Darkens one row of the shadow, skipping the span the opaque window covers anyway. */
+function shadeShadowRow({ dst, dw, y, x0, x1, win, shape: { cx, cy, hw, hh, r }, cfg, inv }) {
+  const py = y + 0.5;
+  const skip = opaqueSpan(py, win.cy, win.cx, win.hw, win.hh, win.r);
+  const sk0 = skip ? Math.ceil(skip[0]) + 1 : Infinity;
+  const sk1 = skip ? Math.floor(skip[1]) - 1 : -Infinity;
+  for (let x = x0; x < x1; x++) {
+    if (x >= sk0 && x <= sk1) {
+      x = sk1;
+      continue;
     }
+    const sd = sdRoundRect(x + 0.5, py, cx, cy, hw, hh, r);
+    if (sd >= cfg.blur) continue;
+    const u = sd <= -cfg.blur ? 1 : smooth(clamp((cfg.blur - sd) * inv, 0, 1));
+    const a = cfg.opacity * u;
+    if (a <= 0.002) continue;
+    const d = (y * dw + x) * 4;
+    const keep = 1 - a;
+    dst[d + 0] *= keep;
+    dst[d + 1] *= keep;
+    dst[d + 2] *= keep;
   }
 }
 
@@ -393,18 +393,29 @@ function drawWindow(dst, dw, dh, src, sw, sh, win, border, scratchRef) {
   const xs = planAxis(outW, (x0 - win.left) * step, step, sw);
   const ys = planAxis(outH, (y0 - win.top) * step, step, sh);
 
-  let rowMin = sh;
-  let rowMax = 0;
-  for (let i = 0; i < ys.idx.length; i++) {
-    const r = ys.idx[i];
-    if (r < rowMin) rowMin = r;
-    if (r > rowMax) rowMax = r;
-  }
-  const rows = rowMax - rowMin + 1;
+  const { rowMin, rows } = sourceRowSpan(ys.idx, sh);
   const need = rows * outW * 3;
   if (scratchRef.buf.length < need) scratchRef.buf = new Float32Array(need);
   const scratch = scratchRef.buf;
 
+  resampleRows({ scratch, src, sw, xs, rowMin, rows, outW });
+  compositeColumns({ dst, dw, scratch, ys, rowMin, outW, outH, x0, y0, win, border });
+}
+
+/** The first source row any output row reads, and how many rows it spans. */
+function sourceRowSpan(idx, sh) {
+  let rowMin = sh;
+  let rowMax = 0;
+  for (let i = 0; i < idx.length; i++) {
+    const r = idx[i];
+    if (r < rowMin) rowMin = r;
+    if (r > rowMax) rowMax = r;
+  }
+  return { rowMin, rows: rowMax - rowMin + 1 };
+}
+
+/** The horizontal pass: each source row resampled to the window's width. */
+function resampleRows({ scratch, src, sw, xs, rowMin, rows, outW }) {
   const xt = xs.taps;
   for (let r = 0; r < rows; r++) {
     const srow = (rowMin + r) * sw * 4;
@@ -428,11 +439,43 @@ function drawWindow(dst, dw, dh, src, sw, sh, win, border, scratchRef) {
       scratch[d + 2] = c;
     }
   }
+}
 
-  const yt = ys.taps;
-  const bw = border ? border.width : 0;
+/** One output pixel's colour, reused across pixels so the hot loop allocates nothing. */
+const pixel = new Float64Array(3);
+
+/** The vertical pass for one pixel, read out of the row-resampled scratch into `pixel`. */
+function sampleColumn(scratch, ys, base, rowMin, outW, x) {
+  let a = 0;
+  let b = 0;
+  let c = 0;
+  for (let k = 0; k < ys.taps; k++) {
+    const w = ys.wgt[base + k];
+    if (w === 0) continue;
+    const p = (ys.idx[base + k] - rowMin) * outW * 3 + x * 3;
+    a += scratch[p] * w;
+    b += scratch[p + 1] * w;
+    c += scratch[p + 2] * w;
+  }
+  pixel[0] = a;
+  pixel[1] = b;
+  pixel[2] = c;
+}
+
+/** Tints `pixel` toward the hairline where it falls on the window's edge. */
+function tintEdge(cov, sd, border) {
+  const ring = (cov - clamp(0.5 - (sd + border.width), 0, 1)) * border.opacity;
+  if (ring <= 0.002) return;
+  pixel[0] = lerp(pixel[0], border.color[0], ring);
+  pixel[1] = lerp(pixel[1], border.color[1], ring);
+  pixel[2] = lerp(pixel[2], border.color[2], ring);
+}
+
+/** The vertical pass, masked to the rounded window and blended over `dst`. */
+function compositeColumns({ dst, dw, scratch, ys, rowMin, outW, outH, x0, y0, win, border }) {
+  const hasEdge = border ? border.width > 0 : false;
   for (let y = 0; y < outH; y++) {
-    const base = y * yt;
+    const base = y * ys.taps;
     const py = y0 + y + 0.5;
     const drow = (y0 + y) * dw;
     for (let x = 0; x < outW; x++) {
@@ -441,32 +484,14 @@ function drawWindow(dst, dw, dh, src, sw, sh, win, border, scratchRef) {
       const cov = clamp(0.5 - sd, 0, 1);
       if (cov <= 0.002) continue;
 
-      let a = 0;
-      let b = 0;
-      let c = 0;
-      for (let k = 0; k < yt; k++) {
-        const w = ys.wgt[base + k];
-        if (w === 0) continue;
-        const p = (ys.idx[base + k] - rowMin) * outW * 3 + x * 3;
-        a += scratch[p] * w;
-        b += scratch[p + 1] * w;
-        c += scratch[p + 2] * w;
-      }
-
-      if (bw > 0) {
-        const ring = (cov - clamp(0.5 - (sd + bw), 0, 1)) * border.opacity;
-        if (ring > 0.002) {
-          a = lerp(a, border.color[0], ring);
-          b = lerp(b, border.color[1], ring);
-          c = lerp(c, border.color[2], ring);
-        }
-      }
+      sampleColumn(scratch, ys, base, rowMin, outW, x);
+      if (hasEdge) tintEdge(cov, sd, border);
 
       const d = (drow + x0 + x) * 4;
       const keep = 1 - cov;
-      dst[d + 0] = clamp(clamp(a, 0, 255) * cov + dst[d + 0] * keep, 0, 255);
-      dst[d + 1] = clamp(clamp(b, 0, 255) * cov + dst[d + 1] * keep, 0, 255);
-      dst[d + 2] = clamp(clamp(c, 0, 255) * cov + dst[d + 2] * keep, 0, 255);
+      dst[d + 0] = clamp(clamp(pixel[0], 0, 255) * cov + dst[d + 0] * keep, 0, 255);
+      dst[d + 1] = clamp(clamp(pixel[1], 0, 255) * cov + dst[d + 1] * keep, 0, 255);
+      dst[d + 2] = clamp(clamp(pixel[2], 0, 255) * cov + dst[d + 2] * keep, 0, 255);
     }
   }
 }
@@ -500,33 +525,20 @@ function drawRipple(dst, dw, dh, px, py, radius, fillA, strokeA, strokeW, color)
 
 // -------------------------------------------------------------------- tracks
 
-/**
- * Turns the beats into camera keyframes and returns a lookup.
- *
- * Each zoomed beat contributes four keyframes: leave 1x, reach the target zoom
- * before the click, hold, return to 1x. At 1x the camera sits on the middle of
- * the recording; zoomed, it sits on the focus point, so zooming in and panning
- * to the target are one movement.
- *
- * When two beats are close enough that the second starts before the first has
- * returned, both 1x keyframes are dropped and the camera pans straight from
- * one focus point to the next. That is the rule for a corner target followed
- * by a central one: zoom once, then move.
- */
-function buildCameraTrack(beats, cfg, duration, midX, midY) {
-  const groups = [];
-  for (const b of beats) {
-    if (b.x == null || b.y == null) continue;
-    const z = b.zoom == null ? cfg.default : b.zoom;
-    if (!(z > 1.0001)) continue;
-    const lead = b.lead == null ? cfg.lead : b.lead;
-    // Every zoom travels at the same rate: the ease lasts as long as the zoom
-    // is deep. A 1.4x and a 1.9x on the same video then read as one camera.
-    const rate = Math.log(z) / Math.log(Math.max(1.0001, cfg.default));
-    const rampIn = (b.in == null ? cfg.in : b.in) * rate;
-    const peak = b.t - lead;
-    const holdEnd = b.t + (b.hold == null ? cfg.hold : b.hold);
-    groups.push({
+/** The four-keyframe zoom one beat asks for, or none when it does not zoom. */
+function zoomGroupsFor(b, cfg) {
+  if (b.x == null || b.y == null) return [];
+  const z = b.zoom == null ? cfg.default : b.zoom;
+  if (!(z > 1.0001)) return [];
+  const lead = b.lead == null ? cfg.lead : b.lead;
+  // Every zoom travels at the same rate: the ease lasts as long as the zoom
+  // is deep. A 1.4x and a 1.9x on the same video then read as one camera.
+  const rate = Math.log(z) / Math.log(Math.max(1.0001, cfg.default));
+  const rampIn = (b.in == null ? cfg.in : b.in) * rate;
+  const peak = b.t - lead;
+  const holdEnd = b.t + (b.hold == null ? cfg.hold : b.hold);
+  return [
+    {
       rampIn: peak - rampIn,
       peak,
       holdEnd,
@@ -534,9 +546,12 @@ function buildCameraTrack(beats, cfg, duration, midX, midY) {
       z,
       cx: b.zoomAt ? b.zoomAt.x : b.x,
       cy: b.zoomAt ? b.zoomAt.y : b.y,
-    });
-  }
+    },
+  ];
+}
 
+/** When two zooms overlap before the first returns, both 1x keyframes drop. */
+function zoomKeyframes(groups, midX, midY) {
   const kf = [];
   for (let i = 0; i < groups.length; i++) {
     const g = groups[i];
@@ -544,15 +559,24 @@ function buildCameraTrack(beats, cfg, duration, midX, midY) {
     const next = groups[i + 1];
     const joinBefore = prev && prev.rampOut > g.rampIn;
     const joinAfter = next && g.rampOut > next.rampIn;
+    const holdEnd = joinAfter ? Math.min(g.holdEnd, next.peak - 0.08) : g.holdEnd;
 
     if (!joinBefore) kf.push({ t: g.rampIn, z: 1, cx: midX, cy: midY });
     kf.push({ t: g.peak, z: g.z, cx: g.cx, cy: g.cy });
-    let holdEnd = g.holdEnd;
-    if (joinAfter) holdEnd = Math.min(holdEnd, next.peak - 0.08);
     kf.push({ t: Math.max(holdEnd, g.peak + 0.02), z: g.z, cx: g.cx, cy: g.cy });
     if (!joinAfter) kf.push({ t: g.rampOut, z: 1, cx: midX, cy: midY });
   }
+  return kf;
+}
 
+/**
+ * Turns the beats into camera keyframes. Each zoomed beat contributes four:
+ * leave 1x, reach the target zoom, hold, return to 1x. When two beats overlap
+ * before the first returns, both 1x keyframes drop and the camera pans straight between them.
+ */
+function buildCameraTrack(beats, cfg, duration, midX, midY) {
+  const groups = beats.flatMap((b) => zoomGroupsFor(b, cfg));
+  const kf = zoomKeyframes(groups, midX, midY);
   if (kf.length === 0) return () => ({ z: 1, cx: midX, cy: midY });
 
   kf.sort((a, b) => a.t - b.t);
@@ -580,234 +604,226 @@ function buildCameraTrack(beats, cfg, duration, midX, midY) {
   };
 }
 
-/**
- * Turns the beats into the cursor's path, its arrow-or-hand state, the click
- * dip, the click ripples and its visibility.
- */
 /** Seconds the source is held before this beat's click, 0 for most beats. */
-const pauseBefore = (b) =>
-  typeof b.pause === "number" ? b.pause : (b.pause?.before ?? 0);
+const pauseBefore = (b) => (typeof b.pause === "number" ? b.pause : (b.pause?.before ?? 0));
 
-function buildCursorTrack(beats, cfg) {
+/**
+ * One cursor move to a beat. Travel time comes from the distance, so the
+ * cursor keeps one speed. A beat with a `pause` has the cursor on target for
+ * the whole pause; every other beat arrives `settle` early and no earlier.
+ */
+function cursorMoveTo({ b, at, freeFrom, cfg }) {
+  const dist = Math.hypot(b.x - at.x, b.y - at.y);
+  const travel =
+    b.travel != null ? b.travel : clamp(dist / cfg.speed, cfg.minTravel, cfg.maxTravel);
+  const latest = b.t - cfg.settle;
+  const wanted = latest - pauseBefore(b);
+  const arrive = clamp(wanted, Math.min(freeFrom + travel, latest), latest);
+  const depart = Math.min(Math.max(arrive - travel, freeFrom), arrive);
+  // The hand only appears where there is something to click.
+  const handAfter = b.click !== false;
+  const arc = b.arc == null ? cfg.arc : b.arc;
+  return { depart, arrive, from: at, to: { x: b.x, y: b.y }, handAfter, arc };
+}
+
+/** The cursor's moves, clicks and visibility keys, in beat order. */
+function planCursor(beats, cfg) {
   const moves = [];
   const clicks = [];
   const vis = [{ t: -1, a: cfg.start.hidden ? 0 : 1 }];
-
   let at = { x: cfg.start.x, y: cfg.start.y };
   let freeFrom = 0;
 
   for (const b of beats) {
-    if (b.hide) {
-      vis.push({ t: b.t, a: 0 });
-      continue;
-    }
-    if (b.show) {
-      vis.push({ t: b.t, a: 1 });
+    if (b.hide || b.show) {
+      vis.push({ t: b.t, a: b.hide ? 0 : 1 });
       continue;
     }
     if (b.x == null || b.y == null || b.cursor === false) continue;
-
-    // Travel time comes from the distance, so the cursor keeps one speed
-    // across the whole video instead of racing over a long move.
-    const dist = Math.hypot(b.x - at.x, b.y - at.y);
-    const travel =
-      b.travel != null
-        ? b.travel
-        : clamp(dist / cfg.speed, cfg.minTravel, cfg.maxTravel);
-    // A beat that asks for a `pause` before its click is asking the viewer to
-    // look at the target, so the cursor has to be on it for the whole pause.
-    // Every other beat arrives `settle` early and no earlier: waiting on a
-    // target nobody was told to look at just reads as lag.
-    const latest = b.t - cfg.settle;
-    const wanted = latest - pauseBefore(b);
-    const arrive = clamp(wanted, Math.min(freeFrom + travel, latest), latest);
-    let depart = arrive - travel;
-    if (depart < freeFrom) depart = freeFrom;
-    if (depart > arrive) depart = arrive;
-    // The hand only appears where there is something to click.
-    const handAfter = b.click !== false;
-    const arc = b.arc == null ? cfg.arc : b.arc;
-    moves.push({ depart, arrive, from: at, to: { x: b.x, y: b.y }, handAfter, arc });
-    if (handAfter) clicks.push({ t: b.t, x: b.x, y: b.y });
-    at = { x: b.x, y: b.y };
+    const move = cursorMoveTo({ b, at, freeFrom, cfg });
+    moves.push(move);
+    if (move.handAfter) clicks.push({ t: b.t, x: b.x, y: b.y });
+    at = move.to;
     // The hand stays down for the whole press. Leaving earlier turns it back
     // into an arrow while the ripple is still expanding under it.
-    freeFrom = b.t + (handAfter ? cfg.press.duration : 0);
+    freeFrom = b.t + (move.handAfter ? cfg.press.duration : 0);
   }
-
-  const posAt = (t) => {
-    for (let i = 0; i < moves.length; i++) {
-      const m = moves[i];
-      if (t < m.depart) {
-        const prev = moves[i - 1];
-        return { p: m.from, hand: prev ? prev.handAfter : false };
-      }
-      if (t <= m.arrive) {
-        const span = m.arrive - m.depart;
-        const u = span <= 0 ? 1 : easeInOutCubic((t - m.depart) / span);
-        const dx = m.to.x - m.from.x;
-        const dy = m.to.y - m.from.y;
-        const len = Math.hypot(dx, dy) || 1;
-        // A slight perpendicular bow keeps the path from looking mechanical.
-        // A beat sets `arc: 0` when it wants a ruled line, such as a sweep
-        // along a line of text.
-        const bow = m.arc * len;
-        const mx = (m.from.x + m.to.x) / 2 - (dy / len) * bow;
-        const my = (m.from.y + m.to.y) / 2 + (dx / len) * bow;
-        const iu = 1 - u;
-        return {
-          p: {
-            x: iu * iu * m.from.x + 2 * iu * u * mx + u * u * m.to.x,
-            y: iu * iu * m.from.y + 2 * iu * u * my + u * u * m.to.y,
-          },
-          hand: false,
-        };
-      }
-    }
-    const lastMove = moves[moves.length - 1];
-    return {
-      p: lastMove ? lastMove.to : cfg.start,
-      hand: lastMove ? lastMove.handAfter : false,
-    };
-  };
-
   vis.sort((a, b) => a.t - b.t);
-  const alphaAt = (t) => {
-    let a = vis[0].a;
-    for (let i = 1; i < vis.length; i++) {
-      const k = vis[i];
-      if (t >= k.t) {
-        a = k.a;
-        continue;
-      }
-      const from = vis[i - 1].a;
-      const u = clamp((t - (k.t - cfg.fade)) / cfg.fade, 0, 1);
-      return lerp(from, k.a, easeInOutCubic(u));
-    }
-    return a;
-  };
-
-  const scaleAt = (t) => {
-    for (const c of clicks) {
-      if (t >= c.t && t <= c.t + cfg.press.duration) {
-        const u = (t - c.t) / cfg.press.duration;
-        // Dip in fast, come back gently.
-        return 1 - (1 - cfg.press.scale) * Math.sin(Math.PI * easeOutCubic(u));
-      }
-    }
-    return 1;
-  };
-
-  return {
-    at: (t) => {
-      const { p, hand } = posAt(t);
-      return { x: p.x, y: p.y, hand, scale: scaleAt(t), alpha: alphaAt(t) };
-    },
-    ripples: (t, cfg2) => {
-      const out = [];
-      for (const c of clicks) {
-        const u = (t - c.t) / cfg2.duration;
-        if (u < 0 || u > 1) continue;
-        const e = easeOutCubic(u);
-        out.push({
-          x: c.x,
-          y: c.y,
-          radius: lerp(cfg2.radius[0], cfg2.radius[1], e),
-          fill: cfg2.fill * (1 - u),
-          stroke: cfg2.stroke * (1 - u),
-        });
-      }
-      return out;
-    },
-  };
+  return { moves, clicks, vis };
 }
 
 /**
- * Freezes the source frame wherever the cursor would have to move faster than
- * a viewer can follow, and maps between the source clock and the output clock.
- *
- * A frozen source is what buys the camera and the cursor their time. Without
- * it the only way to slow a move down is to cut the take differently, and the
- * two targets that need the most room are usually the two the take runs
- * through fastest. A beat asks for a freeze of its own with
- * `pause: { before, after }`, or `pause: 0.6` for a wait before the click.
- *
- * `skip: 1.2` on a beat is the same machinery in reverse: it drops the 1.2
- * seconds of source that come right before that beat, which is how a stretch
- * of dead air in the take is removed without re-cutting it. Check the source
- * really is still over that stretch first:
- *
- *   ffmpeg -v error -i cut.webm -vf \
- *     "trim=6.8:10.2,setpts=PTS-STARTPTS,select='gte(scene,0)',metadata=print:file=-" \
- *     -f null -
+ * A point along a move. A slight perpendicular bow keeps the path from looking
+ * mechanical; a beat sets `arc: 0` when it wants a ruled line.
+ */
+function pointAlong(m, t) {
+  const span = m.arrive - m.depart;
+  const u = span <= 0 ? 1 : easeInOutCubic((t - m.depart) / span);
+  const dx = m.to.x - m.from.x;
+  const dy = m.to.y - m.from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const bow = m.arc * len;
+  const mx = (m.from.x + m.to.x) / 2 - (dy / len) * bow;
+  const my = (m.from.y + m.to.y) / 2 + (dx / len) * bow;
+  const iu = 1 - u;
+  return {
+    x: iu * iu * m.from.x + 2 * iu * u * mx + u * u * m.to.x,
+    y: iu * iu * m.from.y + 2 * iu * u * my + u * u * m.to.y,
+  };
+}
+
+function cursorPositionAt({ moves, start, t }) {
+  for (let i = 0; i < moves.length; i++) {
+    const m = moves[i];
+    if (t < m.depart) {
+      const prev = moves[i - 1];
+      return { p: m.from, hand: prev ? prev.handAfter : false };
+    }
+    if (t <= m.arrive) return { p: pointAlong(m, t), hand: false };
+  }
+  const lastMove = moves[moves.length - 1];
+  return { p: lastMove ? lastMove.to : start, hand: lastMove ? lastMove.handAfter : false };
+}
+
+function cursorAlphaAt({ vis, fade, t }) {
+  let a = vis[0].a;
+  for (let i = 1; i < vis.length; i++) {
+    const k = vis[i];
+    if (t >= k.t) {
+      a = k.a;
+      continue;
+    }
+    const u = clamp((t - (k.t - fade)) / fade, 0, 1);
+    return lerp(vis[i - 1].a, k.a, easeInOutCubic(u));
+  }
+  return a;
+}
+
+/** The click dip: in fast, back gently. */
+function pressScaleAt({ clicks, press, t }) {
+  const c = clicks.find((click) => t >= click.t && t <= click.t + press.duration);
+  if (!c) return 1;
+  const u = (t - c.t) / press.duration;
+  return 1 - (1 - press.scale) * Math.sin(Math.PI * easeOutCubic(u));
+}
+
+function ripplesAt({ clicks, t, cfg2 }) {
+  const out = [];
+  for (const c of clicks) {
+    const u = (t - c.t) / cfg2.duration;
+    if (u < 0 || u > 1) continue;
+    const e = easeOutCubic(u);
+    out.push({
+      x: c.x,
+      y: c.y,
+      radius: lerp(cfg2.radius[0], cfg2.radius[1], e),
+      fill: cfg2.fill * (1 - u),
+      stroke: cfg2.stroke * (1 - u),
+    });
+  }
+  return out;
+}
+
+/**
+ * Turns the beats into the cursor's path, its arrow-or-hand state, the click
+ * dip, the click ripples and its visibility.
+ */
+function buildCursorTrack(beats, cfg) {
+  const { moves, clicks, vis } = planCursor(beats, cfg);
+  return {
+    at: (t) => {
+      const { p, hand } = cursorPositionAt({ moves, start: cfg.start, t });
+      const scale = pressScaleAt({ clicks, press: cfg.press, t });
+      return { x: p.x, y: p.y, hand, scale, alpha: cursorAlphaAt({ vis, fade: cfg.fade, t }) };
+    },
+    ripples: (t, cfg2) => ripplesAt({ clicks, t, cfg2 }),
+  };
+}
+
+const pauseOf = (b) => ({
+  before: pauseBefore(b),
+  after: typeof b.pause === "number" ? 0 : (b.pause?.after ?? 0),
+});
+
+/** Adds a freeze at source time `c`; negative is a skip, so the guard is on magnitude. */
+function insertFreeze(freezes, c, d) {
+  if (!(Math.abs(d) > 0.005)) return;
+  const hit = freezes.find((f) => Math.abs(f.c - c) < 1e-6);
+  if (hit) {
+    hit.d += d;
+    return;
+  }
+  freezes.push({ c, d });
+  freezes.sort((a, b) => a.c - b.c);
+}
+
+function outputTimeOf(freezes, c) {
+  let acc = 0;
+  for (const f of freezes) {
+    if (!(f.c < c - 1e-9)) break;
+    acc += f.d;
+  }
+  return c + acc;
+}
+
+function sourceTimeOf(freezes, o) {
+  let acc = 0;
+  for (const f of freezes) {
+    const start = f.c + acc;
+    if (o < start) return o - acc;
+    if (f.d > 0 && o < start + f.d) return f.c;
+    acc += f.d;
+  }
+  return o - acc;
+}
+
+/**
+ * The click lands at the end of its own `before` freeze, so the frame the
+ * viewer waits on is the one before anything happened.
+ */
+const beatOutputTime = (freezes, b) =>
+  outputTimeOf(freezes, b.t) + (b.x == null ? 0 : pauseOf(b).before);
+
+/** Freezes the source wherever the cursor would have to move faster than `pace.speed`. */
+function autoPace({ beats, pace, cursorCfg, freezes }) {
+  const path = beats.filter((b) => b.x != null && b.cursor !== false);
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1];
+    const b = path[i];
+    const press = a.click === false ? 0 : cursorCfg.press.duration;
+    const travel = Math.hypot(b.x - a.x, b.y - a.y) / pace.speed;
+    const need = travel + cursorCfg.settle + pauseBefore(b) + press + pace.dwell;
+    const short = need - (beatOutputTime(freezes, b) - beatOutputTime(freezes, a));
+    if (short > 0.005) insertFreeze(freezes, Math.min(a.t + pace.afterDelay, b.t - 0.05), short);
+  }
+}
+
+/**
+ * Freezes the source frame wherever the cursor would move faster than a
+ * viewer can follow, mapping source and output clocks — `pause: { before,
+ * after }` asks for one; `skip: 1.2` drops dead air before a beat instead.
  */
 function buildPacing(beats, pace, cursorCfg) {
   const freezes = [];
-  const insert = (c, d) => {
-    // Negative is a skip, so the guard is on the magnitude, not the sign.
-    if (!(Math.abs(d) > 0.005)) return;
-    const hit = freezes.find((f) => Math.abs(f.c - c) < 1e-6);
-    if (hit) {
-      hit.d += d;
-      return;
-    }
-    freezes.push({ c, d });
-    freezes.sort((a, b) => a.c - b.c);
-  };
-  const outOf = (c) => {
-    let acc = 0;
-    for (const f of freezes) {
-      if (f.c < c - 1e-9) acc += f.d;
-      else break;
-    }
-    return c + acc;
-  };
-  const pauseOf = (b) => ({
-    before: pauseBefore(b),
-    after: typeof b.pause === "number" ? 0 : (b.pause?.after ?? 0),
-  });
-  // The click lands at the end of its own `before` freeze, so the frame the
-  // viewer waits on is the one before anything happened.
-  const timeOf = (b) => outOf(b.t) + (b.x == null ? 0 : pauseOf(b).before);
-
   for (const b of beats) {
     if (b.x == null) continue;
     const { before, after } = pauseOf(b);
     // A skip is a freeze of negative length: the source jumps forward instead
     // of standing still, and every clock below already handles the sign.
-    if (b.skip > 0) insert(b.t - b.skip, -b.skip);
-    insert(b.t, before);
-    insert(b.t + pace.afterDelay, after);
+    if (b.skip > 0) insertFreeze(freezes, b.t - b.skip, -b.skip);
+    insertFreeze(freezes, b.t, before);
+    insertFreeze(freezes, b.t + pace.afterDelay, after);
   }
-
-  if (pace.auto) {
-    const path = beats.filter((b) => b.x != null && b.cursor !== false);
-    for (let i = 1; i < path.length; i++) {
-      const a = path[i - 1];
-      const b = path[i];
-      const need =
-        Math.hypot(b.x - a.x, b.y - a.y) / pace.speed +
-        cursorCfg.settle +
-        pauseBefore(b) +
-        (a.click === false ? 0 : cursorCfg.press.duration) +
-        pace.dwell;
-      const short = need - (timeOf(b) - timeOf(a));
-      if (short > 0.005) insert(Math.min(a.t + pace.afterDelay, b.t - 0.05), short);
-    }
-  }
+  if (pace.auto) autoPace({ beats, pace, cursorCfg, freezes });
 
   const total = freezes.reduce((sum, f) => sum + f.d, 0);
-  const srcOf = (o) => {
-    let acc = 0;
-    for (const f of freezes) {
-      const start = f.c + acc;
-      if (o < start) return o - acc;
-      if (f.d > 0 && o < start + f.d) return f.c;
-      acc += f.d;
-    }
-    return o - acc;
+  return {
+    total,
+    freezes,
+    outOf: (c) => outputTimeOf(freezes, c),
+    srcOf: (o) => sourceTimeOf(freezes, o),
+    timeOf: (b) => beatOutputTime(freezes, b),
   };
-  return { total, freezes, outOf, srcOf, timeOf };
 }
 
 // ------------------------------------------------------------------ raw frames
@@ -895,12 +911,8 @@ const DEFAULTS = {
     // output width instead.
     fit: "native",
     radius: 13,
-    // How far the camera follows the focus point. 1 puts the focus dead
-    // centre of the frame, which is the only setting where the camera path is
-    // a straight function of the zoom; 0 keeps the window centred and never
-    // follows. Anything between is a blend of the two, and a blend bends the
-    // path slightly, so lower it only when a corner target shows more
-    // background than you want.
+    // How far the camera follows the focus point (1 = locks on target, 0 =
+    // window stays centred). See README.md "follow" for the zoom-path tradeoff.
     follow: 1,
     shadow: { blur: 44, offsetX: 0, offsetY: 20, spread: 2, opacity: 0.3 },
     border: { width: 1, color: [255, 255, 255], opacity: 0.45 },
@@ -949,8 +961,8 @@ function merge(base, over) {
   return out;
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+/** The timeline, resolved against where it lives, and the source's probed metadata. */
+async function readTimeline(args) {
   const timelinePath = args._[0];
   if (!timelinePath) {
     console.error("usage: polish-recording.mjs <timeline.json> [options]");
@@ -961,33 +973,34 @@ async function main() {
   const base = path.dirname(path.resolve(timelinePath));
   // A bare `cursors/...`, `backgrounds/...` path means the assets shipped next
   // to this script; anything else resolves against the timeline.
-  const asset = (p) =>
-    /^(cursors|backgrounds)\//.test(p)
-      ? path.join(here, p)
-      : path.isAbsolute(p)
-        ? p
-        : path.resolve(base, p);
+  const asset = (p) => {
+    if (/^(cursors|backgrounds)\//.test(p)) return path.join(here, p);
+    if (path.isAbsolute(p)) return p;
+    return path.resolve(base, p);
+  };
   const rel = (p) => (path.isAbsolute(p) ? p : path.resolve(base, p));
   const cfg = merge(DEFAULTS, JSON.parse(fs.readFileSync(timelinePath, "utf8")));
 
   const input = rel(cfg.input);
   const output = args.out ? path.resolve(args.out) : rel(cfg.output);
-  const meta = await probe(input);
+  return { cfg, asset, input, output, meta: await probe(input) };
+}
 
+/** Source, page and output sizes, and the page-to-source scale. */
+function frameGeometry(cfg, meta) {
   const srcW = meta.width;
   const srcH = meta.height;
   const pageW = cfg.page?.width ?? srcW;
   const pageH = cfg.page?.height ?? srcH;
-  const sx = srcW / pageW;
-  const sy = srcH / pageH;
-
   const outW = cfg.size?.width ?? srcW;
   const outH = cfg.size?.height ?? srcH;
-  const fps = cfg.fps;
   if (outW % 2 || outH % 2) throw new Error("output width and height must be even");
+  return { srcW, srcH, pageW, pageH, sx: srcW / pageW, sy: srcH / pageH, outW, outH };
+}
 
-  // Beats may be timed against the raw take or against the finished cut.
-  const beats = cfg.beats
+/** Beats may be timed against the raw take or against the finished cut. */
+function scaledBeats(cfg, { sx, sy }) {
+  return cfg.beats
     .map((b) => ({
       ...b,
       t: b.t != null ? b.t : mapCutTime(cfg.cut, b.tRaw),
@@ -995,9 +1008,11 @@ async function main() {
       y: b.y == null ? null : b.y * sy,
       zoomAt: b.zoomAt ? { x: b.zoomAt.x * sx, y: b.zoomAt.y * sy } : null,
     }))
-    .sort((a, b) => a.t - b.t);
+    .toSorted((a, b) => a.t - b.t);
+}
 
-  const cursorCfg = {
+function cursorConfig(cfg, { pageW, pageH, sx, sy }) {
+  return {
     ...cfg.cursor,
     start: {
       x: (cfg.cursor.start.x ?? pageW * 0.5) * sx,
@@ -1005,15 +1020,278 @@ async function main() {
       hidden: !!cfg.cursor.start.hidden,
     },
   };
+}
 
+async function loadSprites({ args, cfg, asset, geo }) {
   const bgPath = args.background ? path.resolve(args.background) : asset(cfg.frame.background);
   const [background, arrowBmp, pointerBmp] = await Promise.all([
-    loadImageCover(bgPath, outW, outH),
+    loadImageCover(bgPath, geo.outW, geo.outH),
     rasterize(asset(cfg.cursor.arrow), cfg.cursor.size),
     rasterize(asset(cfg.cursor.pointer), cfg.cursor.size),
   ]);
-  const arrow = buildSprite(arrowBmp, cfg.cursor.hotspot.arrow, cfg.cursor.shadow);
-  const pointer = buildSprite(pointerBmp, cfg.cursor.hotspot.pointer, cfg.cursor.shadow);
+  return {
+    background,
+    arrow: buildSprite(arrowBmp, cfg.cursor.hotspot.arrow, cfg.cursor.shadow),
+    pointer: buildSprite(pointerBmp, cfg.cursor.hotspot.pointer, cfg.cursor.shadow),
+  };
+}
+
+function logPacing(pacing, srcDuration, duration) {
+  if (!pacing.freezes.length) return;
+  const list = pacing.freezes
+    .map((f) => `${f.c.toFixed(2)}${f.d > 0 ? "+" : ""}${f.d.toFixed(2)}`)
+    .join(" ");
+  console.log(`  pacing: ${srcDuration.toFixed(2)}s -> ${duration.toFixed(2)}s  [${list}]`);
+}
+
+/**
+ * The output frames to render. `--preview` is stated in seconds of the result,
+ * so the range has to be mapped back through the pacing before it becomes a
+ * trim on the source.
+ */
+function outputRange({ args, pacing, duration, srcDuration, fps }) {
+  const preview = args.preview ? args.preview.split(":").map(Number) : null;
+  const outStart = preview ? Math.max(0, preview[0]) : 0;
+  const outEnd = preview ? Math.min(preview[1], duration) : duration;
+  return {
+    preview,
+    outStart,
+    srcStart: pacing.srcOf(outStart),
+    srcEnd: Math.min(srcDuration, pacing.srcOf(outEnd) + 2 / fps),
+    frames: Math.max(1, Math.round((outEnd - outStart) * fps)),
+  };
+}
+
+/**
+ * The graph always ends in `fps`, and the output always states `-r`. A bare
+ * `setpts` before the end leaves ffmpeg guessing the rate from timestamps,
+ * and it guesses the source's rate, silently dropping frames.
+ */
+function decodeGraph(cut, range, fps) {
+  const graph = cut ? cutFilter(cut) : "[0:v]null[s];";
+  if (!range.preview) return `${graph}[s]fps=${fps}[out]`;
+  return (
+    `${graph}[s]trim=start=${range.srcStart}:end=${range.srcEnd},setpts=PTS-STARTPTS[p];` +
+    `[p]fps=${fps}[out]`
+  );
+}
+
+/**
+ * An ffmpeg child with its stderr kept. `close` is attached now, not after the
+ * loop: a process that has already closed never emits `close` again, and
+ * awaiting it then would let node exit silently.
+ */
+function spawnFfmpeg(argv, stdio) {
+  const child = spawn("ffmpeg", argv, { stdio });
+  const errors = [];
+  child.stderr.on("data", (c) => errors.push(c));
+  return { child, errors, done: once(child, "close") };
+}
+
+function decoderArgs({ input, graph, fps }) {
+  return [
+    "-v",
+    "error",
+    "-i",
+    input,
+    "-filter_complex",
+    graph,
+    "-map",
+    "[out]",
+    "-r",
+    String(fps),
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "rgba",
+    "-",
+  ];
+}
+
+function encoderArgs({ output, geo, fps, crf, cpuUsed }) {
+  return [
+    "-v",
+    "error",
+    "-f",
+    "rawvideo",
+    "-pix_fmt",
+    "rgba",
+    "-s",
+    `${geo.outW}x${geo.outH}`,
+    "-r",
+    String(fps),
+    "-i",
+    "-",
+    "-an",
+    "-c:v",
+    "libvpx-vp9",
+    "-b:v",
+    "0",
+    "-crf",
+    String(crf),
+    "-deadline",
+    "good",
+    "-cpu-used",
+    String(cpuUsed),
+    "-row-mt",
+    "1",
+    "-pix_fmt",
+    "yuv420p",
+    "-y",
+    output,
+  ];
+}
+
+/**
+ * The source is pulled, not iterated: a frozen stretch asks for the same
+ * source frame over several output frames, so the decoder only advances
+ * when the output clock has moved past the next source frame.
+ */
+function sourceReader(stream, bytes) {
+  const source = readFrames(stream, bytes)[Symbol.asyncIterator]();
+  const state = { index: -1, frame: null, drained: false };
+  return {
+    state,
+    async advanceTo(want) {
+      while (!state.drained && state.index < want) {
+        const next = await source.next();
+        if (next.done) {
+          state.drained = true;
+          break;
+        }
+        state.frame = next.value;
+        state.index++;
+      }
+      return state.frame;
+    },
+  };
+}
+
+// Two candidate positions: the window centred in the frame, and the window
+// placed so the focus point is dead centre. `follow` blends them, and both are
+// straight functions of the zoom, so the path has no kink. Clamping the window
+// against the recording's edge put a kink in one axis: the page tilted and snapped back.
+function windowAt({ cam, scene }) {
+  const { cfg, geo } = scene;
+  const scale = scene.baseScale * cam.z;
+  const winW = geo.srcW * scale;
+  const winH = geo.srcH * scale;
+  const left = lerp((geo.outW - winW) / 2, geo.outW / 2 - cam.cx * scale, cfg.frame.follow);
+  const top = lerp((geo.outH - winH) / 2, geo.outH / 2 - cam.cy * scale, cfg.frame.follow);
+  return {
+    left,
+    top,
+    scale,
+    cx: left + winW / 2,
+    cy: top + winH / 2,
+    hw: winW / 2,
+    hh: winH / 2,
+    r: cfg.frame.radius * scale,
+  };
+}
+
+function renderFrame({ scene, frame, t }) {
+  const { cfg, geo, cursor } = scene;
+  const { outW, outH } = geo;
+  const win = windowAt({ cam: scene.cameraAt(t), scene });
+  const { left, top, scale } = win;
+
+  const dst = Buffer.allocUnsafe(outW * outH * 4);
+  scene.background.copy(dst);
+  drawShadow(dst, outW, outH, win, cfg.frame.shadow);
+  drawWindow(dst, outW, outH, frame, geo.srcW, geo.srcH, win, cfg.frame.border, scene.scratchRef);
+
+  for (const r of cursor.ripples(t, cfg.click)) {
+    drawRipple(
+      dst,
+      outW,
+      outH,
+      left + r.x * scale,
+      top + r.y * scale,
+      r.radius,
+      r.fill,
+      r.stroke,
+      cfg.click.strokeWidth,
+      cfg.click.color,
+    );
+  }
+
+  const c = cursor.at(t);
+  if (c.alpha > 0.002) {
+    const sprite = c.hand ? scene.pointer : scene.arrow;
+    drawSprite(dst, outW, outH, sprite, left + c.x * scale, top + c.y * scale, c.scale, c.alpha);
+  }
+  return dst;
+}
+
+/** Renders every frame in the range into the encoder; answers how many it wrote. */
+async function encodeFrames({ scene, range, reader, encoder, fps }) {
+  let n = 0;
+  const started = Date.now();
+  for (let i = 0; i < range.frames; i++) {
+    const t = range.outStart + i / fps;
+    const want = Math.max(0, Math.round((scene.pacing.srcOf(t) - range.srcStart) * fps));
+    const frame = await reader.advanceTo(want);
+    if (!frame) break;
+    if (!encoder.stdin.write(renderFrame({ scene, frame, t }))) await once(encoder.stdin, "drain");
+    n++;
+    if (n % 60 === 0) {
+      const rate = n / ((Date.now() - started) / 1000);
+      process.stderr.write(`\r  frame ${n}  ${rate.toFixed(1)} fps  ${(n / fps).toFixed(1)}s`);
+    }
+  }
+  return n;
+}
+
+async function awaitCoders({ decoder, encoder, drained }) {
+  encoder.child.stdin.end();
+  if (!drained) {
+    decoder.child.stdout.destroy();
+    decoder.child.kill("SIGKILL");
+  }
+  const [decCode] = await decoder.done;
+  const [encCode] = await encoder.done;
+  process.stderr.write("\r".padEnd(60) + "\r");
+
+  if (drained && decCode !== 0) {
+    throw new Error(`decoder failed\n${Buffer.concat(decoder.errors).toString("utf8")}`);
+  }
+  if (encCode !== 0) {
+    throw new Error(`encoder failed\n${Buffer.concat(encoder.errors).toString("utf8")}`);
+  }
+}
+
+async function reportOutput(output, frames) {
+  const result = await probe(output);
+  const size = fs.statSync(output).size;
+  console.log(
+    `${path.relative(process.cwd(), output)}  ` +
+      `${result.duration.toFixed(2)}s  ${(size / 1024 / 1024).toFixed(2)} MB  ` +
+      `${result.width}x${result.height}  ${frames} frames`,
+  );
+}
+
+async function writeStills(args, output) {
+  if (!args.stills) return;
+  const dir = args["stills-dir"]
+    ? path.resolve(args["stills-dir"])
+    : path.join(path.dirname(output), "stills");
+  fs.mkdirSync(dir, { recursive: true });
+  for (const s of args.stills.split(",").map((v) => v.trim())) {
+    const file = path.join(dir, `t${s.replace(".", "_")}.png`);
+    await run("ffmpeg", ["-v", "error", "-ss", s, "-i", output, "-frames:v", "1", "-y", file]);
+  }
+  console.log(`stills: ${path.relative(process.cwd(), dir)}`);
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const { cfg, asset, input, output, meta } = await readTimeline(args);
+  const geo = frameGeometry(cfg, meta);
+  const fps = cfg.fps;
+  const beats = scaledBeats(cfg, geo);
+  const cursorCfg = cursorConfig(cfg, geo);
+  const sprites = await loadSprites({ args, cfg, asset, geo });
 
   const srcDuration = cfg.cut
     ? cfg.cut.segments.reduce((a, seg) => a + segmentDuration(cfg.cut, seg), 0)
@@ -1024,208 +1302,32 @@ async function main() {
   const pacing = buildPacing(beats, cfg.pace, cursorCfg);
   for (const b of beats) b.t = pacing.timeOf(b);
   const duration = srcDuration + pacing.total;
-  if (pacing.freezes.length) {
-    const list = pacing.freezes
-      .map((f) => `${f.c.toFixed(2)}${f.d > 0 ? "+" : ""}${f.d.toFixed(2)}`)
-      .join(" ");
-    console.log(
-      `  pacing: ${srcDuration.toFixed(2)}s -> ${duration.toFixed(2)}s  [${list}]`,
-    );
-  }
+  logPacing(pacing, srcDuration, duration);
 
-  const cameraAt = buildCameraTrack(beats, cfg.zoom, duration, srcW / 2, srcH / 2);
-  const cursor = buildCursorTrack(beats, cursorCfg);
+  const scene = {
+    cfg,
+    geo,
+    pacing,
+    ...sprites,
+    cameraAt: buildCameraTrack(beats, cfg.zoom, duration, geo.srcW / 2, geo.srcH / 2),
+    cursor: buildCursorTrack(beats, cursorCfg),
+    baseScale: cfg.frame.fit === "native" ? 1 : (geo.outW * cfg.frame.fit) / geo.srcW,
+    scratchRef: { buf: new Float32Array(1) },
+  };
 
-  const baseScale = cfg.frame.fit === "native" ? 1 : (outW * cfg.frame.fit) / srcW;
-  const follow = cfg.frame.follow;
-
-  // ------------------------------------------------------------- ffmpeg pair
-  // `--preview` is stated in seconds of the result, so the range has to be
-  // mapped back through the pacing before it becomes a trim on the source.
-  const preview = args.preview ? args.preview.split(":").map(Number) : null;
-  const outStart = preview ? Math.max(0, preview[0]) : 0;
-  const outEnd = preview ? Math.min(preview[1], duration) : duration;
-  const srcStart = pacing.srcOf(outStart);
-  const srcEnd = Math.min(srcDuration, pacing.srcOf(outEnd) + 2 / fps);
-  const frames = Math.max(1, Math.round((outEnd - outStart) * fps));
-
-  // The graph always ends in `fps`, and the output always states `-r`. A bare
-  // `setpts` before the end leaves ffmpeg guessing the rate from timestamps,
-  // and it guesses the source's rate, silently dropping frames.
-  let graph = cfg.cut ? cutFilter(cfg.cut) : "[0:v]null[s];";
-  if (preview) {
-    graph += `[s]trim=start=${srcStart}:end=${srcEnd},setpts=PTS-STARTPTS[p];`;
-    graph += `[p]fps=${fps}[out]`;
-  } else {
-    graph += `[s]fps=${fps}[out]`;
-  }
-
-  const dec = spawn(
-    "ffmpeg",
-    [
-      "-v", "error",
-      "-i", input,
-      "-filter_complex", graph,
-      "-map", "[out]",
-      "-r", String(fps),
-      "-f", "rawvideo",
-      "-pix_fmt", "rgba",
-      "-",
-    ],
-    { stdio: ["ignore", "pipe", "pipe"] },
-  );
-  const decErr = [];
-  dec.stderr.on("data", (c) => decErr.push(c));
-  // Attached now, not after the loop: a process that has already closed never
-  // emits `close` again, and awaiting it then would let node exit silently.
-  const decDone = once(dec, "close");
-
+  const range = outputRange({ args, pacing, duration, srcDuration, fps });
+  const graph = decodeGraph(cfg.cut, range, fps);
+  const decoder = spawnFfmpeg(decoderArgs({ input, graph, fps }), ["ignore", "pipe", "pipe"]);
   fs.mkdirSync(path.dirname(output), { recursive: true });
-  const enc = spawn(
-    "ffmpeg",
-    [
-      "-v", "error",
-      "-f", "rawvideo",
-      "-pix_fmt", "rgba",
-      "-s", `${outW}x${outH}`,
-      "-r", String(fps),
-      "-i", "-",
-      "-an",
-      "-c:v", "libvpx-vp9",
-      "-b:v", "0",
-      "-crf", String(args.crf ?? cfg.quality.crf),
-      "-deadline", "good",
-      "-cpu-used", String(cfg.quality.cpuUsed),
-      "-row-mt", "1",
-      "-pix_fmt", "yuv420p",
-      "-y",
-      output,
-    ],
-    { stdio: ["pipe", "ignore", "pipe"] },
-  );
-  const encErr = [];
-  enc.stderr.on("data", (c) => encErr.push(c));
-  const encDone = once(enc, "close");
+  const crf = args.crf ?? cfg.quality.crf;
+  const encoderArgv = encoderArgs({ output, geo, fps, crf, cpuUsed: cfg.quality.cpuUsed });
+  const encoder = spawnFfmpeg(encoderArgv, ["pipe", "ignore", "pipe"]);
 
-  // -------------------------------------------------------------- frame loop
-  const srcBytes = srcW * srcH * 4;
-  const outBytes = outW * outH * 4;
-  const scratchRef = { buf: new Float32Array(1) };
-  let n = 0;
-  const started = Date.now();
-
-  // The source is pulled, not iterated: a frozen stretch asks for the same
-  // source frame over several output frames, so the decoder only advances
-  // when the output clock has moved past the next source frame.
-  const source = readFrames(dec.stdout, srcBytes)[Symbol.asyncIterator]();
-  let srcIdx = -1;
-  let frame = null;
-  let drained = false;
-
-  for (let i = 0; i < frames; i++) {
-    const t = outStart + i / fps;
-    const want = Math.max(0, Math.round((pacing.srcOf(t) - srcStart) * fps));
-    while (!drained && srcIdx < want) {
-      const next = await source.next();
-      if (next.done) {
-        drained = true;
-        break;
-      }
-      frame = next.value;
-      srcIdx++;
-    }
-    if (!frame) break;
-    const cam = cameraAt(t);
-    const scale = baseScale * cam.z;
-    const winW = srcW * scale;
-    const winH = srcH * scale;
-
-    // Two candidate positions: the window centred in the frame, and the
-    // window placed so the focus point is dead centre. `follow` blends them.
-    // Both are straight functions of the zoom, so the camera path has no kink.
-    // Clamping the window against the edge of the recording, which is what
-    // this used to do, put a kink in exactly one axis, and the eye read that
-    // as the page tilting and then snapping back.
-    const left = lerp((outW - winW) / 2, outW / 2 - cam.cx * scale, follow);
-    const top = lerp((outH - winH) / 2, outH / 2 - cam.cy * scale, follow);
-
-    const win = {
-      left,
-      top,
-      scale,
-      cx: left + winW / 2,
-      cy: top + winH / 2,
-      hw: winW / 2,
-      hh: winH / 2,
-      r: cfg.frame.radius * scale,
-    };
-
-    const dst = Buffer.allocUnsafe(outBytes);
-    background.copy(dst);
-    drawShadow(dst, outW, outH, win, cfg.frame.shadow);
-    drawWindow(dst, outW, outH, frame, srcW, srcH, win, cfg.frame.border, scratchRef);
-
-    for (const r of cursor.ripples(t, cfg.click)) {
-      drawRipple(
-        dst, outW, outH,
-        left + r.x * scale, top + r.y * scale,
-        r.radius, r.fill, r.stroke, cfg.click.strokeWidth, cfg.click.color,
-      );
-    }
-
-    const c = cursor.at(t);
-    if (c.alpha > 0.002) {
-      drawSprite(
-        dst, outW, outH,
-        c.hand ? pointer : arrow,
-        left + c.x * scale, top + c.y * scale,
-        c.scale, c.alpha,
-      );
-    }
-
-    if (!enc.stdin.write(dst)) await once(enc.stdin, "drain");
-    n++;
-    if (n % 60 === 0) {
-      const rate = n / ((Date.now() - started) / 1000);
-      process.stderr.write(
-        `\r  frame ${n}  ${rate.toFixed(1)} fps  ${(n / fps).toFixed(1)}s`,
-      );
-    }
-  }
-
-  enc.stdin.end();
-  if (!drained) {
-    dec.stdout.destroy();
-    dec.kill("SIGKILL");
-  }
-  const [decCode] = await decDone;
-  const [encCode] = await encDone;
-  process.stderr.write("\r".padEnd(60) + "\r");
-
-  if (drained && decCode !== 0) {
-    throw new Error(`decoder failed\n${Buffer.concat(decErr)}`);
-  }
-  if (encCode !== 0) throw new Error(`encoder failed\n${Buffer.concat(encErr)}`);
-
-  const result = await probe(output);
-  const size = fs.statSync(output).size;
-  console.log(
-    `${path.relative(process.cwd(), output)}  ` +
-      `${result.duration.toFixed(2)}s  ${(size / 1024 / 1024).toFixed(2)} MB  ` +
-      `${result.width}x${result.height}  ${n} frames`,
-  );
-
-  if (args.stills) {
-    const dir = args["stills-dir"]
-      ? path.resolve(args["stills-dir"])
-      : path.join(path.dirname(output), "stills");
-    fs.mkdirSync(dir, { recursive: true });
-    for (const s of args.stills.split(",").map((v) => v.trim())) {
-      const file = path.join(dir, `t${s.replace(".", "_")}.png`);
-      await run("ffmpeg", ["-v", "error", "-ss", s, "-i", output, "-frames:v", "1", "-y", file]);
-    }
-    console.log(`stills: ${path.relative(process.cwd(), dir)}`);
-  }
+  const reader = sourceReader(decoder.child.stdout, geo.srcW * geo.srcH * 4);
+  const frames = await encodeFrames({ scene, range, reader, encoder: encoder.child, fps });
+  await awaitCoders({ decoder, encoder, drained: reader.state.drained });
+  await reportOutput(output, frames);
+  await writeStills(args, output);
 }
 
 main().catch((err) => {

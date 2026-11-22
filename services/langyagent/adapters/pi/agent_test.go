@@ -4,15 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
+	"github.com/langwatch/langwatch/services/langyagent/internal/toolmap"
 )
 
 // frameSink is a thread-safe app.ChatSink capturing emitted frame payloads
@@ -57,8 +66,14 @@ func (s *frameSink) waitFor(t *testing.T, want string) {
 // guarantee between them. Returns the sink and the stream outcome.
 func runTurn(t *testing.T, agent *Agent, turnID string) (*frameSink, error) {
 	t.Helper()
+	return runTurnIn(t, context.Background(), agent, turnID)
+}
+
+// runTurnIn is runTurn on the caller's context (one carrying a test logger).
+func runTurnIn(t *testing.T, base context.Context, agent *Agent, turnID string) (*frameSink, error) {
+	t.Helper()
 	sink := &frameSink{}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(base, 10*time.Second)
 	t.Cleanup(cancel)
 
 	errCh := make(chan error, 1)
@@ -123,7 +138,7 @@ func TestAgent_HappyTurn_StreamsFramesAndSettlesClean(t *testing.T) {
 		`"type":"delta"`, `"text":"Hello"`,
 		`"type":"reasoning"`, `"text":"thinking hard"`,
 		`"id":"call_1|fc_1"`, `"phase":"start"`, `"phase":"end"`,
-		`"output":"file.txt"`,
+		`"output":"file.txt"`, `"local":true`,
 		`"type":"plan"`, `"Scanning traces — 2/4"`,
 		`"type":"progress"`, `"current":2`, `"total":4`,
 	} {
@@ -141,6 +156,114 @@ func TestAgent_HappyTurn_StreamsFramesAndSettlesClean(t *testing.T) {
 	}
 	if got := strings.Count(joined, `"phase":"end"`); got != 1 {
 		t.Errorf("end frames = %d, want exactly 1", got)
+	}
+}
+
+// The wrapper's guided turn end guard reports through the protocol, since the
+// wrapper's stderr is discarded: the manager logs the event under the guard's
+// own name with the turn id and what the turn owed, and draws no frame for it.
+//
+// @scenario "The manager logs the guard's report under its name"
+func TestAgent_GuidedTurnEvent_IsLoggedNotFramed(t *testing.T) {
+	agent := spawnFake(t, "guided", 20*time.Second)
+	if err := agent.WaitReady(context.Background()); err != nil {
+		t.Fatalf("WaitReady: %v", err)
+	}
+	core, logs := observer.New(zapcore.InfoLevel)
+	// The turn's logger carries the turn id, as the transport's turnLogFields
+	// attach it to every turn request.
+	ctx := clog.With(clog.Set(context.Background(), zap.New(core)), zap.String("turn_id", "turn-1"))
+
+	sink, err := runTurnIn(t, ctx, agent, "turn-1")
+	if err != nil {
+		t.Fatalf("Stream = %v, want nil on turn_done ok", err)
+	}
+	if strings.Contains(sink.joined(), "guided") {
+		t.Errorf("guided_turn must draw no frame, got:\n%s", sink.joined())
+	}
+	entries := logs.FilterMessage("guided_turn_continued").All()
+	if len(entries) != 1 {
+		t.Fatalf("guided_turn_continued log lines = %d, want 1; all lines: %v", len(entries), logs.All())
+	}
+	fields := entries[0].ContextMap()
+	if got := fields["turn_id"]; got != "turn-1" {
+		t.Errorf("turn_id = %v, want turn-1", got)
+	}
+	if got := fields["missing"]; got != "the branch line; the first scenario card" {
+		t.Errorf("missing = %v, want the guard's two items on one string", got)
+	}
+	if got := fields["segment"]; got != int64(1) {
+		t.Errorf("segment = %v, want 1", got)
+	}
+}
+
+// ansiSequence matches the color codes the pretty console writes.
+var ansiSequence = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+// captureStdout runs fn with os.Stdout redirected into a pipe and returns
+// what was written. The pretty console core locks os.Stdout when the logger
+// is built, so the logger has to be built inside fn.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	was := os.Stdout
+	os.Stdout = w
+	done := make(chan string, 1)
+	go func() {
+		b, _ := io.ReadAll(r)
+		done <- string(b)
+	}()
+	func() {
+		defer func() {
+			os.Stdout = was
+			_ = w.Close()
+		}()
+		fn()
+	}()
+	return <-done
+}
+
+// The report as the manager's console writes it: one line, found by a grep
+// for the event name, carrying the turn id once and what the turn owed. The
+// pretty console draws an array field on a continuation line and repeats a
+// key the logger already carries, which a test logger's field map does not
+// show, so this goes through the real logger setup.
+//
+// @scenario "The manager logs the guard's report under its name"
+func TestAgent_GuidedTurnEvent_PrettyConsoleLine(t *testing.T) {
+	agent := spawnFake(t, "guided", 20*time.Second)
+	if err := agent.WaitReady(context.Background()); err != nil {
+		t.Fatalf("WaitReady: %v", err)
+	}
+	out := captureStdout(t, func() {
+		logger := clog.New(context.Background(), clog.Config{Format: "pretty"})
+		ctx := clog.With(clog.Set(context.Background(), logger), zap.String("turn_id", "turn-1"))
+		if _, err := runTurnIn(t, ctx, agent, "turn-1"); err != nil {
+			t.Errorf("Stream = %v, want nil on turn_done ok", err)
+		}
+		_ = logger.Sync()
+	})
+	var line string
+	for _, candidate := range strings.Split(ansiSequence.ReplaceAllString(out, ""), "\n") {
+		if strings.Contains(candidate, "guided_turn_continued") {
+			line = candidate
+			break
+		}
+	}
+	if line == "" {
+		t.Fatalf("no guided_turn_continued line on the console; output:\n%s", out)
+	}
+	if got := strings.Count(line, "turn_id="); got != 1 {
+		t.Errorf("turn_id appears %d times on the line, want once:\n%s", got, line)
+	}
+	if !strings.Contains(line, "missing=") || !strings.Contains(line, "the branch line; the first scenario card") {
+		t.Errorf("the line must carry what the turn owed:\n%s", line)
+	}
+	if !strings.Contains(line, "segment=1") {
+		t.Errorf("the line must name the segment:\n%s", line)
 	}
 }
 
@@ -466,5 +589,168 @@ func TestAgent_TurnEnded_IsANoOpWhenNothingWasOrphaned(t *testing.T) {
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("TurnEnded blocked on an empty handoff channel")
+	}
+}
+
+// A retried model call shows as the panel's status line and clears once the
+// retried call answers (specs/langy/langy-model-call-retry.feature, "The panel
+// shows which attempt is running", "The retry line clears once the call succeeds").
+func TestStreamState_RetryEventsDrawTheStatusLine(t *testing.T) {
+	var got []string
+	state := newStreamState(func(f frames.Frame) bool {
+		got = append(got, f.JSON())
+		return true
+	})
+	if !state.apply(wireEvent{Type: eventRetrying, TurnID: "t1", Attempt: 2, MaxAttempts: 5, DelayMs: 2140}) {
+		t.Fatal("the retrying status did not reach the relay")
+	}
+	if !state.apply(wireEvent{Type: eventRetrySettled, TurnID: "t1"}) {
+		t.Fatal("the cleared status did not reach the relay")
+	}
+
+	want := []string{
+		`{"type":"status","status":"Retrying (2 of 5)"}`,
+		`{"type":"status","status":""}`,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("frames = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("frame %d = %s, want %s", i, got[i], want[i])
+		}
+	}
+}
+
+// A reasoning event is its own live frame: it carries the thinking text, is
+// never an answer delta, and does not count as answer text (so the paragraph
+// restore that follows a tool call is not triggered by thinking alone).
+// @scenario "The manager emits a reasoning frame for a reasoning delta"
+func TestStreamState_ReasoningEventIsAReasoningFrameNotAnAnswerToken(t *testing.T) {
+	var got []string
+	state := newStreamState(func(f frames.Frame) bool {
+		got = append(got, f.JSON())
+		return true
+	})
+	if !state.apply(wireEvent{Type: eventReasoning, TurnID: "t1", Text: "let me check the traces"}) {
+		t.Fatal("the reasoning frame did not reach the relay")
+	}
+	if !state.apply(wireEvent{Type: eventDelta, TurnID: "t1", Text: "Here is the answer"}) {
+		t.Fatal("the answer frame did not reach the relay")
+	}
+
+	want := []string{
+		`{"type":"reasoning","text":"let me check the traces"}`,
+		`{"type":"delta","text":"Here is the answer"}`,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("frames = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("frame %d = %s, want %s", i, got[i], want[i])
+		}
+	}
+	if strings.Contains(got[0], `"type":"delta"`) {
+		t.Error("a reasoning delta must not be treated as an answer token")
+	}
+}
+
+// The turn stream ends on the turn's own terminal event, and a sibling turn's
+// events (the wrapper tags every event with its turn id) never reach it: the
+// reader routes by turn id, the consumer settles on the terminal.
+// @scenario "Terminal detection and session routing are unchanged by the fast frame"
+func TestAgent_TerminalEndsTheTurnAndAnotherTurnsEventsAreNotForwarded(t *testing.T) {
+	r, w := startTestReader(t)
+	mine := r.register("mine")
+	defer r.unregister("mine", mine)
+	other := r.register("other")
+	defer r.unregister("other", other)
+
+	for _, line := range []string{
+		`{"type":"delta","turnId":"other","text":"not for you"}`,
+		`{"type":"delta","turnId":"mine","text":"for you"}`,
+		`{"type":"turn_done","turnId":"other","outcome":"ok"}`,
+		`{"type":"turn_done","turnId":"mine","outcome":"ok"}`,
+	} {
+		_, _ = w.Write([]byte(line + "\n"))
+	}
+
+	agent := &Agent{}
+	var forwarded []string
+	state := newStreamState(func(f frames.Frame) bool {
+		forwarded = append(forwarded, f.JSON())
+		return true
+	})
+	var settled bool
+	for !settled {
+		select {
+		case ev := <-mine.ch:
+			isDone, err := agent.consumeEvent(context.Background(), state, ev)
+			if err != nil {
+				t.Fatalf("a clean terminal must settle the turn without an error, got %v", err)
+			}
+			settled = isDone
+		case <-time.After(3 * time.Second):
+			t.Fatal("the turn's terminal event never ended its stream")
+		}
+	}
+
+	if len(forwarded) != 1 || !strings.Contains(forwarded[0], `"text":"for you"`) {
+		t.Errorf("forwarded frames = %v, want only this turn's delta", forwarded)
+	}
+	select {
+	case ev := <-mine.ch:
+		t.Errorf("a sibling turn's event leaked into this turn's stream: %+v", ev)
+	default:
+	}
+}
+
+// A plan far past the cap is trimmed, not dropped: the typed plan frame holds
+// MaxPlanItems items of bounded text, and the todo tool call that carried it
+// is still forwarded as a tool card pair for the audit trail.
+// @scenario "The manager caps a runaway plan"
+func TestStreamState_RunawayPlanIsCappedAndTheToolCallStillRecorded(t *testing.T) {
+	var got []string
+	state := newStreamState(func(f frames.Frame) bool {
+		got = append(got, f.JSON())
+		return true
+	})
+	items := make([]planItem, 0, toolmap.MaxPlanItems*2)
+	for i := 0; i < toolmap.MaxPlanItems*2; i++ {
+		items = append(items, planItem{Content: strings.Repeat("x", toolmap.MaxPlanContentChars*2), Status: "pending"})
+	}
+	input := json.RawMessage(`{"todos":[{"content":"step","status":"pending"}]}`)
+	state.apply(wireEvent{Type: eventToolStart, TurnID: "t1", ID: "todo-1", Name: "todowrite", Input: input})
+	state.apply(wireEvent{Type: eventPlan, TurnID: "t1", Items: items})
+	state.apply(wireEvent{Type: eventToolEnd, TurnID: "t1", ID: "todo-1", Name: "todowrite", Input: input, Output: "ok"})
+
+	var plan struct {
+		Type  string `json:"type"`
+		Items []struct {
+			Content string `json:"content"`
+		} `json:"items"`
+	}
+	var starts, ends int
+	for _, payload := range got {
+		switch {
+		case strings.Contains(payload, `"type":"plan"`):
+			if err := json.Unmarshal([]byte(payload), &plan); err != nil {
+				t.Fatalf("plan frame: %v", err)
+			}
+		case strings.Contains(payload, `"phase":"start"`):
+			starts++
+		case strings.Contains(payload, `"phase":"end"`):
+			ends++
+		}
+	}
+	if len(plan.Items) != toolmap.MaxPlanItems {
+		t.Fatalf("plan items = %d, want the cap of %d", len(plan.Items), toolmap.MaxPlanItems)
+	}
+	if got := len([]rune(plan.Items[0].Content)); got != toolmap.MaxPlanContentChars+1 {
+		t.Errorf("item text = %d runes, want %d truncated plus an ellipsis, not dropped", got, toolmap.MaxPlanContentChars)
+	}
+	if starts != 1 || ends != 1 {
+		t.Errorf("the todo tool call must stay recorded: start frames = %d, end frames = %d", starts, ends)
 	}
 }

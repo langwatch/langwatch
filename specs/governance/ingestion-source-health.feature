@@ -184,3 +184,11 @@ Feature: A broken puller is visible, a flaky one is not
     # is only ever written beside a sentence we wrote. A refusal that arrives
     # with just the adapter's diagnostic is filed as a plain failure instead:
     # the diagnostic reaches the log, never the screen.
+
+  @unit
+  Scenario: A pull the provider refuses for the customer's own setup is not reported as our failure
+    Given a pull source whose provider refuses its credentials, a refusal no retry changes
+    When the pull runs
+    Then the refusal is recorded on the source for the customer to fix
+    And the worker reports no error and captures no exception for it
+    And a failure the customer cannot fix is still reported as an error

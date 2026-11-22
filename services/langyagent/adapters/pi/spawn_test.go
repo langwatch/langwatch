@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/langwatch/langwatch/services/langyagent/adapters/github"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
@@ -167,9 +168,6 @@ func TestProvision_ModelLanes(t *testing.T) {
 		if compatOf(model)["supportsLongCacheRetention"] != true {
 			t.Errorf("anthropic lane must allow long cache retention, got %v", compatOf(model))
 		}
-		if model["reasoning"] != true {
-			t.Errorf("anthropic lane should enable reasoning")
-		}
 	})
 
 	t.Run("openai models use the responses lane", func(t *testing.T) {
@@ -226,6 +224,26 @@ func TestProvision_ModelLanes(t *testing.T) {
 			t.Errorf("default model = %v", modelOf(t, cfg)["id"])
 		}
 	})
+}
+
+// @scenario "A model that cannot reason is never asked to"
+func TestProvision_NoLaneDeclaresReasoning(t *testing.T) {
+	for _, id := range []string{
+		"openai/gpt-4.1",
+		"openai/gpt-5-mini",
+		"anthropic/claude-haiku-4-5",
+		"openai_codex/gpt-5-codex",
+		"gemini/gemini-2.5-pro",
+	} {
+		t.Run(id, func(t *testing.T) {
+			creds := testCreds()
+			creds.Model = id
+			_, cfg := provisionHome(t, creds)
+			if reasoning, present := modelOf(t, cfg)["reasoning"]; present {
+				t.Errorf("the lane must leave reasoning to the worker's catalog, got %v", reasoning)
+			}
+		})
+	}
 }
 
 // recordingRunner is testRunner with a chown ledger, for pinning that every
@@ -448,5 +466,24 @@ func TestBuildWorkerEnv_CarriesConversationID(t *testing.T) {
 
 	if env["LANGY_CONVERSATION_ID"] != "conv-ui" {
 		t.Errorf("LANGY_CONVERSATION_ID = %q, want conv-ui", env["LANGY_CONVERSATION_ID"])
+	}
+}
+
+// A capability's NO_PROXY joins the worker's loopback list instead of replacing it.
+//
+// @scenario "Langy's worker reaches githubsim when the stack names it as the GitHub host"
+func TestBuildWorkerEnv_CapabilityNoProxyJoinsTheList(t *testing.T) {
+	env := envMap(t, buildWorkerEnv(SpawnInput{
+		Home:         "/h",
+		Creds:        testCreds(),
+		Capabilities: []app.Capability{github.New("ghs_sim", "alice", "s").WithHost("github.dev.localhost:1355")},
+	}))
+	for _, key := range []string{"NO_PROXY", "no_proxy"} {
+		if !strings.Contains(env[key], "127.0.0.1") || !strings.HasSuffix(env[key], ",github.dev.localhost") {
+			t.Errorf("%s = %q, want loopback plus github.dev.localhost", key, env[key])
+		}
+	}
+	if env["GH_HOST"] != "github.dev.localhost:1355" {
+		t.Errorf("GH_HOST = %q", env["GH_HOST"])
 	}
 }

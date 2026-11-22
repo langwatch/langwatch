@@ -1,0 +1,242 @@
+/**
+ * Pure shaping of the data a run loads: dataset rows and columns, the rows a repeated run lays
+ * out, and the keys loaded targets are cached under.
+ */
+import type { ExecutionScope } from "@langwatch/experiment-contract";
+
+/** The column type a parameter value writes into the dataset. */
+function parameterColumnType(value: string | number | boolean): string {
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "boolean";
+  return "string";
+}
+
+// Column types that store JSON and need parsing
+export const JSON_COLUMN_TYPES = [
+  "chat_messages",
+  "json",
+  "list",
+  "spans",
+  "rag_contexts",
+] as const;
+
+/**
+ * Parses JSON string values in specified columns.
+ */
+export const parseJsonColumns = (
+  rows: Record<string, unknown>[],
+  jsonColumnKeys: Set<string>,
+): Record<string, unknown>[] => {
+  if (jsonColumnKeys.size === 0) {
+    return rows;
+  }
+
+  return rows.map((row) => {
+    const parsedRow = { ...row };
+    for (const key of jsonColumnKeys) {
+      const value = parsedRow[key];
+      if (typeof value === "string" && value.trim()) {
+        try {
+          parsedRow[key] = JSON.parse(value);
+        } catch {
+          // Keep original string if not valid JSON
+        }
+      }
+    }
+
+    return parsedRow;
+  });
+};
+
+/**
+ * Normalizes inline dataset records from column IDs to column names.
+ */
+export const normalizeColumnIdsToNames = (
+  rows: Record<string, unknown>[],
+  columns: { id: string; name: string }[],
+): Record<string, unknown>[] => {
+  const idToName = Object.fromEntries(columns.map((c) => [c.id, c.name]));
+
+  return rows.map((row) => {
+    const normalized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      // Use name if we have a mapping, otherwise keep the key as-is
+      normalized[idToName[key] ?? key] = value;
+    }
+
+    return normalized;
+  });
+};
+
+/**
+ * Result of loading a dataset.
+ */
+export type LoadedDataset = {
+  rows: Record<string, unknown>[];
+  columns: { id: string; name: string; type: string }[];
+};
+
+/**
+ * Normalizes inline row-first data (from the run API or an SDK) into the
+ * loaded dataset shape. Columns are derived from the union of keys across
+ * rows.
+ */
+export const rowsFromInlineData = (data: Record<string, unknown>[]): LoadedDataset => {
+  const columnNames: string[] = [];
+  const seen = new Set<string>();
+  for (const row of data) {
+    for (const key of Object.keys(row)) {
+      if (!seen.has(key)) {
+        seen.add(key);
+        columnNames.push(key);
+      }
+    }
+  }
+
+  return {
+    rows: data,
+    columns: columnNames.map((name) => ({ id: name, name, type: "string" })),
+  };
+};
+
+/**
+ * Every row with a key for each text column the dataset declares: a cell with no
+ * value reads as empty text, so a column left empty on purpose still reaches the
+ * target. Other column types and undeclared keys are never added.
+ * @see specs/experiments-v3/execution-inputs.feature
+ */
+export const fillDeclaredColumns = ({
+  rows,
+  columns,
+}: {
+  rows: Record<string, unknown>[];
+  columns: { name: string; type?: string }[];
+}): Record<string, unknown>[] => {
+  const textColumns = columns.filter((column) => column.type === "string");
+  if (textColumns.length === 0) return rows;
+  return rows.map((row) => {
+    const missing = textColumns.filter((column) => row[column.name] === undefined);
+    if (missing.length === 0) return row;
+    const filled = { ...row };
+    for (const column of missing) filled[column.name] = "";
+    return filled;
+  });
+};
+
+/**
+ * Applies caller-provided parameters as constant columns across every row.
+ */
+export function applyParametersToRows({
+  rows,
+  columns,
+  parameters,
+}: {
+  rows: Record<string, unknown>[];
+  columns: { id: string; name: string; type: string }[];
+  parameters?: Record<string, string | number | boolean>;
+}): {
+  rows: Record<string, unknown>[];
+  columns: { id: string; name: string; type: string }[];
+} {
+  if (!parameters || Object.keys(parameters).length === 0) {
+    return { rows, columns };
+  }
+
+  const existingNames = new Set(columns.map((c) => c.name));
+  // A parameter overriding an existing column rewrites every row's value below,
+  // so the column's declared type must follow the parameter or the rows and the
+  // column metadata would disagree (e.g. a number written into a "string" column).
+  const columnsWithParameters = [
+    ...columns.map((column) =>
+      Object.hasOwn(parameters, column.name)
+        ? { ...column, type: parameterColumnType(parameters[column.name]!) }
+        : column,
+    ),
+    ...Object.entries(parameters)
+      .filter(([key]) => !existingNames.has(key))
+      .map(([key, value]) => ({
+        id: key,
+        name: key,
+        type: parameterColumnType(value),
+      })),
+  ];
+
+  // With no rows, the parameters themselves form a single synthetic row.
+  const baseRows = rows.length === 0 ? [{}] : rows;
+  const rowsWithParameters = baseRows.map((row) => ({ ...row, ...parameters }));
+
+  return { rows: rowsWithParameters, columns: columnsWithParameters };
+}
+
+/**
+ * Cache key for a loaded workflow. Two targets that pin the same workflow to
+ * different versions must not share a loaded DSL, so the key includes the
+ * requested version (or "published" when following the latest committed one).
+ */
+export function workflowLoadKey(target: {
+  workflowId?: string;
+  workflowVersionId?: string;
+}): string {
+  return `${target.workflowId ?? ""}::${target.workflowVersionId ?? "published"}`;
+}
+
+/**
+ * Cache key for a loaded prompt. Two targets that pin the same prompt to
+ * different versions must not share a loaded prompt, so the key includes the
+ * requested version (or "latest" when the target follows the newest one).
+ */
+export function promptLoadKey(target: { promptId?: string; promptVersionNumber?: number }): string {
+  return `${target.promptId ?? ""}@${target.promptVersionNumber ?? "latest"}`;
+}
+
+/** The loaded-agents key: the agent id, plus the deploy label when the target pins one. */
+export function agentLoadKey(target: { dbAgentId?: string; agentLabel?: string }): string {
+  return target.agentLabel
+    ? `${target.dbAgentId ?? ""}@${target.agentLabel}`
+    : (target.dbAgentId ?? "");
+}
+
+/** The bytes one row holds, as the JSON it is stored and sent as. */
+export function rowBytesOf(entry: Record<string, unknown>): number {
+  return Buffer.byteLength(JSON.stringify(entry) ?? "");
+}
+
+/**
+ * The run's rows: every dataset row `repeat` times in a row, so run row `r * repeat + k` is
+ * repetition `k` of dataset row `r` (specs/experiments-v3/run-repeat.feature).
+ */
+export function repeatedRows<T>({ rows, repeat }: { rows: readonly T[]; repeat: number }): T[] {
+  return rows.flatMap((row) => Array.from({ length: repeat }, () => row));
+}
+
+/** Every run row of each dataset row a scope names. */
+function repeatedIndices({ indices, repeat }: { indices: number[]; repeat: number }): number[] {
+  return indices.flatMap((index) =>
+    Array.from({ length: repeat }, (_, repetition) => index * repeat + repetition),
+  );
+}
+
+/** The scope over the repeated rows: a row it names becomes all of that row's repetitions. */
+export function repeatedScope({
+  scope,
+  repeat,
+}: {
+  scope: ExecutionScope;
+  repeat: number;
+}): ExecutionScope {
+  switch (scope.type) {
+    case "rows":
+      return { type: "rows", rowIndices: repeatedIndices({ indices: scope.rowIndices, repeat }) };
+    case "target-rows":
+      return scope.rowIndices
+        ? { ...scope, rowIndices: repeatedIndices({ indices: scope.rowIndices, repeat }) }
+        : scope;
+    default:
+      return scope;
+  }
+}
+
+/** How many times a run asked to repeat every row: 1 when it asked for no repeat. */
+export function runRepeatOf(repeat: number | undefined): number {
+  return repeat !== undefined && repeat > 1 ? repeat : 1;
+}

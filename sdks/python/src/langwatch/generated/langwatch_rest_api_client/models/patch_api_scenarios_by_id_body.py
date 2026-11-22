@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -28,9 +27,13 @@ class PatchApiScenariosByIdBody:
             name, each with an optional description and default. A run supplies values for these names, readable from the
             scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run,
             encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.
-        simulator_model (None | str | Unset): Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the
+        simulator_model (None | str | Unset): Model for the simulated user, e.g. openai/gpt-6-luna. Null uses the
             project default.
-        judge_model (None | str | Unset): Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.
+        judge_model (None | str | Unset): Model for the judge, e.g. openai/gpt-6-luna. Null uses the project default.
+        trace_quiet_period_ms (int | None | Unset): Milliseconds (0 to 60000) the agent's trace must stay unchanged
+            before the judge reads it. Null uses the project's recommendation.
+        trace_wait_timeout_ms (int | None | Unset): Milliseconds (1000 to 300000) the judge waits for the agent's trace
+            before a verdict. Null uses the project's recommendation.
         max_turns (int | None | Unset): Maximum conversation turns for a run of this scenario. Null uses the default.
         min_turns (int | None | Unset): Minimum conversation turns before the judge may end the run. Null uses the
             default.
@@ -49,11 +52,12 @@ class PatchApiScenariosByIdBody:
     parameters: list[PatchApiScenariosByIdBodyParametersItem] | Unset = UNSET
     simulator_model: None | str | Unset = UNSET
     judge_model: None | str | Unset = UNSET
+    trace_quiet_period_ms: int | None | Unset = UNSET
+    trace_wait_timeout_ms: int | None | Unset = UNSET
     max_turns: int | None | Unset = UNSET
     min_turns: int | None | Unset = UNSET
     test_suite_id: None | str | Unset = UNSET
     fields: PatchApiScenariosByIdBodyFields | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
@@ -87,6 +91,18 @@ class PatchApiScenariosByIdBody:
         else:
             judge_model = self.judge_model
 
+        trace_quiet_period_ms: int | None | Unset
+        if isinstance(self.trace_quiet_period_ms, Unset):
+            trace_quiet_period_ms = UNSET
+        else:
+            trace_quiet_period_ms = self.trace_quiet_period_ms
+
+        trace_wait_timeout_ms: int | None | Unset
+        if isinstance(self.trace_wait_timeout_ms, Unset):
+            trace_wait_timeout_ms = UNSET
+        else:
+            trace_wait_timeout_ms = self.trace_wait_timeout_ms
+
         max_turns: int | None | Unset
         if isinstance(self.max_turns, Unset):
             max_turns = UNSET
@@ -110,7 +126,7 @@ class PatchApiScenariosByIdBody:
             fields = self.fields.to_dict()
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update({})
         if name is not UNSET:
             field_dict["name"] = name
@@ -126,6 +142,10 @@ class PatchApiScenariosByIdBody:
             field_dict["simulatorModel"] = simulator_model
         if judge_model is not UNSET:
             field_dict["judgeModel"] = judge_model
+        if trace_quiet_period_ms is not UNSET:
+            field_dict["traceQuietPeriodMs"] = trace_quiet_period_ms
+        if trace_wait_timeout_ms is not UNSET:
+            field_dict["traceWaitTimeoutMs"] = trace_wait_timeout_ms
         if max_turns is not UNSET:
             field_dict["maxTurns"] = max_turns
         if min_turns is not UNSET:
@@ -178,6 +198,24 @@ class PatchApiScenariosByIdBody:
 
         judge_model = _parse_judge_model(d.pop("judgeModel", UNSET))
 
+        def _parse_trace_quiet_period_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_quiet_period_ms = _parse_trace_quiet_period_ms(d.pop("traceQuietPeriodMs", UNSET))
+
+        def _parse_trace_wait_timeout_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_wait_timeout_ms = _parse_trace_wait_timeout_ms(d.pop("traceWaitTimeoutMs", UNSET))
+
         def _parse_max_turns(data: object) -> int | None | Unset:
             if data is None:
                 return data
@@ -220,27 +258,12 @@ class PatchApiScenariosByIdBody:
             parameters=parameters,
             simulator_model=simulator_model,
             judge_model=judge_model,
+            trace_quiet_period_ms=trace_quiet_period_ms,
+            trace_wait_timeout_ms=trace_wait_timeout_ms,
             max_turns=max_turns,
             min_turns=min_turns,
             test_suite_id=test_suite_id,
             fields=fields,
         )
 
-        patch_api_scenarios_by_id_body.additional_properties = d
         return patch_api_scenarios_by_id_body
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

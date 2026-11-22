@@ -6,6 +6,7 @@
 
 import type { Command } from "commander";
 import { describe, expect, it } from "vitest";
+
 import { buildProgram } from "../../../program";
 import { INTERACTIVE_ONLY_MESSAGE, refuseStructuredOutput } from "../index";
 
@@ -13,13 +14,7 @@ import { INTERACTIVE_ONLY_MESSAGE, refuseStructuredOutput } from "../index";
 // stub it for the in-process test run (no bundler define under vitest).
 (globalThis as Record<string, unknown>).__CLI_VERSION__ ??= "0.0.0-test";
 
-const commandNamed = ({
-  parent,
-  name,
-}: {
-  parent: Command;
-  name: string;
-}): Command | undefined =>
+const commandNamed = ({ parent, name }: { parent: Command; name: string }): Command | undefined =>
   parent.commands.find((entry) => entry.name() === name);
 
 describe("given the CLI program", () => {
@@ -33,14 +28,19 @@ describe("given the CLI program", () => {
       const flags = langy?.options.map((option) => option.long) ?? [];
       expect(flags).toContain("--share-control");
     });
+
+    /** @scenario "A login that is not the asker's offers to sign in as the asker" */
+    it("takes --as with the asker's email", () => {
+      const langy = commandNamed({ parent: program, name: "langy" });
+      const as = langy?.options.find((option) => option.long === "--as");
+      expect(as?.flags).toBe("--as <email>");
+    });
   });
 
   describe("when structured output is asked for", () => {
     /** @scenario "JSON output is refused with the reason" */
     it("refuses and says the command is an interactive session", () => {
-      expect(refuseStructuredOutput({ output: "json" })).toBe(
-        INTERACTIVE_ONLY_MESSAGE,
-      );
+      expect(refuseStructuredOutput({ output: "json" })).toBe(INTERACTIVE_ONLY_MESSAGE);
       expect(INTERACTIVE_ONLY_MESSAGE).toContain("interactive session");
       expect(refuseStructuredOutput({ shareControl: true })).toBeNull();
     });
@@ -57,7 +57,9 @@ describe("given the CLI program", () => {
       expect(dev).toBeDefined();
 
       const flagsOf = (command: Command) =>
-        command.options.map((option) => option.long).sort();
+        command.options
+          .map((option) => option.long)
+          .toSorted((a, b) => String(a).localeCompare(String(b)));
       expect(flagsOf(dev!)).toEqual(flagsOf(tunnel!));
       expect(flagsOf(tunnel!)).toContain("--port");
 

@@ -1,0 +1,220 @@
+/** @see specs/identity/sso-signin-error-boundary.feature */
+import { GENERIC_SIGN_IN_ERROR_CODE } from "@langwatch/auth-contract";
+import { describe, expect, it } from "vitest";
+
+import {
+  extractRefusalPageConnection,
+  isSignInCallbackPath,
+  signInErrorRedirectOf,
+  signInFailureLocation,
+} from "../sign-in-callback-failure.rules.ts";
+
+describe("isSignInCallbackPath", () => {
+  describe("when a browser arrives from an identity provider", () => {
+    /** @scenario "A sign-in callback that fails on the server lands on the error screen" */
+    it.each([
+      "/api/auth/callback/microsoft",
+      "/api/auth/oauth2/callback/okta",
+      "/api/auth/sso/callback/conn_1",
+      "/api/auth/sso/saml2/sp/acs/conn_1",
+    ])("names %s a callback", (pathname) => {
+      expect(isSignInCallbackPath({ pathname })).toBe(true);
+    });
+  });
+
+  describe("when the app or an API client calls an auth route", () => {
+    /** @scenario "A server error on an auth route that is not a callback keeps its status" */
+    it.each([
+      "/api/auth/sign-in/email",
+      "/api/auth/get-session",
+      "/api/auth/sso/saml2/sp/metadata",
+    ])("does not name %s a callback", (pathname) => {
+      expect(isSignInCallbackPath({ pathname })).toBe(false);
+    });
+  });
+});
+
+describe("signInFailureLocation", () => {
+  it("carries the generic code and the trace id to the error screen", () => {
+    const location = new URL(
+      signInFailureLocation({ errorPageUrl: "https://app.test/auth/error", traceId: "trace_1" }),
+    );
+
+    expect(location.pathname).toBe("/auth/error");
+    expect(location.searchParams.get("error")).toBe(GENERIC_SIGN_IN_ERROR_CODE);
+    expect(location.searchParams.get("trace")).toBe("trace_1");
+  });
+});
+
+describe("signInErrorRedirectOf", () => {
+  const errorPageUrl = "https://app.test/auth/error";
+  const redirectTo = (location: string) =>
+    signInErrorRedirectOf({ status: 302, location, errorPageUrl, traceId: "trace_1" });
+
+  describe("given a sign-in refused with a handled error", () => {
+    /** @scenario "A handled refusal crosses with its own code" */
+    it.each([
+      "OAuthAccountNotLinked",
+      "account_not_linked",
+      "sso_setup_address_mismatch",
+      "identity_jit_disabled",
+      "identity_link_proposed",
+    ])("lets %s cross as it is", (code) => {
+      expect(redirectTo(`${errorPageUrl}?error=${code}`)).toEqual({ kind: "pass" });
+    });
+  });
+
+  describe("given a sign-in whose state no longer matches this browser", () => {
+    /** @scenario "A sign-in that expired or started elsewhere crosses with its own code" */
+    it("lets state_mismatch cross as it is, so nothing is logged as unknown", () => {
+      expect(redirectTo(`${errorPageUrl}?error=state_mismatch`)).toEqual({ kind: "pass" });
+    });
+  });
+
+  describe("given an identity provider that refused the person", () => {
+    /** @scenario "A provider's access_denied refusal crosses and is logged as a warning" */
+    it("keeps the code and callbackUrl, and drops the description from the Location", () => {
+      const redirect = redirectTo(
+        `${errorPageUrl}?error=access_denied&error_description=AADSTS50105+User+is+not+assigned&callbackUrl=%2Fp&error_uri=https%3A%2F%2Fidp.example`,
+      );
+
+      expect(redirect.kind).toBe("provider_refused");
+      const location = new URL(redirect.kind === "provider_refused" ? redirect.location : "");
+      expect([...location.searchParams.keys()].toSorted()).toEqual([
+        "callbackUrl",
+        "error",
+        "trace",
+      ]);
+      expect(location.searchParams.get("error")).toBe("access_denied");
+      expect(location.searchParams.get("callbackUrl")).toBe("/p");
+      expect(location.searchParams.get("trace")).toBe("trace_1");
+    });
+  });
+
+  describe("given a sign-in that failed for a reason we have not written down", () => {
+    /** @scenario "An unhandled failure crosses as one generic code" */
+    it("sends the generic code with no description, keeping callbackUrl", () => {
+      const redirect = redirectTo(
+        "/auth/error?error=invalid_code&error_description=token+exchange+failed&callbackUrl=%2Fproj",
+      );
+
+      expect(redirect.kind).toBe("withhold");
+      if (redirect.kind !== "withhold") return;
+      const location = new URL(redirect.location);
+      expect(location.searchParams.get("error")).toBe(GENERIC_SIGN_IN_ERROR_CODE);
+      expect(location.searchParams.get("error_description")).toBeNull();
+      expect(location.searchParams.get("callbackUrl")).toBe("/proj");
+    });
+
+    /** @scenario "The cause is written down where we can read it" */
+    it("hands back the real cause for the log and the trace id for the screen", () => {
+      const redirect = redirectTo(`${errorPageUrl}?error=invalid_code&error_description=boom`);
+
+      expect(redirect).toMatchObject({
+        kind: "withhold",
+        code: "invalid_code",
+        description: "boom",
+      });
+      if (redirect.kind !== "withhold") return;
+      expect(new URL(redirect.location).searchParams.get("trace")).toBe("trace_1");
+    });
+  });
+
+  describe("given the plugin's native-transaction error", () => {
+    /** @scenario "An internal code never travels" */
+    it("names no database, adapter or capability in the address", () => {
+      const redirect = redirectTo(
+        `${errorPageUrl}?error=SSO_USER_RESOLUTION_REQUIRES_NATIVE_TRANSACTIONS&error_description=SSO+user+resolution+requires+a+database+adapter+with+native+transaction+support`,
+      );
+
+      expect(redirect.kind).toBe("withhold");
+      if (redirect.kind !== "withhold") return;
+      expect(redirect.location).not.toMatch(/NATIVE_TRANSACTIONS|database|adapter|transaction/i);
+    });
+  });
+
+  describe("given a redirect that is not to the sign-in error page", () => {
+    it.each([
+      [302, "https://app.test/projects?error=whatever"],
+      [302, "https://elsewhere.test/auth/error?error=whatever"],
+      [200, `${errorPageUrl}?error=whatever`],
+    ])("leaves a %s to %s alone", (status, location) => {
+      expect(signInErrorRedirectOf({ status, location, errorPageUrl, traceId: undefined })).toEqual(
+        { kind: "pass" },
+      );
+    });
+  });
+
+  describe("given a callback whose failure Better Auth sent somewhere other than the error page", () => {
+    const fromCallback = (location: string, providerRefused = false) =>
+      signInErrorRedirectOf({
+        status: 302,
+        location,
+        errorPageUrl,
+        traceId: "trace_1",
+        isCallback: true,
+        providerRefused,
+      });
+
+    /** @scenario "A callback failure always lands on the sign-in error screen" */
+    it("moves an unwritten code onto the error page as the generic failure", () => {
+      const redirect = fromCallback(
+        "https://app.test/?error=saml_no_assertion&error_description=SAML+response+contains+no+assertions",
+      );
+
+      expect(redirect.kind).toBe("withhold");
+      const location = new URL((redirect as { location: string }).location);
+      expect(location.pathname).toBe("/auth/error");
+      expect(location.searchParams.get("error")).toBe("sign_in_failed");
+      expect(location.searchParams.get("error_description")).toBeNull();
+    });
+
+    /** @scenario "A callback failure always lands on the sign-in error screen" */
+    it("moves an admitted code onto the error page as itself", () => {
+      const redirect = fromCallback("https://app.test/?error=state_mismatch");
+
+      expect(redirect).toEqual({
+        kind: "misdirected",
+        location: expect.stringContaining("https://app.test/auth/error?"),
+      });
+      expect(new URL((redirect as { location: string }).location).searchParams.get("error")).toBe(
+        "state_mismatch",
+      );
+    });
+
+    /** @scenario "A callback failure always lands on the sign-in error screen" */
+    it("treats a posted refusal as the provider's refusal", () => {
+      expect(fromCallback("https://app.test/?error=saml_no_assertion", true).kind).toBe(
+        "provider_refused",
+      );
+    });
+
+    it("leaves another site, another page and a redirect without an error alone", () => {
+      expect(fromCallback("https://elsewhere.test/?error=x")).toEqual({ kind: "pass" });
+      expect(fromCallback("https://app.test/settings/sso?error=invalid_provider")).toEqual({
+        kind: "pass",
+      });
+      expect(fromCallback("https://app.test/")).toEqual({ kind: "pass" });
+    });
+  });
+});
+
+describe("extractRefusalPageConnection", () => {
+  /** @scenario "A provider's access error page can send the person to our refusal card" */
+  it("reads the connection off a GET of its refusal page", () => {
+    expect(
+      extractRefusalPageConnection({ pathname: "/api/auth/sso/refused/ssoc%20a", method: "GET" }),
+    ).toBe("ssoc a");
+  });
+
+  /** @scenario "A provider's access error page can send the person to our refusal card" */
+  it.each([
+    ["/api/auth/sso/refused/ssoc_a", "POST"],
+    ["/api/auth/sso/refused/", "GET"],
+    ["/api/auth/sso/refused/a/b", "GET"],
+    ["/api/auth/sso/refused/%E0%A4%A", "GET"],
+    ["/api/auth/sso/callback/ssoc_a", "GET"],
+  ])("names no connection for %s over %s", (pathname, method) => {
+    expect(extractRefusalPageConnection({ pathname, method })).toBeUndefined();
+  });
+});

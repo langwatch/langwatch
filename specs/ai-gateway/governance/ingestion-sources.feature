@@ -201,6 +201,77 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       When the admin opens it for editing
       Then the drawer title reads "Edit source"
 
+  Rule: The edit drawer opened by address knows who may edit and what it edits
+    # The drawer opens from `?drawer.open=editIngestionSource&drawer.sourceId=<id>`,
+    # so a shared link, a restored tab or a stale bookmark can open it for a
+    # reader who may not edit, before the list has answered, or for a source
+    # that is gone. Each of those used to render a form the server refused, or
+    # nothing at all while the address still said the drawer was open.
+
+    @integration
+    Scenario: A reader without the manage grant is told why instead of shown the edit form
+      Given a reader holding "ingestionSources:view" but not "ingestionSources:manage"
+      When the reader opens the edit address of a source
+      Then the drawer opens and names the "ingestionSources:manage" grant
+      And no edit field and no Save changes action is offered
+      And the source list is not read for the drawer
+
+    @integration
+    Scenario: The edit drawer says it is loading while the source is read
+      Given the admin's session or the organization's source list has not answered yet
+      When the admin opens the edit address of a source
+      Then the drawer opens in its loading state
+      And no Save changes action and no missing-grant notice is shown yet
+
+    @integration
+    Scenario: An edit address naming an unknown source says so and can be closed
+      Given the organization's source list holds no source with the address's id
+      When the admin opens that edit address
+      Then the drawer says the source isn't in the organization's list
+      And closing it closes the drawer and clears the address
+
+    @integration
+    Scenario: A failed source read in the edit drawer shows the failure and a retry
+      Given the organization's source list read fails
+      When the admin opens the edit address of a source
+      Then the drawer shows that the source could not be loaded, with Try again
+      And it does not claim the source is missing
+
+    @integration
+    Scenario: A manager opening the edit address gets the source's edit form
+      Given the organization's source list holds the address's source
+      When the admin opens that edit address
+      Then the drawer shows that source's edit form with Save changes
+
+  Rule: The source drawers and the once-shown secret keep their controls
+
+    @integration
+    Scenario: The source drawers keep Cancel and say why Save is off
+      When the admin opens the Add or Edit drawer
+      Then the provider's logo is decorative and the title names the source
+      And the footer has Cancel, which closes the drawer once
+      And the primary action is off with a reason while the display name is blank
+
+    @integration
+    Scenario: The once-shown secret ignores an outside click but closes by X or Escape
+      Given a new source's secret is shown
+      When the admin clicks outside the dialog
+      Then the dialog stays open
+      And the X closes it, and so does Escape
+      And "I've saved it" closes it
+
+    @integration
+    Scenario: The secret dialog leads to the source page
+      Given a new source's secret is shown
+      When the admin chooses "View source page"
+      Then the admin goes to that source's page
+
+    @unit
+    Scenario: The test command survives an apostrophe in the source name
+      Given a new push source named "O'Brien's laptop"
+      When its once-shown secret offers the test command
+      Then the command's body is one shell argument holding that name
+
   Rule: Notes about why a field is locked sit behind the title, not above the fields
 
     @integration
@@ -651,6 +722,16 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And once the upstream platform begins pushing, events appear in the
       Activity Monitor within 30 seconds
 
+  # Ruled 2026-10-09 alongside the trace door: a failed handoff is retryable,
+  # and the resend dedupes the spans the pipeline already took.
+  @unit
+  Scenario: A span batch whose pipeline handoff fails is answered as retryable
+    Given an OTel source pushes a span batch to its OTLP URL
+    And the trace pipeline fails to take one of the batch's spans
+    When the receiver answers
+    Then the batch is answered 503 and marked retryable
+    And no event is recorded against the source, so the resend counts once
+
   Scenario: S3 audit log source with custom parser DSL
     Given a customer's homegrown agent system writes audit logs to S3
     When the admin picks "S3 audit (custom)"
@@ -783,12 +864,48 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And after 24h the old secret is auto-invalidated
     And the upstream operator gets a clear paste-this-in instruction for the new value
 
-  Scenario: Disabled source stops ingesting but preserves history
-    When the admin clicks "Disable" on a source
-    Then no new events are ingested from that source
-    And historical events are NOT deleted
-    And re-enabling resumes ingestion seamlessly
-    And the source can be permanently deleted via a separate destroy action
+  # A source is live while it is neither archived nor disabled. That one rule
+  # (`ingestionSourceIsLive`, contract `source-health.ts`) is what the push
+  # receivers, the pull scheduler and the pull worker all ask. The
+  # `ingestion-source-status-literal` lint rule keeps it from being re-spelled.
+  # Disabling only writes the status, so the source's history stays.
+  @unit
+  Scenario: A disabled push source refuses new batches
+    Given a push source the admin has disabled
+    When its sender posts a batch with the source's own secret to its own endpoint
+    Then the receiver answers 403 "ingestion_source_disabled"
+    And nothing is handed to a pipeline and the source is not stamped
+
+  @unit
+  Scenario: A disabled source answers a wrong endpoint as unknown
+    Given a push source the admin has disabled
+    When its secret is posted to another source's endpoint
+    Then the receiver answers the same bare 401 "ingestion_source_unauthorized"
+
+  @unit
+  Scenario: A batch in flight when the source is disabled does not re-enable it
+    Given a batch was let in just before the admin disabled its source
+    When the batch is stamped as received
+    Then the source stays disabled
+
+  @unit
+  Scenario: A pull run completing after the source is disabled does not re-enable it
+    Given a pull run that delivered events was still being recorded when the admin disabled its source
+    When the run's outcome is mirrored onto the source
+    Then the source stays disabled
+    And its cursor, error count and last success still reflect the run
+
+  @unit
+  Scenario: The first batch a source receives makes it active
+    Given a source still awaiting its first event
+    When a batch is stamped as received
+    Then the source is active and its last event time is now
+
+  @unit
+  Scenario: Re-enabling a disabled source resumes ingestion
+    Given a push source the admin disabled and then set back to active
+    When its sender posts a batch with the same secret
+    Then the receiver accepts it
 
   Scenario: Tenant isolation — sources are scoped to one org
     Given two orgs (acme-corp, beta-co) both have configured sources
@@ -1041,3 +1158,24 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       # Asking again inside the run turns one request into several at a
       # provider that has just asked for silence, and spends the wait it
       # named arguing rather than waiting.
+
+  Rule: The report kind is fixed once a source has pulled
+
+    # The adapter's two reports price the same spend twice over. A changed
+    # report no longer matches the stored cursor, so the new report replays
+    # from the configured start and its events land beside the old ones under
+    # different ids, and the same money is counted twice. The full rule is
+    # specified beside the edit form, in
+    # platform/app/specs/governance/edit-pull-source-config.feature; this
+    # scenario is the half only a real database can prove.
+
+    @integration
+    Scenario: A report change that waited on a pull run's cursor is refused
+      Given a source that has never pulled
+      And an admin submits a change of report
+      When a pull run commits its cursor while the change is waiting to be written
+      Then the save is refused rather than applied
+      And the source keeps the report and the cursor the pull run left it with
+      # The write waits on the pull run's row lock and re-reads the cursor as
+      # the pull run left it, rather than deciding on the row as it read it
+      # before the wait.

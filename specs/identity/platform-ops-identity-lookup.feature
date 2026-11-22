@@ -28,13 +28,14 @@ Feature: The platform operator identity lookup - the end of database surgery
   #   ├ methods ───── per person, every sign-in method in every state,     │
   #   │               what proved it and when                              │
   #   ├ waiting ───── sign-ins awaiting confirmation · invitations with    │
-  #   │               their expiry                                         │
+  #   │               their expiry · domain claims awaiting review         │
   #   └ history ───── the most recent identity facts, newest first         │
   #        │
   #        ▼
   #   actions, each one a guarded command with the operator on it:
   #     confirm a proposed sign-in · reject one · detach a method ·
-  #     resend an invitation · extend one · end somebody's sessions
+  #     resend an invitation · extend one · end somebody's sessions ·
+  #     approve a domain claim · reject a domain claim · attest a domain
   #
   # THE READ IS ITSELF THE ACT. Resolving an address here crosses every
   # organization on the installation, so it is authorized and recorded
@@ -132,7 +133,7 @@ Feature: The platform operator identity lookup - the end of database surgery
   @integration
   Scenario: Everything waiting on a human is on one panel
     When "olive" opens a person from the lookup
-    Then sign-ins awaiting confirmation and invitations with their expiry are on one panel
+    Then sign-ins awaiting confirmation, invitations with their expiry, and domain claims awaiting review are on one panel
     And a panel with nothing waiting collapses to a single line rather than filling the page to say so
 
   @unit
@@ -233,12 +234,49 @@ Feature: The platform operator identity lookup - the end of database surgery
     Then a fresh invitation goes out and the previous one stops working
     And the resend is recorded with "olive" on it
 
-  @unit
+  @integration
   Scenario: Extending an invitation moves its expiry and says by how much
     Given an invitation expires tomorrow
     When "olive" extends it
     Then the new expiry is shown as a date, not as a duration the reader has to add up
     And the extension is recorded with "olive" on it
+
+  # ── Domain claims awaiting review ──────────────────────────────────────
+
+  @integration @unimplemented
+  Scenario: Approving a domain claim leaves the customer able to carry on alone
+    Given "acme" has claimed "acme.com" and is waiting
+    When "olive" approves the claim
+    Then "acme" can ask for its domain proof without anybody else acting
+    And the approval is recorded with "olive" on it
+
+  @integration @unimplemented
+  Scenario: Approving a claim for a customer being onboarded leads straight into attesting it
+    Given "olive" has just approved "acme"'s claim on "acme.com" while onboarding it
+    When she attests the domain in the same sitting
+    Then "acme" is asked to publish nothing and to wait for nobody
+    And the approval and the attestation are two facts, each recorded against "olive"
+
+  @integration @unimplemented
+  Scenario: Rejecting a domain claim needs a note, and the customer reads that note
+    Given "acme" has claimed "acme.com" and is waiting
+    When "olive" rejects the claim without writing a note
+    Then the rejection is refused until she writes one
+    And once written, the note is what "acme" reads, unchanged
+
+  @unit @unimplemented
+  Scenario: A claim another operator already decided cannot be decided again
+    Given another operator already approved "acme"'s claim
+    When "olive" decides it
+    Then it is refused with the code "sso_domain_claim_already_decided"
+    And the words say what was decided and by whom
+
+  @integration
+  Scenario: The claims queue puts the longest wait first and says how long it has been
+    Given claims from several organizations are waiting
+    When "olive" opens the queue
+    Then the longest-waiting claim is first, with how long it has waited
+    And the queue is empty-stated in one line when nothing is waiting
 
   # ── The surfaces stay separate, structurally ───────────────────────────
 
@@ -266,3 +304,25 @@ Feature: The platform operator identity lookup - the end of database surgery
     When a repair is refused for a reason we can name
     Then the answer carries a stable code and the words registered for it
     And an operator reading it knows what to try next
+
+  @integration
+  Scenario: A person drawer remains informative while its read is pending or failed
+    When an operator opens a person whose details are loading
+    Then the drawer shows loading feedback
+    And loaded details replace the loading feedback
+    And a failed read shows an error alert with an action to retry
+
+  @integration
+  Scenario: Recent operator activity uses plain words and groups repeated reads
+    When an operator reads recent activity
+    Then operation names read as plain words with relative time
+    And repeated reads by the same operator for the same address within a minute show a count
+    And duplicate audit records appear once
+    And distinct repair records remain separate
+
+  @integration
+  Scenario: Removed sign-in methods remain visible without repair actions
+    Given a person's sign-in method has been removed
+    When an operator opens that person's details
+    Then the method has a Removed badge and its removal time
+    And no repair actions are offered for that method

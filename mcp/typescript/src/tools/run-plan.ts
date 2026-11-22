@@ -3,13 +3,10 @@ import {
   type RunParameters,
   type RunPlanScope,
   type RunPlanTarget,
-} from "../langwatch-api-run-plans.js";
-import { toWireTargets } from "../schemas/run-plan.js";
-import {
-  type EvaluatorAttachmentInput,
-  toWireAttachments,
-} from "../schemas/suite-fields.js";
-import { formatRunPlanRun } from "./format-run-plan.js";
+} from "../langwatch-api-run-plans.ts";
+import { toWireTargets } from "../schemas/run-plan.ts";
+import { type EvaluatorAttachmentInput, toWireAttachments } from "../schemas/suite-fields.ts";
+import { formatRunPlanRun } from "./format-run-plan.ts";
 
 /**
  * Handles the platform_run_plan MCP tool invocation.

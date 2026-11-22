@@ -1,13 +1,10 @@
-import { createTestSuite as apiCreateTestSuite } from "../langwatch-api-test-suites.js";
+import { createTestSuite as apiCreateTestSuite } from "../langwatch-api-test-suites.ts";
 import {
   type EvaluatorAttachmentInput,
   type SuiteField,
   toWireAttachments,
-} from "../schemas/suite-fields.js";
-import {
-  formatEvaluatorAttachments,
-  formatSuiteFields,
-} from "./format-suite-details.js";
+} from "../schemas/suite-fields.ts";
+import { formatEvaluatorAttachments, formatSuiteFields } from "./format-suite-details.ts";
 
 /**
  * Handles the platform_create_test_suite MCP tool invocation.
@@ -35,9 +32,7 @@ export async function handleCreateTestSuite(params: {
     ...formatEvaluatorAttachments(suite.evaluators),
     "",
     `> File scenarios in it with \`platform_create_scenario\` or \`platform_update_scenario\`, passing testSuiteId \`${suite.id}\`${
-      suite.fields && suite.fields.length > 0
-        ? ` and a value per field under \`fields\``
-        : ""
+      suite.fields && suite.fields.length > 0 ? ` and a value per field under \`fields\`` : ""
     }.`,
   ].join("\n");
 }

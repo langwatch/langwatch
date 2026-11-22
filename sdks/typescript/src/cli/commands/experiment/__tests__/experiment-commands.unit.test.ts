@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ExperimentsApiServiceError } from "@/client-sdk/services/experiments/experiments-api.service";
+
+import {
+  ExperimentsApiServiceError,
+  ExperimentsApiService,
+} from "@/client-sdk/services/experiments/experiments-api.service";
 
 vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  const actual = await importOriginal<typeof import("@/client-sdk/services/experiments/experiments-api.service")>();
+  const actual = await importOriginal<typeof experimentsApiServiceModule>();
   return {
     ...actual,
     ExperimentsApiService: vi.fn(),
@@ -11,7 +14,11 @@ vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (impo
 });
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -24,7 +31,9 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+import type * as experimentsApiServiceModule from "@/client-sdk/services/experiments/experiments-api.service";
+
+import { passRateText, rowPassRatesOf } from "../rowPassRates";
 import { runExperimentCommand } from "../run";
 import { experimentStatusCommand } from "../status";
 
@@ -47,15 +56,20 @@ const mockProcessExit = () => {
 describe("runExperimentCommand()", () => {
   let mockStartRun: ReturnType<typeof vi.fn>;
   let mockGetRunStatus: ReturnType<typeof vi.fn>;
+  let mockGetRunResults: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockStartRun = vi.fn();
     mockGetRunStatus = vi.fn();
-    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
-      startRun: mockStartRun,
-      getRunStatus: mockGetRunStatus,
-    }) as unknown as ExperimentsApiService; });
+    mockGetRunResults = vi.fn();
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        startRun: mockStartRun,
+        getRunStatus: mockGetRunStatus,
+        getRunResults: mockGetRunResults,
+      } as unknown as ExperimentsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -96,6 +110,128 @@ describe("runExperimentCommand()", () => {
     });
   });
 
+  describe("when --concurrency is given", () => {
+    /** @scenario "The experiment run command passes its concurrency flag on the run" */
+    it("starts the run with that concurrency", async () => {
+      mockStartRun.mockResolvedValue({ runId: "run_123", status: "running", total: 10 });
+
+      await runExperimentCommand("quality-check", { concurrency: "1" });
+
+      expect(mockStartRun).toHaveBeenCalledWith("quality-check", {
+        parameters: undefined,
+        concurrency: 1,
+      });
+    });
+  });
+
+  describe("when --dataset-version is given", () => {
+    it("starts the run pinned to that dataset version", async () => {
+      mockStartRun.mockResolvedValue({ runId: "run_123", status: "running", total: 10 });
+
+      await runExperimentCommand("quality-check", { datasetVersion: 2 });
+
+      expect(mockStartRun).toHaveBeenCalledWith("quality-check", {
+        parameters: undefined,
+        datasetVersion: 2,
+      });
+    });
+  });
+
+  describe("when --concurrency is outside 1 to 24", () => {
+    for (const value of ["0", "25", "1.5", "many"]) {
+      /** @scenario "The experiment run command refuses a concurrency outside 1 to 24" */
+      it(`refuses "${value}" instead of starting a run`, async () => {
+        await expect(runExperimentCommand("quality-check", { concurrency: value })).rejects.toThrow(
+          ProcessExitError,
+        );
+
+        expect(mockStartRun).not.toHaveBeenCalled();
+      });
+    }
+  });
+
+  describe("when --repeat is given", () => {
+    /** @scenario "The experiment run command passes its repeat flag on the run" */
+    it("starts the run with that repeat", async () => {
+      mockStartRun.mockResolvedValue({ runId: "run_123", status: "running", total: 6 });
+
+      await runExperimentCommand("quality-check", { repeat: "3" });
+
+      expect(mockStartRun).toHaveBeenCalledWith("quality-check", {
+        parameters: undefined,
+        repeat: 3,
+      });
+    });
+  });
+
+  describe("when --repeat is not a whole number from 1 to 5", () => {
+    for (const value of ["0", "6", "1.5", "many"]) {
+      /** @scenario "The experiment run command refuses a repeat that is not a whole number from 1 to 5" */
+      it(`refuses "${value}" instead of starting a run`, async () => {
+        await expect(runExperimentCommand("quality-check", { repeat: value })).rejects.toThrow(
+          ProcessExitError,
+        );
+
+        expect(console.error).toHaveBeenCalledWith(
+          expect.stringContaining("--repeat takes a whole number from 1 to 5"),
+        );
+        expect(mockStartRun).not.toHaveBeenCalled();
+      });
+    }
+  });
+
+  describe("when a repeated run is waited for and completes", () => {
+    /** @scenario "A waited repeated run prints the pass rate of every dataset row" */
+    it("prints and returns each dataset row's pass rate over its repetitions", async () => {
+      mockStartRun.mockResolvedValue({ runId: "run_123", status: "running", total: 6 });
+      mockGetRunStatus.mockResolvedValue({
+        runId: "run_123",
+        status: "completed",
+        progress: 6,
+        total: 6,
+      });
+      const verdicts = [true, false, true, true, true, true];
+      mockGetRunResults.mockResolvedValue({
+        experimentId: "experiment_1",
+        runId: "run_123",
+        projectId: "project_1",
+        repeat: 3,
+        targets: [{ id: "target_a", name: "support-prompt" }],
+        dataset: verdicts.map((_, index) => ({ index, targetId: "target_a", entry: {} })),
+        evaluations: verdicts.map((passed, index) => ({
+          evaluator: "exact",
+          targetId: "target_a",
+          status: "processed",
+          index,
+          passed,
+        })),
+        timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 2 },
+        completeness: {
+          complete: true,
+          dataset: { received: 6, expected: 6 },
+          evaluations: { received: 6, expected: 6 },
+        },
+      });
+
+      const result = await runExperimentCommand("quality-check", { repeat: "3", wait: true });
+      result?.table?.();
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((call) => call.join(" "))
+        .join("\n");
+      expect(printed).toContain("Row 1 · support-prompt:");
+      expect(printed).toContain("2/3 passed (67%)");
+      expect(printed).toContain("3/3 passed (100%)");
+      expect(result?.data).toMatchObject({
+        rowPassRates: [
+          { row: 1, targetId: "target_a", passed: 2, graded: 3, errors: 0, repeat: 3 },
+          { row: 2, targetId: "target_a", passed: 3, graded: 3, errors: 0, repeat: 3 },
+        ],
+      });
+    });
+  });
+
   describe("when a --param pair has no equals sign", () => {
     it("refuses the command instead of starting a run", async () => {
       await expect(
@@ -128,9 +264,7 @@ describe("runExperimentCommand()", () => {
         new ExperimentsApiServiceError("Not found", "start evaluation run"),
       );
 
-      await expect(
-        runExperimentCommand("nonexistent", {}),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runExperimentCommand("nonexistent", {})).rejects.toThrow(ProcessExitError);
     });
   });
 });
@@ -141,16 +275,16 @@ describe("experimentStatusCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetRunStatus = vi.fn();
-    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
-      startRun: vi.fn(),
-      getRunStatus: mockGetRunStatus,
-      getRunResults: vi
-        .fn()
-        .mockRejectedValue(
-          new ExperimentsApiServiceError("Run not found", "get run results"),
-        ),
-      listRuns: vi.fn().mockResolvedValue({ runs: [{ runId: "run_123" }] }),
-    }) as unknown as ExperimentsApiService; });
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        startRun: vi.fn(),
+        getRunStatus: mockGetRunStatus,
+        getRunResults: vi
+          .fn()
+          .mockRejectedValue(new ExperimentsApiServiceError("Run not found", "get run results")),
+        listRuns: vi.fn().mockResolvedValue({ runs: [{ runId: "run_123" }] }),
+      } as unknown as ExperimentsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -195,9 +329,52 @@ describe("experimentStatusCommand()", () => {
         new ExperimentsApiServiceError("Not found", "get run status"),
       );
 
-      await expect(
-        experimentStatusCommand("doc-qa", { runId: "nonexistent" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(experimentStatusCommand("doc-qa", { runId: "nonexistent" })).rejects.toThrow(
+        ProcessExitError,
+      );
+    });
+  });
+});
+
+describe("rowPassRatesOf()", () => {
+  describe("given repetitions whose target or evaluator errored and one with no verdict", () => {
+    /** @scenario "An errored repetition is left out of the pass rate and counted as an error" */
+    it("counts the errors apart and leaves them and the ungraded repetition out", () => {
+      const rates = rowPassRatesOf({
+        repeat: 4,
+        results: {
+          dataset: [
+            { index: 0, targetId: "target_a", entry: {} },
+            { index: 1, targetId: "target_a", entry: {}, error: "timed out" },
+            { index: 2, targetId: "target_a", entry: {} },
+            { index: 3, targetId: "target_a", entry: {} },
+          ],
+          evaluations: [
+            {
+              evaluator: "exact",
+              targetId: "target_a",
+              status: "processed",
+              index: 0,
+              passed: true,
+            },
+            { evaluator: "score", targetId: "target_a", status: "processed", index: 2, score: 0.4 },
+            { evaluator: "judge", targetId: "target_a", status: "error", index: 3 },
+          ],
+        },
+      });
+
+      expect(rates).toEqual([
+        {
+          row: 1,
+          targetId: "target_a",
+          targetName: null,
+          passed: 1,
+          graded: 1,
+          errors: 2,
+          repeat: 4,
+        },
+      ]);
+      expect(passRateText(rates[0]!)).toBe("1/1 passed (100%), 2 errors");
     });
   });
 });

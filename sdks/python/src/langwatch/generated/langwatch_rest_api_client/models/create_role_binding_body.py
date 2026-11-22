@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 from ..models.create_role_binding_body_role import CreateRoleBindingBodyRole
 from ..models.create_role_binding_body_scope_type import CreateRoleBindingBodyScopeType
@@ -24,6 +26,7 @@ class CreateRoleBindingBody:
         group_id (str | Unset):
         api_key_id (str | Unset):
         custom_role_id (str | Unset):
+        expires_at (datetime.datetime | Unset):
     """
 
     role: CreateRoleBindingBodyRole
@@ -33,6 +36,7 @@ class CreateRoleBindingBody:
     group_id: str | Unset = UNSET
     api_key_id: str | Unset = UNSET
     custom_role_id: str | Unset = UNSET
+    expires_at: datetime.datetime | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -49,6 +53,10 @@ class CreateRoleBindingBody:
         api_key_id = self.api_key_id
 
         custom_role_id = self.custom_role_id
+
+        expires_at: str | Unset = UNSET
+        if not isinstance(self.expires_at, Unset):
+            expires_at = self.expires_at.isoformat()
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -67,6 +75,8 @@ class CreateRoleBindingBody:
             field_dict["apiKeyId"] = api_key_id
         if custom_role_id is not UNSET:
             field_dict["customRoleId"] = custom_role_id
+        if expires_at is not UNSET:
+            field_dict["expiresAt"] = expires_at
 
         return field_dict
 
@@ -87,6 +97,13 @@ class CreateRoleBindingBody:
 
         custom_role_id = d.pop("customRoleId", UNSET)
 
+        _expires_at = d.pop("expiresAt", UNSET)
+        expires_at: datetime.datetime | Unset
+        if isinstance(_expires_at, Unset):
+            expires_at = UNSET
+        else:
+            expires_at = isoparse(_expires_at)
+
         create_role_binding_body = cls(
             role=role,
             scope_type=scope_type,
@@ -95,6 +112,7 @@ class CreateRoleBindingBody:
             group_id=group_id,
             api_key_id=api_key_id,
             custom_role_id=custom_role_id,
+            expires_at=expires_at,
         )
 
         create_role_binding_body.additional_properties = d

@@ -4,6 +4,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.scim_create_group_body import ScimCreateGroupBody
 from ...models.scim_create_group_response_201 import ScimCreateGroupResponse201
 from ...models.scim_create_group_response_400 import ScimCreateGroupResponse400
 from ...models.scim_create_group_response_401 import ScimCreateGroupResponse401
@@ -12,13 +13,22 @@ from ...models.scim_create_group_response_409 import ScimCreateGroupResponse409
 from ...types import Response, safe_http_status
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    body: ScimCreateGroupBody,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/api/scim/v2/Groups",
     }
 
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/scim+json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -86,6 +96,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
+    body: ScimCreateGroupBody,
 ) -> Response[
     ScimCreateGroupResponse201
     | ScimCreateGroupResponse400
@@ -100,6 +111,9 @@ def sync_detailed(
     group can be provisioned before everyone in it is. Granting the group access is a separate step: a
     group carries no permissions until a role binding is created for it.
 
+    Args:
+        body (ScimCreateGroupBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -108,7 +122,9 @@ def sync_detailed(
         Response[ScimCreateGroupResponse201 | ScimCreateGroupResponse400 | ScimCreateGroupResponse401 | ScimCreateGroupResponse403 | ScimCreateGroupResponse409]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -120,6 +136,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
+    body: ScimCreateGroupBody,
 ) -> (
     ScimCreateGroupResponse201
     | ScimCreateGroupResponse400
@@ -135,6 +152,9 @@ def sync(
     group can be provisioned before everyone in it is. Granting the group access is a separate step: a
     group carries no permissions until a role binding is created for it.
 
+    Args:
+        body (ScimCreateGroupBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -145,12 +165,14 @@ def sync(
 
     return sync_detailed(
         client=client,
+        body=body,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
+    body: ScimCreateGroupBody,
 ) -> Response[
     ScimCreateGroupResponse201
     | ScimCreateGroupResponse400
@@ -165,6 +187,9 @@ async def asyncio_detailed(
     group can be provisioned before everyone in it is. Granting the group access is a separate step: a
     group carries no permissions until a role binding is created for it.
 
+    Args:
+        body (ScimCreateGroupBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -173,7 +198,9 @@ async def asyncio_detailed(
         Response[ScimCreateGroupResponse201 | ScimCreateGroupResponse400 | ScimCreateGroupResponse401 | ScimCreateGroupResponse403 | ScimCreateGroupResponse409]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -183,6 +210,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
+    body: ScimCreateGroupBody,
 ) -> (
     ScimCreateGroupResponse201
     | ScimCreateGroupResponse400
@@ -197,6 +225,9 @@ async def asyncio(
     return; an id that is not a member of the organization is skipped rather than failing the call, so a
     group can be provisioned before everyone in it is. Granting the group access is a separate step: a
     group carries no permissions until a role binding is created for it.
+
+    Args:
+        body (ScimCreateGroupBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -209,5 +240,6 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
+            body=body,
         )
     ).parsed

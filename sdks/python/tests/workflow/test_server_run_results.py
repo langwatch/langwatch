@@ -1,7 +1,7 @@
 """Unit tests for server-side ``langwatch.workflow.run`` with per-row results.
 
 These mock the HTTP boundary (``create_client``) so we assert the SDK posts to
-``/api/workflows/{workflow_id}/evaluate`` and that ``result.results`` builds the
+``/api/v1/workflows/{workflow_id}/evaluate`` and that ``result.results`` builds the
 SAME per-row DataFrame shape an experiment run returns.
 
 Specs: specs/workflow/server_run_results.feature
@@ -167,7 +167,7 @@ class TestWorkflowRunWithInlineData:
             evaluate_post = next(
                 p for p in _FakeClient.captured_posts if "/evaluate" in p["url"]
             )
-            assert "/api/workflows/workflow_abc/evaluate" in evaluate_post["url"]
+            assert "/api/v1/workflows/workflow_abc/evaluate" in evaluate_post["url"]
             assert evaluate_post["json"] == {"data": rows}
 
             # run_url points at the workflow's experiment results page.
@@ -200,6 +200,37 @@ class TestWorkflowRunWithDatasetId:
             p for p in _FakeClient.captured_posts if "/evaluate" in p["url"]
         )
         assert evaluate_post["json"] == {"dataset_id": "ds_xyz"}
+
+
+class TestWorkflowRunWithDatasetVersion:
+    """when running a workflow pinned to a version of its saved dataset"""
+
+    def test_posts_dataset_version(self):
+        _script_full_run()
+        with patch.object(platform_run, "create_client", _FakeClient), patch.object(
+            workflow_module, "create_client", _FakeClient
+        ):
+            workflow_run("workflow_abc", dataset_version=2, poll_interval=0)
+
+        evaluate_post = next(
+            p for p in _FakeClient.captured_posts if "/evaluate" in p["url"]
+        )
+        assert evaluate_post["json"] == {"dataset_version": 2}
+
+    @pytest.mark.parametrize("version", [0, -1, 1.5, True])
+    def test_refuses_a_version_that_is_not_a_whole_number_from_one(self, version):
+        with patch.object(workflow_module, "create_client", _FakeClient):
+            with pytest.raises(ValueError):
+                workflow_run("workflow_abc", dataset_version=version)
+
+        assert _FakeClient.captured_posts == []
+
+    def test_refuses_a_version_with_inline_data(self):
+        with patch.object(workflow_module, "create_client", _FakeClient):
+            with pytest.raises(ValueError):
+                workflow_run("workflow_abc", data=[{"q": "x"}], dataset_version=1)
+
+        assert _FakeClient.captured_posts == []
 
 
 class TestWorkflowRunWithParameters:

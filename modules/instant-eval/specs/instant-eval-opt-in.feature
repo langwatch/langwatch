@@ -1,0 +1,391 @@
+Feature: An organization switches Instant Evals on itself, once it has read where the judged text goes
+
+  As a member of an organization on the hosted service
+  I want to switch Instant Evals on from the search bar, after being told where my trace text goes
+  So that my organization agrees to that data flow itself, rather than having it turned on for it
+
+  A run sends the judged text to the judge's provider under a data processing agreement,
+  and the provider does not train on it. That is a flow an
+  organization agrees to, so:
+  - a self-serve organization is offered the switch in the popover, with the explanation and a
+    link to the docs paragraph that says the same at length, to a member who may manage the
+    organization; a member who may not reads the same explanation and is told to ask an
+    organization admin, and is never offered a button the server would refuse;
+  - an enterprise organization is offered a word with us instead, and is never switched on by a
+    click;
+  - a self-hosted install that judges through LangWatch is released by its license alone: the
+    customer signed a license that names Instant Evals, which is the same agreement, and an
+    organization admin can still switch hosted judging off in Settings, Connect; the operator's
+    release flag never releases it, so no install judges without a license that names them;
+  - a self-hosted install that is not released is told why in its own terms: its license does
+    not include Instant Evals, an admin switched them off, it is not connected to LangWatch, or it
+    has judging turned off, since judging runs on LangWatch Cloud only, and its operator decides;
+  - on the hosted service the plan decides what releases a project: a self-serve organization is
+    released by its own switch alone, whatever the operator's release flag says, so no organization
+    sends its text to the judge without having agreed to it; an enterprise organization is released
+    by the flag alone, which is how one that asked gets them, and a switch thrown before it was on
+    an enterprise plan no longer counts;
+  - an install that does not judge through LangWatch, which has judging turned off or is a
+    development checkout with its own key, is released by the operator's release flag.
+
+  Rule: The offer depends on the plan, the deployment, and whether the member may throw the switch
+
+    @unit
+    Scenario: A self-serve organization is offered the switch
+      Given an organization on the hosted service that is not on an enterprise plan
+      And a member who may manage the organization
+      When the popover asks what to offer
+      Then it is offered the switch
+
+    @unit @integration
+    Scenario: A member who may not throw the switch is told to ask an admin
+      Given an organization on the hosted service that is not on an enterprise plan
+      And a member who may not manage the organization
+      When the popover asks what to offer
+      Then it is offered a word with an organization admin
+      And the popover says where the judged text goes, links "Read more", and offers no "Enable"
+      And no estimate is requested and the typed query stays in the bar
+
+    @unit
+    Scenario: An enterprise organization is offered a word with us
+      Given an organization on the hosted service that is on an enterprise plan
+      When the popover asks what to offer
+      Then it is offered a word with us, whatever the member may do
+
+  Rule: A self-hosted install is released by its license alone, and told why when it is not
+
+    @unit
+    Scenario: A license that names Instant Evals releases them without the flag
+      Given a self-hosted install that judges through LangWatch, with the release flag off
+      And the organization's license names Instant Evals and no admin switched them off
+      When the project asks whether it may judge
+      Then it may, from the license, and the organization's own switch is not read
+
+    @unit
+    Scenario: An admin who switched hosted judging off keeps it off
+      Given a self-hosted install that judges through LangWatch, with the release flag off
+      And the organization's license names Instant Evals but an admin switched them off
+      When the project asks whether it may judge
+      Then it may not
+
+    @unit
+    Scenario: The release flag does not release a self-hosted install without a license
+      Given a self-hosted install that judges through LangWatch, with the release flag on
+      And the organization's license does not name Instant Evals
+      When the project asks whether it may judge
+      Then it may not, and neither the flag nor the organization's own switch is read
+
+    @unit
+    Scenario: A development checkout waits for the release flag
+      Given a development checkout that does not judge through LangWatch
+      When the project asks whether it may judge
+      Then it may when the release flag is on and may not when it is off
+      And the license is not read
+
+    @unit
+    Scenario: A self-hosted install is told why from its judge and its license, and the plan is not read
+      Given a self-hosted install
+      When the popover asks what to offer
+      Then an install whose license does not include Instant Evals, or that holds no license, is told Instant Evals are part of LangWatch Enterprise
+      And an install whose admin switched hosted judging off is told where to switch it back on
+      And an install with Connect switched off, or that holds no credential to present, is told it is not connected to LangWatch
+      And an install that has judging turned off is told to ask whoever runs it
+
+    @integration
+    Scenario: Each self-hosted refusal says what to do about it
+      Given an eval chip refused on a self-hosted install
+      When the popover opens
+      Then an install without Instant Evals in its license, or with no license, says "Instant Evals is part of LangWatch Enterprise"
+      And an organization admin is offered "Activate a license" and "Get a license", both leading to Settings > License
+      And a member is told "Ask an organization admin to activate a license." with no button
+      And it never says the license doesn't include them when no license is installed
+      And a switched-off organization names Settings, Connect, and offers no "Contact us"
+      And an install that is not connected to LangWatch names connect.langwatch.ai and gateway.langwatch.ai and links "Read more"
+      And an install that has judging turned off offers no "Contact us"
+
+    @integration
+    Scenario: A judgement that fails on an install judging through LangWatch names the addresses it needs
+      Given a project on an install that judges through LangWatch
+      When the judge can't be reached for an eval chip
+      Then the "can't run right now" popover names connect.langwatch.ai and gateway.langwatch.ai
+      And it still offers to contact us
+
+  Rule: A project on its own decision model is released by that model, whatever the release says
+
+    # ADR-182. Its key, its bill: `release_instant_evals` and the license govern LangWatch's model
+    # only. The resolver answers "own" only under the own-model flag with a usable key.
+
+    @unit
+    Scenario: An own decision model releases Instant Evals without the flag or a license
+      Given a self-hosted install with no license, no classifier and the release flag off
+      And a project whose Instant Evals column is its own decision model, ready to run
+      When the project asks whether it may judge
+      Then it may, and neither the flag, the license nor the classifier is read
+      And LangWatch's own model is still not released
+
+    @unit
+    Scenario: An own decision model that cannot run releases nothing
+      Given a self-hosted install with no license and the release flag off
+      And a project whose own decision model has no usable key
+      When the project asks whether it may judge
+      Then it may not
+
+    @unit
+    Scenario: The popover reports LangWatch's model apart from an own one
+      Given a project released by its own decision model alone
+      When the explorer asks for its Instant Evals access
+      Then it is released, and LangWatch's own model is not
+
+
+    @integration
+    Scenario: Every refusal of LangWatch's own model offers the project's own decision model
+      Given an eval chip refused for the plan, the organization's switch, a license or an install
+      When the refusal popover opens
+      Then it links to Default models, in a new tab, to run Instant Evals on the project's own decision model
+      And a judge that can't run right now offers no such link
+      And with the own decision model switched off for the organization it offers no such link and never mentions the own decision model
+  Rule: The switch is the organization's, and the first click is the one that counts
+
+    @integration
+    Scenario: Instant Evals off for a self-serve organization open the enable popover
+      Given an organization that has not switched Instant Evals on, offered the switch
+      When the reader submits an eval chip
+      Then a closable popover anchored under the search bar says where the judged text goes, under what agreement, and that it is never trained on
+      And it offers "Enable" and a "Read more" link to the docs paragraph on where the judged text goes
+      And no estimate is requested and the typed query stays in the bar
+      And "Not now", Escape and a click outside keep the typed query and search nothing
+
+    @integration
+    Scenario: Enable switches the organization on and the judgement goes ahead
+      Given the enable popover is open over a submitted eval chip
+      When the reader clicks "Enable"
+      Then the switch is thrown for the project's organization, resolved on the server and never taken from the client
+      And the access read is refreshed
+      And the popover closes and the same chip goes on to the estimate
+      And a switch answered after a later submit superseded it starts nothing
+
+    @unit
+    Scenario: Enable records the moment and the member, once
+      Given an organization that has not switched Instant Evals on
+      When a member throws the switch
+      Then the moment and the member are recorded
+      And a later click leaves the first record in place
+
+    @integration
+    Scenario: A second click against the database keeps the first record
+      Given an organization a member has switched Instant Evals on, stored in Postgres
+      When another member throws the switch later
+      Then the stored moment and member are still the first member's
+
+    @integration
+    Scenario: A refused switch is a warning and the popover stays
+      Given the enable popover is open
+      When the server refuses the switch for a reason other than it no longer being offered
+      Then the registry's words are shown as a warning
+      And no estimate is requested and the popover stays open
+
+  Rule: On the hosted service the plan decides whether the switch or the release flag releases a project
+
+    @unit @integration
+    Scenario: An organization that switched itself on is judged without the flag
+      Given a self-serve organization on the hosted service that switched Instant Evals on
+      And the release flag is off for the project
+      When the project asks whether it may judge
+      Then it may, from the organization's switch
+
+    @unit @integration
+    Scenario: The release flag does not release a self-serve organization that never switched itself on
+      Given a self-serve organization on the hosted service that has not switched Instant Evals on
+      And the release flag is on for the project
+      When the project asks whether it may judge
+      Then it may not, and the flag is not read
+      And the popover still offers the switch
+
+    @unit @integration
+    Scenario: The release flag releases an enterprise organization
+      Given an enterprise organization on the hosted service
+      And the release flag is on for the project
+      When the project asks whether it may judge
+      Then it may, and the organization's switch is not read
+
+    @integration
+    Scenario: The search bar takes release from the server, never from its own read of the flag
+      Given the release flag reads on in the browser but the server says the project is not released
+      When the search bar asks whether Instant Evals are available
+      Then they are not, and the offer is the server's
+
+    @unit
+    Scenario: A switch thrown before an organization moved to an enterprise plan no longer counts
+      Given an enterprise organization on the hosted service whose switch was thrown earlier
+      And the release flag is off for the project
+      When the project asks whether it may judge
+      Then it may not
+
+  Rule: An enterprise organization is never switched on by a click
+
+    @integration
+    Scenario: Instant Evals off for an enterprise organization ask for a decision model of its own
+      Given an organization that is offered a word with us
+      And the own decision model is switched on for the organization
+      And the reader may manage the project
+      When the reader submits an eval chip
+      Then a closable popover anchored under the search bar asks the reader to pick a decision model
+      And it says in one line that Instant Evals run on a decision model of their own
+      And it shows the decision model picker in place
+      And it neither says Instant Evals aren't enabled nor offers to contact us nor names Evals Preview
+      And no estimate is requested and the typed query stays in the bar
+      And closing it, by Escape or a click outside, keeps the typed query and searches nothing
+
+    @integration
+    Scenario: The eval popover picks the project's own decision model in place
+      Given an organization that is offered a word with us
+      And the own decision model is switched on for the organization
+      And the project holds an Azure OpenAI key
+      And the reader may manage the project
+      When the reader submits an eval chip
+      Then the picker is the one Default models shows for Instant Evals
+      And the decision models the project's keys would run can be picked
+      And it never lists Evals Preview
+      And the rest of the catalogue is greyed out, each saying which key to add
+      And "Configure available models" at the foot of the picker's list opens Model Providers in a new tab
+      When the reader picks Azure Microsoft Decision 1
+      Then it is saved as the project's Instant Evals default model
+      And the popover closes and the held eval chip is estimated
+      When the save is refused
+      Then a warning says why and the popover stays
+
+    @integration
+    Scenario: A reader who can't set the project's default models is sent to an admin
+      Given an organization that is offered a word with us
+      And the own decision model is switched on for the organization
+      And the reader may not manage the project
+      When the reader submits an eval chip
+      Then the popover says Instant Evals need a decision model and asks a project admin to pick one
+      And it links to Default models in a new tab and shows no picker
+      And it neither offers to contact us nor names Evals Preview
+
+    @integration
+    Scenario: Instant Evals off for an enterprise organization open the contact-us popover
+      Given an organization that is offered a word with us
+      And the own decision model is switched off for the organization
+      When the reader submits an eval chip
+      Then a closable popover anchored under the search bar says Instant Evals aren't enabled for this project and offers to contact us
+      And it never mentions the project's own decision model
+      And no estimate is requested and the typed query stays in the bar
+      And closing it, by Escape or a click outside, keeps the typed query and searches nothing
+
+    @unit
+    Scenario: The server refuses a switch the popover did not offer
+      Given an organization that is offered a word with us
+      When a request tries to throw the switch anyway
+      Then it is refused as not offered, and nothing is recorded
+      And the refusal says what turns Instant Evals on instead: the plan, or on a self-hosted install its license, or whoever runs it when it has judging turned off
+
+  Rule: Instant Evals decide whether a run's statement may call an eval function, and Analytics takes that answer
+
+    @unit
+    Scenario: Every read a run makes carries Instant Evals' own answer to whether eval functions may run
+      Given a project whose statement calls an eval function
+      When a run reads its rows through Analytics
+      Then each read states whether the project is released, by the flag, the license or the organization's switch
+      And a connected install whose license names Instant Evals is allowed without the flag
+      And an organization on the hosted service that switched them on is allowed without the flag
+      And an install whose license does not name them, with the flag off and no switch, is refused "lwql_not_permitted"
+      And Analytics never reads the release flag for that read itself
+
+  Rule: LangWatch can switch its hosted model off for one organization, whatever its plan, and its own decision models keep running
+
+    # Customer report: an organization that may only ever use its own models. The
+    # instant_evals_hosted_disabled flag, off by default and set per organization at
+    # /ops/feature-flags, wins over the plan, the organization's switch, the release flag and the
+    # license. It never touches an own decision model: its key, its bill (ADR-182).
+
+    @unit
+    Scenario: The hosted switch is off unless set for an organization
+      When the flag registry is read
+      Then instant_evals_hosted_disabled is a product flag, off by default
+
+    @unit
+    Scenario: A self-serve organization with hosted switched off is not released by its own switch
+      Given a self-serve organization on the hosted service that switched Instant Evals on
+      And LangWatch's hosted model is switched off for it
+      When the project asks whether it may judge
+      Then it may not, and LangWatch's own model is not released
+
+    @unit
+    Scenario: An enterprise organization with hosted switched off is not released by the release flag
+      Given an enterprise organization on the hosted service with the release flag on
+      And LangWatch's hosted model is switched off for it
+      When the project asks whether it may judge
+      Then it may not, and LangWatch's own model is not released
+
+    @unit
+    Scenario: An install judging through LangWatch with hosted switched off is not released by its license
+      Given a self-hosted install whose license names Instant Evals, left on by its admin
+      And LangWatch's hosted model is switched off for its organization
+      When the project asks whether it may judge
+      Then it may not
+
+    @unit
+    Scenario: An own decision model still runs for an organization with hosted switched off
+      Given an organization with LangWatch's hosted model switched off
+      And a project whose Instant Evals column is its own decision model, ready to run
+      When the project asks whether it may judge
+      Then it may, and the hosted switch is not read
+      And LangWatch's own model is still not released
+
+    @unit
+    Scenario: With the hosted switch off for nobody, the plan still decides
+      Given a self-serve organization on the hosted service that switched Instant Evals on
+      And LangWatch's hosted model is not switched off for it
+      When the project asks whether it may judge
+      Then it may, from its own switch
+
+    @unit
+    Scenario: An organization with hosted switched off is offered no switch
+      Given a self-serve organization on the hosted service with LangWatch's hosted model switched off
+      When the popover asks what to offer a member who may manage the organization
+      Then it offers a word with us, never the switch, and LangWatch's own model is not released
+      And so Default models lists no Evals Preview and the popover asks for an own decision model
+
+    @unit
+    Scenario: The server refuses the switch for an organization with hosted switched off
+      Given a self-serve organization on the hosted service with LangWatch's hosted model switched off
+      When a member throws the switch anyway
+      Then it is refused as not offered, and nothing is recorded
+      And the refusal says LangWatch's hosted model is off for the organization and names its own decision model instead
+
+    @unit
+    Scenario: A hosted-off refusal never sends the reader to the enterprise plan
+      Given the switch was refused because LangWatch's hosted model is off for the organization
+      When the refusal is explained
+      Then the headline says LangWatch's hosted model is off for the organization
+      And the words name the Instant Evals column of Default models, never an enterprise plan
+
+    @integration
+    Scenario: A stale Enable says why the hosted model is off and stops offering Enable
+      Given the enable popover was opened before LangWatch's hosted model was switched off
+      When the member clicks Enable and the server refuses it as not offered
+      Then the registry's words are shown as a warning
+      And the access read is asked again
+      And the popover turns into the one that asks for an own decision model, keeping the eval chip
+
+    @unit
+    Scenario: LangWatch's hosted judge never classifies for an organization with hosted switched off
+      Given an organization with LangWatch's hosted model switched off
+      When a run, a judged query, a classify call or the search bar's route reaches LangWatch's hosted judge
+      Then it skips as not configured and the hosted classifier is never called
+
+    @unit
+    Scenario: LangWatch's hosted judge classifies as before for every other organization
+      Given an organization with LangWatch's hosted model not switched off
+      When a text reaches LangWatch's hosted judge
+      Then the hosted classifier answers it
+
+    @unit
+    Scenario: An LLM judge on Evals Preview is an error for an organization with hosted switched off
+      Given an organization with LangWatch's hosted model switched off
+      And an LLM judge on Instant Evals in a project whose column is Evals Preview
+      When the evaluation runs
+      Then it is an error saying no decision model is set up, and the judge is never called
+      And the judge router flag is never read

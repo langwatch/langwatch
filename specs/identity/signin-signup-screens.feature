@@ -43,6 +43,39 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     And a method-picker decision shows the methods it named
     But an unknown-account decision continues to account creation
 
+  @integration
+  Scenario: An address routed to an identity provider is dialled on the router's first answer
+    When I enter an address the router sends to my organization's identity provider
+    Then the provider sign-in starts once, from that answer
+    And the router is not asked again on the way
+
+  @integration
+  Scenario: Leaving for the company sign-in says what to do if it refuses
+    When I enter an address the router sends to my organization's identity provider
+    Then the screen says at once that it is continuing to my company's sign-in
+    And it says to ask my IT team to assign me the LangWatch app if that sign-in says I have no access
+    And it names no organization and no administrator
+
+  @integration
+  Scenario: A refused hand-off to the identity provider says so instead of waiting
+    When I enter an address the router sends to my organization's identity provider
+    And starting the provider sign-in is refused or fails on the network
+    Then the waiting state stops
+    And the screen tells me the organization's sign-in could not start
+
+  @integration
+  Scenario: Retrying the hand-off clears the refusal
+    Given starting my organization's sign-in was refused
+    When I try again from the button
+    Then the refusal is cleared while the new attempt runs
+
+  @integration
+  Scenario: A signed-in visitor on the sign-in page is sent where they were going
+    Given I already hold a session
+    When I land on the sign-in screen, with or without a return address
+    Then I am sent to the return address, or home when there is none
+    And the router is not asked
+
   # Account-aware routing may name that an address is unknown; it must not turn
   # a credential refusal into an oracle for which half of a submitted pair was
   # wrong. Bound in `betterAuthErrorSweep.unit.test.ts`.
@@ -81,6 +114,46 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then no passkey request has started
     When I click into the field or start typing my address
     Then the passkey offer starts, once, and never again for this visit
+
+  # Focus has not moved yet when a pointer goes down, so it still names what
+  # somebody is clicking AWAY from, which on a screen that autofocuses the
+  # address field is the address field. Reading focus there armed the offer
+  # from a click on any control on the card, "Continue" included — and
+  # Continue runs a passkey ceremony of its own. Two ceremonies share one
+  # server-side challenge: the second overwrites the first, and both
+  # assertions are then turned down, so a passkey that was fine reads as one
+  # the account does not hold.
+  @integration
+  Scenario: Clicking a button on the card is not reaching for the address field
+    Given this deployment offers passkeys
+    And the entrance focuses the address field for me
+    When I click a button on the card without touching the field
+    Then no passkey request has started
+
+  # Browsers say nothing about whether a passkey exists for this site, and
+  # asking the server by address would say which accounts exist. So the button
+  # follows a flag this browser keeps once a passkey worked or was made here;
+  # the address field's own autofill still finds one on a new device.
+  @integration
+  Scenario: The passkey button waits until this browser has used a passkey
+    Given this deployment offers passkeys
+    And this browser has never used or made a passkey
+    When the sign-in screen or an invitation opens
+    Then "Continue with a passkey" is not offered
+
+  @integration
+  Scenario: A browser that has used a passkey is offered the passkey button
+    Given this deployment offers passkeys
+    And this browser has signed in with or made a passkey before
+    When the sign-in screen or an invitation opens
+    Then "Continue with a passkey" is offered
+
+  @integration
+  Scenario: A passkey that works here is remembered without naming anybody
+    Given this deployment offers passkeys
+    When I sign in with or create a passkey in this browser
+    Then this browser remembers that it has a passkey
+    And what it keeps holds no address and no account id
 
   # ── The device is being asked, and the card says so ────────────────────
   #
@@ -162,6 +235,15 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Given a passkey is being offered from the address field itself
     When I dismiss the sheet instead of picking one
     Then nothing is said about it
+
+  # The client resolves a failure in this browser with the same 400 a refusal
+  # carries; only its code tells the two apart.
+  @integration
+  Scenario: A browser with no passkey never hears that a passkey failed
+    Given a passkey is being offered from the address field itself
+    And this browser holds no passkey, or cannot finish the request
+    When the request ends without any credential reaching the server
+    Then nothing is said about a passkey I never chose
 
   # The opposite of the castle's rule, and worth stating so nobody reads one
   # for the other: the snake is pinned ABSENT under reduced motion, and this
@@ -260,7 +342,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # The link proves the address but does not choose or create a credential.
   # Its proof is bound to the address and may be consumed only once by the
   # account-creation boundary.
-  @integration @e2e
+  @integration
   Scenario: Opening the link unlocks credential choice
     Given I asked to sign up and have not opened the confirmation link
     When I open the link
@@ -298,7 +380,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # precedes the account and credential writes; those writes are not one
   # cross-resource transaction. If enrollment then fails, recovery starts
   # with a fresh email proof rather than replaying the claimed one.
-  @unit @e2e
+  @unit
   Scenario: Signing up with a passkey consumes the verified address proof
     Given I returned with a valid proof for an address that has no account
     When I create a passkey instead of choosing a password
@@ -342,6 +424,52 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then no password or passkey control is shown
     And I am offered a fresh confirmation link
 
+  # An installation with no email provider cannot prove an address (ADR-117,
+  # revision 2026-09-25). Sign-up there enrolls a password and leaves the
+  # address unconfirmed, so domain join requests and OAuth account linking,
+  # which require a confirmed address, stay closed for that account.
+  @unit @integration @e2e
+  Scenario: An installation that cannot send email signs up with a password and leaves the address unconfirmed
+    Given the installation has no email provider configured
+    When I start sign-up with my email
+    Then no confirmation link is sent
+    And the screen says the address is not confirmed and asks for a password
+    And no passkey sign-up is offered
+    When I choose a password
+    Then my account is created with its address unconfirmed
+    And I am signed in
+
+  # A provider that is named but unusable (a mistyped EMAIL_PROVIDER, a
+  # missing credential) is a misconfiguration: sign-up keeps asking for the
+  # mailed link and fails loudly rather than skipping address confirmation.
+  @unit
+  Scenario: A misconfigured email provider keeps sign-up on the mailed link
+    Given the installation names an email provider it cannot use
+    When I start sign-up with my email
+    Then no unconfirmed address proof is issued
+    And the confirmation link is attempted through the provider
+
+  @unit
+  Scenario: An unconfirmed address proof is refused once the installation can send email
+    Given I hold an unconfirmed address proof minted while no email provider was configured
+    And the installation now has an email provider
+    When I try to enroll or register with that proof
+    Then it is refused and no account is created
+
+  @unit
+  Scenario: A confirmed address proof and an unconfirmed one never stand in for each other
+    Given an unconfirmed address proof for my address
+    When it is checked or claimed as a confirmed proof
+    Then it is refused
+    And a confirmed proof is refused where an unconfirmed one is asked for
+
+  @unit @integration
+  Scenario: Without a way to send email, the address confirmation nudge stays silent
+    Given the installation has no email provider configured
+    And my account's address is unconfirmed
+    Then no resend confirmation action is offered for it
+    And asking to send the confirmation anyway is refused with a named error
+
   @integration
   Scenario: Post-link routing still governs credential enrollment
     Given I returned with a valid proof for my address
@@ -365,6 +493,15 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then it sends a confirmation link before showing credential controls
     And no account exists while I am checking that inbox
     And the returned proof is required by the account-creation call
+
+  # Signing in is answered before the next page has loaded, and a slow load read as nothing
+  # happening: testers left and lost the account (WEB-708).
+  @integration
+  Scenario: Creating an account shows progress until the next page has loaded
+    Given I have opened the link and chosen a password
+    When I create the account and it signs me in
+    Then the Create account button stays busy while the browser loads the next page
+    And it is free again if signing in fails, with the failure shown
 
   # The one thing the log-in door must NOT do on the way is bank the password
   # that was typed at it. That field is spelled `current-password`, is asked
@@ -421,7 +558,8 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   # The interstitial's CONTRACT ships with D13 and is bound below (verified
   # email in, decision out, nothing rendered when there is nothing to offer).
   # Which organizations will take an address, and the words that go with them,
-  # are D12's - so this stays parked until D12 fills the seam.
+  # are D12's, and D12 has filled the seam - so this is bound rather than
+  # parked, against the page at /auth/join.
   @integration
   Scenario: Sign-up offers my team before offering a new workspace
     Given my verified domain matches an organization that allows joining
@@ -507,6 +645,45 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then nothing is promoted and nothing is badged
     And the methods stay in the order the decision named
 
+  # The dial cannot write the badge — a consent screen somebody backs out of
+  # would wear it forever — so the method is parked and only a session may
+  # promote it. Nothing on the sign-in screen can be what notices: a federated
+  # callback returns the browser to wherever the sign-in was heading, and that
+  # screen is never mounted again. The session fetch is the one thing every
+  # landing passes through, so it is where the promotion belongs.
+  @integration
+  Scenario: A social provider that got me in is badged, wherever the callback lands
+    Given I dialled a social provider and it signed me in
+    When the browser lands anywhere in the app holding a session
+    Then that provider is badged the next time the door is drawn
+
+  @unit
+  Scenario: A social provider I backed out of is never badged
+    Given I dialled a social provider and abandoned it before it signed me in
+    When the browser comes back with no session
+    Then nothing is badged
+
+  # The parked method has to be retired by whatever gets the person in next,
+  # or an abandoned dial outlives its own flow: back out of the consent
+  # screen, sign in with a password, and the first session fetch after that
+  # promotes the provider straight over the badge the password just earned.
+  @unit
+  Scenario: A method I abandoned cannot take the badge from the one that got me in
+    Given I dialled a social provider and abandoned it
+    When I sign in with my password instead
+    Then the password is badged, and stays badged once I am let in
+
+  # The hand-off nobody clicks. A typed address that routes to an organization's
+  # identity provider is dialled for the person, with no button pressed, and
+  # that is the ordinary way in for everybody whose organization owns their
+  # domain. It has to earn the badge the same way a pressed button does, or
+  # the people who sign in this way every day are the ones never badged.
+  @integration
+  Scenario: A provider my address was routed to is badged once it lets me in
+    Given my address routes to my organization's identity provider
+    When I am taken there without pressing anything, and it lets me in
+    Then that provider is badged
+
   # Every button on the rail is live, or it is not there. A screen that drew a
   # provider the deployment never mounted would be offering a door that opens
   # onto an error, and the person pressing it has no way to know that before
@@ -536,6 +713,25 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     And it asks for a password or a passkey, the way the sign-up door does
     And finishing lands me on the same "check your email" the sign-up door shows
     And I can go back to the address step for a mistyped address
+
+  # The log-in door turns an unknown address into a sign-up by mailing it a
+  # confirmation link. An installation with no email provider cannot send one,
+  # so the screen does not offer it and says what is missing instead.
+  @integration
+  Scenario: An address with no account on an installation that cannot send email is told what is missing
+    Given the installation has no email provider configured
+    When I enter an email address no account holds
+    Then the screen says there is no account for that address yet
+    And it says an administrator needs to set up email, or that I can sign in with single sign-on once it is set up
+    And no confirmation link is offered
+    And I can go back to the address step for a mistyped address
+
+  @integration
+  Scenario: A late instance-methods answer does not undo the carried address routing
+    Given the sign-up door opened with an address carried from the log-in screen
+    And it asked the router about the instance's methods and about that address
+    When the answer for the address arrives before the answer for the methods
+    Then the screen keeps the routing decision for the address
 
   @integration
   Scenario: An account with a passkey is asked for it, not offered a button
@@ -593,6 +789,18 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   Scenario: A successful sign-in shows no error
     When I sign in with the correct password
     Then no alert or toast appears on the page I land on
+
+  # The door meters through the counter the process already supplies it, so a
+  # refusal is the throttle's own code with the wait in its meta — never the
+  # platform-fault "service unavailable" a missing collaborator raises. The
+  # presentation registry for `auth_rate_limited` reads `retryAfterSeconds`
+  # to say how long; without it every customer is told "a few minutes".
+  @unit
+  Scenario: A throttled door says how long the wait is
+    Given a front door operation past its budget
+    When the door refuses the attempt
+    Then the refusal carries the rate-limit code, not a service-unavailable one
+    And it carries the seconds to wait, so the words can name them
 
   # Bug-bash finding: the ordinary case — a person kept getting logged out
   # and signing back in, the way a shared machine or a flaky network makes
@@ -742,17 +950,34 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then the screen says the link expired and offers to send a fresh one
     And the answer never says whether that link was ever issued
 
-  # A link proves an ADDRESS. It never adopts an account, because an account
-  # that appeared after the link was sent may already hold a password or a
-  # passkey somebody else chose — and opening a session on it would hand that
-  # account to whoever happened to be holding the older link.
+  # A link proves an ADDRESS. An unfinished account on it (never confirmed, never
+  # signed into) is adopted by that proof alone: any password or passkey it holds
+  # was chosen before anybody proved the address, possibly by somebody else, so
+  # adoption drops them and the person who proved it adds their own afterwards
+  # (rulings 2026-10-05 Auth 32-36; 2026-10-06 Auth 32). Memberships stay.
   @unit
-  Scenario: A confirmation link never opens an account it did not create
-    Given a confirmation link was sent for an address with no account
-    And an account for that address exists by the time the link is opened
+  Scenario: A confirmation link adopts an unfinished account on its address
+    Given an account for my address awaits confirmation and was never signed into
+    And it holds a password and a passkey set before the address was proven
+    When I open my confirmation link
+    Then the address is confirmed and both of those sign-in methods are gone
+    And I am signed in to that account, to add a passkey or a password of my own
+
+  @unit
+  Scenario: A confirmation link never opens an account it cannot adopt
+    Given a confirmation link was sent for my address
+    And by the time it is opened the address's account is confirmed, or has been signed into
     When I open the link
     Then it is refused the way a dead link is, and nothing about that account changes
-    And a link issued for an address whose account was already awaiting confirmation is refused the same way
+
+  # The link was sent while the address could still sign up; an organization
+  # may have claimed its domain in the hour since.
+  @unit
+  Scenario: A confirmation link never adopts an account its organization's sign-in owns
+    Given an account for my address awaits confirmation
+    And my address now signs in through its organization's own connection
+    When I open my confirmation link
+    Then it is refused the way a dead link is, and nothing about that account changes
 
   # The identifier-verification LANDING never spends the link — a mail scanner
   # following it must consume nothing — so it cannot learn that a token is
@@ -811,6 +1036,16 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     And the words and the recovery action are the ones it always offered
     And the error code from the query string is never shown to me
 
+  # Linking GitHub from Settings > Security with an account whose email
+  # differs ends here. The server rule stays; the screen sends the person
+  # back to where they started and says what to do.
+  @integration
+  Scenario: Linking an account with a different email sends me back to Security and says what to do
+    Given I started linking a sign-in method from Settings > Security
+    When the account I picked uses a different email from my LangWatch address
+    Then the screen tells me to link an account that has my LangWatch address as a verified email, or to add that address to it first
+    And the button reads "Back to Settings" and opens Settings > Security, not the organization's sign-in policy
+
   @integration
   Scenario: The invitation and join screens stand on the same ground
     When I open an invitation link or reach the join-before-create step
@@ -861,7 +1096,9 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   Scenario: A signed-in visitor confirms and joins
     Given I am already signed in with a verified identifier matching the invite
     When I open the invite link
-    Then I am asked to confirm joining, and confirming makes me a member
+    Then I see the organization, who invited me and which account I am signed in as
+    And I am asked to confirm joining, and confirming makes me a member
+    And I can switch to another account from the same card
 
   @integration
   Scenario: An expired invite offers to ask for a new one
@@ -879,3 +1116,47 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   Scenario: No unauthenticated journey touches an Auth0-hosted page
     When every unauthenticated journey is walked
     Then no page, asset, or redirect resolves to an Auth0-hosted surface
+
+  @integration @regression
+  Scenario: Signing out does not start another provider sign-in
+    Given an identity provider still has an active session
+    When I reach the signed-out confirmation page
+    Then no sign-in routing or provider handoff starts
+    And I can explicitly choose to log in again
+
+  # A self-hosted deployment with one live connection is an SSO deployment:
+  # colleagues go straight to their identity provider and never see a
+  # LangWatch log-in page. `?local=1` is the way to the local sign-in.
+  @integration @regression
+  Scenario: A self-hosted sign-in page goes straight to the sole live connection
+    Given the self-hosted installation has one live SSO connection
+    When I open the sign-in page without submitting an address
+    Then the provider sign-in starts without me pressing anything
+
+  @integration @regression
+  Scenario: The sole connection is not dialed twice in a row
+    Given the sign-in page sent me to the sole connection moments ago
+    When I land on the sign-in page again without a session
+    Then I see a button for that provider instead of another automatic redirect
+    When I choose to continue with that provider
+    Then the provider sign-in starts
+
+  @integration @regression
+  Scenario: A failed sign-in return never redirects to the sole connection
+    Given the self-hosted installation has one live SSO connection
+    When I open the sign-in page with an error from the identity provider
+    Then I see the error and no provider sign-in starts
+
+  @integration @regression
+  Scenario: The break-glass sign-in page never redirects to the sole connection
+    Given the self-hosted installation has one live SSO connection
+    When I open the sign-in page with the break-glass parameter
+    Then I see the local sign-in and no provider sign-in starts
+
+  @unit @regression
+  Scenario: Logout reports a revocation failure instead of confirming success
+    Given a signed-in session is stored in the database and session cache
+    When either store cannot complete revocation
+    Then logout reports the failure
+    And it still attempts to revoke the session from the other store
+    And it does not confirm that the person is signed out

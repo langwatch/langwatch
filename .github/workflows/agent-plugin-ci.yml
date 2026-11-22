@@ -26,6 +26,7 @@ on:
     # ready_for_review is NOT a default pull_request activity type. Without
     # it, taking a PR out of draft fires no event at all, so the job's draft
     # guard below would never get its first non-draft run.
+    # No `labeled`: a label starts no run, and `ci:full` counts from the next push.
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "plugins/**"
@@ -53,10 +54,9 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  # Supersede an outdated run on a PR branch, never on main: every commit
-  # that lands on main has to keep its own validation, and cancelling here
-  # would let a merge silently void the run for the commit before it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # A newer commit supersedes an older run, on main too: the newest verdict
+  # covers the commits before it. Image and release builds keep their own rule.
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -66,8 +66,16 @@ jobs:
     # Draft PRs release the runner slot entirely; the work returns on
     # ready_for_review and in the merge queue. This was `needs.changes.outputs
     # .heavy`, which cost a whole gate job to compute the same expression.
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # A PR labelled `ci:full` runs on a draft or release-please PR too.
+    if: >-
+      (github.event_name != 'pull_request' || (github.event.pull_request.draft == false
+       && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent'))
+       || contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -84,15 +92,22 @@ jobs:
           CI=true pnpm install --frozen-lockfile
           --filter "langwatch..."
           --filter "@langwatch/agent-plugin..."
-
-      - name: Typecheck
-        run: pnpm --filter @langwatch/agent-plugin run typecheck
+          --filter "@langwatch/workspace"
 
       # The launcher is plain ESM with no build. The CLI it runs is the one
       # thing to build here, and the integration test would build it on
       # demand anyway; doing it as its own step keeps a build failure readable.
+      # It comes before the typecheck, whose references reach observability,
+      # which imports the built SDK.
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: agent-plugin
+
       - name: Build the CLI
-        run: pnpm --filter langwatch run build
+        run: pnpm exec nx run langwatch:build --outputStyle=static
+
+      - name: Typecheck
+        run: pnpm --filter @langwatch/agent-plugin run typecheck
 
       # Unit tests read the manifests and run the launcher against fake CLIs;
       # integration tests run it against the built CLI, a local collector and a

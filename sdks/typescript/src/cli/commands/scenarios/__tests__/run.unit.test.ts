@@ -1,19 +1,31 @@
 /**
  * `scenario run` is a run plan scoped to one scenario.
- *
- * It sends ONE request. No suite is created for it and none is deleted
- * afterwards, which is what the first assertions here pin: the old command
- * minted an ephemeral suite, ran it and cleaned it up, so a failure between
- * those steps left rubbish in the project.
- *
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+import { stdoutDocuments } from "../../../utils/__tests__/stdout-documents";
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 const runSpy = vi.hoisted(() => vi.fn());
 vi.mock("../../run-plans/cli-run-plans-service", () => ({
   createCliRunPlansService: vi.fn(() => ({ run: runSpy })),
+}));
+
+const scenarios = vi.hoisted(() => [
+  { id: "scenario_1", name: "Login Flow" },
+  { id: "scenario_2", name: "Refund a paid order" },
+]);
+const getAllSpy = vi.hoisted(() => vi.fn(async () => scenarios));
+const getSpy = vi.hoisted(() =>
+  vi.fn(async (id: string) => {
+    const found = scenarios.find((scenario) => scenario.id === id);
+    if (!found) throw new Error(`no scenario ${id}`);
+    return found;
+  }),
+);
+vi.mock("../cli-scenarios-service", () => ({
+  createCliScenariosService: vi.fn(() => ({ getAll: getAllSpy, get: getSpy })),
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
@@ -68,16 +80,6 @@ const makeRunResult = (overrides: Record<string, unknown> = {}) => ({
  */
 let savedAgentEnv: Record<string, string | undefined> = {};
 
-/** Every JSON document the command printed on stdout. */
-const printedDocuments = (): string[] =>
-  vi
-    .mocked(console.log)
-    .mock.calls.map((call) => call[0] as unknown)
-    .filter(
-      (line): line is string =>
-        typeof line === "string" && line.trimStart().startsWith("{"),
-    );
-
 describe("runScenarioCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -129,6 +131,19 @@ describe("runScenarioCommand()", () => {
     });
   });
 
+  describe("when the scenario is named by its name", () => {
+    /** @scenario "Run a scenario by its name" */
+    it("posts the run scoped to the scenario that name names", async () => {
+      await runScenarioCommand("Refund a paid order", { target: ["http:agent_abc123"] });
+
+      expect(runSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({ scenarioIds: ["scenario_2"] }),
+        }),
+      );
+    });
+  });
+
   describe("when the run is sent", () => {
     /** @scenario "Running a scenario declares the command line as its surface" */
     it("goes through the service that declares the command line as its surface", async () => {
@@ -162,10 +177,7 @@ describe("runScenarioCommand()", () => {
     /** @scenario "Run a scenario against one agent on two models" */
     it("sends two targets, each with its own values", async () => {
       await runScenarioCommand("scenario_1", {
-        target: [
-          "http:agent_abc123?model=gpt-5",
-          "http:agent_abc123?model=gpt-5-mini",
-        ],
+        target: ["http:agent_abc123?model=gpt-5", "http:agent_abc123?model=gpt-5-mini"],
       });
 
       expect(runSpy).toHaveBeenCalledWith(
@@ -197,9 +209,7 @@ describe("runScenarioCommand()", () => {
         name: "Login checks",
       });
 
-      expect(runSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "Login checks" }),
-      );
+      expect(runSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "Login checks" }));
     });
   });
 
@@ -222,9 +232,7 @@ describe("runScenarioCommand()", () => {
   describe("when no target is given", () => {
     /** @scenario "Run a scenario with no target" */
     it("refuses before anything is scheduled", async () => {
-      await expect(runScenarioCommand("scenario_1", {})).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(runScenarioCommand("scenario_1", {})).rejects.toThrow(ProcessExitError);
 
       expect(runSpy).not.toHaveBeenCalled();
     });
@@ -263,6 +271,7 @@ describe("runScenarioCommand()", () => {
 
   describe("when --note is given", () => {
     /** @scenario "Run a scenario with a note" */
+    /** @scenario "A note given on the command line is stored with the batch" */
     it("schedules the run with that note", async () => {
       await runScenarioCommand("scenario_1", {
         target: ["http:agent_abc123"],
@@ -350,7 +359,7 @@ describe("runScenarioCommand()", () => {
         vi.useRealTimers();
       }
 
-      const documents = printedDocuments();
+      const documents = stdoutDocuments();
       expect(documents).toHaveLength(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.outcome).toBe("failed");

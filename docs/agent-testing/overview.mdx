@@ -1,9 +1,11 @@
 ---
-title: Agent Testing
+title: AI agent testing with simulated users
 sidebarTitle: Overview
 keywords: langwatch, agent testing, agent simulations, scenarios, test suites, run plans, simulated user, judge, voice agents, red teaming
 description: Test your agents through multi-turn conversations with a simulated user to capture issues before production and prevent regressions.
 ---
+
+LangWatch tests AI agents with simulated users. A simulated user talks to your agent over a multi-turn conversation, then a judge reads the conversation and the agent's traces and passes or fails each of your criteria, with its reasoning. Write scenarios in the LangWatch platform with no code, or in code with [Scenario](https://langwatch.ai/scenario/), LangWatch's open-source testing library, as pytest or vitest tests that run in CI.
 
 <Tip>
   **Quick setup?** Paste the [Connect your agent prompt](/agent-testing/connect-your-agent) into your coding agent to connect your agent and run a first test suite, or the [scenarios prompt](/skills/directory) to add code-first scenario tests.
@@ -27,11 +29,11 @@ Use it to:
 
 ## How a test runs
 
-| Part | What it does |
-|---|---|
-| Simulated user | Plays the user in the situation the scenario describes, with different wording on every run. |
-| Your agent | Answers each turn as it does in production. |
-| Judge | Reads the conversation and the agent's traces, then passes or fails each criterion and explains why. |
+| Part           | What it does                                                                                         |
+| -------------- | ---------------------------------------------------------------------------------------------------- |
+| Simulated user | Plays the user in the situation the scenario describes, with different wording on every run.         |
+| Your agent     | Answers each turn as it does in production.                                                          |
+| Judge          | Reads the conversation and the agent's traces, then passes or fails each criterion and explains why. |
 
 A scenario is one situation and its criteria. A [test suite](/agent-testing/test-suites) groups the scenarios you run together. A [run plan](/agent-testing/run-plans) is the history of one configuration, and the [Results](/agent-testing/results) tab shows its pass rate over time.
 
@@ -41,24 +43,31 @@ Both use the same simulated user, the same judge and the same results pages. The
 
 <CardGroup cols={2}>
   <Card title="Test from the platform" icon="globe" href="/agent-testing/test-from-the-platform">
-    Connect your agent from your service startup, then write, run and see scenarios in the LangWatch interface. No test code in your repository.
+    Connect your agent from your service startup, then write, run and see scenarios in the LangWatch
+    interface. No test code in your repository.
   </Card>
   <Card title="Write scenarios in code" icon="code" href="/agent-testing/scenarios-in-code">
-    Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test runner and in CI, and see every run in LangWatch.
+    Write scenarios with the Scenario SDK in Python or TypeScript, run them with your test runner
+    and in CI, and see every run in LangWatch.
   </Card>
 </CardGroup>
+
+New to writing scenarios in code? [Test AI agents with simulated users in pytest or vitest](/agent-testing/simulated-users) builds a first test step by step.
 
 ## What you can test
 
 <CardGroup cols={3}>
   <Card title="Conversational agents" icon="comments" href="/agent-testing/scenarios">
-    Multi-turn conversations judged on outcomes, internal actions and the things the agent must never do.
+    Multi-turn conversations judged on outcomes, internal actions and the things the agent must
+    never do.
   </Card>
   <Card title="Voice agents" icon="microphone" href="/agent-testing/voice-agents">
-    Real audio through ElevenLabs, OpenAI Realtime, Twilio, Pipecat and Gemini Live, with background noise, interruptions and latency metrics.
+    Real audio through ElevenLabs, OpenAI Realtime, Twilio, Pipecat and Gemini Live, with background
+    noise, interruptions and latency metrics.
   </Card>
   <Card title="Red teaming" icon="shield-halved" href="/agent-testing/red-teaming">
-    Multi-turn adversarial attacks with escalation, refusal detection and backtracking, to find security gaps before a release.
+    Multi-turn adversarial attacks with escalation, refusal detection and backtracking, to find
+    security gaps before a release.
   </Card>
 </CardGroup>
 
@@ -126,3 +135,7 @@ Use evaluations for the parts inside the agent. Use agent testing to check the a
     The full reference of the Scenario framework.
   </Card>
 </CardGroup>
+
+## Further reading
+
+- [What are AI agent simulations?](https://langwatch.ai/blog/what-are-ai-agent-simulations) explains agent simulation testing, how it differs from multi-agent research, and why scenarios should start from production conversations.

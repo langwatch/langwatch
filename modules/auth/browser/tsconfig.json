@@ -1,0 +1,33 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+
+    "jsx": "react-jsx",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    // See the same entries in `apps/ui/tsconfig.json`: the checker reads the
+    // trimmed browser contract, the bundler still resolves the real package.
+    "paths": {
+      "better-auth/react": ["../../../packages/browser-types/better-auth-react.d.ts"],
+      "@better-auth/passkey/client": [
+        "../../../packages/browser-types/better-auth-passkey-client.d.ts"
+      ]
+    },
+    "composite": true,
+    "noEmit": false
+  },
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "./tsconfig.test.json"
+    }
+  ]
+}

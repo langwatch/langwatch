@@ -33,6 +33,13 @@ Feature: A provider says which models may skip Langy's permission checks
       Then the field shows which line is invalid
       And nothing is saved
 
+    @unit
+    Scenario: The save is refused server-side even without the field
+      Given a request to create or update a provider with an invalid pattern
+      When the request reaches the model provider service
+      Then it is refused before any database work
+      And a valid list of patterns saves normally
+
     @integration
     Scenario: Clearing the field restores the provider's default list
       Given I saved a custom list
@@ -80,3 +87,17 @@ Feature: A provider says which models may skip Langy's permission checks
       Given the OpenAI provider with a custom list holding one pattern
       When the gate is asked about a default model outside that pattern
       Then it answers no
+
+  Rule: The list the customer saved is the list the gate reads back
+
+    @integration
+    Scenario: A stored list replaces the provider default
+      Given the OpenAI provider saved with a custom list of two patterns
+      When the provider is read back
+      Then it carries those two patterns and not the provider's default
+
+    @integration
+    Scenario: Clearing the list returns the provider to its default
+      Given the OpenAI provider saved with a custom list
+      When the customer clears the list and saves
+      Then the provider carries no custom list, so the default applies again

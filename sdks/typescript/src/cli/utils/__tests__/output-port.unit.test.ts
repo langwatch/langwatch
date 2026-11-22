@@ -1,18 +1,11 @@
+import { Command } from "commander";
 /**
- * The output PORT, pinned: a command returns data, the port picks the format.
- *
- * Every test here covers a way the CLI could answer a machine caller with
- * human text — or with a fabricated value — at exit 0. That class of bug is
- * invisible to the caller by construction, so it has to be invisible to the
- * test suite too or it comes straight back.
- *
- * The gate that REFUSES a format a command cannot serve is a separate concern
- * and lives in `output-format-gate.unit.test.ts`; the `--jq` subset lives in
- * `output-jq.unit.test.ts`; the wiring into the real tree lives in
- * `output-command-tree.unit.test.ts`.
+ * The output PORT: a command returns data, the port picks the format. Every
+ * test guards against answering a machine caller with human text -- or a
+ * fabricated value -- at exit 0, invisible by construction.
  */
 import { describe, it, expect } from "vitest";
-import { Command } from "commander";
+
 import { isOutputAware, registerOutputOptions, emitsResult } from "../output";
 import { installOutputHarness } from "./output-harness";
 
@@ -223,9 +216,7 @@ describe("emitsResult", () => {
       let seen: string | undefined;
       const program = buildProgram((p) => {
         emitsResult(
-          p
-            .command("paged")
-            .option("--limit <n>", "Rows fetched per page; the walk covers all"),
+          p.command("paged").option("--limit <n>", "Rows fetched per page; the walk covers all"),
           (options: { limit?: string }) => {
             seen = options.limit;
             return { data: PAYLOAD, table: () => console.log("HUMAN TABLE") };

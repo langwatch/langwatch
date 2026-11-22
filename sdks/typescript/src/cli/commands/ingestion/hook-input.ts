@@ -1,13 +1,5 @@
 /**
- * The payload a coding agent hands `langwatch ingest hook <tool>`: how it
- * arrives, and what it is allowed to say.
- *
- * All three seams write the same JSON object to the hook's stdin, so reading it
- * is one concern with two halves: draining the pipe without ever waiting
- * forever on it, and reading a few optional strings out of whatever turned up.
- * Every malformed shape reads as an empty payload, which is what lets the
- * command stay silent instead of explaining itself to a session.
- *
+ * Hook payload: drain stdin bounded by deadline and byte cap.
  * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
@@ -45,12 +37,18 @@ const reportedText = z
 const hookInputSchema = z
   .object({
     session_id: reportedText,
+    // The Copilot CLI spells it this way; VS Code Copilot Chat, Claude Code
+    // and codex spell it `session_id`. No seam sends both, so when one ever
+    // does, `session_id` wins as the spelling every other seam agrees on.
+    sessionId: reportedText,
     cwd: reportedText,
     hook_event_name: reportedText,
     // Claude's SessionStart payload carries the session's current title when
-    // one is set (`--name` at launch, `/rename` before a resume). Absent on
-    // the other events, where the live registry answers instead.
+    // one is set (`--name` at launch, `/rename` before a resume). pi's seam
+    // sends its `/name` on every run start. Absent elsewhere.
     session_title: reportedText,
+    // Grok's SubagentStart, which fires in the parent: the child's own session id.
+    subagentId: reportedText,
   })
   .transform(
     (
@@ -60,28 +58,20 @@ const hookInputSchema = z
       cwd?: string;
       hookEventName?: string;
       sessionTitle?: string;
+      subagentId?: string;
     } => ({
-      sessionId: payload.session_id,
+      sessionId: payload.session_id ?? payload.sessionId,
       cwd: payload.cwd,
       hookEventName: payload.hook_event_name,
       sessionTitle: payload.session_title,
+      subagentId: payload.subagentId,
     }),
   );
 
 /** The facts a seam reports, each absent until proven otherwise. */
 export type HookInput = z.infer<typeof hookInputSchema>;
 
-/**
- * Drain stdin. A terminal is not a hook payload, so it reads as empty.
- *
- * Bounded in both directions, by the deadline and by the byte cap, because a
- * seam that spawns the hook with a pipe it never closes would otherwise leave
- * it draining for the rest of the session, and the opencode plugin spawns it
- * without waiting, so nothing upstream would notice. Whatever arrived by the
- * deadline is what gets parsed, and half a payload is not JSON, so it takes the
- * same silent path as none. A payload past the cap takes that path too: the
- * read stops there rather than buffering the rest of whatever is being written.
- */
+/** Drain stdin bounded by deadline and byte cap; terminal reads as empty. */
 export async function readStdin({
   stream = process.stdin,
   timeoutMs = STDIN_TIMEOUT_MS,

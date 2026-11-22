@@ -27,7 +27,7 @@ ALLOWED_PREFIXES=(
   ".github/readme/"
   "docs/images/"
   "docs/media/"
-  "platform/app/public/"
+  "apps/ui/public/"
   "assets/"
   "specs/"
   "sdks/python/examples/"

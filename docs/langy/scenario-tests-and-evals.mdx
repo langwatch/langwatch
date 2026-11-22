@@ -10,7 +10,12 @@ keywords:
 
 Langy writes and runs Scenario simulation tests and evaluations through the `langwatch` CLI, so they live in your project like any test or evaluator you wrote by hand. Which one it picks depends on what the question needs to prove; see the table below.
 
-<Info>**Also check:** [Ask Langy](/langy/chat) (how you request a test), [Pull requests](/langy/pull-requests) (the tests it wrote run in your CI), [Agent Testing](/agent-testing/overview) and [Evaluations](/evaluations/overview) (the product surfaces these land in).</Info>
+<Info>
+  **Also check:** [Ask Langy](/langy/chat) (how you request a test), [Pull
+  requests](/langy/pull-requests) (the tests it wrote run in your CI), [Agent
+  Testing](/agent-testing/overview) and [Evaluations](/evaluations/overview) (the product surfaces
+  these land in).
+</Info>
 
 ## Scenario simulation tests
 
@@ -65,11 +70,11 @@ Use each for a different job:
 
 Langy picks based on what your question needs to prove:
 
-| You want to check | Langy writes |
-|---|---|
+| You want to check                               | Langy writes               |
+| ----------------------------------------------- | -------------------------- |
 | The agent handles a full conversation correctly | A Scenario simulation test |
-| One run scores well on a criterion | An evaluation |
-| Live traffic stays within a criterion | An online monitor |
-| Two models or prompts, head to head | An experiment |
+| One run scores well on a criterion              | An evaluation              |
+| Live traffic stays within a criterion           | An online monitor          |
+| Two models or prompts, head to head             | An experiment              |
 
 You can also name the one you want in the [chat](/langy/chat): "write a Scenario test that..." or "set up an evaluator for...".

@@ -23,14 +23,13 @@ Feature: CI/CD Execution of Platform Evaluations
 
   Scenario: API key authentication via X-Auth-Token header
     Given a valid API key in the X-Auth-Token header
-    When I POST to /api/experiments/my-evaluation/run
-    Then I receive 200 OK
-    And the response contains a runId
+    When the project key door identifies the request that POSTs to /api/experiments/my-evaluation/run
+    Then the key resolves to exactly its own project
 
   Scenario: API key authentication via Authorization Bearer header
     Given a valid API key in the Authorization header as "Bearer {key}"
-    When I POST to /api/experiments/my-evaluation/run
-    Then I receive 200 OK
+    When the project key door identifies the request that POSTs to /api/experiments/my-evaluation/run
+    Then the key resolves to exactly its own project
 
   @unimplemented
   Scenario: Missing API key returns 401
@@ -60,6 +59,12 @@ Feature: CI/CD Execution of Platform Evaluations
     When I POST to /api/experiments/non-existent/run
     Then I receive 404 Not Found
     And the response contains error "Evaluation not found"
+
+  Scenario: A run call is read whatever Content-Type it carries, as on main
+    Given the SDK posts the run with no body and no Content-Type, or a JSON body under text/plain
+    When it calls /api/experiments/non-existent/run or /api/evaluations/v3/non-existent/run
+    Then the call is never refused 415
+    And I receive 404 Not Found
 
   @unimplemented
   Scenario: Evaluation belongs to different project returns 404
@@ -102,6 +107,58 @@ Feature: CI/CD Execution of Platform Evaluations
   Scenario: Poll for non-existent run returns 404
     When I GET /api/experiments/runs/non-existent
     Then I receive 404 Not Found
+
+  # ==========================================================================
+  # Per-run concurrency
+  # ==========================================================================
+
+  Scenario: A run call that names a concurrency runs that many cells at once
+    When I POST to /api/experiments/my-evaluation/run with body:
+      """json
+      { "concurrency": 1 }
+      """
+    Then the run executes one cell at a time
+    And the experiment's saved run options are unchanged
+
+  Scenario: A run call that names no concurrency uses the deployment's default
+    Given the deployment runs ten cells at once by default
+    When I POST to /api/experiments/my-evaluation/run
+    Then the run executes up to ten cells at once
+
+  Scenario Outline: A run call with a concurrency outside 1 to 24 is refused
+    When I POST to /api/experiments/my-evaluation/run with body:
+      """json
+      { "concurrency": <concurrency> }
+      """
+    Then I receive 400 Bad Request with code "experiment_evaluation_input_invalid"
+    And no run is started
+
+    Examples:
+      | concurrency |
+      | 0           |
+      | 25          |
+      | 1.5         |
+
+  @unit
+  Scenario: The SDKs send a concurrency on the run they start
+    When I call the Python or TypeScript SDK's experiment run for "my-evaluation" with a concurrency of 1
+    Then the run request body carries a concurrency of 1
+
+  @unit
+  Scenario: The experiment run command passes its concurrency flag on the run
+    When I run `langwatch experiment run my-evaluation --concurrency 1`
+    Then the run starts with a concurrency of 1
+
+  @unit
+  Scenario: The experiment run command refuses a concurrency outside 1 to 24
+    When I run `langwatch experiment run my-evaluation --concurrency 25`
+    Then the command exits non-zero
+    And no run is started
+
+  @unit
+  Scenario: The MCP run tool passes its concurrency on the run
+    When an agent calls platform_run_experiment for "my-evaluation" with a concurrency of 1
+    Then the run request body carries a concurrency of 1
 
   # ==========================================================================
   # SSE Streaming Mode
@@ -203,3 +260,13 @@ Feature: CI/CD Execution of Platform Evaluations
     When execution completes
     Then the run appears in the evaluation's run history
     And can be viewed in the LangWatch UI
+
+  # ==========================================================================
+  # The SDKs' older path
+  # ==========================================================================
+
+  Scenario: The evaluations v3 alias answers what the experiments run doors answer
+    Given the SDK still calls "/api/evaluations/v3" instead of "/api/experiments"
+    When it starts a run, polls it, reads its results, or reads, saves or pages the saved setup
+    Then the status and body equal those of the same call under "/api/experiments"
+    And the older path is left out of the published API reference

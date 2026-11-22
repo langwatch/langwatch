@@ -1,72 +1,17 @@
+import * as fs from "node:fs";
 /**
- * `langwatch ingest hook <tool>`: what a coding agent runs at the start and end
- * of every session.
- *
- * Coding agents know exactly which repository, branch and worktree a session is
- * working in and export none of it over telemetry. Each of the three that can
- * run our code inside a session reaches this same command, and each hands it
- * the same three facts on stdin (`session_id`, `cwd`, `hook_event_name`):
- *
- *   - Claude Code and Codex call it directly as a command hook, and the
- *     LangWatch Claude Code plugin calls it through its launcher
- *     (`plugins/langwatch/scripts/launch.mjs`), which runs whatever
- *     `langwatch` is installed.
- *   - opencode has no command hooks, so the plugin the CLI installs subscribes
- *     to its session event bus and spawns this command with the same payload.
- *
- * THE CROSS-VERSION CONTRACT. The plugin and the CLI release separately, so a
- * plugin from any version has to run with a CLI from any version. This
- * command and `ingest guidance` therefore accept and ignore options and
- * arguments they do not know (registered with `allowUnknownOption` and
- * `allowExcessArguments` in program.ts) and always exit zero, whatever they
- * were called with. A future plugin passing an argument this build does not
- * understand still gets the session reported; a usage error there would be
- * prose on stderr and a non-zero exit on every session start.
- *
- * The session id each seam reports is the one that agent puts on its own
- * telemetry, so the record this posts joins the session the agent is already
- * describing. So the command runs git itself and posts one small OTLP log
- * record, which is what lets a session's traces be joined to the code they were
- * working on.
- *
- * Where that record goes is `resolveTarget` below, and it is deliberately not
- * the environment alone: Claude Code hands its child processes an environment
- * with every `OTEL_*` variable removed, and Codex hands its hooks one with no
- * exporter variables either, so a hook that trusted them would never send
- * anything from a real session.
- *
- * Two constraints shape every branch below.
- *
- *   - NOTHING ON STDOUT, EVER. A SessionStart hook's stdout is injected into
- *     the user's session context, so one stray line would land in the
- *     model's prompt. Diagnostics go to stderr, and only when `DEBUG`
- *     contains "langwatch" (the CLI's existing debug convention).
- *   - ALWAYS EXIT ZERO, AND SOON. Unparseable input, no repository, no
- *     telemetry configured, a collector that refuses the post: every one of
- *     them returns quietly. Every wait is bounded, stdin included, so a seam
- *     that never closes a pipe cannot leave the hook alive for the rest of the
- *     session. A hook is never allowed to be why a session broke.
- *
- * A failed post deliberately leaves the fingerprint file alone, so the next
- * hook in the same session retries instead of assuming the context landed.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
+ * `langwatch ingest hook <tool>`: runs at session start/end, posting one OTLP
+ * log to join the session's traces to its repo/branch. NOTHING ON STDOUT EVER
+ * (a hook's stdout is injected into the model's prompt) and ALWAYS EXIT ZERO.
+ * @see specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
+import * as path from "node:path";
 
 import {
-  type GovernanceConfig,
-  loadConfig,
-} from "@/cli/utils/governance/config";
-import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
-import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
-import { resolveLogsEndpoint } from "@/internal/endpoint";
-
-import {
-  type GitRunner,
-  readSessionContext,
-  runGitCommand,
-} from "./git-context";
-import { parseHookInput, readStdin } from "./hook-input";
+  defaultClaudeSessionRegistryDir,
+  readClaudeSessionName,
+} from "@/cli/utils/governance/claude-session-registry";
+import { type GovernanceConfig, loadConfig } from "@/cli/utils/governance/config";
 import {
   defaultStateDir,
   pruneStaleState,
@@ -74,18 +19,8 @@ import {
   stateFilePath,
   writeFingerprint,
 } from "@/cli/utils/governance/hook-state";
-import * as fs from "node:fs";
-import * as path from "node:path";
-
-import {
-  type HealOutcome,
-  healRevokedIngestKey,
-} from "@/cli/utils/governance/ingest-key-heal";
-import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
-import {
-  defaultClaudeSessionRegistryDir,
-  readClaudeSessionName,
-} from "@/cli/utils/governance/claude-session-registry";
+import { type HealOutcome, healRevokedIngestKey } from "@/cli/utils/governance/ingest-key-heal";
+import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
 import {
   buildSessionContextLogPayload,
   normalizeSessionName,
@@ -93,46 +28,35 @@ import {
   parseTraceparent,
   sessionContextFingerprint,
 } from "@/cli/utils/governance/session-context";
+import {
+  HOOK_TIMEOUT_SECONDS,
+  type SessionContextAgent,
+  sessionContextAgentFor,
+} from "@/cli/utils/governance/session-context-agents";
+import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
+import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
+import { resolveLogsEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
-/**
- * What each accepted tool argument means: the agent the record declares, plus
- * the environment variables that agent publishes about the running session.
- * Anything else is a silent no-op.
- *
- * Both variables are per-agent rather than read unconditionally, because a
- * hook process inherits whatever its ancestors exported. A Codex session
- * started from inside a Claude Code session sees `CLAUDE_CODE_SESSION_ID` and
- * `CLAUDE_PROJECT_DIR` in its environment, and reading either would report the
- * wrong session, on the wrong checkout, under the wrong agent.
- *
- * The payload's `cwd` beats `projectDirVar`. Claude Code's payload `cwd` is
- * the harness's own working directory: a `cd` inside the Bash tool never moves
- * it, and a native worktree switch (EnterWorktree) does. `CLAUDE_PROJECT_DIR`
- * stays pinned to the directory the session was launched in, so preferring it
- * would keep reporting the launch checkout after the session moved into a
- * worktree to work on another branch. It remains the fallback for a payload
- * with no `cwd`. Codex and opencode publish no such variable, and their
- * payload `cwd` is already the session's own directory.
- */
-const TOOLS: Record<
-  string,
-  { agent: string; sessionIdVar?: string; projectDirVar?: string }
-> = {
-  claude_code: {
-    agent: "claude_code",
-    sessionIdVar: "CLAUDE_CODE_SESSION_ID",
-    projectDirVar: "CLAUDE_PROJECT_DIR",
-  },
-  codex: { agent: "codex" },
-  opencode: { agent: "opencode" },
-};
+import { endProcessWhenDone } from "./end-process";
+import { type GitRunner, readSessionContext, runGitCommand } from "./git-context";
+import { parseHookInput, readStdin } from "./hook-input";
 
 /** How long the collector has to accept the record before we give up on it. */
 const POST_TIMEOUT_MS = 3_000;
 
+/**
+ * The whole hook's time. Three of the agent's seconds stay spare: node has to
+ * start, and a git call running when the budget ends blocks until it returns.
+ */
+export const HOOK_BUDGET_MS = (HOOK_TIMEOUT_SECONDS - 3) * 1_000;
+
 export interface HookCommandOptions {
-  /** The agent the hook is running for: `claude-code`, `codex` or `opencode`. */
+  /**
+   * The agent the hook is running for: `claude-code`, `codex`, `opencode` or
+   * `copilot`, one row of the session context agent table.
+   */
   tool: string;
   env?: NodeJS.ProcessEnv;
   /** Reads the hook payload. Defaults to draining this process's stdin. */
@@ -153,22 +77,18 @@ export interface HookCommandOptions {
    * no login; defaults to the real healer.
    */
   healRevokedKey?: (params: {
-    agent: string;
+    sourceType: string;
     rejectedToken: string | undefined;
   }) => Promise<HealOutcome>;
 }
 
 /**
  * The part of the device config the hook needs to reach a collector. Every
- * field is optional here even though the config type requires the control
- * plane: a CLI that was never signed in has none of them, and that is the
- * "no telemetry configured" case rather than an error.
+ * field is optional here (even though the config type requires it): a CLI
+ * never signed in has none, which is "no telemetry configured", not an error.
  */
 export type CliTelemetryConfig = Partial<
-  Pick<
-    GovernanceConfig,
-    "control_plane_url" | "default_personal_ingest_keys" | "tool_project_keys"
-  >
+  Pick<GovernanceConfig, "control_plane_url" | "default_personal_ingest_keys" | "tool_project_keys">
 >;
 
 /** Where one record goes, what authenticates it, and which source named it. */
@@ -216,6 +136,21 @@ export async function hookCommand({
   }
 }
 
+/**
+ * The hook as the process an agent spawns: it ends itself once the work is
+ * done or its budget is spent, so nothing left open outlives the agent's timeout.
+ */
+export async function runHookProcess({
+  budgetMs = HOOK_BUDGET_MS,
+  exit,
+  ...options
+}: HookCommandOptions & {
+  budgetMs?: number;
+  exit?: (code: number) => void;
+}): Promise<void> {
+  await endProcessWhenDone({ work: () => hookCommand(options), budgetMs, exit });
+}
+
 async function runHook({
   tool,
   env,
@@ -239,18 +174,27 @@ async function runHook({
   readCliConfig: () => CliTelemetryConfig;
   healRevokedKey: NonNullable<HookCommandOptions["healRevokedKey"]>;
 }): Promise<void> {
-  const spec = TOOLS[tool.trim().toLowerCase().replace(/-/g, "_")];
+  const spec = sessionContextAgentFor(tool);
   if (!spec) {
     debug({ message: `no hook for tool '${tool}'`, env });
     return;
   }
   const agent = spec.agent;
+  // Grok also runs the Claude Code hooks it finds, for its own session: the
+  // record would make a phantom Claude row, so Grok's own hook reports instead.
+  if (agent === "claude_code" && env.GROK_HOOK_EVENT?.trim()) {
+    debug({ message: "the Claude Code hook was run by Grok; Grok's own hook reports", env });
+    return;
+  }
+  // Which personal key this run posts with: the agent's own, or for an agent
+  // with more than one surface, the one of the surface that ran the hook.
+  const sourceType = spec.keySourceType(env);
 
   // Checked before stdin is read and before any git work: an agent with no
   // telemetry configured is the common case, and it must cost nothing but this
   // lookup. Reading first would spend the stdin deadline on a pipe the seam
   // may never close, for a payload nothing was ever going to be sent from.
-  const target = resolveTarget({ env, agent, readCliConfig });
+  const target = resolveTarget({ env, sourceType, readCliConfig });
   if (!target) {
     debug({
       message: "no telemetry target in the environment or the CLI config",
@@ -260,10 +204,15 @@ async function runHook({
   }
 
   const input = parseHookInput(await readInput());
-  const sessionId = firstNonEmpty(
+  const ownSessionId = firstNonEmpty(
     input.sessionId,
     spec.sessionIdVar ? env[spec.sessionIdVar] : undefined,
   );
+  // Grok gives a subagent a session of its own whose telemetry names no parent.
+  // Its SubagentStart fires in the parent, so the record is the child's, linked.
+  const isSubagentStart = input.hookEventName === "SubagentStart" && !!input.subagentId;
+  const sessionId = isSubagentStart ? input.subagentId : ownSessionId;
+  const parentSessionId = isSubagentStart ? ownSessionId : undefined;
   if (!sessionId) {
     debug({ message: "no session id in the hook input or the environment", env });
     return;
@@ -277,6 +226,7 @@ async function runHook({
     spec,
     agent,
     sessionId,
+    parentSessionId,
     input,
     env,
     runGit,
@@ -287,51 +237,86 @@ async function runHook({
     target,
   });
 
-  // A 401 means the key this device exports with is dead: revoked on the
-  // platform, or retired with the session that minted it. The agent's own
-  // exporter fails the same way and says nothing, so this is the one place
-  // the device finds out. A personal key is re-minted under the current
-  // session, the wiring rewritten, the record retried, and the user told to
-  // restart the agent, which still holds the old key. A pinned key stops at
-  // the report.
-  let liveTarget = target;
-  if (own.httpStatus === 401 && claimHealWindow({ stateDir, agent, now })) {
-    // A pinned key is not this device's to replace: minting a personal one in
-    // its place would move the session's telemetry into another project
-    // without saying so. The healer declines a pinned tool for that same
-    // reason, so the report is the whole repair, and the only person who can
-    // make it is the one who pinned the key.
-    if (target.source === "pin") {
-      debug({
-        message: "the pinned ingest key was rejected; not re-minted",
-        env,
-      });
-      if (agent === "claude_code") notifyClaude(PINNED_REJECTED_NOTICE);
-    } else {
-      await healOrReport({
-        agent,
-        env,
-        target,
-        own,
-        stateDir,
-        healRevokedKey,
-        adoptHealed: (healed) => {
-          liveTarget = healed;
-        },
-      });
-    }
-  }
+  const liveTarget = await repairRejectedKey({
+    agent,
+    sourceType,
+    env,
+    target,
+    own,
+    now,
+    stateDir,
+    healRevokedKey,
+  });
 
-  // Whatever this hook had to say about its own directory is said. Anything
-  // the agent declared from a shell that could not reach the collector goes
-  // out now, last, so the declared checkout is the session's current one.
+  // Anything the agent declared from a shell that could not reach the
+  // collector goes out now, last, so the declared checkout is the session's
+  // current one. A collector that just gave no answer is not asked again.
+  if (own.isCollectorUnreachable) return;
   await drainSessionContextSpool({
     stateDir,
     now,
-    post: async (payload) =>
-      (await postSessionContext({ target: liveTarget, env, payload, fetchImpl }))
-        .ok,
+    post: async (payload) => {
+      const sent = await postSessionContext({ target: liveTarget, env, payload, fetchImpl });
+      if (sent.status === null) throw new Error("the collector did not answer");
+      return sent.ok;
+    },
   });
+}
+
+/**
+ * A 401 means the key is dead; the agent's exporter fails silently, so this is
+ * where it's caught. A personal key is re-minted, rewired and retried; a pinned
+ * key just reports. Returns the target to post anything further with.
+ */
+async function repairRejectedKey({
+  agent,
+  sourceType,
+  env,
+  target,
+  own,
+  now,
+  stateDir,
+  healRevokedKey,
+}: {
+  agent: string;
+  sourceType: string;
+  env: NodeJS.ProcessEnv;
+  target: TelemetryTarget;
+  own: OwnContextOutcome;
+  now: () => number;
+  stateDir: string;
+  healRevokedKey: NonNullable<HookCommandOptions["healRevokedKey"]>;
+}): Promise<TelemetryTarget> {
+  let liveTarget = target;
+  if (own.httpStatus !== 401 || !claimHealWindow({ stateDir, sourceType, now })) {
+    return target;
+  }
+  // A pinned key is not this device's to replace: minting a personal one in
+  // its place would move the session's telemetry into another project
+  // without saying so. The healer declines a pinned tool for that same
+  // reason, so the report is the whole repair, and the only person who can
+  // make it is the one who pinned the key.
+  if (target.source === "pin") {
+    debug({
+      message: "the pinned ingest key was rejected; not re-minted",
+      env,
+    });
+    if (agent === "claude_code") notifyClaude(PINNED_REJECTED_NOTICE);
+  } else {
+    await healOrReport({
+      agent,
+      sourceType,
+      env,
+      target,
+      own,
+      stateDir,
+      healRevokedKey,
+      adoptHealed: (healed) => {
+        liveTarget = healed;
+      },
+    });
+  }
+  return liveTarget;
 }
 
 /**
@@ -340,6 +325,7 @@ async function runHook({
  */
 async function healOrReport({
   agent,
+  sourceType,
   env,
   target,
   own,
@@ -348,6 +334,8 @@ async function healOrReport({
   adoptHealed,
 }: {
   agent: string;
+  /** The source type the rejected personal key is cached under. */
+  sourceType: string;
   env: NodeJS.ProcessEnv;
   target: TelemetryTarget;
   own: OwnContextOutcome;
@@ -356,7 +344,7 @@ async function healOrReport({
   adoptHealed: (target: TelemetryTarget) => void;
 }): Promise<void> {
   const outcome = await healRevokedKey({
-    agent,
+    sourceType,
     rejectedToken: bearerOf(target.headers),
   }).catch((error: Error) => {
     debug({ message: `heal failed: ${error.message}`, env });
@@ -366,7 +354,7 @@ async function healOrReport({
   // without touching the platform, so holding the window would cost nothing
   // to repeat and would silence the next 401 that this device CAN repair.
   if (outcome.status === "declined") {
-    releaseHealWindow({ stateDir, agent });
+    releaseHealWindow({ stateDir, sourceType });
   }
   if (outcome.status === "healed") {
     const healed: TelemetryTarget = { ...outcome.target, source: "personal" };
@@ -408,46 +396,29 @@ const SIGNED_OUT_NOTICE =
 /** How long one heal attempt stands before the hook tries again. */
 const HEAL_THROTTLE_MS = 10 * 60 * 1000;
 
-function healStateFile({
-  stateDir,
-  agent,
-}: {
-  stateDir: string;
-  agent: string;
-}): string {
-  return path.join(stateDir, `heal-${agent}.json`);
+/**
+ * One heal window per cached key, so the two Copilot surfaces each repair
+ * their own; for every single-surface agent the source type is its agent id.
+ */
+function healStateFile({ stateDir, sourceType }: { stateDir: string; sourceType: string }): string {
+  return path.join(stateDir, `heal-${sourceType}.json`);
 }
 
 /**
- * Take this agent's heal window, or report that another attempt holds it.
- *
- * The window is claimed before the mint and with an exclusive create, so two
- * sessions that start together and read the same 401 cannot both ask the
- * platform to replace the same dead key: the second finds the first one's
- * claim and stands down.
- *
- * A claim older than the window belonged to a run that died mid-heal, and
- * replacing it is a delete followed by a create, which two hooks holding the
- * same stale reading could interleave into two winners. So the right to
- * replace it is itself an exclusive create: whoever lands the takeover marker
- * does the delete, and the hooks that lose the marker stand down instead of
- * racing it. The marker is held across two filesystem calls rather than the
- * whole heal, so a run has to die inside those to strand one, and its own
- * staleness is bounded by the same window.
- *
- * A state directory that cannot be written claims nothing and costs one extra
- * attempt, the same trade the fingerprints make.
+ * Take this key's heal window, or report another attempt holds it, via an
+ * exclusive create so two sessions reading the same 401 can't both re-mint.
+ * A stale claim is replaced through its own exclusive takeover marker.
  */
 function claimHealWindow({
   stateDir,
-  agent,
+  sourceType,
   now,
 }: {
   stateDir: string;
-  agent: string;
+  sourceType: string;
   now: () => number;
 }): boolean {
-  const file = healStateFile({ stateDir, agent });
+  const file = healStateFile({ stateDir, sourceType });
   const marker = `${file}.takeover`;
   const claim = JSON.stringify({ attemptedAt: now() });
   const write = (at: string): "claimed" | "taken" | "unwritable" => {
@@ -455,9 +426,7 @@ function claimHealWindow({
       fs.writeFileSync(at, claim, { flag: "wx" });
       return "claimed";
     } catch (error) {
-      return (error as NodeJS.ErrnoException).code === "EEXIST"
-        ? "taken"
-        : "unwritable";
+      return (error as NodeJS.ErrnoException).code === "EEXIST" ? "taken" : "unwritable";
     }
   };
 
@@ -479,6 +448,7 @@ function claimHealWindow({
     } catch {
       // The next stale claim reclaims it by its own age; a marker left behind
       // costs this device one heal window, never the heal itself.
+      void 0;
     }
   }
 }
@@ -504,13 +474,7 @@ function claimTakeover({
 }
 
 /** Whether the claim on disk is young enough to still stand for its run. */
-function standingClaimIsFresh({
-  file,
-  now,
-}: {
-  file: string;
-  now: () => number;
-}): boolean {
+function standingClaimIsFresh({ file, now }: { file: string; now: () => number }): boolean {
   try {
     const raw = fs.readFileSync(file, "utf8");
     const attemptedAt = Number((JSON.parse(raw) as { attemptedAt?: number }).attemptedAt);
@@ -523,15 +487,16 @@ function standingClaimIsFresh({
 /** Hand the window back, for an outcome that never reached the platform. */
 function releaseHealWindow({
   stateDir,
-  agent,
+  sourceType,
 }: {
   stateDir: string;
-  agent: string;
+  sourceType: string;
 }): void {
   try {
-    fs.rmSync(healStateFile({ stateDir, agent }), { force: true });
+    fs.rmSync(healStateFile({ stateDir, sourceType }), { force: true });
   } catch {
     // A claim we cannot clear stands for the window, costing one repair.
+    void 0;
   }
 }
 
@@ -561,6 +526,7 @@ async function postOwnSessionContext({
   spec,
   agent,
   sessionId,
+  parentSessionId,
   input,
   env,
   runGit,
@@ -570,9 +536,10 @@ async function postOwnSessionContext({
   claudeRegistryDir,
   target,
 }: {
-  spec: (typeof TOOLS)[string];
+  spec: SessionContextAgent;
   agent: string;
   sessionId: string;
+  parentSessionId?: string;
   input: ReturnType<typeof parseHookInput>;
   env: NodeJS.ProcessEnv;
   runGit: GitRunner;
@@ -584,22 +551,18 @@ async function postOwnSessionContext({
 }): Promise<OwnContextOutcome> {
   const projectDir = spec.projectDirVar ? env[spec.projectDirVar] : undefined;
   const directory = firstNonEmpty(input.cwd, projectDir) ?? process.cwd();
-  // The session's own name, as claude itself holds it. The SessionStart
-  // payload carries it at start; the live registry is what makes a
-  // mid-session /rename observable from the Stop hook, which runs after
-  // every turn. Codex and opencode hold no such registry, so for them the
-  // record carries no name and the harvest names their sessions instead.
-  const name =
-    agent === "claude_code"
-      ? normalizeSessionName(
-          input.sessionTitle ??
-            readClaudeSessionName({
-              sessionId,
-              registryDir:
-                claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
-            }),
-        )
-      : null;
+  // The session's own name, as the harness holds it. Claude's live registry
+  // makes a mid-session /rename observable from the Stop hook. pi sends its
+  // name on every run start. Agents that send none are named by the harvest.
+  const name = normalizeSessionName(
+    input.sessionTitle ??
+      (agent === "claude_code"
+        ? readClaudeSessionName({
+            sessionId,
+            registryDir: claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
+          })
+        : null),
+  );
   // Outside a repository the record can still carry the session's name, and
   // the name alone is worth a post: it is what labels the session before its
   // first prompt. With neither identity nor a name there is nothing to say.
@@ -630,6 +593,7 @@ async function postOwnSessionContext({
     scopeVersion: LANGWATCH_SDK_VERSION,
     trace: parseTraceparent(env.TRACEPARENT),
     name,
+    parentSessionId,
   });
 
   const recordFingerprint = (): void => {
@@ -654,6 +618,7 @@ async function postOwnSessionContext({
   if (!posted.ok) {
     return {
       httpStatus: posted.status,
+      isCollectorUnreachable: posted.status === null,
       retry: async (healed) => {
         const again = await postSessionContext({
           target: healed,
@@ -678,37 +643,27 @@ async function postOwnSessionContext({
  */
 interface OwnContextOutcome {
   httpStatus: number | null;
+  /** The post got no answer at all: the collector is down or unreachable. */
+  isCollectorUnreachable?: boolean;
   retry?: (target: TelemetryTarget) => Promise<boolean>;
 }
 
 /**
- * Where to post the record, and what to authenticate it with.
- *
- * The environment is the first source, per the OTel exporter spec, and the
- * only one when the hook is driven by something other than an agent the CLI
- * signed in. It cannot be the only one: Claude Code strips every `OTEL_*`
- * variable from the processes it spawns, hooks included, so a session
- * exporting perfectly well hands its hooks an environment with no endpoint in
- * it at all.
- *
- * The fallback is the CLI's own device config, written by `langwatch login`,
- * `langwatch instrument` and `langwatch ingest install`. It holds two
- * credentials for one agent and they are read in the order `instrument`
- * chooses between them: the tool's pin first (`tool_project_keys`, with the
- * endpoint override it may carry), then the personal ingest key minted for
- * this agent under the control plane the CLI is signed in to. Null when no
- * source can name a collector, which is the "no telemetry configured" no-op.
- *
- * Shared with `langwatch ingest context`, which posts the same record from
- * the same sources when the agent declares its context itself.
+ * Where to post the record: env first, but not the only source -- Claude
+ * Code strips every `OTEL_*` var from hooks it spawns. Falls back to the
+ * device config's pin, then the personal key. Null means no source can name a collector.
  */
 export function resolveTarget({
   env,
-  agent,
+  sourceType,
   readCliConfig,
 }: {
   env: NodeJS.ProcessEnv;
-  agent: string;
+  /**
+   * The source type the personal key is cached under. The pin is keyed by
+   * the tool slug, read off this through the same table.
+   */
+  sourceType: string;
   readCliConfig: () => CliTelemetryConfig;
 }): TelemetryTarget | null {
   const fromEnv = resolveLogsEndpoint(env);
@@ -723,15 +678,11 @@ export function resolveTarget({
   const config = readCliConfig();
   const controlPlane = config.control_plane_url;
 
-  // `langwatch instrument <tool> --key/--project` pins the tool to one ingest
-  // key, and while that pin stands the personal path is neither consulted nor
-  // rewritten, so a pinned tool has no personal key to read here. The pin is
-  // kept per tool rather than per agent, hence the slug translation. It wins
-  // over the personal key, and the endpoint it carries wins with it, because a
-  // pin is an explicit choice of where this tool's data goes;
-  // `installTelemetryWiring` picks the same credential for the env block, so
-  // the record posted here and the traces the agent exports land together.
-  const pinned = config.tool_project_keys?.[TOOL_BY_SOURCE_TYPE[agent] ?? agent];
+  // A pin from `langwatch instrument` wins over the personal key (and its
+  // endpoint with it) while it stands -- an explicit choice of where this
+  // tool's data goes. `installTelemetryWiring` picks the same credential for
+  // the env block, so the record posted here and exported traces land together.
+  const pinned = config.tool_project_keys?.[TOOL_BY_SOURCE_TYPE[sourceType] ?? sourceType];
   const pinnedSecret = pinned?.secret?.trim();
   if (pinnedSecret) {
     const pinnedEndpoint = logsEndpointUnder(pinned?.endpoint ?? controlPlane);
@@ -746,7 +697,7 @@ export function resolveTarget({
   }
 
   const endpoint = logsEndpointUnder(controlPlane);
-  const secret = config.default_personal_ingest_keys?.[agent]?.secret?.trim();
+  const secret = config.default_personal_ingest_keys?.[sourceType]?.secret?.trim();
   if (!endpoint || !secret) return null;
 
   return {
@@ -780,6 +731,7 @@ export async function postSessionContext({
       method: "POST",
       headers: {
         ...target.headers,
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
         // Last, so a headers variable carrying its own content-type cannot
         // mislabel a body we know the encoding of.
         "content-type": "application/json",
@@ -800,7 +752,7 @@ export async function postSessionContext({
   }
 }
 
-function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
+function firstNonEmpty(...values: (string | undefined)[]): string | undefined {
   for (const value of values) {
     const trimmed = value?.trim();
     if (trimmed) return trimmed;
@@ -808,13 +760,7 @@ function firstNonEmpty(...values: Array<string | undefined>): string | undefined
   return undefined;
 }
 
-function debug({
-  message,
-  env,
-}: {
-  message: string;
-  env: NodeJS.ProcessEnv;
-}): void {
+function debug({ message, env }: { message: string; env: NodeJS.ProcessEnv }): void {
   if (!env.DEBUG?.includes("langwatch")) return;
   process.stderr.write(`langwatch:hook ${message}\n`);
 }

@@ -95,6 +95,34 @@ var providerCredentialTips = map[string][]string{
 	},
 }
 
+// configProblemTips replaces the generic provider_config_invalid advice when
+// the answer names what the slot is missing. The generic list tells the
+// customer to add the model to the provider, which is the wrong instruction
+// for a slot that has no API key at all. Each list ends by saying the failure
+// repeats, as the generic one does.
+var configProblemTips = map[ConfigProblem][]string{
+	ConfigProblemAPIKeyMissing: {
+		"This provider is enabled with no API key saved, so the request stopped inside LangWatch and never reached the provider",
+		"Open the provider under Settings → Model Providers, enter its API key and save",
+		"Every request fails the same way until a key is saved",
+	},
+	ConfigProblemEndpointMissing: {
+		"This provider is reached at a URL you supply, and none is saved, so there was nowhere to send the request",
+		"Open the provider under Settings → Model Providers, enter its endpoint URL and save",
+		"Every request fails the same way until an endpoint is saved",
+	},
+	ConfigProblemDeploymentMissing: {
+		"Azure and Bedrock serve a model through a named deployment, and this provider maps none for the requested model",
+		"Add the deployment mapping for the model under Settings → Model Providers",
+		"Every request for this model fails the same way until it is mapped",
+	},
+	ConfigProblemOperationUnsupported: {
+		"This provider has no API for this kind of request",
+		"Send the request to a provider that supports it, or pick another model",
+		"Every retry returns the same answer",
+	},
+}
+
 var registry = map[herr.Code]remediation{
 	ErrProviderCredentialInvalid: {
 		tips: []string{
@@ -165,7 +193,9 @@ func Remediate(e herr.E) herr.E {
 	meta := make(herr.M, len(e.Meta)+2)
 	maps.Copy(meta, e.Meta)
 	if !hasTips {
-		if tips := tipsFor(entry, e.Code, provider); len(tips) > 0 {
+		if tips := configProblemTipsFor(e); len(tips) > 0 {
+			meta["tips"] = tips
+		} else if tips := tipsFor(entry, e.Code, provider); len(tips) > 0 {
 			meta["tips"] = tips
 		}
 	}
@@ -177,6 +207,27 @@ func Remediate(e herr.E) herr.E {
 
 	e.Meta = meta
 	return e
+}
+
+// configProblemTipsFor returns the advice written for the specific thing a
+// provider slot is missing, or nil when the answer names no problem or one
+// with no list of its own.
+func configProblemTipsFor(e herr.E) []string {
+	if e.Code != ErrProviderConfigInvalid {
+		return nil
+	}
+	tips, ok := configProblemTips[configProblemOf(e.Meta)]
+	if !ok {
+		return nil
+	}
+	return capTips(tips)
+}
+
+// configProblemOf reads the problem an answer's meta names. Both producers
+// write it as a plain string, which is also what survives a JSON boundary.
+func configProblemOf(meta herr.M) ConfigProblem {
+	problem, _ := meta["problem"].(string)
+	return ConfigProblem(problem)
 }
 
 // maxTips mirrors MAX_TIPS in
@@ -256,16 +307,6 @@ func RemediationDocsPaths() []string {
 		add(path)
 	}
 	return paths
-}
-
-// RemediationCodes returns every code the registry answers for, so a test can
-// assert the codes that most need remediation actually have it.
-func RemediationCodes() []herr.Code {
-	codes := make([]herr.Code, 0, len(registry))
-	for code := range registry {
-		codes = append(codes, code)
-	}
-	return codes
 }
 
 func (r remediation) String() string {

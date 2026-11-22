@@ -102,6 +102,23 @@ Feature: Handled errors — what the customer actually reads
     Then the description points at the key and its permissions
     And it does not suggest retrying, because a retry cannot succeed
 
+  # Providers that write a code of their own send it instead of the status:
+  # Bedrock "access_denied", Anthropic "authentication_error", OpenAI
+  # "invalid_api_key". They mean the same thing and read the same way.
+  @unit @bdd @handled-errors @presentation
+  Scenario: A provider's own access code reads as a refused credential
+    Given a handled error carries the code "llm_upstream_error"
+    And its reason is the provider's own code for a refused key or refused access
+    When the client surfaces it
+    Then the description points at the key and its access to the model
+
+  @unit @bdd @handled-errors @presentation
+  Scenario: A provider that does not know the model gets its own remediation copy
+    Given a handled error carries the code "llm_upstream_error"
+    And its reason says the provider does not serve the model
+    When the client surfaces it
+    Then the description says to check the model name or pick another model
+
   @unit @bdd @handled-errors @presentation
   Scenario: A provider rate limit gets its own remediation copy
     Given a handled error carries the code "llm_upstream_error"
@@ -170,6 +187,13 @@ Feature: Handled errors — what the customer actually reads
     But when it is absent, or of an unexpected type
     Then the description falls back rather than rendering the raw value
 
+  @unit @bdd @handled-errors @presentation
+  Scenario: The refusal names the reserved parameter the caller actually supplied
+    Given a lwql_reserved_parameter_supplied error whose meta names the parameters actually supplied
+    When it is surfaced to a customer
+    Then the description names exactly the parameters that were supplied
+    And it does not name a reserved parameter the request never sent
+
   @unit @integration @bdd @handled-errors @presentation
   Scenario: An unhandled failure says nothing, but stays traceable
     Given a procedure fails with an unhandled error
@@ -226,12 +250,13 @@ Feature: Handled errors — what the customer actually reads
     Then the customer reads the calm generic message instead
 
     Examples:
-      | shape                           |
-      | a database driver's diagnostic  |
-      | a socket error code             |
-      | a stack frame                   |
-      | a socket address with a port    |
-      | longer than a sentence or two   |
+      | shape                                       |
+      | a database driver's diagnostic              |
+      | a socket error code                         |
+      | a stack frame                               |
+      | a socket address with a port                |
+      | longer than a sentence or two               |
+      | a request router's missing-procedure answer |
       # deliberately narrow: a bare address a person typed ("The IP 10.0.0.1 is
       # not allowed as a webhook destination") is real copy and must survive
 

@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
+    "composite": false,
+    "noEmit": true
+  },
+  "include": [
+    "src/**/__tests__/**/*.ts",
+    "src/**/tests/**/*.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.*.ts",
+    "tests/**/*.ts"
+  ],
+
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../test-harness/tsconfig.build.json"
+    }
+  ]
+}

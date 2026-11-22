@@ -1,0 +1,124 @@
+import type { Named } from "@langwatch/module";
+import { z } from "zod";
+
+import { ssoSamlIdpInitiatedSchema } from "./sso-idp-initiated-landing.ts";
+
+/**
+ * What an administrator hands over to register their identity provider (D09).
+ * Two protocols and one shape each, discriminated rather than a bag of
+ * optional fields, because half the combinations are nonsense.
+ */
+
+const ssoOidcRegistrationSchemaDefinition = z.object({
+  protocol: z.literal("oidc"),
+  /** The address the discovery document lives under. */
+  issuer: z.string().trim().min(1).max(2048),
+  clientId: z.string().trim().min(1).max(512),
+  clientSecret: z.string().min(1).max(4096),
+});
+export interface SsoOidcRegistrationSchema extends Named<
+  typeof ssoOidcRegistrationSchemaDefinition
+> {}
+export const ssoOidcRegistrationSchema: SsoOidcRegistrationSchema =
+  ssoOidcRegistrationSchemaDefinition;
+
+const ssoSamlRegistrationSchemaDefinition = z.object({
+  protocol: z.literal("saml"),
+  /** Where a sign-in request is sent. */
+  entryPoint: z.string().trim().min(1).max(2048),
+  /** What the provider calls itself. Derivable from metadata, so either this
+   *  or `metadataXml` has to be there and neither alone is required. */
+  entityId: z.string().trim().max(2048).nullable().default(null),
+  metadataXml: z.string().max(512_000).nullable().default(null),
+  certificate: z.string().max(64_000).nullable().default(null),
+  /** Sign-ins the identity provider starts: off until an editor opts in. */
+  idpInitiated: ssoSamlIdpInitiatedSchema,
+});
+export interface SsoSamlRegistrationSchema extends Named<
+  typeof ssoSamlRegistrationSchemaDefinition
+> {}
+export const ssoSamlRegistrationSchema: SsoSamlRegistrationSchema =
+  ssoSamlRegistrationSchemaDefinition;
+
+const ssoIdpRegistrationSchemaDefinition = z.discriminatedUnion("protocol", [
+  ssoOidcRegistrationSchema,
+  ssoSamlRegistrationSchema,
+]);
+export interface SsoIdpRegistrationSchema extends Named<
+  typeof ssoIdpRegistrationSchemaDefinition
+> {}
+export const ssoIdpRegistrationSchema: SsoIdpRegistrationSchema =
+  ssoIdpRegistrationSchemaDefinition;
+
+/**
+ * A registration's fields, to change an existing connection's identity provider
+ * settings. A blank OpenID Connect client secret keeps the stored one: a secret
+ * is never shown back, so every issuer fix would otherwise need it again.
+ */
+const ssoOidcUpdateSchemaDefinition = z.object({
+  ...ssoOidcRegistrationSchema.shape,
+  clientSecret: z.string().max(4096).nullable().default(null),
+});
+export interface SsoOidcUpdateSchema extends Named<typeof ssoOidcUpdateSchemaDefinition> {}
+export const ssoOidcUpdateSchema: SsoOidcUpdateSchema = ssoOidcUpdateSchemaDefinition;
+
+const ssoIdpUpdateSchemaDefinition = z.discriminatedUnion("protocol", [
+  ssoOidcUpdateSchema,
+  ssoSamlRegistrationSchema,
+]);
+export interface SsoIdpUpdateSchema extends Named<typeof ssoIdpUpdateSchemaDefinition> {}
+export const ssoIdpUpdateSchema: SsoIdpUpdateSchema = ssoIdpUpdateSchemaDefinition;
+
+export type SsoIdpUpdate = z.infer<typeof ssoIdpUpdateSchema>;
+
+/**
+ * A connection's current identity provider settings, as the edit form is
+ * prefilled with them. Never the OpenID Connect client secret: the form says
+ * whether one is stored, and a blank secret keeps it.
+ */
+export type SsoIdentityProviderView =
+  | {
+      protocol: "oidc";
+      issuer: string | null;
+      clientId: string | null;
+      hasClientSecret: boolean;
+    }
+  | {
+      protocol: "saml";
+      entryPoint: string | null;
+      entityId: string | null;
+      metadataXml: string | null;
+      certificate: string | null;
+      idpInitiated: SsoSamlIdpConfig["idpInitiated"];
+    }
+  /** A grandfathered connection dials the legacy provider: no settings of its own. */
+  | { protocol: "grandfathered" };
+
+export type SsoOidcRegistration = z.infer<typeof ssoOidcRegistrationSchema>;
+export type SsoSamlRegistration = z.infer<typeof ssoSamlRegistrationSchema>;
+export type SsoIdpRegistration = z.infer<typeof ssoIdpRegistrationSchema>;
+
+/**
+ * The SAML configuration as one document, which is what the vault holds under
+ * a single reference and what a provider row is rebuilt from.
+ */
+const ssoSamlIdpConfigSchemaDefinition = z.object({
+  entryPoint: z.string().min(1),
+  entityId: z.string().nullable(),
+  metadataXml: z.string().nullable(),
+  certificate: z.string().nullable(),
+  idpInitiated: ssoSamlIdpInitiatedSchema,
+});
+export interface SsoSamlIdpConfigSchema extends Named<typeof ssoSamlIdpConfigSchemaDefinition> {}
+export const ssoSamlIdpConfigSchema: SsoSamlIdpConfigSchema = ssoSamlIdpConfigSchemaDefinition;
+export type SsoSamlIdpConfig = z.infer<typeof ssoSamlIdpConfigSchema>;
+
+/** The stored document, or null when the reference held something else. */
+export function parseSamlIdpConfig(raw: string): SsoSamlIdpConfig | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return ssoSamlIdpConfigSchema.parse(parsed);
+  } catch {
+    return null;
+  }
+}

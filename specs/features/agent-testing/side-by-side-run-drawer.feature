@@ -85,6 +85,14 @@ Feature: The wide run detail drawer
     And no empty "Passed criteria" heading is shown
 
   @integration
+  Scenario: Criteria the judge could not decide read apart from the failed ones
+    Given a finished run whose judge met one criterion, missed one and could not decide one
+    When the results are read
+    Then a "Could not check" section reads between the failed and the passed sections
+    And the undecided criterion is listed there and not under "Failed criteria"
+    And its row carries an orange dashed circle
+
+  @integration
   Scenario: The messages carry no heading and no line beside the results
     Given a finished run open in the wide drawer
     When the drawer is read
@@ -181,7 +189,7 @@ Feature: The wide run detail drawer
   Scenario: The drawer header offers Edit Scenario for the scenario that ran
     Given a run open in the drawer
     When its header is read
-    Then one labelled "Edit Scenario" control for the scenario is offered
+    Then one labelled "Edit scenario" control for the scenario is offered
     And using it opens the scenario editor
 
   @integration
@@ -189,7 +197,7 @@ Feature: The wide run detail drawer
     Given a run open in the drawer
     When its header is read
     Then no separate Play and Edit icon buttons are offered
-    And a single "Edit Scenario" button is shown next to the overflow menu
+    And a single "Edit scenario" button is shown next to the overflow menu
     And a run of that scenario is triggered from inside the scenario editor
       through its "Save & Run" control
 

@@ -2,8 +2,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
-import { initConfig } from "./config.js";
-import { createMcpServer } from "./create-mcp-server.js";
+import { initConfig } from "./config.ts";
+import { createMcpServer } from "./create-mcp-server.ts";
 
 const argv = await yargs(hideBin(process.argv))
   .option("apiKey", {
@@ -13,6 +13,10 @@ const argv = await yargs(hideBin(process.argv))
   .option("endpoint", {
     type: "string",
     description: "LangWatch API endpoint",
+  })
+  .option("projectId", {
+    type: "string",
+    description: "LangWatch project ID",
   })
   .option("http", {
     type: "boolean",
@@ -41,13 +45,12 @@ const argv = await yargs(hideBin(process.argv))
 initConfig({
   apiKey: argv.apiKey,
   endpoint: argv.endpoint,
+  projectId: argv.projectId,
 });
 
 if (argv.http) {
-  const { startHttpServer } = await import("./http-server.js");
-  const { isLoopbackHost, parseAllowedOrigins } = await import(
-    "./http-security.js"
-  );
+  const { startHttpServer } = await import("./http-server.ts");
+  const { isLoopbackHost, parseAllowedOrigins } = await import("./http-security.ts");
 
   const allowedOrigins =
     argv.allowedOrigin && argv.allowedOrigin.length > 0
@@ -62,19 +65,14 @@ if (argv.http) {
 
   // An IPv6 literal has to be bracketed inside a URL, and must not be
   // double-bracketed when the operator already wrote it that way.
-  const displayHost =
-    host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
-  console.log(
-    `LangWatch MCP server listening on http://${displayHost}:${port}/mcp`
-  );
-  console.log(
-    "Clients must provide their API key via Authorization: Bearer <key> header"
-  );
+  const displayHost = host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
+  console.log(`LangWatch MCP server listening on http://${displayHost}:${port}/mcp`);
+  console.log("Clients must provide their API key via Authorization: Bearer <key> header");
   if (!isLoopbackHost(host)) {
     console.warn(
       `Warning: bound to ${host}, so the server is reachable from other machines. ` +
         "Make sure it sits behind a trusted network boundary and that --allowedOrigin " +
-        "lists only origins you control."
+        "lists only origins you control.",
     );
   }
   if (process.env.LANGWATCH_MCP_TRUST_PROXY === "true") {
@@ -83,7 +81,7 @@ if (argv.http) {
         "authentication uses the client address from X-Forwarded-For. Keep this " +
         "on only when a trusted proxy terminates in front of the port and " +
         "overwrites that header. Otherwise a client can supply any address there " +
-        "and the limit stops counting."
+        "and the limit stops counting.",
     );
   }
 } else {

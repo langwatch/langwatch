@@ -22,20 +22,20 @@ OpenAI's own `list` shape:
   "object": "list",
   "data": [
     { "id": "claude-sonnet-4-5", "object": "model", "created": 0, "owned_by": "anthropic" },
-    { "id": "complex",           "object": "model", "created": 0, "owned_by": "anthropic" },
-    { "id": "europe/gpt-5-mini", "object": "model", "created": 0, "owned_by": "openai" },
-    { "id": "gpt-5-mini",        "object": "model", "created": 0, "owned_by": "openai" }
+    { "id": "complex", "object": "model", "created": 0, "owned_by": "anthropic" },
+    { "id": "europe/gpt-6-luna", "object": "model", "created": 0, "owned_by": "openai" },
+    { "id": "gpt-6-luna", "object": "model", "created": 0, "owned_by": "openai" }
   ]
 }
 ```
 
 Entries are sorted by `id` and deduplicated. `data` is always an array, empty rather than null when the key reaches no models.
 
-| Field | Value |
-|---|---|
-| `id` | The exact string to send as `model`. |
-| `object` | Always `model`. |
-| `created` | Always `0`. A gateway model list has no creation date to report. |
+| Field      | Value                                                                                                                                                                   |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`       | The exact string to send as `model`.                                                                                                                                    |
+| `object`   | Always `model`.                                                                                                                                                         |
+| `created`  | Always `0`. A gateway model list has no creation date to report.                                                                                                        |
 | `owned_by` | The provider family that serves the model: `openai`, `anthropic`, `azure`, `bedrock`, `vertex`, `gemini`, and the rest. `langwatch` when the entry carries no provider. |
 
 ## What the list holds
@@ -54,31 +54,31 @@ When the key runs on a routing policy, the reserved tier names `complex`, `reaso
 
 ### Providers with an instance handle
 
-A model from a provider that has an [instance handle](/ai-gateway/model-naming#instance-handles) is listed under the handle-qualified id, for example `europe/gpt-5-mini`. That id is the only name that reaches that provider when the key holds two of the same family. `owned_by` stays the provider family, because that is what a model picker groups by.
+A model from a provider that has an [instance handle](/ai-gateway/model-naming#instance-handles) is listed under the handle-qualified id, for example `europe/gpt-6-luna`. That id is the only name that reaches that provider when the key holds two of the same family. `owned_by` stays the provider family, because that is what a model picker groups by.
 
 ## Incomplete discovery
 
 A provider the key can dispatch to can contribute no models to the catalog. The response then carries `X-Langwatch-Models-Discovery-Incomplete` with one `provider:reason` token per gap, comma separated:
 
-```
+```http
 X-Langwatch-Models-Discovery-Incomplete: bedrock:not-enumerable,openai:probe-failed
 ```
 
-| Reason | Meaning |
-|---|---|
-| `not-enumerable` | The provider has no catalog endpoint for this credential shape, and no deployment mapping to read model names from. |
-| `probe-failed` | The provider has a catalog endpoint and this round's probe did not deliver: the endpoint was down or slow, the key was rejected, or the endpoint policy refused the URL. |
+| Reason           | Meaning                                                                                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `not-enumerable` | The provider has no catalog endpoint for this credential shape, and no deployment mapping to read model names from.                                                      |
+| `probe-failed`   | The provider has a catalog endpoint and this round's probe did not deliver: the endpoint was down or slow, the key was rejected, or the endpoint policy refused the URL. |
 
 The header is absent when the list is complete, and when the key sets a literal allowlist, since no catalog is read then.
 
 ## Errors
 
-| Code | Status | Cause |
-|---|---|---|
-| `invalid_api_key` | 401 | The presented credential matches no virtual key. |
-| `virtual_key_revoked` | 403 | The key was revoked. |
-| `virtual_key_disabled` | 403 | The key was disabled. |
-| `virtual_key_expired` | 403 | The key's expiration date has passed. |
+| Code                   | Status | Cause                                            |
+| ---------------------- | ------ | ------------------------------------------------ |
+| `invalid_api_key`      | 401    | The presented credential matches no virtual key. |
+| `virtual_key_revoked`  | 403    | The key was revoked.                             |
+| `virtual_key_disabled` | 403    | The key was disabled.                            |
+| `virtual_key_expired`  | 403    | The key's expiration date has passed.            |
 
 The full table is on [Errors](/ai-gateway/api/errors).
 

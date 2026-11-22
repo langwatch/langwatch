@@ -167,3 +167,39 @@ Feature: Dataset management in evaluations workbench
     When I open the agent configuration panel
     Then the mapping dropdown shows columns grouped by dataset
     And the active dataset group is marked as "(active)"
+
+  # ==========================================================================
+  # Large saved datasets
+  # ==========================================================================
+
+  # The grid loads a saved dataset up to the size one response carries. A larger
+  # dataset shows its first rows and says so; a run reads the dataset on the
+  # server by its id, so it covers every row whatever the grid loaded.
+
+  @integration
+  Scenario: A saved dataset larger than the grid loads says how many rows are shown
+    Given a saved dataset of 10,000 rows of which the grid loaded the first 1,200
+    When I open the workbench with that dataset active
+    Then I see a notice saying 1,200 of 10,000 rows are shown
+    And the notice says a run still covers all 10,000 rows
+
+  @integration
+  Scenario: A saved dataset the grid loads in full shows no rows notice
+    Given a saved dataset the grid loaded every row of
+    When I open the workbench with that dataset active
+    Then I see no notice about rows not shown
+
+  @unit
+  Scenario: The grid remembers that a saved dataset read left rows out
+    Given a read of a saved dataset that reports it was cut short
+    When the grid stores the rows it loaded
+    Then it keeps how many rows were loaded and how many the dataset holds
+    And that count is never saved with the experiment
+
+  @unit
+  Scenario: A run on a saved dataset names the dataset and sends none of the grid's rows
+    Given a workbench whose active dataset is saved and only partly loaded in the grid
+    When I run the evaluation
+    Then the request names the saved dataset by its id
+    And the request carries none of the rows the grid loaded
+

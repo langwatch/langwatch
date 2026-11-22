@@ -23,29 +23,29 @@ helm install lw . \
   --set autogen.enabled=true
 ```
 
-| Category | File | Description |
-|----------|------|-------------|
-| **Size** | `size-minimal.yaml` | CI smoke test (50m CPU, 256Mi) |
-| | `size-dev.yaml` | Local dev / small team |
-| | `size-prod.yaml` | Production, single-node CH |
-| | `size-ha.yaml` | HA, 3-node replicated CH |
-| **Access** | `access-nodeport.yaml` | Kind: http://localhost:30560 |
-| | `access-ingress.yaml` | Cloud: Ingress + TLS |
-| **Infra** | `local-images.yaml` | Use `pullPolicy: Never` images |
-| | `clickhouse-external.yaml` | External ClickHouse |
-| | `clickhouse-replicated.yaml` | 3-node replicated CH |
-| | `postgres-external.yaml` | External PostgreSQL |
-| | `redis-external.yaml` | External Redis |
-| | `cold-storage-s3.yaml` | S3 tiering + backups |
+| Category   | File                         | Description                    |
+| ---------- | ---------------------------- | ------------------------------ |
+| **Size**   | `size-minimal.yaml`          | CI smoke test (50m CPU, 256Mi) |
+|            | `size-dev.yaml`              | Local dev / small team         |
+|            | `size-prod.yaml`             | Production, single-node CH     |
+|            | `size-ha.yaml`               | HA, 3-node replicated CH       |
+| **Access** | `access-nodeport.yaml`       | Kind: http://localhost:30560   |
+|            | `access-ingress.yaml`        | Cloud: Ingress + TLS           |
+| **Infra**  | `local-images.yaml`          | Use `pullPolicy: Never` images |
+|            | `clickhouse-external.yaml`   | External ClickHouse            |
+|            | `clickhouse-replicated.yaml` | 3-node replicated CH           |
+|            | `postgres-external.yaml`     | External PostgreSQL            |
+|            | `redis-external.yaml`        | External Redis                 |
+|            | `cold-storage-s3.yaml`       | S3 tiering + backups           |
 
 ## Profile files
 
 For common scenarios, use one of the all-in-one profiles:
 
-| File | Equivalent overlays |
-|------|-------------------|
-| `values-local.yaml` | `size-dev` + `access-nodeport` + `local-images` + autogen |
-| `values-hosted-prod.yaml` | `size-prod` + `access-ingress` + `postgres-external` + `redis-external` |
+| File                        | Equivalent overlays                                                                       |
+| --------------------------- | ----------------------------------------------------------------------------------------- |
+| `values-local.yaml`         | `size-dev` + `access-nodeport` + `local-images` + autogen                                 |
+| `values-hosted-prod.yaml`   | `size-prod` + `access-ingress` + `postgres-external` + `redis-external`                   |
 | `values-scalable-prod.yaml` | `size-ha` + `access-ingress` + `postgres-external` + `redis-external` + `cold-storage-s3` |
 
 ## Template rendering (no cluster needed)

@@ -15,27 +15,40 @@ Feature: ClickHouse backup status metrics are opt-out
   absence of configuration keeps the existing behaviour and only a deliberate
   opt-out stops collection.
 
+  @unit
   Scenario: a deployment that says nothing keeps collecting backup status
     Given CLICKHOUSE_BACKUP_METRICS_ENABLED is not set
     When the storage stats collector ticks
     Then backup status is collected from the ClickHouse backup log
 
+  @unit
   Scenario: a deployment with backups collects backup status
     Given backup metrics collection is enabled for the deployment
     When the storage stats collector ticks
     Then backup status is collected from the ClickHouse backup log
 
+  @unit
   Scenario: a deployment without backups opts out of the backup log query
     Given backup metrics collection is explicitly disabled
     When the storage stats collector ticks
     Then the ClickHouse backup log is never queried
     And table and disk storage stats are still collected
 
+  @unit
   Scenario: an unrecognised value is treated as enabled
     Given CLICKHOUSE_BACKUP_METRICS_ENABLED is set to an unparseable value
     When the storage stats collector ticks
     Then backup status is collected from the ClickHouse backup log
 
+  @unit
+  Scenario: an instance with no backup log names the absence once at info
+    Given backup metrics collection is enabled
+    And the ClickHouse instance has never taken a backup, so there is no backup log
+    When the storage stats collector ticks repeatedly
+    Then the missing backup log is named once, as information rather than a warning
+    And no failure warning is logged for it
+
+  @unit
   Scenario: transient backup-log failure warns once until recovery
     Given backup metrics collection is enabled
     When the backup log query fails on consecutive ticks
@@ -44,23 +57,52 @@ Feature: ClickHouse backup status metrics are opt-out
 
   # The Helm chart states the toggle explicitly in both directions, coupled to
   # the backup config, so a chart deployment never depends on the app's default.
+  @e2e
   Scenario: the Helm chart enables backup metrics wherever it runs backups
     Given the langwatch chart is deployed with clickhouse.backup.enabled true
     When the app and worker deployments are rendered
     Then CLICKHOUSE_BACKUP_METRICS_ENABLED is set to true on them
 
+  @e2e
   Scenario: an operator forces backup metrics for out-of-band backups
     Given the langwatch chart is deployed with clickhouse.backup.metricsEnabled true
     And chart-managed backups are disabled
     When the app and worker deployments are rendered
     Then CLICKHOUSE_BACKUP_METRICS_ENABLED is set to true on them
 
+  @e2e
   Scenario: the Helm chart opts out where it knows there are no backups
     Given the langwatch chart is deployed with clickhouse backups disabled
     When the app and worker deployments are rendered
     Then CLICKHOUSE_BACKUP_METRICS_ENABLED is set to false on them
 
+  @unit
   Scenario: haven opts local worktrees out
     Given a haven stack manages its own ClickHouse
     When the portless overlay is rendered
     Then CLICKHOUSE_BACKUP_METRICS_ENABLED is set to false in it
+
+  @unit
+  Scenario: A named cluster reads every replica's backup history
+    Given CLICKHOUSE_CLUSTER names the cluster
+    When the backup history is read from a replica that did not run the backup
+    Then the table probe and the read both go through all replicas
+    And an unreachable replica does not blank the reading
+
+  @unit
+  Scenario: A cluster the server does not know falls back to the local node
+    Given CLICKHOUSE_CLUSTER names a cluster ClickHouse does not know
+    When the cluster-wide table probe or backup read is refused for the unknown cluster
+    Then the local node is probed and read instead, and the fallback is logged
+
+  @unit
+  Scenario: Any other cluster-wide failure is reported, not hidden
+    Given CLICKHOUSE_CLUSTER names the cluster
+    When the cluster-wide probe or backup read times out, lacks rights or meets a missing table
+    Then the failure is logged and reaches the collector rather than a local answer standing in for it
+
+  @unit
+  Scenario: A cluster name that is not a plain identifier reads the local node
+    Given CLICKHOUSE_CLUSTER holds something that is not a plain identifier
+    When the backup history is read
+    Then only the local node is read

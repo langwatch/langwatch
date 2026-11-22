@@ -8,15 +8,18 @@ sidebarTitle: Custom OpenAI-compatible
 
 Open **Settings > Model Providers**, click **Add Model Provider** and select **Custom (OpenAI-compatible)**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-| Field | Value |
-|---|---|
+| Field             | Value                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------- |
 | `CUSTOM_BASE_URL` | The endpoint, for example `https://inference.acme.internal/v1`. A trailing `/v1` is accepted. |
-| `CUSTOM_API_KEY` | Optional. Sent as `Authorization: Bearer` when set. |
+| `CUSTOM_API_KEY`  | Optional. Sent as `Authorization: Bearer` when set.                                           |
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
 <Frame caption="The Custom (OpenAI-compatible) row: the optional CUSTOM_API_KEY, the required CUSTOM_BASE_URL, Add Header and the routing handle custom.">
-  <img src="/images/ai-gateway/model-provider-custom-form.png" alt="The Custom OpenAI-compatible model provider drawer with CUSTOM_API_KEY, CUSTOM_BASE_URL, an Add Header button and the routing handle custom" />
+  <img
+    src="/images/ai-gateway/model-provider-custom-form.png"
+    alt="The Custom OpenAI-compatible model provider drawer with CUSTOM_API_KEY, CUSTOM_BASE_URL, an Add Header button and the routing handle custom"
+  />
 </Frame>
 
 Add the models the endpoint serves under **Custom Models** on the row. `GET /v1/models` lists those names.
@@ -26,7 +29,11 @@ The endpoint must be reachable from the gateway. The gateway always refuses link
 On LangWatch Cloud the endpoint must use `https`: a hosted gateway refuses to start without `REQUIRE_HTTPS_CUSTOM_ENDPOINTS=true`, and with it an `http` endpoint is refused. A self-hosted gateway accepts `http` while that setting stays `false`.
 
 <Warning>
-An `http` endpoint sends `CUSTOM_API_KEY` in cleartext, because the gateway puts it in an `Authorization: Bearer` header on every request. Anyone on the path between the gateway and the endpoint can read the key. Use `http` only for an endpoint with no `CUSTOM_API_KEY`. On a self-hosted gateway that dispatches to a row with a key, set `REQUIRE_HTTPS_CUSTOM_ENDPOINTS=true` as well.
+  An `http` endpoint sends `CUSTOM_API_KEY` in cleartext, because the gateway puts it in an
+  `Authorization: Bearer` header on every request. Anyone on the path between the gateway and the
+  endpoint can read the key. Use `http` only for an endpoint with no `CUSTOM_API_KEY`. On a
+  self-hosted gateway that dispatches to a row with a key, set `REQUIRE_HTTPS_CUSTOM_ENDPOINTS=true`
+  as well.
 </Warning>
 
 ## Model names
@@ -47,12 +54,12 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 ## Endpoints
 
-| Endpoint | Served |
-|---|---|
-| `POST /v1/chat/completions` | Yes |
-| `POST /v1/messages` | Yes, translated |
-| `POST /v1/embeddings` | Yes, when the endpoint serves it |
+| Endpoint                                               | Served                                                                                                                                                       |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /v1/chat/completions`                            | Yes                                                                                                                                                          |
+| `POST /v1/messages`                                    | Yes, translated                                                                                                                                              |
+| `POST /v1/embeddings`                                  | Yes, when the endpoint serves it                                                                                                                             |
 | `POST /v1/images/generations`, `POST /v1/images/edits` | No, rejected with HTTP 400. Image traffic needs a direct OpenAI, Azure OpenAI, Gemini, Vertex AI or Bedrock credential. See [Images](/ai-gateway/api/images) |
-| `GET /v1/models` | Yes, the names under Custom Models |
+| `GET /v1/models`                                       | Yes, the names under Custom Models                                                                                                                           |
 
 Streaming, tools and other features depend on what the endpoint implements. A feature the endpoint does not support comes back as the endpoint's own error.

@@ -1,5 +1,5 @@
-import { makeRequest } from "./langwatch-api.js";
-import type { SimulationRunEvaluation } from "./tools/format-suite-details.js";
+import { makeRequest } from "./langwatch-api.ts";
+import type { SimulationRunEvaluation } from "./tools/format-suite-details.ts";
 
 export interface SimulationRunSummary {
   scenarioRunId: string;
@@ -18,7 +18,7 @@ export interface SimulationRunSummary {
     /** One result per evaluator that ran after the conversation. */
     evaluations?: SimulationRunEvaluation[];
   } | null;
-  messages?: Array<{ role: string; content: string }>;
+  messages?: { role: string; content: string }[];
   /** Why the run was started, as given when it was queued. Null without one. */
   note?: string | null;
   timestamp: number;
@@ -42,15 +42,13 @@ export async function listSimulationRuns(params?: {
   if (params?.batchRunId) query.set("batchRunId", params.batchRunId);
   if (params?.limit) query.set("limit", String(params.limit));
   const qs = query.toString() ? `?${query}` : "";
-  return makeRequest("GET", `/api/simulation-runs${qs}`) as Promise<SimulationRunListResponse>;
+  return makeRequest("GET", `/api/v1/simulation-runs${qs}`) as Promise<SimulationRunListResponse>;
 }
 
 /** Gets a single simulation run by its ID. */
-export async function getSimulationRun(
-  scenarioRunId: string,
-): Promise<SimulationRunSummary> {
+export async function getSimulationRun(scenarioRunId: string): Promise<SimulationRunSummary> {
   return makeRequest(
     "GET",
-    `/api/simulation-runs/${encodeURIComponent(scenarioRunId)}`,
+    `/api/v1/simulation-runs/${encodeURIComponent(scenarioRunId)}`,
   ) as Promise<SimulationRunSummary>;
 }

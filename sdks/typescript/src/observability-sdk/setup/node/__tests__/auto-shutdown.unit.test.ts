@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { resourceFromAttributes } from "@opentelemetry/resources";
 import { trace } from "@opentelemetry/api";
-import { createAndStartNodeSdk } from "../setup.js";
+import { resourceFromAttributes } from "@opentelemetry/resources";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import { resetObservabilitySdkConfig } from "../../../config.js";
+import { createAndStartNodeSdk } from "../setup.js";
 import type { SetupObservabilityOptions } from "../types.js";
 
 const mocks = vi.hoisted(() => ({
@@ -22,8 +23,8 @@ vi.mock("../../../exporters", () => ({
     return { shutdown: vi.fn() };
   }),
 }));
-vi.mock("@opentelemetry/sdk-node", () => ({
-  NodeSDK: vi.fn().mockImplementation(function () {
+vi.mock("../node-sdk", () => ({
+  NodeSdk: vi.fn().mockImplementation(function () {
     return { start: vi.fn(), shutdown: mocks.shutdown };
   }),
 }));

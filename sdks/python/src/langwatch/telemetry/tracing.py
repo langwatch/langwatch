@@ -8,7 +8,7 @@ from deprecated import deprecated
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 from langwatch.attributes import AttributeKey
 from langwatch.http_client import create_client
-from langwatch.utils.auth import build_auth_headers
+from langwatch.utils.auth import build_request_headers
 from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import (
     SerializableWithStringFallback,
@@ -56,7 +56,7 @@ import langwatch.telemetry.context
 
 if TYPE_CHECKING:
     from openai import OpenAI, AsyncOpenAI, AzureOpenAI, AsyncAzureOpenAI
-    from langwatch.evaluations import BasicEvaluateData
+    from langwatch.evaluation import BasicEvaluateData
 
 __all__ = ["trace", "LangWatchTrace"]
 
@@ -369,7 +369,7 @@ class LangWatchTrace:
             with create_client() as client:
                 response = client.post(
                     f"{endpoint}/api/trace/{trace_id}/share",
-                    headers=build_auth_headers(get_api_key()),
+                    headers=build_request_headers(get_api_key()),
                     timeout=30,
                 )
                 better_raise_for_status(response)
@@ -391,7 +391,7 @@ class LangWatchTrace:
             with create_client() as client:
                 response = client.post(
                     f"{endpoint}/api/trace/{trace_id}/unshare",
-                    headers=build_auth_headers(get_api_key()),
+                    headers=build_request_headers(get_api_key()),
                     timeout=30,
                 )
                 better_raise_for_status(response)
@@ -482,9 +482,9 @@ class LangWatchTrace:
         error: Optional[Exception] = None,
         timestamps: Optional[EvaluationTimestamps] = None,
     ):
-        from langwatch import evaluations
+        from langwatch import evaluation
 
-        evaluations._add_evaluation(  # type: ignore
+        evaluation._add_evaluation(
             span=span,
             evaluation_id=evaluation_id,
             name=name,
@@ -516,20 +516,21 @@ class LangWatchTrace:
         as_guardrail: bool = False,
         data: Optional[Union["BasicEvaluateData", Dict[str, Any]]] = None,
     ):
-        from langwatch import evaluations
+        from langwatch import evaluation
 
-        return evaluations.evaluate(
-            trace=self,
+        return evaluation.evaluate(
             slug=slug,
+            data=evaluation._merge_keyword_data(
+                data,
+                input=input,
+                output=output,
+                expected_output=expected_output,
+                contexts=contexts,
+                conversation=conversation,
+            ),
             name=name,
-            input=input,
-            output=output,
-            expected_output=expected_output,
-            contexts=contexts,
-            conversation=conversation,
             settings=settings,
             as_guardrail=as_guardrail,
-            data=data,
         )
 
     @deprecated(
@@ -548,20 +549,21 @@ class LangWatchTrace:
         as_guardrail: bool = False,
         data: Optional[Union["BasicEvaluateData", Dict[str, Any]]] = None,
     ):
-        from langwatch import evaluations
+        from langwatch import evaluation
 
-        return await evaluations.async_evaluate(
-            trace=self,
+        return await evaluation.async_evaluate(
             slug=slug,
+            data=evaluation._merge_keyword_data(
+                data,
+                input=input,
+                output=output,
+                expected_output=expected_output,
+                contexts=contexts,
+                conversation=conversation,
+            ),
             name=name,
-            input=input,
-            output=output,
-            expected_output=expected_output,
-            contexts=contexts,
-            conversation=conversation,
             settings=settings,
             as_guardrail=as_guardrail,
-            data=data,
         )
 
     def __call__(self, func: T) -> T:

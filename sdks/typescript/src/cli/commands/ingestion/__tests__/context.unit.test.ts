@@ -1,9 +1,6 @@
 /**
- * `langwatch ingest context`: the agent declares the repository and branch it
- * is working on, itself. Which session it declares for, what it posts, what
- * it says back, and how it shares the fingerprint state with the hooks.
- *
- * Feature: specs/ai-governance/cli-wrappers/session-context-declare.feature
+ * Agent declares repo/branch. Tests session resolution, declaration sharing,
+ * fingerprint state. Feature: session-context-declare.feature.
  */
 
 import * as fs from "node:fs";
@@ -17,9 +14,10 @@ import {
   readSpooledDeclarations,
   spoolDir,
   spoolFilePath,
+  writeSpooledDeclaration,
 } from "@/cli/utils/governance/session-context-spool";
 
-import { contextCommand } from "../context";
+import { contextCommand, runContextProcess } from "../context";
 import { hookCommand } from "../hook";
 import {
   attributesOf,
@@ -49,8 +47,7 @@ let previousTmpdir: string | undefined;
 const posted: PostedRequest[] = [];
 const lines: string[] = [];
 
-const collector =
-  (status = 200): typeof fetch =>
+const collector = (status = 200): typeof fetch =>
   ((url: string, init: { headers: Record<string, string>; body: string }) => {
     posted.push({
       url,
@@ -84,10 +81,7 @@ function writeRollout({
 }: { sessionId?: string; agoMs?: number } = {}): void {
   const dir = path.join(sessionsRoot, "2026", "08", "22");
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(
-    dir,
-    `rollout-2026-08-22T10-00-00-${sessionId}.jsonl`,
-  );
+  const file = path.join(dir, `rollout-2026-08-22T10-00-00-${sessionId}.jsonl`);
   fs.writeFileSync(
     file,
     [
@@ -125,9 +119,7 @@ const ancestorHolding = (sessionId: string): AncestorProbe => ({
       : [],
 });
 
-const runContext = (
-  options: Partial<Parameters<typeof contextCommand>[0]> = {},
-) =>
+const runContext = (options: Partial<Parameters<typeof contextCommand>[0]> = {}) =>
   contextCommand({
     env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT, ...CLAUDE_ENV },
     cwd: "/repo/worktrees/review",
@@ -191,6 +183,28 @@ describe("the declare command's session resolution", () => {
     });
   });
 
+  it("declares for a Copilot session the flags name, with the surface's own key", async () => {
+    await runContext({
+      agent: "copilot",
+      sessionId: "copilot-conversation",
+      env: { CLAUDECODE: "", COPILOT_CLI: "1" },
+      readCliConfig: () => ({
+        control_plane_url: "https://app.example.com",
+        default_personal_ingest_keys: {
+          copilot_cli: { secret: "ik-lw-copilot-cli" },
+          copilot_vscode: { secret: "ik-lw-copilot-vscode" },
+        },
+      }),
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(posted[0]!.headers.Authorization).toBe("Bearer ik-lw-copilot-cli");
+    expect(attributesOf(posted[0]!)).toMatchObject({
+      "coding_agent.name": "copilot",
+      "session.id": "copilot-conversation",
+    });
+  });
+
   it("asks for both flags when only one is passed", async () => {
     await runContext({ sessionId: "half-a-session" });
 
@@ -199,7 +213,7 @@ describe("the declare command's session resolution", () => {
     expect(lines[0]).toContain("--agent");
   });
 
-  /** @scenario "The invoking codex session is resolved from the ancestor process that holds the rollout open" */
+  /** @scenario "Codex session resolved from ancestor holding rollout" */
   it("declares for the session whose process this runs under", async () => {
     writeRollout({ sessionId: CODEX_SESSION, agoMs: 5 * 60_000 });
     writeRollout({ sessionId: OTHER_CODEX_SESSION, agoMs: 1_000 });
@@ -217,7 +231,7 @@ describe("the declare command's session resolution", () => {
     });
   });
 
-  /** @scenario "The invoking codex session is resolved from the ancestor process that holds the rollout open" */
+  /** @scenario "Codex session resolved from ancestor holding rollout" */
   it("declares for the ancestor session while a second session is mid-turn", async () => {
     writeRollout({ sessionId: CODEX_SESSION, agoMs: 5_000 });
     writeRollout({ sessionId: OTHER_CODEX_SESSION, agoMs: 2_000 });
@@ -341,7 +355,8 @@ describe("what the declaration posts", () => {
       "vcs.worktree.name": "review",
     });
     expect(lines).toEqual([
-      `Declared github.com/langwatch/langwatch@feat/session-context for claude_code session ${SESSION_ID}`,
+      `Declared github.com/langwatch/langwatch@feat/session-context for ` +
+        `claude_code session ${SESSION_ID}`,
     ]);
   });
 
@@ -387,9 +402,7 @@ describe("what the declaration posts", () => {
       },
     });
 
-    expect(recordOf(posted[0]!).traceId).toBe(
-      "16872e6253edb3e8748023ff172703c4",
-    );
+    expect(recordOf(posted[0]!).traceId).toBe("16872e6253edb3e8748023ff172703c4");
     expect(recordOf(posted[0]!).spanId).toBe("be7ce7c6bf1173f5");
   });
 });
@@ -429,6 +442,35 @@ describe("the declare command's refusals", () => {
     expect(lines[0]).toContain("next reports");
   });
 
+  /** @scenario "A declaration that cannot be delivered does not hold the agent's shell" */
+  it("ends the process with exit code zero after its one line", async () => {
+    const exits: number[] = [];
+    // The post fails at once, but the connection attempt behind it stays open.
+    const connecting = setInterval(() => undefined, 60_000);
+    try {
+      await runContextProcess({
+        env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT, ...CLAUDE_ENV },
+        cwd: "/repo/worktrees/review",
+        runGit: gitRunner(WORKTREE_GIT),
+        fetchImpl: unreachableCollector,
+        now: () => NOW,
+        stateDir,
+        claudeRegistryDir: path.join(stateDir, "claude-sessions"),
+        codexSessionsRoot: sessionsRoot,
+        ancestorStartPid: 100,
+        ancestorProbe: NO_ANCESTOR,
+        readCliConfig: () => ({}),
+        writeLine: (line) => lines.push(line),
+        exit: (code) => exits.push(code),
+      });
+    } finally {
+      clearInterval(connecting);
+    }
+
+    expect(lines).toHaveLength(1);
+    expect(exits).toEqual([0]);
+  });
+
   /** @scenario "A successful declaration queues nothing" */
   it("queues nothing when the collector accepts the declaration", async () => {
     await runContext();
@@ -448,9 +490,7 @@ describe("the declare command's refusals", () => {
       }),
     });
 
-    expect(
-      readSpooledDeclarations({ stateDir, now: () => NOW }),
-    ).toHaveLength(1);
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(1);
   });
 });
 
@@ -499,9 +539,7 @@ describe("the declaration and the hooks share one fingerprint", () => {
     });
 
     expect(posted).toHaveLength(2);
-    expect(attributesOf(posted[1]!)["vcs.ref.head.name"]).toBe(
-      "fix/regression",
-    );
+    expect(attributesOf(posted[1]!)["vcs.ref.head.name"]).toBe("fix/regression");
   });
 });
 
@@ -514,10 +552,7 @@ describe("a queued declaration and the next session report", () => {
     hookCommand({
       tool: "claude-code",
       env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT },
-      readInput: () =>
-        Promise.resolve(
-          JSON.stringify({ session_id: SESSION_ID, cwd }),
-        ),
+      readInput: () => Promise.resolve(JSON.stringify({ session_id: SESSION_ID, cwd })),
       runGit: gitRunner({
         ...WORKTREE_GIT,
         "branch --show-current": "main",
@@ -537,9 +572,7 @@ describe("a queued declaration and the next session report", () => {
 
     await runHookSeam();
 
-    const branches = posted.map(
-      (request) => attributesOf(request)["vcs.ref.head.name"],
-    );
+    const branches = posted.map((request) => attributesOf(request)["vcs.ref.head.name"]);
     expect(branches).toContain("feat/session-context");
     expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toEqual([]);
   });
@@ -554,9 +587,9 @@ describe("a queued declaration and the next session report", () => {
     // The declaration has to land last or the session keeps the hook branch.
     expect(posted.length).toBeGreaterThanOrEqual(2);
     expect(attributesOf(posted[0]!)["vcs.ref.head.name"]).toBe("main");
-    expect(
-      attributesOf(posted[posted.length - 1]!)["vcs.ref.head.name"],
-    ).toBe("feat/session-context");
+    expect(attributesOf(posted[posted.length - 1]!)["vcs.ref.head.name"]).toBe(
+      "feat/session-context",
+    );
   });
 
   /** @scenario "The next session report sends the queued declaration" */
@@ -580,18 +613,13 @@ describe("a queued declaration and the next session report", () => {
       agent: "claude_code",
       sessionId: SESSION_ID,
     });
-    const stale = JSON.parse(fs.readFileSync(entry, "utf8")) as Record<
-      string,
-      unknown
-    >;
+    const stale = JSON.parse(fs.readFileSync(entry, "utf8")) as Record<string, unknown>;
     stale.queued_at_ms = NOW - 61 * 60_000;
     fs.writeFileSync(entry, JSON.stringify(stale));
 
     await runHookSeam();
 
-    const branches = posted.map(
-      (request) => attributesOf(request)["vcs.ref.head.name"],
-    );
+    const branches = posted.map((request) => attributesOf(request)["vcs.ref.head.name"]);
     expect(branches).not.toContain("feat/session-context");
     expect(fs.existsSync(entry)).toBe(false);
   });
@@ -602,8 +630,47 @@ describe("a queued declaration and the next session report", () => {
 
     await runHookSeam({ fetchImpl: unreachableCollector });
 
-    expect(
-      readSpooledDeclarations({ stateDir, now: () => NOW }),
-    ).toHaveLength(1);
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(1);
+  });
+  const queueSessions = (count: number): void => {
+    for (let index = 0; index < count; index++) {
+      writeSpooledDeclaration({
+        stateDir,
+        agent: "copilot",
+        sessionId: `queued-${index}`,
+        fingerprint: `fingerprint-${index}`,
+        payload: { queued: index },
+        now: () => NOW,
+      });
+    }
+  };
+
+  /** @scenario "A report that cannot reach the collector sends no queued declarations" */
+  it("sends nothing queued once its own post got no answer", async () => {
+    queueSessions(5);
+    let attempts = 0;
+    const silentCollector = (async () => {
+      attempts++;
+      throw new Error("connect ETIMEDOUT");
+    }) as unknown as typeof fetch;
+
+    await runHookSeam({ fetchImpl: silentCollector });
+
+    expect(attempts).toBe(1);
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(5);
+  });
+
+  /** @scenario "The queue drains once the collector answers again" */
+  it("posts every queued declaration when the collector answers again", async () => {
+    queueSessions(5);
+    await runHookSeam({ fetchImpl: unreachableCollector });
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(5);
+
+    await runHookSeam();
+
+    expect(posted.map((request) => request.body)).toEqual(
+      expect.arrayContaining([0, 1, 2, 3, 4].map((queued) => ({ queued }))),
+    );
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toEqual([]);
   });
 });

@@ -1,4 +1,5 @@
 import { readFileSync } from "fs";
+
 import type {
   ChartParameterValue,
   SavedChartDefinitionInput,
@@ -16,21 +17,16 @@ export interface DefinitionFlags {
 export class ChartInputError extends Error {}
 
 /**
- * Parses one repeatable `--param key=value` flag. Values that read as JSON
- * scalars are sent as those scalars (`--param since=7` binds a number,
- * `--param active=true` a boolean) so a saved parameter keeps the type the
- * statement's placeholder declares; anything else is sent as the string.
+ * Parses one repeatable `--param key=value` flag. JSON-scalar-shaped values
+ * (`since=7`, `active=true`) send as that scalar so a saved parameter keeps
+ * its placeholder's type; anything else sends as the string.
  */
-export const parseParameterFlags = (
-  flags: string[],
-): Record<string, ChartParameterValue> => {
+export const parseParameterFlags = (flags: string[]): Record<string, ChartParameterValue> => {
   const parameters: Record<string, ChartParameterValue> = {};
   for (const flag of flags) {
     const separator = flag.indexOf("=");
     if (separator <= 0) {
-      throw new ChartInputError(
-        `Invalid --param "${flag}": expected key=value`,
-      );
+      throw new ChartInputError(`Invalid --param "${flag}": expected key=value`);
     }
     const key = flag.slice(0, separator);
     const raw = flag.slice(separator + 1);
@@ -42,26 +38,21 @@ export const parseParameterFlags = (
 const coerceScalar = (raw: string): ChartParameterValue => {
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (
-      typeof parsed === "string" ||
-      typeof parsed === "number" ||
-      typeof parsed === "boolean" ||
-      parsed === null
-    ) {
-      return parsed;
-    }
+    if (typeof parsed === "string") return parsed;
+    if (typeof parsed === "number") return parsed;
+    if (typeof parsed === "boolean") return parsed;
+    if (parsed === null) return parsed;
   } catch {
     // Not JSON — a plain string value.
+    void 0;
   }
   return raw;
 };
 
 /**
  * Resolves the definition flags into the request's definition, or undefined
- * when no definition flag was supplied at all (an update touching only the
- * name). `--sql` and `--sql-file` are mutually exclusive; a definition needs
- * one of them, because parameters and a specification mean nothing without
- * the statement they belong to.
+ * when none was supplied (an update touching only the name). `--sql` and
+ * `--sql-file` are mutually exclusive; a definition needs one of them.
  */
 export const resolveDefinitionInput = (
   flags: DefinitionFlags,
@@ -74,15 +65,11 @@ export const resolveDefinitionInput = (
   if (!hasDefinitionFlag) return undefined;
 
   if (flags.sql !== undefined && flags.sqlFile !== undefined) {
-    throw new ChartInputError(
-      "Pass either --sql or --sql-file, not both",
-    );
+    throw new ChartInputError("Pass either --sql or --sql-file, not both");
   }
   const sql = flags.sql ?? (flags.sqlFile ? readSqlFile(flags.sqlFile) : undefined);
   if (sql === undefined || sql.trim().length === 0) {
-    throw new ChartInputError(
-      "A definition needs its statement: pass --sql or --sql-file",
-    );
+    throw new ChartInputError("A definition needs its statement: pass --sql or --sql-file");
   }
 
   const definition: SavedChartDefinitionInput = {
@@ -114,15 +101,11 @@ const readSpecFile = (path: string): Record<string, unknown> => {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new ChartInputError(
-        `Specification file is not a JSON object: ${path}`,
-      );
+      throw new ChartInputError(`Specification file is not a JSON object: ${path}`);
     }
     return parsed as Record<string, unknown>;
   } catch (error) {
     if (error instanceof ChartInputError) throw error;
-    throw new ChartInputError(
-      `Specification file is not valid JSON: ${path}`,
-    );
+    throw new ChartInputError(`Specification file is not valid JSON: ${path}`);
   }
 };

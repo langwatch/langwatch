@@ -3,14 +3,7 @@ title: Vector Search vs Hybrid Search using LanceDB
 sidebarTitle: Vector Search vs Hybrid Search
 description: Learn the key differences between vector search and hybrid search in RAG applications. Use cases, performance tradeoffs, and when to choose each.
 keywords:
-  [
-    vector search,
-    hybrid search,
-    semantic search,
-    lexical search,
-    information retrieval,
-    AI search,
-  ]
+  [vector search, hybrid search, semantic search, lexical search, information retrieval, AI search]
 ---
 
 In this cookbook, we'll explore the differences between pure vector search and hybrid search approaches that combine vector embeddings with metadata filtering. We'll see how structured metadata can dramatically improve search relevance and precision beyond what vector similarity alone can achieve.
@@ -69,19 +62,8 @@ Here's what our taxonomy structure looks like:
           "Sweatshirts"
         ],
         "attributes": {
-          "Sleeve Length": [
-            "Sleeveless",
-            "Short Sleeve",
-            "3/4 Sleeve",
-            "Long Sleeve"
-          ],
-          "Neckline": [
-            "Crew Neck",
-            "V-Neck",
-            "Turtleneck",
-            "Scoop Neck",
-            "Cowl Neck"
-          ],
+          "Sleeve Length": ["Sleeveless", "Short Sleeve", "3/4 Sleeve", "Long Sleeve"],
+          "Neckline": ["Crew Neck", "V-Neck", "Turtleneck", "Scoop Neck", "Cowl Neck"],
           "Fit": ["Regular", "Slim", "Oversized", "Cropped"]
         }
       },
@@ -207,7 +189,7 @@ tbl.create_fts_index("searchable_text", replace=True)
 
 When you don't have production data to start with, you can generate synthetic data to simulate a real-world scenario. We already have the 'output', which is the clothing item we just embedded. We now want to generate synthetic queries that would be relevant to the clothing item.
 
-In this case, we'll use GPT-5 to generate realistic user queries that would naturally lead to each product in our catalog. This gives us query-product pairs where we know the ground truth relevance.
+In this case, we'll use gpt-6-luna to generate realistic user queries that would naturally lead to each product in our catalog. This gives us query-product pairs where we know the ground truth relevance.
 
 ```python
 import random
@@ -256,7 +238,7 @@ def generate_synthetic_query(item):
 
     # Generate query using OpenAI
     response = client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-6-luna",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that generates realistic shopping queries."},
             {"role": "user", "content": prompt}
@@ -283,7 +265,7 @@ from rich import print
 print(synthetic_queries[0])
 ```
 
-```json
+```text
 {
     'query': 'Searching for a sleeveless top with lace detailing at the neckline for casual outings and dinner
 dates.',
@@ -367,6 +349,8 @@ To objectively compare our search methods, we'll use two standard information re
 2. **Mean Reciprocal Rank (MRR)**: How high relevant items appear in our results
 
 ```python
+import langwatch
+
 def recall(retrieved, expected):
     return float(len(set(retrieved).intersection(set(expected)))) / len(expected)
 
@@ -487,6 +471,8 @@ Now we can run the experiments. The code does the following:
 3. Organizes the results in a DataFrame for comparison
 
 ```python
+import langwatch
+
 k_values = [3, 5, 10]
 results = []
 

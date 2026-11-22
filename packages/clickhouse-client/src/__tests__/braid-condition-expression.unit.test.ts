@@ -1,0 +1,48 @@
+/** The braid preview's predicate rendering (ADR-201 §3, §7): every key and literal a parameter. */
+import type { CompiledWhere } from "@langwatch/authorization";
+import { describe, expect, it } from "vitest";
+
+import { braidConditionExpression } from "../authorized-reads.ts";
+import { StatementScopeError } from "../statementScopeError.ts";
+
+const compiledWhere: CompiledWhere = {
+  version: 1,
+  tree: {
+    kind: "and",
+    terms: [
+      { kind: "attributeEquals", on: "span", key: "orchestrator'", value: "web'); DROP" },
+      { kind: "verified", key: "orchestrator" },
+    ],
+  },
+};
+
+describe("braidConditionExpression", () => {
+  describe("given a condition holding literals and a Verified() term", () => {
+    it("binds every key and literal under the prefix, and the reader for Verified()", () => {
+      const rendered = braidConditionExpression({
+        compiledWhere,
+        reader: "proj_reader",
+        prefix: "preview",
+      });
+
+      expect(rendered.sql).toBe(
+        "(SpanAttributes[{preview_k:Array(String)}[1]] = {preview_v:Array(String)}[1] AND mapContains(SpanAttributes, {preview_k:Array(String)}[2]) AND SpanAttributes[{preview_k:Array(String)}[3]] = {preview_reader:String})",
+      );
+      expect(rendered.params).toEqual({
+        preview_k: ["orchestrator'", "orchestrator", "langwatch.reserved.verified.orchestrator"],
+        preview_v: ["web'); DROP"],
+        preview_reader: "proj_reader",
+      });
+      expect(rendered.sql).not.toContain("orchestrator");
+      expect(rendered.sql).not.toContain("proj_reader");
+    });
+  });
+
+  describe("given the fence's own parameter prefix", () => {
+    it("refuses it, so a statement cannot write into the fence's parameters", () => {
+      expect(() =>
+        braidConditionExpression({ compiledWhere, reader: "r", prefix: "tenantScope" }),
+      ).toThrow(StatementScopeError);
+    });
+  });
+});

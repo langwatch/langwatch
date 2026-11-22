@@ -1,6 +1,6 @@
 import os
 import langwatch
-from pksuid import PKSUID
+from langwatch_ksuid import generate as generate_ksuid
 
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -42,7 +42,7 @@ class Question(BaseModel):
 
 def stream_openai_response(question: str):
     response = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-6-luna",
         messages=[{"role": "user", "content": question}],
         stream=True,
         stream_options={"include_usage": True},
@@ -68,7 +68,7 @@ async def ask(question: Question):
     name="handle_ask",
     kind=SpanKind.SERVER,
     type=SpanType.LLM,
-    attributes={"span_attr": "test", MetadataName.ThreadId: str(PKSUID("thread"))},
+    attributes={"span_attr": "test", MetadataName.ThreadId: str(generate_ksuid("thread"))},
 )
 def handle_ask(question: str, user_id: str):
     get_current_span().set_attributes(

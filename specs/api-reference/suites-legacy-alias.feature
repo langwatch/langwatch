@@ -5,7 +5,8 @@ Feature: The suites REST family is a deprecated alias
   So that I can move to run plans and test suites on my own schedule
 
   # /api/suites predates the split between a RUN PLAN (what you run) and a
-  # TEST SUITE (a group of scenarios). It keeps answering exactly as it did.
+  # TEST SUITE (a group of scenarios). It keeps answering as it did, except
+  # that a create body carrying a field it does not have is refused.
   # Every response names its successor, and every operation is marked
   # deprecated in the published document.
 
@@ -49,3 +50,13 @@ Feature: The suites REST family is a deprecated alias
     Given the project holds one test suite
     When I update the test suite through the alias with a target in the body
     Then the response is 422 with the code validation_error
+
+  Scenario: Archiving a run plan through the alias archives it
+    Given the project holds one run plan
+    When I archive the run plan through the alias
+    Then the response is 200 and names the run plan as archived
+
+  Scenario: Archiving an id the project does not hold through the alias answers suite_not_found
+    Given a suite id the project does not hold
+    When I archive that id through the alias
+    Then the response is 404 with the code suite_not_found

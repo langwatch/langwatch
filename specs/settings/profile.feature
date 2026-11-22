@@ -152,6 +152,13 @@ Feature: Profile - who I am here, and where I am signed in
       And a confirmed address is marked nothing at all
 
     @integration
+    Scenario: The sign-in methods keep the Security page's labels
+      Given I hold two addresses and a single sign-on identifier
+      When I open the sign-in methods on my profile
+      Then each is a bordered row labelled "Email address" or "Single sign-on"
+      And the address row says how many addresses I hold
+
+    @integration
     Scenario: Only an account with no address anywhere is told it has none
       Given my account has no address on it and no identifiers
       When I open the sign-in methods on my profile
@@ -251,3 +258,13 @@ Feature: Profile - who I am here, and where I am signed in
       Given the read of my keys fails
       When I open my profile
       Then I am told what could not be read, in words, with a trace to quote
+
+  Rule: the page keeps the settings look
+
+    @integration
+    Scenario: The profile is a narrow column of divided bands with bordered rows
+      Given I hold a browser session and a key
+      When I open my profile
+      Then the page column is no wider than 820px
+      And each band has a hairline divider above it
+      And each row of a band has its own border

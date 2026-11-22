@@ -8,18 +8,17 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import {
   LOCAL_CONTROL_PROTOCOL_VERSION,
   type LocalCall,
   type WorkspaceInfo,
 } from "../../../../agent/local-control-protocol";
 import type { SocketLike } from "../../../../agent/transport";
-import type {
-  ApprovalCard,
-  ApprovalPrompt,
-  TerminalApproval,
-} from "../approval";
+import { stripAnsi } from "../../../utils/formatting";
+import type { ApprovalCard, ApprovalPrompt, TerminalApproval } from "../approval";
 import { startLangySession, type LangySession } from "../session";
 import { createUi, type UiWriter } from "../ui";
 
@@ -31,11 +30,11 @@ const CONVERSATION = {
 
 /** A socket the test drives: it records what the CLI sent and pushes frames back. */
 class FakeSocket implements SocketLike {
-  readonly sent: Array<Record<string, unknown>> = [];
+  readonly sent: Record<string, unknown>[] = [];
   closedWith: number | null = null;
-  private messageListeners: Array<(data: string) => void> = [];
-  private closeListeners: Array<(code: number) => void> = [];
-  private openListeners: Array<() => void> = [];
+  private messageListeners: ((data: string) => void)[] = [];
+  private closeListeners: ((code: number) => void)[] = [];
+  private openListeners: (() => void)[] = [];
 
   send(data: string): void {
     this.sent.push(JSON.parse(data) as Record<string, unknown>);
@@ -73,7 +72,7 @@ class FakeSocket implements SocketLike {
     for (const listener of this.messageListeners) listener(text);
   }
 
-  sentOf(type: string): Array<Record<string, unknown>> {
+  sentOf(type: string): Record<string, unknown>[] {
     return this.sent.filter((frame) => frame.type === type);
   }
 }
@@ -151,10 +150,15 @@ describe("given a folder connected to a Langy conversation", () => {
   let lines: string[];
   let session: LangySession;
 
-  const writer: UiWriter = { line: (text) => lines.push(text) };
+  const writer: UiWriter = { line: (text) => lines.push(stripAnsi(text)) };
 
   const start = (
-    options: { withoutGit?: boolean; approvals?: ApprovalPrompt } = {},
+    options: {
+      withoutGit?: boolean;
+      approvals?: ApprovalPrompt;
+      readProjectApiKey?: (projectId: string) => Promise<string>;
+      withoutEndpoint?: boolean;
+    } = {},
   ) => {
     socket = new FakeSocket();
     lines = [];
@@ -164,7 +168,7 @@ describe("given a folder connected to a Langy conversation", () => {
       os: "test",
     };
     session = startLangySession({
-      endpoint: "http://localhost:5560",
+      ...(options.withoutEndpoint === true ? {} : { endpoint: "http://localhost:5560" }),
       sessionKey: "sk-lw-langy-session",
       workspace,
       conversation: CONVERSATION,
@@ -173,6 +177,12 @@ describe("given a folder connected to a Langy conversation", () => {
       backoff: { baseMs: 10, maxMs: 10 },
       approvals: options.approvals ?? null,
       ...(options.withoutGit === true ? { withoutGit: true } : {}),
+      ...(options.readProjectApiKey
+        ? {
+            project: { id: "project_acme", name: "Acme Shop" },
+            readProjectApiKey: options.readProjectApiKey,
+          }
+        : {}),
     });
     return session;
   };
@@ -188,9 +198,7 @@ describe("given a folder connected to a Langy conversation", () => {
   };
 
   beforeEach(() => {
-    root = fs.realpathSync(
-      fs.mkdtempSync(path.join(os.tmpdir(), "langy-session-")),
-    );
+    root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "langy-session-")));
     fs.writeFileSync(path.join(root, "app.py"), "print('hi')\n");
   });
 
@@ -233,9 +241,7 @@ describe("given a folder connected to a Langy conversation", () => {
       register();
       lines.length = 0;
 
-      socket.deliver(
-        callFrame({ tool: "local_read", params: { path: "app.py" } }),
-      );
+      socket.deliver(callFrame({ tool: "local_read", params: { path: "app.py" } }));
       await settle();
       socket.deliver({
         ...callFrame({
@@ -265,18 +271,19 @@ describe("given a folder connected to a Langy conversation", () => {
       expect(results).toHaveLength(2);
       expect(results[0]!.ok).toBe(true);
       expect(String(results[0]!.text)).toContain("print('hi')");
-      expect((results[1]!.output as { stdout: string }).stdout).toContain(
-        "secret-output",
-      );
+      expect((results[1]!.output as { stdout: string }).stdout).toContain("secret-output");
     });
   });
 
   describe("when a call needs the developer's answer and this screen cannot ask", () => {
-    /** @scenario "Without a terminal there is no selector" */
-    it("asks the card, prints where to answer, and prints the outcome", async () => {
+    beforeEach(async () => {
       start();
       await settle();
       register();
+    });
+
+    /** @scenario "Without a terminal there is no selector" */
+    it("asks the card, prints where to answer, and prints the outcome", async () => {
       lines.length = 0;
 
       socket.deliver(
@@ -311,10 +318,6 @@ describe("given a folder connected to a Langy conversation", () => {
     });
 
     it("carries the time limit of a command, and none for a file call", async () => {
-      start();
-      await settle();
-      register();
-
       socket.deliver(
         callFrame({
           tool: "local_bash",
@@ -340,15 +343,9 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "A session grant silences the next matching command" */
     it("runs the call when the answer allows it, and a pattern grant silences the next one", async () => {
-      start();
-      await settle();
-      register();
-
-      // `true` is not in the read-only set, so the first call asks and the
-      // grant it produces is `true *`.
-      socket.deliver(
-        callFrame({ tool: "local_bash", params: { command: "true" } }),
-      );
+      // `sync` is not in the read-only set, so the first call asks, and it
+      // carries no argument of its own, so the grant it produces is `sync *`.
+      socket.deliver(callFrame({ tool: "local_bash", params: { command: "sync" } }));
       await settle();
       expect(socket.sentOf("permission_required")).toHaveLength(1);
       socket.deliver({
@@ -361,11 +358,11 @@ describe("given a folder connected to a Langy conversation", () => {
       });
 
       socket.deliver({
-        ...callFrame({ tool: "local_bash", params: { command: "true again" } }),
+        ...callFrame({ tool: "local_bash", params: { command: "sync again" } }),
         call: {
           ...callFrame({
             tool: "local_bash",
-            params: { command: "true again" },
+            params: { command: "sync again" },
           }).call,
           callId: "call-2",
         },
@@ -378,16 +375,10 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "A long command is printed once" */
     it("prints the command in full on the ask and the patterns on the answer", async () => {
-      start();
-      await settle();
-      register();
       lines.length = 0;
 
-      const chain =
-        'git add app.py && git commit -m "feat: add tracing" && git push -u origin HEAD';
-      socket.deliver(
-        callFrame({ tool: "local_bash", params: { command: chain } }),
-      );
+      const chain = 'uv sync && uv run pytest -s && gh pr create --title "Add tracing"';
+      socket.deliver(callFrame({ tool: "local_bash", params: { command: chain } }));
       await settle();
 
       const [asked] = socket.sentOf("permission_required");
@@ -406,11 +397,9 @@ describe("given a folder connected to a Langy conversation", () => {
       });
       const answer = lines.filter((line) => line.includes("Allowed"));
       expect(answer).toHaveLength(1);
-      expect(answer[0]).toContain(
-        '"git add", "git commit" and "git push" for this session',
-      );
+      expect(answer[0]).toContain('"uv sync", "uv run" and "gh pr" for this session');
       expect(answer[0]).toContain("on the card in LangWatch");
-      expect(answer[0]).not.toContain("feat: add tracing");
+      expect(answer[0]).not.toContain("Add tracing");
 
       // The grant covers every segment the card named, so the next chain of
       // the same shape runs with no card.
@@ -419,7 +408,7 @@ describe("given a folder connected to a Langy conversation", () => {
         call: {
           ...callFrame({
             tool: "local_bash",
-            params: { command: 'git add README.md && git commit -m "docs"' },
+            params: { command: "uv run pytest -s tests && gh pr view 12" },
           }).call,
           callId: "call-2",
         },
@@ -432,12 +421,7 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "A grant lives with the session, not with the conversation" */
     it("forgets the grant when the command line is started again", async () => {
-      start();
-      await settle();
-      register();
-      socket.deliver(
-        callFrame({ tool: "local_bash", params: { command: "true" } }),
-      );
+      socket.deliver(callFrame({ tool: "local_bash", params: { command: "touch marker" } }));
       await settle();
       socket.deliver({
         type: "permission",
@@ -454,12 +438,12 @@ describe("given a folder connected to a Langy conversation", () => {
       start();
       await settle();
       register();
-      socket.deliver(
-        callFrame({ tool: "local_bash", params: { command: "true" } }),
-      );
+      socket.deliver(callFrame({ tool: "local_bash", params: { command: "touch marker" } }));
       await waitUntil(() => socket.sentOf("permission_required").length === 1, {
         what: "the second session to ask again",
       });
+
+      expect(socket.sentOf("permission_required")).toHaveLength(1);
     });
   });
 
@@ -470,9 +454,7 @@ describe("given a folder connected to a Langy conversation", () => {
       await settle();
       register();
       lines.length = 0;
-      socket.deliver(
-        callFrame({ tool: "local_bash", params: { command } }),
-      );
+      socket.deliver(callFrame({ tool: "local_bash", params: { command } }));
       await settle();
       return approvals;
     };
@@ -485,24 +467,20 @@ describe("given a folder connected to a Langy conversation", () => {
       const [card] = approvals.cards;
       expect(card!.title).toContain("Langy wants to run in");
       expect(card!.subject).toBe("pnpm typecheck");
-      expect(card!.description).toContain(
-        "Stops after 5 minutes if it has not finished.",
-      );
+      expect(card!.description).toContain("Stops after 5 minutes if it has not finished.");
       expect(card!.options.map((option) => option.value)).toEqual([
         "allow_pattern",
         "allow_once",
         "deny",
       ]);
-      expect(card!.options[0]!.label).toBe(
-        'Yes, allow "pnpm typecheck" for this session',
-      );
+      expect(card!.options[0]!.label).toBe('Yes, allow "pnpm typecheck" for this session');
       // The card in the panel is asked at the same time.
       expect(socket.sentOf("permission_required")).toHaveLength(1);
     });
 
     /** @scenario "Allowing the pattern runs the call and settles the line" */
     it("runs the call, tells the platform and grants the pattern", async () => {
-      const approvals = await ask("true");
+      const approvals = await ask("sync");
 
       approvals.answer({ decision: "allow_pattern" });
       await waitUntil(() => socket.sentOf("result").length === 1, {
@@ -513,16 +491,16 @@ describe("given a folder connected to a Langy conversation", () => {
       expect(answered).toBeDefined();
       expect(answered!.callId).toBe("call-1");
       expect(answered!.decision).toBe("allow_pattern");
-      expect(answered!.patterns).toEqual(["true *"]);
-      expect(lines.join("\n")).toContain('Allowed "true *" for this session');
+      expect(answered!.patterns).toEqual(["sync *"]);
+      expect(lines.join("\n")).toContain('Allowed "sync *" for this session');
       expect(lines.join("\n")).not.toContain("on the card in LangWatch");
 
       socket.deliver({
-        ...callFrame({ tool: "local_bash", params: { command: "true again" } }),
+        ...callFrame({ tool: "local_bash", params: { command: "sync again" } }),
         call: {
           ...callFrame({
             tool: "local_bash",
-            params: { command: "true again" },
+            params: { command: "sync again" },
           }).call,
           callId: "call-2",
         },
@@ -535,7 +513,7 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "Allowing once runs the call and grants nothing" */
     it("runs the call once and carries no patterns", async () => {
-      const approvals = await ask("true");
+      const approvals = await ask("touch marker");
 
       approvals.answer({ decision: "allow_once" });
       await waitUntil(() => socket.sentOf("result").length === 1, {
@@ -583,13 +561,12 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "Two questions at once are asked one at a time" */
     it("asks the second question only after the first one is answered", async () => {
-      const approvals = await ask("true");
+      const approvals = await ask("touch marker");
 
       socket.deliver({
-        ...callFrame({ tool: "local_bash", params: { command: "false" } }),
+        ...callFrame({ tool: "local_bash", params: { command: "sync" } }),
         call: {
-          ...callFrame({ tool: "local_bash", params: { command: "false" } })
-            .call,
+          ...callFrame({ tool: "local_bash", params: { command: "sync" } }).call,
           callId: "call-2",
         },
       });
@@ -601,13 +578,13 @@ describe("given a folder connected to a Langy conversation", () => {
       await waitUntil(() => approvals.cards.length === 2, {
         what: "the second question to open",
       });
-      expect(approvals.cards[1]!.subject).toBe("false");
+      expect(approvals.cards[1]!.subject).toBe("sync");
       expect(approvals.state.open).toBe(1);
     });
 
     /** @scenario "The card can answer first and the settled line names it" */
     it("closes the selector when the card answers first and names the card", async () => {
-      const approvals = await ask("true");
+      const approvals = await ask("touch marker");
 
       socket.deliver({
         type: "permission",
@@ -626,7 +603,7 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "A card answer after the terminal answered is ignored" */
     it("ignores the card's answer once the terminal answered", async () => {
-      const approvals = await ask("true");
+      const approvals = await ask("touch marker");
 
       approvals.answer({ decision: "allow_once" });
       await waitUntil(() => socket.sentOf("result").length === 1, {
@@ -675,9 +652,7 @@ describe("given a folder connected to a Langy conversation", () => {
       await settle();
       register();
 
-      socket.deliver(
-        callFrame({ tool: "local_bash", params: { command: "sleep 30" } }),
-      );
+      socket.deliver(callFrame({ tool: "local_bash", params: { command: "sleep 30" } }));
       await settle();
       socket.deliver({
         type: "permission",
@@ -713,13 +688,224 @@ describe("given a folder connected to a Langy conversation", () => {
         "Permission checks are off for this session. Langy runs commands here without asking.",
       );
 
-      socket.deliver(
-        callFrame({ tool: "local_bash", params: { command: "echo hi" } }),
-      );
+      socket.deliver(callFrame({ tool: "local_bash", params: { command: "echo hi" } }));
       await waitUntil(() => socket.sentOf("result").length === 1, {
         what: "the command to run with no card",
       });
       expect(socket.sentOf("permission_required")).toHaveLength(0);
+    });
+  });
+
+  describe("when Langy writes the project's credentials", () => {
+    const envFile = () => fs.readFileSync(path.join(root, ".env"), "utf8");
+
+    /** @scenario "The app gets the project's key through the developer's own login" */
+    it("fetches the key with the login, writes the file and never repeats the key", async () => {
+      const asked: string[] = [];
+      start({
+        readProjectApiKey: async (projectId) => {
+          asked.push(projectId);
+          return "sk-lw-proj-key";
+        },
+      });
+      await settle();
+      register();
+      socket.deliver({ type: "policy", skipPermissions: true });
+      lines.length = 0;
+
+      socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the credentials to be written",
+      });
+
+      expect(asked).toEqual(["project_acme"]);
+      expect(envFile()).toBe(
+        "LANGWATCH_API_KEY=sk-lw-proj-key\nLANGWATCH_ENDPOINT=http://localhost:5560\n",
+      );
+      const [result] = socket.sentOf("result");
+      expect(result!.ok).toBe(true);
+      expect(String(result!.text)).toBe(
+        "Set LANGWATCH_API_KEY and LANGWATCH_ENDPOINT in .env for project Acme Shop.",
+      );
+      expect(JSON.stringify(socket.sent)).not.toContain("sk-lw-proj");
+      const printed = lines.join("\n");
+      expect(printed).toContain("Env(.env)");
+      expect(printed).toContain("Set 2 variables");
+      expect(printed).not.toContain("sk-lw-proj");
+    });
+
+    it("names no missing endpoint when only the key reader is absent", async () => {
+      start({});
+      await settle();
+      register();
+      socket.deliver({ type: "policy", skipPermissions: true });
+
+      socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the refusal to be reported",
+      });
+
+      const [result] = socket.sentOf("result");
+      expect(result!.ok).toBe(false);
+      const error = result!.error as { message: string };
+      expect(error.message).toContain(".env was not changed");
+      expect(error.message).not.toContain("endpoint");
+    });
+
+    it("replaces the values a second call finds", async () => {
+      fs.writeFileSync(
+        path.join(root, ".env"),
+        "OPENAI_API_KEY=sk-openai\nLANGWATCH_API_KEY=stale\nLANGWATCH_ENDPOINT=http://old\n",
+      );
+      start({ readProjectApiKey: async () => "sk-lw-proj-key" });
+      await settle();
+      register();
+      socket.deliver({ type: "policy", skipPermissions: true });
+
+      socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the credentials to be written",
+      });
+
+      expect(envFile()).toBe(
+        "OPENAI_API_KEY=sk-openai\nLANGWATCH_API_KEY=sk-lw-proj-key\nLANGWATCH_ENDPOINT=http://localhost:5560\n",
+      );
+    });
+
+    /** @scenario "The key is refused when the login lacks the permission" */
+    it("reports the refusal by its code, names the permission and leaves the file alone", async () => {
+      fs.writeFileSync(path.join(root, ".env"), "OPENAI_API_KEY=sk-openai\n");
+      start({
+        readProjectApiKey: async () => {
+          throw Object.assign(new Error("Forbidden"), { status: 403 });
+        },
+      });
+      await settle();
+      register();
+      socket.deliver({ type: "policy", skipPermissions: true });
+
+      socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the refusal to be reported",
+      });
+
+      const [result] = socket.sentOf("result");
+      expect(result!.ok).toBe(false);
+      const error = result!.error as { code: string; message: string };
+      expect(error.code).toBe("key_refused");
+      expect(error.message).toContain("traces:create");
+      expect(error.message).toContain("Acme Shop");
+      expect(error.message).toContain(".env");
+      expect(envFile()).toBe("OPENAI_API_KEY=sk-openai\n");
+    });
+
+    describe("when the key cannot be fetched", () => {
+      /** @scenario "A failed credentials write offers another try, never a manual paste" */
+      it.each([
+        ["an expired login", { status: 401 }],
+        ["a missing permission", { status: 403 }],
+        ["an app that did not answer", { status: 502 }],
+      ])("says what failed and offers another try for %s", async (_name, failure) => {
+        start({
+          readProjectApiKey: async () => {
+            throw Object.assign(new Error("failed"), failure);
+          },
+        });
+        await settle();
+        register();
+        socket.deliver({ type: "policy", skipPermissions: true });
+
+        socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+        await waitUntil(() => socket.sentOf("result").length === 1, {
+          what: "the failure to be reported",
+        });
+
+        const [result] = socket.sentOf("result");
+        const error = result!.error as { code: string; message: string };
+        expect(error.message).toMatch(/\.env was not changed/);
+        expect(error.message).toMatch(/offer to (write the credentials again|try again)/);
+        expect(error.message).not.toMatch(/by hand|settings page/);
+      });
+
+      it.each([
+        [
+          "the project lookup refused",
+          { stage: "lookup", status: 403 },
+          /cannot see Acme Shop \(it needs project:view\)/,
+        ],
+        [
+          "no project found for the login",
+          { stage: "key", status: 404, code: "project_not_found" },
+          /found no project Acme Shop/,
+        ],
+        [
+          "a server older than the command line",
+          { stage: "key", status: 404, code: "endpoint_missing" },
+          /updating LangWatch fixes it/,
+        ],
+      ])("gives guidance that fits when %s", async (_name, failure, guidance) => {
+        start({
+          readProjectApiKey: async () => {
+            throw Object.assign(new Error("failed"), failure);
+          },
+        });
+        await settle();
+        register();
+        socket.deliver({ type: "policy", skipPermissions: true });
+
+        socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+        await waitUntil(() => socket.sentOf("result").length === 1, {
+          what: "the failure to be reported",
+        });
+
+        const [result] = socket.sentOf("result");
+        const error = result!.error as { code: string; message: string };
+        expect(error.code).toBe("key_refused");
+        expect(error.message).toMatch(guidance);
+        expect(error.message).not.toMatch(/project:manage|did not answer|by hand/);
+      });
+    });
+
+    /** @scenario "The credentials are not written when the terminal has no endpoint" */
+    it("fails the call without an endpoint instead of pointing the app at the cloud", async () => {
+      fs.writeFileSync(path.join(root, ".env"), "OPENAI_API_KEY=sk-openai\n");
+      const asked: string[] = [];
+      start({
+        withoutEndpoint: true,
+        readProjectApiKey: async (projectId) => {
+          asked.push(projectId);
+          return "sk-lw-proj-key";
+        },
+      });
+      await settle();
+      register();
+      socket.deliver({ type: "policy", skipPermissions: true });
+
+      socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the failure to be reported",
+      });
+
+      const [result] = socket.sentOf("result");
+      expect(result!.ok).toBe(false);
+      const error = result!.error as { code: string; message: string };
+      expect(error.code).toBe("exec_failed");
+      expect(error.message).toContain(".env");
+      expect(asked).toEqual([]);
+      expect(envFile()).toBe("OPENAI_API_KEY=sk-openai\n");
+      expect(JSON.stringify(socket.sent)).not.toContain("app.langwatch.ai");
+    });
+
+    it("asks before it writes, because the env file may hold secrets", async () => {
+      start({ readProjectApiKey: async () => "sk-lw-proj-key" });
+      await settle();
+      register();
+
+      socket.deliver(callFrame({ tool: "local_langwatch_env", params: {} }));
+      await waitUntil(() => socket.sentOf("permission_required").length === 1, {
+        what: "the permission ask",
+      });
+      expect(fs.existsSync(path.join(root, ".env"))).toBe(false);
     });
   });
 
@@ -767,8 +953,7 @@ describe("given a folder connected to a Langy conversation", () => {
       socket.deliver({
         ...callFrame({ tool: "local_bash", params: { command: "sleep 30" } }),
         call: {
-          ...callFrame({ tool: "local_bash", params: { command: "sleep 30" } })
-            .call,
+          ...callFrame({ tool: "local_bash", params: { command: "sleep 30" } }).call,
           callId: "call-2",
         },
       });
@@ -792,16 +977,16 @@ describe("given a folder connected to a Langy conversation", () => {
   });
 
   describe("when the developer presses Ctrl-C", () => {
-    /** @scenario "Ctrl-C tells the platform and stops running commands" */
-    it("deregisters, kills the running command and ends inside the deadline", async () => {
+    beforeEach(async () => {
       start();
       await settle();
       register();
-
-      socket.deliver(
-        callFrame({ tool: "local_bash", params: { command: "sleep 30" } }),
-      );
+      socket.deliver(callFrame({ tool: "local_bash", params: { command: "sleep 30" } }));
       await settle();
+    });
+
+    /** @scenario "Ctrl-C tells the platform and stops running commands" */
+    it("deregisters, kills the running command and ends inside the deadline", async () => {
       socket.deliver({
         type: "permission",
         callId: "call-1",
@@ -822,14 +1007,6 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "A second Ctrl-C exits at once" */
     it("exits at once on the second one", async () => {
-      start();
-      await settle();
-      register();
-      socket.deliver(
-        callFrame({ tool: "local_bash", params: { command: "sleep 30" } }),
-      );
-      await settle();
-
       session.requestShutdown();
       session.requestShutdown();
       await expect(session.done).resolves.toBe(130);
@@ -853,7 +1030,7 @@ describe("given a folder whose connection drops while Langy is working", () => {
       sessionKey: "sk-lw-langy-session",
       workspace: { root, name: path.basename(root), os: "test" },
       conversation: CONVERSATION,
-      ui: createUi({ line: (text) => lines.push(text) }),
+      ui: createUi({ line: (text) => lines.push(stripAnsi(text)) }),
       socketFactory: () => {
         const socket = new FakeSocket();
         sockets.push(socket);
@@ -877,9 +1054,13 @@ describe("given a folder whose connection drops while Langy is working", () => {
   };
 
   beforeEach(() => {
-    root = fs.realpathSync(
-      fs.mkdtempSync(path.join(os.tmpdir(), "langy-reconnect-")),
-    );
+    root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "langy-reconnect-")));
+  });
+
+  beforeEach(async () => {
+    start();
+    await settle();
+    register();
   });
 
   afterEach(async () => {
@@ -889,10 +1070,6 @@ describe("given a folder whose connection drops while Langy is working", () => {
 
   /** @scenario "A call that arrives again after a reconnect runs once" */
   it("runs a replayed call once, and says it is still in flight", async () => {
-    start();
-    await settle();
-    register();
-
     const marker = path.join(root, "runs.txt");
     const call = callFrame({
       tool: "local_bash",
@@ -908,9 +1085,9 @@ describe("given a folder whose connection drops while Langy is working", () => {
     await waitUntil(() => sockets.length === 2, { what: "the reconnect" });
     register();
     const registered = live().sentOf("register")[0]!;
-    expect(
-      (registered.instance as { inFlightCallIds: string[] }).inFlightCallIds,
-    ).toEqual(["call-1"]);
+    expect((registered.instance as { inFlightCallIds: string[] }).inFlightCallIds).toEqual([
+      "call-1",
+    ]);
 
     // The platform replays the call it has no answer for.
     live().deliver(call);
@@ -925,10 +1102,6 @@ describe("given a folder whose connection drops while Langy is working", () => {
 
   /** @scenario "A call replayed after its answer was lost is answered again" */
   it("answers a replayed call from what already ran, and runs nothing twice", async () => {
-    start();
-    await settle();
-    register();
-
     const marker = path.join(root, "runs.txt");
     const call = callFrame({
       tool: "local_bash",
@@ -957,10 +1130,6 @@ describe("given a folder whose connection drops while Langy is working", () => {
 
   /** @scenario "A result that no connection carried is sent again" */
   it("sends the answer of a command that finished while the socket was down", async () => {
-    start();
-    await settle();
-    register();
-
     live().deliver(
       callFrame({
         tool: "local_bash",

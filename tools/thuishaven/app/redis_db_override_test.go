@@ -42,6 +42,31 @@ func TestAllocateRedisDB(t *testing.T) {
 	})
 
 	t.Run("given no pin", func(t *testing.T) {
+		t.Run("when the stack sits on db 0, shared with unmanaged processes, it moves off", func(t *testing.T) {
+			store := &fakeStore{stacks: []domain.Stack{{Slug: "mine", RedisDB: 0}}}
+			o := &Orchestrator{cfg: Config{}, store: store, log: zap.NewNop()}
+			if db, _ := o.allocateRedisDB("mine"); db == 0 {
+				t.Fatal("allocateRedisDB returned db 0")
+			}
+			if db, _ := o.allocateRedisDB("brand-new"); db == 0 {
+				t.Fatal("allocateRedisDB returned db 0 for a new stack")
+			}
+		})
+
+		t.Run("when several stacks allocate in turn, no two share a database", func(t *testing.T) {
+			store := &fakeStore{}
+			o := &Orchestrator{cfg: Config{}, store: store, log: zap.NewNop()}
+			seen := map[int]bool{}
+			for _, slug := range []string{"a", "b", "c", "d", "e", "f"} {
+				db, _ := o.allocateRedisDB(slug)
+				if seen[db] {
+					t.Fatalf("%s got db %d, already held", slug, db)
+				}
+				seen[db] = true
+				store.stacks = append(store.stacks, domain.Stack{Slug: slug, RedisDB: db})
+			}
+		})
+
 		t.Run("when the stack is registered, its recorded database is reused", func(t *testing.T) {
 			store := &fakeStore{stacks: []domain.Stack{{Slug: "mine", RedisDB: 3}}}
 			o := &Orchestrator{cfg: Config{}, store: store, log: zap.NewNop()}

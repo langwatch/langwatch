@@ -40,6 +40,13 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     # across charged the cached tokens at the full input rate and again at
     # the cache rate, which priced such a turn about four times over.
 
+  @unit
+  Scenario: A codex response span's cached input is priced once, not twice
+    Given a codex response span whose gen_ai.usage.input_tokens includes its cached tokens
+    And a codex turn span that reports the same whole input on its gen_ai usage keys
+    When the spans are canonicalised with every other canonicaliser
+    Then each span's input tokens are the part that was not cached
+
   # --- Which conversation a codex turn belongs to ---------------------------
 
   # A codex turn span names two ids: the session it belongs to, and the turn
@@ -150,6 +157,24 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     When the span input is built from the request body
     Then the span input carries the tool names so MCP and built-in tools are visible
 
+  # Claude Code sends a tool's answer back as a user turn holding only
+  # tool_result blocks. The person typed none of it.
+
+  @unit
+  Scenario: A user turn holding only tool results reads as the tools answering
+    Given a claude code api_request_body whose last user turn holds only tool_result blocks
+    When the span input is built from the request body
+    Then that turn is a tool message that keeps the results' text
+    And a user turn mixing typed text with tool results stays a user message
+    And a truncated request body reads its tool-result turns the same way
+
+  @unit
+  Scenario: A tool-result turn is never shown as the user's prompt
+    Given a model call whose input ends with a tool message holding a script's result
+    And the session sent no user_prompt log record
+    When the transcript is derived from the session's spans and logs
+    Then no prompt line is made from the tool message
+
   @unit
   Scenario: Identical system prompts across a session's calls are shown once
     Given two model calls in one trace whose request bodies carry the same system prompt
@@ -205,6 +230,24 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     When the span is ingested
     Then the span is filtered out and not stored
 
+  # Newer codex releases report their spans under the app-server's scope name
+  # instead of the originator's. Same emitter, same span names and attributes,
+  # so the same filter applies.
+
+  @unit
+  Scenario: Codex app-server sessions get the same noise filter as the TUI
+    Given a codex Path B infrastructure span (auth, rollout persistence, file read) under the codex-app-server scope
+    When the span is ingested
+    Then the span is filtered out and not stored
+    And a session_task.turn span or a gen_ai usage span under the same scope is kept
+
+  @unit
+  Scenario: A codex app-server turn carries its model and tokens
+    Given a codex session_task.turn span under the codex-app-server scope carrying model and codex.turn.token_usage
+    When the span is canonicalised
+    Then the model and token counts are lifted onto gen_ai attributes
+    And the turn's handle_responses span is flagged so its usage is not counted twice
+
   @unit
   Scenario: Codex tool spans are filtered so a tool call never mints its own trace
     Given a codex Path B tool span whose parent span lives in another trace
@@ -249,6 +292,13 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     And the helper's turn span, ingested in a later batch, is stored as it came
 
   @unit
+  Scenario: A codex app-server helper request is stored with its thread id
+    Given a codex helper thread's request span and its queue child exported under the app-server scope
+    When the batch is ingested
+    Then the request span is stored carrying the helper's thread id and marks its session auxiliary
+    And the user's own request span under that scope is filtered out
+
+  @unit
   Scenario: A codex turn of the user's own is not marked
     Given a codex turn/start span whose request id is the client's own counter
     When the turn's spans are ingested
@@ -269,7 +319,7 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
 
   @unit
   Scenario: Spans from other instrumentation scopes are never filtered
-    Given a span from any scope other than codex_cli_rs or opencode
+    Given a span from any scope other than codex's (codex_cli_rs, codex_exec, codex-app-server) or opencode
     When the span is ingested
     Then the span is kept regardless of its name or attributes
 

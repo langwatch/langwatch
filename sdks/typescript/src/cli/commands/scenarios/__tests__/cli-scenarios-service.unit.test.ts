@@ -1,20 +1,28 @@
 /**
  * A scenario save made from the command line has to be recorded as such.
- *
- * The platform reads the author of a version row from the surface header on
- * the request, so the write commands go through a client that declares it.
- * Without that header a command-line edit is recorded as an anonymous API
- * save, and the scenario's history says the wrong thing.
- *
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const useSpy = vi.hoisted(() => vi.fn());
 const putSpy = vi.hoisted(() => vi.fn());
+const getSpy = vi.hoisted(() => {
+  const scenario = {
+    id: "scenario_abc123",
+    name: "Login Flow",
+    testSuiteId: null,
+  };
+  return vi.fn(async (path: string) => ({
+    data: path === "/api/v1/scenarios" ? [scenario] : scenario,
+  }));
+});
 
 vi.mock("@/internal/api/client", () => ({
-  createLangWatchApiClient: vi.fn(() => ({ use: useSpy, PUT: putSpy })),
+  createLangWatchApiClient: vi.fn(() => ({
+    use: useSpy,
+    PUT: putSpy,
+    GET: getSpy,
+  })),
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
@@ -35,12 +43,10 @@ vi.mock("ora", () => ({
   }),
 }));
 
+import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "@/internal/surface";
+
 import { createCliScenariosService } from "../cli-scenarios-service";
 import { updateScenarioCommand } from "../update";
-import {
-  CLI_SURFACE_HEADER,
-  CLI_SURFACE_VALUE,
-} from "../../../utils/governance/surface";
 
 const noop = () => {
   // intentionally empty, suppresses output during tests
@@ -51,10 +57,9 @@ const surfaceHeaderOf = (call: unknown): string | null => {
   const middleware = call as {
     onRequest: (arg: { request: Request }) => Request;
   };
-  const request = new Request(
-    "https://app.langwatch.ai/api/scenarios/scenario_abc123",
-    { method: "PUT" },
-  );
+  const request = new Request("https://app.langwatch.ai/api/v1/scenarios/scenario_abc123", {
+    method: "PUT",
+  });
   return middleware.onRequest({ request }).headers.get(CLI_SURFACE_HEADER);
 };
 
@@ -91,7 +96,7 @@ describe("the scenarios service the command line writes through", () => {
       name: "Updated Login Flow",
     });
 
-    expect(putSpy).toHaveBeenCalledWith("/api/scenarios/{id}", {
+    expect(putSpy).toHaveBeenCalledWith("/api/v1/scenarios/{id}", {
       params: { path: { id: "scenario_abc123" } },
       body: { name: "Updated Login Flow" },
     });

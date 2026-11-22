@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -43,6 +42,12 @@ class ListRunPlansResponse200Item:
         created_at (str): When the plan was created.
         updated_at (str): When the plan was last written.
         platform_url (str): Where to open this run plan in the LangWatch platform.
+        trace_quiet_period_ms (int | None | Unset): Milliseconds the agent's trace must stay unchanged before the judge
+            reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge
+            trace settings.
+        trace_wait_timeout_ms (int | None | Unset): Milliseconds the judge waits for the agent's trace before a verdict,
+            or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace
+            settings.
         evaluators (list[ListRunPlansResponse200ItemEvaluatorsItem] | Unset): The plan's own evaluators. Absent on
             servers that predate evaluators on this family.
     """
@@ -66,8 +71,9 @@ class ListRunPlansResponse200Item:
     created_at: str
     updated_at: str
     platform_url: str
+    trace_quiet_period_ms: int | None | Unset = UNSET
+    trace_wait_timeout_ms: int | None | Unset = UNSET
     evaluators: list[ListRunPlansResponse200ItemEvaluatorsItem] | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.list_run_plans_response_200_item_scope_type_0 import ListRunPlansResponse200ItemScopeType0
@@ -116,6 +122,18 @@ class ListRunPlansResponse200Item:
 
         platform_url = self.platform_url
 
+        trace_quiet_period_ms: int | None | Unset
+        if isinstance(self.trace_quiet_period_ms, Unset):
+            trace_quiet_period_ms = UNSET
+        else:
+            trace_quiet_period_ms = self.trace_quiet_period_ms
+
+        trace_wait_timeout_ms: int | None | Unset
+        if isinstance(self.trace_wait_timeout_ms, Unset):
+            trace_wait_timeout_ms = UNSET
+        else:
+            trace_wait_timeout_ms = self.trace_wait_timeout_ms
+
         evaluators: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.evaluators, Unset):
             evaluators = []
@@ -124,7 +142,7 @@ class ListRunPlansResponse200Item:
                 evaluators.append(evaluators_item)
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -143,6 +161,10 @@ class ListRunPlansResponse200Item:
                 "platformUrl": platform_url,
             }
         )
+        if trace_quiet_period_ms is not UNSET:
+            field_dict["traceQuietPeriodMs"] = trace_quiet_period_ms
+        if trace_wait_timeout_ms is not UNSET:
+            field_dict["traceWaitTimeoutMs"] = trace_wait_timeout_ms
         if evaluators is not UNSET:
             field_dict["evaluators"] = evaluators
 
@@ -244,6 +266,24 @@ class ListRunPlansResponse200Item:
 
         platform_url = d.pop("platformUrl")
 
+        def _parse_trace_quiet_period_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_quiet_period_ms = _parse_trace_quiet_period_ms(d.pop("traceQuietPeriodMs", UNSET))
+
+        def _parse_trace_wait_timeout_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_wait_timeout_ms = _parse_trace_wait_timeout_ms(d.pop("traceWaitTimeoutMs", UNSET))
+
         _evaluators = d.pop("evaluators", UNSET)
         evaluators: list[ListRunPlansResponse200ItemEvaluatorsItem] | Unset = UNSET
         if _evaluators is not UNSET:
@@ -268,24 +308,9 @@ class ListRunPlansResponse200Item:
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,
+            trace_quiet_period_ms=trace_quiet_period_ms,
+            trace_wait_timeout_ms=trace_wait_timeout_ms,
             evaluators=evaluators,
         )
 
-        list_run_plans_response_200_item.additional_properties = d
         return list_run_plans_response_200_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

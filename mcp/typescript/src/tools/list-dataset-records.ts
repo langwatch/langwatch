@@ -1,7 +1,5 @@
-import {
-  listDatasetRecords as apiListDatasetRecords,
-} from "../langwatch-api-datasets.js";
-import { escapeMarkdown } from "../utils/escape-markdown.js";
+import { listDatasetRecords as apiListDatasetRecords } from "../langwatch-api-datasets.ts";
+import { escapeMarkdown } from "../utils/escape-markdown.ts";
 
 /**
  * Handles the platform_list_dataset_records MCP tool invocation.
@@ -31,7 +29,9 @@ export async function handleListDatasetRecords(params: {
   }
 
   const lines: string[] = [];
-  lines.push(`# Records (page ${pagination.page} of ${pagination.totalPages}, ${pagination.total} total)\n`);
+  lines.push(
+    `# Records (page ${pagination.page} of ${pagination.totalPages}, ${pagination.total} total)\n`,
+  );
 
   for (const record of records) {
     lines.push(`**${escapeMarkdown(record.id)}**: ${escapeMarkdown(JSON.stringify(record.entry))}`);
@@ -39,7 +39,9 @@ export async function handleListDatasetRecords(params: {
 
   if (pagination.page < pagination.totalPages) {
     lines.push("");
-    lines.push(`> Use \`platform_list_dataset_records\` with \`page: ${pagination.page + 1}\` to see the next page.`);
+    lines.push(
+      `> Use \`platform_list_dataset_records\` with \`page: ${pagination.page + 1}\` to see the next page.`,
+    );
   }
 
   return lines.join("\n");

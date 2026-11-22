@@ -352,7 +352,7 @@ func New(ctx context.Context, opts Options) (*Relay, error) {
 	r.forwardFailures = newForwardFailureCounter()
 	if r.internalEndpoint != "" || r.mirrorEndpoint != "" {
 		// The cancel function is invoked by Shutdown after the workers stop.
-		r.internalCtx, r.internalCancel = context.WithCancel(ctx) //nolint:gosec // lifecycle-owned by Relay.Shutdown
+		r.internalCtx, r.internalCancel = context.WithCancel(ctx)
 		r.internalJobs = make(chan internalExportJob, internalExportQueueSize)
 		r.internalDropped = newInternalDropCounter()
 		r.mirrorFailures = newMirrorForwardFailureCounter()

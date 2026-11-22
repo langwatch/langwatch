@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+
+  // The langwatch plugin's rules, and only those: `pnpm lint` runs this config
+  // beside the native one, so the JS plugin's thread never waits on native
+  // linting. ADR-150, amendment 2026-10-05.
+  "extends": ["./packages/architecture-enforcer/oxlint.architecture.jsonc"],
+  "options": { "reportUnusedDisableDirectives": "error" },
+  "categories": { "correctness": "off" },
+
+  "overrides": [
+    {
+      // Prisma's extended client has no nameable type; the one cast stays (Alex, 2026-09-27).
+      "files": ["packages/prisma-client/src/connection.ts"],
+      "rules": { "langwatch/stand-in-cast": "off" },
+    },
+  ],
+}

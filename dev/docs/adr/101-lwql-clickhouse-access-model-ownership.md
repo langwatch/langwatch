@@ -2,7 +2,9 @@
 
 **Date:** 2026-09-01
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-159](./159-the-app-owns-the-lwql-access-model.md)
+
+> **Superseded (2026-09-22).** ADR-159: the app owns the LangWatchQL access model on every distribution; no rendered copy exists. The two-owner table below is historical.
 
 ## Context
 
@@ -46,10 +48,10 @@ only stable state.
 **One owner per entity name, always.** Whoever owns the ClickHouse server owns
 the access model for that server:
 
-| ClickHouse is... | Access model owner | Mechanism |
-| --- | --- | --- |
+| ClickHouse is...                                                             | Access model owner  | Mechanism                                                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Chart-managed (`clickhouse.chartManaged: true`, the default) or SaaS-managed | The rendered config | `charts/clickhouse-serverless` (chart path) / `render-config.sh` (SaaS path) writes `langwatch_lwql`, `lwql_restricted`, the row policies, and the `lwql_postgres` named collection as XML/YAML config at pod boot. Re-read on every restart; no SQL DDL for these objects ever runs. |
-| External / BYO (`clickhouse.chartManaged: false`) | The application | The app cannot render config into a server it does not run, so it self-provisions the same objects via SQL DDL on every boot, and degrades to a logged, fail-closed refusal if the server rejects a statement. |
+| External / BYO (`clickhouse.chartManaged: false`)                            | The application     | The app cannot render config into a server it does not run, so it self-provisions the same objects via SQL DDL on every boot, and degrades to a logged, fail-closed refusal if the server rejects a statement.                                                                        |
 
 This is enforced structurally, not just by convention: `charts/langwatch`'s
 `langwatch.lwql.selfProvisionActive` helper (`templates/_helpers.tpl`) gates
@@ -91,6 +93,26 @@ thing that can create these objects when it does not own the server."
   to the rendered-config path: ClickHouse must dial PostgreSQL with the real
   credential, so unlike every other rendered credential this one cannot be
   hashed and lands in plaintext in `config.d/`.
+
+## Update — #8085: the tenant predicate is a set, single-sourced
+
+As of #8085 the tenant capability carries a _set_ of the caller's per-project
+key hashes (comma-joined), and the row-policy predicate is set membership
+(`has(splitByChar(',', getSetting(...)), KeyHash)`) rather than a single-hash
+equality — so one key reaches every project it can read.
+
+Because the same predicate must be identical across all three provisioning
+copies this ADR governs, it is now single-sourced as SQL text with
+`{placeholder}` slots:
+
+- `infra/clickhouse-serverless/internal/render/lwqlTenantPredicate.sql` and
+  `lwqlKeyMapSelfFilter.sql` — embedded by `lwql.go` (`//go:embed`).
+- `accessModel.ts` mirrors them as `LWQL_TENANT_PREDICATE_TEMPLATE` /
+  `LWQL_KEY_MAP_SELF_FILTER_TEMPLATE`, and
+  `provisioning/__tests__/lwqlPredicateParity.unit.test.ts` fails the build if
+  the app constant and the embedded file drift apart.
+- The SaaS `render-config.sh` (langwatch-saas#1233) remains a third copy this
+  repo cannot check; it must be updated to the same set-membership predicate.
 
 ## References
 

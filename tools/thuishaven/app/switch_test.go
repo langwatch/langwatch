@@ -17,7 +17,7 @@ func switchOrchestrator(store *fakeStore, sys *fakeSystem, hyg *fakeHygiene) *Or
 	}
 }
 
-// `haven switch` is what the shell function from `haven shell-init` cd's to, so
+// `haven switch` is what the shell function from `haven self shell-init` cd's to, so
 // what it resolves has to be a directory or a refusal — never a guess. Typing
 // enough to be unique is the contract; typing less than that must say so rather
 // than pick whichever worktree sorted first.

@@ -1,0 +1,368 @@
+/**
+ * Authoritative registry for resources, actions, scopes; everything else is
+ * derived. APPEND-ONLY (bitset indices) (ADR-092 §1).
+ */
+
+import { z } from "zod";
+
+const READ_ONLY = ["view"] as const;
+
+export const AUTHZ_RESOURCES = {
+  organization: {
+    actions: ["view", "manage", "delete"],
+    scopes: ["organization"],
+  },
+  project: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  team: {
+    actions: ["view", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  analytics: {
+    // `analytics:create` is requested by the dashboards router even though no
+    // bag grants it directly (manage implies it via the hierarchy).
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  cost: {
+    actions: READ_ONLY,
+    scopes: ["project", "team", "organization"],
+  },
+  traces: {
+    // No `traces:manage` exists anywhere in the legacy vocabulary — traces
+    // deliberately have no blanket-manage, so no hierarchy family here.
+    actions: ["view", "create", "update", "share"],
+    scopes: ["project", "team", "organization"],
+  },
+  scenarios: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  annotations: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  evaluations: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  datasets: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  triggers: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  workflows: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  experiments: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  prompts: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  secrets: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  playground: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  ops: {
+    // Platform-tier only: grantable by exactly one source (ADMIN_EMAILS →
+    // platform-ops principal), never by org/team/project bindings.
+    actions: ["view", "manage"],
+    scopes: ["platform"],
+  },
+  auditLog: {
+    actions: READ_ONLY,
+    scopes: ["project", "team", "organization"],
+  },
+  virtualKeys: {
+    actions: ["view", "create", "update", "delete", "rotate", "manage", "viewOtherPersonal"],
+    scopes: ["project", "team", "organization"],
+  },
+  gatewayBudgets: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  gatewayProviders: {
+    actions: ["view", "update", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  routingPolicies: {
+    actions: ["view", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  gatewayGuardrails: {
+    actions: ["view", "attach", "detach", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  gatewayLogs: {
+    // Deprecated in the legacy vocabulary but still granted by every bag;
+    // kept for parity until the stage-E breaking-change pass drops it.
+    actions: READ_ONLY,
+    scopes: ["project", "team", "organization"],
+  },
+  gatewayUsage: {
+    actions: READ_ONLY,
+    scopes: ["project", "team", "organization"],
+  },
+  gatewayCacheRules: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  governance: {
+    actions: ["view", "manage"],
+    scopes: ["organization"],
+  },
+  ingestionSources: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["organization"],
+  },
+  anomalyRules: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["organization"],
+  },
+  complianceExport: {
+    actions: READ_ONLY,
+    scopes: ["organization"],
+  },
+  activityMonitor: {
+    actions: READ_ONLY,
+    scopes: ["organization"],
+  },
+  aiTools: {
+    actions: ["view", "manage"],
+    scopes: ["organization"],
+  },
+  webhookEndpoints: {
+    // Org-tier only: endpoints carry signing secrets and stream event
+    // families out of the platform (see the legacy vocabulary's rationale).
+    actions: ["view", "manage"],
+    scopes: ["organization"],
+  },
+  gatewaySpend: {
+    actions: ["view", "manage"],
+    scopes: ["organization"],
+  },
+  langy: {
+    actions: ["view", "create", "update", "delete", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  agentCache: {
+    actions: ["view", "manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  // Owners set an experiment's policy for a whole project or organization.
+  // Distinct from `experiments:*`, which is the evaluation product; this is
+  // control over feature-flag experiment enrolment. Appended last, per the
+  // append-only rule above.
+  featureFlags: {
+    actions: ["manageExperiments"],
+    scopes: ["project", "organization"],
+  },
+  governanceCost: {
+    // Org-tier only (aggregates spend across teams); view-only (ADR-128).
+    actions: ["view"],
+    scopes: ["organization"],
+  },
+  // D05, ADR-122. Seeing a connection and changing one are two jobs: a
+  // security reviewer reads which domains route and who proved them, an IT
+  // administrator sets it up. Org-tier only, and the directory that
+  // provisions people is gated by these same two — federating sign-in and
+  // letting a directory write your membership are one administrator's job.
+  sso: {
+    actions: ["view", "manage"],
+    scopes: ["organization"],
+  },
+  // Moving a deploy label ("production") of an agent or an evaluator, and
+  // archiving one that carries a label. Editing stays `evaluations:*`, so a
+  // custom role can edit without deciding what production runs.
+  agents: {
+    actions: ["deploy"],
+    scopes: ["project", "team", "organization"],
+  },
+  evaluators: {
+    actions: ["deploy"],
+    scopes: ["project", "team", "organization"],
+  },
+  // Starting a paid subscription (`upgrade`), and changing a live one: seats, the billing
+  // portal, invoices (`manage`). The Billing role holds both without taking a seat.
+  subscription: {
+    actions: ["upgrade", "manage"],
+    scopes: ["organization"],
+  },
+  // Requests to approve a seat for someone the seat limit held back or admitted as Lite.
+  seatRequests: {
+    actions: ["view", "manage"],
+    scopes: ["organization"],
+  },
+  // The member directory and the roles each member holds. Every organization role reads it;
+  // changing it stays `organization:manage`.
+  members: {
+    actions: ["view"],
+    scopes: ["organization"],
+  },
+  // ADR-201 §2: who may share matching spans into another project's traces.
+  // Its own resource, appended last: a `traces:braid` action would move every
+  // later bitset index. Admin-only; `traces:share` stays the public share link.
+  braids: {
+    actions: ["manage"],
+    scopes: ["project", "team", "organization"],
+  },
+  // ADR-201 §3: the one permission a braid grant carries, minted onto it at proof time and read
+  // only by the span read. No scope: no role, custom role, key or binding can ever confer it.
+  spans: {
+    actions: ["braided"],
+    scopes: [],
+  },
+} as const satisfies Record<
+  string,
+  {
+    actions: readonly string[];
+    scopes: readonly ("project" | "team" | "organization" | "platform")[];
+  }
+>;
+
+const AUTHZ_RESOURCE_NAMES = Object.keys(AUTHZ_RESOURCES) as [
+  keyof typeof AUTHZ_RESOURCES,
+  ...(keyof typeof AUTHZ_RESOURCES)[],
+];
+export const authzResourceSchema = z.enum(AUTHZ_RESOURCE_NAMES);
+export type AuthzResource = z.infer<typeof authzResourceSchema>;
+
+/** The tiers a permission may be granted at. Every scope tier except
+ *  `resource`, which is reached by a grant on the resource itself rather
+ *  than by a permission declaration. */
+export const authzScopeTypeSchema = z.enum(["project", "team", "organization", "platform"]);
+export type AuthzScopeType = z.infer<typeof authzScopeTypeSchema>;
+
+/** Only VALID resource:action pairs — `traces:rotate` is a type error. */
+type RegistryPermission = {
+  [R in AuthzResource]: `${R}:${(typeof AUTHZ_RESOURCES)[R]["actions"][number]}`;
+}[AuthzResource];
+
+/**
+ * Stable, append-only enumeration of every valid permission. Declaration
+ * order IS the bitset index (stage F passports depend on indices never
+ * moving), enforced by sentinel tests.
+ */
+export const ALL_PERMISSIONS: readonly RegistryPermission[] = Object.entries(
+  AUTHZ_RESOURCES,
+).flatMap(([resource, def]) =>
+  def.actions.map((action) => `${resource}:${action}` as RegistryPermission),
+);
+
+export const authzPermissionSchema = z.enum(
+  ALL_PERMISSIONS as [RegistryPermission, ...RegistryPermission[]],
+);
+export type AuthzPermission = z.infer<typeof authzPermissionSchema>;
+
+const PERMISSION_INDEX: ReadonlyMap<string, number> = new Map(
+  ALL_PERMISSIONS.map((permission, index) => [permission, index]),
+);
+
+export function isRegistryPermission(value: string): value is AuthzPermission {
+  return PERMISSION_INDEX.has(value);
+}
+
+/** The permission a braid grant carries in a proof, and the only one (ADR-201 §3). */
+export const SPAN_BRAID_PERMISSION = "spans:braided" as const satisfies RegistryPermission;
+
+/**
+ * Whether any grant may confer `permission`: false for a permission declared at no scope, which
+ * is minted onto a proof and never granted. A string outside the registry is not refused here.
+ */
+export function isGrantablePermission(permission: string): boolean {
+  const def = (AUTHZ_RESOURCES as Record<string, { scopes: readonly string[] } | undefined>)[
+    permissionResource(permission)
+  ];
+  return def === undefined || def.scopes.length > 0;
+}
+
+/** A registry permission a role, custom role or key may list: never a minted-only one. */
+export const grantablePermissionSchema = authzPermissionSchema.refine(isGrantablePermission, {
+  message: "is minted onto a proof and never granted",
+});
+
+/** Bitset index for a permission, or undefined for unknown strings. */
+export function findPermissionIndex(permission: string): number | undefined {
+  return PERMISSION_INDEX.get(permission);
+}
+
+export function permissionResource(permission: string): string {
+  return permission.split(":")[0] ?? "";
+}
+
+/**
+ * Legacy hierarchy rule, verbatim semantics: `<resource>:manage` satisfies
+ * view/create/update/delete/rotate/attach/detach on the same resource.
+ * Parity-tested against `hasPermissionWithHierarchy` in rbac.ts.
+ */
+const MANAGE_IMPLIED_ACTIONS: ReadonlySet<string> = new Set([
+  "view",
+  "create",
+  "update",
+  "delete",
+  "rotate",
+  "attach",
+  "detach",
+]);
+
+/**
+ * Never implied by `manage`: only a direct grant satisfies these. Deleting
+ * the organization is irreversible, so holding `organization:manage` (a CLI
+ * `--management` key, a key minted by one) must not reach it.
+ */
+const NEVER_IMPLIED_BY_MANAGE: ReadonlySet<string> = new Set(["organization:delete"]);
+
+/**
+ * True when `requested` is satisfied by the `granted` set, applying the
+ * manage-implication rule. `granted` may contain non-registry strings
+ * (legacy custom-role rows) — membership is string-based on purpose.
+ */
+export function permissionSatisfiedBy({
+  granted,
+  requested,
+}: {
+  granted: ReadonlySet<string>;
+  requested: string;
+}): boolean {
+  if (granted.has(requested)) return true;
+  if (NEVER_IMPLIED_BY_MANAGE.has(requested)) return false;
+  const separator = requested.lastIndexOf(":");
+  if (separator === -1) return false;
+  const action = requested.slice(separator + 1);
+  if (!MANAGE_IMPLIED_ACTIONS.has(action)) return false;
+  return granted.has(`${requested.slice(0, separator)}:manage`);
+}
+
+/**
+ * Individually shareable resource kinds; children is documentation only
+ * (caller supplies ancestry as scope.parents) (ADR-092 §8).
+ */
+export const SHAREABLE_RESOURCE_KINDS = {
+  trace: {
+    children: ["span", "log", "metric", "evaluation", "annotation"],
+  },
+  thread: {
+    children: ["trace"],
+  },
+} as const satisfies Record<string, { children: readonly string[] }>;
+
+export const shareableResourceKindSchema = z.enum(
+  Object.keys(SHAREABLE_RESOURCE_KINDS) as [
+    keyof typeof SHAREABLE_RESOURCE_KINDS,
+    ...(keyof typeof SHAREABLE_RESOURCE_KINDS)[],
+  ],
+);
+export type ShareableResourceKind = z.infer<typeof shareableResourceKindSchema>;

@@ -25,6 +25,13 @@ Feature: Custom chart widgets import any module and run under their own CSP
     And the response is never cached
 
   @unit
+  Scenario: The frame's own inline scripts survive a nonce added upstream
+    Given the frame route issues a fresh nonce on every response
+    When the frame document and its policy are built
+    Then the policy's script-src carries that nonce and no 'unsafe-inline'
+    And every inline script in the document, including the import map, carries the same nonce
+
+  @unit
   Scenario: The frame document is sandboxed even when opened directly
     Given the app serves the chart frame document at "/sandbox/chart-frame"
     When the frame document's response headers are built
@@ -62,8 +69,36 @@ Feature: Custom chart widgets import any module and run under their own CSP
 
   @unit
   Scenario: Built-in modules resolve to the frame's own instance
-    When a widget imports "react", "react-dom", "react-dom/client", "recharts" or "@langwatch/charts"
-    Then the specifier is left unchanged so the import map serves the frame's UMD global
+    When the specifier resolver reads "react", "react-dom", "react-dom/client", "recharts" or "@langwatch/charts"
+    Then it leaves the specifier unchanged rather than sending it to esm.sh
+    And the import map, or the compiled import rewritten after it, serves the frame's UMD global
+
+  # WebKit and Firefox ignore an import map that arrives after any module load
+  # has started, and a proxy in front of the app may inject a module script
+  # into the frame document. So the map is markup, ahead of everything else.
+  @unit
+  Scenario: A custom widget that imports recharts renders in Chromium, WebKit and Firefox
+    When the chart frame document is built
+    Then the import map is static markup and the first element of the head
+    And no script, stylesheet or preload comes before it
+    And it maps "react", "react-dom", "react-dom/client", "recharts", "@langwatch/charts" and both JSX runtimes
+    And no script in the document creates an import map at run time
+
+  @unit
+  Scenario: The import map names every export of the bundled charts library
+    When the charts library the frame bundles is evaluated
+    Then the "@langwatch/charts" module in the import map exports exactly its members
+
+  @unit
+  Scenario: The bundled charts library matches a fresh build of its source
+    When the charts library generator is run again
+    Then its output is identical to the charts library the frame bundles
+
+  @unit
+  Scenario: A widget's own built-in import loads even where the import map was ignored
+    When a widget imports "recharts", "react" or "@langwatch/charts"
+    Then the compiled module imports the module URL the import map names for that specifier
+    And so the import does not depend on the engine having accepted the import map
 
   @unit
   Scenario: A package built with the automatic JSX runtime shares the frame's React
@@ -71,6 +106,13 @@ Feature: Custom chart widgets import any module and run under their own CSP
     When the frame resolves it
     Then it resolves to the frame's own React instance through the import map
     And it is not rewritten to esm.sh
+
+  @unit
+  Scenario: The JSX runtime shim preserves array children exactly
+    Given a third-party package compiled with the automatic JSX runtime renders a component with children
+    When it passes an empty array, a single-element array or a multi-element array as children
+    Then the component receives the same array shape React would give it
+    And a key passed as the third argument becomes the element key, not a prop
 
   @unit
   Scenario: URL, data, blob and relative imports are left alone

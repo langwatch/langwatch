@@ -1,15 +1,19 @@
 {
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-    "noUncheckedIndexedAccess": true
+    "noUncheckedIndexedAccess": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["**/*.ts"],
-  "exclude": ["node_modules", "_tests/fixtures"]
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    }
+  ]
 }

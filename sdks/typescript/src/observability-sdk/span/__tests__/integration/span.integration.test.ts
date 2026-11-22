@@ -1,23 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import {
-  InMemorySpanExporter,
-  SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
-import type { setupObservability } from "../../../setup/node";
-import { getLangWatchTracer } from "../../../tracer";
-import { createLangWatchSpan } from "../..";
-import { createIntegrationObservability } from "../../../setup/node/__tests__/createIntegrationObservability";
-import * as semconv from "../../../semconv";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+import { createLangWatchSpan } from "../..";
+import * as semconv from "../../../semconv";
+import type { setupObservability } from "../../../setup/node";
+import { createIntegrationObservability } from "../../../setup/node/__tests__/createIntegrationObservability";
+import { getLangWatchTracer } from "../../../tracer";
 
 /**
- * Integration tests for LangWatch spans with real OpenTelemetry setup.
- *
- * These tests verify:
- * - Real span data serialization and export
- * - Data format consistency across different input types
- * - Event recording and attribute setting
- * - Integration with OpenTelemetry span lifecycle
+ * Integration tests for LangWatch spans with real OpenTelemetry setup:
+ * serialization, format consistency, event/attribute recording, and span
+ * lifecycle integration.
  */
 
 // Test data constants for consistency
@@ -87,15 +81,12 @@ describe("Span Integration Tests", () => {
     trace.disable();
   });
 
-  describe("data format serialization", () => {
+  describe("when serializing data formats", () => {
     it("serializes complex input/output data correctly", async () => {
       const tracer = getLangWatchTracer("data-serialization-test");
 
       await tracer.withActiveSpan("complex-data-test", async (span) => {
-        span
-          .setType("llm")
-          .setInput(COMPLEX_TEST_INPUT)
-          .setOutput(COMPLEX_TEST_OUTPUT);
+        span.setType("llm").setInput(COMPLEX_TEST_INPUT).setOutput(COMPLEX_TEST_OUTPUT);
       });
 
       await spanProcessor.forceFlush();
@@ -108,9 +99,7 @@ describe("Span Integration Tests", () => {
       }
 
       // Verify input serialization
-      const inputData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string,
-      );
+      const inputData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string);
       expect(inputData.type).toBe("json");
       expect(inputData.value.messages).toHaveLength(2);
       expect(inputData.value.messages[0].role).toBe("user");
@@ -122,18 +111,11 @@ describe("Span Integration Tests", () => {
       expect(inputData.value.score).toBe(null);
 
       // Verify output serialization
-      const outputData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_OUTPUT] as string,
-      );
+      const outputData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_OUTPUT] as string);
       expect(outputData.type).toBe("json");
-      expect(outputData.value.response.text).toBe(
-        "Hello! How can I help you today?",
-      );
+      expect(outputData.value.response.text).toBe("Hello! How can I help you today?");
       expect(outputData.value.response.confidence).toBe(0.95);
-      expect(outputData.value.response.reasoning).toEqual([
-        "greeting_detected",
-        "help_offered",
-      ]);
+      expect(outputData.value.response.reasoning).toEqual(["greeting_detected", "help_offered"]);
       expect(outputData.value.usage.promptTokens).toBe(25);
       expect(outputData.value.timing.latencyMs).toBe(1333);
     });
@@ -182,9 +164,7 @@ describe("Span Integration Tests", () => {
         throw new Error("Expected span to be exported");
       }
 
-      const inputData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string,
-      );
+      const inputData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string);
       expect(inputData.type).toBe("json");
       expect(inputData.value.emptyString).toBe("");
       expect(inputData.value.emptyArray).toEqual([]);
@@ -230,12 +210,8 @@ describe("Span Integration Tests", () => {
 
       expect(exportedSpans).toHaveLength(2);
 
-      const stringSpan = exportedSpans.find(
-        (s) => s.name === "string-input-span",
-      );
-      const objectSpan = exportedSpans.find(
-        (s) => s.name === "object-input-span",
-      );
+      const stringSpan = exportedSpans.find((s) => s.name === "string-input-span");
+      const objectSpan = exportedSpans.find((s) => s.name === "object-input-span");
 
       if (!stringSpan || !objectSpan) {
         throw new Error("Expected both string and object spans to be exported");
@@ -320,9 +296,7 @@ describe("Span Integration Tests", () => {
       }
 
       // Verify input data format consistency
-      const inputData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string,
-      );
+      const inputData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string);
       expect(inputData.type).toBe("json");
       expect(inputData.value.text).toBe("string input");
       expect(inputData.value.number).toBe(42);
@@ -332,33 +306,27 @@ describe("Span Integration Tests", () => {
       expect(inputData.value.nullValue).toBe(null);
 
       // Verify RAG contexts format (plain array, no wrapper)
-      const ragData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_RAG_CONTEXTS] as string,
-      );
+      const ragData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_RAG_CONTEXTS] as string);
       expect(ragData).toHaveLength(2);
       expect(ragData[0].document_id).toBe("doc-1");
       expect(ragData[1].document_id).toBe("doc-2");
 
       // Verify metrics format
-      const metricsData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_METRICS] as string,
-      );
+      const metricsData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_METRICS] as string);
       expect(metricsData.type).toBe("json");
       expect(metricsData.value.promptTokens).toBe(100);
       expect(metricsData.value.completionTokens).toBe(50);
       expect(metricsData.value.cost).toBeCloseTo(0.005);
 
       // Verify output format
-      const outputData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_OUTPUT] as string,
-      );
+      const outputData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_OUTPUT] as string);
       expect(outputData.type).toBe("json");
       expect(outputData.value.processed).toBe(true);
       expect(outputData.value.originalData.text).toBe("string input");
     });
   });
 
-  describe("attributes and metadata", () => {
+  describe("when setting attributes and metadata", () => {
     it("handles RAG context data correctly", async () => {
       const tracer = getLangWatchTracer("rag-context-test");
 
@@ -404,12 +372,8 @@ describe("Span Integration Tests", () => {
 
       expect(exportedSpans).toHaveLength(2);
 
-      const singleSpan = exportedSpans.find(
-        (s) => s.name === "single-rag-context",
-      );
-      const multipleSpan = exportedSpans.find(
-        (s) => s.name === "multiple-rag-contexts",
-      );
+      const singleSpan = exportedSpans.find((s) => s.name === "single-rag-context");
+      const multipleSpan = exportedSpans.find((s) => s.name === "multiple-rag-contexts");
 
       if (!singleSpan || !multipleSpan) {
         throw new Error("Expected both RAG context spans to be exported");
@@ -458,9 +422,7 @@ describe("Span Integration Tests", () => {
         throw new Error("Expected span to be exported");
       }
 
-      const parsedMetrics = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_METRICS] as string,
-      );
+      const parsedMetrics = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_METRICS] as string);
       expect(parsedMetrics.type).toBe("json");
       expect(parsedMetrics.value.promptTokens).toBe(150);
       expect(parsedMetrics.value.completionTokens).toBe(75);
@@ -474,8 +436,8 @@ describe("Span Integration Tests", () => {
       await tracer.withActiveSpan("model-span", async (span) => {
         span
           .setType("llm")
-          .setRequestModel("gpt-4-turbo-preview")
-          .setResponseModel("gpt-4-turbo-preview-20240125");
+          .setRequestModel("gpt-5-mini-preview")
+          .setResponseModel("gpt-5-mini-preview-20240125");
       });
 
       await spanProcessor.forceFlush();
@@ -487,16 +449,12 @@ describe("Span Integration Tests", () => {
         throw new Error("Expected span to be exported");
       }
 
-      expect(span.attributes["gen_ai.request.model"]).toBe(
-        "gpt-4-turbo-preview",
-      );
-      expect(span.attributes["gen_ai.response.model"]).toBe(
-        "gpt-4-turbo-preview-20240125",
-      );
+      expect(span.attributes["gen_ai.request.model"]).toBe("gpt-5-mini-preview");
+      expect(span.attributes["gen_ai.response.model"]).toBe("gpt-5-mini-preview-20240125");
     });
   });
 
-  describe("span lifecycle integration", () => {
+  describe("when integrating span lifecycle", () => {
     it("properly handles manual span lifecycle", () => {
       const tracer = getLangWatchTracer("manual-lifecycle-test");
 
@@ -557,19 +515,15 @@ describe("Span Integration Tests", () => {
       expect(span.attributes.step).toBe(4); // Last value wins
       expect(span.events).toHaveLength(1);
 
-      const inputData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string,
-      );
+      const inputData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string);
       expect(inputData.value).toBe("Start");
 
-      const outputData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_OUTPUT] as string,
-      );
+      const outputData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_OUTPUT] as string);
       expect(outputData.value).toBe("End");
     });
   });
 
-  describe("error handling and edge cases", () => {
+  describe("when handling errors or edge cases", () => {
     it("handles invalid data gracefully", async () => {
       const tracer = getLangWatchTracer("invalid-data-test");
 
@@ -592,9 +546,7 @@ describe("Span Integration Tests", () => {
       }
 
       // Should still have valid data
-      const inputData = JSON.parse(
-        span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string,
-      );
+      const inputData = JSON.parse(span.attributes[semconv.ATTR_LANGWATCH_INPUT] as string);
       expect(inputData.value).toBe("Valid input");
     });
 

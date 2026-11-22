@@ -1,0 +1,137 @@
+import { Box, Circle, Heading, HStack, Stack, Text } from "@chakra-ui/react";
+import { ArrowUpRight, Lock, MapPinOff } from "lucide-react";
+import type { ReactNode } from "react";
+
+export type AccessStateProps = {
+  kind: "upgrade" | "permission" | "unavailable";
+  title: ReactNode;
+  description: ReactNode;
+  actions?: ReactNode;
+  children?: ReactNode;
+  compact?: boolean;
+  /** Inside a card, popover or dialog that already draws the surface: no box of its own, the
+   * icon beside the words, so the lock starts on the host's content edge. Implies `compact`. */
+  inset?: boolean;
+  /** A whole page's only content, often with an illustration: everything on the centre axis. */
+  centered?: boolean;
+  "data-testid"?: string;
+};
+
+export function AccessState({
+  kind,
+  title,
+  description,
+  actions,
+  children,
+  compact = false,
+  inset = false,
+  centered = false,
+  "data-testid": testId,
+}: AccessStateProps) {
+  if (inset) {
+    return (
+      <HStack width="full" gap={3} align="start" data-testid={testId} data-inset="">
+        <AccessStateIcon kind={kind} compact />
+        <Stack gap={3} minWidth={0} flex={1} paddingTop={0.5}>
+          <Stack gap={1} maxWidth="64ch">
+            <Heading as="h2" size="sm">
+              {title}
+            </Heading>
+            <Text color="fg.muted" fontSize="sm" lineHeight="tall">
+              {description}
+            </Text>
+          </Stack>
+          {children && <Box>{children}</Box>}
+          {actions && (
+            <HStack gap={2} flexWrap="wrap">
+              {actions}
+            </HStack>
+          )}
+        </Stack>
+      </HStack>
+    );
+  }
+  return (
+    <Stack
+      width="full"
+      gap={compact ? 4 : 6}
+      padding={compact ? 5 : { base: 6, md: 8 }}
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="xl"
+      bg="bg.panel"
+      align={centered ? "center" : undefined}
+      textAlign={centered ? "center" : undefined}
+      data-testid={testId}
+      data-centered={centered ? "" : undefined}
+    >
+      <Stack gap={4} align={centered ? "center" : "start"}>
+        <AccessStateIcon kind={kind} compact={compact} />
+        <Stack gap={2} maxWidth="64ch">
+          <Heading as="h2" size={compact ? "sm" : "xl"}>
+            {title}
+          </Heading>
+          <Text color="fg.muted" fontSize="sm" lineHeight="tall">
+            {description}
+          </Text>
+        </Stack>
+      </Stack>
+      {children &&
+        (centered ? (
+          <Stack width="full" align="center">
+            {children}
+          </Stack>
+        ) : (
+          <Box>{children}</Box>
+        ))}
+      {actions && (
+        <HStack gap={3} flexWrap="wrap" justify={centered ? "center" : undefined}>
+          {actions}
+        </HStack>
+      )}
+    </Stack>
+  );
+}
+
+export function UpgradeRequired({
+  feature,
+  actions,
+  compact,
+  "data-testid": testId,
+}: {
+  feature: string;
+  actions: ReactNode;
+  compact?: boolean;
+  "data-testid"?: string;
+}) {
+  return (
+    <AccessState
+      kind="upgrade"
+      title={`${feature} on Enterprise`}
+      description={`Your current plan doesn't include ${feature.toLowerCase()}. Compare plans to see what's included, or ask an organization admin about changing your plan.`}
+      actions={actions}
+      compact={compact}
+      data-testid={testId}
+    />
+  );
+}
+
+export function AccessStateIcon({
+  kind,
+  compact = false,
+}: {
+  kind: AccessStateProps["kind"];
+  compact?: boolean;
+}) {
+  const icons = { upgrade: ArrowUpRight, permission: Lock, unavailable: MapPinOff };
+  const Icon = icons[kind];
+  return (
+    <Circle
+      size={compact ? 10 : 12}
+      bg={kind === "upgrade" ? "orange.subtle" : "bg.muted"}
+      color={kind === "upgrade" ? "orange.fg" : "fg.muted"}
+    >
+      <Icon size={20} aria-hidden />
+    </Circle>
+  );
+}

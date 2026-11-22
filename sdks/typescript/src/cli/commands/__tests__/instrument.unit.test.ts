@@ -1,8 +1,7 @@
 /**
- * `langwatch instrument <tool>` - scope selection and wiring dispatch.
- * The wiring writers and the credential resolver carry their own suites
- * (instrument-wiring, resolve-ingestion-credential); here they are
- * mocked so each scope rule is pinned at the command level.
+ * `langwatch instrument <tool>`: scope selection and wiring dispatch. The
+ * wiring writers and credential resolver are mocked here so each scope rule
+ * is pinned at the command level.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -18,9 +17,7 @@ import * as telemetryRefreshMod from "../../utils/governance/telemetry-refresh";
 import { instrumentCommand } from "../instrument";
 
 vi.mock("../../utils/governance/config", async () => {
-  const actual = await vi.importActual<typeof configMod>(
-    "../../utils/governance/config",
-  );
+  const actual = await vi.importActual<typeof configMod>("../../utils/governance/config");
   return { ...actual, loadConfig: vi.fn(), saveConfig: vi.fn(), isLoggedIn: vi.fn() };
 });
 
@@ -47,8 +44,7 @@ class ExitError extends Error {
   }
 }
 
-const asMock = (fn: unknown): ReturnType<typeof vi.fn> =>
-  fn as ReturnType<typeof vi.fn>;
+const asMock = (fn: unknown): ReturnType<typeof vi.fn> => fn as ReturnType<typeof vi.fn>;
 
 const personalCredential = {
   token: "ik-lw-personal00000000_secret",
@@ -97,12 +93,13 @@ afterEach(() => {
 });
 
 describe("instrumentCommand", () => {
-
   describe("given changed wiring and a running langwatch code launcher", () => {
     it("prints the restart advice returned by the installer", async () => {
       const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
       asMock(installTelemetryWiring).mockReturnValue({
-        labels: ["~/.zshrc"], warnings: [notice], requiredFailures: [],
+        labels: ["~/.zshrc"],
+        warnings: [notice],
+        requiredFailures: [],
       });
 
       await instrumentCommand("code", {});
@@ -153,6 +150,60 @@ describe("instrumentCommand", () => {
     });
   });
 
+  describe("given a local instance behind the wiring this command writes", () => {
+    let prevCliConfig: string | undefined;
+
+    beforeEach(() => {
+      prevCliConfig = process.env.LANGWATCH_CLI_CONFIG;
+      delete process.env.LANGWATCH_CLI_CONFIG;
+      asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
+        ...personalCredential,
+        endpoint: "http://localhost:5610/api/otel",
+      });
+    });
+
+    afterEach(() => {
+      if (prevCliConfig === undefined) delete process.env.LANGWATCH_CLI_CONFIG;
+      else process.env.LANGWATCH_CLI_CONFIG = prevCliConfig;
+    });
+
+    /** @scenario "Instrumenting against a local instance names the isolation env vars" */
+    it("names the global config it rewrites and the env vars that isolate a QA shell", async () => {
+      await instrumentCommand("claude", {});
+
+      const err = writtenTo(stderrSpy);
+      expect(err).toContain("local instance");
+      expect(err).toContain("LANGWATCH_CLI_CONFIG");
+      expect(err).toContain("CLAUDE_CONFIG_DIR");
+      expect(err).toContain("CODEX_HOME");
+      // A warning, never a refusal: the wiring still lands.
+      expect(installTelemetryWiring).toHaveBeenCalledTimes(1);
+      expect(writtenTo(stdoutSpy)).toContain("runs now send telemetry to");
+    });
+
+    /** @scenario "A shell that already relocated the CLI config hears nothing" */
+    it("says nothing when LANGWATCH_CLI_CONFIG already points elsewhere", async () => {
+      process.env.LANGWATCH_CLI_CONFIG = "/tmp/dogfood/langwatch-config.json";
+
+      await instrumentCommand("claude", {});
+
+      expect(writtenTo(stderrSpy)).not.toContain("LANGWATCH_CLI_CONFIG");
+      expect(installTelemetryWiring).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A remote endpoint is not a local instance" */
+    it("says nothing for an endpoint on another host", async () => {
+      asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
+        ...personalCredential,
+        endpoint: "https://lw.acme.dev/api/otel",
+      });
+
+      await instrumentCommand("codex", {});
+
+      expect(writtenTo(stderrSpy)).not.toContain("local instance");
+    });
+  });
+
   describe("given a companion write the wiring depends on failed", () => {
     it("fails instead of reporting a wired tool", async () => {
       asMock(installTelemetryWiring).mockReturnValue({
@@ -161,13 +212,9 @@ describe("instrumentCommand", () => {
         requiredFailures: ["could not enable opencode's OpenTelemetry flag"],
       });
 
-      await expect(instrumentCommand("opencode", {})).rejects.toThrow(
-        ExitError,
-      );
+      await expect(instrumentCommand("opencode", {})).rejects.toThrow(ExitError);
 
-      expect(writtenTo(stderrSpy)).toContain(
-        "could not enable opencode's OpenTelemetry flag",
-      );
+      expect(writtenTo(stderrSpy)).toContain("could not enable opencode's OpenTelemetry flag");
       expect(writtenTo(stdoutSpy)).not.toContain("runs now send telemetry to");
     });
   });
@@ -215,9 +262,9 @@ describe("instrumentCommand", () => {
 
   describe("given --endpoint without --key", () => {
     it("refuses: logged-in scopes use the login's endpoint", async () => {
-      await expect(
-        instrumentCommand("codex", { endpoint: "https://lw.acme.dev" }),
-      ).rejects.toThrow(ExitError);
+      await expect(instrumentCommand("codex", { endpoint: "https://lw.acme.dev" })).rejects.toThrow(
+        ExitError,
+      );
       expect(writtenTo(stderrSpy)).toContain("--endpoint only applies");
     });
   });
@@ -229,22 +276,16 @@ describe("instrumentCommand", () => {
 
     /** @scenario "A tool whose organization forbids direct OTLP is not instrumented" */
     it("refuses before minting a project key or writing any wiring", async () => {
-      await expect(
-        instrumentCommand("codex", { project: "acme-app" }),
-      ).rejects.toThrow(ExitError);
+      await expect(instrumentCommand("codex", { project: "acme-app" })).rejects.toThrow(ExitError);
 
-      expect(writtenTo(stderrSpy)).toContain(
-        "does not allow codex to send telemetry directly",
-      );
+      expect(writtenTo(stderrSpy)).toContain("does not allow codex to send telemetry directly");
       expect(pinToolToProject).not.toHaveBeenCalled();
       expect(telemetryRefreshMod.resolveIngestionCredential).not.toHaveBeenCalled();
       expect(installTelemetryWiring).not.toHaveBeenCalled();
     });
 
     it("refuses --personal too, leaving the existing pin in place", async () => {
-      await expect(
-        instrumentCommand("codex", { personal: true }),
-      ).rejects.toThrow(ExitError);
+      await expect(instrumentCommand("codex", { personal: true })).rejects.toThrow(ExitError);
 
       expect(clearToolProjectPin).not.toHaveBeenCalled();
       expect(installTelemetryWiring).not.toHaveBeenCalled();
@@ -335,12 +376,10 @@ describe("instrumentCommand", () => {
       it("fails and points at login or --key", async () => {
         asMock(configMod.isLoggedIn).mockReturnValue(false);
 
-        await expect(
-          instrumentCommand("codex", { project: "acme-app" }),
-        ).rejects.toThrow(ExitError);
-        expect(writtenTo(stderrSpy)).toContain(
-          "--project needs a signed-in session",
+        await expect(instrumentCommand("codex", { project: "acme-app" })).rejects.toThrow(
+          ExitError,
         );
+        expect(writtenTo(stderrSpy)).toContain("--project needs a signed-in session");
         expect(pinToolToProject).not.toHaveBeenCalled();
       });
     });

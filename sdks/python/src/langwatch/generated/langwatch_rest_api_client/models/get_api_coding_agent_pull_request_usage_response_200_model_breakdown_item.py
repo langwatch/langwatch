@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 T = TypeVar("T", bound="GetApiCodingAgentPullRequestUsageResponse200ModelBreakdownItem")
 
@@ -21,6 +20,7 @@ class GetApiCodingAgentPullRequestUsageResponse200ModelBreakdownItem:
         total_tokens (float):
         cost_usd (float | None):
         tokens_known (bool):
+        ai_units (float | None):
     """
 
     model: str
@@ -31,7 +31,7 @@ class GetApiCodingAgentPullRequestUsageResponse200ModelBreakdownItem:
     total_tokens: float
     cost_usd: float | None
     tokens_known: bool
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    ai_units: float | None
 
     def to_dict(self) -> dict[str, Any]:
         model = self.model
@@ -51,8 +51,11 @@ class GetApiCodingAgentPullRequestUsageResponse200ModelBreakdownItem:
 
         tokens_known = self.tokens_known
 
+        ai_units: float | None
+        ai_units = self.ai_units
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "model": model,
@@ -63,6 +66,7 @@ class GetApiCodingAgentPullRequestUsageResponse200ModelBreakdownItem:
                 "totalTokens": total_tokens,
                 "costUsd": cost_usd,
                 "tokensKnown": tokens_known,
+                "aiUnits": ai_units,
             }
         )
 
@@ -92,6 +96,13 @@ class GetApiCodingAgentPullRequestUsageResponse200ModelBreakdownItem:
 
         tokens_known = d.pop("tokensKnown")
 
+        def _parse_ai_units(data: object) -> float | None:
+            if data is None:
+                return data
+            return cast(float | None, data)
+
+        ai_units = _parse_ai_units(d.pop("aiUnits"))
+
         get_api_coding_agent_pull_request_usage_response_200_model_breakdown_item = cls(
             model=model,
             input_tokens=input_tokens,
@@ -101,23 +112,7 @@ class GetApiCodingAgentPullRequestUsageResponse200ModelBreakdownItem:
             total_tokens=total_tokens,
             cost_usd=cost_usd,
             tokens_known=tokens_known,
+            ai_units=ai_units,
         )
 
-        get_api_coding_agent_pull_request_usage_response_200_model_breakdown_item.additional_properties = d
         return get_api_coding_agent_pull_request_usage_response_200_model_breakdown_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

@@ -1,0 +1,97 @@
+import { HStack, Stack, Text } from "@chakra-ui/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
+
+import { MeterBar } from "./meter-bar.tsx";
+
+const meta = {
+  title: "Data display/Meter bar",
+  parameters: {
+    usage: {
+      use: "How much of a limit is used, as a filled track.",
+      avoid:
+        "A share that passed: use Pass rate indicator. A running job: Progress from primitives.",
+    },
+  },
+  component: MeterBar,
+  tags: ["autodocs"],
+  args: {
+    fillRatio: 0.4,
+    width: "120px",
+    height: "6px",
+    fillColor: "blue.solid",
+  },
+  argTypes: {
+    fillRatio: { control: { type: "range", min: 0, max: 1.2, step: 0.05 } },
+    align: { control: "inline-radio", options: ["start", "end"] },
+  },
+} satisfies Meta<typeof MeterBar>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {};
+
+/** No reading taken yet: a track with no fill says something different from zero. */
+export const NoReading: Story = {
+  args: { fillRatio: null },
+};
+
+export const Empty: Story = {
+  args: { fillRatio: 0 },
+};
+
+/** Anything past the width it is measured in clamps to a full track. */
+export const OverFull: Story = {
+  args: { fillRatio: 1.6, fillColor: "red.solid" },
+};
+
+export const Alignments: Story = {
+  render: (args) => (
+    <Stack gap="3">
+      <HStack gap="3">
+        <Text textStyle="xs" width="60px">
+          start
+        </Text>
+        <MeterBar {...args} align="start" />
+      </HStack>
+      <HStack gap="3">
+        <Text textStyle="xs" width="60px">
+          end
+        </Text>
+        <MeterBar {...args} align="end" />
+      </HStack>
+    </Stack>
+  ),
+};
+
+export const NarrowWidth: Story = {
+  args: { width: "36px" },
+};
+
+/** Two parts of one whole, e.g. traces that get every span and those that get some. */
+export const TwoSegments: Story = {
+  render: () => (
+    <MeterBar
+      width="240px"
+      height="8px"
+      segments={[
+        { ratio: 0.45, color: "blue.solid" },
+        { ratio: 0.2, color: "blue.muted" },
+      ]}
+    />
+  ),
+};
+
+/** Parts that add up past the track clamp to a full track. */
+export const TwoSegmentsOverFull: Story = {
+  render: () => (
+    <MeterBar
+      width="240px"
+      height="8px"
+      segments={[
+        { ratio: 0.8, color: "blue.solid" },
+        { ratio: 0.6, color: "blue.muted" },
+      ]}
+    />
+  ),
+};

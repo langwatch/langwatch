@@ -39,7 +39,31 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the value was normalized exactly as attach-time normalization does
     And the decision carries the reason code "domain_routed"
 
-  # RETIRED, and replaced by the four scenarios below (ADR-117, revision
+  @unit @regression
+  Scenario: Sign-up never reveals account existence on an SSO domain
+    Given "acme.com" is managed by an active or suspended SSO connection
+    When a signed-out visitor requests a sign-up verification link
+    Then registered, unconfirmed and unknown emails receive the same refusal "auth_direct_registration_unavailable"
+    And the response directs the visitor to their organization's sign-in method
+    And no account-existence lookup or verification email is sent
+
+  @unit @regression
+  Scenario: Sign-up never reveals account existence when managed SSO cannot route
+    Given "acme.com" is managed by an active SSO connection
+    And that connection is unlicensed or its provider is not configured
+    When a signed-out visitor requests a sign-up verification link
+    Then registered, unconfirmed and unknown emails receive the same refusal "auth_direct_registration_unavailable"
+    And no account-existence lookup or verification email is sent
+
+  @unit
+  Scenario: Sign-up still guides an existing account outside SSO domains
+    Given "home.net" is not managed by an SSO connection
+    And "sam@home.net" already has a confirmed account
+    When a signed-out visitor requests a sign-up verification link for "sam@home.net"
+    Then the response is "email_already_registered"
+    And no verification email is sent
+
+  # Outside SSO-managed domains, replaced by the four scenarios below (ADR-117, revision
   # 2026-08-25). The router used to answer a known address and an unknown one
   # identically, by construction. It no longer does, and the argument is in
   # the ADR: the sign-up door already answers "does this address have an
@@ -75,13 +99,20 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the decision never routes to sign-up with the reason code "identifier_unknown"
 
   @unit
-  Scenario: An account still waiting for identifier backfill keeps its way in
+  Scenario: An unlatched legacy account with a password offers password sign-in
     Given "home.net" belongs to no ACTIVE connection
-    And an existing account holds "legacy@home.net"
-    And that account's identifier backfill is not finalized
-    When "legacy@home.net" is submitted to the router
-    Then the decision offers the account's legacy sign-in method
-    And the decision never routes to sign-up with the reason code "identifier_unknown"
+    And the legacy account for "sam@home.net" has not completed identifier backfill and holds a password
+    When "sam@home.net" is submitted to the router
+    Then the decision offers the password with the reason code "account_methods"
+    And the decision never routes to sign-up
+
+  @unit
+  Scenario: A migrated account is answered from the projection alone
+    Given an account whose identifier backfill has finalized
+    And legacy rows still carry a method the migration moved
+    When that address is submitted to the router
+    Then the legacy rows are not read
+    And the decision offers only what the projection holds
 
   @unit
   Scenario: The methods offered are the ones that account holds
@@ -161,7 +192,8 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the next question is refused and says how long to wait
     And the router is never asked to decide it
 
-  @unit
+  # Gap: auth meters only the caller (auth.route:<caller>, 200/h); no per-address budget exists, and main had none.
+  @unit @unimplemented
   Scenario: One address probed from many places is eventually refused
     Given the same address is asked about from a new client each time
     When that address's budget for the hour is spent
@@ -184,9 +216,9 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the budget is spent against the address the caller connected from
 
   @unit
-  Scenario: An in-cluster ingress does not collapse every visitor into one bucket
-    Given no trusted proxy is configured
-    And the app is reached through an ingress on a private address
+  Scenario: An in-cluster ingress declared as a trusted proxy does not collapse every visitor into one bucket
+    Given the ingress's private range is configured as a trusted proxy
+    And the app is reached through that ingress
     When two visitors ask the sign-in router where an address should go
     Then the ingress is read as the deployment's own hop
     And each visitor spends a separate per-client budget
@@ -201,10 +233,17 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
   # ── Self-hosted priority ───────────────────────────────────────────────
 
   @unit
-  Scenario: A sole ACTIVE connection auto-redirects before any email is asked
+  Scenario: A sole ACTIVE connection is selected before any email is asked
     Given a self-hosted installation with exactly one ACTIVE connection
     When the sign-in page is requested
-    Then the decision is an immediate redirect to that identity provider
+    Then the decision selects that identity provider for sign-in
+    And the decision carries the reason code "sole_active_connection"
+
+  @unit
+  Scenario: A self-serve connection that went live is the sole connection
+    Given a self-hosted installation whose only connection is a self-serve one that went live
+    When the sign-in page is requested
+    Then the decision redirects to that connection's own provider
     And the decision carries the reason code "sole_active_connection"
 
   @unit
@@ -266,45 +305,34 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And a deployment that chose email mode mounts and offers no social provider, whatever credentials linger
     And a provider env naming something unmountable still lands in email mode with the password offered
 
-  # ── The Auth0 connection bridge (deliberately short-term, D09) ─────────
-  #
-  # SaaS's social sign-ins still broker through Auth0. Until they are native,
-  # the door shows each brokered connection as its own branded button, and
-  # clicking one dials Auth0 pre-scoped to that connection — the person picks
-  # their provider exactly once, on our screen, and Auth0's own picker never
-  # appears. Self-hosted Auth0 deployments are untouched: their tenant's
-  # connections have names no hardcoded bridge may guess, so they keep the
-  # generic hand-off to Auth0's own screen.
+  # ── Auth0 serves only legacy SSO organizations on cloud ────────────────
+  # On cloud the rail never draws the Auth0 broker or its social buttons; legacy
+  # SSO organizations reach it by typing their address. Self-hosted keeps it.
 
   @unit
-  Scenario: SaaS shows the broker's social connections as their own buttons
+  Scenario: Cloud never offers the Auth0 broker on the sign-in screen
     Given a SaaS deployment whose provider is the Auth0 broker
+    And credentials are present for the native Google and GitHub providers
     When the sign-in page is requested
-    Then Google, GitHub and Microsoft are offered as branded methods ahead of the generic one
-    And dialing a branded method names the connection Auth0's own screen offered
-    And a self-hosted Auth0 deployment is offered only the generic method
+    Then the native Google and GitHub methods and the password are offered
+    And neither the broker nor a branded button for one of its connections is offered
+    And with no native social provider set up only the password is offered
 
   @unit
-  Scenario: An account brokered through a social connection routes to its own button
-    Given the account for "sam@home.net" signed in through the broker's Google connection
-    When "sam@home.net" is submitted to the router on SaaS
-    Then the decision redirects to the branded Google method
-    And an account the broker holds as a database user keeps the generic method
+  Scenario: An organization still on legacy Auth0 SSO is routed to the broker by its domain
+    Given a SaaS deployment whose provider is the Auth0 broker and that issues its own passwords
+    And "acme.com" belongs to an organization still on legacy Auth0 SSO
+    When "sam@acme.com" is submitted to the router
+    Then the decision redirects to the broker for that organization's connection
 
-  # How the bridge ends: one provider at a time, on its credentials. Mounting
-  # a native client for a bridged provider IS that provider's cutover — the
-  # rail can never draw two buttons that both say "Continue with Google", and
-  # the accounts already brokered through that connection must follow the
-  # button the rail actually draws, or ranking drops them onto the generic
-  # picker the bridge exists to avoid.
   @unit
-  Scenario: A natively mounted provider takes over its own bridge button
-    Given a SaaS deployment whose provider is the Auth0 broker
-    And credentials are present for the native Google provider
-    When the sign-in page is requested
-    Then the native Google method stands in the bridge's Google slot
-    And the providers with no native credentials keep their branded bridge methods
-    And an account brokered through the Google connection routes to the native method
+  Scenario: A deployment whose door is its named provider keeps offering it
+    Given a deployment whose provider is the Auth0 broker
+    When the sign-in page is requested on a self-hosted install
+    Then the broker is offered ahead of the native social methods
+    And a SaaS deployment never offers the broker, whatever its password setting
+    And a SaaS deployment that issues no passwords of its own and has no native social provider offers no password
+    And no branded button for one of the broker's connections is offered anywhere
 
   # What of the ask survives on every deployment: the address was already
   # typed once, on our screen, and typing it again on the provider's is the
@@ -391,10 +419,18 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then that provider is not one of the offered methods
 
   @unit
-  Scenario: The license gate still freezes at startup
-    Given the license gate resolved at startup
-    When a license is activated mid-process
-    Then routing decisions do not change until the next restart
+  Scenario: The license gate re-reads a deny after a minute
+    Given the license gate denied federation
+    When another replica stores a license
+    Then routing decisions do not change for up to one minute
+    And then federation is offered without a restart
+
+  @unit
+  Scenario: A licence store that does not answer denies federation within the gate's timeout
+    Given a self-hosted installation whose licence store does not answer
+    When the sign-in page is routed
+    Then federation is denied once the gate's timeout passes, and the failed scan is logged
+    And the scan still in flight answers the next request once the store recovers
 
   # ── Callback linking ───────────────────────────────────────────────────
 
@@ -423,21 +459,23 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
 
   @unit
   Scenario: An ambiguous match becomes a proposal, not a guess
-    Given the callback's verified email matches a user with identifiers the organization cannot vouch for
+    Given the callback's verified email is held by more than one user
     When the SSO callback completes
     Then a LinkProposed event is recorded and the sign-in is refused with guidance
     And confirming the proposal later attaches the identifier and admits the user
 
+  @unit @unimplemented
+  Scenario: A match holding identifiers the organization cannot vouch for becomes a proposal
+    Given the callback's verified email matches a user with identifiers the organization cannot vouch for
+    When the SSO callback completes
+    Then a LinkProposed event is recorded and the sign-in is refused with guidance
+
   # WHERE THE RULE ABOVE ACTUALLY RUNS.
   #
-  # The four scenarios above describe the callback service that owns the whole
-  # decision: resolve the person, then link, propose or provision. On every
-  # deployment we run, the identity library owns that resolution instead, and
-  # the only moment it offers before a sign-in method exists is one where the
-  # link has already been chosen. So the same rule is applied there, from the
-  # one shared refusal function, and these two scenarios bind THAT — a
-  # scenario bound only to the service above would be bound to code no
-  # deployment reaches.
+  # The callback scenarios above run in the SSO user resolution the identity
+  # library asks before it links or creates anybody. A method added to an
+  # account that already signs in is judged later, when the library is about to
+  # attach it, and these two scenarios bind that moment.
   #
   # It judges an addition to an account that already signs in some way. A
   # person with no sign-in method yet is covered by
@@ -464,7 +502,7 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When the SSO callback completes on a connection that allows JIT
     Then a user is provisioned and signed in
     But on a connection that forbids JIT the sign-in is refused
-    And the refusal carries the reason code "jit_disabled"
+    And the refusal carries the reason code "identity_jit_disabled"
 
   @integration @unimplemented
   Scenario: The pending SSO setup flag is reconciled once and retired
@@ -472,3 +510,16 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When the reconciliation runs
     Then each user's state is re-derived from their identifier data
     And the column is dropped once nothing reads it
+
+  @unit
+  Scenario: The installed router sends an address nobody holds to sign-up
+    Given an email-mode deployment with the identity module installed through the process chain
+    When "nobody@home.net" is submitted through IdentityApi.routeSignIn
+    Then the decision routes to sign-up with the reason code "identifier_unknown"
+    And the decision offers no method at all
+
+  @unit
+  Scenario: The served page names the identifier-first screens as the sign-in front door
+    Given any deployment, whatever its environment says
+    When the auth module projects its browser config
+    Then the browser is told the identifier-first screens are the front door

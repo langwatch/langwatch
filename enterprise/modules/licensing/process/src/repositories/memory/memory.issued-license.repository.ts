@@ -1,0 +1,204 @@
+import { Temporal, type Instant } from "@langwatch/time";
+
+import type {
+  IssuedLicenseDraft,
+  IssuedLicensePatch,
+  IssuedLicenseQuery,
+  IssuedLicenseRecord,
+  IssuedLicenseRepository,
+} from "../issued-license.repository.ts";
+
+/**
+ * The registry in memory. The two conditional writes are the twin's whole
+ * point: they answer false exactly where the Prisma statement's WHERE clause
+ * would match no row, so a test can prove the race without a database.
+ */
+export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
+  static create(rows: readonly IssuedLicenseRecord[] = []): MemoryIssuedLicenseRepository {
+    return new MemoryIssuedLicenseRepository(new Map(rows.map((row) => [row.id, { ...row }])));
+  }
+
+  #sequence = 0;
+
+  private constructor(private readonly rows: Map<string, IssuedLicenseRecord>) {
+    this.#sequence = rows.size;
+  }
+
+  async create(data: IssuedLicenseDraft): Promise<IssuedLicenseRecord> {
+    this.refuseDuplicate(data);
+    this.#sequence += 1;
+    const timestamp = data.issuedAt;
+    const row: IssuedLicenseRecord = {
+      ...data,
+      id: `issued-license-${this.#sequence}`,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    this.rows.set(row.id, row);
+    return { ...row };
+  }
+
+  async findById(id: string): Promise<IssuedLicenseRecord | null> {
+    return this.copyOf(this.rows.get(id));
+  }
+
+  async findByTokenHash(tokenHash: string): Promise<IssuedLicenseRecord | null> {
+    return this.copyOf(this.all().find((row) => row.tokenHash === tokenHash));
+  }
+
+  async findByVirtualKeyId(virtualKeyId: string): Promise<IssuedLicenseRecord | null> {
+    return this.copyOf(this.all().find((row) => row.virtualKeyId === virtualKeyId));
+  }
+
+  async findByReplacesId(replacesId: string): Promise<IssuedLicenseRecord | null> {
+    return this.copyOf(this.all().find((row) => row.replacesId === replacesId));
+  }
+
+  async findAllByOrganization(organizationId: string): Promise<IssuedLicenseRecord[]> {
+    return this.all()
+      .filter((row) => row.organizationId === organizationId)
+      .map((row) => ({ ...row }));
+  }
+
+  async findAllSeatsRaised({
+    organizationId,
+  }: {
+    organizationId?: string;
+  }): Promise<IssuedLicenseRecord[]> {
+    return this.all()
+      .filter(
+        (row) =>
+          row.seatsRaisedFrom !== null &&
+          (organizationId === undefined || row.organizationId === organizationId),
+      )
+      .toSorted((a, b) => a.issuedAt.epochMilliseconds - b.issuedAt.epochMilliseconds)
+      .map((row) => ({ ...row }));
+  }
+
+  async findAllBoundToInstance(instanceId: string): Promise<IssuedLicenseRecord[]> {
+    return this.all()
+      .filter((row) => row.instanceId === instanceId && row.revokedAt === null)
+      .toSorted(
+        (a, b) =>
+          (b.instanceBoundAt?.epochMilliseconds ?? 0) - (a.instanceBoundAt?.epochMilliseconds ?? 0),
+      )
+      .map((row) => ({ ...row }));
+  }
+
+  async listAll({
+    page,
+    pageSize,
+    ...query
+  }: IssuedLicenseQuery & { page: number; pageSize: number }): Promise<{
+    rows: IssuedLicenseRecord[];
+    total: number;
+  }> {
+    const matched = this.matching(query).toSorted((left, right) =>
+      Temporal.Instant.compare(right.createdAt, left.createdAt),
+    );
+    return {
+      rows: matched.slice(page * pageSize, page * pageSize + pageSize).map((row) => ({ ...row })),
+      total: matched.length,
+    };
+  }
+
+  async countAll(query: IssuedLicenseQuery): Promise<number> {
+    return this.matching(query).length;
+  }
+
+  private matching({ search, status, emailSuffixes }: IssuedLicenseQuery): IssuedLicenseRecord[] {
+    const term = search?.trim().toLowerCase();
+    return this.all()
+      .filter((row) => (term ? matches(row, term) : true))
+      .filter((row) => !status || activeAtInstant(row, status.at) === status.active)
+      .filter(
+        (row) =>
+          !emailSuffixes ||
+          emailSuffixes.suffixes.some((suffix) =>
+            row.email.toLowerCase().endsWith(suffix.toLowerCase()),
+          ) === emailSuffixes.matching,
+      );
+  }
+
+  async update(id: string, data: IssuedLicensePatch): Promise<IssuedLicenseRecord> {
+    const row = this.rows.get(id);
+    if (!row) throw new Error(`no issued license ${id}`);
+    const updated: IssuedLicenseRecord = { ...row, ...data };
+    this.rows.set(id, updated);
+    return { ...updated };
+  }
+
+  async delete(id: string): Promise<void> {
+    this.rows.delete(id);
+  }
+
+  async bindInstance({
+    id,
+    instanceId,
+    at,
+  }: {
+    id: string;
+    instanceId: string;
+    at: Instant;
+  }): Promise<boolean> {
+    const row = this.rows.get(id);
+    if (!row || row.instanceId !== null) return false;
+    this.rows.set(id, { ...row, instanceId, instanceBoundAt: at });
+    return true;
+  }
+
+  async attachVirtualKey({
+    id,
+    virtualKeyId,
+    requires,
+  }: {
+    id: string;
+    virtualKeyId: string;
+    requires: { organizationId: string; instanceId: string; activeAt: Instant };
+  }): Promise<boolean> {
+    const row = this.rows.get(id);
+    const admitted =
+      row !== undefined &&
+      row.virtualKeyId === null &&
+      row.organizationId === requires.organizationId &&
+      row.instanceId === requires.instanceId &&
+      row.revokedAt === null &&
+      row.supersededAt === null &&
+      Temporal.Instant.compare(row.expiresAt, requires.activeAt) > 0;
+    if (!admitted) return false;
+    this.rows.set(id, { ...row, virtualKeyId });
+    return true;
+  }
+
+  private all(): IssuedLicenseRecord[] {
+    return [...this.rows.values()];
+  }
+
+  private copyOf(row: IssuedLicenseRecord | undefined): IssuedLicenseRecord | null {
+    return row ? { ...row } : null;
+  }
+
+  /** The unique indexes the table carries, reported the way Prisma reports them. */
+  private refuseDuplicate(data: IssuedLicenseDraft): void {
+    for (const column of ["tokenHash", "licenseId", "replacesId"] as const) {
+      const value = data[column];
+      if (value === null) continue;
+      if (this.all().some((row) => row[column] === value)) {
+        throw Object.assign(new Error(`unique constraint on ${column}`), {
+          code: "P2002",
+          meta: { target: [column] },
+        });
+      }
+    }
+  }
+}
+
+function activeAtInstant(row: IssuedLicenseRecord, at: Instant): boolean {
+  return !row.revokedAt && !row.supersededAt && Temporal.Instant.compare(row.expiresAt, at) > 0;
+}
+
+function matches(row: IssuedLicenseRecord, term: string): boolean {
+  return [row.organizationName, row.email, row.licenseId].some((value) =>
+    value.toLowerCase().includes(term),
+  );
+}

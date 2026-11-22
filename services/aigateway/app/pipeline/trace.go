@@ -266,7 +266,9 @@ func (w *traceStreamWrapper) Err() error          { return w.inner.Err() }
 // Chunk(). isBodyDropped flips once we've truncated so onClose can stamp
 // a langwatch.reserved.trace_body_truncated marker downstream.
 func (w *traceStreamWrapper) captureChunk(chunk []byte) {
-	if len(chunk) == 0 {
+	// Synthesized speech is never captured: the chunks are audio, raw or
+	// base64 inside an event, and the span carries the request text only.
+	if len(chunk) == 0 || w.req.Type == domain.RequestTypeSpeech {
 		return
 	}
 	w.bodyMu.Lock()
@@ -286,6 +288,10 @@ func (w *traceStreamWrapper) captureChunk(chunk []byte) {
 	}
 	w.body = append(w.body, chunk...)
 }
+
+// Unwrap exposes the wrapped iterator so its optional extensions stay
+// reachable (domain.StreamHeadersOf).
+func (w *traceStreamWrapper) Unwrap() domain.StreamIterator { return w.inner }
 
 // RawFraming delegates to the inner iterator so writers can still
 // detect raw-framed (Gemini passthrough) streams through wrapper chains.

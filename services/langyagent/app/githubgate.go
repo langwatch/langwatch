@@ -14,7 +14,7 @@
 // turn that carries none, trips the gate; the gate cancels the stream and
 // driveTurn emits the vetted error frame. The command grammar mirrors the TS
 // recogniser in
-// platform/app/src/server/app-layer/langy/execution/githubCommand.ts — keep the
+// modules/langy/contract/src/github-command.ts — keep the
 // two in sync.
 package app
 
@@ -39,8 +39,8 @@ const (
 //
 //   - No GitHub credential on the turn + a settled GitHub-reaching command ⇒
 //     trip `langy_github_not_connected` (the install card, not an error).
-//   - Credential present + the command FAILED looking like the repo isn't in
-//     the installation (404 / not found) ⇒ trip
+//   - Credential present + the command FAILED with git or gh saying the
+//     repository is not found or not writable for the token ⇒ trip
 //     `langy_github_repo_not_accessible` (point at the installation settings).
 //
 // On trip it cancels the stream (via the injected cancel), so driveTurn can
@@ -73,6 +73,10 @@ type gateToolFrame struct {
 	} `json:"input"`
 	Output  string `json:"output"`
 	IsError *bool  `json:"isError"`
+	// Local: the call ran in the developer's shared folder, whatever the
+	// tool is named. The worker sets it on every call that went through the
+	// local control path, the shell named `bash` included.
+	Local bool `json:"local"`
 }
 
 // localToolPrefix names the tools that do not run in the worker at all: they
@@ -81,8 +85,17 @@ type gateToolFrame struct {
 // in that path, so a `git push` or a `gh pr create` there needs nothing from
 // the platform and must never trip this gate. Without the carve-out the whole
 // local-control path dies on `git fetch origin` with an install card the
-// developer has no reason to act on.
+// developer has no reason to act on. The shell the model reaches for by its
+// standard name delegates to the folder too while one is connected, under the
+// name `bash`, so the frame's `local` marker is read beside the prefix: where
+// the command ran decides, not what the tool is called.
 const localToolPrefix = "local_"
+
+// ranInFolder reports whether the settled call ran in the developer's shared
+// folder: a local_* tool, or any tool whose end frame carries the marker.
+func ranInFolder(tf gateToolFrame) bool {
+	return strings.HasPrefix(tf.Name, localToolPrefix) || tf.Local
+}
 
 // Observe inspects one emitted frame. Inspect-only from the sink's point of
 // view, it never blocks or fails the emit; a trip is surfaced by canceling
@@ -102,7 +115,7 @@ func (g *githubGate) Observe(f frames.Frame) {
 	if tf.Type != "tool" || tf.Phase != "end" || tf.Input.Command == "" {
 		return
 	}
-	if strings.HasPrefix(tf.Name, localToolPrefix) {
+	if ranInFolder(tf) {
 		return
 	}
 	if !commandNeedsGithubAuth(tf.Input.Command) {
@@ -143,15 +156,31 @@ func (g *githubGate) Tripped() (message, code string, ok bool) {
 	return g.message, g.code, g.tripped
 }
 
+// repoNotAccessiblePatterns are what git and gh print when the installation
+// token cannot see or write a repository, and nothing else: a bare "not found"
+// or "404" also comes from a missing label, file, branch or command, which the
+// agent reads and works around itself.
+var repoNotAccessiblePatterns = []*regexp.Regexp{
+	// git over https: `remote: Repository not found.` / `fatal: repository '<url>' not found`.
+	regexp.MustCompile(`remote: repository not found`),
+	regexp.MustCompile(`fatal: repository '[^']*' not found`),
+	// gh GraphQL, on a repository the token cannot see.
+	regexp.MustCompile(`could not resolve to a repository with the name`),
+	// git push with a token that may read the repository but not write it.
+	regexp.MustCompile(`remote: permission to \S+ denied`),
+}
+
 // outputLooksRepoNotAccessible classifies a FAILED GitHub-reaching command's
-// output as "the app cannot see that repository". Only consulted when a
-// credential was present and the call errored, so the match can be broad: a 404
-// from gh/git on a repo the installation doesn't cover is the dominant cause.
+// output as "the app cannot reach that repository". Only consulted when a
+// credential was present and the call errored.
 func outputLooksRepoNotAccessible(output string) bool {
 	o := strings.ToLower(output)
-	return strings.Contains(o, "404") ||
-		strings.Contains(o, "not found") ||
-		strings.Contains(o, "could not resolve to a repository")
+	for _, pattern := range repoNotAccessiblePatterns {
+		if pattern.MatchString(o) {
+			return true
+		}
+	}
+	return false
 }
 
 // --- the command grammar (port of githubCommand.ts, keep in sync) -----------

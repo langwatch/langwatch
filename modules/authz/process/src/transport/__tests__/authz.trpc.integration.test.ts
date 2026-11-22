@@ -1,0 +1,190 @@
+import type { TrpcContractHandlerArguments, TrpcProcedureFactory } from "@langwatch/api/trpc";
+/**
+ * @vitest-environment node
+ * The application's `authz.*` procedures, bound to a declaration a process
+ * mounts on its own tRPC runtime.
+ * Spec: modules/authz/specs/package-boundary.feature
+ */
+import {
+  type AuthzApi,
+  AuthzScopeNotFoundError,
+  type AuthzScopeRef,
+} from "@langwatch/authz-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { createAuthzTestApp } from "../../app/__tests__/authz.fixture.ts";
+import type { AuthzService } from "../../services/authz.service.ts";
+import { authzTrpc, authzTrpcTransport } from "../authz.trpc.ts";
+
+const USER_ID = "user_1";
+const PROJECT_ID = "project_1";
+const ORGANIZATION_ID = "organization_1";
+const PROJECT_SCOPE: AuthzScopeRef = { type: "project", id: PROJECT_ID } as AuthzScopeRef;
+
+type Procedure = (input: unknown) => Promise<unknown>;
+
+/** The one procedure the declaration names, over a stated application. */
+function harness(
+  overrides: {
+    getScope?: AuthzService["getScope"];
+    effectivePermissions?: AuthzService["effectivePermissionsWithOrganization"];
+  } = {},
+) {
+  const getScope = vi.fn(overrides.getScope ?? (async () => PROJECT_SCOPE));
+  const effectivePermissions = vi.fn(
+    overrides.effectivePermissions ??
+      (async () => ({
+        permissions: ["project:view" as const],
+        organizationPermissions: ["organization:view" as const],
+      })),
+  );
+  // Nobody here holds the platform grant, so the answer carries no ops permissions.
+  const can = vi.fn(async () => false);
+  const app = createAuthzTestApp({
+    permissions: { getScope, effectivePermissionsWithOrganization: effectivePermissions, can },
+  });
+
+  const procedures: Record<string, Procedure> = {};
+  const accesses: string[] = [];
+  const runtime: TrpcProcedureFactory<object> = {
+    procedure: ({ procedure, member, access, handle }) => {
+      const invoke = handle as (args: TrpcContractHandlerArguments<unknown, AuthzApi>) => unknown;
+
+      accesses.push(access.kind);
+      procedures[procedure.split(".")[1]!] = async (input: unknown) =>
+        invoke({
+          app,
+          input: member.input.parse(input),
+          actor: { type: "user", id: USER_ID },
+          scope: null,
+          authorization: null,
+          signal: undefined,
+        });
+
+      return {};
+    },
+    router: (record) => record,
+  };
+
+  authzTrpcTransport.router(runtime, () => app);
+
+  return { app, getScope, effectivePermissions, procedures, accesses };
+}
+
+describe("the application's AuthZ tRPC adapter", () => {
+  describe("when a procedure resolves effective permissions", () => {
+    /** @scenario "Application tRPC remains a separate adapter" */
+    it("delegates once to the composed contract service", async () => {
+      const { procedures, getScope, effectivePermissions } = harness();
+
+      const answer = await procedures.effectivePermissions!({ projectId: PROJECT_ID });
+
+      expect(getScope).toHaveBeenCalledTimes(1);
+      expect(effectivePermissions).toHaveBeenCalledTimes(1);
+      expect(effectivePermissions).toHaveBeenCalledWith({
+        principal: { type: "user", id: USER_ID },
+        scope: PROJECT_SCOPE,
+      });
+      expect(answer).toEqual({
+        scope: { type: "project", id: PROJECT_ID },
+        permissions: ["project:view"],
+        organizationPermissions: ["organization:view"],
+      });
+    });
+
+    /**
+     * The narrower id decides the scope, and it is the application that
+     * decides it: the adapter forwards the input it parsed and nothing else.
+     */
+    /** @scenario "Application tRPC remains a separate adapter" */
+    it("forwards the caller's input without deciding the scope itself", async () => {
+      const { procedures, getScope } = harness();
+
+      await procedures.effectivePermissions!({
+        projectId: PROJECT_ID,
+        organizationId: ORGANIZATION_ID,
+      });
+
+      expect(getScope).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        organizationId: undefined,
+      });
+    });
+
+    /** @scenario "Application tRPC remains a separate adapter" */
+    it("answers the empty set for a scope that does not resolve", async () => {
+      const { procedures, effectivePermissions } = harness({
+        getScope: async ({ projectId }) => {
+          throw new AuthzScopeNotFoundError({ projectId });
+        },
+      });
+
+      const answer = await procedures.effectivePermissions!({ projectId: "project_missing" });
+
+      expect(answer).toEqual({ scope: null, permissions: [], organizationPermissions: [] });
+      expect(effectivePermissions).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an administrator grants the Billing role", () => {
+    /** @scenario "Granting or revoking Billing never reaches beyond the caller" */
+    it("passes the session as the caller the escalation ceiling bounds", async () => {
+      const { app, procedures } = harness();
+      const setBillingRole = vi.spyOn(app, "setBillingRole").mockResolvedValue(undefined);
+
+      await procedures.setMemberBillingRole!({
+        organizationId: ORGANIZATION_ID,
+        userId: "user_2",
+        holds: true,
+      });
+
+      expect(setBillingRole).toHaveBeenCalledWith(
+        expect.objectContaining({ caller: { type: "user", id: USER_ID } }),
+      );
+    });
+  });
+
+  describe("given the mounted router", () => {
+    /** @scenario "Application tRPC remains a separate adapter" */
+    it("exposes only the procedures the surface declares", () => {
+      const { procedures } = harness();
+      const declared = [
+        "effectivePermissions",
+        "listGrants",
+        "createGrant",
+        "changeGrantRole",
+        "revokeGrant",
+        "listManagedGrants",
+        "listMemberGrants",
+        "applyMemberGrants",
+        "listBraids",
+        "createBraid",
+        "changeBraid",
+        "removeBraid",
+        "getBraidsPolicy",
+        "setBraidsPolicy",
+        "setBraidsEnabled",
+        "listOrganizationBraids",
+        "countProjectTraceViewers",
+        "listBraidTargets",
+        "listBillingMembers",
+        "setMemberBillingRole",
+      ];
+
+      expect(Object.keys(authzTrpc.members)).toEqual(declared);
+      expect(Object.keys(procedures)).toEqual(declared);
+    });
+
+    /**
+     * Membership is the whole requirement, so the declaration proves standing
+     * itself rather than naming a permission the caller must already hold.
+     */
+    /** @scenario "Application tRPC remains a separate adapter" */
+    it("declares the read service-authorized", () => {
+      const { accesses } = harness();
+
+      // The grant, braid and billing procedures beside it each declare a permission.
+      expect(accesses).toEqual(["service-authorized", ...Array(19).fill("permission")]);
+    });
+  });
+});

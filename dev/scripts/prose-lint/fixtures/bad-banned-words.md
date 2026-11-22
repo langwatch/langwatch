@@ -1,0 +1,1 @@
+Honestly, the whole result hinges on one number that most companies never measure: how many of the agent's tool calls read a file it had already read. That count is the interesting one, and it is load-bearing for everything below… so here is the plot → the curve bends at 40 calls. It's not magic, it's just caching! And it works!

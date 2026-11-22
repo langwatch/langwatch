@@ -116,7 +116,7 @@ Feature: Prompt facets in traces v2
   @planned
   Scenario: Autocomplete suggests known prompt handles
     # Not yet implemented as of 2026-05-01 — `FIELD_VALUES` in
-    # query-language/metadata only includes `origin` and `status`. There
+    # Trace query metadata only includes `origin` and `status`. There
     # is no curated list of prompt handles surfaced through the search
     # suggestion dropdown for `selectedPrompt:` / `lastUsedPrompt:`.
     Given the project has prompts "support-bot", "billing-bot", "onboarding-bot"

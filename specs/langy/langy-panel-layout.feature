@@ -57,6 +57,13 @@ Feature: Langy panel layout modes
     Then the panel docks flush to the viewport edge at full height
     And the page reserves the panel's width so content is not covered
 
+  @integration
+  Scenario: A full-height page still fills the content card around the dock wrapper
+    Given a page that uses the app shell and draws itself at full height, like the prompt playground
+    When the page renders, with the Langy panel open or closed
+    Then the page fills the content card down to the bottom of the viewport
+    And it does not collapse to the height of its own content
+
   Scenario: Closing the dock returns the page to full width
     Given the Langy panel is open in sidebar mode
     When I close the panel
@@ -114,12 +121,20 @@ Feature: Langy panel layout modes
     When the panel closes
     Then the drawer returns to the viewport's right edge
 
+  # Regression: a phone-only full-screen margin, conditioned on a media query,
+  # silently beat the yield on wide screens and left the drawer under Langy.
+  @regression @integration
+  Scenario: An open drawer sits beside the open Langy panel instead of under it
+    Given the Langy panel is open in sidebar mode on a wide screen
+    When a right-anchored drawer opens, such as the trace drawer
+    Then the drawer's right edge sits left of the panel, with a strip of space between the two cards
+    And on a phone the drawer still fills the screen as a sheet
+
   @integration
-  Scenario: The docked companion offers a single close affordance
+  Scenario: The docked companion keeps its own Minimise
     Given the Langy panel is riding beside an open drawer as the docked companion
-    Then the panel's header hides its own Close control
-    And the drawer's own close is the only X on screen
-    So closing the drawer, not Langy, is the obvious action
+    Then the panel's header still shows its Minimise control
+    And the drawer keeps its own close
 
   # The closed state is a PEEK of the panel itself, not a separate launcher —
   # see specs/langy/langy-peek-dock.feature for its states and geometry.

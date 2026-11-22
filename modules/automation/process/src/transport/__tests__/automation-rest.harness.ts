@@ -1,0 +1,136 @@
+import { ProjectMissingCredentialsError } from "@langwatch/api";
+/**
+ * The automation REST families over a process's own door, as a test supplies
+ * one: a project API key that resolves to `project_1`, and the middleware context a
+ * project-scoped family reads beyond its input.
+ */
+import {
+  bindMiddlewareContext,
+  canonicalErrorResponse,
+  createRestRuntime,
+  projectRequestContext,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
+import type { AutomationApi } from "@langwatch/automation-contract";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
+
+import { createAutomationRest } from "../automation.rest.ts";
+import { slackAutomationRest } from "../slack-trigger.rest.ts";
+import { unsubscribeCallerAddress, unsubscribeRest } from "../unsubscribe.rest.ts";
+
+/** The project every credentialed request in these suites is authenticated for. */
+export const TEST_PROJECT = { id: "project_1", slug: "acme" } as const;
+
+/** The default `platformUrl` a case's `Partial<AutomationApi>` did not override. */
+const defaultPlatformUrl = ({ projectSlug, path }: { projectSlug: string; path: string }) =>
+  `https://app.test/${projectSlug}${path}`;
+
+function runtime() {
+  return createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
+    identity: {
+      authenticate: () => ({
+        actor: { type: "user", id: "user_owner" },
+        scope: { tier: "project", id: TEST_PROJECT.id },
+      }),
+    },
+  });
+}
+
+const projectContext = () => [
+  bindMiddlewareContext(projectRequestContext, () => ({
+    projectSlug: TEST_PROJECT.slug,
+    viewerUserId: "user_owner",
+    actorId: "user_owner",
+  })),
+];
+
+/** A caller over one mounted family. */
+function requests(hono: MountableRestApp) {
+  const send = (method: string, path: string, body?: unknown) =>
+    hono.fetch(
+      new Request(`http://api.test${path}`, {
+        method,
+        headers: { "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      }),
+    );
+
+  return {
+    get: (path: string) => send("GET", path),
+    post: (path: string, body?: unknown) => send("POST", path, body ?? {}),
+    patch: (path: string, body?: unknown) => send("PATCH", path, body ?? {}),
+    delete: (path: string) => send("DELETE", path),
+    send,
+    postRaw: (path: string, body: string) =>
+      hono.fetch(
+        new Request(`http://api.test${path}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body,
+        }),
+      ),
+  };
+}
+
+/** `/api/triggers`, refusing through the canonical boundary, over the slice a case names. */
+export function mountAutomationRest(app: Partial<AutomationApi>) {
+  const withDefaults: AutomationApi = { platformUrl: defaultPlatformUrl, ...app } as AutomationApi;
+
+  return requests(
+    runtime().mount(createAutomationRest().router(), {
+      app: () => withDefaults,
+      credential: "project",
+      onError: canonicalErrorResponse,
+      middlewareContext: projectContext(),
+    }),
+  );
+}
+
+/** `/api/trigger/slack`, refusing through the process's own canonical boundary. */
+export function mountSlackAutomationRest(app: Partial<AutomationApi>) {
+  return requests(
+    runtime().mount(slackAutomationRest.router(), {
+      app: () => app as AutomationApi,
+      credential: "project",
+      onError: canonicalErrorResponse,
+    }),
+  );
+}
+
+/** `/api/trigger/slack` for a caller the credential chain refuses: no handler is ever reached. */
+export function mountSlackAutomationRestForUnauthenticatedCaller(app: Partial<AutomationApi>) {
+  const refusing = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
+    identity: {
+      authenticate: () => {
+        throw new ProjectMissingCredentialsError();
+      },
+    },
+  });
+
+  return requests(
+    refusing.mount(slackAutomationRest.router(), {
+      app: () => app as AutomationApi,
+      credential: "project",
+      onError: canonicalErrorResponse,
+    }),
+  );
+}
+
+/** `/api/unsubscribe`, whose caller presents no credential at all. */
+export function mountUnsubscribeRest(
+  app: Partial<AutomationApi>,
+  callerAddress: string | null = "10.0.0.1",
+) {
+  return requests(
+    runtime().mount(unsubscribeRest.router(), {
+      app: () => app as AutomationApi,
+      credential: "public",
+      onError: canonicalErrorResponse,
+      middlewareContext: [bindMiddlewareContext(unsubscribeCallerAddress, () => callerAddress)],
+    }),
+  );
+}

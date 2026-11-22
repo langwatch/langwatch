@@ -1,18 +1,14 @@
 /**
  * `langwatch langy --share-control`: share this folder with the Langy
- * conversation that asked for it.
- *
- * The command is a live session, not a query. It signs in, finds the control
- * request the conversation recorded, asks in the terminal, and then executes
- * the calls Langy makes with its local tools until Ctrl-C or a disconnect
- * from the panel.
- *
- * @see specs/typescript-sdk/cli-langy-share-control.feature
- * @see dev/docs/adr/129-langy-local-control.md
+ * conversation that asked for it. A live session: signs in, finds the
+ * request, asks in the terminal, then executes Langy's local calls.
  */
 
 import chalk from "chalk";
-import { loginCommand } from "../login";
+
+import { runDeviceFlowLogin } from "../../utils/governance/login-flow";
+import { matchAskerAccount, nothingYetMessage, signedInPerson } from "./account";
+import { platformProjectKeyReader } from "./project-key";
 import {
   chooseRequest,
   createControlApi,
@@ -21,6 +17,7 @@ import {
   isGitRepository,
   resolveShareRoot,
   ShareControlError,
+  platformTakesTheKey,
   waitForRequests,
 } from "./requests";
 import { startLangySession } from "./session";
@@ -29,6 +26,8 @@ import { noticeRows } from "./ui";
 export interface LangyCommandOptions {
   /** The one thing the command does today. A bare `langwatch langy` does it too. */
   shareControl?: boolean;
+  /** The email of whoever asked Langy, from the card's command; checked against the login. */
+  as?: string;
   /** Declared only so the refusal can say why, see `refuseStructuredOutput`. */
   output?: string;
   /** The global `--json` flag, passed on by the registration. */
@@ -45,16 +44,12 @@ export const INTERACTIVE_ONLY_MESSAGE =
   "`langy` is an interactive session, not a query, so it has no structured output. Run it without -o/--output, --json or --jq.";
 
 /** The refusal for a structured-output request, or null when none was made. */
-export function refuseStructuredOutput(
-  options: LangyCommandOptions,
-): string | null {
+export function refuseStructuredOutput(options: LangyCommandOptions): string | null {
   const asked = options.output !== undefined || options.json === true || options.jq === true;
   return asked ? INTERACTIVE_ONLY_MESSAGE : null;
 }
 
-export async function langyCommand(
-  options: LangyCommandOptions = {},
-): Promise<void> {
+export async function langyCommand(options: LangyCommandOptions = {}): Promise<void> {
   const refusal = refuseStructuredOutput(options);
   if (refusal) {
     console.error(chalk.red(refusal));
@@ -66,43 +61,46 @@ export async function langyCommand(
   try {
     root = resolveShareRoot();
   } catch (error) {
-    console.error(
-      chalk.red(error instanceof Error ? error.message : String(error)),
-    );
+    console.error(chalk.red(error instanceof Error ? error.message : String(error)));
     process.exitCode = 1;
     return;
   }
 
   try {
-    await shareControl(root);
+    await shareControl({ root, askedBy: options.as });
   } catch (error) {
-    console.error(
-      chalk.red(error instanceof Error ? error.message : String(error)),
-    );
+    console.error(chalk.red(error instanceof Error ? error.message : String(error)));
     process.exitCode = 1;
   }
 }
 
-async function shareControl(root: string): Promise<void> {
-  const credentials = await ensureSignedIn({
-    login: async ({ device }) => {
-      await loginCommand({ device });
-    },
-  });
+async function shareControl({ root, askedBy }: { root: string; askedBy?: string }): Promise<void> {
+  // The flow itself rather than `langwatch login`: a failed sign-in comes
+  // back as an error this command words, not as an exit.
+  const login = async () => {
+    await runDeviceFlowLogin({ isQuiet: true });
+  };
+  const signIn = () => ensureSignedIn({ login, isAccepted: platformTakesTheKey });
+  let credentials = await signIn();
+  if ((await matchAskerAccount({ askedBy, signIn: login })) === "switched") {
+    credentials = await signIn();
+  }
   const api = createControlApi(credentials);
 
   const requests = await waitForRequests({
     api,
     onWaiting: () => {
       console.log("");
+      console.log(`Waiting for a Langy conversation to ask for this folder (${root}).`);
       console.log(
-        `Waiting for a Langy conversation to ask for this folder (${root}).`,
+        chalk.gray("Ask Langy for a code change in the LangWatch panel; its request appears here."),
       );
-      console.log(
-        chalk.gray(
-          "Ask Langy for a code change in the LangWatch panel; its request appears here.",
-        ),
-      );
+    },
+    onNothingYet: () => {
+      const [line, hint] = nothingYetMessage({ person: signedInPerson() });
+      console.log("");
+      console.log(chalk.yellow(line));
+      console.log(chalk.gray(hint));
     },
   });
 
@@ -110,9 +108,7 @@ async function shareControl(root: string): Promise<void> {
   if (choice.action === "quit") return;
   if (choice.action === "cancel") {
     await api.cancel({ requestId: choice.request.id });
-    for (const line of noticeRows(
-      "Cancelled this request. The conversation has been told.",
-    )) {
+    for (const line of noticeRows("Cancelled this request. The conversation has been told.")) {
       console.log(line);
     }
     return;
@@ -139,6 +135,16 @@ async function shareControl(root: string): Promise<void> {
       url: choice.request.conversationUrl,
     },
     withoutGit: !isGitRepository(root),
+    project: {
+      id: choice.request.projectId,
+      name: choice.request.projectName,
+    },
+    // The developer's own device session, never the session key: the
+    // platform gates the key on this person's permission on the project.
+    readProjectApiKey: platformProjectKeyReader({
+      endpoint: credentials.endpoint,
+      apiKey: credentials.apiKey,
+    }),
   });
 
   const onSignal = () => session.requestShutdown();

@@ -1,0 +1,222 @@
+import type { OrganizationUserRole } from "@langwatch/authorization";
+import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
+import {
+  getRoleChangeType,
+  isFullMember,
+  type EntitlementApi,
+  type Plan,
+  type PlanProviderUser,
+  type RoleChangeType,
+} from "@langwatch/entitlement-contract";
+import { seatsFree, type LimitCheckResult, type LimitType } from "@langwatch/organization-contract";
+
+import type {
+  OrganizationSeatRepository,
+  SeatLease,
+} from "../repositories/organization-seat.repository.ts";
+import {
+  assertAdditionsNotHeldForPayment,
+  isAdditionsHeldForPayment,
+} from "../rules/payment-hold.rules.ts";
+import type { SeatLimitNoticeService } from "./seat-limit-notice.service.ts";
+
+/**
+ * The person a plan lookup is attributed to. Structural on purpose, since the licence store's
+ * own user shape lives in an Enterprise package.
+ */
+export type OrganizationPlanUser = Readonly<{
+  id: string;
+  name?: string | null;
+  email?: string | null;
+}>;
+
+/** What a seat check answers, counts included: the `licenseEnforcement.*` answer. */
+type OrganizationSeatDecision = LimitCheckResult;
+
+/**
+ * The seat and plan gates on a membership write. Deliberately two methods rather than the
+ * platform's four: role classification, plan reads, seat counts, and the Enterprise custom-role
+ * requirement are all one decision — "may this organization make this change on its plan."
+ */
+export interface OrganizationSeatLicense {
+  /**
+   * The one way a seat-taking write runs: its seat check and its write go inside `work`, and
+   * no other seat-taking write on the organization runs meanwhile. Taken once per write path,
+   * never from inside another `withSeat` on the same organization.
+   */
+  withSeat<T>(input: {
+    organizationId: string;
+    work: (lease: SeatLease) => Promise<T>;
+  }): Promise<T>;
+
+  /** Whether one more of `resource` fits inside the organization's plan. Answers rather than
+   * throws, since only the caller knows how to turn a refusal into a named error; an unpaid
+   * invoice's hold throws `member_additions_held_for_payment`. */
+  checkLimit(input: {
+    organizationId: string;
+    resource: LimitType;
+    user?: OrganizationPlanUser | undefined;
+  }): Promise<OrganizationSeatDecision>;
+
+  /** Whether the member holds a full seat now; asked before a removal or a disable. */
+  holdsFullSeat(input: { organizationId: string; userId: string }): Promise<boolean>;
+
+  /**
+   * Refuses a role change the organization's seats do not carry. Throws, never a soft answer.
+   * The custom-role plan is declared on the door.
+   */
+  assertRoleChangeAllowed(input: {
+    organizationId: string;
+    currentRole: string;
+    userPermissions: string[] | undefined;
+    role: string;
+    user?: OrganizationPlanUser | undefined;
+  }): Promise<void>;
+}
+
+/** Seat licence over the same plan and membership counts; all fields answered. */
+export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
+  static create(options: {
+    plans: Pick<EntitlementApi, "getActivePlan">;
+    memberships: OrganizationSeatRepository;
+    notices: Pick<SeatLimitNoticeService, "reached">;
+  }): OrganizationSeatLicenseService {
+    return new OrganizationSeatLicenseService(options);
+  }
+
+  private constructor(
+    private readonly options: {
+      plans: Pick<EntitlementApi, "getActivePlan">;
+      memberships: OrganizationSeatRepository;
+      /** A refused role change is recorded before it is thrown, as main's guard did. */
+      notices: Pick<SeatLimitNoticeService, "reached">;
+    },
+  ) {}
+
+  withSeat<T>(input: {
+    organizationId: string;
+    work: (lease: SeatLease) => Promise<T>;
+  }): Promise<T> {
+    return this.options.memberships.withSeatLock(input);
+  }
+
+  async checkLimit(input: {
+    organizationId: string;
+    resource: LimitType;
+    user?: OrganizationPlanUser | undefined;
+  }): Promise<LimitCheckResult> {
+    const plan = await this.activePlan(input.organizationId, input.user);
+    const max = this.allowance(plan, input.resource);
+    if (plan.overrideAddingLimitations) {
+      return { allowed: true, limitType: input.resource, current: 0, max };
+    }
+
+    const { current, free } = await this.seatsFor({ plan, ...input });
+    // A read answers the hold instead of throwing it; seat-taking writes refuse via assertSeatFree.
+    if (isAdditionsHeldForPayment(plan)) {
+      return { allowed: false, limitType: input.resource, current, max, heldForPayment: true };
+    }
+    return { allowed: free, limitType: input.resource, current, max };
+  }
+
+  async holdsFullSeat({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const holders = await this.options.memberships.findFullSeatHolderIds(organizationId);
+    return holders.includes(userId);
+  }
+
+  async assertRoleChangeAllowed(input: {
+    organizationId: string;
+    currentRole: string;
+    userPermissions: string[] | undefined;
+    role: string;
+    user?: OrganizationPlanUser | undefined;
+  }): Promise<void> {
+    const plan = await this.activePlan(input.organizationId, input.user);
+    // The NEW role's permissions are deliberately not read: a built-in role
+    // carries none, and a custom one is gated on the plan by the door, not on
+    // a seat. That is the platform's own call, kept.
+    const oldRole = input.currentRole as OrganizationUserRole;
+    const change = getRoleChangeType({
+      oldRole,
+      oldPermissions: input.userPermissions,
+      newRole: input.role as OrganizationUserRole,
+      newPermissions: undefined,
+    });
+    await this.assertSeatForChange({
+      change,
+      wasFull: isFullMember(oldRole, input.userPermissions),
+      organizationId: input.organizationId,
+      plan,
+    });
+  }
+
+  private async assertSeatForChange(input: {
+    change: RoleChangeType;
+    /** Whether the member held a full seat before; a Developer moving to Lite did not. */
+    wasFull: boolean;
+    organizationId: string;
+    plan: Plan;
+  }): Promise<void> {
+    // A move onto a Developer seat enters a pool no plan meters (ADR-171), and a demotion from a
+    // full seat is never refused for a full Lite pool: it frees a seat (seat-rotation.feature).
+    const freesOrSkipsCappedSeat =
+      input.change === "no-change" ||
+      input.change === "to-developer" ||
+      (input.change === "full-to-lite" && input.wasFull);
+    if (freesOrSkipsCappedSeat || input.plan.overrideAddingLimitations) return;
+    assertAdditionsNotHeldForPayment(input.plan);
+
+    const resource = input.change === "lite-to-full" ? "members" : "membersLite";
+    const max = this.allowance(input.plan, resource);
+    const { current, free } = await this.seatsFor({ ...input, resource });
+    if (!free) {
+      this.options.notices.reached({
+        organizationId: input.organizationId,
+        limitType: resource,
+        current,
+        max,
+      });
+      throw new LimitExceededError(resource, current, max);
+    }
+  }
+
+  private activePlan(
+    organizationId: string,
+    user: OrganizationPlanUser | undefined,
+  ): Promise<Plan> {
+    // The plan application's own caller shape is the Enterprise licensing one
+    // and the membership half may not name it, so the structural person the two
+    // writes already carry is forwarded as it stands.
+    return this.options.plans.getActivePlan({
+      organizationId,
+      ...(user ? { user: user as PlanProviderUser } : {}),
+    });
+  }
+
+  private allowance(plan: Plan, resource: LimitType): number {
+    return resource === "members" ? plan.maxMembers : plan.maxMembersLite;
+  }
+
+  /** The pool's seats taken, and whether one more fits, by the rule scim admits by too. */
+  private async seatsFor({
+    plan,
+    organizationId,
+    resource,
+  }: {
+    plan: Plan;
+    organizationId: string;
+    resource: LimitType;
+  }): Promise<{ current: number; free: boolean }> {
+    const seats = await this.options.memberships.countMemberSeats(organizationId);
+    const { fullSeatFree, liteSeatFree } = seatsFree({ plan, seats });
+    return resource === "members"
+      ? { current: seats.fullMembers, free: fullSeatFree }
+      : { current: seats.liteMembers, free: liteSeatFree };
+  }
+}

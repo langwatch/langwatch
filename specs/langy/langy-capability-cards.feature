@@ -18,7 +18,7 @@ Feature: Langy renders domain-capability cards for tool calls
     When Langy runs the trace-search capability and it returns matching traces
     Then Langy shows a traces card listing the matched traces
     And each trace row links to that trace
-    And the card offers an "Open in Traces" link
+    And the card offers a "View in Trace Explorer" link
     And the card shows no Apply or Discard action
 
   @integration
@@ -32,7 +32,40 @@ Feature: Langy renders domain-capability cards for tool calls
     When Langy runs the analytics capability and it returns numbers
     Then Langy shows a metrics card with the reported figures
     And each figure rolls up from zero as a rolling number
-    And the card offers an "Open in Analytics" link
+    And the card offers no deep link, since a link that did not carry the query would mislead
+
+  @integration
+  Scenario: A trace count split by model reads as a count of traces
+    Given the project has 7 traces, all on one model
+    When Langy counts the project's traces over the whole range, split by model
+    Then the metrics card is titled "Traces"
+    And its headline figure reads 7, captioned "traces"
+    And the model's own figure sits beside it, captioned by the model's name
+    And the card never shows the aggregation name or a count of result buckets
+
+  @integration @unit
+  Scenario: A grouped average is never summed into one figure
+    When Langy averages a metric split by model, with the models averaging 1 and 3
+    Then the metrics card shows each model's average beside its name
+    And it never shows their sum as the period's figure
+    And when every model spans several days, the card says the result has no single figure rather than that there is no data
+    And the CLI draws one line per model instead of one summed line, with no period-over-period total
+
+  @integration @unit
+  Scenario: A distinct count is added up only where each id falls once
+    When Langy counts distinct traces per day
+    Then the card and the CLI total the days, since each trace falls on one day
+    When Langy counts distinct users per day
+    Then neither totals the days, since a user can come back on another day
+    When Langy counts distinct traces split by model
+    Then the CLI draws one line per model and totals nothing, since one trace can carry two models
+
+  @unit
+  Scenario: A metrics card names its aggregation in words
+    When Langy reads a metric aggregated as a total, an average, a minimum, a maximum, a median or a percentile
+    Then the card keeps the metric as its heading
+    And the caption under the figure names the aggregation in words, such as "total" or "95th percentile"
+    And an aggregation it does not know is shown with its separators turned into spaces
 
   @integration
   Scenario: An evaluation run renders its result
@@ -80,6 +113,15 @@ Feature: Langy renders domain-capability cards for tool calls
     And the card shows the scenario status when the payload carries one
     And the card shows no line of the serialised payload
 
+  # The agent's document is a machine contract: ids, timestamps and a host
+  # label that the skills read. The card names the catalog's fields instead
+  # of printing the row.
+  @integration
+  Scenario: An agent card reads in customer copy
+    When Langy reads one connected agent, or lists them
+    Then the card shows its status as Online or Offline, its environment and its host
+    And it shows no id, type, timestamp or host label field
+
   @integration
   Scenario: Every LangWatch action Langy takes shows a result card
     When Langy runs any LangWatch action and it returns a result
@@ -116,10 +158,22 @@ Feature: Langy renders domain-capability cards for tool calls
     Then the card shows no failure
     And it counts the rows it read instead of printing their JSON
 
+  # The CLI's suite run document carries the batch's outcome and tallies with
+  # the per-run rows under them. The card read none of those fields, fell to
+  # word-matching the text, and wore the first row's "FAILED" as the run's
+  # badge, beside a page reading two of three passed.
+  @integration
+  Scenario: A run card carries the run's aggregate, not one row's verdict
+    When Langy runs a suite or a scenario with the CLI and waits for it
+    Then the card's badge is the batch's state, completed once every run answered
+    And it shows the pass rate and how many passed, failed and ran, from the run's tallies
+    And a row's verdict never becomes the run's badge
+
   @integration
   Scenario: An unmapped tool falls through to the raw view
+    Given developer mode is on
     When Langy runs a tool that is not a LangWatch action and has no capability card
-    Then Langy shows the tool's raw name, state, input, and output
+    Then I can show the tool's raw name, state, input, and output
     And it does not fabricate a card it has no mapping for
 
   @integration
@@ -210,6 +264,26 @@ Feature: Langy renders domain-capability cards for tool calls
     When Langy runs the trace-search capability and its output cannot be parsed
     Then the card says it could not read the result
     And it does not claim that zero traces matched
+    And the card still offers the way into Traces
+
+  # An oversized result is reduced before it is recorded: arrays keep a head and
+  # wide objects keep a few keys. Keys were kept in alphabetical order, so a
+  # trace row kept "error" to "metrics" and lost "trace_id". The card then read
+  # a total of 13 and no row it could name, and said "13 traces, showing 0. No
+  # traces matched."
+  @unit
+  Scenario: A reduced result keeps the id of every row it keeps
+    Given a trace search result too large to record whole
+    When the result is reduced to fit
+    Then every row that is kept still carries its trace id
+    And the total the search reported is kept
+
+  @integration
+  Scenario: Rows the card cannot identify render as unreadable, never as an empty result
+    When Langy runs the trace-search capability and the recorded rows carry no trace id
+    And the result still reports 13 matches
+    Then the card says it could not read the result
+    And it does not claim that no traces matched
     And the card still offers the way into Traces
 
   @integration
@@ -318,6 +392,7 @@ Feature: Langy renders domain-capability cards for tool calls
     Scenario: A turn that failed immediately still leads with the failure
       Given the first thing Langy did in a turn failed
       Then the failure is the first thing in the transcript
+      And once the turn answered, it is the first row of the folded record of the work
 
     # Ordering held inside the activity block and nowhere else. The block itself
     # sat above the reply and the whole reply below it, so a turn that wrote a
@@ -337,6 +412,17 @@ Feature: Langy renders domain-capability cards for tool calls
       When it settles
       Then the settled turn keeps the order the reader watched it arrive in
 
+    # The cards a call raises (a question, a pull request, a proposal, the
+    # code access ask, a secret) rendered in a pile under the whole reply, so
+    # the closing line of a guided path sat above the question the path had
+    # asked three steps earlier, and above the commit receipt.
+    @integration
+    Scenario: A card raised by a call sits where the call ran
+      Given Langy asked a question with a tool call and went on to write a closing line
+      Then the question card is shown before the closing line
+      And the pull request progress card sits after the call that committed, not under the closing line
+      And a guided conversation leaves the progress card out
+
     # The record was built as every tool call first and the reply after them,
     # from the text the agent wrote after its LAST call. Everything written
     # between calls existed only on the live edge, so a reader who refreshed
@@ -350,6 +436,16 @@ Feature: Langy renders domain-capability cards for tool calls
       When the turn is recorded
       Then the recorded parts are the paragraphs and the calls in the order they happened
       And no paragraph written between two calls is dropped
+
+    # GPT-5 on the Responses API writes a commentary message and a final
+    # message in one reply. They reached the panel as one run of text with no
+    # break, so one sentence ran into the next ("met both criteria.Evals &
+    # LLM Ops is already complete.").
+    @unit
+    Scenario: Two text blocks of one reply are separated by a paragraph break
+      Given Langy wrote two text blocks with no tool call between them
+      When the turn streams to the panel
+      Then the second block starts on a new paragraph
 
     @unit
     Scenario: A card is recorded where the work began
@@ -382,6 +478,15 @@ Feature: Langy renders domain-capability cards for tool calls
       Then each paragraph appears once, where it was written
       And no closing paragraph is added after the last call
 
+    @unit
+    Scenario: A line Langy wrote is shown once
+      Given a turn that said four lines with the say tool and then wrote a reply repeating three of them
+      And the proposal was both said and passed as the question of its question card
+      When the turn is recorded
+      Then each said line appears once, where it was said
+      And the reply keeps only the lines that were not said
+      And the proposal is drawn by its question card alone
+
     # Two paths finish a turn and race each other: the live relay's terminal
     # frame, and the agent's own post over HTTP. The record keeps whichever
     # lands first, so the order must not be read by one of them. It is read
@@ -413,6 +518,32 @@ Feature: Langy renders domain-capability cards for tool calls
     Scenario: A scenario card with an id opens that scenario
       When Langy shows a card for one named scenario
       Then the card's link opens that scenario in the library
+
+  # The card that says "Created and ready to use" was the end of the road:
+  # running the scenario meant leaving the panel for Simulations. The card now
+  # offers the run in words, through the composer, so Langy resolves the
+  # target and asks what it has to ask, exactly as it does for a typed request.
+  Rule: A created scenario offers its first run
+
+    @integration
+    Scenario: A created scenario offers to run against the connected agent
+      Given Langy created a scenario in a live conversation
+      When the card renders
+      Then it offers "Run against my agent" beside the deep link
+      And the offer waits while Langy is still answering
+
+    @integration
+    Scenario: Choosing the run offer asks Langy in words, through the composer
+      Given a created-scenario card with the run offer
+      When the reader chooses the offer
+      Then the composer sends "Run scenario "<name>" against my connected agent" as the reader's message
+      And the card itself schedules nothing
+
+    @integration
+    Scenario: A created scenario in a replayed conversation offers no run
+      Given a created-scenario card rendered while the reader replays an earlier turn
+      When the card renders
+      Then no run offer is drawn, since the replay can route no request
 
   # WHICH card a result renders in is decided once, at the command boundary,
   # from the command's name and the result's own shape together (ADR-079). The

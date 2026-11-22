@@ -71,8 +71,8 @@ every release. Do not default a new prompt to a legacy model like
 `gpt-4o-mini`; pick one only when the user is trading quality for cost or
 latency on purpose.
 
-**Temperature:** the gpt-5 family rejects a custom `temperature`, so do not add
-`modelParameters.temperature` for those models. `create` omits it on purpose.
+**Temperature:** the gpt-5 and gpt-6 families reject a custom `temperature`, so
+do not add `modelParameters.temperature` for those models. `create` omits it on purpose.
 
 **Structured outputs:** if the prompt must return strict JSON, add a
 `response_format` block instead of asking for JSON in prose:
@@ -158,5 +158,5 @@ Run `langwatch prompt list` to confirm everything synced, or open the Prompts se
 - Do NOT manually edit `prompts.json`. Use the CLI
 - Do NOT skip `langwatch prompt sync` after creating prompts
 - Prefer the flagship alias `openai/latest` (or `openai/latest-mini` for the fast tier). Pin a version only when a prompt is tuned to one, and pick an older model like `gpt-4o-mini` only when intentionally optimizing for cost or latency
-- Do NOT set `modelParameters.temperature` on a gpt-5-family model; the family rejects it
+- Do NOT set `modelParameters.temperature` on a gpt-5 or gpt-6 family model; both families reject it
 - Do NOT ask for JSON in the prompt text when output must be structured. Use a `response_format` block

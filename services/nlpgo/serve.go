@@ -10,17 +10,21 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/lifecycle"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
 
 // Serve wires the app into HTTP transport and lifecycle management,
 // blocking until shutdown.
 //
-// `playground` may be nil in test contexts that don't exercise the
+// `in.Playground.Proxy` may be nil in test contexts that don't exercise the
 // /go/proxy/v1/* path; the handler falls back to a typed 501 in that
 // case so misconfiguration is loud rather than silent.
-func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config, playground httpapi.PlaygroundProxy) error {
+func Serve(ctx context.Context, in ServeInput) error {
+	application, deps, cfg, playground := in.App, in.Deps, in.Cfg, in.Playground
 	deps.Logger.Info("nlpgo_starting", zap.String("addr", cfg.Server.Addr))
+
+	logInternalAuthPosture(deps.Logger, cfg.InternalSecret)
 
 	info := contexts.MustGetServiceInfo(ctx)
 	handler := httpapi.NewRouter(newRouterDeps(routerDepsInput{
@@ -50,6 +54,43 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config, pl
 	return g.Run(ctx)
 }
 
+// logInternalAuthPosture says out loud which of the two postures this process
+// is in. The engine runs user-authored code for whichever project the request
+// body names and authenticates no project itself, so an operator reading the
+// log of an unguarded install should find that stated rather than have to
+// infer it from the absence of a line.
+//
+// Separate from Serve so the posture is assertable without binding a listener.
+func logInternalAuthPosture(logger *zap.Logger, secret string) {
+	if secret == "" {
+		logger.Warn("nlpgo_internal_auth_disabled",
+			zap.String("variable", "LANGWATCH_NLP_INTERNAL_SECRET"),
+			zap.String("effect", "/go routes accept any caller that can reach this address"),
+		)
+		return
+	}
+	logger.Info("nlpgo_internal_auth_enabled",
+		zap.String("header", httpapi.InternalSecretHeader),
+	)
+}
+
+// ServeInput is what Serve runs: the app, its dependencies and config, and
+// what serves the playground proxy.
+type ServeInput struct {
+	App        *app.App
+	Deps       *Deps
+	Cfg        Config
+	Playground PlaygroundWiring
+}
+
+// PlaygroundWiring is what serves /go/proxy/v1/*: the proxy into the
+// in-process gateway, and the model catalog that names each model's output
+// token limit (nil keeps the engine's name rule).
+type PlaygroundWiring struct {
+	Proxy        httpapi.PlaygroundProxy
+	ModelCatalog litellm.OutputTokensLookup
+}
+
 // routerDepsInput carries everything newRouterDeps needs to map the
 // service config onto the HTTP adapter. A struct rather than a positional
 // list so a new knob is named at the call site instead of joining a row of
@@ -59,7 +100,7 @@ type routerDepsInput struct {
 	Deps       *Deps
 	Cfg        Config
 	Version    string
-	Playground httpapi.PlaygroundProxy
+	Playground PlaygroundWiring
 }
 
 // newRouterDeps maps the service config onto the HTTP adapter's
@@ -73,7 +114,9 @@ func newRouterDeps(in routerDepsInput) httpapi.RouterDeps {
 		Health:              in.Deps.Health,
 		Version:             in.Version,
 		MaxRequestBodyBytes: in.Cfg.Server.MaxRequestBodyBytes,
-		PlaygroundProxy:     in.Playground,
+		InternalSecret:      in.Cfg.InternalSecret,
+		PlaygroundProxy:     in.Playground.Proxy,
+		ModelCatalog:        in.Playground.ModelCatalog,
 		OTel:                in.Deps.OTel,
 		StreamHeartbeat:     resolveStreamHeartbeat(in.Cfg.Engine.StreamHeartbeatSeconds),
 		StreamIdleTimeout:   resolveStreamIdleTimeout(in.Cfg.Engine.StreamIdleTimeoutSeconds),

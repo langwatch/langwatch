@@ -1,6 +1,7 @@
 {{- if .Values.redis.chartManaged }}
 {{- $authEnabled := .Values.redis.auth.enabled }}
 {{- $secretName := .Values.redis.auth.existingSecret | default (printf "%s-redis" .Release.Name) }}
+{{- $maxmemory := include "langwatch.redisMaxmemory" . }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -53,9 +54,12 @@ spec:
           image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
           imagePullPolicy: {{ .Values.redis.image.pullPolicy | default "IfNotPresent" }}
           {{- if $authEnabled }}
-          command: ["sh", "-c", "redis-server --maxmemory-policy noeviction --requirepass \"$REDIS_PASSWORD\""]
+          # exec makes redis-server PID 1, so it receives SIGTERM, saves and
+          # exits at once. Behind a shell that does not forward the signal it
+          # would sit out terminationGracePeriodSeconds and be killed unsaved.
+          command: ["sh", "-c", "exec redis-server --maxmemory-policy noeviction{{ if $maxmemory }} --maxmemory {{ $maxmemory }}{{ end }} --requirepass \"$REDIS_PASSWORD\""]
           {{- else }}
-          command: ["redis-server", "--maxmemory-policy", "noeviction"]
+          command: ["redis-server", "--maxmemory-policy", "noeviction"{{ if $maxmemory }}, "--maxmemory", {{ $maxmemory | quote }}{{ end }}]
           {{- end }}
           ports:
             - name: redis
@@ -108,8 +112,13 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: {{ .Values.redis.scratchSizeLimit }}
+  # apiVersion and kind are spelled out: the API server stores them on every
+  # claim template, so a GitOps controller diffing with server-side apply
+  # reports the StatefulSet as out of sync forever when they are left off.
   volumeClaimTemplates:
-    - metadata:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
         name: redis-data
       spec:
         accessModes: ["ReadWriteOnce"]

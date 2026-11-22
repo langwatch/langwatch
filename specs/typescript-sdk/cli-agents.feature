@@ -12,12 +12,47 @@ Feature: The agent commands show connected agents and run them through the relay
 
   Rule: The list shows where each agent runs and whether it is online
 
-    Scenario: The list prints Name, Environment, Status, Type, ID, Owner and Updated
+    Scenario: The list prints Name, Environment, Status, Last seen, Type, ID, Owner and Updated
       Given the project has a connected agent online in production and an HTTP agent
       When I run "langwatch agent list"
-      Then the table has the columns Name, Environment, Status, Type, ID, Owner and Updated
+      Then the table has the columns Name, Environment, Status, Last seen, Type, ID, Owner and Updated
       And the connected agent reads online
       And the HTTP agent has an empty environment and status
+
+    Scenario: The list prints when a connected agent was last seen
+      Given a connected agent online, one offline last seen two days ago, and an HTTP agent
+      When I run "langwatch agent list"
+      Then the online agent's last seen reads "now"
+      And the offline agent's last seen reads how long ago it was seen
+      And the HTTP agent's last seen is empty
+
+    # A connected agent gets a new row whenever its scope changes: a personal
+    # key instead of a project key, another machine, another environment. The
+    # old rows stay for thirty days and are never coming back.
+    Scenario: Stale sibling rows of one name and environment are collapsed
+      Given "support-agent" in development has an online row, an offline row last seen three days ago and an offline row last seen an hour ago
+      When I run "langwatch agent list"
+      Then the online row and the row seen an hour ago are listed
+      And the row seen three days ago is not
+      And the summary says one stale row is hidden and names --all
+
+    # A reader of the machine document counts what it was given, so a total
+    # that still included the collapsed siblings would read as a page cut short.
+    Scenario: The collapsed listing counts the rows it ships
+      Given "support-agent" in development has an online row, an offline row last seen three days ago and an offline row last seen an hour ago
+      When I run "langwatch agent list"
+      Then the listing's total is the number of rows it lists
+      And it reports how many stale rows it hid
+
+    Scenario: A lone offline row is never collapsed
+      Given "support-agent" in staging has one offline row last seen a month ago
+      When I run "langwatch agent list"
+      Then that row is listed
+
+    Scenario: The --all flag lists every row
+      Given "support-agent" in development has an online row and an offline row last seen three days ago
+      When I run "langwatch agent list --all"
+      Then both rows are listed
 
     Scenario: The status colour follows the status, not the column width
       Given a list with both an online and an offline agent
@@ -29,6 +64,34 @@ Feature: The agent commands show connected agents and run them through the relay
       When I run "langwatch agent list"
       Then the first row names the user
       And the second row names the host label
+
+    # A process that has just started takes a few seconds to register. The
+    # wait lives in the command so no caller scripts a loop of its own around
+    # it: Langy once wrote such a loop, misread the document it got back and
+    # gave up on an agent that was online the whole time.
+    Scenario: The list can wait for an agent to come online
+      Given a connected agent that registers a few seconds after its process starts
+      When I run "langwatch agent list --wait-online acme-checkout"
+      Then the list is read again every few seconds until that agent reports online
+      And the list is printed once it does
+      And the command fails when the timeout passes with the agent still offline
+
+    # Under --format json the spinner is silent. A timeout that leaves only
+    # the identity notice ("... Switch: langwatch login ...") and a gray hint
+    # on stderr reads, to a model, as the command line asking for a login,
+    # on a command line that is signed in.
+    @unit
+    Scenario: A name with spaces passed bare is told to quote it
+      When I run "langwatch agent list --wait-online ACME checkout --format json"
+      Then the command refuses the stray word as too many arguments
+      And the refusal says a name with spaces goes in double quotes
+
+    Scenario: The wait's timeout names the agent, the wait and the credentials, never a login
+      Given a connected agent that never reports online
+      When I run "langwatch agent list --wait-online acme-checkout --format json" and the timeout passes
+      Then stderr says which agent it waited for, for how many seconds, and which credentials the listing was read with
+      And the line is printed in every output format, not through the spinner
+      And no line of the failure mentions a login command
 
     Scenario: A row the key cannot choose reads as not selectable
       Given a personal development agent owned by another person
@@ -81,6 +144,20 @@ Feature: The agent commands show connected agents and run them through the relay
       Given an HTTP agent
       When I run "langwatch agent run <id> --input '{...}'"
       Then the URL is called directly and the relay is not
+
+  Rule: A refused connected target comes with next steps
+
+    Scenario: An owner-only refusal tells the caller how to share the agent
+      Given a run refused with "agent_owner_only" and no advice from the platform
+      When the command line explains the failure
+      Then it says the agent belongs to the owner of the key that registered it
+      And it names LANGWATCH_AGENT_ENVIRONMENT as the way to share it
+
+    Scenario: An unresolved environment refusal points at the agents list and the shared environment
+      Given a run refused with "agent_environment_unresolved" and no advice from the platform
+      When the command line explains the failure
+      Then it points at `langwatch agent list`
+      And it names LANGWATCH_AGENT_ENVIRONMENT as the way to share a personal agent
 
   Rule: The help says which command serves which agent type
 

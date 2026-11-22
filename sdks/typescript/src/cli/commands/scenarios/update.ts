@@ -1,17 +1,17 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import type { UpdateScenarioBody } from "@/client-sdk/services/scenarios";
 import type { SuiteFieldDefinition } from "@/client-sdk/services/test-suites";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
-import { parseScenarioFieldFlags } from "../../utils/suiteFieldFlags";
-import { createCliScenariosService } from "./cli-scenarios-service";
-import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service";
-import {
-  resolveSuiteReference,
-  SuiteReferenceError,
-} from "../test-suites/resolveSuite";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { parseScenarioFieldFlags } from "../../utils/suiteFieldFlags.ts";
+import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service.ts";
+import { resolveSuiteReference, SuiteReferenceError } from "../test-suites/resolveSuite.ts";
+import { createCliScenariosService } from "./cli-scenarios-service.ts";
+import { resolveScenarioId } from "./resolveScenario.ts";
 
 /**
  * The field definitions of the suite a scenario is filed in, or none when
@@ -35,8 +35,9 @@ async function suiteFieldsOfScenario({
   }
 }
 
+/** Updates one scenario, named by its id or by its name. */
 export const updateScenarioCommand = async (
-  id: string,
+  reference: string,
   options: {
     name?: string;
     situation?: string;
@@ -53,11 +54,7 @@ export const updateScenarioCommand = async (
   // One of the two says where the scenario goes, so a line carrying both says
   // two different things. It is refused before the scenario is touched.
   if (options.testSuite !== undefined && options.noTestSuite) {
-    console.error(
-      chalk.red(
-        "Error: --test-suite and --no-test-suite cannot be used together.",
-      ),
-    );
+    console.error(chalk.red("Error: --test-suite and --no-test-suite cannot be used together."));
     process.exit(1);
   }
 
@@ -65,25 +62,16 @@ export const updateScenarioCommand = async (
   let testSuiteName: string | undefined;
   let fieldDefinitions: SuiteFieldDefinition[] | undefined;
   if (options.testSuite !== undefined) {
-    try {
-      const testSuite = await resolveSuiteReference({
-        reference: options.testSuite,
-      });
-      testSuiteId = testSuite.id;
-      testSuiteName = testSuite.name;
-      fieldDefinitions = testSuite.fields ?? [];
-    } catch (error) {
-      if (error instanceof SuiteReferenceError) {
-        console.error(chalk.red(`Error: ${error.message}`));
-        process.exit(1);
-      }
-      throw error;
-    }
+    const testSuite = await resolveScenarioSuite(options.testSuite);
+    testSuiteId = testSuite.id;
+    testSuiteName = testSuite.name;
+    fieldDefinitions = testSuite.fields ?? [];
   } else if (options.noTestSuite) {
     testSuiteId = null;
   }
 
   const service = createCliScenariosService();
+  const id = await resolveScenarioId({ reference, service });
 
   // A field value is read by the type the suite declares, so the suite the
   // scenario stays in is looked up when the command line names none.
@@ -103,19 +91,13 @@ export const updateScenarioCommand = async (
     if (options.situation !== undefined) body.situation = options.situation;
     if (options.criteria !== undefined)
       body.criteria = options.criteria.split(",").map((c) => c.trim());
-    if (options.labels !== undefined)
-      body.labels = options.labels.split(",").map((l) => l.trim());
+    if (options.labels !== undefined) body.labels = options.labels.split(",").map((l) => l.trim());
     if (testSuiteId !== undefined) body.testSuiteId = testSuiteId;
     if (fields !== undefined) body.fields = fields;
 
     const scenario = await service.update(id, body);
 
-    const movement =
-      testSuiteId === null
-        ? " (no test suite)"
-        : testSuiteName
-          ? ` (test suite: ${testSuiteName})`
-          : "";
+    const movement = suiteMovementLabel(testSuiteId, testSuiteName);
     spinner.succeed(
       `Updated scenario "${chalk.cyan(scenario.name)}"${movement} ${chalk.gray(`(id: ${scenario.id})`)}`,
     );
@@ -131,3 +113,23 @@ export const updateScenarioCommand = async (
     process.exit(1);
   }
 };
+
+function suiteMovementLabel(
+  testSuiteId: string | null | undefined,
+  testSuiteName: string | undefined,
+): string {
+  if (testSuiteId === null) return " (no test suite)";
+  return testSuiteName ? ` (test suite: ${testSuiteName})` : "";
+}
+
+async function resolveScenarioSuite(reference: string) {
+  try {
+    return await resolveSuiteReference({ reference });
+  } catch (error) {
+    if (error instanceof SuiteReferenceError) {
+      console.error(chalk.red(`Error: ${error.message}`));
+      process.exit(1);
+    }
+    throw error;
+  }
+}

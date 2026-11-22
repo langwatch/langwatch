@@ -1,7 +1,6 @@
 /**
  * When the healer may re-mint a personal ingest key, and what it rewrites
  * when it does.
- *
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 import { describe, expect, it, vi } from "vitest";
@@ -36,9 +35,7 @@ function deps(over: Partial<HealDeps> = {}): HealDeps & {
     saveConfig: vi.fn(),
     isLoggedIn: (cfg: GovernanceConfig) => Boolean(cfg.access_token),
     // A platform from before the cause was recorded: the heal proceeds.
-    describeIngestionKey: vi
-      .fn()
-      .mockResolvedValue({ status: "unknown", revocationCause: null }),
+    describeIngestionKey: vi.fn().mockResolvedValue({ status: "unknown", revocationCause: null }),
     resolveLiveIngestionKey: vi.fn().mockResolvedValue({
       token: FRESH,
       prefix: FRESH.slice(0, 12),
@@ -61,7 +58,7 @@ describe("healRevokedIngestKey", () => {
       const d = deps();
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: CACHED,
         deps: d,
       });
@@ -92,6 +89,67 @@ describe("healRevokedIngestKey", () => {
     });
   });
 
+  describe("given a rejected key cached for a Copilot surface", () => {
+    it.each([
+      ["copilot_cli", "copilot"],
+      ["copilot_vscode", "code"],
+    ])("re-mints the %s key and rewires the %s tool", async (sourceType, tool) => {
+      const d = deps({
+        loadConfig: () =>
+          config({
+            default_personal_ingest_keys: {
+              [sourceType]: { secret: CACHED, prefix: CACHED.slice(0, 12) },
+            },
+          }),
+      });
+
+      const healed = await healRevokedIngestKey({ sourceType, rejectedToken: CACHED, deps: d });
+
+      expect(healed.status).toBe("healed");
+      expect(d.resolveLiveIngestionKey).toHaveBeenCalledWith(
+        expect.objectContaining({ sourceType }),
+      );
+      expect(d.installTelemetryWiring).toHaveBeenCalledWith(
+        expect.objectContaining({ tool, token: FRESH }),
+      );
+    });
+
+    it("declines a pinned surface without asking the platform", async () => {
+      const d = deps({
+        loadConfig: () =>
+          config({
+            default_personal_ingest_keys: {
+              copilot_vscode: { secret: CACHED, prefix: CACHED.slice(0, 12) },
+            },
+            tool_project_keys: { code: { secret: "sk-lw-pinned", project_id: "p1" } },
+          }),
+      });
+
+      const healed = await healRevokedIngestKey({
+        sourceType: "copilot_vscode",
+        rejectedToken: CACHED,
+        deps: d,
+      });
+
+      expect(healed).toEqual({ status: "declined" });
+      expect(d.describeIngestionKey).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a source type no hooked agent posts with", () => {
+    it("declines without reading the config", async () => {
+      const loadConfig = vi.fn(() => config());
+      const healed = await healRevokedIngestKey({
+        sourceType: "gemini",
+        rejectedToken: CACHED,
+        deps: deps({ loadConfig }),
+      });
+
+      expect(healed).toEqual({ status: "declined" });
+      expect(loadConfig).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a platform that says a person revoked the cached key", () => {
     /** @scenario "A key a person revoked is not re-minted" */
     it("withholds the repair: no mint, no wiring, no cache write", async () => {
@@ -102,7 +160,7 @@ describe("healRevokedIngestKey", () => {
       });
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: CACHED,
         deps: d,
       });
@@ -130,7 +188,7 @@ describe("healRevokedIngestKey", () => {
       });
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: CACHED,
         deps: d,
       });
@@ -150,7 +208,7 @@ describe("healRevokedIngestKey", () => {
       });
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: CACHED,
         deps: d,
       });
@@ -173,7 +231,7 @@ describe("healRevokedIngestKey", () => {
       });
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: CACHED,
         deps: d,
       });
@@ -194,7 +252,7 @@ describe("healRevokedIngestKey", () => {
       });
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: CACHED,
         deps: d,
       });
@@ -208,13 +266,11 @@ describe("healRevokedIngestKey", () => {
     it("re-mints for a rotation and for an older server's cap alike", async () => {
       for (const revocationCause of ["rotation", "cap"]) {
         const d = deps({
-          describeIngestionKey: vi
-            .fn()
-            .mockResolvedValue({ status: "revoked", revocationCause }),
+          describeIngestionKey: vi.fn().mockResolvedValue({ status: "revoked", revocationCause }),
         });
 
         const healed = await healRevokedIngestKey({
-          agent: "claude_code",
+          sourceType: "claude_code",
           rejectedToken: CACHED,
           deps: d,
         });
@@ -228,17 +284,15 @@ describe("healRevokedIngestKey", () => {
     /** @scenario "A status call that does not answer ends the heal" */
     it("reports a failure rather than minting past a decision it cannot read", async () => {
       const d = deps({
-        describeIngestionKey: vi
-          .fn()
-          .mockRejectedValue(
-            Object.assign(new Error("The operation was aborted"), {
-              name: "TimeoutError",
-            }),
-          ),
+        describeIngestionKey: vi.fn().mockRejectedValue(
+          Object.assign(new Error("The operation was aborted"), {
+            name: "TimeoutError",
+          }),
+        ),
       });
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: CACHED,
         deps: d,
       });
@@ -261,7 +315,7 @@ describe("healRevokedIngestKey", () => {
       });
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: CACHED,
         deps: d,
       });
@@ -281,7 +335,7 @@ describe("healRevokedIngestKey", () => {
       const d = deps({ loadConfig: () => config({ access_token: undefined }) });
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: CACHED,
         deps: d,
       });
@@ -304,7 +358,7 @@ describe("healRevokedIngestKey", () => {
       });
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: "ik-lw-project-key",
         deps: d,
       });
@@ -320,7 +374,7 @@ describe("healRevokedIngestKey", () => {
       const d = deps();
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: "sk-lw-pasted-by-the-user",
         deps: d,
       });
@@ -344,7 +398,7 @@ describe("healRevokedIngestKey", () => {
       });
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: CACHED,
         deps: d,
       });
@@ -361,7 +415,7 @@ describe("healRevokedIngestKey", () => {
       const d = deps();
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: undefined,
         deps: d,
       });
@@ -385,15 +439,13 @@ describe("healRevokedIngestKey", () => {
       });
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: CACHED,
         deps: d,
       });
 
       expect(healed).toEqual({ status: "failed" });
-      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(
-        CACHED,
-      );
+      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(CACHED);
     });
   });
 
@@ -411,7 +463,7 @@ describe("healRevokedIngestKey", () => {
       });
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: CACHED,
         deps: d,
       });
@@ -420,9 +472,7 @@ describe("healRevokedIngestKey", () => {
       // The invariant the next heal depends on: the cache still names the key
       // the collector rejected, so `rejectedToken === cached` holds next time,
       // on disk as well as in memory.
-      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(
-        CACHED,
-      );
+      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(CACHED);
       expect(d.saveConfig).toHaveBeenLastCalledWith(
         expect.objectContaining({
           default_personal_ingest_keys: expect.objectContaining({
@@ -445,7 +495,7 @@ describe("healRevokedIngestKey", () => {
       });
 
       const healed = await healRevokedIngestKey({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: CACHED,
         deps: d,
       });
@@ -454,9 +504,7 @@ describe("healRevokedIngestKey", () => {
       // A key the cache never recorded would be rejected by the next heal as
       // someone else's, so the tool is left on the one the cache does name.
       expect(d.installTelemetryWiring).not.toHaveBeenCalled();
-      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(
-        CACHED,
-      );
+      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(CACHED);
     });
   });
 });

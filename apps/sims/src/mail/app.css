@@ -1,0 +1,36 @@
+/* Layout glue only; every value is a kit token (packages/design-system-internal/README.md). */
+
+.mail-search {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.mail-recipient {
+  flex: 0 1 18rem;
+  min-width: 0;
+}
+
+.mail-preview {
+  display: block;
+  width: 100%;
+  height: 70vh;
+  min-height: 30rem;
+  border: 0;
+  /* Mail is written for a light page: with data-theme="light", Canvas is white in dark mode too. */
+  background: Canvas;
+}
+
+.mail-text {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 719px) {
+  .mail-search,
+  .mail-recipient {
+    flex-basis: 100%;
+  }
+}

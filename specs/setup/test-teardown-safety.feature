@@ -67,20 +67,33 @@ Feature: Test teardown cannot sweep the shared database
 
   Rule: the dangerous form cannot merge
 
-    @unit
+    # Gap: main's teardown scan (teardownScan.ts) was deleted in 0affb6cbab; nothing on the branch scans raw deleteMany calls.
+    @unit @unimplemented
     Scenario: A reassignable id in a raw delete fails the check
       Given a test file deleting rows filtered by a let-declared variable
       When the teardown check runs over it
       Then the file fails the check, naming the variable and the line
 
-    @unit
+    # Gap: main's teardown scan (teardownScan.ts) was deleted in 0affb6cbab; nothing on the branch scans raw deleteMany calls.
+    @unit @unimplemented
     Scenario: A module constant in a raw delete passes the check
       Given a test file deleting rows filtered by a module-level constant
       When the teardown check runs over it
       Then the file passes the check
 
-    @unit
+    # Gap: main's teardown scan (teardownScan.ts) was deleted in 0affb6cbab; nothing on the branch scans raw deleteMany calls.
+    @unit @unimplemented
     Scenario: An unfiltered delete fails the check
       Given a test file calling deleteMany with no filter at all
       When the teardown check runs over it
       Then the file fails the check
+
+    # Gap: main's teardown scan (teardownScan.ts) was deleted in 0affb6cbab; nothing on the branch scans raw deleteMany calls.
+    @unit @unimplemented
+    Scenario: A domain method named deleteMany is not a table
+      Given a test file calling deleteMany on the unit under test
+      When the teardown check runs over it
+      Then the file passes the check
+      # A Prisma model is always reached through the client, so a delegate call
+      # has a model segment in front of it. A bare receiver is our own tRPC
+      # procedure or repository method of the same name, driven against a fake.

@@ -235,3 +235,125 @@ func TestElevenLabsConversationIDPrefersATopLevelField(t *testing.T) {
 	assert.Empty(t, elevenLabsConversationID([]byte(`{"signed_url":"wss://x"}`)))
 	assert.Empty(t, elevenLabsConversationID([]byte(`not json`)))
 }
+
+// @scenario "An ElevenLabs single-use token is minted for each socket type"
+func TestElevenLabsTokenMintPostsTheVendorsOwnPathAndEchoesItsAnswer(t *testing.T) {
+	t.Parallel()
+
+	for _, tokenType := range []domain.ElevenLabsTokenType{
+		domain.ElevenLabsTokenTTSWebsocket,
+		domain.ElevenLabsTokenTTDWebsocket,
+		domain.ElevenLabsTokenRealtimeScribe,
+		domain.ElevenLabsTokenBatchScribe,
+	} {
+		t.Run(string(tokenType), func(t *testing.T) {
+			t.Parallel()
+			var gotMethod, gotPath, gotKey string
+			var gotBody []byte
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotMethod, gotPath, gotKey = r.Method, r.URL.Path, r.Header.Get("xi-api-key")
+				gotBody, _ = io.ReadAll(r.Body)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"token":"sutkn_abc"}`))
+			}))
+			defer server.Close()
+
+			req := &domain.Request{
+				Type:  domain.RequestTypeRealtimeSession,
+				Model: tokenType.DefaultModel(),
+				RealtimeSession: &domain.RealtimeSessionRequest{
+					Vendor:    domain.RealtimeVendorElevenLabs,
+					TokenType: tokenType,
+					SessionID: "req_abc",
+				},
+			}
+			resp, err := realtimeRouter(server).dispatchRealtimeSession(
+				context.Background(), req, elevenLabsCredential(server))
+			require.NoError(t, err)
+
+			assert.Equal(t, http.MethodPost, gotMethod)
+			assert.Equal(t, "/v1/single-use-token/"+string(tokenType), gotPath)
+			assert.Equal(t, "xi-secret", gotKey, "the customer's stored key, never the virtual key")
+			assert.Empty(t, gotBody, "the vendor route takes no body, and the model never reaches it")
+
+			assert.Equal(t, http.StatusOK, resp.StatusCode)
+			assert.JSONEq(t, `{"token":"sutkn_abc","langwatch":{"session_id":"req_abc"}}`, string(resp.Body))
+			assert.Empty(t, resp.RealtimeConversationID, "a token names no conversation")
+			assert.True(t, resp.RealtimeCredentialExpiresAt.IsZero(), "the answer states no expiry")
+		})
+	}
+}
+
+// @scenario "A token mint honors a residency base URL"
+func TestElevenLabsTokenMintHonorsAResidencyBaseURL(t *testing.T) {
+	t.Parallel()
+
+	var reached string
+	residency := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reached = r.URL.Path
+		_, _ = w.Write([]byte(`{"token":"sutkn_eu"}`))
+	}))
+	defer residency.Close()
+
+	req := &domain.Request{
+		Type: domain.RequestTypeRealtimeSession,
+		RealtimeSession: &domain.RealtimeSessionRequest{
+			Vendor:    domain.RealtimeVendorElevenLabs,
+			TokenType: domain.ElevenLabsTokenRealtimeScribe,
+		},
+	}
+	_, err := realtimeRouter(residency).dispatchRealtimeSession(
+		context.Background(), req, elevenLabsCredential(residency))
+	require.NoError(t, err)
+	assert.Equal(t, "/v1/single-use-token/realtime_scribe", reached,
+		"a customer on a regional host must be minted there")
+}
+
+func TestElevenLabsTokenMintForwardsTheVendorsOwnError(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"detail":{"status":"missing_permissions"}}`))
+	}))
+	defer server.Close()
+
+	req := &domain.Request{
+		Type: domain.RequestTypeRealtimeSession,
+		RealtimeSession: &domain.RealtimeSessionRequest{
+			Vendor:    domain.RealtimeVendorElevenLabs,
+			TokenType: domain.ElevenLabsTokenTTSWebsocket,
+			SessionID: "req_abc",
+		},
+	}
+	resp, err := realtimeRouter(server).dispatchRealtimeSession(
+		context.Background(), req, elevenLabsCredential(server))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	assert.JSONEq(t, `{"detail":{"status":"missing_permissions"}}`, string(resp.Body))
+}
+
+// @scenario "An OpenAI mint books what metering needs"
+func TestOpenAIMintReadsTheCredentialExpiryFromTheAnswer(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"value":"ek_x","expires_at":1786873895}`))
+	}))
+	defer server.Close()
+
+	req := &domain.Request{
+		Type: domain.RequestTypeRealtimeSession,
+		Body: []byte(`{"session":{"type":"realtime","model":"gpt-realtime-2.1"}}`),
+		RealtimeSession: &domain.RealtimeSessionRequest{
+			Vendor: domain.RealtimeVendorOpenAI, SessionID: "req_abc",
+		},
+	}
+	cred := domain.Credential{
+		ID: "openai_1", ProviderID: domain.ProviderOpenAI, APIKey: "sk-x",
+		Extra: map[string]string{"base_url": server.URL},
+	}
+	resp, err := realtimeRouter(server).dispatchRealtimeSession(context.Background(), req, cred)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1786873895), resp.RealtimeCredentialExpiresAt.Unix())
+}

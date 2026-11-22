@@ -1,0 +1,496 @@
+import { createHash } from "node:crypto";
+
+import {
+  apiKeyTokenResolutionInputSchema,
+  apiKeyVerificationSchema,
+  getTokenType,
+  organizationApiKeyResolutionInputSchema,
+  organizationApiKeyResolutionSchema,
+  resolvedApiKeyTokenSchema,
+  type OrganizationApiKeyResolution,
+  type ResolvedApiKeyCredential,
+  API_KEY_PREFIX,
+  LANGY_SESSION_API_KEY_NAME,
+  WORKFLOW_RUN_API_KEY_NAME,
+} from "@langwatch/api-key-contract";
+import type * as apiKeyContractModule from "@langwatch/api-key-contract";
+import { createLogger } from "@langwatch/observability";
+import { noteRequestCredential } from "@langwatch/observability/credential-census";
+import { projectIdentitySchema, type ProjectIdentity } from "@langwatch/project-contract";
+import { Temporal, fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
+import { z } from "zod";
+
+import {
+  API_KEY_ANSWER_TTL_MS,
+  API_KEY_UNKNOWN_TTL_MS,
+  type ApiKeyAnswerCacheRepository,
+} from "../repositories/api-key-answer-cache.repository.ts";
+import type { ApiKeyRepository, KeyLiveness } from "../repositories/api-key.repository.ts";
+import { bindingsReachProject, findGrantedProjectIds } from "../rules/api-key-grant-reach.rules.ts";
+import {
+  isDocsSessionAllowed,
+  isDocsSessionKey,
+  isKeyLive,
+  MAX_KEY_ANCESTRY,
+  keyCredentialTypeOf,
+  parseHeld,
+  publicApiKey,
+  shared,
+} from "../rules/api-key-held-answer.rules.ts";
+import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
+import { ApiKeyLastUsedService } from "./api-key-last-used.service.ts";
+import type { ApiKeyDependencies } from "./api-key.service.ts";
+
+const logger = createLogger("langwatch:api-key:answers");
+
+/** A key's answer and one project's identity, held under its public lookup id for a revoke. */
+const heldVerificationSchema = z.object({
+  tokenHash: z.string(),
+  answer: apiKeyVerificationSchema,
+  project: projectIdentitySchema.nullable(),
+  /** When the docs session key governing this key was minted: itself, or the key it came from. */
+  docsSessionSince: z.date().nullable().default(null),
+});
+type HeldAnswer = Omit<z.infer<typeof heldVerificationSchema>, "tokenHash">;
+type VerifiedRow = {
+  answer: apiKeyContractModule.ApiKeyVerification;
+  docsSessionSince: Instant | null;
+};
+const heldLegacySchema = z.object({ project: projectIdentitySchema.nullable() });
+/** What a revoke leaves in a key's entry: a refusal that no late fill can overwrite. */
+const REVOKED = "revoked";
+/** The value a revoked legacy key's column holds; it never authenticates (ARCHITECTURE.md §10). */
+const REVOKED_LEGACY_KEY_PREFIX = "lw-revoked-";
+
+const verifiedKey = (lookupId: string) => `pat:${lookupId}`;
+const unknownKey = (hash: string) => `unknown:${hash}`;
+const legacyKey = (hash: string) => `legacy:${hash}`;
+
+export class ApiKeyTokenResolutionService {
+  static create(
+    options: ApiKeyDependencies & {
+      repository: ApiKeyRepository;
+      answers: ApiKeyAnswerCacheRepository;
+      now?: () => Instant;
+    },
+  ): ApiKeyTokenResolutionService {
+    return new ApiKeyTokenResolutionService(options.repository, options.answers, options);
+  }
+
+  private readonly bindings: ApiKeyGrantsService;
+  /** Legacy key uses, keyed by project id: one stamp a minute per project in this process. */
+  private readonly legacyUses: ApiKeyLastUsedService;
+  private readonly answerReads = new Map<string, Promise<HeldAnswer | null>>();
+  private readonly legacyReads = new Map<string, Promise<ProjectIdentity | null>>();
+
+  private constructor(
+    private readonly repository: ApiKeyRepository,
+    private readonly answers: ApiKeyAnswerCacheRepository,
+    private readonly options: ApiKeyDependencies & { now?: () => Instant },
+  ) {
+    this.bindings = ApiKeyGrantsService.create({ authz: options.authz });
+    this.legacyUses = ApiKeyLastUsedService.create({
+      repository: {
+        updateLastUsedAt: async ({ id }) => {
+          await options.projects.markLegacyApiKeyUsed({ projectId: id });
+        },
+      },
+      subject: "projectId",
+      now: options.now,
+    });
+  }
+
+  /**
+   * A revoked key's shared answer becomes a refusal held as long as any answer, so a check that
+   * read Postgres before the revoke cannot fill it again; a changed key's answer is deleted.
+   */
+  async forget({ lookupId, revoked }: { lookupId: string; revoked: boolean }): Promise<void> {
+    const key = verifiedKey(lookupId);
+    try {
+      if (revoked) await this.answers.set({ key, value: REVOKED, ttlMs: API_KEY_ANSWER_TTL_MS });
+      else await this.answers.delete({ key });
+    } catch (error) {
+      logger.error(
+        { error, lookupId },
+        "the shared answer of a changed API key could not be replaced; it lapses within its TTL",
+      );
+    }
+  }
+
+  async findVerifiedToken({
+    token,
+  }: {
+    token: string;
+  }): Promise<apiKeyContractModule.ApiKeyVerification | null> {
+    return (await this.findAnswer({ token, projectId: null, withProject: false }))?.answer ?? null;
+  }
+
+  /**
+   * A docs session key, or a key minted under one, authenticates only while its organization
+   * lets the docs playground connect and only if minted after it last turned it off (ADR-185,
+   * 2026-11-14). Asked live, never held, so turning it off ends them at once and for good.
+   */
+  private async findAnswer(input: {
+    token: string;
+    projectId: string | null;
+    withProject: boolean;
+  }): Promise<HeldAnswer | null> {
+    const held = await this.findHeldAnswer(input);
+    const sinceDate =
+      held?.docsSessionSince ??
+      (held && isDocsSessionKey({ key: held.answer }) ? held.answer.createdAt : null);
+    if (!held || !sinceDate) return held;
+    const since = fromDate(sinceDate);
+    const policy = await this.options.organizations.getDocsPlaygroundPolicy({
+      organizationId: held.answer.organizationId,
+    });
+
+    return isDocsSessionAllowed({ since, policy }) ? held : null;
+  }
+
+  /**
+   * Redis first, then Postgres. A held answer counts only for the exact token whose hash it
+   * carries, so a wrong secret is verified in full; it lapses at the key's own expiry when
+   * that comes sooner. A revoke's refusal is final. A failed read throws and nothing is held.
+   */
+  private async findHeldAnswer(input: {
+    token: string;
+    projectId: string | null;
+    withProject: boolean;
+  }): Promise<HeldAnswer | null> {
+    const lookupId = this.findTokenParts(input.token)?.lookupId;
+    if (!lookupId) return null;
+
+    const hash = tokenHash({ token: input.token });
+    for (const raw of await this.findHeld(verifiedKey(lookupId))) {
+      if (raw === REVOKED) return null;
+      const held = heldVerificationSchema.safeParse(parseHeld({ raw }));
+      if (held.success && held.data.tokenHash === hash) {
+        const answer = this.unexpired(held.data.answer);
+        const { project, docsSessionSince } = held.data;
+        return answer ? { answer, project, docsSessionSince } : null;
+      }
+    }
+    if ((await this.findHeld(unknownKey(hash))).length > 0) return null;
+
+    const projectHint = input.withProject ? `project:${input.projectId ?? ""}` : "none";
+    return shared({
+      pending: this.answerReads,
+      key: `${hash}:${projectHint}`,
+      read: () => this.readAnswer({ ...input, lookupId, hash }),
+    });
+  }
+
+  /** Reads Postgres, then fills the shared answer only where no entry (or refusal) exists. */
+  private async readAnswer({
+    token,
+    projectId,
+    withProject,
+    lookupId,
+    hash,
+  }: {
+    token: string;
+    projectId: string | null;
+    withProject: boolean;
+    lookupId: string;
+    hash: string;
+  }): Promise<HeldAnswer | null> {
+    const startedMs = this.nowMs();
+    const verified = await this.readVerifiedToken({ token });
+    if (!verified) {
+      const ttlMs = this.sinceRead({ startedMs, ttlMs: API_KEY_UNKNOWN_TTL_MS });
+      await this.hold({ key: unknownKey(hash), value: "1", ttlMs });
+      return null;
+    }
+    const { answer, docsSessionSince } = verified;
+    const grantedProjectIds = findGrantedProjectIds(answer.grants);
+    const soleProjectId = grantedProjectIds.length === 1 ? grantedProjectIds[0] : undefined;
+    const heldProjectId = withProject ? (projectId ?? soleProjectId ?? null) : null;
+    const project = heldProjectId ? await this.findProjectIdentity(heldProjectId) : null;
+    const ttlMs = Math.min(
+      this.sinceRead({ startedMs, ttlMs: API_KEY_ANSWER_TTL_MS }),
+      answer.expiresAt ? answer.expiresAt.getTime() - this.nowMs() : API_KEY_ANSWER_TTL_MS,
+    );
+    const value = JSON.stringify({ tokenHash: hash, answer, project, docsSessionSince });
+    await this.hold({ key: verifiedKey(lookupId), value, ttlMs });
+
+    return {
+      answer,
+      project,
+      docsSessionSince: docsSessionSince ? toDate(docsSessionSince) : null,
+    };
+  }
+
+  /** A held answer whose key expired since is refused, whatever the store's own clock says. */
+  private unexpired(
+    answer: apiKeyContractModule.ApiKeyVerification,
+  ): apiKeyContractModule.ApiKeyVerification | null {
+    return answer.expiresAt && answer.expiresAt.getTime() <= this.nowMs() ? null : answer;
+  }
+
+  private async readVerifiedToken({ token }: { token: string }): Promise<VerifiedRow | null> {
+    const split = this.findTokenParts(token);
+    if (!split) {
+      return null;
+    }
+
+    const row = await this.repository.findByLookupId({ lookupId: split.lookupId });
+    const expired =
+      row?.expiresAt != null && Temporal.Instant.compare(fromDate(row.expiresAt), this.now()) < 0;
+    if (!row || row.revokedAt || expired) {
+      return null;
+    }
+
+    // A key minted under a parent key (a CLI login key or a run's starting
+    // key) cannot outlive it — the cascade retires it on revoke, but that is
+    // one caller's work. A transient failure or a cascade-less revoke path
+    // must not leave this key alive, so this checks the parent directly.
+    const parent = row.parentApiKeyId ? await this.findParent(row.parentApiKeyId) : null;
+    if (parent && !parent.live) return null;
+
+    const verification = this.options.tokens.verify(split.secret, row.hashedSecret);
+    if (verification === "no_match") {
+      return null;
+    }
+
+    if (verification === "match_legacy") {
+      void this.repository
+        .upgradeHash({ id: row.id, hashedSecret: this.options.tokens.hash(split.secret) })
+        .catch(() => void 0);
+    }
+
+    const key = publicApiKey({ row: await this.bindings.attachOne(row) });
+    this.options.legacyGrants.mint(key);
+    const docsSessionSince = isDocsSessionKey({ key: row })
+      ? fromDate(row.createdAt)
+      : (parent?.docsSessionSince ?? null);
+
+    return { answer: { ...key, tokenType: "apiKey" }, docsSessionSince };
+  }
+
+  async findResolvedToken(input: {
+    token: string;
+    projectId?: string | null;
+  }): Promise<ResolvedApiKeyCredential | null> {
+    const parsed = apiKeyTokenResolutionInputSchema.parse(input);
+    if (getTokenType(parsed.token) === "apiKey") {
+      const resolved = await this.findCurrentApiKeyResolution(
+        parsed.token,
+        parsed.projectId ?? null,
+      );
+      if (resolved) return resolved;
+      if (!parsed.token.startsWith(API_KEY_PREFIX)) return null;
+    }
+
+    // A legacy key that authenticates stamps its project's last legacy use
+    // (spec: modules/api-key/specs/request-credential-type.feature).
+    const legacy = await this.findLegacyProjectKeyResolution(parsed.token);
+    if (legacy?.type === "legacyProjectKey") this.legacyUses.markUsed({ id: legacy.project.id });
+
+    return legacy;
+  }
+
+  async resolveOrganizationToken(input: { token: string }): Promise<OrganizationApiKeyResolution> {
+    const parsed = organizationApiKeyResolutionInputSchema.parse(input);
+    if (getTokenType(parsed.token) === "apiKey") {
+      const apiKey = await this.findVerifiedToken({ token: parsed.token });
+      if (apiKey) {
+        noteRequestCredential({
+          credentialType: keyCredentialTypeOf({ key: apiKey }),
+          apiKeyId: apiKey.id,
+          organizationId: apiKey.organizationId,
+        });
+        return organizationApiKeyResolutionSchema.parse({
+          ok: true,
+          resolved: {
+            type: "apiKey-org",
+            apiKeyId: apiKey.id,
+            userId: apiKey.userId,
+            organizationId: apiKey.organizationId,
+            ...(apiKey.name === LANGY_SESSION_API_KEY_NAME ? { isLangySessionKey: true } : {}),
+          },
+        });
+      }
+    }
+
+    const legacy = await this.findLegacyProjectKeyResolution(parsed.token);
+
+    return organizationApiKeyResolutionSchema.parse(
+      legacy
+        ? { ok: false, reason: "wrong_credential_class" }
+        : { ok: false, reason: "unusable_credential" },
+    );
+  }
+
+  private findTokenParts(token: string): { lookupId: string; secret: string } | null {
+    return this.options.tokens.findTokenParts(token);
+  }
+
+  /** Every key above must be live; a key minted under a docs key, at any depth, answers to it. */
+  private async findParent(
+    parentApiKeyId: string,
+  ): Promise<{ live: boolean; docsSessionSince: Instant | null }> {
+    let next: string | null = parentApiKeyId;
+    for (let depth = 0; next !== null; depth++) {
+      const parent: KeyLiveness | null =
+        depth < MAX_KEY_ANCESTRY ? await this.repository.findLivenessById({ id: next }) : null;
+      if (!parent || !isKeyLive({ key: parent, now: this.now() }))
+        return { live: false, docsSessionSince: null };
+      if (isDocsSessionKey({ key: parent }))
+        return { live: true, docsSessionSince: parent.createdAt };
+      next = parent.parentApiKeyId;
+    }
+    return { live: true, docsSessionSince: null };
+  }
+
+  private async findLegacyProjectKeyResolution(
+    token: string,
+  ): Promise<ResolvedApiKeyCredential | null> {
+    const project = await this.findLegacyProject(token);
+    if (!project) return null;
+    noteRequestCredential({
+      credentialType: "legacy_project_key",
+      projectId: project.id,
+      organizationId: project.organizationId,
+    });
+
+    return resolvedApiKeyTokenSchema.parse({ type: "legacyProjectKey", project });
+  }
+
+  private async findCurrentApiKeyResolution(
+    token: string,
+    projectId: string | null,
+  ): Promise<ResolvedApiKeyCredential | null> {
+    const held = await this.findAnswer({ token, projectId, withProject: true });
+    if (!held) {
+      return null;
+    }
+    const apiKey = held.answer;
+
+    const grantedProjectIds = findGrantedProjectIds(apiKey.grants);
+    const soleProjectId = grantedProjectIds.length === 1 ? grantedProjectIds[0] : undefined;
+    const effectiveProjectId = projectId ?? soleProjectId;
+    if (!effectiveProjectId) {
+      return null;
+    }
+
+    const project =
+      held.project?.id === effectiveProjectId
+        ? held.project
+        : await this.findProjectIdentity(effectiveProjectId);
+    if (!project || project.organizationId !== apiKey.organizationId) {
+      return null;
+    }
+
+    // Only a caller-NAMED project needs this: a self-scoped resolution derived
+    // the project from a binding already.
+    if (projectId && !bindingsReachProject(apiKey.grants, project)) {
+      return null;
+    }
+    noteRequestCredential({
+      credentialType: keyCredentialTypeOf({ key: apiKey }),
+      apiKeyId: apiKey.id,
+      projectId: project.id,
+      organizationId: apiKey.organizationId,
+    });
+
+    return resolvedApiKeyTokenSchema.parse({
+      type: "apiKey",
+      apiKeyId: apiKey.id,
+      userId: apiKey.userId,
+      organizationId: apiKey.organizationId,
+      ingestSourceType: apiKey.ingestSourceType,
+      ingestionTemplateId: apiKey.ingestionTemplateId,
+      isLangySessionKey: apiKey.name === LANGY_SESSION_API_KEY_NAME,
+      isUnattendedRunKey:
+        apiKey.isSystemManaged === true &&
+        apiKey.userId === null &&
+        !apiKey.parentApiKeyId &&
+        apiKey.name === WORKFLOW_RUN_API_KEY_NAME,
+      project,
+    });
+  }
+
+  /** A legacy key's project, held under the token's hash; a revoked column value never matches. */
+  private async findLegacyProject(token: string): Promise<ProjectIdentity | null> {
+    if (token.startsWith(REVOKED_LEGACY_KEY_PREFIX)) return null;
+
+    const key = legacyKey(tokenHash({ token }));
+    for (const raw of await this.findHeld(key)) {
+      const held = heldLegacySchema.safeParse(parseHeld({ raw }));
+      if (held.success) return held.data.project;
+    }
+
+    return shared({
+      pending: this.legacyReads,
+      key,
+      read: () => this.readLegacyProject({ token, key }),
+    });
+  }
+
+  private async readLegacyProject({
+    token,
+    key,
+  }: {
+    token: string;
+    key: string;
+  }): Promise<ProjectIdentity | null> {
+    const startedMs = this.nowMs();
+    const projectId = await this.options.projects.findIdByLegacyApiKey({ token });
+    const project = projectId ? await this.findProjectIdentity(projectId) : null;
+    await this.hold({
+      key,
+      value: JSON.stringify({ project }),
+      ttlMs: this.sinceRead({
+        startedMs,
+        ttlMs: project ? API_KEY_ANSWER_TTL_MS : API_KEY_UNKNOWN_TTL_MS,
+      }),
+    });
+
+    return project;
+  }
+
+  private findProjectIdentity(projectId: string): Promise<ProjectIdentity | null> {
+    return this.options.projects.findIdentity(projectId);
+  }
+
+  /** An unreachable cache is a miss, never a refusal: Postgres answers instead. */
+  private async findHeld(key: string): Promise<string[]> {
+    try {
+      return await this.answers.findValues({ key });
+    } catch (error) {
+      logger.warn({ error }, "the shared API-key answers could not be read; asking Postgres");
+      return [];
+    }
+  }
+
+  /**
+   * What is left of `ttlMs` counted from when the Postgres read began, so a refusal or delete
+   * written after the read began always outlives the fill it races.
+   */
+  private sinceRead({ startedMs, ttlMs }: { startedMs: number; ttlMs: number }): number {
+    return ttlMs - (this.nowMs() - startedMs);
+  }
+
+  /** A fill never overwrites: an entry already there, a revoke's refusal included, wins. */
+  private async hold(input: { key: string; value: string; ttlMs: number }): Promise<void> {
+    if (input.ttlMs <= 0) return;
+    try {
+      await this.answers.set({ ...input, onlyIfAbsent: true });
+    } catch (error) {
+      logger.warn({ error }, "an API-key answer could not be shared; the next request reads again");
+    }
+  }
+
+  private now(): Instant {
+    return (this.options.now ?? nowInstant)();
+  }
+
+  private nowMs(): number {
+    return this.now().epochMilliseconds;
+  }
+}
+
+function tokenHash({ token }: { token: string }): string {
+  return createHash("sha256").update(token).digest("hex");
+}

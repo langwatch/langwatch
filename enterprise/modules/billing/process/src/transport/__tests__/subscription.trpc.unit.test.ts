@@ -1,0 +1,385 @@
+/**
+ * @vitest-environment node
+ * The `subscription.*` surface: the eight names the billing page calls, the
+ * permission each is behind, and the two-step every checkout is.
+ */
+import { bindTrpcMiddlewareContext, createTrpcRuntime } from "@langwatch/api/trpc";
+import { UserEmailRequiredError } from "@langwatch/enterprise-billing-contract";
+import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
+import { initTRPC } from "@trpc/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  billingCallerEmailContext,
+  subscriptionTrpcTransport,
+  type BillingSubscriptionApi,
+} from "../subscription.trpc.ts";
+import type { BillingTrpcTestContext } from "./billing.trpc.harness.ts";
+
+const ORGANIZATION = "org_acme";
+const CUSTOMER = "cus_acme";
+
+const getOrCreateCustomerId = vi.fn<BillingSubscriptionApi["getOrCreateCustomerId"]>();
+const updateSubscriptionItems = vi.fn<BillingSubscriptionApi["updateSubscriptionItems"]>();
+const createOrUpdateSubscription = vi.fn<BillingSubscriptionApi["createOrUpdateSubscription"]>();
+const createBillingPortalSession = vi.fn<BillingSubscriptionApi["createBillingPortalSession"]>();
+const findLastNonCancelledSubscription =
+  vi.fn<BillingSubscriptionApi["findLastNonCancelledSubscription"]>();
+const previewProration = vi.fn<BillingSubscriptionApi["previewProration"]>();
+const notifyProspective = vi.fn<BillingSubscriptionApi["notifyProspective"]>();
+const listInvoices = vi.fn<BillingSubscriptionApi["listInvoices"]>();
+const developerSeats = vi.fn<BillingSubscriptionApi["developerSeats"]>();
+const previewDeveloperSeats = vi.fn<BillingSubscriptionApi["previewDeveloperSeats"]>();
+const setDeveloperSeats = vi.fn<BillingSubscriptionApi["setDeveloperSeats"]>();
+const paymentRecovery = vi.fn<BillingSubscriptionApi["paymentRecovery"]>();
+const paymentRecoveryDetails = vi.fn<BillingSubscriptionApi["paymentRecoveryDetails"]>();
+const paymentRecoveryPayLink = vi.fn<BillingSubscriptionApi["paymentRecoveryPayLink"]>();
+
+const billing: BillingSubscriptionApi = {
+  paymentRecovery,
+  paymentRecoveryDetails,
+  paymentRecoveryPayLink,
+  getOrCreateCustomerId,
+  updateSubscriptionItems,
+  createOrUpdateSubscription,
+  createBillingPortalSession,
+  findLastNonCancelledSubscription,
+  previewProration,
+  notifyProspective,
+  listInvoices,
+  developerSeats,
+  previewDeveloperSeats,
+  setDeveloperSeats,
+};
+
+const trpc = initTRPC.context<BillingTrpcTestContext>().create();
+
+function routerFor(permits: (permission: string) => boolean = () => true) {
+  return createTrpcRuntime<BillingTrpcTestContext>({
+    root: trpc,
+    procedure: trpc.procedure,
+    members: trpcTestMembers<BillingTrpcTestContext>({ permits }),
+  }).mount(subscriptionTrpcTransport, () => billing, {
+    // The address is the PROCESS's to resolve, off the session it authenticated.
+    middlewareContext: [
+      bindTrpcMiddlewareContext(billingCallerEmailContext, (ctx) => ctx.email ?? null),
+    ],
+  });
+}
+
+const router = routerFor();
+
+function callerWith(email: string | null) {
+  return router.createCaller({ actor: { id: "user_ana" }, email });
+}
+
+const caller = callerWith("ana@acme.com");
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  getOrCreateCustomerId.mockResolvedValue(CUSTOMER);
+});
+
+describe("given the mounted subscription router", () => {
+  describe("when its procedures are read", () => {
+    /** @scenario "The invite checkout is organization's procedure" */
+    it("exposes exactly the names the billing page calls", () => {
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
+        "addTeamMemberOrEvents",
+        "create",
+        "developerSeats",
+        "getLastSubscription",
+        "listInvoices",
+        "manage",
+        "paymentRecovery",
+        "paymentRecoveryDetails",
+        "paymentRecoveryPayLink",
+        "previewDeveloperSeats",
+        "previewProration",
+        "prospective",
+        "setDeveloperSeats",
+      ]);
+    });
+
+    it("reads with queries and changes what is paid with mutations", () => {
+      const kinds = Object.fromEntries(
+        Object.entries(router._def.procedures).map(([name, procedure]) => [
+          name,
+          (procedure as { _def: { type: string } })._def.type,
+        ]),
+      );
+
+      expect(kinds).toEqual({
+        addTeamMemberOrEvents: "mutation",
+        create: "mutation",
+        developerSeats: "query",
+        getLastSubscription: "query",
+        listInvoices: "query",
+        manage: "mutation",
+        paymentRecovery: "query",
+        paymentRecoveryDetails: "query",
+        paymentRecoveryPayLink: "mutation",
+        previewDeveloperSeats: "query",
+        previewProration: "query",
+        prospective: "mutation",
+        setDeveloperSeats: "mutation",
+      });
+    });
+  });
+});
+
+describe("given a caller who may read the organization but not manage it", () => {
+  describe("when a change to what the organization pays is asked for", () => {
+    /** @scenario "A Billing member approves seat requests but cannot invite" */
+    it("refuses the change and the invoices, and still answers the read", async () => {
+      const viewer = routerFor((permission) => permission === "organization:view").createCaller({
+        actor: { id: "user_ana" },
+        email: "ana@acme.com",
+      });
+
+      findLastNonCancelledSubscription.mockResolvedValue(null);
+
+      await expect(
+        viewer.create({ organizationId: ORGANIZATION, baseUrl: "https://app", plan: "PRO" }),
+      ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+      await expect(viewer.listInvoices({ organizationId: ORGANIZATION })).rejects.toMatchObject({
+        cause: { code: "permission_denied" },
+      });
+      await expect(
+        viewer.getLastSubscription({ organizationId: ORGANIZATION }),
+      ).resolves.toBeNull();
+      expect(createOrUpdateSubscription).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given an organization with an open recovery case", () => {
+  describe("when a member without subscription management asks for the case details", () => {
+    /** @scenario "Only people who can manage the subscription read the recovery case" */
+    it("refuses the details and the pay link, and still answers whether it is paused", async () => {
+      const viewer = routerFor((permission) => permission === "organization:view").createCaller({
+        actor: { id: "user_ana" },
+        email: "ana@acme.com",
+      });
+      paymentRecovery.mockResolvedValue({ state: "paused" });
+
+      await expect(
+        viewer.paymentRecoveryDetails({ organizationId: ORGANIZATION }),
+      ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+      await expect(
+        viewer.paymentRecoveryPayLink({ organizationId: ORGANIZATION }),
+      ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+      await expect(viewer.paymentRecovery({ organizationId: ORGANIZATION })).resolves.toEqual({
+        state: "paused",
+      });
+      expect(paymentRecoveryDetails).not.toHaveBeenCalled();
+      expect(paymentRecoveryPayLink).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a member who may upgrade but not manage the organization", () => {
+  const member = routerFor(
+    (permission) => permission === "organization:view" || permission === "subscription:upgrade",
+  ).createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
+
+  /** @scenario "A Member starts a checkout for an organization without a subscription" */
+  it("starts a checkout", async () => {
+    createOrUpdateSubscription.mockResolvedValue({ url: "https://checkout" });
+
+    await expect(
+      member.create({
+        organizationId: ORGANIZATION,
+        baseUrl: "https://app",
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+        membersToAdd: 2,
+      }),
+    ).resolves.toEqual({ url: "https://checkout" });
+  });
+
+  /** @scenario "A Member cannot open the billing portal" */
+  it("is refused the billing portal", async () => {
+    await expect(
+      member.manage({ organizationId: ORGANIZATION, baseUrl: "https://app" }),
+    ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+    expect(createBillingPortalSession).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A Member cannot change the seats of a live subscription" */
+  it("is refused a seat change on the live subscription", async () => {
+    await expect(
+      member.addTeamMemberOrEvents({
+        organizationId: ORGANIZATION,
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+        upgradeMembers: true,
+        upgradeTraces: false,
+        totalMembers: 1,
+        totalTraces: 0,
+      }),
+    ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+    expect(updateSubscriptionItems).not.toHaveBeenCalled();
+  });
+
+  it("is refused a Developer seat change", async () => {
+    await expect(
+      member.setDeveloperSeats({ organizationId: ORGANIZATION, quantity: 2 }),
+    ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+    expect(setDeveloperSeats).not.toHaveBeenCalled();
+  });
+});
+
+describe("when a first checkout is started", () => {
+  it("resolves the provider customer from the caller's own address first", async () => {
+    createOrUpdateSubscription.mockResolvedValue({ url: "https://checkout" });
+
+    await expect(
+      caller.create({
+        organizationId: ORGANIZATION,
+        baseUrl: "https://app",
+        plan: "PRO",
+        membersToAdd: 3,
+        currency: "EUR",
+        billingInterval: "annual",
+      }),
+    ).resolves.toEqual({ url: "https://checkout" });
+
+    expect(getOrCreateCustomerId).toHaveBeenCalledWith({
+      user: { email: "ana@acme.com" },
+      organizationId: ORGANIZATION,
+    });
+    expect(createOrUpdateSubscription).toHaveBeenCalledWith({
+      startedByUserId: "user_ana",
+      organizationId: ORGANIZATION,
+      baseUrl: "https://app",
+      plan: "PRO",
+      customerId: CUSTOMER,
+      membersToAdd: 3,
+      currency: "EUR",
+      billingInterval: "annual",
+    });
+  });
+});
+
+describe("when the billing portal is opened", () => {
+  it("opens it against the same customer the checkout would use", async () => {
+    createBillingPortalSession.mockResolvedValue({ url: "https://portal" });
+
+    await expect(
+      caller.manage({ organizationId: ORGANIZATION, baseUrl: "https://app" }),
+    ).resolves.toEqual({ url: "https://portal" });
+
+    expect(createBillingPortalSession).toHaveBeenCalledWith({
+      customerId: CUSTOMER,
+      baseUrl: "https://app",
+      organizationId: ORGANIZATION,
+    });
+  });
+});
+
+describe("when the seat and volume lines are raised on a live subscription", () => {
+  it("prices the change at the instant the customer was quoted", async () => {
+    updateSubscriptionItems.mockResolvedValue({ success: true });
+
+    await expect(
+      caller.addTeamMemberOrEvents({
+        organizationId: ORGANIZATION,
+        plan: "GROWTH",
+        upgradeMembers: true,
+        upgradeTraces: false,
+        totalMembers: 9,
+        totalTraces: 0,
+        quotedAt: 1_700_000_000,
+      }),
+    ).resolves.toEqual({ success: true });
+
+    expect(updateSubscriptionItems).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION,
+      plan: "GROWTH",
+      upgradeMembers: true,
+      upgradeTraces: false,
+      totalMembers: 9,
+      totalTraces: 0,
+      quotedAt: 1_700_000_000,
+    });
+    // No customer is resolved for a subscription that already exists.
+    expect(getOrCreateCustomerId).not.toHaveBeenCalled();
+  });
+});
+
+describe("when the most recent subscription is read", () => {
+  it("answers the provider's own object, and nothing where there is none", async () => {
+    findLastNonCancelledSubscription.mockResolvedValue({ id: "sub_1", status: "active" });
+
+    await expect(caller.getLastSubscription({ organizationId: ORGANIZATION })).resolves.toEqual({
+      id: "sub_1",
+      status: "active",
+    });
+
+    findLastNonCancelledSubscription.mockResolvedValue(null);
+
+    await expect(caller.getLastSubscription({ organizationId: ORGANIZATION })).resolves.toBeNull();
+  });
+});
+
+describe("when a seat change is quoted before it is confirmed", () => {
+  it("answers the quote unchanged, so the charge can reproduce it", async () => {
+    previewProration.mockResolvedValue({ amountDueCents: 4200, quotedAt: 1_700_000_000 });
+
+    await expect(
+      caller.previewProration({ organizationId: ORGANIZATION, newTotalSeats: 6 }),
+    ).resolves.toEqual({ amountDueCents: 4200, quotedAt: 1_700_000_000 });
+  });
+});
+
+describe("when sales is told an organization asked about a negotiated plan", () => {
+  it("names the caller's own address on the notice", async () => {
+    notifyProspective.mockResolvedValue({ delivered: true });
+
+    await caller.prospective({
+      organizationId: ORGANIZATION,
+      plan: "ACCELERATE",
+      note: "60 seats",
+    });
+
+    expect(notifyProspective).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION,
+      plan: "ACCELERATE",
+      actorEmail: "ana@acme.com",
+      note: "60 seats",
+    });
+  });
+
+  describe("given a caller the process resolved no address for", () => {
+    it("hands the application no address, and answers the refusal it raises", async () => {
+      notifyProspective.mockRejectedValueOnce(new UserEmailRequiredError());
+
+      await expect(
+        callerWith(null).prospective({ organizationId: ORGANIZATION, plan: "ACCELERATE" }),
+      ).rejects.toMatchObject({ cause: { code: "billing_customer_email_required" } });
+      expect(notifyProspective).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION,
+        plan: "ACCELERATE",
+        actorEmail: null,
+      });
+    });
+  });
+});
+
+describe("when the billing page lists invoices", () => {
+  it("answers the organization's own invoices", async () => {
+    const invoice = {
+      id: "in_1",
+      number: "0001",
+      date: 1_700_000_000,
+      amountDue: 4200,
+      currency: "eur",
+      status: "paid",
+      pdfUrl: null,
+      hostedUrl: null,
+    };
+    listInvoices.mockResolvedValue([invoice]);
+
+    await expect(caller.listInvoices({ organizationId: ORGANIZATION })).resolves.toEqual([invoice]);
+    expect(listInvoices).toHaveBeenCalledWith({ organizationId: ORGANIZATION });
+  });
+});

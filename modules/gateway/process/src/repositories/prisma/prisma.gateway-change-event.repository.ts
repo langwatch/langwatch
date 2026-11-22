@@ -1,0 +1,108 @@
+/**
+ * GatewayChangeEvent is the monotonic revision feed the Go gateway long-polls
+ * via GET /api/internal/gateway/changes?since=<revision>. Any mutation to a
+ * gateway-visible artifact (VK, budget, ModelProvider) must append here.
+ */
+import { skipTenantCheck } from "@langwatch/prisma-client";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
+
+import type {
+  GatewayChangeEventsRepository,
+  AppendGatewayChangeEventInput,
+  GatewayChangeEventKind,
+} from "../gateway-change-event.repository.ts";
+import type { GatewayPersistenceTransaction } from "../gateway-transaction.repository.ts";
+
+/** The client slice the revision feed needs. */
+type GatewayChangeEventDatabase = Pick<PrismaClient, "gatewayChangeEvent" | "$transaction">;
+
+export class PrismaGatewayChangeEventsRepository implements GatewayChangeEventsRepository {
+  static create(database: GatewayChangeEventDatabase): PrismaGatewayChangeEventsRepository {
+    return new PrismaGatewayChangeEventsRepository(database);
+  }
+
+  constructor(private readonly prisma: GatewayChangeEventDatabase) {}
+
+  async append(
+    input: AppendGatewayChangeEventInput,
+    transaction?: GatewayPersistenceTransaction,
+  ): Promise<{ revision: bigint }> {
+    if (!transaction) {
+      return this.prisma.$transaction((tx) => this.append(input, tx));
+    }
+    const client = transaction as Prisma.TransactionClient;
+    // One appender per organization until commit: a later revision committing first
+    // would let the feed's cursor pass an earlier one (a revoke) before it is visible.
+    await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`gateway-change-feed:${input.organizationId}`}, 0)) ${skipTenantCheck(
+      {
+        // A lock, not a read; its key is itself one organization's.
+        SKIP_TENANT_CHECK: true,
+      },
+    )}`;
+    const event = await client.gatewayChangeEvent.create({
+      data: {
+        organizationId: input.organizationId,
+        projectId: input.projectId ?? null,
+        kind: input.kind,
+        virtualKeyId: input.virtualKeyId ?? null,
+        budgetId: input.budgetId ?? null,
+        modelProviderId: input.modelProviderId ?? null,
+        payload: jsonInput(input.payload),
+      },
+      select: { revision: true },
+    });
+    return { revision: event.revision };
+  }
+
+  /**
+   * Fetch events strictly greater than `since`. The gateway keeps its own
+   * revision pointer and calls this repeatedly via the long-poll endpoint.
+   */
+  async since(
+    organizationId: string,
+    since: bigint,
+    limit = 500,
+  ): Promise<{
+    currentRevision: bigint;
+    events: {
+      revision: bigint;
+      kind: GatewayChangeEventKind;
+      virtualKeyId: string | null;
+      budgetId: string | null;
+      modelProviderId: string | null;
+      projectId: string | null;
+    }[];
+  }> {
+    const events = await this.prisma.gatewayChangeEvent.findMany({
+      where: { organizationId, revision: { gt: since } },
+      orderBy: { revision: "asc" },
+      take: limit,
+      select: {
+        revision: true,
+        kind: true,
+        virtualKeyId: true,
+        budgetId: true,
+        modelProviderId: true,
+        projectId: true,
+      },
+    });
+    const last = events.at(-1);
+    const currentRevision = last?.revision ?? since;
+    return { currentRevision, events };
+  }
+
+  async currentRevision(organizationId: string): Promise<bigint> {
+    const last = await this.prisma.gatewayChangeEvent.findFirst({
+      where: { organizationId },
+      orderBy: { revision: "desc" },
+      select: { revision: true },
+    });
+    return last?.revision ?? 0n;
+  }
+}
+
+function jsonInput(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  if (value === undefined || value === null) return Prisma.JsonNull;
+  return z.json().parse(value) as Prisma.InputJsonValue;
+}

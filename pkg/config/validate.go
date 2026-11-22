@@ -38,7 +38,7 @@ func Validate(ctx context.Context, cfg any) error {
 // envPathResolver builds a map from "FieldA.FieldB" → "PREFIX_A_PREFIX_B"
 // by walking env struct tags.
 func envPathResolver(t reflect.Type, prefix string) map[string]string {
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { DeviceFlowError } from "../device-flow";
 import type { GovernanceConfig } from "../config";
+import { DeviceFlowError } from "../device-flow";
 import {
   canRefreshSession,
   isAccessTokenExpired,
@@ -53,9 +53,7 @@ describe("isAccessTokenExpired", () => {
 describe("canRefreshSession", () => {
   it("needs a refresh token", () => {
     expect(canRefreshSession(baseConfig())).toBe(true);
-    expect(canRefreshSession(baseConfig({ refresh_token: undefined }))).toBe(
-      false,
-    );
+    expect(canRefreshSession(baseConfig({ refresh_token: undefined }))).toBe(false);
   });
 });
 
@@ -84,10 +82,9 @@ describe("refreshSession", () => {
 
   it("reports unavailable with no refresh token to spend", async () => {
     const refreshImpl = vi.fn();
-    const outcome = await refreshSession(
-      baseConfig({ refresh_token: undefined }),
-      { refreshImpl: refreshImpl as never },
-    );
+    const outcome = await refreshSession(baseConfig({ refresh_token: undefined }), {
+      refreshImpl: refreshImpl as never,
+    });
 
     expect(outcome.status).toBe("unavailable");
     expect(refreshImpl).not.toHaveBeenCalled();
@@ -194,18 +191,52 @@ describe("refreshSession", () => {
     expect(cfg.access_token).toBe("lw_at_old");
   });
 
-  it("still hands back a working token when the config cannot be written", async () => {
-    const cfg = baseConfig();
-    const outcome = await refreshSession(cfg, {
-      refreshImpl: (async () => freshPair) as never,
-      saveImpl: (() => {
-        throw new Error("EROFS");
-      }) as never,
-      loadImpl: vi.fn() as never,
-    });
+  describe("when the config cannot be saved", () => {
+    /** @scenario "A refresh is refused when the config cannot be saved" */
+    it("refuses before sending the refresh token, so it stays valid", async () => {
+      const cfg = baseConfig();
+      const refreshImpl = vi.fn(async () => freshPair);
 
-    expect(outcome.status).toBe("refreshed");
-    expect(cfg.access_token).toBe("lw_at_new");
+      await expect(
+        refreshSession(cfg, {
+          refreshImpl: refreshImpl as never,
+          saveImpl: vi.fn(),
+          loadImpl: vi.fn() as never,
+          writeProblemImpl: () => "ENOSPC: no space left on device",
+        }),
+      ).rejects.toMatchObject({
+        code: "config_not_writable",
+        message: expect.stringContaining("ENOSPC: no space left on device"),
+      });
+      expect(refreshImpl).not.toHaveBeenCalled();
+      expect(cfg.refresh_token).toBe("lw_rt_old");
+    });
+  });
+
+  describe("when the save fails after the server rotated the pair", () => {
+    /** @scenario "A rotated session that could not be saved is reported" */
+    it("hands back the working token and warns that the next run may ask to log in", async () => {
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+      const cfg = baseConfig();
+      try {
+        const outcome = await refreshSession(cfg, {
+          refreshImpl: (async () => freshPair) as never,
+          saveImpl: (() => {
+            throw new Error("EROFS: read-only file system");
+          }) as never,
+          loadImpl: vi.fn() as never,
+          writeProblemImpl: () => undefined,
+        });
+
+        expect(outcome.status).toBe("refreshed");
+        expect(cfg.access_token).toBe("lw_at_new");
+        const written = stderr.mock.calls.map((c) => String(c[0])).join("");
+        expect(written).toContain("EROFS: read-only file system");
+        expect(written).toContain("may ask you to log in again");
+      } finally {
+        stderr.mockRestore();
+      }
+    });
   });
 });
 

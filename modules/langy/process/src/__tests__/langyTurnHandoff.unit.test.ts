@@ -1,0 +1,109 @@
+import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  LANGY_HANDOFF_TTL_SECONDS,
+  langyTurnHandoffSchema,
+} from "../repositories/langy-live-turn.repository.ts";
+import { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
+
+function fakeRedis() {
+  return memoryRedisDouble();
+}
+
+const handoff = {
+  projectId: "project-1",
+  conversationId: "conversation-1",
+  turnId: "turn-1",
+  actorUserId: "user-1",
+  prompt: "hello",
+  system: "be helpful",
+  credentials: {
+    llmVirtualKey: "virtual-key",
+    langwatchEndpoint: "https://langwatch.example",
+    gatewayBaseUrl: "https://gateway.example/v1",
+    organizationId: "organization-1",
+  },
+  runToken: "run-token",
+};
+
+describe("LangyTurnHandoffRedisRepository", () => {
+  it("round-trips a handoff by conversation and turn", async () => {
+    const redis = fakeRedis();
+    const store = LangyTurnHandoffRedisRepository.create({ redis });
+
+    await store.stash(handoff);
+
+    await expect(
+      store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
+    ).resolves.toEqual({ kind: "hit", handoff });
+  });
+
+  it("returns null for a missing or corrupt handoff", async () => {
+    const redis = fakeRedis();
+    const store = LangyTurnHandoffRedisRepository.create({ redis });
+
+    await expect(
+      store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
+    ).resolves.toEqual({ kind: "miss" });
+
+    await redis.set("langy:handoff:{conversation-1}:turn-1", "not-json");
+    await expect(
+      store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
+    ).resolves.toEqual({ kind: "miss" });
+
+    await redis.set(
+      "langy:handoff:{conversation-1}:turn-1",
+      JSON.stringify({ ...handoff, credentials: {} }),
+    );
+    await expect(
+      store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
+    ).resolves.toEqual({ kind: "miss" });
+  });
+
+  /** @scenario A turn handoff written during a rolling deploy parses on either release */
+  it("reads a handoff the previous release wrote with its permit flag", async () => {
+    const redis = fakeRedis();
+    const store = LangyTurnHandoffRedisRepository.create({ redis });
+    const previous = { ...handoff, permitReserved: true };
+    await redis.set("langy:handoff:{conversation-1}:turn-1", JSON.stringify(previous));
+
+    await expect(
+      store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
+    ).resolves.toEqual({ kind: "hit", handoff: previous });
+  });
+
+  /** @scenario A turn handoff written during a rolling deploy parses on either release */
+  it("writes the permit flag the previous release's strict parse requires", () => {
+    const previousRelease = langyTurnHandoffSchema.required({ permitReserved: true });
+    expect(previousRelease.validate({ ...handoff, permitReserved: false })).toBe(true);
+    expect(previousRelease.validate(handoff)).toBe(false);
+  });
+
+  it("refreshes a live handoff without rewriting it", async () => {
+    const keys = memoryRedisStore();
+    await LangyTurnHandoffRedisRepository.create({
+      redis: memoryRedisDouble({ store: keys }),
+    }).stash(handoff);
+    const set = vi.fn(async () => "OK");
+    const redis = memoryRedisDouble({ store: keys, script: { set } });
+    const store = LangyTurnHandoffRedisRepository.create({ redis });
+
+    await expect(
+      store.refresh({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
+    ).resolves.toBe(true);
+    expect(await redis.ttl("langy:handoff:{conversation-1}:turn-1")).toBe(
+      LANGY_HANDOFF_TTL_SECONDS,
+    );
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  it("does not recreate an expired handoff", async () => {
+    const redis = fakeRedis();
+    const store = LangyTurnHandoffRedisRepository.create({ redis });
+
+    await expect(
+      store.refresh({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
+    ).resolves.toBe(false);
+  });
+});

@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..models.get_api_experiments_runs_by_run_id_response_200_status import (
     GetApiExperimentsRunsByRunIdResponse200Status,
@@ -31,6 +30,7 @@ class GetApiExperimentsRunsByRunIdResponse200:
         status (GetApiExperimentsRunsByRunIdResponse200Status):
         progress (float): Cells finished so far
         total (float): Cells in the run
+        concurrency (int | Unset): Cells the run executes at once, as it was fixed when the run started
         started_at (float | Unset): Unix milliseconds
         finished_at (float | Unset): Unix milliseconds; set once the run is no longer running
         summary (GetApiExperimentsRunsByRunIdResponse200Summary | Unset): Present when completed
@@ -45,13 +45,13 @@ class GetApiExperimentsRunsByRunIdResponse200:
     status: GetApiExperimentsRunsByRunIdResponse200Status
     progress: float
     total: float
+    concurrency: int | Unset = UNSET
     started_at: float | Unset = UNSET
     finished_at: float | Unset = UNSET
     summary: GetApiExperimentsRunsByRunIdResponse200Summary | Unset = UNSET
     error: str | Unset = UNSET
     domain_error: GetApiExperimentsRunsByRunIdResponse200DomainError | Unset = UNSET
     trace_id: str | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         run_id = self.run_id
@@ -61,6 +61,8 @@ class GetApiExperimentsRunsByRunIdResponse200:
         progress = self.progress
 
         total = self.total
+
+        concurrency = self.concurrency
 
         started_at = self.started_at
 
@@ -79,7 +81,7 @@ class GetApiExperimentsRunsByRunIdResponse200:
         trace_id = self.trace_id
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "runId": run_id,
@@ -88,6 +90,8 @@ class GetApiExperimentsRunsByRunIdResponse200:
                 "total": total,
             }
         )
+        if concurrency is not UNSET:
+            field_dict["concurrency"] = concurrency
         if started_at is not UNSET:
             field_dict["startedAt"] = started_at
         if finished_at is not UNSET:
@@ -121,6 +125,8 @@ class GetApiExperimentsRunsByRunIdResponse200:
 
         total = d.pop("total")
 
+        concurrency = d.pop("concurrency", UNSET)
+
         started_at = d.pop("startedAt", UNSET)
 
         finished_at = d.pop("finishedAt", UNSET)
@@ -148,6 +154,7 @@ class GetApiExperimentsRunsByRunIdResponse200:
             status=status,
             progress=progress,
             total=total,
+            concurrency=concurrency,
             started_at=started_at,
             finished_at=finished_at,
             summary=summary,
@@ -156,21 +163,4 @@ class GetApiExperimentsRunsByRunIdResponse200:
             trace_id=trace_id,
         )
 
-        get_api_experiments_runs_by_run_id_response_200.additional_properties = d
         return get_api_experiments_runs_by_run_id_response_200
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

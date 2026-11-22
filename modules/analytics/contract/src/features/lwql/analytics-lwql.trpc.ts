@@ -1,0 +1,165 @@
+/**
+ * Every `analytics.lwql.*` procedure, declared once. The dotted namespace is the
+ * browser's cache key and the audit path both, and nothing here validates SQL.
+ * @see modules/analytics/specs/analytics-lwql-workbench.feature
+ */
+import { defineTrpcContract, type Named } from "@langwatch/module";
+import { z } from "zod";
+
+import { lwqlMemberProjectsRequestSchema, lwqlStatementSchema } from "./analytics-lwql.schemas.ts";
+import {
+  langWatchQLAvailabilitySchema,
+  langWatchQLQueryResultSchema,
+  langWatchQLSchema,
+  traceSourcesSchema,
+} from "./analytics.lwql.ts";
+import {
+  LWQL_CLAUSES,
+  LWQL_VIOLATION_CODES,
+  type LangWatchQLViolation,
+} from "./langwatch-ql-violation.ts";
+
+/** The project every workbench question is asked about. */
+const lwqlProjectScopeSchemaDefinition = z.object({ projectId: z.string() });
+export interface LwqlProjectScopeSchema extends Named<typeof lwqlProjectScopeSchemaDefinition> {}
+export const lwqlProjectScopeSchema: LwqlProjectScopeSchema = lwqlProjectScopeSchemaDefinition;
+
+/** One statement, run for one project. */
+const lwqlRunRequestSchemaDefinition = z.object({
+  ...lwqlProjectScopeSchema.shape,
+  ...lwqlStatementSchema.shape,
+});
+export interface LwqlRunRequestSchema extends Named<typeof lwqlRunRequestSchemaDefinition> {}
+export const lwqlRunRequestSchema: LwqlRunRequestSchema = lwqlRunRequestSchemaDefinition;
+
+/** An id a log line records: bounded, so a run cannot write an arbitrary string into the logs. */
+const telemetryIdSchema = z.string().min(1).max(200);
+
+/** What the browser says of the widget a run is for. */
+const lwqlRunTelemetryRequestSchemaDefinition = z
+  .object({
+    dashboardId: telemetryIdSchema.optional(),
+    widgetId: telemetryIdSchema,
+    templateId: telemetryIdSchema.optional(),
+  })
+  .strict();
+/** The named type of {@link lwqlRunTelemetryRequestSchema}. */
+export interface LwqlRunTelemetryRequestSchema extends Named<
+  typeof lwqlRunTelemetryRequestSchemaDefinition
+> {}
+/** The widget ids a query request may carry for its log line; it can name no caller. */
+export const lwqlRunTelemetryRequestSchema: LwqlRunTelemetryRequestSchema =
+  lwqlRunTelemetryRequestSchemaDefinition;
+/** What the browser says of the widget a run is for. */
+export type LangWatchQLRunTelemetryRequest = z.infer<typeof lwqlRunTelemetryRequestSchema>;
+
+/**
+ * One statement run, kept to the trace origins a dashboard query counts (dashboards-v2 AC200):
+ * its stored list, or `null` when it stores none, which the server reads as the default. Absent,
+ * the run is no widget's and reads every origin. The REST query runs what it is sent.
+ */
+const lwqlQueryRequestSchemaDefinition = z.object({
+  ...lwqlRunRequestSchema.shape,
+  sources: traceSourcesSchema.nullable().optional(),
+  /** The projects the card reads; absent, the board's project (AC206). */
+  projects: lwqlMemberProjectsRequestSchema.optional(),
+  /**
+   * The widget a run is for, recorded on its log line only. Present, the server names the
+   * caller `dashboard_widget`; absent, `workbench`. The browser never names the caller.
+   */
+  telemetry: lwqlRunTelemetryRequestSchema.optional(),
+});
+export interface LwqlQueryRequestSchema extends Named<typeof lwqlQueryRequestSchemaDefinition> {}
+export const lwqlQueryRequestSchema: LwqlQueryRequestSchema = lwqlQueryRequestSchemaDefinition;
+
+/** One refusal, positioned where the parser or the policy found it. */
+export const lwqlViolationSchema: z.ZodType<LangWatchQLViolation> = z
+  .object({
+    code: z.enum(LWQL_VIOLATION_CODES),
+    clause: z.enum(LWQL_CLAUSES),
+    message: z.string(),
+    at: z.object({ line: z.number(), column: z.number() }).optional(),
+    hint: z.string(),
+    allowedFunctions: z.array(z.string()).readonly().optional(),
+    availableViews: z.array(z.string()).readonly().optional(),
+    view: z.string().optional(),
+    availableColumns: z.array(z.string()).readonly().optional(),
+    maxRows: z.number().optional(),
+    missingGates: z.array(z.string()).readonly().optional(),
+  })
+  .strict();
+
+/** What the policy says of a statement: every refusal, none when it would be admitted. */
+const lwqlValidationResultSchemaDefinition = z.object({
+  violations: z.array(lwqlViolationSchema),
+});
+export interface LwqlValidationResultSchema extends Named<
+  typeof lwqlValidationResultSchemaDefinition
+> {}
+export const lwqlValidationResultSchema: LwqlValidationResultSchema =
+  lwqlValidationResultSchemaDefinition;
+
+export type LangWatchQLValidationResult = z.infer<typeof lwqlValidationResultSchema>;
+
+/** A project the member may name on a card's query: its id and the name the picker shows. */
+const lwqlReadableProjectSchemaDefinition = z.object({ id: z.string(), name: z.string() });
+export interface LwqlReadableProjectSchema extends Named<
+  typeof lwqlReadableProjectSchemaDefinition
+> {}
+export const lwqlReadableProjectSchema: LwqlReadableProjectSchema =
+  lwqlReadableProjectSchemaDefinition;
+export type LangWatchQLReadableProject = z.infer<typeof lwqlReadableProjectSchema>;
+
+const lwqlReadableProjectsSchemaDefinition = z.object({
+  projects: z.array(lwqlReadableProjectSchema),
+});
+export interface LwqlReadableProjectsSchema extends Named<
+  typeof lwqlReadableProjectsSchemaDefinition
+> {}
+export const lwqlReadableProjectsSchema: LwqlReadableProjectsSchema =
+  lwqlReadableProjectsSchemaDefinition;
+
+/**
+ * Where the span widgets' history starts: `span_metrics` holds spans from `from` on, or all of
+ * them when null; `rebuilding` while its replay has not started yet (ADR-006).
+ */
+const lwqlSpanDataFloorSchemaDefinition = z.object({
+  from: z.string().nullable(),
+  rebuilding: z.boolean(),
+});
+export interface LwqlSpanDataFloorSchema extends Named<typeof lwqlSpanDataFloorSchemaDefinition> {}
+export const lwqlSpanDataFloorSchema: LwqlSpanDataFloorSchema = lwqlSpanDataFloorSchemaDefinition;
+export type LangWatchQLSpanDataFloor = z.infer<typeof lwqlSpanDataFloorSchema>;
+
+export const analyticsLwqlTrpc = defineTrpcContract("analytics.lwql")
+  // Separate from `schema` because the catalog is answerable without an
+  // executor, so a deployment with no LangWatchQL identity would describe a
+  // surface it cannot run. The navigation gates on this, never on the schema.
+  .query("availability")
+  .withInput(lwqlProjectScopeSchema)
+  .withOutput(langWatchQLAvailabilitySchema)
+
+  /** The datasets and columns this member's permissions unlock. */
+  .query("schema")
+  .withInput(lwqlProjectScopeSchema)
+  .withOutput(langWatchQLSchema)
+
+  /** The statement's refusals for this member, with positions. Never executes. */
+  .query("validate")
+  .withInput(lwqlRunRequestSchema)
+  .withOutput(lwqlValidationResultSchema)
+
+  /** Where span_metrics' history starts, so a span widget can say its data begins there. */
+  .query("spanDataFloor")
+  .withInput(lwqlProjectScopeSchema)
+  .withOutput(lwqlSpanDataFloorSchema)
+
+  /** The projects of the organization this member may read, for the editor's project picker. */
+  .query("readableProjects")
+  .withInput(lwqlProjectScopeSchema)
+  .withOutput(lwqlReadableProjectsSchema)
+
+  .mutation("query")
+  .withInput(lwqlQueryRequestSchema)
+  .withOutput(langWatchQLQueryResultSchema)
+  .build();

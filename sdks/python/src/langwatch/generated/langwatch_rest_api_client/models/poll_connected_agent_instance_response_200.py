@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 if TYPE_CHECKING:
     from ..models.poll_connected_agent_instance_response_200_frames_item_type_0 import (
@@ -23,14 +22,12 @@ class PollConnectedAgentInstanceResponse200:
     """
     Attributes:
         frames (list[PollConnectedAgentInstanceResponse200FramesItemType0 |
-            PollConnectedAgentInstanceResponse200FramesItemType1]): The call and cancel frames waiting for the instance;
-            empty once the poll wait passes with none.
+            PollConnectedAgentInstanceResponse200FramesItemType1]):
     """
 
     frames: list[
         PollConnectedAgentInstanceResponse200FramesItemType0 | PollConnectedAgentInstanceResponse200FramesItemType1
     ]
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.poll_connected_agent_instance_response_200_frames_item_type_0 import (
@@ -48,7 +45,7 @@ class PollConnectedAgentInstanceResponse200:
             frames.append(frames_item)
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "frames": frames,
@@ -99,21 +96,4 @@ class PollConnectedAgentInstanceResponse200:
             frames=frames,
         )
 
-        poll_connected_agent_instance_response_200.additional_properties = d
         return poll_connected_agent_instance_response_200
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

@@ -69,10 +69,8 @@ export function parseCommand(line: string): ManagerCommand | undefined {
 // ---- wrapper -> manager -------------------------------------------------
 
 /**
- * `resumed` reports whether the worker continued a persisted session its home
- * already held (see session.ts). The manager reads it to skip the transcript
- * seed for a resumed conversation; an absent field reads as false, so an
- * older worker binary keeps the seed path.
+ * `resumed`: the worker continued a persisted session (see session.ts); an
+ * absent field reads as false, so an older worker keeps the seed path.
  */
 export type ReadyEvent = { type: "ready"; protocol: number; resumed: boolean };
 export type PongEvent = { type: "pong" };
@@ -101,6 +99,8 @@ export type ToolEndEvent = {
   input: unknown;
   isError: boolean;
   output: string;
+  /** The call ran on the developer's machine via local control; absent means it ran sandboxed. */
+  local?: boolean;
 };
 export type PlanItem = { content: string; status: string };
 export type PlanEvent = { type: "plan"; turnId: string; items: PlanItem[] };
@@ -112,6 +112,36 @@ export type TurnDoneEvent = {
 };
 export type HandoffEvent = { type: "handoff"; turnId: string; seed: string };
 
+/**
+ * The guided turn end guard's report (guided-turn-end.ts): a continuation
+ * was appended, or the guard gave up on a second bare end. `missing` names
+ * what the turn owed in the guard's own words, never the model's text.
+ */
+export type GuidedTurnEvent = {
+  type: "guided_turn";
+  turnId: string;
+  event: "guided_turn_continued" | "guided_turn_bare_end";
+  /** 1 for the calls before any card answered inside the turn, one more per answered card. */
+  segment: number;
+  missing: string[];
+};
+
+/**
+ * A model call failed for a transient reason and is made again after
+ * `delayMs` (model-retry.ts). `attempt` counts retries from 1 up to
+ * `maxAttempts`; the call that failed first is not one of them.
+ */
+export type RetryingEvent = {
+  type: "retrying";
+  turnId: string;
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+};
+
+/** A retried model call answered, so the retry line the manager shows is over. */
+export type RetrySettledEvent = { type: "retry_settled"; turnId: string };
+
 export type WorkerEvent =
   | ReadyEvent
   | PongEvent
@@ -122,6 +152,9 @@ export type WorkerEvent =
   | ToolUpdateEvent
   | ToolEndEvent
   | PlanEvent
+  | GuidedTurnEvent
+  | RetryingEvent
+  | RetrySettledEvent
   | TurnDoneEvent
   | HandoffEvent;
 
@@ -174,13 +207,7 @@ export function boundJsonValue({
 }
 
 /** Byte-accurate truncation that never splits a code point. */
-export function truncateToBytes({
-  text,
-  maxBytes,
-}: {
-  text: string;
-  maxBytes: number;
-}): string {
+export function truncateToBytes({ text, maxBytes }: { text: string; maxBytes: number }): string {
   if (maxBytes <= 0) return "";
   const buffer = Buffer.from(text, "utf8");
   if (buffer.byteLength <= maxBytes) return text;

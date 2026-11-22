@@ -1,19 +1,16 @@
 /**
- * Scenario tests for the refund rule.
- *
- * Both tests run the agent in this process, no HTTP server needed. The pro
- * test runs the connected agent itself, so the simulation on the platform and
- * this test share one code path.
+ * Scenario tests for the refund rule. Both run the agent in-process; the
+ * pro test runs the connected agent itself, sharing one code path with
+ * the platform simulation.
  */
 import "dotenv/config";
-
 import { openai } from "@ai-sdk/openai";
 import scenario, { AgentRole, type AgentAdapter } from "@langwatch/scenario";
 import type { ModelMessage } from "ai";
 import { describe, expect, it } from "vitest";
 
-import { answerTurn } from "../src/agent.js";
-import { acmeSupport } from "../src/server.js";
+import { answerTurn } from "../src/agent.ts";
+import { acmeSupport } from "../src/server.ts";
 
 const judgeModel = openai("gpt-5-mini");
 

@@ -8,12 +8,22 @@ sidebarTitle: Python
 
 Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model` on the OpenAI-shaped and Anthropic-shaped routes; see [Model naming](/ai-gateway/model-naming).
 
-| SDK | Base URL | Where the key goes |
-|---|---|---|
-| OpenAI | `https://gateway.langwatch.ai/v1` | `api_key`, sent as `Authorization: Bearer` |
-| Anthropic | `https://gateway.langwatch.ai` | `api_key`, sent as `X-Api-Key` |
-| Google GenAI | `https://gateway.langwatch.ai` | `api_key`, sent as `X-Goog-Api-Key` |
-| ElevenLabs | `https://gateway.langwatch.ai` | `api_key`, sent as `Xi-Api-Key` |
+| SDK          | Base URL                          | Where the key goes                         |
+| ------------ | --------------------------------- | ------------------------------------------ |
+| OpenAI       | `https://gateway.langwatch.ai/v1` | `api_key`, sent as `Authorization: Bearer` |
+| Anthropic    | `https://gateway.langwatch.ai`    | `api_key`, sent as `X-Api-Key`             |
+| Google GenAI | `https://gateway.langwatch.ai`    | `api_key`, sent as `X-Goog-Api-Key`        |
+| ElevenLabs   | `https://gateway.langwatch.ai`    | `api_key`, sent as `Xi-Api-Key`            |
+
+## Install
+
+```bash
+pip install openai
+# add the SDK you use: anthropic, google-genai, langchain-openai, llama-index-llms-openai
+# and langwatch, to link the gateway span to your trace
+```
+
+The virtual key (`vk-lw-...`) is not your LangWatch API key. `LANGWATCH_API_KEY` is only needed by the LangWatch SDK: to link the gateway span to your own trace, and to manage keys and budgets from code.
 
 ## OpenAI SDK
 
@@ -26,7 +36,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="openai/gpt-5-mini",
+    model="openai/gpt-6-luna",
     messages=[{"role": "user", "content": "Say hi in one word"}],
 )
 print(response.choices[0].message.content)
@@ -78,7 +88,7 @@ from langchain_openai import ChatOpenAI
 llm = ChatOpenAI(
     base_url="https://gateway.langwatch.ai/v1",
     api_key="vk-lw-...",
-    model="openai/gpt-5-mini",
+    model="openai/gpt-6-luna",
 )
 ```
 
@@ -92,9 +102,13 @@ from llama_index.llms.openai import OpenAI
 llm = OpenAI(
     api_base="https://gateway.langwatch.ai/v1",
     api_key="vk-lw-...",
-    model="openai/gpt-5-mini",
+    model="openai/gpt-6-luna",
 )
 ```
+
+## Check it worked
+
+Run the OpenAI SDK sample. It prints the model's answer. Then open the project the virtual key traces to in LangWatch: the gateway's `gen_ai.<request type>` span appears in the traces list within a few seconds, as its own trace, with the model, the tokens and the cost.
 
 ## Link the gateway span to your trace
 
@@ -114,7 +128,7 @@ def trace_headers() -> dict[str, str]:
 client = OpenAI(base_url="https://gateway.langwatch.ai/v1", api_key="vk-lw-...")
 
 response = client.chat.completions.create(
-    model="openai/gpt-5-mini",
+    model="openai/gpt-6-luna",
     messages=[{"role": "user", "content": "Say hi in one word"}],
     extra_headers=trace_headers(),
 )
@@ -126,11 +140,11 @@ The [LangWatch Python SDK](/integration/python/guide) uses OpenTelemetry, so the
 
 ## Headers you can send
 
-| Header | Purpose |
-|---|---|
-| `traceparent` | Nests the gateway span in your trace. |
+| Header                    | Purpose                                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `traceparent`             | Nests the gateway span in your trace.                                                                     |
 | `X-LangWatch-End-User-Id` | The end user of your product, for per-end-user budgets and spend. The OpenAI `user` body field works too. |
-| `X-LangWatch-Metadata` | A JSON object, at most 4096 bytes, copied onto the spend event. |
+| `X-LangWatch-Metadata`    | A JSON object, at most 4096 bytes, copied onto the spend event.                                           |
 
 Pass them per request with `extra_headers={...}`. The gateway removes them before it forwards the request to the provider. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries).
 
@@ -138,7 +152,7 @@ Pass them per request with `extra_headers={...}`. The gateway removes them befor
 
 ```python
 raw = client.chat.completions.with_raw_response.create(
-    model="openai/gpt-5-mini",
+    model="openai/gpt-6-luna",
     messages=[{"role": "user", "content": "Say hi in one word"}],
 )
 headers = raw.http_response.headers
@@ -162,11 +176,11 @@ client = OpenAI(base_url="https://gateway.acme.internal/v1", api_key="vk-lw-..."
 
 ## Troubleshooting
 
-| Symptom | Cause |
-|---|---|
-| `401` on every request | The key is wrong, revoked, or sent in a header the gateway does not read. The gateway reads `Authorization: Bearer`, `X-Api-Key`, `X-Goog-Api-Key` and `Xi-Api-Key`. |
-| `400 model_not_allowed` | The key restricts its models under **Provider access**, or its routing policy does. |
-| Two spans per call in Trace Explorer | The OpenAI client is also autotracked by the LangWatch SDK. Remove the autotrack for gateway calls. |
-| The gateway span is its own trace | No `traceparent` on the request, or the headers were computed outside the active span. |
+| Symptom                              | Cause                                                                                                                                                                |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401` on every request               | The key is wrong, revoked, or sent in a header the gateway does not read. The gateway reads `Authorization: Bearer`, `X-Api-Key`, `X-Goog-Api-Key` and `Xi-Api-Key`. |
+| `400 model_not_allowed`              | The key restricts its models under **Provider access**, or its routing policy does.                                                                                  |
+| Two spans per call in Trace Explorer | The OpenAI client is also autotracked by the LangWatch SDK. Remove the autotrack for gateway calls.                                                                  |
+| The gateway span is its own trace    | No `traceparent` on the request, or the headers were computed outside the active span.                                                                               |
 
 See [Errors](/ai-gateway/api/errors) for every error code.

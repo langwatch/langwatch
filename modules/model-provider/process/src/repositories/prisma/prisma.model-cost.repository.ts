@@ -1,0 +1,80 @@
+import {
+  ModelCostNotFoundError,
+  type ModelCost,
+  type ModelDefaultScope,
+} from "@langwatch/model-provider-contract";
+import { type PrismaClient, type CustomLLMModelCost } from "@langwatch/prisma-client/generated";
+
+import { byScopePrecedence } from "../../rules/model-cost-scope-precedence.rules.ts";
+import type { ModelCostRepository } from "../model-cost.repository.ts";
+
+type Database = Pick<PrismaClient, "customLLMModelCost">;
+
+export class PrismaModelCostRepository implements ModelCostRepository {
+  private constructor(private readonly database: Database) {}
+
+  static create(database: Database): PrismaModelCostRepository {
+    return new PrismaModelCostRepository(database);
+  }
+
+  async findForProject(projectScopes: ModelDefaultScope[]): Promise<ModelCost[]> {
+    const rows = await this.database.customLLMModelCost.findMany({
+      where: {
+        OR: projectScopes,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Most specific scope first: the matcher takes the first row whose pattern
+    // matches, so a project row has to precede an organization row that names
+    // the same model, whichever was saved last.
+    return byScopePrecedence(rows.map(toCost));
+  }
+
+  async getById(id: string): Promise<ModelCost> {
+    const row = await this.database.customLLMModelCost.findUnique({ where: { id } });
+    if (!row) throw new ModelCostNotFoundError();
+    return toCost(row);
+  }
+
+  async save(input: ModelCost): Promise<ModelCost> {
+    const row = await this.database.customLLMModelCost.upsert({
+      where: { id: input.id },
+      create: {
+        ...input,
+        organizationId: input.organizationId,
+        projectId: input.scopeType === "PROJECT" ? input.scopeId : null,
+      },
+      update: {
+        ...input,
+        organizationId: input.organizationId,
+        projectId: input.scopeType === "PROJECT" ? input.scopeId : null,
+      },
+    });
+
+    return toCost(row);
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.database.customLLMModelCost.delete({ where: { id } });
+  }
+}
+
+function toCost(row: CustomLLMModelCost): ModelCost {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    projectId: row.projectId ?? null,
+    scopeType: row.scopeType,
+    scopeId: row.scopeId,
+    model: row.model,
+    regex: row.regex,
+    inputCostPerToken: row.inputCostPerToken ?? null,
+    outputCostPerToken: row.outputCostPerToken ?? null,
+    cacheReadCostPerToken: row.cacheReadCostPerToken ?? null,
+    cacheCreationCostPerToken: row.cacheCreationCostPerToken ?? null,
+    cacheCreation1hCostPerToken: row.cacheCreation1hCostPerToken ?? null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
