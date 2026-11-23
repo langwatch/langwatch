@@ -42,7 +42,7 @@ function regexLiteral(value: string): string {
  * A content key as one RE2 pattern: a catalog key alone, or followed by `.` (the exploded form,
  * `gen_ai.prompt.0.content`). A lambda over the prefixes copies every key once per prefix.
  */
-export const CONTENT_ATTRIBUTE_KEY_PATTERN = `^(?:${CONTENT_ATTRIBUTE_KEYS.map(regexLiteral).join("|")})(?:\\.|$)`;
+const CONTENT_ATTRIBUTE_KEY_PATTERN = `^(?:${CONTENT_ATTRIBUTE_KEYS.map(regexLiteral).join("|")})(?:\\.|$)`;
 
 const CONTENT_ATTRIBUTE_KEY_REGEX = new RegExp(CONTENT_ATTRIBUTE_KEY_PATTERN);
 

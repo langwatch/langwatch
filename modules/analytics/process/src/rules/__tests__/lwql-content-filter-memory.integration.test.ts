@@ -40,6 +40,11 @@ const PROBE_KEYS = [
   ...CONTENT_ATTRIBUTE_KEYS.map((key) => `${key}.0.content`),
   ...CONTENT_ATTRIBUTE_KEYS.map((key) => `${key}x`),
   ...CONTENT_ATTRIBUTE_KEYS.map((key) => `x${key}`),
+  // Differs from a content key only where it has a dot, so an unescaped dot would drop it.
+  ...CONTENT_ATTRIBUTE_KEYS.filter((key) => key.includes(".")).flatMap((key) => [
+    key.replaceAll(".", "_"),
+    key.replaceAll(".", "X"),
+  ]),
   "gen_ai.request.model",
   "gen_ai.prompt_id",
   "metadata.task_type",

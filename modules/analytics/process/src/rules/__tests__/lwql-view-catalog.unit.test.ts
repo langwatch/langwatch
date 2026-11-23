@@ -16,9 +16,7 @@ import {
   LangWatchQLCatalogShapesService,
   LWQL_COLUMN_UNITS,
 } from "../../services/langwatch-ql-catalog-shapes.service.ts";
-import { clickHouseLiteral } from "../langwatch-ql-sql-literal.rules.ts";
 import {
-  CONTENT_ATTRIBUTE_KEY_PATTERN,
   CONTENT_ATTRIBUTE_KEYS,
   contentKeyExclusionSql,
   gateForContentCategory,
@@ -389,12 +387,15 @@ describe("given the LangWatchQL view catalog when the map filter is compared wit
     ).toEqual(expected);
 
     const sql = contentKeyExclusionSql("k");
-    expect(sql).toBe(`NOT match(k, ${clickHouseLiteral(CONTENT_ATTRIBUTE_KEY_PATTERN)})`);
+    expect(sql.startsWith("NOT match(k, '^(?:"), "the filter is one anchored match").toBe(true);
     expect(sql, "the filter must not run a lambda per key").not.toContain("arrayExists");
     for (const key of expected) {
+      // In the SQL literal a regex `\.` is written `\\.`: an unescaped dot would match any byte.
+      expect(sql, `the filter never names ${key}`).toContain(key.replaceAll(".", "\\\\."));
       expect(isContentAttributeKey(key)).toBe(true);
       expect(isContentAttributeKey(`${key}.0.content`)).toBe(true);
-      for (const probe of [`${key}x`, `x${key}`]) {
+      const dotSwapped = [key.replaceAll(".", "_"), key.replaceAll(".", "X")];
+      for (const probe of [`${key}x`, `x${key}`, ...dotSwapped]) {
         const isContent = expected.some((k) => probe === k || probe.startsWith(`${k}.`));
         expect(isContentAttributeKey(probe), probe).toBe(isContent);
       }
