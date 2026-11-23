@@ -1454,22 +1454,20 @@ describe("a board with the organization's library released", () => {
   });
 
   describe("when an LLM Ops board shared with the organization opens at its address", () => {
-    /** @scenario "An org-level board draws its home product's chrome, with no project chip" */
-    it("draws LLM Ops with its project switcher", () => {
+    beforeEach(() => {
       releaseLibrary();
       resolvedBoards = { board_1: { homeProduct: "llm-ops", scope: "ORGANIZATION" } };
       renderShell({ readings: { ...releasedReadings, pathname: "/dashboards/board_1" } });
+    });
 
+    /** @scenario "An org-level board draws its home product's chrome, with no project chip" */
+    it("draws LLM Ops with its project switcher", () => {
       expect(productLabel()).toHaveTextContent("LLM Ops");
       expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent("Demo");
     });
 
     /** @scenario "An org-level board draws its home product's chrome, with no project chip" */
     it("keeps the board open and changes only the project in view on a pick", async () => {
-      releaseLibrary();
-      resolvedBoards = { board_1: { homeProduct: "llm-ops", scope: "ORGANIZATION" } };
-      renderShell({ readings: { ...releasedReadings, pathname: "/dashboards/board_1" } });
-
       await pickSupportBot();
 
       await waitFor(() => {

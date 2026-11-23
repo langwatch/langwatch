@@ -1,4 +1,4 @@
-/** The rules of a board's home product. Spec: dashboards-organization-area.feature (Create, Move). */
+/** A board's home product rules. Spec: dashboards-organization-area.feature (Create, Move). */
 import { describe, expect, it } from "vitest";
 
 import {

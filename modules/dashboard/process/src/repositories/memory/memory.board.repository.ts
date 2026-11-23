@@ -8,14 +8,14 @@ import {
   type StarredDashboard,
 } from "@langwatch/dashboard-contract";
 
-import {
-  type BoardReach,
-  type BoardRecord,
-  type BoardRepository,
-  type BoardSummaryRecord,
-  type BoardUpdate,
-  type MemberStars,
-  starredBoardRow,
+import { starredBoardRow } from "../../rules/starred-board-row.rules.ts";
+import type {
+  BoardReach,
+  BoardRecord,
+  BoardRepository,
+  BoardSummaryRecord,
+  BoardUpdate,
+  MemberStars,
 } from "../board.repository.ts";
 import { MemoryDashboardDatabase, type StoredFavourite } from "./memory.dashboard.database.ts";
 
@@ -123,7 +123,7 @@ export class MemoryBoardRepository implements BoardRepository {
       const dashboard = this.#database.boards.find(
         (row) => row.id === favourite.dashboardId && owners.includes(row.projectId),
       );
-      return dashboard ? [{ kind: "board", dashboard: starredBoardRow(dashboard) }] : [];
+      return dashboard ? [{ kind: "board", dashboard: starredBoardRow({ board: dashboard }) }] : [];
     });
   }
 

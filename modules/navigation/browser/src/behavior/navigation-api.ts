@@ -5,7 +5,6 @@
  */
 
 import type { AgentType } from "@langwatch/agent-contract";
-import type { DashboardHomeProduct } from "@langwatch/analytics-client";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { AuthzOwnStanding, AuthzOwnStandingInput } from "@langwatch/authz-contract";
 import type { identityTrpc } from "@langwatch/identity-contract";
@@ -17,6 +16,12 @@ export type NavigationHomeResolution = {
   intentPinned: boolean;
   governanceUiEnabled: boolean;
 };
+
+/**
+ * The dashboard contract's `homeProduct`, spelled out: importing it from the analytics client
+ * would pull that package into every procedure map's type graph (ADR-130).
+ */
+type BoardHomeProduct = "llm-ops" | "me" | "gateway" | "governance";
 
 export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
   organization: {
@@ -196,7 +201,7 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
     resolve: {
       query: {
         input: { organizationId: string; dashboardId: string };
-        output: { homeProduct: DashboardHomeProduct; scope: string };
+        output: { homeProduct: BoardHomeProduct; scope: string };
       };
     };
   };

@@ -12,14 +12,14 @@ import {
 import { isRecordNotFoundError, PrismaRepository } from "@langwatch/prisma-client";
 import type { DashboardsV2, Prisma } from "@langwatch/prisma-client/generated";
 
-import {
-  type BoardReach,
-  type BoardRecord,
-  type BoardRepository,
-  type BoardSummaryRecord,
-  type BoardUpdate,
-  type MemberStars,
-  starredBoardRow,
+import { starredBoardRow } from "../../rules/starred-board-row.rules.ts";
+import type {
+  BoardReach,
+  BoardRecord,
+  BoardRepository,
+  BoardSummaryRecord,
+  BoardUpdate,
+  MemberStars,
 } from "../board.repository.ts";
 
 /** The column a star matches on: the board id for a board, the template id for a template. */
@@ -217,7 +217,7 @@ export class PrismaBoardRepository
       }
       const dashboard =
         favourite.dashboardId === null ? undefined : byId.get(favourite.dashboardId);
-      return dashboard ? [{ kind: "board", dashboard: starredBoardRow(dashboard) }] : [];
+      return dashboard ? [{ kind: "board", dashboard: starredBoardRow({ board: dashboard }) }] : [];
     });
   }
 

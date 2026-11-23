@@ -112,7 +112,7 @@ export const boardTrpc = defineTrpcContract("boards")
   /**
    * Rehomes a board, asked as `update` is in the project that owns it; the owning project never
    * changes. A Project board leaving LLM Ops becomes Only me, and only its author may move it
-   * (`dashboard_scope_author_only`; ADR-002, decision 8). Answers the board as the library lists it.
+   * (`dashboard_scope_author_only`; ADR-002, decision 8). Answers the board as the library shows.
    */
   .mutation("move")
   .withInput(z.object({ ...boardRefSchema.shape, homeProduct: dashboardHomeProductSchema }))

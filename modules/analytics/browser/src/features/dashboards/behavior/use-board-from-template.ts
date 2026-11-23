@@ -114,6 +114,26 @@ function openingPath({
   return organizationBoardPath({ dashboardId });
 }
 
+/**
+ * What a copy keeps of its source: the product, and the scope at org level or where the product
+ * has no projects; a star row names no product, so its copy is LLM Ops.
+ */
+function copyKeeps({
+  atOrganization,
+  scope,
+  homeProduct,
+}: {
+  atOrganization: boolean;
+  scope: DashboardScope;
+  homeProduct: DashboardHomeProduct | undefined;
+}): Pick<BoardSource, "scope" | "homeProduct"> {
+  const hasProjects = homeProduct === void 0 || homeAllowsScope({ homeProduct, scope: "PROJECT" });
+  return {
+    ...(atOrganization || !hasProjects ? { scope } : {}),
+    ...(homeProduct === void 0 ? {} : { homeProduct }),
+  };
+}
+
 /** `atOrganization`: made from an org-level page, stored in `storeProject`; none, nothing made. */
 export function useBoardFromTemplate({
   atOrganization = false,
@@ -241,8 +261,7 @@ export function useBoardFromTemplate({
 
   /**
    * Copies the board and its widgets as "<name> copy" and opens it. `readFrom`: the project that
-   * shows the source, where not the store. Keeps the product, and the scope at org level or where
-   * the product has no projects; a star row names no product, so its copy is LLM Ops.
+   * shows the source, where not the store.
    */
   const duplicateBoard = ({
     board,
@@ -254,17 +273,13 @@ export function useBoardFromTemplate({
     };
     existingNames: readonly string[];
     readFrom?: string;
-  }) => {
-    const { homeProduct } = board;
-    const hasProjects =
-      homeProduct === void 0 || homeAllowsScope({ homeProduct, scope: "PROJECT" });
-    return createFrom({
+  }) =>
+    createFrom({
       source: {
         id: board.id,
         name: boardCopyName(board.name),
         description: board.description,
-        ...(atOrganization || !hasProjects ? { scope: board.scope } : {}),
-        ...(homeProduct === void 0 ? {} : { homeProduct }),
+        ...copyKeeps({ atOrganization, scope: board.scope, homeProduct: board.homeProduct }),
         widgetSource: ({ definition }) => definition.source,
         widgets: async () => {
           const stored = await utils.dashboardWidgets.list.fetch({
@@ -279,7 +294,6 @@ export function useBoardFromTemplate({
       made: dashboardCreated({ createdFrom: "duplicate" }),
       titled: duplicatedAs,
     });
-  };
 
   /** "Duplicate to edit": the From LangWatch board's built widgets as "<name> (copy)". */
   const duplicateCurated = ({

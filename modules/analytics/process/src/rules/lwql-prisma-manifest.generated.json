@@ -9516,6 +9516,15 @@
           "documentation": "The owning project's organization, stamped when the board is first set to\nORGANIZATION; null before."
         },
         {
+          "name": "homeProduct",
+          "columnName": "homeProduct",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The product whose sidebar lists it: llm-ops, me, gateway or governance (ADR-002,\ndecision 8). Every board made before homes existed is llm-ops."
+        },
+        {
           "name": "excludedOrigins",
           "columnName": "excludedOrigins",
           "type": "Json",

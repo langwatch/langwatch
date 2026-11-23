@@ -1,6 +1,5 @@
 import type {
   Board,
-  Dashboard,
   DashboardHomeProduct,
   DashboardScope,
   DashboardStar,
@@ -23,12 +22,6 @@ export type BoardUpdate = Readonly<{
   organizationId?: string;
   homeProduct?: DashboardHomeProduct;
 }>;
-
-/** A board as a star list carries it: star lists name no home product. */
-export function starredBoardRow(board: BoardRecord): Dashboard {
-  const { homeProduct: _homeProduct, ...dashboard } = board;
-  return dashboard;
-}
 
 /**
  * The project a read is made from. With `organization` the read also reaches the Organization

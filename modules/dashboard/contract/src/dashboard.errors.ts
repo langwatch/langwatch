@@ -62,7 +62,7 @@ export class DashboardScopeAuthorOnlyError extends HandledError {
   }
 }
 
-/** A board homed outside LLM Ops made or set to Project: no project lists it (ADR-002, decision 8). */
+/** A board outside LLM Ops made or set to Project: no project lists it (ADR-002, decision 8). */
 export class DashboardHomeNeedsOrgScopeError extends HandledError {
   declare readonly code: "dashboard_home_needs_org_scope";
 

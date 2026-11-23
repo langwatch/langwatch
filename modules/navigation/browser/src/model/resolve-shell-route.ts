@@ -70,10 +70,9 @@ function seatRefusalAt({
 }
 
 /**
- * The product the chrome draws. An open board draws its home product, whatever its address. With
- * the organization's library on, a project's Dashboards pages are LLM Ops (owner decision D1);
- * without it a reader who clicked in from LLM Ops stays there (the hint), except in the library.
- * Dashboards wins over the personal plane: the Coding agents sidebar has no saved-dashboards list.
+ * An open board draws its home product, whatever its address. With the organization's library on,
+ * a project's Dashboards pages are LLM Ops (owner decision D1); without it the LLM Ops hint holds,
+ * except in the library. Dashboards beats the personal plane: Coding agents lists no dashboards.
  */
 function activeProductFor({
   isSettingsRoute,
@@ -140,7 +139,7 @@ export function resolveShellRoute({
   organizationRole: string | null | undefined;
   /** The sidebar this tab last came from; only a Dashboards address reads it. */
   sidebarHint?: DashboardsSidebarHint | null;
-  /** The open board's home product, when the seat reaches it; only a Dashboards address reads it. */
+  /** The open board's home product, if the seat reaches it; only a Dashboards address reads it. */
   boardHomeProduct?: ProductId | null;
   /** Whether the organization's Dashboards library is on (ADR-002). */
   hasOrganizationLibrary?: boolean;

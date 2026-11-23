@@ -133,11 +133,9 @@ export interface DashboardApi {
     viewer?: DashboardViewer;
   }): Promise<Board>;
   /**
-   * A Dashboards board, at `scope` in the same write or else Project; `createdById` is its
-   * author, absent for a project credential. A member's own My dashboard starts starred for them,
-   * at Only me (AC160b, AC170). `dashboards_not_enabled` while `release_dashboards` is off (AC189).
-   * Homed in `homeProduct`, LLM Ops when absent; Project outside LLM Ops is
-   * `dashboard_home_needs_org_scope` (ADR-002, decision 8).
+   * A Dashboards board at `scope` (else Project) in `homeProduct` (else LLM Ops), in one write;
+   * `createdById` is its author. A member's own My dashboard starts starred at Only me (AC160b,
+   * AC170). Refuses `dashboards_not_enabled` (AC189), `dashboard_home_needs_org_scope` (ADR-002).
    */
   createBoard(input: {
     projectId: string;

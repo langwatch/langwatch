@@ -104,13 +104,13 @@ function renderBoard({
   answer: unknown;
   /** The home the project's list answers for the board. */
   homeProduct?: DashboardHomeProduct;
-  /** The project the LLM Ops top bar has in view; none for a member who never opened one. */
-  projectInView?: AnalyticsHostProject | undefined;
+  /** The project the LLM Ops top bar has in view; null for a member who never opened one. */
+  projectInView?: AnalyticsHostProject | null;
   /** The projects the top bar can switch to, in place. */
   switchTo?: readonly AnalyticsHostProject[];
 }) {
   const calls: UiProcedureCall[] = [];
-  const host = hostIn(projectInView);
+  const host = hostIn(projectInView ?? undefined);
   const hosts = [host, ...switchTo.map(hostIn)];
   const respond = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
@@ -200,7 +200,7 @@ describe("a board opened at /dashboards/<id>", () => {
           project: null,
           openProject: SHOP,
         }),
-        projectInView: undefined,
+        projectInView: null,
       });
 
       const heading = await screen.findByRole("heading", { name: "Everyone's board" });
