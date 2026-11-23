@@ -467,6 +467,15 @@ Rule: A Code Mode session reads like the real CLI, not like REPL and Poll
     And it is named after the tool and carries the command it ran
     And it is ordered by the time it was decided, after the script that made it
 
+  @unit
+  Scenario: A script result Claude Code delivered without a Poll call is listed
+    Given a Claude Code session in Code Mode whose script finished before the model called Poll
+    And Claude Code handed its result to the model as a Poll call of its own in the next request
+    When the transcript is derived from the session's spans and logs
+    Then that result is a Poll tool call carrying the delivered text
+    And it is listed once although later requests repeat it
+    And a request body that does not parse adds nothing
+
   @integration
   Scenario: The calls a Code Mode script made are shown under its Code row
     Given a Claude Code session in Code Mode whose script ran Bash commands
