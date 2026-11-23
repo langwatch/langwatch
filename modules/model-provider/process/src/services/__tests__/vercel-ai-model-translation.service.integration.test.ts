@@ -74,9 +74,13 @@ async function readJson(request: IncomingMessage): Promise<{ messages: ChatMessa
 }
 
 /** Refuses a user turn carrying instructions, as Prompt Shields do; system text is not scanned. */
+/** The messages each call sent, so a test can see where the text went. */
+const received: ChatMessage[][] = [];
+
 function startPromptShieldedProvider(): Promise<Server> {
   const server = createServer((request, response) => {
     void readJson(request).then(({ messages }) => {
+      received.push(messages);
       const userText = messages.filter((m) => m.role === "user").map(textOf);
       if (userText.some((text) => /ignorer|instruksjoner/i.test(text))) {
         response.writeHead(400, { "content-type": "application/json" });
@@ -144,6 +148,13 @@ describe("VercelAiModelTranslationService", () => {
     /** @scenario "Trace text that reads like instructions to a model still translates" */
     it("translates it, since the text never rides in the user turn", async () => {
       await expect(translate({ text: INSTRUCTION_TEXT })).resolves.toBe("You are an assistant.");
+
+      const system =
+        received
+          .at(-1)
+          ?.filter((m) => m.role === "system")
+          .map(textOf) ?? [];
+      expect(system.join("\n")).toContain(INSTRUCTION_TEXT);
     });
   });
 
