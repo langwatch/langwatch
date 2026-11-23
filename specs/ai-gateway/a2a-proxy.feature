@@ -16,8 +16,10 @@ Feature: A2A proxy on the gateway
 
   @unit
   Scenario: targets are registered from the control plane
-    When an admin registers an A2A agent in the project settings
-    Then the gateway loads it with the project's configuration
+    When an admin registers an A2A agent for project "p1" through gatewayA2aTargets.create
+    Then the target is stored for project "p1" with its header names, never their values
+    And the project's gateways are told to reload their configuration
+    And the gateway loads it with the project's configuration
 
   @unit
   Scenario: a project admin manages the project's own targets

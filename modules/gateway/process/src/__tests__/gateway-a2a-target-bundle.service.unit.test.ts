@@ -9,6 +9,7 @@ import {
 } from "./support/a2a-target.fixture.ts";
 
 describe("GatewayA2aTargetService bundle", () => {
+  /** @scenario "targets are registered from the control plane" */
   it("prefers the project's target over the org-wide one and keeps the allow list", async () => {
     const targets = service();
     await targets.create({
