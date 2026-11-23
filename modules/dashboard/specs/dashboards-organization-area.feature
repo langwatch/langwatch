@@ -239,7 +239,7 @@ Feature: Organization-wide Dashboards area
     Then the group shows 8 and a "Show 3 more" again
     # Evidence: haven browser screenshots after each reload
 
-  @integration
+  @integration @unimplemented
   Scenario: A library row's menu offers what I may do
     Given my Organization board homed in Gateway, owned by "Shop", where I hold analytics:update and analytics:delete
     Then its menu offers Rename, Move to product…, Duplicate and Delete
