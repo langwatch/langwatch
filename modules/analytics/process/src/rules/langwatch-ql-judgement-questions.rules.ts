@@ -8,7 +8,9 @@
 import type {
   LangWatchQLAppFunctionCall,
   LangWatchQLAppFunctionOption,
+  LangWatchQLAppFunctionSource,
   LangWatchQLColumn,
+  LangWatchQLJudgedText,
   LangWatchQLJudgementAsked,
   LangWatchQLJudgementCall,
 } from "@langwatch/analytics-contract";
@@ -145,11 +147,25 @@ export function langWatchQLJudgementCalls(
       ...(judgement.kind === "boolean"
         ? { threshold: thresholdOf({ definition, options: call.options }) }
         : {}),
+      ...judgedTextOf(call.source),
       ...judgementAsked({ definition, options: call.options }),
     });
   }
 
   return judgements;
+}
+
+/** The trace or span extraction a call judges; nothing for a thread's text or a literal one. */
+function judgedTextOf(source: LangWatchQLAppFunctionSource | undefined): {
+  judgedText?: LangWatchQLJudgedText;
+} {
+  if (!source) return {};
+  const [definition] = findLangWatchQLAppFunctions(source.function);
+  if (definition?.kind !== "extraction") return {};
+  const { keyKind } = definition;
+  if (keyKind !== "trace" && keyKind !== "span") return {};
+
+  return { judgedText: { function: definition.name, keyKind } };
 }
 
 /**

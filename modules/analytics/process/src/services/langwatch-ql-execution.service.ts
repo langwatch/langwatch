@@ -91,12 +91,15 @@ export class LangWatchQLExecutionService {
     const { validation, granularity, memberWindows } = run;
     const execution = await this.runRestricted({ ...run, projects });
     const hydrationStartedMs = this.deps.stopwatch();
+    // A widget's eval results are kept under the widget; any other query's under itself.
+    const widgetId = telemetry?.widgetId;
     const answer = await this.deps.extraction.hydrate({
       projects: hydratableProjects({ projects, memberWindows }),
       protections,
       validation,
       execution,
       ...(signal ? { signal } : {}),
+      ...(widgetId === undefined ? {} : { source: { kind: "dashboard" as const, id: widgetId } }),
     });
     // The database's own time plus what hydration spent reading and judging: a judged query
     // that took three seconds must not report the sixty milliseconds ClickHouse saw of it.

@@ -76,6 +76,14 @@ describe("buildRetentionTTLExpression", () => {
         "IF(_retention_days > 0, toDateTime(OccurredAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
       );
     });
+
+    it("Instant Evals results anchor retention on their trace's time", () => {
+      const config = TABLE_TTL_CONFIG.find((entry) => entry.table === "eval_results")!;
+      expect(config.retentionTTLColumn).toBe("OccurredAt");
+      expect(buildRetentionTTLExpression(config)).toBe(
+        "IF(_retention_days > 0, toDateTime(OccurredAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE",
+      );
+    });
   });
 
   describe("when retentionTTLColumn is not set", () => {
@@ -102,8 +110,8 @@ describe("hasRetentionTTL", () => {
 });
 
 describe("RETENTION_MANAGED_TABLES", () => {
-  it("includes all 21 retention-managed tables", () => {
-    expect(RETENTION_MANAGED_TABLES).toHaveLength(21);
+  it("includes all 22 retention-managed tables", () => {
+    expect(RETENTION_MANAGED_TABLES).toHaveLength(22);
     expect(RETENTION_MANAGED_TABLES).toContain("stored_spans");
     expect(RETENTION_MANAGED_TABLES).toContain("event_log");
     expect(RETENTION_MANAGED_TABLES).toContain("trace_summaries");
@@ -121,6 +129,8 @@ describe("RETENTION_MANAGED_TABLES", () => {
     // (currently categorised "traces" until eval split-out lands).
     expect(RETENTION_MANAGED_TABLES).toContain("evaluation_analytics");
     expect(RETENTION_MANAGED_TABLES).toContain("evaluation_analytics_rollup");
+    // ADR-189: every Instant Evals judgment expires with its trace.
+    expect(RETENTION_MANAGED_TABLES).toContain("eval_results");
     expect(RETENTION_MANAGED_TABLES).toContain("langy_analytics_events");
     expect(RETENTION_MANAGED_TABLES).toContain("simulation_runs");
     expect(RETENTION_MANAGED_TABLES).toContain("suite_runs");

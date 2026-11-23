@@ -5,6 +5,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
  * whole trace (tool calls and results included), every other evaluator keeps
  * the trace's own fields. Spec: specs/evaluators/judges-read-tool-evidence.feature
  */
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
@@ -75,6 +76,8 @@ function buildService() {
     },
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
     judgeRouting: { isRouted: async () => false, isHostedOff: async () => false },
+    monitorJudgments: { recall: async () => ({ kind: "not_kept" }), keep: async () => undefined },
+    projects: createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
     installEnvironment: {},
   };
   return {

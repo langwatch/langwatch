@@ -37,6 +37,12 @@ interface LangWatchQLStatementRunner {
   executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult>;
 }
 
+/** A hydrated result, and when each trace it read by id started. */
+export interface LangWatchQLHydrated extends LangWatchQLHydrationResult {
+  /** Epoch milliseconds by trace id; a trace the reads did not find is absent. */
+  readonly traceStartedAt: ReadonlyMap<string, number>;
+}
+
 export class LangWatchQLHydrationService {
   private readonly reads: LangWatchQLHydrationReadService;
   private readonly compute: LangWatchQLHydrationComputeService;
@@ -91,9 +97,16 @@ export class LangWatchQLHydrationService {
     signal?: AbortSignal;
     /** By output column: the judge's budget a judged conversation is re-rendered under. */
     judgeFits?: ReadonlyMap<string, InstantEvalTranscriptFit>;
-  }): Promise<LangWatchQLHydrationResult> {
+  }): Promise<LangWatchQLHydrated> {
     if (calls.length === 0) {
-      return { columns, rows, isTruncatedByBytes: false, valueTruncations: [], unresolvedKeys: [] };
+      return {
+        columns,
+        rows,
+        isTruncatedByBytes: false,
+        valueTruncations: [],
+        unresolvedKeys: [],
+        traceStartedAt: new Map(),
+      };
     }
 
     const resolved = collectLangWatchQLKeys({ calls, rows });
@@ -116,13 +129,12 @@ export class LangWatchQLHydrationService {
       ...(judgeFits ? { judgeFits } : {}),
     });
 
-    return assembleLangWatchQLHydration({
-      columns,
-      rows,
-      resolved,
-      computed,
-      limits: this.limits,
-    });
+    return {
+      ...assembleLangWatchQLHydration({ columns, rows, resolved, computed, limits: this.limits }),
+      traceStartedAt: new Map(
+        [...traces.byId].map(([traceId, trace]) => [traceId, trace.timestamps.started_at]),
+      ),
+    };
   }
 
   /**

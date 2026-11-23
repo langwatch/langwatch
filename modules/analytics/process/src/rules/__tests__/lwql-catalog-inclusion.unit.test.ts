@@ -74,6 +74,7 @@ describe("the LangWatchQL catalog is opt-in", () => {
       // Real manifest tables the catalog deliberately does not list.
       const unlisted = [
         "instant_eval_runs",
+        "eval_results",
         "goose_db_version",
         "automation_audit",
         "stored_spans_id_index",

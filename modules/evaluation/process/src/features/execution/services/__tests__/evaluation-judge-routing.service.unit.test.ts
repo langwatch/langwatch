@@ -3,21 +3,20 @@ import { describe, expect, it, vi } from "vitest";
 
 import { EvaluationJudgeRoutingService } from "../evaluation-judge-routing.service.ts";
 
-function buildRouting({ organizationId }: { organizationId: string | undefined }) {
+function buildRouting() {
   const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>().mockResolvedValue(true);
-  const routing = EvaluationJudgeRoutingService.create({
-    flags: { isEnabled },
-    projects: { findOrganizationId: async () => organizationId },
-  });
+  const routing = EvaluationJudgeRoutingService.create({ flags: { isEnabled } });
   return { routing, isEnabled };
 }
 
 describe("EvaluationJudgeRoutingService", () => {
   /** @scenario "An LLM judge on LangWatch Evals Preview is routed when the flag is on" */
   it("reads the router flag for the project within its organization", async () => {
-    const { routing, isEnabled } = buildRouting({ organizationId: "org-1" });
+    const { routing, isEnabled } = buildRouting();
 
-    await expect(routing.isRouted({ projectId: "proj-1" })).resolves.toBe(true);
+    await expect(routing.isRouted({ projectId: "proj-1", organizationId: "org-1" })).resolves.toBe(
+      true,
+    );
     expect(isEnabled).toHaveBeenCalledWith("release_instant_evals_judge_router", {
       kind: "project",
       projectId: "proj-1",
@@ -26,16 +25,20 @@ describe("EvaluationJudgeRoutingService", () => {
   });
 
   it("never routes a project with no organization", async () => {
-    const { routing, isEnabled } = buildRouting({ organizationId: undefined });
+    const { routing, isEnabled } = buildRouting();
 
-    await expect(routing.isRouted({ projectId: "proj-1" })).resolves.toBe(false);
+    await expect(
+      routing.isRouted({ projectId: "proj-1", organizationId: undefined }),
+    ).resolves.toBe(false);
     expect(isEnabled).not.toHaveBeenCalled();
   });
 
   it("reads the hosted switch for the project within its organization", async () => {
-    const { routing, isEnabled } = buildRouting({ organizationId: "org-1" });
+    const { routing, isEnabled } = buildRouting();
 
-    await expect(routing.isHostedOff({ projectId: "proj-1" })).resolves.toBe(true);
+    await expect(
+      routing.isHostedOff({ projectId: "proj-1", organizationId: "org-1" }),
+    ).resolves.toBe(true);
     expect(isEnabled).toHaveBeenCalledWith("instant_evals_hosted_disabled", {
       kind: "project",
       projectId: "proj-1",
@@ -44,9 +47,11 @@ describe("EvaluationJudgeRoutingService", () => {
   });
 
   it("never reads the hosted switch for a project with no organization", async () => {
-    const { routing, isEnabled } = buildRouting({ organizationId: undefined });
+    const { routing, isEnabled } = buildRouting();
 
-    await expect(routing.isHostedOff({ projectId: "proj-1" })).resolves.toBe(false);
+    await expect(
+      routing.isHostedOff({ projectId: "proj-1", organizationId: undefined }),
+    ).resolves.toBe(false);
     expect(isEnabled).not.toHaveBeenCalled();
   });
 });

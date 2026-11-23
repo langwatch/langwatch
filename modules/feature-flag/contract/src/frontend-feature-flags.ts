@@ -56,6 +56,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   // bar says Instant Evals are not enabled instead of starting a run
   // (specs/traces-v2/instant-eval-search.feature).
   "release_instant_evals",
+  // Instant Evals results kept on their trace and recalled before judging (ADR-189).
+  "release_instant_eval_results",
   // The own decision models in the Instant Evals column of Default models (ADR-182).
   "release_instant_evals_own_decision_model",
   // LangWatch Evals Preview says it routes through the LangWatch Judge (ADR-190).

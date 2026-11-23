@@ -338,7 +338,7 @@ interface Input {
 type Output = z.infer<typeof codingAgentTranscriptSchema>; // ../contract/src/coding-agent-transcript.ts:107
 
 // codingAgents.sessionGroups
-type Input = z.infer<typeof traceSessionGroupsInputSchema>; // ../../trace/contract/src/traces.trpc.ts:164
+type Input = z.infer<typeof traceSessionGroupsInputSchema>; // ../../trace/contract/src/traces.trpc.ts:165
 type Output = z.infer<typeof tracesSessionsPageSchema>; // ../../trace/contract/src/trace.responses.ts:148
 ```
 

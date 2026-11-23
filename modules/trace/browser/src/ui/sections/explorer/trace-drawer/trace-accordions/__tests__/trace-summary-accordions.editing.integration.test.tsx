@@ -65,6 +65,13 @@ vi.mock("../../../../../../features/trace-drawer/behavior/use-trace-evaluations.
   }),
 }));
 
+vi.mock(
+  "../../../../../../features/trace-drawer/behavior/use-trace-instant-eval-results.ts",
+  () => ({
+    useTraceInstantEvalResults: () => ({ isShown: false, results: [] }),
+  }),
+);
+
 vi.mock("../../../hooks/use-trace-resources.ts", () => ({
   useTraceResources: () => ({
     rootSpanId: null,

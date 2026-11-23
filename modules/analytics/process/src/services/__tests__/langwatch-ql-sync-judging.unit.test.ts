@@ -5,7 +5,7 @@
  * @see specs/lwql/eval-functions.feature
  * @see specs/lwql/app-functions.feature
  */
-import type { LangWatchQLColumn } from "@langwatch/analytics-contract";
+import type { LangWatchQLColumn, LangWatchQLRunTelemetry } from "@langwatch/analytics-contract";
 import {
   computeInstantEvalTranscriptFit,
   type InstantEvalApi,
@@ -95,12 +95,20 @@ function threadRenderer(transcript: string) {
   return { rendering, budgets };
 }
 
-function trace({ id, threadId }: { id: string; threadId: string }): Trace {
+function trace({
+  id,
+  threadId,
+  startedAt = 1,
+}: {
+  id: string;
+  threadId: string;
+  startedAt?: number;
+}): Trace {
   return {
     trace_id: id,
     project_id: "project-1",
     metadata: { thread_id: threadId },
-    timestamps: { started_at: 1, inserted_at: 1, updated_at: 1 },
+    timestamps: { started_at: startedAt, inserted_at: 1, updated_at: 1 },
     spans: [],
   };
 }
@@ -113,14 +121,16 @@ const renderer: LangWatchQLTraceRenderer = {
   renderTraceJson: async () => "{}",
 };
 
-/** Holds every conversation it is asked for, and counts the reads. */
+/** Holds every conversation it is asked for and the traces it was given, and counts the reads. */
 class CountingTraceSource implements LangWatchQLTraceSource {
   reads = 0;
 
-  async readTraces(): Promise<readonly Trace[]> {
+  constructor(private readonly traces: readonly Trace[] = []) {}
+
+  async readTraces({ traceIds }: { traceIds: readonly string[] }): Promise<readonly Trace[]> {
     this.reads += 1;
 
-    return [];
+    return this.traces.filter((held) => traceIds.includes(held.trace_id));
   }
 
   async readThreadTraces({
@@ -161,20 +171,45 @@ class ColumnAnsweringExecutor extends LangWatchQLExecutorRepository {
   }
 }
 
+/** Answers the rows it was given, with a column for each of the first row's names. */
+class RowsAnsweringExecutor extends LangWatchQLExecutorRepository {
+  constructor(private readonly rows: readonly Record<string, unknown>[]) {
+    super();
+  }
+
+  execute(_request: LangWatchQLExecutionRequest): Promise<LangWatchQLExecutionResult> {
+    const columns: LangWatchQLColumn[] = Object.keys(this.rows[0] ?? {}).map((name) => ({
+      name,
+      type: "String",
+    }));
+
+    return Promise.resolve({
+      columns,
+      rows: [...this.rows],
+      statistics: { elapsedMs: 1, rowsRead: 10, bytesRead: 10, rowsReturned: this.rows.length },
+    });
+  }
+}
+
 function serviceOver({
   column = "annoyed",
   values = ["thread-a"],
   judgeQuery,
   stopwatch,
   rendering = renderer,
+  executor = new ColumnAnsweringExecutor(column, values),
+  held = [],
 }: {
   column?: string;
   values?: readonly string[];
   judgeQuery?: JudgeQuery;
   stopwatch?: () => number;
   rendering?: LangWatchQLTraceRenderer;
+  executor?: LangWatchQLExecutorRepository;
+  /** The traces a read by id finds. */
+  held?: readonly Trace[];
 }) {
-  const traces = new CountingTraceSource();
+  const traces = new CountingTraceSource(held);
   const asked: Parameters<JudgeQuery>[0][] = [];
   const judging = createApiFixture<InstantEvalApi>(
     judgeQuery
@@ -198,7 +233,7 @@ function serviceOver({
   const service = LangWatchQLService.create({
     runTelemetry: TEST_RUN_TELEMETRY,
     placement: ADMIT_EVERY_PLACEMENT,
-    executor: new ColumnAnsweringExecutor(column, values),
+    executor,
     database: "analytics",
     hydration,
     judging,
@@ -212,10 +247,12 @@ function query({
   service,
   sql,
   signal,
+  telemetry,
 }: {
   service: LangWatchQLService;
   sql: string;
   signal?: AbortSignal;
+  telemetry?: LangWatchQLRunTelemetry;
 }) {
   return service.executeForProjects({
     projects: [{ id: "project-1", lwqlKey: "key-1" }],
@@ -223,6 +260,7 @@ function query({
     sql,
     isInstantEvalsEnabled: true,
     ...(signal ? { signal } : {}),
+    ...(telemetry ? { telemetry } : {}),
   });
 }
 
@@ -329,6 +367,99 @@ describe("LangWatchQLService with an eval function", () => {
         { TraceId: "trace-of-Sorry about that", apology: "Sorry about that" },
       ]);
       expect(traces.reads).toBe(0);
+    });
+  });
+
+  describe("when the statement projects TraceId but not OccurredAt", () => {
+    const APOLOGY_QUERY =
+      "SELECT TraceId, eval(llm_messages(TraceId), 'The answer is an apology') AS apology " +
+      "FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 1)";
+    const STARTED_AT = Date.UTC(2026, 10, 2, 10);
+
+    /** @scenario "A query that projects TraceId but not OccurredAt keeps its trace-level result" */
+    it("judges each found trace's row with the trace's start time, and answers without it", async () => {
+      const { service, asked } = serviceOver({
+        judgeQuery: answering(0.9),
+        executor: new RowsAnsweringExecutor([
+          { TraceId: "trace-a", apology: "trace-a" },
+          { TraceId: "trace-gone", apology: "trace-gone" },
+        ]),
+        held: [trace({ id: "trace-a", threadId: "thread-a", startedAt: STARTED_AT })],
+      });
+
+      const result = await query({ service, sql: APOLOGY_QUERY });
+
+      expect(asked[0]?.rows[0]?.OccurredAt).toBe(STARTED_AT);
+      expect(asked[0]?.rows[1]).not.toHaveProperty("OccurredAt");
+      expect(result.rows).toEqual([
+        { TraceId: "trace-a", apology: 0.9 },
+        { TraceId: "trace-gone", apology: 0.9 },
+      ]);
+    });
+
+    /** @scenario "A query that projects TraceId but not OccurredAt keeps its trace-level result" */
+    it("leaves OccurredAt off every row when the judge returns new rows in another order", async () => {
+      const { service } = serviceOver({
+        judgeQuery: async ({ rows }) => ({
+          rows: rows.map((row) => ({ ...row, apology: 0.9 })).reverse(),
+          skipped: {},
+        }),
+        executor: new RowsAnsweringExecutor([
+          { TraceId: "trace-a", apology: "trace-a" },
+          { TraceId: "trace-gone", apology: "trace-gone" },
+        ]),
+        held: [trace({ id: "trace-a", threadId: "thread-a", startedAt: STARTED_AT })],
+      });
+
+      const result = await query({ service, sql: APOLOGY_QUERY });
+
+      expect(result.rows).toHaveLength(2);
+      for (const row of result.rows) expect(row).not.toHaveProperty("OccurredAt");
+    });
+
+    /** @scenario "A query that projects TraceId but not OccurredAt keeps its trace-level result" */
+    it("keeps a time the statement projected itself, in the judged row and the answer", async () => {
+      const projected = "2026-11-01 08:00:00.000";
+      const { service, asked } = serviceOver({
+        judgeQuery: answering(0.9),
+        executor: new RowsAnsweringExecutor([
+          { TraceId: "trace-a", OccurredAt: projected, apology: "trace-a" },
+        ]),
+        held: [trace({ id: "trace-a", threadId: "thread-a", startedAt: STARTED_AT })],
+      });
+
+      const sql = APOLOGY_QUERY.replace("SELECT TraceId,", "SELECT TraceId, OccurredAt,");
+
+      const result = await query({ service, sql });
+
+      expect(asked[0]?.rows[0]?.OccurredAt).toBe(projected);
+      expect(result.rows).toEqual([{ TraceId: "trace-a", OccurredAt: projected, apology: 0.9 }]);
+    });
+  });
+
+  describe("when a dashboard widget runs the query", () => {
+    /** @scenario "A dashboard widget's results name the widget" */
+    it("names the widget as the source its kept results carry", async () => {
+      const { service, asked } = serviceOver({ judgeQuery: answering(0.9) });
+
+      await query({
+        service,
+        sql: ANNOYED_QUERY,
+        telemetry: { caller: "dashboard_widget", dashboardId: "board-1", widgetId: "widget-1" },
+      });
+
+      expect(asked[0]?.source).toEqual({ kind: "dashboard", id: "widget-1" });
+    });
+  });
+
+  describe("when the workbench runs the query", () => {
+    /** @scenario "A quick eval() ask's results name the query" */
+    it("names no source, so instant-eval names the ask by its own query id", async () => {
+      const { service, asked } = serviceOver({ judgeQuery: answering(0.9) });
+
+      await query({ service, sql: ANNOYED_QUERY, telemetry: { caller: "workbench" } });
+
+      expect(asked[0]).not.toHaveProperty("source");
     });
   });
 

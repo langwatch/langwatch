@@ -14,6 +14,9 @@ import {
   type InstantEvalSkipReason,
 } from "@langwatch/instant-eval-judge-contract";
 
+/** A query asked from a dashboard widget, which its stored results name as their source. */
+export type InstantEvalQuerySource = Readonly<{ kind: "dashboard"; id: string }>;
+
 /** One synchronous query's judged columns, their texts in place, and its caller's request. */
 export interface InstantEvalQueryJudgingInput {
   readonly projectId: string;
@@ -21,6 +24,8 @@ export interface InstantEvalQueryJudgingInput {
   readonly rows: readonly Record<string, unknown>[];
   /** The caller's request: a cancel stops judging, keeping and billing what was answered. */
   readonly signal?: AbortSignal;
+  /** The widget that asked; absent, the query is an ask named by its own id (ADR-189). */
+  readonly source?: InstantEvalQuerySource;
 }
 
 /**

@@ -128,6 +128,7 @@ export class EvaluationExecutionOutcomeService {
             ? prepared.monitor.evaluator.workflowId
             : undefined,
         idempotencyKey: operationKey,
+        monitor: { id: prepared.monitor.id, isGuardrail: !!data.isGuardrail },
       },
       cost: {
         isGuardrail: !!data.isGuardrail,

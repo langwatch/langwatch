@@ -20,6 +20,7 @@ import {
 } from "@langwatch/evaluator-contract";
 import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { Protections, Trace, TraceApi } from "@langwatch/trace-contract";
 
 import type { EvaluationRunRepository } from "../../../repositories/evaluation.repository.ts";
@@ -40,6 +41,11 @@ import {
   EvaluationJudgingService,
   type EvaluationJudgeRouting,
 } from "./evaluation-judging.service.ts";
+import type {
+  EvaluationMonitorJudgmentsService,
+  EvaluationMonitorReference,
+  EvaluationMonitorRun,
+} from "./evaluation-monitor-judgments.service.ts";
 import type { EvaluationSpanDigestService } from "./evaluation-span-digest.service.ts";
 
 // Evaluations need full access to trace data — no user-facing redaction.
@@ -79,6 +85,10 @@ export interface EvaluationExecutionDeps {
   decisionModels: Pick<ModelProviderApi, "resolveDecisionModel">;
   /** Whether an organization's Instant Evals judges go through the judge router (ADR-190). */
   judgeRouting: EvaluationJudgeRouting;
+  /** A monitor's kept Instant Evals verdicts, behind `release_instant_eval_results` (ADR-189). */
+  monitorJudgments: Pick<EvaluationMonitorJudgmentsService, "recall" | "keep">;
+  /** The project's organization, looked up at most once per judge call for every flag read. */
+  projects: Pick<ProjectApi, "findOrganizationId">;
   /**
    * The install environment the optional evaluators read their opt-out
    * switches from. Stated by the process rather than read here, because a
@@ -92,6 +102,11 @@ export interface EvaluationExecutionDeps {
 // ---------------------------------------------------------------------------
 // Internal types
 // ---------------------------------------------------------------------------
+
+/** A queued command, and the monitor it runs for when a monitor queued it (ADR-189 section 5). */
+export type EvaluationExecutionCommand = ExecuteEvaluationCommand & {
+  monitor?: EvaluationMonitorReference | undefined;
+};
 
 /**
  * What the evaluator dispatch is handed, in the engine's own terms.
@@ -111,6 +126,7 @@ type TraceEvaluationParams = {
   idempotencyKey?: string;
   /** The reader's redactions; a monitor or queued run reads with full access. */
   protections?: ReadProtections;
+  monitor?: EvaluationMonitorReference | undefined;
 };
 
 /** One trace scored, or the reason it was not, before either caller shapes it. */
@@ -143,7 +159,7 @@ export class EvaluationExecutionService {
   }
 
   /** The command carries its mappings as JSON; the engine reads them parsed. */
-  execute(input: ExecuteEvaluationCommand): Promise<EvaluationExecutionResult> {
+  execute(input: EvaluationExecutionCommand): Promise<EvaluationExecutionResult> {
     return this.executeForTrace({
       ...input,
       mappings: input.mappings === null ? null : mappingStateSchema.parse(input.mappings),
@@ -190,6 +206,7 @@ export class EvaluationExecutionService {
       workflowId,
       idempotencyKey,
       protections = INTERNAL_PROTECTIONS,
+      monitor,
     } = params;
 
     const trace = await this.loadTraceForEvaluation({ projectId, traceId, mappings, protections });
@@ -241,6 +258,7 @@ export class EvaluationExecutionService {
       workflowId,
       parentCausalityDepth,
       idempotencyKey,
+      monitor: monitor === undefined ? undefined : { ...monitor, isThreadLevel },
     });
 
     return { kind: "scored", result, evaluationThreadId, inputs: data.data };
@@ -324,6 +342,7 @@ export class EvaluationExecutionService {
     idempotencyKey?: string;
     signal?: AbortSignal | undefined;
     guardrailDirection?: GuardrailCheckDirection | undefined;
+    monitor?: EvaluationMonitorRun | undefined;
   }): Promise<SingleEvaluationResult> {
     const {
       projectId,

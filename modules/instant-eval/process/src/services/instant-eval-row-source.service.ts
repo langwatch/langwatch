@@ -15,15 +15,11 @@ import {
   type LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
 import { InstantEvalNotEnabledError } from "@langwatch/instant-eval-contract";
-import { Temporal } from "@langwatch/time";
 
-import {
-  INSTANT_EVAL_TRACE_COLUMN,
-  instantEvalSampleBuckets,
-} from "../rules/instant-eval-composition.rules.ts";
+import { instantEvalSampleBuckets } from "../rules/instant-eval-composition.rules.ts";
 import { isInstantEvalQueryIdentityRefused } from "../rules/instant-eval-query-identity.rules.ts";
 import {
-  instantEvalRowText,
+  instantEvalRowKeyOf,
   type InstantEvalCursor,
   type InstantEvalKeyPage,
   type InstantEvalRowKey,
@@ -58,34 +54,6 @@ interface InstantEvalPassInput {
   readonly protections: LangWatchQLProtections;
   readonly sql: string;
   readonly parameters?: Readonly<Record<string, unknown>>;
-}
-
-/**
- * Epoch milliseconds a time column's text carries, or `NaN` when it carries no
- * instant. ClickHouse renders a DateTime without a zone, which is UTC.
- */
-function epochMillisecondsOf(text: string): number {
-  const zoned = /[Z+-]\d{0,2}:?\d{0,2}$/.test(text.slice(10)) ? text : `${text}Z`;
-  try {
-    return Temporal.Instant.from(zoned).epochMilliseconds;
-  } catch {
-    return Number.NaN;
-  }
-}
-
-function toRowKey(row: Record<string, unknown>): InstantEvalRowKey {
-  const key = {
-    traceId: instantEvalRowText(row, INSTANT_EVAL_TRACE_COLUMN),
-    threadId: instantEvalRowText(row, "ThreadId"),
-    spanId: instantEvalRowText(row, "SpanId"),
-  };
-  const at = row.OccurredAt;
-  if (typeof at === "number") return { ...key, occurredAt: at };
-  const text = instantEvalRowText(row, "OccurredAt");
-  if (text === "") return { ...key, occurredAt: null };
-  const millis = epochMillisecondsOf(text);
-
-  return { ...key, occurredAt: Number.isNaN(millis) ? null : millis };
 }
 
 export class InstantEvalRowSourceService {
@@ -158,7 +126,7 @@ export class InstantEvalRowSourceService {
     });
 
     return {
-      keys: execution.rows.slice(0, input.limit).map(toRowKey),
+      keys: execution.rows.slice(0, input.limit).map(instantEvalRowKeyOf),
       hasMore: execution.rows.length > input.limit,
     };
   }
@@ -187,7 +155,7 @@ export class InstantEvalRowSourceService {
       maxRows: input.limit,
     });
 
-    return execution.rows.map(toRowKey);
+    return execution.rows.map(instantEvalRowKeyOf);
   }
 
   /**

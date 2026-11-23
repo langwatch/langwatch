@@ -91,6 +91,9 @@
     },
     {
       "path": "../../analytics/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../data-retention/contract/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).

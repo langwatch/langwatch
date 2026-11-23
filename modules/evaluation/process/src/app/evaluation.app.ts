@@ -86,6 +86,7 @@ import {
 import { EvaluationJudgeRoutingService } from "../features/execution/services/evaluation-judge-routing.service.ts";
 import { EvaluationLoopMetricsService } from "../features/execution/services/evaluation-loop-metrics.service.ts";
 import { EvaluationModelCascadeService } from "../features/execution/services/evaluation-model-cascade.service.ts";
+import { EvaluationMonitorJudgmentsService } from "../features/execution/services/evaluation-monitor-judgments.service.ts";
 import { EvaluationSettingsRecoverySwitchService } from "../features/execution/services/evaluation-settings-recovery-switch.service.ts";
 import { EvaluationSpanDigestService } from "../features/execution/services/evaluation-span-digest.service.ts";
 import { EvaluationMonitorLookupService } from "../features/monitors/services/evaluation-monitor-lookup.service.ts";
@@ -274,7 +275,7 @@ export class EvaluationModule implements EvaluationApiContract {
     judges: InstantEvalJudgeApi,
     /** Mints the own-only proof each evaluation_runs read is fenced by; a leaf (AGG-EVAL-PROOF). */
     authz: AuthzApi,
-    /** A project's organization, so the judge router flag is read with its organization rule. */
+    /** A project's organization, so the judge router and kept-results flags read its rules. */
     projects: ProjectApi,
   };
   static readonly secrets = {
@@ -443,10 +444,12 @@ export class EvaluationModule implements EvaluationApiContract {
       workflowExecutor: WorkflowEvaluationService.create(dependencies.workflows),
       judges: dependencies.judges,
       decisionModels: dependencies.modelProviders,
-      judgeRouting: EvaluationJudgeRoutingService.create({
+      judgeRouting: EvaluationJudgeRoutingService.create({ flags: dependencies.featureFlags }),
+      monitorJudgments: EvaluationMonitorJudgmentsService.create({
+        results: channels.instantEvalResults,
         flags: dependencies.featureFlags,
-        projects: dependencies.projects,
       }),
+      projects: dependencies.projects,
       installEnvironment: environment.read(),
       telemetry,
     });

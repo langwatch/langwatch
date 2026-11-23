@@ -264,6 +264,30 @@ export interface LwqlClickHouseRows {
     readonly ToAt: "DateTime64(3)";
     readonly _retention_days: "UInt16";
   };
+  readonly eval_results: {
+    readonly TenantId: "String";
+    readonly TraceId: "String";
+    readonly SpanId: "String";
+    readonly QuestionHash: "String";
+    readonly Question: "String";
+    readonly Kind: "LowCardinality(String)";
+    readonly JudgeModel: "LowCardinality(String)";
+    readonly InputHash: "String";
+    readonly JudgedColumn: "LowCardinality(String)";
+    readonly KeyVersion: "UInt16";
+    readonly Source: "LowCardinality(String)";
+    readonly SourceId: "String";
+    readonly Status: "LowCardinality(String)";
+    readonly Score: "Nullable(Float64)";
+    readonly Label: "String";
+    readonly Probability: "Nullable(Float64)";
+    readonly Probabilities: "String";
+    readonly Error: "String";
+    readonly OccurredAt: "DateTime64(3)";
+    readonly JudgedAt: "DateTime64(3)";
+    readonly UpdatedAt: "DateTime64(3)";
+    readonly _retention_days: "UInt16";
+  };
   readonly evaluation_analytics: {
     readonly TenantId: "String";
     readonly EvaluationId: "String";

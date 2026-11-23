@@ -1,6 +1,7 @@
 import type { MappingState } from "@langwatch/dataset-contract";
 import type { TraceEvaluationData } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -70,6 +71,8 @@ function buildService({ earlier }: { earlier: TraceEvaluationData[] }) {
     },
     decisionModels: { resolveDecisionModel: async () => ({ kind: "langwatch" }) },
     judgeRouting: { isRouted: async () => false, isHostedOff: async () => false },
+    monitorJudgments: { recall: async () => ({ kind: "not_kept" }), keep: async () => undefined },
+    projects: createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
     installEnvironment: {},
   });
   return { service, trace, findTraceEvaluations, authorizeInternal };

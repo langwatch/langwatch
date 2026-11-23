@@ -173,6 +173,13 @@ export const FEATURE_FLAGS = [
       "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. On the hosted service this releases an enterprise organization only: a self-serve one is released by switching them on itself from the search bar, whatever this says. A self-hosted install that judges through Connect is released by a license that names Instant Evals alone, and this never releases it; only a development checkout that judges with its own key still needs this. A deployment with no classifier configured keeps them unavailable either way.",
   },
   {
+    key: "release_instant_eval_results",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Keeps every trace-linked Instant Evals result in eval_results and recalls it before judging (ADR-189): a quick eval(), a run or a dashboard widget asking the same question of the same trace text with the same judge reuses the stored verdict instead of paying for a new judge call. Off by default; enable per project or organization via a targeting rule. Off, nothing reads or writes eval_results and every judgement is made as today. The usage report counts judged results only for organizations with it on.",
+  },
+  {
     key: "release_instant_evals_own_decision_model",
     scope: "PRODUCT",
     defaultValue: true,

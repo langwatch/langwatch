@@ -18,6 +18,7 @@ import type {
 import { describe, expect, it, vi } from "vitest";
 
 import { aggregateProof, ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import { MemoryTraceInstantEvalResultsChannel } from "../../channels/memory/memory.trace-instant-eval-results.channel.ts";
 import { MemoryNullTraceBraidReadsRepository } from "../../features/braid/repositories/memory/memory.null-trace-braid-reads.repository.ts";
 import type { TraceOtherProjectLookupService } from "../../features/read/services/trace-other-project-lookup.service.ts";
 import { TraceSummaryService } from "../../features/read/services/trace-summary-read.service.ts";
@@ -83,6 +84,7 @@ function harness(
     getByTraceId: TraceSummaryReader["getByTraceId"];
     summary: TraceSummaryReader;
     evaluationRuns: MemoryTraceEvaluationRunsRepository;
+    instantEvalResults: MemoryTraceInstantEvalResultsChannel;
     otherProjectLookup: Pick<TraceOtherProjectLookupService, "locate">;
   }> = {},
 ) {
@@ -155,6 +157,7 @@ function harness(
       cleanupTenantEmitter: () => undefined,
     },
     evaluationRuns: reads.evaluationRuns ?? MemoryTraceEvaluationRunsRepository.create(),
+    ...(reads.instantEvalResults ? { instantEvalResults: reads.instantEvalResults } : {}),
     share: {} as ShareApi,
     projects: {
       getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
@@ -443,6 +446,118 @@ describe("TraceModule", () => {
             viewerUserId: "user-1",
           }),
         ).rejects.toThrow("Trace member narrowing is unavailable");
+      });
+    });
+
+    describe("when the drawer reads the trace's kept Instant Evals results (ADR-189)", () => {
+      const keptResult = (tenantId: string) => ({
+        tenantId,
+        traceId: "trace-1",
+        spanId: "",
+        judgedColumn: "output",
+        question: "Is the customer annoyed?",
+        kind: "boolean",
+        status: "judged" as const,
+        probability: 0.8,
+        score: null,
+        label: null,
+        judgeModel: "langwatch/instant-evals",
+        judgedAt: 1_500,
+        source: "dashboard" as const,
+        sourceId: `widget-${tenantId}`,
+      });
+
+      async function resultsHarness({ holders }: { holders: string[] }) {
+        const instantEvalResults = MemoryTraceInstantEvalResultsChannel.create();
+        instantEvalResults.results.push(keptResult(ENGINEER), keptResult(SELLER));
+        const repository = MemoryTraceSummaryRepository.create();
+        for (const tenantId of holders) {
+          await repository.upsert({ ...summaryRow(false), traceId: "trace-1" }, tenantId);
+        }
+        const { app } = harness({
+          summary: TraceSummaryService.create({ repository }),
+          instantEvalResults,
+        });
+        vi.spyOn(app, "resolveViewerProtections").mockResolvedValue(VISIBLE);
+        return app;
+      }
+
+      const read = {
+        projectId: AGGREGATE,
+        traceId: "trace-1",
+        occurredFrom: 1_000,
+        occurredUntil: 2_000,
+        viewerUserId: "user-1",
+      };
+
+      /** @scenario "The drawer asks instant-eval for the results of the trace's member" */
+      it("answers the results of the member that holds the trace, never another's", async () => {
+        const app = await resultsHarness({ holders: [SELLER] });
+
+        const results = await app.readInstantEvalResults({
+          ...read,
+          tenantId: SELLER,
+          authorization: aggregate(),
+        });
+
+        expect(results.map((result) => result.sourceId)).toEqual([`widget-${SELLER}`]);
+      });
+
+      /** @scenario "The drawer asks instant-eval for the results of the trace's member" */
+      it("answers empty where no member holds the trace", async () => {
+        const app = await resultsHarness({ holders: [] });
+
+        await expect(
+          app.readInstantEvalResults({ ...read, authorization: aggregate() }),
+        ).resolves.toEqual([]);
+      });
+
+      describe("given a plan that withholds the trace", () => {
+        const withheldFrom = (withheldFromMs: number | null) => ({
+          ...VISIBLE,
+          withheldFromMs,
+          overPlan: { members: 5, maxMembers: 2 },
+        });
+
+        async function withholdingHarness({ withheldFromMs }: { withheldFromMs: number | null }) {
+          const instantEvalResults = MemoryTraceInstantEvalResultsChannel.create();
+          instantEvalResults.results.push(keptResult(SELLER));
+          const findResultsByTrace = vi.spyOn(instantEvalResults, "findResultsByTrace");
+          const repository = MemoryTraceSummaryRepository.create();
+          await repository.upsert(
+            { ...summaryRow(false), traceId: "trace-1", occurredAt: 1_500 },
+            SELLER,
+          );
+          const { app } = harness({
+            summary: TraceSummaryService.create({ repository }),
+            instantEvalResults,
+          });
+          vi.spyOn(app, "resolveViewerProtections").mockResolvedValue(withheldFrom(withheldFromMs));
+          return { app, findResultsByTrace };
+        }
+
+        /** @scenario "A trace the viewer's plan withholds shows no Instant Evals results" */
+        it("refuses the read and never asks instant-eval", async () => {
+          const { app, findResultsByTrace } = await withholdingHarness({ withheldFromMs: 1_000 });
+
+          await expect(
+            app.readInstantEvalResults({ ...read, tenantId: SELLER, authorization: aggregate() }),
+          ).rejects.toMatchObject({ code: "trace_withheld_over_plan" });
+          expect(findResultsByTrace).not.toHaveBeenCalled();
+        });
+
+        /** @scenario "A trace the viewer's plan withholds shows no Instant Evals results" */
+        it("still answers the results of a trace the plan does not withhold", async () => {
+          const { app } = await withholdingHarness({ withheldFromMs: null });
+
+          const results = await app.readInstantEvalResults({
+            ...read,
+            tenantId: SELLER,
+            authorization: aggregate(),
+          });
+
+          expect(results.map((result) => result.sourceId)).toEqual([`widget-${SELLER}`]);
+        });
       });
     });
 
