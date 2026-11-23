@@ -104,7 +104,6 @@ describe.skipIf(!scratchClickHouseUrl)("the drift check over stored rows", () =>
     const calls: Record<string, unknown>[] = [];
     const drifts: CounterHandle = { inc: (attributes) => void calls.push({ ...attributes }) };
     const checker = RetentionDriftCheckService.create({
-      policies: { findOrganizationIdsWithRules: async () => [organizationId] },
       projects: {
         findScopeProjectIds: async () => [drifting, settled, outside],
         getResolvedForProjects: async ({ projectIds }) =>

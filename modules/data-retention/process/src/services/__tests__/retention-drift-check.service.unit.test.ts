@@ -24,6 +24,7 @@ import {
   retentionDriftWindows,
 } from "../../rules/retention-drift.rules.ts";
 import { RetentionDriftCheckService } from "../retention-drift-check.service.ts";
+import { RetentionDriftRequestService } from "../retention-drift-request.service.ts";
 
 const AT = Date.UTC(2026, 10, 22, 4);
 const DAY_MS = 86_400_000;
@@ -42,8 +43,11 @@ function harness({ organizationIds = ["organization-1"] } = {}) {
   const stamps = MemoryRetroactiveRetentionRepository.create();
   const { logger, lines } = createTestLogger();
   const drifts = recordingCounter();
-  const service = RetentionDriftCheckService.create({
+  const requests = RetentionDriftRequestService.create({
     policies: { findOrganizationIdsWithRules: async () => organizationIds },
+    logger,
+  });
+  const service = RetentionDriftCheckService.create({
     projects: {
       findScopeProjectIds: async () => ["project-1", "project-2"],
       getResolvedForProjects: async ({ projectIds }) =>
@@ -53,7 +57,7 @@ function harness({ organizationIds = ["organization-1"] } = {}) {
     logger,
     drifts,
   });
-  return { service, stamps, lines, drifts };
+  return { service, requests, stamps, lines, drifts };
 }
 
 describe("the drift check's daily wake", () => {
@@ -76,10 +80,10 @@ describe("the drift check's daily wake", () => {
         { messageKey: `sweep:${AT}`, intentType: "sweep", payload: { scheduledFor: AT } },
       ]);
 
-      const { service } = harness({ organizationIds: ["organization-1", "organization-2"] });
+      const { requests } = harness({ organizationIds: ["organization-1", "organization-2"] });
       const sent: CheckRetentionDriftCommandData[] = [];
-      service.connect(async (data) => void sent.push(data));
-      await expect(service.requestAll({ at: AT })).resolves.toEqual({ requested: 2, failed: 0 });
+      requests.connect(async (data) => void sent.push(data));
+      await expect(requests.requestAll({ at: AT })).resolves.toEqual({ requested: 2, failed: 0 });
       expect(sent.map((each) => each.organizationId)).toEqual(["organization-1", "organization-2"]);
       expect(sent.every((each) => each.occurredAt === AT)).toBe(true);
     });
@@ -90,19 +94,19 @@ describe("the drift check's daily wake", () => {
         processStore: InMemoryProcessStore.createForTesting(),
       });
       try {
-        const { service } = harness();
+        const { requests } = harness();
         const checked = vi.fn(async () => []);
         const registered = eventing.register(
           buildRetentionDriftPipeline({
             checkCommand: CheckRetentionDriftCommand.create({ checker: { check: checked } }),
             sweep: {
-              request: ({ at }) => service.requestAll({ at }),
+              request: ({ at }) => requests.requestAll({ at }),
               deleteDispatchedBefore: async () => 0,
             },
           }),
         );
-        service.connect((data) => registered.commands.checkRetentionDrift.send(data));
-        await service.requestAll({ at: AT });
+        requests.connect((data) => registered.commands.checkRetentionDrift.send(data));
+        await requests.requestAll({ at: AT });
         await vi.waitFor(() =>
           expect(checked).toHaveBeenCalledWith({ organizationId: "organization-1", at: AT }),
         );
@@ -115,13 +119,15 @@ describe("the drift check's daily wake", () => {
   describe("when sending the check for one organization fails", () => {
     /** @scenario "An organization whose check cannot be sent is counted, not fatal" */
     it("still asks the others and counts and logs the failure", async () => {
-      const { service, lines } = harness({ organizationIds: ["organization-1", "organization-2"] });
+      const { requests, lines } = harness({
+        organizationIds: ["organization-1", "organization-2"],
+      });
       const sent: string[] = [];
-      service.connect(async (data) => {
+      requests.connect(async (data) => {
         if (data.organizationId === "organization-1") throw new Error("queue down");
         sent.push(data.organizationId);
       });
-      await expect(service.requestAll({ at: AT })).resolves.toEqual({ requested: 1, failed: 1 });
+      await expect(requests.requestAll({ at: AT })).resolves.toEqual({ requested: 1, failed: 1 });
       expect(sent).toEqual(["organization-2"]);
       expect(lines.findLine("error", "could not be requested")).toBeDefined();
     });

@@ -63,10 +63,11 @@ import {
 import { DataRetentionSnapshotService } from "../services/data-retention-snapshot.service.ts";
 import { DataRetentionService } from "../services/data-retention.service.ts";
 import { OrganizationStorageEstimateService } from "../services/organization-storage-estimate.service.ts";
+import { RetentionDriftCheckService } from "../services/retention-drift-check.service.ts";
 import {
-  RetentionDriftCheckService,
+  RetentionDriftRequestService,
   type RetentionDriftRequestOutcome,
-} from "../services/retention-drift-check.service.ts";
+} from "../services/retention-drift-request.service.ts";
 import { RetentionExtensionService } from "../services/retention-extension.service.ts";
 import { RetentionPermissionsService } from "../services/retention-permissions.service.ts";
 import { RetentionPlanService } from "../services/retention-plan.service.ts";
@@ -157,6 +158,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
   readonly #users: UserApi;
   readonly #applyStatus: RetentionApplyStatusRepository;
   readonly #driftCheck: RetentionDriftCheckService;
+  readonly #driftRequests: RetentionDriftRequestService;
 
   private constructor(services: {
     retention: DataRetentionService;
@@ -171,6 +173,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     users: UserApi;
     applyStatus: RetentionApplyStatusRepository;
     driftCheck: RetentionDriftCheckService;
+    driftRequests: RetentionDriftRequestService;
   }) {
     this.#retention = services.retention;
     this.#policy = services.policy;
@@ -184,6 +187,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
     this.#users = services.users;
     this.#applyStatus = services.applyStatus;
     this.#driftCheck = services.driftCheck;
+    this.#driftRequests = services.driftRequests;
   }
 
   static create({ repositories, dependencies, config }: DataRetentionSetup): DataRetentionModule {
@@ -256,10 +260,10 @@ export class DataRetentionModule implements DataRetentionApiContract {
       users: dependencies.users,
       applyStatus: repositories.applyStatus,
       driftCheck: RetentionDriftCheckService.create({
-        policies: repositories.policies,
         projects: retention,
         stamps: repositories.retroactive,
       }),
+      driftRequests: RetentionDriftRequestService.create({ policies: repositories.policies }),
     });
   }
 
@@ -318,14 +322,14 @@ export class DataRetentionModule implements DataRetentionApiContract {
     return buildRetentionDriftPipeline({
       checkCommand: CheckRetentionDriftCommand.create({ checker: this.#driftCheck }),
       sweep: {
-        request: ({ at }) => this.#driftCheck.requestAll({ at }),
+        request: ({ at }) => this.#driftRequests.requestAll({ at }),
         deleteDispatchedBefore: deps.deleteDispatchedBefore,
       },
     });
   }
 
   connectDriftCheckCommands(commands: EventingCommands<RetentionDriftPipelineDefinition>): void {
-    this.#driftCheck.connect((data) => commands.checkRetentionDrift.send(data));
+    this.#driftRequests.connect((data) => commands.checkRetentionDrift.send(data));
   }
 
   /** Sends a drift check now, for one organization or for every one with rules. */
@@ -333,8 +337,8 @@ export class DataRetentionModule implements DataRetentionApiContract {
     organizationId?: string;
   }): Promise<RetentionDriftRequestOutcome> {
     return input.organizationId
-      ? this.#driftCheck.requestOrganization({ organizationId: input.organizationId })
-      : this.#driftCheck.requestAll();
+      ? this.#driftRequests.requestOrganization({ organizationId: input.organizationId })
+      : this.#driftRequests.requestAll();
   }
 
   /** Sends today's measure command for one organization, or for every one with rules. */

@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 
-import type { RetentionDriftRequestOutcome } from "../services/retention-drift-check.service.ts";
+import type { RetentionDriftRequestOutcome } from "../services/retention-drift-request.service.ts";
 import { RETENTION_DRIFT_PROCESS_NAME } from "./retention-drift.process.ts";
 
 const logger = createLogger("langwatch:data-retention:retention-drift");
