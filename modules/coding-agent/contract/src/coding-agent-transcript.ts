@@ -2,8 +2,7 @@ import type { Named } from "@langwatch/module";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import { collectDeliveredPolls } from "./coding-agent-transcript-delivered.ts";
-import { collectLogEntries } from "./coding-agent-transcript-log.ts";
+import { collectDeliveredPolls, collectLogEntries } from "./coding-agent-transcript-log.ts";
 import { collectSpanEntries } from "./coding-agent-transcript-span.ts";
 import {
   type SpanReply,
