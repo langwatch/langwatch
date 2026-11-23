@@ -1,4 +1,4 @@
-import type { TagToken } from "liqe";
+import type { LiqeQuery, TagToken } from "liqe";
 
 import type { DerivedTraceEvent } from "../../trace.responses.ts";
 import type { ResolvedInstantEvalRun } from "../evaluation/trace-instant-eval-chips.ts";
@@ -23,6 +23,8 @@ export interface TranslationContext {
    * checked against the project. Absent when the query carries no such chip.
    */
   evalRuns?: readonly ResolvedInstantEvalRun[];
+  /** The eval chip tags of the compiled tree no run can answer: they get none of `evalRuns`. */
+  unjudgeableEvalTags?: ReadonlySet<LiqeQuery>;
 }
 
 export type FieldHandler = (tag: TagToken, negated: boolean, context: TranslationContext) => string;
