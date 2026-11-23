@@ -7,6 +7,7 @@
  */
 import {
   bindMiddlewareContext,
+  callerAddressContext,
   canonicalErrorResponse,
   createRestRuntime,
 } from "@langwatch/api/rest";
@@ -19,7 +20,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
-import { digestCallerAddress, digestUnsubscribeRest } from "../digest-unsubscribe.rest.ts";
+import { digestUnsubscribeRest } from "../digest-unsubscribe.rest.ts";
 
 const TOKEN = "payload.signature";
 const CALLER = "203.0.113.7";
@@ -39,7 +40,7 @@ function mount(app: Partial<DigestApi>) {
     app: () => createApiFixture<DigestApi>(app, "DigestApi"),
     credential: "public",
     onError: canonicalErrorResponse,
-    middlewareContext: [bindMiddlewareContext(digestCallerAddress, () => CALLER)],
+    middlewareContext: [bindMiddlewareContext(callerAddressContext, () => CALLER)],
   });
   return (method: "GET" | "POST", path: string) =>
     hono.fetch(new Request(`http://api.test${path}?token=${TOKEN}`, { method }));

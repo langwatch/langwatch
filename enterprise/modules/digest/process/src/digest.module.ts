@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { ClientAddress } from "@langwatch/api/policy";
+import { callerAddressOfRequest } from "@langwatch/api/rest";
 import type { DigestApi, DigestServerConfig } from "@langwatch/enterprise-digest-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
@@ -17,8 +17,7 @@ export const digestProcessModule: PublishedProcessModule<"digest", DigestApi, Di
     .withChannels(digestChannels)
     .withApi(DigestModule)
     .withTransports(digestTrpcTransport, digestUnsubscribeRest)
-    .provideMiddlewareContext({
-      digestCallerAddress: (request) => ClientAddress.resolvedFor(request) ?? null,
-    })
+    // The unsubscribe throttle counts each caller by the address the door resolved.
+    .provideMiddlewareContext({ callerAddress: callerAddressOfRequest })
     .withEventing(digestEventing)
     .withEventing(digestSendEventing);

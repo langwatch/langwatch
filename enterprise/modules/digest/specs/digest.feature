@@ -98,6 +98,25 @@ Feature: Weekly digest emails
     Then its totals are the sums of the series it kept, each shown as "at least"
     And a week whose series all fit shows its totals without "at least"
 
+  @unit
+  Scenario: A span counts under the model that answered it
+    Given a span that names the model it asked for and the model that answered
+    When it is folded into the project's week
+    Then it counts under the model that answered
+    And a span whose answering model is blank counts under the model it asked for
+
+  @unit
+  Scenario: A coding-agent repository is named with its owner when one was reported
+    Given coding-agent facts stamped with a repository
+    When they are folded into the person's week
+    Then the repository is named owner/name when an owner was reported, and by name alone if not
+
+  @unit
+  Scenario: A coding-agent metric the digest does not sum is not folded
+    Given a coding-agent metric series whose name the coding-agent contract does not normalise
+    When it is folded into the person's week
+    Then no series is added
+
   @integration
   Scenario: Scenario outcomes fold into the project's week
     Given scenario runs that finished passing and failing this week

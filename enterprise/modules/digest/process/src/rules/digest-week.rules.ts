@@ -3,9 +3,6 @@
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
-const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * HOUR_MS;
-const WEEK_MS = 7 * DAY_MS;
 const MONTH_LABELS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
 /** The send goes out after Monday 08:00 UTC, for the week that just ended. */
 export const SEND_HOUR_UTC = 8;
@@ -26,6 +23,10 @@ export type PlannableWeek = { kind: "open"; isoWeek: string } | { kind: "closed"
 const utcDayOf = (epochMs: number) =>
   Temporal.Instant.fromEpochMilliseconds(epochMs).toZonedDateTimeISO("UTC").toPlainDate();
 
+/** `2026-W39`: ISO week-numbering year and week, so 2027-01-01 is 2026-W53. */
+const isoWeekOfDay = (day: ReturnType<typeof utcDayOf>) =>
+  `${day.yearOfWeek}-W${String(day.weekOfYear).padStart(2, "0")}`;
+
 /** `Dec 1`, the way a template names a day. */
 const dayLabel = ({ month, day }: { month: number; day: number }) =>
   `${MONTH_LABELS[month - 1]} ${day}`;
@@ -39,11 +40,7 @@ const mondayOf = (isoWeek: string) => {
 
 /** The ISO 8601 week an instant falls in, `2026-W39`. */
 export function isoWeekOf(epochMs: number): string {
-  const day = utcDayOf(epochMs);
-  // A week belongs to the year its Thursday falls in, which is what makes 2026-W53.
-  const thursday = day.add({ days: 4 - day.dayOfWeek });
-  const week = Math.floor((thursday.dayOfYear - 1) / 7) + 1;
-  return `${thursday.year}-W${String(week).padStart(2, "0")}`;
+  return isoWeekOfDay(utcDayOf(epochMs));
 }
 
 /** Monday 00:00 UTC of an ISO week. */
@@ -53,16 +50,23 @@ export function weekStartOf(isoWeek: string): number {
 
 /** The `count` weeks before `isoWeek`, newest first. */
 export function weeksBefore({ isoWeek, count }: { isoWeek: string; count: number }): string[] {
-  const start = weekStartOf(isoWeek);
-  return Array.from({ length: count }, (_, index) => isoWeekOf(start - (index + 1) * WEEK_MS));
+  const monday = mondayOf(isoWeek);
+  return Array.from({ length: count }, (_, index) =>
+    isoWeekOfDay(monday.subtract({ weeks: index + 1 })),
+  );
+}
+
+/** Monday 08:00 UTC of an ISO week, when its send opens. */
+function sendOpensAt(isoWeek: string): number {
+  const weekStart = Temporal.Instant.fromEpochMilliseconds(weekStartOf(isoWeek));
+  return weekStart.add({ hours: SEND_HOUR_UTC }).epochMilliseconds;
 }
 
 /** The finished week a send at `now` covers: last week once Monday 08:00 UTC has passed. */
 export function sendableWeek(now: number): string {
   const current = isoWeekOf(now);
-  const opensAt = weekStartOf(current) + SEND_HOUR_UTC * HOUR_MS;
   const [lastWeek, weekBefore] = weeksBefore({ isoWeek: current, count: 2 });
-  return (now >= opensAt ? lastWeek : weekBefore) ?? current;
+  return (now >= sendOpensAt(current) ? lastWeek : weekBefore) ?? current;
 }
 
 /**
@@ -71,8 +75,9 @@ export function sendableWeek(now: number): string {
  * it would mail a second, older week to anyone armed in those hours.
  */
 export function plannableWeek(now: number): PlannableWeek {
-  const opensAt = weekStartOf(isoWeekOf(now)) + SEND_HOUR_UTC * HOUR_MS;
-  return now >= opensAt ? { kind: "open", isoWeek: sendableWeek(now) } : { kind: "closed" };
+  return now >= sendOpensAt(isoWeekOf(now))
+    ? { kind: "open", isoWeek: sendableWeek(now) }
+    : { kind: "closed" };
 }
 
 /** The oldest week kept at `now`: the sendable week's baseline still needs its four. */

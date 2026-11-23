@@ -12,13 +12,12 @@
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
-  defineMiddlewareContext,
+  callerAddressContext,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   type RestBytesProducer,
 } from "@langwatch/api/rest";
 import { DigestApi, digestTokenQuerySchema } from "@langwatch/enterprise-digest-contract";
-import { z } from "zod";
 
 import { DIGEST_UNSUBSCRIBE_PATH } from "../rules/digest-mail.rules.ts";
 
@@ -43,15 +42,6 @@ const TOKEN_ERRORS = [
   { status: 503, description: "No signing secret is configured, so no link can be checked" },
 ];
 
-/**
- * Which caller a request is counted as: the client address resolved from the request, or null
- * when none can be, which the throttle counts in one shared bucket rather than skipping.
- */
-export const digestCallerAddress = defineMiddlewareContext(
-  "digestCallerAddress",
-  z.string().nullable(),
-);
-
 const RESUBSCRIBE_PATH = "/api/digest/resubscribe";
 
 export const digestUnsubscribeRest = defineRestRouter(DigestApi)
@@ -69,7 +59,7 @@ export const digestUnsubscribeRest = defineRestRouter(DigestApi)
     summary: "The weekly digest's unsubscribe page",
     errors: TOKEN_ERRORS,
   })
-  .withMiddlewareContext(digestCallerAddress)
+  .withMiddlewareContext(callerAddressContext)
   .handle(async ({ app, input, response }, callerAddress) =>
     htmlPage(
       response,
@@ -91,7 +81,7 @@ export const digestUnsubscribeRest = defineRestRouter(DigestApi)
     summary: "RFC 8058 one-click unsubscribe from the weekly digest",
     errors: TOKEN_ERRORS,
   })
-  .withMiddlewareContext(digestCallerAddress)
+  .withMiddlewareContext(callerAddressContext)
   .handle(async ({ app, input, response }, callerAddress) => {
     await app.unsubscribe({ ...input, callerAddress });
     return htmlPage(response, unsubscribedPage(input.token));
@@ -109,7 +99,7 @@ export const digestUnsubscribeRest = defineRestRouter(DigestApi)
     summary: "Resubscribe to the weekly digest from its unsubscribe page",
     errors: TOKEN_ERRORS,
   })
-  .withMiddlewareContext(digestCallerAddress)
+  .withMiddlewareContext(callerAddressContext)
   .handle(async ({ app, input, response }, callerAddress) => {
     await app.resubscribe({ ...input, callerAddress });
     return htmlPage(response, resubscribedPage(input.token));

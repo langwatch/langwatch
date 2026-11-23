@@ -66,7 +66,7 @@ resubscribe(input: DigestTokenCall): Promise<void>;
 
 |             |                                               |
 | ----------- | --------------------------------------------- |
-| Declared at | `src/transport/digest-unsubscribe.rest.ts:57` |
+| Declared at | `src/transport/digest-unsubscribe.rest.ts:47` |
 | Base URL    | none: each route's path is its address        |
 | Addressing  | literal                                       |
 | Credential  | project                                       |
@@ -75,7 +75,7 @@ resubscribe(input: DigestTokenCall): Promise<void>;
 
 The weekly digest's unsubscribe page
 
-Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session exists, and the HMAC token naming one person is the whole authorization. Hidden from the OpenAPI document. Declared at `src/transport/digest-unsubscribe.rest.ts:63`.
+Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session exists, and the HMAC token naming one person is the whole authorization. Hidden from the OpenAPI document. Declared at `src/transport/digest-unsubscribe.rest.ts:53`.
 
 Answers at `/api/digest/unsubscribe`.
 
@@ -84,7 +84,7 @@ Answers at `/api/digest/unsubscribe`.
 interface Query {
   token: string;
 }
-// Response: inline, src/transport/digest-unsubscribe.rest.ts:66
+// Response: inline, src/transport/digest-unsubscribe.rest.ts:56
 type Response = unknown;
 ```
 
@@ -92,13 +92,13 @@ type Response = unknown;
 
 RFC 8058 one-click unsubscribe from the weekly digest
 
-Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session exists, and the HMAC token naming one person is the whole authorization. Hidden from the OpenAPI document. Declared at `src/transport/digest-unsubscribe.rest.ts:82`.
+Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session exists, and the HMAC token naming one person is the whole authorization. Hidden from the OpenAPI document. Declared at `src/transport/digest-unsubscribe.rest.ts:72`.
 
 Answers at `/api/digest/unsubscribe`.
 
 ```typescript
 type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:67
-// Response: inline, src/transport/digest-unsubscribe.rest.ts:88
+// Response: inline, src/transport/digest-unsubscribe.rest.ts:78
 type Response = unknown;
 ```
 
@@ -106,13 +106,13 @@ type Response = unknown;
 
 Resubscribe to the weekly digest from its unsubscribe page
 
-Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session exists, and the HMAC token naming one person is the whole authorization. Hidden from the OpenAPI document. Declared at `src/transport/digest-unsubscribe.rest.ts:100`.
+Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives where no session exists, and the HMAC token naming one person is the whole authorization. Hidden from the OpenAPI document. Declared at `src/transport/digest-unsubscribe.rest.ts:90`.
 
 Answers at `/api/digest/resubscribe`.
 
 ```typescript
 type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:67
-// Response: inline, src/transport/digest-unsubscribe.rest.ts:106
+// Response: inline, src/transport/digest-unsubscribe.rest.ts:96
 type Response = unknown;
 ```
 
