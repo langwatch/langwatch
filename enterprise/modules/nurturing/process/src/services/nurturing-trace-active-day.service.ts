@@ -31,7 +31,7 @@ export class NurturingTraceActiveDayService {
   private constructor(private readonly dependencies: TraceActiveDayDependencies) {}
 
   /**
-   * Answers how many it sent. A failed claim or a refused batch gives that batch's claims back and
+   * Answers how many it sent. A failed claim or a refused batch gives that whole batch's claims back and
    * throws, so the caller's retry sends them; batches sent before it keep theirs.
    */
   async send({
@@ -65,7 +65,9 @@ export class NurturingTraceActiveDayService {
     const releasing = (error: unknown) =>
       NurturingClaimReleaseService.create(claims).rethrowAfterReleasing({
         error,
-        keys: claimed.map(({ claimKey }) => claimKey),
+        // Every key: a claim that rejected (a timeout) may still have been saved; releasing a key
+        // not held is a plain delete, so harmless.
+        keys: batch.map(({ claimKey }) => claimKey),
       });
     const failed = results.find(
       (result): result is PromiseRejectedResult => result.status === "rejected",

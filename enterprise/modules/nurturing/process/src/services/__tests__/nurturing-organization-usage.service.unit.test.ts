@@ -505,20 +505,18 @@ describe("NurturingOrganizationUsageService", () => {
       expect(warned[0]).toMatchObject({ organizationId: "org-1", msg: expect.any(String) });
     });
 
-    /** @scenario "A failed identify is reported and swallowed" */
-    it("reports and swallows a members read that failed", async () => {
-      lines.length = 0;
-      const { service, sent } = await serviceOver({
+    /** @scenario "A failed member read fails the sync" */
+    it("rejects when the members read fails, so the job retries", async () => {
+      const { service } = await serviceOver({
         placed,
         members: {
           findMembershipsOfMembers: () => Promise.reject(new Error("member copy unavailable")),
         },
       });
 
-      await expect(service.usageChanged({ projectId: "project-1" })).resolves.toBeUndefined();
-
-      expect(sent).toHaveLength(1);
-      expect(lines.filter((line) => line.level === 40)).toHaveLength(1);
+      await expect(service.usageChanged({ projectId: "project-1" })).rejects.toThrow(
+        "member copy unavailable",
+      );
     });
   });
 
@@ -635,9 +633,10 @@ describe("NurturingOrganizationUsageService", () => {
         placed,
         logger: observed.logger,
         syncs: observed.syncs,
-        members: createApiFixture<MembersCopy>({
-          findMembershipsOfMembers: () => Promise.reject(new Error("unavailable")),
-        }),
+        members: await membersOver(new Map([["admin-1", ["org-1"]]])),
+        send: async (calls) => {
+          if (calls.some((call) => call.type === "identify")) throw new Error("refused");
+        },
       });
 
       await service.usageChanged({ projectId: "project-1" });
@@ -1079,6 +1078,33 @@ describe("NurturingOrganizationUsageService given an organization that traced to
       "claims unavailable",
     );
     expect(tracksOf(sent)).toEqual([]);
+
+    failing = false;
+    await service.tracesChanged({ projectId: "project-1" });
+
+    expect(tracksOf(sent).map((call) => call.messageId)).toEqual([
+      "trace_active_day:admin-1:2026-11-19",
+      "trace_active_day:admin-1:2026-11-20",
+    ]);
+  });
+
+  /** @scenario "A failed trace_active_day send fails the sync, and its retry sends the events once" */
+  it("gives back a claim that was saved though its call rejected, so the retry sends it", async () => {
+    const memory = MemoryNurturingClaimRepository.create();
+    let failing = true;
+    const claims: NurturingClaimRepository = {
+      claim: async (key, ttlSeconds) => {
+        const claimed = await memory.claim(key, ttlSeconds);
+        if (failing && key.endsWith(":2026-11-20")) throw new Error("claim timed out");
+        return claimed;
+      },
+      release: (key) => memory.release(key),
+    };
+    const { service, sent } = await tracedOrganization({ claims });
+
+    await expect(service.tracesChanged({ projectId: "project-1" })).rejects.toThrow(
+      "claim timed out",
+    );
 
     failing = false;
     await service.tracesChanged({ projectId: "project-1" });

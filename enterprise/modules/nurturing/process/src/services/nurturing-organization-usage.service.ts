@@ -207,8 +207,11 @@ export class NurturingOrganizationUsageService {
       throw error;
     }
     const mirrored: MirroredCounts = { identifyCalls: 0 };
-    const { userIds, mirrorFailed } = await this.mirrorOntoOrganization({
+    // Outside the swallowing mirror: a failed read rejects, so the retry sends the events it would skip.
+    const userIds = await this.membersToMirrorOnto({ organizationId });
+    const mirrorFailed = await this.tryMirrorOntoMembers({
       organizationId,
+      userIds,
       traits,
       counts: mirrored,
     });
@@ -336,30 +339,30 @@ export class NurturingOrganizationUsageService {
   }
 
   /**
-   * Mirrors the traits onto the organization's members, swallowing a failure: the group call
-   * stands, and the next sync mirrors again, as the other sinks' failures. `counts` is an
-   * out-parameter, so a batch that fails midway still reports the identifies already sent.
+   * Mirrors the traits onto the members, swallowing a failure: the group call stands, and the next
+   * sync mirrors again, as the other sinks' failures. `counts` is an out-parameter, so a batch that
+   * fails midway still reports the identifies already sent. Answers whether the mirror failed.
    */
-  private async mirrorOntoOrganization({
+  private async tryMirrorOntoMembers({
     organizationId,
+    userIds,
     traits,
     counts,
   }: Readonly<{
     organizationId: string;
+    userIds: readonly string[];
     traits: CioOrganizationUsageTraits;
     counts: MirroredCounts;
-  }>): Promise<{ userIds: readonly string[]; mirrorFailed: boolean }> {
-    let userIds: readonly string[] = [];
+  }>): Promise<boolean> {
     try {
-      userIds = await this.membersToMirrorOnto({ organizationId });
       await this.mirrorOntoMembers({ userIds, traits, counts });
-      return { userIds, mirrorFailed: false };
+      return false;
     } catch (error) {
       this.dependencies.logger.warn(
         { error, organizationId },
         "an organization's usage could not be mirrored onto its members",
       );
-      return { userIds, mirrorFailed: true };
+      return true;
     }
   }
 

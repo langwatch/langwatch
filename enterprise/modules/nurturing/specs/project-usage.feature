@@ -50,7 +50,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   The usage mirror reads the marks too, so such a row, or one from before the marks, gets no
   identify.
   On a usage sync a failed identify is reported and swallowed, as the
-  other sinks' failures are; the group call stands. At a window's end it fails the sweep, which retries. A project's first trace syncs as later ones do. The
+  other sinks' failures are; the group call stands. A failed read of the members fails the sync, which retries. At a window's end it fails the sweep, which retries. A project's first trace syncs as later ones do. The
   signup day comes from its own copy of
   lw.organization.created. It reads no other module's table and calls no other module's API for
   a usage fact, and keeps no copy for projects or
@@ -417,10 +417,16 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
 
   @unit
   Scenario: A failed identify is reported and swallowed
-    Given Customer.io refuses the members' identify, or nurturing's member copy cannot be read
+    Given Customer.io refuses the members' identify
     When a project of the organization changes its usage, not at a window's end
     Then the failure is reported as a warning and the sync does not fail
     And the group call has already been sent
+
+  @unit
+  Scenario: A failed member read fails the sync
+    Given nurturing's member copy cannot be read
+    When a project of the organization changes its usage, not at a window's end
+    Then the sync rejects, so the job retries and no trace_active_day event is lost
 
   @unit
   Scenario: A project nurturing never saw created sends nothing
