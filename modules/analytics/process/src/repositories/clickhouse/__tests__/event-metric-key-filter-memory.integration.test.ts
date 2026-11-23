@@ -14,24 +14,10 @@ const TABLE = `event_metric_keys_${nanoid(8).replace(/[^A-Za-z0-9]/g, "x")}`;
 const SPAN_COUNT = 70_000;
 const EVENTS_PER_SPAN = 8;
 const KEYS_PER_EVENT = 20;
-const SEED_SLICE = 10_000;
+const SEED_SLICE = 2_000;
 const FILTER_KEYS = ["zz1", "zz2", "zz3", "zz4", "zz5", "event.metrics.k3_4"];
-/** A lambda over the keys peaked near 99 MiB here; one hasAny per event near 50 MiB. */
+/** A lambda over the keys peaked near 116 MiB here; one hasAny per event near 49 MiB. */
 const MEMORY_CAP_BYTES = "70000000";
-
-/** Retries a seed step the server killed for its total memory, which other suites share. */
-async function seedStep(run: () => Promise<unknown>): Promise<void> {
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      await run();
-      return;
-    } catch (error) {
-      const killed = (error as { type?: string }).type === "MEMORY_LIMIT_EXCEEDED";
-      if (!killed || attempt === 5) throw error;
-      await new Promise((resolve) => setTimeout(resolve, attempt * 2_000));
-    }
-  }
-}
 
 /** The span-side condition of the translated filter, with the table's own column names. */
 function eventCondition(): { sql: string; params: Record<string, unknown> } {
@@ -55,26 +41,31 @@ describe("given spans whose events carry attribute maps", () => {
     ch = (await startMigratedClickHouse()).client;
     await ch.command({
       query: `CREATE TABLE ${TABLE} (id UInt64, Events Nested(Name String, Attributes Map(String, String)))
-        ENGINE = MergeTree ORDER BY id`,
+        ENGINE = MergeTree ORDER BY id
+        SETTINGS vertical_merge_algorithm_min_rows_to_activate = 1,
+          vertical_merge_algorithm_min_columns_to_activate = 1`,
     });
-    // Seeded in slices: one 70k-row insert of generated maps passes the 1 GiB a CI server allows.
+    // Small slices, each merged into one part as it lands: a slice peaks near 54 MiB and each
+    // merge reads two parts column by column near 100 MiB, far below a CI server's 1 GiB total.
+    // The filter then reads one part in blocks as large as before.
     for (let start = 0; start < SPAN_COUNT; start += SEED_SLICE) {
-      await seedStep(() =>
-        ch.command({
-          query: `INSERT INTO ${TABLE} SELECT number,
+      await ch.command({
+        query: `INSERT INTO ${TABLE} SELECT number,
           arrayMap(e -> concat('evt', toString((number + e) % 3)), range(${EVENTS_PER_SPAN})),
           arrayMap(e -> CAST(mapFromArrays(
             arrayMap(i -> concat('event.metrics.k', toString(i), '_', toString(number % 11)), range(${KEYS_PER_EVENT})),
             arrayMap(i -> concat(repeat('v', 40), toString(number)), range(${KEYS_PER_EVENT}))
           ) AS Map(String, String)), range(${EVENTS_PER_SPAN}))
           FROM numbers(${start}, ${SEED_SLICE})`,
-          clickhouse_settings: { max_threads: 1, max_insert_threads: "1", max_block_size: "4096" },
-        }),
-      );
+        clickhouse_settings: {
+          max_threads: 1,
+          max_insert_threads: "1",
+          max_block_size: String(SEED_SLICE),
+        },
+      });
+      await ch.command({ query: `OPTIMIZE TABLE ${TABLE} FINAL` });
     }
-    // One part again, so the filter reads blocks as large as one insert gave.
-    await seedStep(() => ch.command({ query: `OPTIMIZE TABLE ${TABLE} FINAL` }));
-  }, 180_000);
+  }, 120_000);
 
   afterAll(async () => {
     await ch?.command({ query: `DROP TABLE IF EXISTS ${TABLE}` });
