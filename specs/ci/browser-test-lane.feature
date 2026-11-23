@@ -55,6 +55,50 @@ Feature: The real-browser test lane runs, and only where React is
       When the lane is checked
       Then the check fails naming the uncollected file
 
+  # Bound by .github/scripts/run-package-suites.test.ts (the scheduler),
+  # tools/ciguard/mainsuites_test.go (the workflow's legs) and
+  # .github/scripts/nightly-workflows.test.ts (the nightly hunt's legs).
+  Rule: browser suites run on a runner of their own
+
+    # A suite that starts a container changes the runner's network, and Chromium
+    # in a browser suite running beside it aborts with ERR_NETWORK_CHANGED.
+
+    @unit
+    Scenario: Browser suites run on their own runner, never beside a suite that starts containers
+      Given the package suites job is split into legs
+      When each leg schedules its suites
+      Then one leg runs every browser suite and no other suite
+      And every other leg runs every suite except the browser suites
+
+    # The weights file records seconds per script, so a leg weighs a package by the
+    # suites it keeps: a 161s jsdom suite beside a 15s browser suite is 161s on the
+    # no-browser leg (heavy, so it runs alone) and 15s on the browser leg.
+    @unit
+    Scenario: A leg weighs a package by the seconds of the suites it keeps
+      Given a package with a slow jsdom suite and a short browser suite
+      When each leg plans its shard
+      Then the no-browser leg weighs the package as the jsdom suite alone
+      And the browser leg weighs it as the browser suite alone
+
+    @unit
+    Scenario: Without a lane filter every lane runs
+      Given the package suites run with no lane filter set
+      When the suites are scheduled
+      Then every lane runs, browser suites included, as a local run always has
+
+    @unit
+    Scenario: A lane filter other than browser or no-browser is refused
+      Given PACKAGE_SUITES_LANES is set to anything but browser or no-browser
+      When the package suites job starts
+      Then it fails instead of running every lane on every leg
+
+    @unit
+    Scenario: The nightly flaky-test hunt runs browser suites on a leg of their own
+      Given the nightly hunt runs the package suites over shards, three times each
+      When each of its legs schedules its suites
+      Then every numbered shard runs every suite except the browser suites
+      And each run index has one leg that runs only the browser suites
+
   Rule: React testing dependencies belong only to web packages
 
     # A contract or server package that grows a React testing dependency is

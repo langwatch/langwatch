@@ -2,6 +2,8 @@ package suiteweights
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -34,46 +36,91 @@ func m(pkg, script string, seconds float64, cached bool) Measurement {
 	return Measurement{Package: pkg, Script: script, Seconds: seconds, Cached: cached}
 }
 
+func k(pkg, script string) ScriptKey { return ScriptKey{Package: pkg, Script: script} }
+
+func allDefined(ScriptKey) bool { return true }
+
 // @scenario "A suite Nx replayed from its cache does not make it look cheap"
 func TestWeighIgnoresCacheReplaysWhenARealRunExists(t *testing.T) {
 	weights := Weigh([][]Measurement{
 		{m("a", "test", 2, true)},
 		{m("a", "test", 90, false)},
 		{m("a", "test", 3, true)},
-	}, nil)
+	}, nil, allDefined)
 
-	assert.InDelta(t, 90.0, weights["a"], 0.001)
+	assert.InDelta(t, 90.0, weights[k("a", "test")], 0.001)
 }
 
 // @scenario "A suite only ever replayed from the cache still has a weight"
 func TestWeighFallsBackToReplaysWhenNothingRanForReal(t *testing.T) {
-	weights := Weigh([][]Measurement{{m("a", "test", 4, true)}, {m("a", "test", 6, true)}}, nil)
+	weights := Weigh([][]Measurement{{m("a", "test", 4, true)}, {m("a", "test", 6, true)}}, nil, allDefined)
 
-	assert.InDelta(t, 5.0, weights["a"], 0.001)
+	assert.InDelta(t, 5.0, weights[k("a", "test")], 0.001)
 }
 
 // @scenario "A package only ever replayed from the cache keeps its committed weight"
 func TestWeighKeepsTheCommittedWeightOfAPackageNoRunExecuted(t *testing.T) {
-	previous := ParseWeights("# header\n@x/sims  28\n@x/ran  90  # note\n")
+	previous := ParseWeights("# header\n@x/sims  test  28\n@x/sims  test:browser  12\n@x/ran  test  90  # note\n")
 
 	weights := Weigh([][]Measurement{
 		{m("@x/sims", "test", 2, true), m("@x/ran", "test", 40, false)},
 		{m("@x/sims", "test", 3, true), m("@x/ran", "test", 50, false)},
-	}, previous)
+	}, previous, allDefined)
 
-	assert.InDelta(t, 28.0, weights["@x/sims"], 0.001)
-	assert.InDelta(t, 45.0, weights["@x/ran"], 0.001)
+	assert.InDelta(t, 28.0, weights[k("@x/sims", "test")], 0.001)
+	assert.InDelta(t, 12.0, weights[k("@x/sims", "test:browser")], 0.001)
+	assert.InDelta(t, 45.0, weights[k("@x/ran", "test")], 0.001)
 }
 
-// @scenario "A package's weight is the median of its runs, summed over its scripts"
-func TestWeighSumsTheMedianOfEachScript(t *testing.T) {
+// @scenario "A script no run measured keeps its committed weight"
+func TestWeighKeepsAScriptNoRunExecutedWhenItsPackageRan(t *testing.T) {
+	previous := ParseWeights("@x/app  test  30\n@x/app  test:browser  70\n@x/gone  test  20\n")
+
+	weights := Weigh([][]Measurement{{m("@x/app", "test", 40, false)}}, previous, allDefined)
+
+	assert.InDelta(t, 40.0, weights[k("@x/app", "test")], 0.001)
+	assert.InDelta(t, 70.0, weights[k("@x/app", "test:browser")], 0.001)
+	assert.NotContains(t, weights, k("@x/gone", "test"))
+}
+
+// @scenario "A committed script its package no longer defines is dropped"
+func TestWeighDropsAScriptItsPackageNoLongerDefines(t *testing.T) {
+	previous := ParseWeights("@x/app  test  30\n@x/app  test:browser  70\n")
+	defined := func(key ScriptKey) bool { return key == k("@x/app", "test") }
+
+	weights := Weigh([][]Measurement{{m("@x/app", "test", 40, false)}}, previous, defined)
+
+	assert.NotContains(t, weights, k("@x/app", "test:browser"))
+}
+
+// @scenario "A measured script its package no longer defines is dropped"
+func TestWeighDropsAMeasuredScriptItsPackageNoLongerDefines(t *testing.T) {
+	defined := func(key ScriptKey) bool { return key == k("@x/app", "test") }
+
+	weights := Weigh([][]Measurement{
+		{m("@x/app", "test", 40, false), m("@x/app", "test:browser", 70, false), m("@x/gone", "test", 20, true)},
+	}, nil, defined)
+
+	assert.Equal(t, map[ScriptKey]float64{k("@x/app", "test"): 40}, weights)
+}
+
+// @scenario "A package's weight is the median of its runs, kept per script"
+func TestWeighKeepsTheMedianOfEachScriptApart(t *testing.T) {
 	weights := Weigh([][]Measurement{
 		{m("a", "test", 50, false), m("a", "test:integration", 274, false)},
 		{m("a", "test", 40, false), m("a", "test:integration", 404, false)},
 		{m("a", "test", 60, false), m("a", "test:integration", 300, false)},
-	}, nil)
+	}, nil, allDefined)
 
-	assert.InDelta(t, 350.0, weights["a"], 0.001)
+	assert.InDelta(t, 50.0, weights[k("a", "test")], 0.001)
+	assert.InDelta(t, 300.0, weights[k("a", "test:integration")], 0.001)
+}
+
+// @scenario "The file lists each script with its own seconds"
+func TestParseWeightsReadsPackageScriptAndSeconds(t *testing.T) {
+	got := ParseWeights("# h\n@x/a  test  161\n@x/a  test:browser  15 # n\nbad line\n@x/b  test\n@x/c  test  0\n")
+
+	assert.Equal(t, map[ScriptKey]float64{k("@x/a", "test"): 161, k("@x/a", "test:browser"): 15}, got)
 }
 
 type fakeSource struct {
@@ -150,6 +197,18 @@ func TestCollectRefusesANonPositiveRunCount(t *testing.T) {
 	}
 }
 
+// @scenario "The browser job is measured when present and must be green"
+func TestSuiteJobsTakesAGreenBrowserJobAndRejectsAFailedOne(t *testing.T) {
+	jobs := shards(1, "success", "success")
+
+	got, ok := suiteJobs(append(jobs, Job{ID: 99, Name: "package-suites (browser)", Conclusion: "success"}))
+	assert.True(t, ok)
+	assert.Len(t, got, 3)
+
+	_, ok = suiteJobs(append(jobs, Job{ID: 99, Name: "package-suites (browser)", Conclusion: "failure"}))
+	assert.False(t, ok)
+}
+
 func TestARunMissingAShardIsNotComplete(t *testing.T) {
 	_, ok := suiteJobs([]Job{{ID: 1, Name: "package-suites (1/8)", Conclusion: "success"}})
 
@@ -157,8 +216,11 @@ func TestARunMissingAShardIsNotComplete(t *testing.T) {
 }
 
 // @scenario "The file is written heaviest first and names its runs"
-func TestRenderListsHeaviestFirstAndNamesTheRuns(t *testing.T) {
-	out := Render(map[string]float64{"@x/b": 120.4, "@x/a": 120.2, "@x/c": 300, "@x/tiny": 9.4}, []int64{11, 22})
+func TestRenderListsHeaviestScriptFirstAndNamesTheRuns(t *testing.T) {
+	out := Render(map[ScriptKey]float64{
+		k("@x/b", "test"): 120.4, k("@x/a", "test:browser"): 120.2, k("@x/a", "test"): 120.3,
+		k("@x/c", "test"): 300, k("@x/tiny", "test"): 9.4,
+	}, []int64{11, 22})
 
 	var body []string
 	for _, line := range strings.Split(out, "\n") {
@@ -166,7 +228,9 @@ func TestRenderListsHeaviestFirstAndNamesTheRuns(t *testing.T) {
 			body = append(body, line)
 		}
 	}
-	assert.Equal(t, []string{"@x/c  300", "@x/a  120", "@x/b  120"}, body)
+	assert.Equal(t, []string{
+		"@x/c  test  300", "@x/a  test  120", "@x/a  test:browser  120", "@x/b  test  120",
+	}, body)
 	assert.Contains(t, out, "main runs 11, 22")
 }
 
@@ -193,4 +257,39 @@ func TestParseJobsReadsIDConclusionAndName(t *testing.T) {
 	require.Error(t, err, "a short line is an error, not a skipped job")
 	_, err = parseJobs("x\tsuccess\tlint\n")
 	assert.Error(t, err)
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o750))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+}
+
+// @scenario "Workspace globs decide which packages define scripts"
+func TestDefinedScriptsFollowsWorkspaceGlobs(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "pnpm-workspace.yaml"),
+		"packages:\n  - packages/*\n  - modules/*/*\n  - '!packages/skip'\n")
+	writeFile(t, filepath.Join(root, "packages", "a", "package.json"), `{"name":"a","scripts":{"test":"x"}}`)
+	writeFile(t, filepath.Join(root, "packages", "skip", "package.json"), `{"name":"skip","scripts":{"test":"x"}}`)
+	writeFile(t, filepath.Join(root, "modules", "m", "process", "package.json"), `{"name":"m","scripts":{"test:integration":"x"}}`)
+	writeFile(t, filepath.Join(root, "other", "package.json"), `{"name":"other","scripts":{"test":"x"}}`)
+
+	defined, err := DefinedScripts(root)
+
+	require.NoError(t, err)
+	assert.True(t, defined(k("a", "test")))
+	assert.True(t, defined(k("m", "test:integration")))
+	assert.False(t, defined(k("skip", "test")), "negated glob excludes the package")
+	assert.False(t, defined(k("other", "test")), "unmatched dir is not a package")
+	assert.False(t, defined(k("a", "test:unit")))
+}
+
+// @scenario "Only the scripts the gate runs are defined"
+func TestScriptsForMirrorsTheGate(t *testing.T) {
+	all := map[string]string{"test": "a", "test:unit": "b", "test:integration": "c", "test:browser": "d", "build": "e"}
+
+	assert.ElementsMatch(t, []string{"test:unit", "test:integration", "test:browser"}, scriptsFor(all))
+	assert.Equal(t, []string{"test"}, scriptsFor(map[string]string{"test": "a", "build": "e"}))
+	assert.Empty(t, scriptsFor(map[string]string{"build": "e"}))
 }

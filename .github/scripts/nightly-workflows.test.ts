@@ -65,3 +65,35 @@ void describe("given the nightly workflow", () => {
     });
   });
 });
+
+/** One job's block of a workflow: from its key, two spaces in, to the next job's. */
+const jobBlock = (text: string, job: string): string =>
+  new RegExp(`^ {2}${job}:\\n((?:(?: {3,}.*|\\s*)\\n)+)`, "m").exec(text)?.[1] ?? "";
+
+void describe("given the nightly flaky-test hunt", () => {
+  const hunt = jobBlock(read("nightly.yml"), "flaky-hunt");
+
+  void describe("when its legs are read", () => {
+    /** @scenario "The nightly flaky-test hunt runs browser suites on a leg of their own" */
+    void it("runs the numbered shards without browser suites and one browser leg per run", () => {
+      const shards = /^ {8}shard: \[([\d, ]+)\]$/m.exec(hunt)?.[1].split(",") ?? [];
+      const runs = /^ {8}run: \[([\d, ]+)\]$/m.exec(hunt)?.[1].split(",").map(Number) ?? [];
+      assert.ok(shards.length > 1, "the hunt lists no shards");
+      assert.match(hunt, new RegExp(`^ {8}total: \\[${shards.length}\\]$`, "m"));
+      assert.match(hunt, /^ {8}lanes: \[no-browser\]$/m);
+      const browserRuns = [
+        ...hunt.matchAll(/^ {10}- shard: browser\n {12}lanes: browser\n {12}run: (\d+)$/gm),
+      ].map((match) => Number(match[1]));
+      assert.deepEqual(browserRuns.toSorted(), runs.toSorted(), "one browser leg per run index");
+      assert.match(hunt, /^ {10}PACKAGE_SUITES_LANES: \$\{\{ matrix\.lanes \}\}$/m);
+      assert.match(
+        hunt,
+        /^ {10}PACKAGE_SUITES_SHARD: \$\{\{ matrix\.lanes != 'browser' && format\('\{0\}\/\{1\}', matrix\.shard, matrix\.total\) \|\| '' \}\}$/m,
+      );
+      assert.match(
+        hunt,
+        /^ {10}name: flaky-results-\$\{\{ matrix\.shard \}\}-\$\{\{ matrix\.run \}\}$/m,
+      );
+    });
+  });
+});
