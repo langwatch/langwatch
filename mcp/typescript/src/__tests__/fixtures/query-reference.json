@@ -11916,7 +11916,7 @@
         },
         {
           "name": "analytics.gateway_budget_ledgers",
-          "description": "Rows of the GatewayBudgetLedger table, one row per (GatewayBudgetLedgerId), counted once across the projects read, under the lowest project id.",
+          "description": "Rows of the GatewayBudgetLedger table, one row per (GatewayBudgetLedgerId), counted once across the projects read, under the lowest project id. Spend through a personal key, or against a budget scoped to one member, is not queryable.",
           "grain": "one row per (GatewayBudgetLedgerId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
@@ -12057,7 +12057,7 @@
         },
         {
           "name": "analytics.gateway_budgets",
-          "description": "Rows of the GatewayBudget table, one row per (GatewayBudgetId), counted once across the projects read, under the lowest project id.",
+          "description": "Rows of the GatewayBudget table, one row per (GatewayBudgetId), counted once across the projects read, under the lowest project id. Budgets scoped to one member or to a personal key are not queryable.",
           "grain": "one row per (GatewayBudgetId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
