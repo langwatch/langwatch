@@ -722,4 +722,52 @@ describe("the Dashboards library", () => {
       expect(inputsTo(calls, "boards.create")).toEqual([]);
     });
   });
+
+  describe("given no project where the member may create", () => {
+    /** Absence only counts once the store projects are answered, so wait for that read. */
+    const storeProjectsRead = (calls: readonly UiProcedureCall[]) =>
+      waitFor(() => expect(calls.map((call) => call.path)).toContain("boards.storeProjects"));
+
+    /**
+     * @scenario "Create from the library with a name, product and who can see it"
+     * @scenario "Nobody without analytics:create anywhere is offered creation"
+     */
+    it("offers no New dashboard, in the header or the empty library", async () => {
+      const { calls } = renderLibrary({ listed: [], storeProjects: [] });
+
+      expect(await screen.findByText("No dashboards yet")).toBeVisible();
+      await storeProjectsRead(calls);
+      expect(screen.queryByRole("button", { name: "New dashboard" })).toBeNull();
+    });
+
+    /**
+     * @scenario "Create from the library with a name, product and who can see it"
+     * @scenario "Nobody without analytics:create anywhere is offered creation"
+     */
+    it("offers no Duplicate on a board they may edit, and no New dashboard", async () => {
+      const { calls, user } = renderLibrary({ storeProjects: [] });
+
+      await storeProjectsRead(calls);
+      await user.click(await screen.findByRole("button", { name: "Actions for Shop board" }));
+
+      const items = await screen.findAllByRole("menuitem");
+      expect(items.map((item) => item.textContent)).toEqual([
+        "Rename",
+        "Move to product…",
+        "Delete",
+      ]);
+      expect(screen.queryByRole("button", { name: "New dashboard" })).toBeNull();
+    });
+
+    /** @scenario "Create from the library with a name, product and who can see it" */
+    it("offers no Duplicate to edit on a board they may not edit", async () => {
+      const { calls, user } = renderLibrary({ storeProjects: [] });
+
+      await storeProjectsRead(calls);
+      await user.click(await screen.findByRole("button", { name: "Actions for Everyone's board" }));
+
+      const items = await screen.findAllByRole("menuitem");
+      expect(items.map((item) => item.textContent)).toEqual(["Move to product…"]);
+    });
+  });
 });

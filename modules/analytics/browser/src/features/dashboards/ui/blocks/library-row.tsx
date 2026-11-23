@@ -10,13 +10,9 @@ import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
+import type { BoardMenuActions } from "../../model/organization-library.ts";
 import { InlineTextField } from "../elements/inline-text-field.tsx";
-import {
-  BoardMenu,
-  type BoardMenuActions,
-  hasBoardMenuItems,
-  revealsBoardMenu,
-} from "./board-menu.tsx";
+import { BoardMenu, revealsBoardMenu } from "./board-menu.tsx";
 
 /** Name, who sees it, owner, menu: the columns every row lines up on. */
 const ROW_COLUMNS = "minmax(0, 1fr) 150px 96px 28px";
@@ -43,7 +39,7 @@ export function LibraryRow({
   renaming?: LibraryRowRenaming | undefined;
 }) {
   // While renaming the menu is gone, so closing it cannot hand focus back and end the edit.
-  const hasMenu = renaming === void 0 && hasBoardMenuItems(actions);
+  const hasMenu = renaming === void 0;
   const frame = { name, href, whoSees, isPrivate, owner, renaming };
   return <RowFrame {...frame}>{hasMenu && <BoardMenu name={name} actions={actions} />}</RowFrame>;
 }

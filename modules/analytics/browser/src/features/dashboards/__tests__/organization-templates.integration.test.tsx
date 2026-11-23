@@ -19,8 +19,10 @@ const TEMPLATE = finderPool({})[0]!.board;
 /** Where the member may create, other than the project in view (`proj-1`) they may not. */
 const STORE = { id: "proj-store", slug: "store-project", name: "Store project" };
 
+type StoreProjects = readonly (typeof STORE)[];
+
 /** Boards and widgets from memory, every call kept. */
-function inMemoryServer() {
+function inMemoryServer({ storeProjects = [STORE] }: { storeProjects?: StoreProjects }) {
   const state = { calls: [] as UiProcedureCall[], boards: [] as { id: string; name: string }[] };
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     state.calls.push(call);
@@ -40,7 +42,7 @@ function inMemoryServer() {
       case "featureFlag.isEnabledForEachOrganization":
         return Promise.resolve({ enabledByOrganizationId: { "org-1": true } });
       case "boards.storeProjects":
-        return Promise.resolve([STORE]);
+        return Promise.resolve(storeProjects);
       case "boards.listInOrganization":
         return Promise.resolve(
           state.boards.map((board) => ({
@@ -73,8 +75,8 @@ function inMemoryServer() {
   return { state, answer };
 }
 
-function openTemplates() {
-  const server = inMemoryServer();
+function openTemplates({ storeProjects }: { storeProjects?: StoreProjects } = {}) {
+  const server = inMemoryServer({ storeProjects });
   const host = new StubAnalyticsHost({
     flags: { release_dashboards: true },
     projectPermissions: { [STORE.id]: ["analytics:create", "analytics:update"] },
@@ -112,5 +114,14 @@ describe("the templates finder at the organization level", () => {
     await waitFor(() => expect(host.navigations).toHaveLength(2));
     const names = inputsTo("boards.createAtScope").map((input) => (input as { name: string }).name);
     expect(names).toEqual([TEMPLATE.name, `${TEMPLATE.name} 2`]);
+  });
+
+  /** @scenario "Create from the library with a name, product and who can see it" */
+  it("offers no Add on any template when the member may create in no project", async () => {
+    openTemplates({ storeProjects: [] });
+
+    // The page draws only once the store projects are answered, so the cards follow that read.
+    expect(await screen.findByRole("article", { name: TEMPLATE.name })).toBeVisible();
+    expect(screen.queryAllByRole("button", { name: /^Add / })).toEqual([]);
   });
 });

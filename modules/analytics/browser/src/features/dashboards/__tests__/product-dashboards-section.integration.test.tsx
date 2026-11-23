@@ -46,17 +46,19 @@ function render({
   element,
   listed,
   host = new StubAnalyticsHost(),
+  storeProjects = [SHOP],
 }: {
   element: ReactElement;
   listed: unknown[];
   host?: StubAnalyticsHost;
+  storeProjects?: readonly (typeof SHOP)[];
 }) {
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
     if (call.path === "boards.listInOrganization") return Promise.resolve(listed);
     if (call.path === "boards.listStarred") return Promise.resolve([]);
-    if (call.path === "boards.storeProjects") return Promise.resolve([SHOP]);
+    if (call.path === "boards.storeProjects") return Promise.resolve(storeProjects);
     if (call.path === "boards.update") return Promise.resolve({});
     return NO_PROCEDURES(call);
   };
@@ -210,6 +212,35 @@ describe("a product's Dashboards section", () => {
       if (!llmOps || !gateway) throw new Error("expected two Dashboards sections");
       expect(within(llmOps).getByRole("button", { name: "New dashboard" })).toBeVisible();
       expect(within(gateway).queryByRole("button", { name: "New dashboard" })).toBeNull();
+    });
+  });
+
+  describe("given no project where the member may create", () => {
+    /**
+     * @scenario "Create from the library with a name, product and who can see it"
+     * @scenario "Nobody without analytics:create anywhere is offered creation"
+     */
+    it("offers no New dashboard in any product's section", async () => {
+      const { calls } = render({
+        element: (
+          <>
+            <ProductDashboardsSection product="me" />
+            <ProductDashboardsSection product="llm-ops" />
+            <ProductDashboardsSection product="gateway" />
+            <ProductDashboardsSection product="governance" />
+          </>
+        ),
+        listed: [],
+        host: new StubAnalyticsHost({
+          projectPermissions: { [SHOP.id]: ["analytics:view", "analytics:update"] },
+        }),
+        storeProjects: [],
+      });
+
+      await waitFor(() => expect(screen.getAllByText("No dashboards yet")).toHaveLength(4));
+      // Absence only counts once the store projects are answered.
+      await waitFor(() => expect(calls.map((call) => call.path)).toContain("boards.storeProjects"));
+      expect(screen.queryByRole("button", { name: "New dashboard" })).toBeNull();
     });
   });
 

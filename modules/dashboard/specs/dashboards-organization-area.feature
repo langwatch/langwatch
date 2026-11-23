@@ -621,7 +621,7 @@ Feature: Organization-wide Dashboards area
     Then it offers Organization and Only me, and no Project
     # Evidence: screenshots of both menus
 
-  @integration @unimplemented
+  @integration
   Scenario: Nobody without analytics:create anywhere is offered creation
     Given I may create dashboards in no project of "Acme"
     Then the library and every product section offer no "New dashboard" and no "+"

@@ -178,6 +178,63 @@ export function mayRenameBoard({
   return mayEditInOwner && !isOwnMyDashboard({ board, userId });
 }
 
+/** "Move to product…": `onMove` where the member may move it, else why not, shown disabled. */
+export type BoardMenuMove = { onMove: () => void } | { refusal: string };
+
+/** What a board's "⋮" menu offers; an entry left out is not shown. */
+export type BoardMenuActions = {
+  onRename?: () => void;
+  move?: BoardMenuMove;
+  onDuplicate?: () => void;
+  /** "Duplicate to edit" on a board the member cannot edit. */
+  duplicateLabel?: string;
+  /** `onDelete` is absent for My dashboard, whose Delete shows disabled. */
+  remove?: { onDelete?: () => void };
+};
+
+/** What each menu entry does when chosen. */
+export type BoardMenuHandlers = {
+  rename: () => void;
+  move: () => void;
+  /** Unset where there is no store project to copy into. */
+  duplicate: (() => void) | undefined;
+  delete: () => void;
+};
+
+/** Why a board the member may only view offers no move. */
+const VIEW_ONLY_MOVE_REFUSAL = "You can view this dashboard but not change it.";
+
+/**
+ * A board's menu, in the library and the product sidebars alike, from the member's grants in
+ * the project that owns it. My dashboard keeps its name and shows Delete disabled; a board that
+ * opens nowhere cannot be copied; one the member cannot edit shows Move disabled.
+ */
+export function boardMenuActions({
+  board,
+  userId,
+  mayEditInOwner,
+  mayDeleteInOwner,
+  on,
+}: {
+  board: LibraryBoard;
+  userId: string | undefined;
+  /** `analytics:update` in the project that owns the board. */
+  mayEditInOwner: boolean;
+  /** `analytics:delete` in the project that owns the board. */
+  mayDeleteInOwner: boolean;
+  on: BoardMenuHandlers;
+}): BoardMenuActions {
+  const duplicate = board.openProject !== null ? on.duplicate : void 0;
+  const duplicateLabel = mayEditInOwner ? "Duplicate" : "Duplicate to edit";
+  const remove = isOwnMyDashboard({ board, userId }) ? {} : { onDelete: on.delete };
+  return {
+    ...(mayRenameBoard({ board, userId, mayEditInOwner }) ? { onRename: on.rename } : {}),
+    move: mayEditInOwner ? { onMove: on.move } : { refusal: VIEW_ONLY_MOVE_REFUSAL },
+    ...(duplicate ? { onDuplicate: duplicate, duplicateLabel } : {}),
+    ...(mayDeleteInOwner ? { remove } : {}),
+  };
+}
+
 /** The first "Untitled dashboard N" no board in the project has taken. */
 export function firstUntitledName(taken: readonly string[]): string {
   const names = new Set(taken);

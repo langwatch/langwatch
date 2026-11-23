@@ -13,6 +13,7 @@ import { type ReactNode, useState } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardReader } from "../../behavior/use-board-access.ts";
+import { useBoardMenuActions } from "../../behavior/use-board-menu-actions.ts";
 import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
 import { useLibraryCreate, useLibraryDuplicate } from "../../behavior/use-library-writes.ts";
 import { useProductDashboards } from "../../behavior/use-product-dashboards.ts";
@@ -24,11 +25,10 @@ import {
   namesInProduct,
 } from "../../model/organization-library.ts";
 import { PRODUCT_BOARDS_SHOWN_MAX, sharingTitle } from "../../model/product-dashboards.ts";
-import { BoardMenu, hasBoardMenuItems } from "../blocks/board-menu.tsx";
+import { BoardMenu } from "../blocks/board-menu.tsx";
 import { SidebarLinkRow } from "../blocks/sidebar-link-row.tsx";
 import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 import { BoardMenuDialogs } from "./board-menu-dialogs.tsx";
-import { boardMenuActions } from "./library-board-rows.tsx";
 import { hasSharingChoice, NewDashboardDialog } from "./new-dashboard-dialog.tsx";
 
 /** One title in every product, never with a project name (the G13 title rule). */
@@ -39,7 +39,7 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
   const { boards, allBoards, isLoaded } = useProductDashboards({ product });
   const store = useStoreProject();
   const [isShowingAll, setIsShowingAll] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [pendingMove, setPendingMove] = useState<LibraryBoard | undefined>();
   const [pendingDelete, setPendingDelete] = useState<LibraryBoard | undefined>();
   const { duplicateBoard } = useLibraryDuplicate();
@@ -65,7 +65,7 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
       <HStack minHeight="28px" paddingX={2} paddingTop={2.5} paddingBottom={0.5} gap={1}>
         <SidebarSectionLabel label={LABEL} />
         {store.storeProject && hasSharingChoice({ product, mayShare: store.mayShare }) && (
-          <NewDashboardButton isCreating={false} onCreate={() => setIsCreating(true)} />
+          <NewDashboardButton isCreating={false} onCreate={() => setIsNewDialogOpen(true)} />
         )}
       </HStack>
       {boards.length === 0 && (
@@ -94,12 +94,12 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           />
         </RowList>
       )}
-      {isCreating && (
+      {isNewDialogOpen && (
         <ProductNewDashboard
           product={product}
           allBoards={allBoards}
           store={store}
-          onClose={() => setIsCreating(false)}
+          onClose={() => setIsNewDialogOpen(false)}
         />
       )}
       <BoardMenuDialogs
@@ -129,15 +129,10 @@ function BoardRow({
   onMove: () => void;
   onDelete: () => void;
 }) {
-  const host = useAnalyticsHost();
   const edits = useLibraryBoardEdits();
   const [isRenaming, setIsRenaming] = useState(false);
-  const href = libraryBoardPath(board);
-  if (!href) return null;
-  const Icon = board.scope === "PRIVATE" ? Lock : LayoutDashboard;
-  const actions = boardMenuActions({
+  const actions = useBoardMenuActions({
     board,
-    host,
     on: {
       rename: () => setIsRenaming(true),
       move: onMove,
@@ -145,6 +140,9 @@ function BoardRow({
       delete: onDelete,
     },
   });
+  const href = libraryBoardPath(board);
+  if (!href) return null;
+  const Icon = board.scope === "PRIVATE" ? Lock : LayoutDashboard;
   const renaming = {
     onCommit: (name: string) => {
       setIsRenaming(false);
@@ -159,7 +157,7 @@ function BoardRow({
       icon={<Icon size={14} />}
       iconTitle={sharingTitle(board)}
       isActive={isOpen}
-      menu={hasBoardMenuItems(actions) ? <BoardMenu name={board.name} actions={actions} /> : null}
+      menu={<BoardMenu name={board.name} actions={actions} />}
       renaming={isRenaming ? renaming : void 0}
     />
   );

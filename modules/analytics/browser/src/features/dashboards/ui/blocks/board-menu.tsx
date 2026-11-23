@@ -9,19 +9,7 @@ import { Box, HStack, IconButton, Text } from "@langwatch/design-system/primitiv
 import { Copy, FolderInput, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
-/** "Move to product…": `onMove` where the member may move it, else why not, shown disabled. */
-export type BoardMenuMove = { onMove: () => void } | { refusal: string };
-
-/** What the menu offers; an entry left out is not shown. */
-export type BoardMenuActions = {
-  onRename?: () => void;
-  move?: BoardMenuMove;
-  onDuplicate?: () => void;
-  /** "Duplicate to edit" on a board the member cannot edit. */
-  duplicateLabel?: string;
-  /** `onDelete` is absent for My dashboard, whose Delete shows disabled. */
-  remove?: { onDelete?: () => void };
-};
+import type { BoardMenuActions, BoardMenuMove } from "../../model/organization-library.ts";
 
 /**
  * Spread on the row that holds the menu, so hovering or keyboard focus in the row shows it.
@@ -30,11 +18,6 @@ export type BoardMenuActions = {
 export const revealsBoardMenu = {
   css: { "&:hover .board-menu, &:has(:focus-visible) .board-menu": { opacity: 1 } },
 };
-
-/** Whether the menu would offer anything at all. */
-export function hasBoardMenuItems({ onRename, move, onDuplicate, remove }: BoardMenuActions) {
-  return [onRename, move, onDuplicate, remove].some((entry) => entry !== void 0);
-}
 
 export function BoardMenu({ name, actions }: { name: string; actions: BoardMenuActions }) {
   const { onRename, move, onDuplicate, duplicateLabel = "Duplicate", remove } = actions;
