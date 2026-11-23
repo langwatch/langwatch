@@ -5,8 +5,7 @@ import { z } from "zod";
  * of it may answer with something that is not JSON, so only a known code picks a sentence and
  * nothing the server wrote is ever shown (specs/settings/change-password-auth0.feature).
  */
-export const GENERIC_LINK_REFUSAL =
-  "We could not connect this sign-in method. Try again in a moment.";
+const GENERIC_LINK_REFUSAL = "We could not connect this sign-in method. Try again in a moment.";
 
 const LINK_REFUSAL_COPY: ReadonlyMap<string, string> = new Map([
   ["PROVIDER_NOT_FOUND", "This sign-in method is not available here."],
