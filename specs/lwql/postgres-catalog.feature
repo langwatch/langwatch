@@ -168,6 +168,26 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       And a caller who queries the view sees only the shared conversation's rows
       And the private conversation's ids and message content never appear
 
+    # A PostgreSQL view has no caller to compare a key's owner with, so the rule is structural
+    # there; owners and admins keep these rows on the Gateway pages (gateway-budget-service.feature).
+    @unit @integration
+    Scenario: The budget views return no rows for personal keys or person-scoped budgets, for any reader
+      Given budget ledger rows spent through a shared key and through a member's personal key
+      And budgets scoped to the organization, to a shared key, to a personal key, to one member, and to each end user of the shared key and of the personal key
+      When anyone queries gateway_budget_ledgers, gateway_budgets or gateway_budget_bucket_boundaries, admins and the key's owner included
+      Then they see the shared key's ledger rows and the organization and shared-key budgets
+      And they see the shared key's per-end-user budget, its spend and its boundaries, since a key's end users are not members
+      And no ledger row of the personal key, no budget scoped to a member or a personal key, and no per-end-user budget of the personal key appears
+      And no boundary of a budget left out of gateway_budgets appears
+
+    @unit @integration
+    Scenario: A key with no owner whose creator's account is gone counts as personal, unless a machine created it
+      Given a key with no principal that was never marked personal, created by a member whose account is gone
+      And a key with no principal created by a project credential, whose creator id starts with "svc_"
+      When anyone queries gateway_budget_ledgers or gateway_budgets
+      Then the first key's ledger rows and budgets do not appear
+      And the machine-created key's ledger rows and budgets do
+
   Rule: Everything derived is discoverable
 
     @unit
@@ -270,6 +290,12 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       Then no error occurs
       And the view's columns match the derived catalog's order
       And the reader role can still select from it
+
+    @integration
+    Scenario: Re-provisioning puts a view's new row rule in place on an installation already provisioned
+      Given gateway_budget_ledgers' approved view provisioned before it carried a row rule
+      When provisioning runs the current approved-view statements against that same database
+      Then the approved view's definition carries the personal-key rule
 
   Rule: A read of a Postgres view takes no table modifier
 

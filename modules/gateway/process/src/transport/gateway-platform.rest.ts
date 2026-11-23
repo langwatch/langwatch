@@ -46,6 +46,8 @@ import {
   type GatewayVirtualKeySnakeDto,
   type GatewayVirtualKeyScope,
   type GatewayBudgetScope,
+  type GatewayBudgetReader,
+  type GatewayKeyCaller,
   type VirtualKeyBudgetInput,
 } from "@langwatch/gateway-contract";
 import { nowInstant, Temporal } from "@langwatch/time";
@@ -250,6 +252,19 @@ async function liveBudgetAnswer({
       ...(includeReach ? { reachable: !found.unreachableByAnyKey } : {}),
     }),
   };
+}
+
+/** Appended to each `/budgets/:id` route's description: the rule `assertBudgetOpensFor` applies. */
+const PERSONAL_BUDGET_RULE =
+  " A budget scoped to one member (principal), or to a member's personal virtual key, answers " +
+  "budget_not_found, as for one that does not exist, unless the key acts for that member or " +
+  "holds virtualKeys:viewOtherPersonal at the organization.";
+
+/** A key caller as a budget reader: an API key acts for its user, a project key for no one. */
+function budgetReaderOf(caller: GatewayKeyCaller): GatewayBudgetReader {
+  return caller.kind === "apiKey"
+    ? { kind: "apiKey", apiKeyId: caller.apiKeyId, userId: caller.userId }
+    : { kind: "projectKey" };
 }
 
 function scopeFromWire(
@@ -680,12 +695,15 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withDocs({
     summary: "Get budget",
     description:
-      "Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at the organization for a key that names no project.",
+      "Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at the organization for a key that names no project." +
+      PERSONAL_BUDGET_RULE,
     responses: canonicalBaseResponses,
   })
   .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId } = await app.getKeyCaller({ caller });
+    const reader = budgetReaderOf(caller);
+    await app.assertBudgetOpensFor({ id: input.id, organizationId, reader });
     return liveBudgetAnswer({ app, id: input.id, organizationId });
   })
 
@@ -701,15 +719,17 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withDocs({
     summary: "Create budget",
     description:
-      "Creates an organization-owned budget across all seven scope types. Spend is counted from the moment the budget is created, so spend earlier in the current window is not included. Requires gatewayBudgets:create at the organization; a project key or an organization key may call it.",
+      "Creates an organization-owned budget across all seven scope types. Spend is counted from the moment the budget is created, so spend earlier in the current window is not included. Requires gatewayBudgets:create at the organization; a project key or an organization key may call it. A principal scope naming another member, or a virtual_key scope naming a personal key that is not the caller's, also requires virtualKeys:viewOtherPersonal at the organization; without it the key answers virtual_key_not_found and the member gateway_scope_org_mismatch, as for one that does not exist.",
     responses: { ...canonicalBaseResponses, ...canonicalConflictResponses },
   })
   .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
+    const scope = scopeFromWire(input.scope);
+    await app.assertBudgetScopeOpensFor({ scope, organizationId, reader: budgetReaderOf(caller) });
     const row = await app.createBudget({
       organizationId,
-      scope: scopeFromWire(input.scope),
+      scope,
       name: input.name,
       description: input.description ?? null,
       window: toStoredEnum(input.window),
@@ -747,12 +767,15 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withDocs({
     summary: "Update budget",
     description:
-      "Partial update. Scope, window and cycle_anchor_at are immutable after create. Answers with the budget's live spend, the same figure `GET /budgets` reports. Requires gatewayBudgets:update at the organization.",
+      "Partial update. Scope, window and cycle_anchor_at are immutable after create. Answers with the budget's live spend, the same figure `GET /budgets` reports. Requires gatewayBudgets:update at the organization." +
+      PERSONAL_BUDGET_RULE,
     responses: canonicalBaseResponses,
   })
   .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
+    const reader = budgetReaderOf(caller);
+    await app.assertBudgetOpensFor({ id: input.id, organizationId, reader });
     const row = await app.updateBudget({
       id: input.id,
       organizationId,
@@ -779,12 +802,15 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withDocs({
     summary: "Archive budget",
     description:
-      "Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires gatewayBudgets:delete at the organization.",
+      "Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires gatewayBudgets:delete at the organization." +
+      PERSONAL_BUDGET_RULE,
     responses: canonicalBaseResponses,
   })
   .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
+    const reader = budgetReaderOf(caller);
+    await app.assertBudgetOpensFor({ id: input.id, organizationId, reader });
     const row = await app.archiveBudget({ id: input.id, organizationId, actorUserId });
     return { budget: toBudgetDto({ budget: row }) };
   })
@@ -801,12 +827,15 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withDocs({
     summary: "Reset budget period",
     description:
-      "Moves the budget's period boundary to now; recorded spend is never mutated. Requires gatewayBudgets:update at the organization.",
+      "Moves the budget's period boundary to now; recorded spend is never mutated. Requires gatewayBudgets:update at the organization." +
+      PERSONAL_BUDGET_RULE,
     responses: canonicalBaseResponses,
   })
   .withMiddlewareContext(gatewayKeyCaller)
   .handle(async ({ app, input }, caller) => {
     const { organizationId, actorUserId } = await app.getKeyCaller({ caller });
+    const reader = budgetReaderOf(caller);
+    await app.assertBudgetOpensFor({ id: input.id, organizationId, reader });
     const row = await app.resetBudget({
       id: input.id,
       organizationId,

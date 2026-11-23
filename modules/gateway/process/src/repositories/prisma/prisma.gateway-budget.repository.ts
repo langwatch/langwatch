@@ -36,6 +36,7 @@ import { Prisma } from "@langwatch/prisma-client/generated";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import { type Instant, fromDate, nowInstant, toDate } from "@langwatch/time";
 
+import type { VirtualKeyOwnership } from "../../rules/gateway-personal-key.rules.ts";
 import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
 import type {
   BudgetBucketBoundary,
@@ -46,6 +47,7 @@ import {
   GatewayBudgetRepository,
   type AttributedUserBudgetTemplate,
   type BucketBoundaryRow,
+  type BudgetScopeOwnership,
   type GatewayBudgetCheckReadInput,
   type GatewayBudgetReadInput,
   type GatewayKeyReachRow,
@@ -53,6 +55,7 @@ import {
   type GatewayOrganizationBudgetReadInput,
   type GatewayProjectBudgetReadInput,
   type GatewayVirtualKeyProjectScope,
+  RECENT_LEDGER_READ_LIMIT,
 } from "../gateway-budget.repository.ts";
 import { PrismaGatewayAuditRepository } from "./prisma.gateway-audit.repository.ts";
 import { PrismaGatewayBudgetResolutionRepository } from "./prisma.gateway-budget-resolution.repository.ts";
@@ -188,7 +191,9 @@ type BudgetDetail = {
     status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED";
     occurredAt: Instant;
     virtualKey: { name: string; displayPrefix: string } | null;
+    keyOwner: VirtualKeyOwnership | null;
   }[];
+  scopeKeyOwner: VirtualKeyOwnership | null;
   /** False when spend could not be totalled, so `spentUsd` is not real spend. */
   spendAvailable: boolean;
   /** True when no active key can produce traffic this budget matches. */
@@ -699,9 +704,9 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 
   /**
-   * Budget plus resolved scope-target label (human-friendly name for the scope FK) and the
-   * last 20 ledger entries, for the detail page — one round-trip per scope kind so the UI
-   * doesn't chain queries.
+   * Budget plus resolved scope-target label (human-friendly name for the scope FK) and up to
+   * RECENT_LEDGER_READ_LIMIT newest ledger entries, which the caller filters and trims to 20 for
+   * the detail page; one round-trip per scope kind so the UI doesn't chain queries.
    */
   async findDetailById(input: GatewayBudgetReadInput): Promise<BudgetDetail | null> {
     const row = await this.prisma.gatewayBudget.findFirst({
@@ -722,53 +727,94 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       secondary: null,
     };
 
-    // Recent ledger entries come from ClickHouse
-    // (gateway_budget_ledger_events). The CH events table doesn't carry
-    // the VK name/displayPrefix fields, so we resolve those via a
-    // single Prisma round-trip on the distinct VK ids in the slice.
-    let recentLedger: BudgetDetail["recentLedger"] = [];
-    if (this.chRepo) {
-      // The ledger is sharded on TenantId = the project the trace landed
-      // in, and org/team/principal/group budgets accrue rows across
-      // every project in the org, so the read fans out over the same
-      // tenant set the utilization read uses. The BudgetId filter keeps
-      // narrower scopes exact.
-      const tenantIds = input.tenantIds;
-      const events =
-        tenantIds.length > 0
-          ? await this.chRepo.recentEventsForBudget(tenantIds, budget.id, 20)
-          : [];
-      const vkIds = Array.from(new Set(events.map((e) => e.virtualKeyId)));
-      const vks = vkIds.length
-        ? await this.prisma.virtualKey.findMany({
-            where: { id: { in: vkIds } },
-            select: { id: true, name: true, displayPrefix: true },
-          })
+    // ClickHouse ledger events lack key names, so one Prisma read resolves them. The ledger shards
+    // on the project a trace landed in and wider budgets accrue across the org's projects, so the
+    // read fans out over the utilization read's tenant set; BudgetId keeps narrow scopes exact.
+    const events =
+      this.chRepo && input.tenantIds.length > 0
+        ? await this.chRepo.recentEventsForBudget(
+            input.tenantIds,
+            budget.id,
+            RECENT_LEDGER_READ_LIMIT,
+          )
         : [];
-      const vkById = new Map(vks.map((v) => [v.id, v]));
-      recentLedger = events.map((e) => ({
+    const scopeKeyId = budget.scopeType === "VIRTUAL_KEY" ? [budget.scopeId] : [];
+    const vkIds = Array.from(new Set([...events.map((e) => e.virtualKeyId), ...scopeKeyId]));
+    const vks = vkIds.length
+      ? await this.prisma.virtualKey.findMany({
+          where: { id: { in: vkIds } },
+          select: {
+            id: true,
+            name: true,
+            displayPrefix: true,
+            principalUserId: true,
+            mintedAsPersonal: true,
+            createdById: true,
+          },
+        })
+      : [];
+    const vkById = new Map(vks.map((v) => [v.id, v]));
+    const ownerOf = (id: string): VirtualKeyOwnership | null => {
+      const key = vkById.get(id);
+      return key
+        ? {
+            principalUserId: key.principalUserId,
+            mintedAsPersonal: key.mintedAsPersonal,
+            createdById: key.createdById,
+          }
+        : null;
+    };
+    const recentLedger: BudgetDetail["recentLedger"] = events.map((e) => {
+      const key = vkById.get(e.virtualKeyId);
+      return {
         id: e.id,
         virtualKeyId: e.virtualKeyId,
         amountUsd: new Prisma.Decimal(e.amountUsd),
         model: e.model,
         status: e.status,
         occurredAt: e.occurredAt,
-        virtualKey: vkById.get(e.virtualKeyId)
-          ? {
-              name: vkById.get(e.virtualKeyId)!.name,
-              displayPrefix: vkById.get(e.virtualKeyId)!.displayPrefix,
-            }
-          : null,
-      }));
-    }
+        virtualKey: key ? { name: key.name, displayPrefix: key.displayPrefix } : null,
+        keyOwner: ownerOf(e.virtualKeyId),
+      };
+    });
 
     return {
       budget,
       scopeTarget,
       recentLedger,
+      scopeKeyOwner: scopeKeyId.length > 0 ? ownerOf(budget.scopeId) : null,
       spendAvailable,
       unreachableByAnyKey: scopeReach.get(budget.id)?.reachable === false,
     };
+  }
+
+  async getScopeOwnership({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<BudgetScopeOwnership> {
+    const budget = await this.tryGetStored(id, organizationId);
+    if (!budget) throw new GatewayBudgetNotFoundError();
+    const scopeKeyOwner =
+      budget.scopeType === "VIRTUAL_KEY"
+        ? await this.findScopeKeyOwnership({ virtualKeyId: budget.scopeId, organizationId })
+        : null;
+    return { scopeType: budget.scopeType, scopeId: budget.scopeId, scopeKeyOwner };
+  }
+
+  findScopeKeyOwnership({
+    virtualKeyId,
+    organizationId,
+  }: {
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<VirtualKeyOwnership | null> {
+    return this.prisma.virtualKey.findFirst({
+      where: { id: virtualKeyId, organizationId },
+      select: { principalUserId: true, mintedAsPersonal: true, createdById: true },
+    });
   }
 
   /**

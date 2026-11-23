@@ -27,6 +27,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 
+import type { VirtualKeyOwnership } from "../../rules/gateway-personal-key.rules.ts";
 import type { GatewayAuditAction, GatewayAuditRepository } from "../gateway-audit.repository.ts";
 import type {
   BudgetBucketBoundary,
@@ -42,6 +43,7 @@ import {
   type BudgetHealth,
   type BudgetListWithHealth,
   type BudgetPageWithHealth,
+  type BudgetScopeOwnership,
   type CreateBudgetInput,
   type GatewayBudgetCheckReadInput,
   type GatewayBudgetReadInput,
@@ -51,6 +53,7 @@ import {
   type GatewayProjectBudgetReadInput,
   type GatewayVirtualKeyProjectScope,
   type UpdateBudgetInput,
+  RECENT_LEDGER_READ_LIMIT,
 } from "../gateway-budget.repository.ts";
 import type { GatewayChangeEventsRepository } from "../gateway-change-event.repository.ts";
 import {
@@ -311,6 +314,27 @@ export class MemoryGatewayBudgetRepository extends GatewayBudgetRepository {
     return { budget: budgets[0] ?? stored, spendAvailable, readAt, unreachableByAnyKey: false };
   }
 
+  async getScopeOwnership(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<BudgetScopeOwnership> {
+    const budget = this.#stored(input);
+    if (!budget) throw new GatewayBudgetNotFoundError();
+    return {
+      scopeType: budget.scopeType,
+      scopeId: budget.scopeId,
+      scopeKeyOwner: budget.scopeType === "VIRTUAL_KEY" ? this.#ownerOf(budget.scopeId) : null,
+    };
+  }
+
+  async findScopeKeyOwnership(input: {
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<VirtualKeyOwnership | null> {
+    const key = this.store.virtualKeys.get(input.virtualKeyId);
+    return key?.organizationId === input.organizationId ? this.#ownerOf(key.id) : null;
+  }
+
   async findDetailById(input: GatewayBudgetReadInput): Promise<BudgetDetail | null> {
     const stored = this.#stored(input);
     if (!stored) return null;
@@ -318,7 +342,11 @@ export class MemoryGatewayBudgetRepository extends GatewayBudgetRepository {
     const budget = budgets[0] ?? stored;
     const events =
       input.tenantIds.length > 0
-        ? await this.spend.recentEventsForBudget(input.tenantIds, budget.id, 20)
+        ? await this.spend.recentEventsForBudget(
+            input.tenantIds,
+            budget.id,
+            RECENT_LEDGER_READ_LIMIT,
+          )
         : [];
 
     return {
@@ -339,8 +367,10 @@ export class MemoryGatewayBudgetRepository extends GatewayBudgetRepository {
           status: event.status,
           occurredAt: event.occurredAt,
           virtualKey: key ? { name: key.name, displayPrefix: key.displayPrefix } : null,
+          keyOwner: this.#ownerOf(event.virtualKeyId),
         };
       }),
+      scopeKeyOwner: budget.scopeType === "VIRTUAL_KEY" ? this.#ownerOf(budget.scopeId) : null,
       spendAvailable,
       unreachableByAnyKey: false,
     };
@@ -882,6 +912,18 @@ export class MemoryGatewayBudgetRepository extends GatewayBudgetRepository {
         other.externalId === budget.externalId,
     );
     if (taken) throw new MemoryGatewayUniqueConflictError(["organizationId", "externalId"]);
+  }
+
+  /** Whose key `id` is, as the personal-key rule reads it; null for a key gone. */
+  #ownerOf(id: string): VirtualKeyOwnership | null {
+    const key = this.store.virtualKeys.get(id);
+    return key
+      ? {
+          principalUserId: key.principalUserId,
+          mintedAsPersonal: this.store.mintedAsPersonal.has(key.id),
+          createdById: key.createdById,
+        }
+      : null;
   }
 
   #stored(input: { id: string; organizationId: string }): GatewayBudget | undefined {

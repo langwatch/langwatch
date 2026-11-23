@@ -17,6 +17,7 @@ import { SecretApi } from "@langwatch/secret-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TraceApi } from "@langwatch/trace-contract";
+import { isMigrationStep, type MigrationStepReport } from "@langwatch/upgrade/step";
 import { describe, expect, it } from "vitest";
 
 import { gatewayProcessModule } from "../../gateway.module.ts";
@@ -44,6 +45,30 @@ function recordingHost(mounted: unknown[]) {
   return { mount: (_declaration: object, app: () => unknown) => void mounted.push(app()) };
 }
 
+/** Stand-ins for every peer the gateway names; no test here calls them. */
+function gatewayPeers() {
+  return [
+    testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),
+    testPeer({
+      token: ProjectApi,
+      instance: createApiFixture<ProjectApi>({
+        listIdsByOrganization: async () => [],
+        listTraceDestinations: async () => [],
+      }),
+    }),
+    testPeer({ token: EvaluatorApi, instance: createApiFixture<EvaluatorApi>() }),
+    testPeer({ token: EvaluationApi, instance: createApiFixture<EvaluationApi>() }),
+    testPeer({ token: MonitorApi, instance: createApiFixture<MonitorApi>() }),
+    testPeer({ token: OrganizationApi, instance: createApiFixture<OrganizationApi>() }),
+    testPeer({ token: FeatureFlagApi, instance: createApiFixture<FeatureFlagApi>() }),
+    testPeer({ token: ModelProviderApi, instance: createApiFixture<ModelProviderApi>() }),
+    testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
+    testPeer({ token: SecretApi, instance: createApiFixture<SecretApi>() }),
+    testPeer({ token: ApiKeyApi, instance: createApiFixture<ApiKeyApi>() }),
+    testPeer({ token: LicensingApi, instance: createApiFixture<LicensingApi>() }),
+  ];
+}
+
 async function bootGateway() {
   const rest: unknown[] = [];
   const trpc: unknown[] = [];
@@ -53,26 +78,7 @@ async function bootGateway() {
     config: { gateway: {} },
     stores: memberSource(),
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
-    peers: [
-      testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),
-      testPeer({
-        token: ProjectApi,
-        instance: createApiFixture<ProjectApi>({
-          listIdsByOrganization: async () => [],
-          listTraceDestinations: async () => [],
-        }),
-      }),
-      testPeer({ token: EvaluatorApi, instance: createApiFixture<EvaluatorApi>() }),
-      testPeer({ token: EvaluationApi, instance: createApiFixture<EvaluationApi>() }),
-      testPeer({ token: MonitorApi, instance: createApiFixture<MonitorApi>() }),
-      testPeer({ token: OrganizationApi, instance: createApiFixture<OrganizationApi>() }),
-      testPeer({ token: FeatureFlagApi, instance: createApiFixture<FeatureFlagApi>() }),
-      testPeer({ token: ModelProviderApi, instance: createApiFixture<ModelProviderApi>() }),
-      testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
-      testPeer({ token: SecretApi, instance: createApiFixture<SecretApi>() }),
-      testPeer({ token: ApiKeyApi, instance: createApiFixture<ApiKeyApi>() }),
-      testPeer({ token: LicensingApi, instance: createApiFixture<LicensingApi>() }),
-    ],
+    peers: gatewayPeers(),
     surface: () => ({
       hosts: { rest: recordingHost(rest), trpc: recordingHost(trpc) },
       serve: () => undefined,
@@ -82,7 +88,50 @@ async function bootGateway() {
   return { runtime, rest, trpc };
 }
 
+/** The role that collects the image's migration steps, with no doors mounted. */
+function bootGatewayTasks() {
+  return bootInstalledProcess({
+    role: "tasks",
+    modules: [gatewayProcessModule],
+    config: { gateway: {} },
+    stores: memberSource(),
+    secrets: (owner, declared) => resolver.scopeTo(owner, declared),
+    peers: gatewayPeers(),
+  });
+}
+
 describe("gateway budget installation", () => {
+  describe("when the tasks role collects the gateway's migration steps", () => {
+    /** @scenario "Keys minted for a person before the mark existed are marked by a background step" */
+    it("installs the personal-key mark as a background step that resumes from its saved checkpoint", async () => {
+      const runtime = await bootGatewayTasks();
+
+      try {
+        const step = runtime
+          .migrationSteps(isMigrationStep)
+          .find(({ id }) => id === "gateway:mark-personal-virtual-keys");
+        const saved: MigrationStepReport[] = [];
+        const run = (resumeFrom: MigrationStepReport | null) =>
+          step?.run({
+            log: { info: () => undefined, warn: () => undefined },
+            checkpoint: { resumeFrom, save: async ({ report }) => void saved.push(report) },
+            dryRun: false,
+            signal: new AbortController().signal,
+          });
+
+        expect(step).toMatchObject({ kind: "data", mode: "background", needsOldWritersGone: true });
+        await expect(run(null)).resolves.toEqual({ afterId: null, marked: 0 });
+        await expect(run({ afterId: "vk_last", marked: 3 })).resolves.toEqual({
+          afterId: "vk_last",
+          marked: 3,
+        });
+        expect(saved).toEqual([]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
   describe("when the gateway module boots in the api role", () => {
     /** @scenario "The process owns one budget decision service" */
     it("hands every REST and tRPC door the one gateway app the process booted", async () => {

@@ -290,6 +290,12 @@ export type GatewayBudgetDetail = {
   unreachableByAnyKey: boolean;
 };
 
+/** Who opens a budget: a member, an API key acting for its user if it has one, or a project key. */
+export type GatewayBudgetReader =
+  | { kind: "member"; userId: string }
+  | { kind: "apiKey"; apiKeyId: string; userId: string | null }
+  | { kind: "projectKey" };
+
 export type GatewayBudgetScope =
   | { kind: "ORGANIZATION"; organizationId: string }
   | { kind: "TEAM"; teamId: string }

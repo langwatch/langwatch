@@ -22303,6 +22303,15 @@
           }
         },
         {
+          "name": "mintedAsPersonal",
+          "columnName": "mintedAsPersonal",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
           "name": "traceProjectId",
           "columnName": "traceProjectId",
           "type": "String",

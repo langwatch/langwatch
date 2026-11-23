@@ -56,8 +56,70 @@ const NOT_A_BOARD_COPY =
 const allOf = (...predicates: readonly string[]) =>
   predicates.map((predicate) => `(${predicate})`).join(" AND ");
 
-/** The five Langy views, restricted to shared conversations, and the boards without Only me. */
+/**
+ * The key `keyColumn` names is someone's own: it has a principal, was minted for one, or has
+ * neither and its creator's account is gone. A machine creator (`svc_<projectId>`) never is.
+ * A view has no caller, so this holds for everyone (specs/lwql/postgres-catalog.feature).
+ */
+const isPersonalKey = (keyColumn: string) =>
+  `EXISTS (\n` +
+  `  SELECT 1 FROM {{schema}}."VirtualKey" AS "vk"\n` +
+  `  WHERE "vk"."id" = ${keyColumn}\n` +
+  `    AND (\n` +
+  `      "vk"."principalUserId" IS NOT NULL\n` +
+  `      OR "vk"."mintedAsPersonal"\n` +
+  `      OR (left("vk"."createdById", 4) <> 'svc_' AND NOT EXISTS (\n` +
+  `        SELECT 1 FROM {{schema}}."User" AS "u" WHERE "u"."id" = "vk"."createdById"\n` +
+  `      ))\n` +
+  `    )\n` +
+  `)`;
+
+/** One member's budget. */
+const MEMBER_SCOPES = `('PRINCIPAL')`;
+
+/**
+ * A key's budget, or one capping each end user of a key or project (its scope id is the anchor).
+ * End users are not members, so a per-end-user budget goes only with a personal key it caps
+ * (specs/ai-gateway/end-user-attribution.feature); a project anchor names no key.
+ */
+const KEY_SCOPES = `('VIRTUAL_KEY', 'ATTRIBUTED_USER')`;
+
+/** The budget `budget` (a table alias) is scoped to one member, or to or over a personal key. */
+const isPersonalBudget = (budget: string) =>
+  `${budget}."scopeType" IN ${MEMBER_SCOPES} OR ` +
+  `(${budget}."scopeType" IN ${KEY_SCOPES} AND ${isPersonalKey(`${budget}."scopeId"`)})`;
+
+/** The row's budget (`budgetId`) is not one `budgetPredicate` holds for (alias "b"). */
+const notOnBudgetWhere = (budgetPredicate: string) =>
+  `NOT EXISTS (\n` +
+  `  SELECT 1 FROM {{schema}}."GatewayBudget" AS "b"\n` +
+  `  WHERE "b"."id" = "m"."budgetId"\n` +
+  `    AND ${budgetPredicate}\n` +
+  `)`;
+
+/**
+ * The five Langy views, restricted to shared conversations, the boards without Only me, and the
+ * budget views without personal-key usage.
+ */
 export const VISIBILITY_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = {
+  GatewayBudget: {
+    rowFilter: `NOT (${isPersonalBudget(`"m"`)})`,
+    rowFilterNote:
+      " Budgets scoped to one member or to a personal key, or capping each end user of a personal key, are not queryable.",
+  },
+  GatewayBudgetBucketBoundary: {
+    rowFilter: notOnBudgetWhere(`(${isPersonalBudget(`"b"`)})`),
+    rowFilterNote:
+      " Boundaries of a budget that gateway_budgets leaves out are not queryable either.",
+  },
+  GatewayBudgetLedger: {
+    rowFilter: allOf(
+      `NOT ${isPersonalKey(`"m"."virtualKeyId"`)}`,
+      notOnBudgetWhere(`"b"."scopeType" IN ${MEMBER_SCOPES}`),
+    ),
+    rowFilterNote:
+      " Spend through a personal key, or against a budget scoped to one member, is not queryable.",
+  },
   Dashboard: {
     rowFilter: allOf(BOARD_NOT_ONLY_ME, NOT_A_BOARD_COPY),
     rowFilterNote:

@@ -73,3 +73,64 @@ Feature: Gateway budget decision service
     Given a member of the organization
     When they ask for the budget overview
     Then the answer reports access and the budget read is scoped to that organization
+
+  @integration
+  Scenario: Personal-key usage on a budget's detail is visible only to its owner and to those allowed to see other members' personal keys
+    Given a budget whose recent ledger holds a row spent through a shared key and one through a member's personal key
+    When the key's owner, an organization admin, another member and a viewer each open the budget
+    Then the owner and the admin see both rows
+    And the other member and the viewer see only the shared key's row
+    And a caller whose newest rows are all another member's still sees older shared rows, at most 20
+
+  @integration
+  Scenario: A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys
+    Given a budget scoped to one member, and a budget scoped to that member's personal key
+    When the member, an organization admin and a viewer each open, edit, reset or archive it
+    Then the member and the admin reach it
+    And the viewer is answered exactly as for a budget that does not exist
+    And over the REST API, a key acting for the member or holding that permission at the organization reads it
+    And any other key is answered exactly as for a budget that does not exist
+    And a budget scoped to a shared key, or capping each end user of a key, opens for the viewer
+
+  @integration
+  Scenario: A budget on one person or on a personal key is created only by that person and those allowed to see other members' personal keys
+    Given a member, that member's personal key, and a shared key
+    When the member, an organization admin and another member each create a budget scoped to the member or to the personal key
+    Then the member and the admin create it
+    And the other member is refused exactly as for a target that does not exist: the key as virtual_key_not_found, the member as gateway_scope_org_mismatch
+    And over the REST API, a key acting for the member or holding that permission at the organization creates it, and any other key is refused the same way
+    And a budget scoped to the shared key is created for anyone allowed to create budgets
+
+  @unit
+  Scenario: The ledger rows of a key with no owner whose creator's account is gone count as personal on a budget's detail
+    Given a budget whose recent ledger holds a row from a key with no principal, never marked personal, whose creator's account is gone
+    When a member opens the budget
+    Then that row is not shown
+    And an organization admin still sees it
+    And when the account lookup fails, the read fails rather than counting the account as gone
+    And a budget scoped to that key still opens for the member, who may also create one on it
+
+  @unit
+  Scenario: A key a machine created never counts as personal on a budget's detail
+    Given a budget whose recent ledger holds a row from a key with no principal, created by a project credential whose creator id starts with "svc_"
+    When a member opens the budget
+    Then that row is shown
+    And no account is looked up for its creator
+
+  @unit
+  Scenario: A key minted for a person stays personal after its principal is cleared
+    Given a virtual key created with a principal user
+    Then the same write marks it minted as personal
+    And a key created without a principal is not marked
+    And an update of a key never writes a principal or the mark
+
+  @unit
+  Scenario: Keys minted for a person before the mark existed are marked by a background step
+    Given keys that carry a principal but no mark, and a key that carries no principal
+    When the background step runs
+    Then each key with a principal is marked, and progress is saved after each page
+    And the key without a principal is left unmarked
+    And a second run marks nothing
+    And a dry run marks nothing and saves no progress
+    And a resumed run counts on from the total its checkpoint saved
+    And marking a key leaves its last edit time as it was

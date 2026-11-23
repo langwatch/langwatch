@@ -7,7 +7,6 @@ import {
   updateGatewayBudgetInputSchema,
   type GatewayBudgetCheckInput,
   type GatewayBudgetCheckResult,
-  type GatewayBudgetDetail,
   type GatewayBudgetHealth,
   type GatewayBudgetPageInput,
   type GatewayBudgetResource,
@@ -41,6 +40,7 @@ import {
   type BucketBoundaryRow,
   type BudgetCheckInput,
   type BudgetCheckResult,
+  type BudgetDetail,
   type BudgetListWithHealth,
   type BudgetPageWithHealth,
   type CreateBudgetInput,
@@ -222,7 +222,7 @@ export class GatewayService {
   }: {
     id: string;
     organizationId: string;
-  }): Promise<GatewayBudgetDetail | null> {
+  }): Promise<BudgetDetail | null> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
     const detail = await this.repository.findDetailById({ id, organizationId, tenantIds });
     if (!detail) {

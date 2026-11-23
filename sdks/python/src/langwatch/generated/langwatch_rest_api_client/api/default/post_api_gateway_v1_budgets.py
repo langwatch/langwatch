@@ -121,7 +121,11 @@ def sync_detailed(
 
      Creates an organization-owned budget across all seven scope types. Spend is counted from the moment
     the budget is created, so spend earlier in the current window is not included. Requires
-    gatewayBudgets:create at the organization; a project key or an organization key may call it.
+    gatewayBudgets:create at the organization; a project key or an organization key may call it. A
+    principal scope naming another member, or a virtual_key scope naming a personal key that is not the
+    caller's, also requires virtualKeys:viewOtherPersonal at the organization; without it the key
+    answers virtual_key_not_found and the member gateway_scope_org_mismatch, as for one that does not
+    exist.
 
     Args:
         idempotency_key (str | Unset):
@@ -165,7 +169,11 @@ def sync(
 
      Creates an organization-owned budget across all seven scope types. Spend is counted from the moment
     the budget is created, so spend earlier in the current window is not included. Requires
-    gatewayBudgets:create at the organization; a project key or an organization key may call it.
+    gatewayBudgets:create at the organization; a project key or an organization key may call it. A
+    principal scope naming another member, or a virtual_key scope naming a personal key that is not the
+    caller's, also requires virtualKeys:viewOtherPersonal at the organization; without it the key
+    answers virtual_key_not_found and the member gateway_scope_org_mismatch, as for one that does not
+    exist.
 
     Args:
         idempotency_key (str | Unset):
@@ -203,7 +211,11 @@ async def asyncio_detailed(
 
      Creates an organization-owned budget across all seven scope types. Spend is counted from the moment
     the budget is created, so spend earlier in the current window is not included. Requires
-    gatewayBudgets:create at the organization; a project key or an organization key may call it.
+    gatewayBudgets:create at the organization; a project key or an organization key may call it. A
+    principal scope naming another member, or a virtual_key scope naming a personal key that is not the
+    caller's, also requires virtualKeys:viewOtherPersonal at the organization; without it the key
+    answers virtual_key_not_found and the member gateway_scope_org_mismatch, as for one that does not
+    exist.
 
     Args:
         idempotency_key (str | Unset):
@@ -245,7 +257,11 @@ async def asyncio(
 
      Creates an organization-owned budget across all seven scope types. Spend is counted from the moment
     the budget is created, so spend earlier in the current window is not included. Requires
-    gatewayBudgets:create at the organization; a project key or an organization key may call it.
+    gatewayBudgets:create at the organization; a project key or an organization key may call it. A
+    principal scope naming another member, or a virtual_key scope naming a personal key that is not the
+    caller's, also requires virtualKeys:viewOtherPersonal at the organization; without it the key
+    answers virtual_key_not_found and the member gateway_scope_org_mismatch, as for one that does not
+    exist.
 
     Args:
         idempotency_key (str | Unset):

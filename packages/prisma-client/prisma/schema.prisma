@@ -5639,6 +5639,11 @@ model VirtualKey {
   principalUserId String?
   principalUser   User?   @relation("PrincipalScopedVirtualKeys", fields: [principalUserId], references: [id], onDelete: SetNull)
 
+  // Set in the same write as a principal at mint and never cleared, so a key
+  // stays personal after erasing its owner nulls principalUserId. Keys minted
+  // before this column are marked by the gateway's background step.
+  mintedAsPersonal Boolean @default(false)
+
   // Where this key's traces and costs land. Decided once, when the key is
   // written, and stored: it used to be derived on every read by trying this
   // column, then the key's single project scope, then the organization's

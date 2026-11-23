@@ -1,5 +1,6 @@
 import type { GatewayVirtualKeyRecord, GatewayVirtualKeyScope } from "@langwatch/gateway-contract";
 import { identityPatchData } from "@langwatch/gateway-contract";
+import { skipTenantCheck } from "@langwatch/prisma-client";
 /**
  * Data-access for VirtualKey. Post-collapse: organization-scoped + reachable
  * from N (scopeType, scopeId) VirtualKeyScope entries. dbMultiTenancyProtection
@@ -260,6 +261,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
           hashedSecret: data.hashedSecret,
           displayPrefix: data.displayPrefix,
           principalUserId: data.principalUserId ?? null,
+          mintedAsPersonal: (data.principalUserId ?? null) !== null,
           traceProjectId: data.traceProjectId ?? null,
           expiresAt: data.expiresAt ? toDate(data.expiresAt) : null,
           config: jsonInput(data.config),
@@ -323,6 +325,43 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
         },
       }),
     );
+  }
+
+  async findUnmarkedPersonalIds({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT "id" FROM "VirtualKey"
+      WHERE "principalUserId" IS NOT NULL
+        AND NOT "mintedAsPersonal"
+        AND "id" > ${afterId ?? ""}
+      ORDER BY "id"
+      LIMIT ${limit}
+      ${skipTenantCheck({
+        // The personal-key mark backfill, every organization (background upgrade step, worker)
+        SKIP_TENANT_CHECK: true,
+      })}
+    `;
+    return rows.map((row) => row.id);
+  }
+
+  async markMintedAsPersonal({ ids }: { ids: readonly string[] }): Promise<number> {
+    if (ids.length === 0) return 0;
+    // Raw, so Prisma's @updatedAt keeps each key's last edit time as it was.
+    return this.prisma.$executeRaw`
+      UPDATE "VirtualKey" SET "mintedAsPersonal" = true
+      WHERE "id" = ANY(${[...ids]}::text[])
+        AND "principalUserId" IS NOT NULL
+        AND NOT "mintedAsPersonal"
+      ${skipTenantCheck({
+        // The personal-key mark backfill, every organization (background upgrade step, worker)
+        SKIP_TENANT_CHECK: true,
+      })}
+    `;
   }
 
   async findRoutingPolicyOwner({

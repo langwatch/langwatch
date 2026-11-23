@@ -157,6 +157,7 @@ export class MemoryGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
       routingPolicy: null,
     };
     this.store.virtualKeys.set(key.id, key);
+    if (key.principalUserId !== null) this.store.mintedAsPersonal.add(key.id);
     this.store.connectColumns.set(key.id, {
       connectServices: [],
       licenseTokenHash: null,
@@ -166,6 +167,26 @@ export class MemoryGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
     });
 
     return this.#joined(key);
+  }
+
+  async findUnmarkedPersonalIds(input: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<string[]> {
+    return this.#keys()
+      .filter((key) => this.#unmarkedPersonal(key) && (input.afterId ?? "") < key.id)
+      .map((key) => key.id)
+      .toSorted((left, right) => (left < right ? -1 : 1))
+      .slice(0, input.limit);
+  }
+
+  async markMintedAsPersonal(input: { ids: readonly string[] }): Promise<number> {
+    const marked = input.ids.filter((id) => {
+      const key = this.store.virtualKeys.get(id);
+      return key !== undefined && this.#unmarkedPersonal(key);
+    });
+    for (const id of marked) this.store.mintedAsPersonal.add(id);
+    return marked.length;
   }
 
   async update(input: UpdateGatewayVirtualKeyInput): Promise<GatewayVirtualKeyRecord> {
@@ -328,6 +349,10 @@ export class MemoryGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
     const key = this.store.virtualKeys.get(id);
     if (!key) throw new MemoryGatewayRowNotFoundError("virtual key", id);
     this.store.virtualKeys.set(id, { ...key, lastUsedAt: at, updatedAt: nowInstant() });
+  }
+
+  #unmarkedPersonal(key: GatewayVirtualKeyRecord): boolean {
+    return key.principalUserId !== null && !this.store.mintedAsPersonal.has(key.id);
   }
 
   #keys(): GatewayVirtualKeyRecord[] {

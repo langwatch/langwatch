@@ -216,6 +216,7 @@ function mountGatewayPlatform(options: { allowedAtOrganization: readonly string[
       actor: null,
       actorUserId: "user_1",
     }),
+    assertBudgetOpensFor: async () => undefined,
     archiveBudget,
     updateCacheRule,
     groupMemberCounts: async () => new Map<string, number>(),
@@ -437,6 +438,7 @@ describe("the gateway platform family's idempotent creates", () => {
         actorUserId: "user_1",
       }),
       createBudget,
+      assertBudgetScopeOpensFor: async () => undefined,
       groupMemberCounts: async () => new Map<string, number>(),
       budgetScopeReach: async () => ({
         reachable: true,
@@ -571,6 +573,7 @@ describe("the gateway platform family's caller", () => {
         app: createApiFixture<GatewayApi>({
           getKeyCaller,
           createBudget,
+          assertBudgetScopeOpensFor: async () => undefined,
           groupMemberCounts: async () => new Map<string, number>(),
           budgetScopeReach: async () => ({
             reachable: true,
@@ -832,6 +835,7 @@ describe("the gateway budget routes behind the key door", () => {
           actor: null,
           actorUserId: "user_1",
         }),
+        assertBudgetOpensFor: async () => undefined,
         getBudgetWithHealth: async () => ({
           budget: budgetRow(),
           spendAvailable: true,
@@ -861,6 +865,7 @@ describe("the gateway budget routes behind the key door", () => {
       const app = createApiFixture<GatewayApi>({
         getKeyCaller,
         createBudget,
+        assertBudgetScopeOpensFor: async () => undefined,
         groupMemberCounts: async () => new Map<string, number>(),
         budgetScopeReach: async () => ({
           reachable: true,
@@ -918,6 +923,7 @@ describe("the gateway budget routes behind the key door", () => {
           actor: null,
           actorUserId: "user_1",
         }),
+        assertBudgetOpensFor: async () => undefined,
         updateBudget: async () => written,
         getBudgetWithHealth: async () => ({
           budget: live,
@@ -950,6 +956,7 @@ describe("the gateway budget routes behind the key door", () => {
           actor: null,
           actorUserId: "user_1",
         }),
+        assertBudgetOpensFor: async () => undefined,
         resetBudget: async () => budgetRow(),
         getBudgetWithHealth: async () => ({
           budget: budgetRow(),

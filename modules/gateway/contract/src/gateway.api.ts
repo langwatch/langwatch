@@ -16,6 +16,8 @@ import type {
   GatewayBudgetCheckResult,
   GatewayBudgetDebitRow,
   GatewayBudgetDetail,
+  GatewayBudgetReader,
+  GatewayBudgetScope,
   GatewayBudgetListWithHealth,
   GatewayBudgetPageWithHealth,
   GatewayBudgetResolutionTarget,
@@ -635,12 +637,33 @@ export interface GatewayApi extends GatewayInternalProtocol {
     budgets: { scopeType: string; scopeId: string }[],
     organizationId: string | null,
   ): Promise<Map<string, GatewayBudgetScopeTarget>>;
-  findBudgetDetail(input: {
+  /**
+   * The budget's detail as `actorUserId` may see it: opened as `assertBudgetOpensFor` does,
+   * with personal-key ledger rows under the same rule. Throws the handled 404 otherwise.
+   */
+  getBudgetDetail(input: {
     id: string;
     organizationId: string;
-  }): Promise<GatewayBudgetDetail | null>;
-  /** The budget's detail; throws the handled 404 when this organization holds none by that id. */
-  getBudgetDetail(input: { id: string; organizationId: string }): Promise<GatewayBudgetDetail>;
+    actorUserId: string;
+  }): Promise<GatewayBudgetDetail>;
+  /**
+   * Throws the handled 404 for a budget scoped to one member or to a personal key, unless the
+   * reader is that member or holds `virtualKeys:viewOtherPersonal` at the organization.
+   */
+  assertBudgetOpensFor(input: {
+    id: string;
+    organizationId: string;
+    reader: GatewayBudgetReader;
+  }): Promise<void>;
+  /**
+   * Refuses to create a budget on a member or a personal key the reader could not open afterwards
+   * (see `assertBudgetOpensFor`): a key as `virtual_key_not_found`, a member as outside the org.
+   */
+  assertBudgetScopeOpensFor(input: {
+    scope: GatewayBudgetScope;
+    organizationId: string;
+    reader: GatewayBudgetReader;
+  }): Promise<void>;
   createBudget(input: CreateGatewayBudgetInput): Promise<GatewayBudgetResource>;
   updateBudget(input: UpdateGatewayBudgetInput): Promise<GatewayBudgetResource>;
   archiveBudget(input: ArchiveGatewayBudgetInput): Promise<GatewayBudgetResource>;

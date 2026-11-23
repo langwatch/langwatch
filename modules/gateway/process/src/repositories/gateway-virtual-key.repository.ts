@@ -115,10 +115,18 @@ export abstract class GatewayVirtualKeyRepository {
     scope: GatewayVirtualKeyScope,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord[]>;
+  /** A key minted with a principal is marked personal in the same write, and never unmarked. */
   abstract create(
     input: CreateGatewayVirtualKeyInput,
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord>;
+  /** Keys of every organization holding a principal but no personal mark, by id after `afterId`. */
+  abstract findUnmarkedPersonalIds(input: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<string[]>;
+  /** Marks these keys personal where they still hold a principal; answers how many it marked. */
+  abstract markMintedAsPersonal(input: { ids: readonly string[] }): Promise<number>;
   /** Applies an edit and bumps the revision the gateway long-polls on. */
   abstract update(
     input: UpdateGatewayVirtualKeyInput,

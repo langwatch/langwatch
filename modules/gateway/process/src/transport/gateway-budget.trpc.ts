@@ -124,11 +124,12 @@ export const gatewayBudgetTrpcTransport: TrpcRouterDeclaration<
 
   .procedure("get")
   .withPermission("gatewayBudgets:view")
-  .handle(async ({ app, input }) => {
+  .handle(async ({ app, actor, input }) => {
     await app.assertOrganizationExists(input.organizationId);
     const detail = await app.getBudgetDetail({
       id: input.id,
       organizationId: input.organizationId,
+      actorUserId: actor.id,
     });
 
     const providerLabels = await app.resolveProviderLabels([detail.budget]);
@@ -172,6 +173,11 @@ export const gatewayBudgetTrpcTransport: TrpcRouterDeclaration<
   .procedure("create")
   .withPermission("gatewayBudgets:create")
   .handle(async ({ app, input, actor }) => {
+    await app.assertBudgetScopeOpensFor({
+      scope: input.scope,
+      organizationId: input.organizationId,
+      reader: { kind: "member", userId: actor.id },
+    });
     const row = await app.createBudget({
       organizationId: input.organizationId,
       scope: input.scope,
@@ -193,6 +199,8 @@ export const gatewayBudgetTrpcTransport: TrpcRouterDeclaration<
   .procedure("update")
   .withPermission("gatewayBudgets:update")
   .handle(async ({ app, input, actor }) => {
+    const reader = { kind: "member", userId: actor.id } as const;
+    await app.assertBudgetOpensFor({ id: input.id, organizationId: input.organizationId, reader });
     const row = await app.updateBudget({ ...input, actorUserId: actor.id });
 
     return toDto(row);
@@ -201,6 +209,8 @@ export const gatewayBudgetTrpcTransport: TrpcRouterDeclaration<
   .procedure("archive")
   .withPermission("gatewayBudgets:delete")
   .handle(async ({ app, input, actor }) => {
+    const reader = { kind: "member", userId: actor.id } as const;
+    await app.assertBudgetOpensFor({ id: input.id, organizationId: input.organizationId, reader });
     const row = await app.archiveBudget({ ...input, actorUserId: actor.id });
 
     return toDto(row);
@@ -209,6 +219,8 @@ export const gatewayBudgetTrpcTransport: TrpcRouterDeclaration<
   .procedure("reset")
   .withPermission("gatewayBudgets:update")
   .handle(async ({ app, input, actor }) => {
+    const reader = { kind: "member", userId: actor.id } as const;
+    await app.assertBudgetOpensFor({ id: input.id, organizationId: input.organizationId, reader });
     const row = await app.resetBudget({
       id: input.id,
       organizationId: input.organizationId,

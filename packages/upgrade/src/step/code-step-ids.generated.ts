@@ -24,6 +24,7 @@ export type CodeStepId =
   | "evaluator:backfill-versions"
   | "experiment:fill-id-indexes"
   | "experiment:fill-second-id-indexes"
+  | "gateway:mark-personal-virtual-keys"
   | "gateway:fill-id-indexes"
   | "governance:record-coding-assistant-billing"
   | "governance:record-coding-assistant-ingest-source-billing"

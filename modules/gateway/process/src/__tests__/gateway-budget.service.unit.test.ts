@@ -394,7 +394,8 @@ describe("GatewayService.findDetailById", () => {
   });
 
   describe("when joining the ledger", () => {
-    it("returns the ledger rows limited to the last 20, ordered by occurredAt desc", async () => {
+    // The read takes more than the screen lists; the caller's view then keeps the newest 20.
+    it("returns the ledger rows ordered by occurredAt desc, beyond the 20 the screen lists", async () => {
       const budget = memoryBudgetSeed();
       const { service, repositories } = await serviceOver({ budgets: [{ budget }] });
       const now = nowInstant();
@@ -411,10 +412,10 @@ describe("GatewayService.findDetailById", () => {
 
       const detail = await service.findDetailById({ id: "b_01", organizationId: "org_01" });
 
-      expect(detail?.recentLedger).toHaveLength(20);
+      expect(detail?.recentLedger).toHaveLength(21);
       expect(detail?.recentLedger.map((row) => row.id)).toEqual(
         Array.from(
-          { length: 20 },
+          { length: 21 },
           (_, minutesAgo) => `l_${minutesAgo.toString().padStart(2, "0")}`,
         ),
       );
