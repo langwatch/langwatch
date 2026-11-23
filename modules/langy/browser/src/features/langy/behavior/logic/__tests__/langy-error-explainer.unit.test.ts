@@ -809,6 +809,16 @@ describe("explainLangyError", () => {
           "Langy hit an error while writing this reply. Your message is safe — try again.",
         );
       });
+
+      /** @scenario "A failed reply with no recorded cause does not claim an upstream rejection" */
+      it("offers a retry and claims no upstream rejection", () => {
+        const presentation = explainLangyError(
+          domain({ code: "langy_agent_errored", httpStatus: 502, retryable: true, reasons: [] }),
+        );
+        expect(presentation.kind).toBe("langy_agent_errored");
+        expect(presentation.action).toEqual({ label: "Try again", kind: "retry" });
+        expect(`${presentation.title} ${presentation.description}`).not.toMatch(/upstream/i);
+      });
     });
   });
 

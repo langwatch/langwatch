@@ -206,6 +206,7 @@ jobs:
           render ha+ingress+replicated --set autogen.enabled=true -f examples/overlays/size-ha.yaml -f examples/overlays/access-ingress.yaml -f examples/overlays/clickhouse-replicated.yaml
           render langy-gvisor --set autogen.enabled=true -f examples/overlays/langy-gvisor.yaml
           render langy-disabled --set autogen.enabled=true -f examples/overlays/langy-disabled.yaml
+          render pii-redaction-model --set autogen.enabled=true --set piiRedactionModel.enabled=true
           render prod+external-ch --set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/clickhouse-external.yaml
           render prod+ext-pg+ext-redis --set autogen.enabled=true -f examples/overlays/size-prod.yaml -f examples/overlays/access-ingress.yaml -f examples/overlays/postgres-external.yaml -f examples/overlays/redis-external.yaml
 
@@ -233,6 +234,12 @@ jobs:
       - name: "assert the redis-valkey overlay swaps only the image"
         if: "!cancelled()"
         run: ./tests/redis-valkey.sh
+
+      # The PII redaction model: off in every profile, sized in prod/HA, and
+      # PII_REDACTION_MODEL_ENDPOINT on the app and workers only when enabled.
+      - name: "assert the PII redaction model wiring"
+        if: "!cancelled()"
+        run: ./tests/pii-redaction-model.sh
 
       # An install taking existing agent objects over in place needs the
       # chart to render their selector, which can never change on a live
