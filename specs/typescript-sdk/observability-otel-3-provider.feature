@@ -63,6 +63,8 @@ Feature: Joining an OpenTelemetry JS 3.x tracer provider
     When a child span starts after an await inside an active parent span
     Then the child's parent span id is the parent's span id
 
+  # CommonJS only: an ESM app links every module before any SDK code runs, so it gets Node's
+  # "does not provide an export named 'SeverityNumber'" instead; the docs name both.
   @unit
   Scenario: An OpenTelemetry API older than 1.10 is refused with a message saying what to install
     Given @opentelemetry/api older than 1.10 is installed

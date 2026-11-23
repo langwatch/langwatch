@@ -40,7 +40,7 @@ LangWatch helps you monitor, debug, and optimize your LLM/GenAI applications. Th
 npm install langwatch
 ```
 
-`@opentelemetry/api` is a peer dependency (npm installs it for you). A custom `metricReader` or `instrumentations` needs `@opentelemetry/sdk-metrics` or `@opentelemetry/instrumentation` installed in your app.
+`@opentelemetry/api` is a peer dependency (npm installs it for you) and must be `>=1.10.0 <1.11.0`; an app still on OpenTelemetry JS 2.x stays on langwatch 2.x. On an older `@opentelemetry/api`, a CommonJS app gets an error naming that range, but an ESM app fails at import with `SyntaxError: The requested module '@opentelemetry/api' does not provide an export named 'SeverityNumber'` (or `'createNoopLogger'`): Node links every module before any LangWatch code runs. Both mean the same fix: install `@opentelemetry/api@~1.10.0`. A custom `metricReader` or `instrumentations` needs `@opentelemetry/sdk-metrics` or `@opentelemetry/instrumentation` installed in your app.
 
 ---
 
