@@ -130,6 +130,20 @@ describe("a login waiting on a device code", () => {
     });
   });
 
+  describe("when a project key login prints its code", () => {
+    /** @scenario The CLI says how long the code lives */
+    it("says the rerun has to happen in the same folder", async () => {
+      startDeviceCode.mockResolvedValueOnce(deviceCode("WDJB-MJHT"));
+      pollUntilDone.mockImplementationOnce(killedWhileWaiting);
+
+      await expect(runUnifiedLoginFlow({ kind: "project_api_key" })).rejects.toThrow("killed");
+
+      expect(printed.join("\n")).toContain(
+        "run it again in this folder: it waits on the same code",
+      );
+    });
+  });
+
   describe("when the login stopped before the person approved", () => {
     /** @scenario A login that stops before the approval is picked up by the next run */
     it("waits on the earlier code on the next run and signs in with its approval", async () => {
@@ -227,6 +241,30 @@ describe("a login waiting on a device code", () => {
         device_code: "dc-FRST-CODE",
         expires_in: 30,
       });
+    });
+  });
+
+  describe("when the rerun comes after the saved code expired", () => {
+    /** @scenario A code past its expiry is not picked up */
+    it("starts a new code and replaces the expired one", async () => {
+      startDeviceCode
+        .mockResolvedValueOnce(deviceCode("FRST-CODE"))
+        .mockResolvedValueOnce(deviceCode("SCND-CODE"));
+      pollUntilDone.mockImplementation(killedWhileWaiting);
+      await expect(runDeviceFlowLogin()).rejects.toThrow("killed");
+
+      const saved = JSON.parse(fs.readFileSync(pendingLoginPath(), "utf8")) as {
+        expires_at: number;
+      };
+      vi.spyOn(Date, "now").mockReturnValue(saved.expires_at + 1_000);
+      await expect(runDeviceFlowLogin()).rejects.toThrow("killed");
+
+      expect(startDeviceCode).toHaveBeenCalledTimes(2);
+      expect(pollUntilDone.mock.calls[1]?.[1]).toMatchObject({ device_code: "dc-SCND-CODE" });
+      const pending = JSON.parse(fs.readFileSync(pendingLoginPath(), "utf8")) as {
+        device_code: string;
+      };
+      expect(pending.device_code).toBe("dc-SCND-CODE");
     });
   });
 

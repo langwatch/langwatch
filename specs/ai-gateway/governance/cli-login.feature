@@ -64,6 +64,7 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     When the CLI prints the address to open
     Then it says the code expires in 15 minutes
     And it says that running the command again waits on the same code
+    And for a project key login it says to run it again in the same folder
 
   @unit
   Scenario: The CLI waits as long as the server says the code lives
@@ -85,6 +86,13 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     Given a login left a pending device code with 30 seconds left
     When the same login runs again
     Then it waits on that code rather than asking for a new one
+
+  @unit
+  Scenario: A code past its expiry is not picked up
+    Given a login left a pending device code whose expiry has passed
+    When the same login runs again
+    Then it asks the server for a new code
+    And the expired code is no longer kept
 
   @unit
   Scenario: A finished login leaves another login's code alone

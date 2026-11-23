@@ -430,9 +430,10 @@ async function waitOnDeviceCode({
       `If your browser doesn't open, paste the URL above and enter code: ${chalk.bold(dc.user_code)}`,
     ),
   );
+  const rerunFrom = request.kind === "project_api_key" ? " in this folder" : "";
   console.log(
     chalk.gray(
-      `The code expires in ${expiryPhrase(dc.expires_in)}. If this command stops before you approve, run it again: it waits on the same code.`,
+      `The code expires in ${expiryPhrase(dc.expires_in)}. If this command stops before you approve, run it again${rerunFrom}: it waits on the same code.`,
     ),
   );
   console.log();
