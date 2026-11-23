@@ -46,6 +46,24 @@ describe("queryWithoutFacet", () => {
       expect(without).toContain("service:api");
     });
 
+    /** @scenario "A facet whose term an OR joins to other terms counts under the whole query" */
+    it.each([
+      "status:error OR model:gpt-5-mini",
+      "NOT (status:error AND model:gpt-5-mini)",
+      "user:u1 AND (status:error OR model:gpt-5-mini)",
+      "NOT (NOT (status:error OR model:gpt-5-mini))",
+    ])("keeps %s whole, since dropping the term would change the rest", (queryText) => {
+      expect(queryWithoutFacet({ queryText, facetKey: "status" })).toBe(queryText);
+    });
+
+    /** @scenario "A facet whose term an OR joins to other terms counts under the whole query" */
+    it.each([
+      ["NOT (NOT status:error OR model:gpt-5-mini)", "NOT model:gpt-5-mini"],
+      ["(status:error OR status:ok) AND model:gpt-5-mini", "model:gpt-5-mini"],
+    ])("still drops the term from %s, where an AND joins it", (queryText, expected) => {
+      expect(queryWithoutFacet({ queryText, facetKey: "status" })).toBe(expected);
+    });
+
     it("becomes empty when the query only named this facet", () => {
       expect(
         queryWithoutFacet({ queryText: "status:error OR status:ok", facetKey: "status" }),

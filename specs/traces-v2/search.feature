@@ -230,6 +230,7 @@ Rule: Query syntax
     When the user searches for "NOT (@evaluator:x AND @evaluatorScore:>0.5)"
     Then the trace is shown, because x did not score above 0.5
     And the compiled query passes the tenant guard instead of erroring
+    And the evaluator stays tied to its results only when they are written in one AND chain; a written-out form such as "NOT (NOT @evaluator:x OR NOT @evaluatorScore:>0.5)" reads them separately
 
   @integration
   Scenario: The table lists exactly the complement of a group under NOT
@@ -2757,6 +2758,13 @@ Rule: Enter routes a sentence
       Given a query negating a group that names the facet
       When the query is rewritten for that facet's count
       Then the negated group no longer carries the facet's term
+
+    @unit @integration
+    Scenario: A facet whose term an OR joins to other terms counts under the whole query
+      Given a query joining the facet's term to another field's by an OR, or by an AND under a NOT
+      When the facet's counts are computed
+      Then the facet is counted under the whole query, as the table is
+      And a facet joined to the rest by AND still drops its own terms
 
   Rule: The Explorer leaves Langy's own turns out unless the query names an origin
 

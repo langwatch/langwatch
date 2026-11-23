@@ -9,6 +9,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { expandStatementForProject } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import type {
   ExpressionCategoricalDef,
   RangeFacetDef,
@@ -946,13 +947,19 @@ describe("given a NOT over a bracketed group", () => {
     return compiled!;
   }
 
-  /** The guard's first refusal, `NOT` over a bracket naming TenantId, is the one asked here. */
+  /** The tenant guard's verdict on the statement the list would run, fenced to one project. */
   function guardOf(query: string) {
     const { sql, params } = compile(query);
+    const statement = expandStatementForProject({
+      query: `SELECT TraceId FROM trace_summaries ts WHERE ${tenantScope("OccurredAt")} AND ${sql}`,
+      queryParams: params,
+      projectId: "project-1",
+    });
     return checkTenantScope({
-      sql: `SELECT TraceId FROM trace_summaries WHERE TenantId = {tenantId:String} AND ${sql}`,
-      params: { ...params, tenantId: "project-1" },
+      sql: statement.query,
+      params: statement.queryParams,
       tenantId: "project-1",
+      tenantIds: ["project-1"],
     });
   }
 
@@ -1027,10 +1034,9 @@ describe("given a NOT over a bracketed group", () => {
 
     /** @scenario "NOT over an evaluator group keeps the evaluator's own results together" */
     it("compiles to a NOT IN membership, never a NOT the tenant guard refuses", () => {
-      expect(guardOf("evaluator:x AND evaluatorScore:>0.5")?.kind).not.toBe("negated-predicate");
-      expect(guardOf("NOT (evaluator:x AND evaluatorScore:>0.5)")?.kind).not.toBe(
-        "negated-predicate",
-      );
+      expect(guardOf("evaluator:x AND evaluatorScore:>0.5")).toBeNull();
+      expect(guardOf("NOT (evaluator:x AND evaluatorScore:>0.5)")).toBeNull();
+      expect(guardOf("NOT (evaluator:x AND NOT evaluatorScore:>0.5)")).toBeNull();
       expect(compile("NOT (evaluator:x AND evaluatorScore:>0.5)").sql).toContain(") NOT IN (");
     });
   });
