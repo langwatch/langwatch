@@ -238,6 +238,53 @@ describe("<LLMModelDisplay/>", () => {
     });
   });
 
+  describe("given the judge picker's one hosted model on the written id", () => {
+    const ROUTER_OFF = [{ value: "langwatch/instant-evals", label: "Instant Preview" }];
+    const ROUTER_ON = [
+      { value: "langwatch/instant-evals", label: "Evals Preview" },
+      { value: "langwatch/instant-preview", label: "Instant Preview" },
+    ];
+
+    /** @scenario "A judge stored with the earlier id shows as Instant Preview where routing is off" */
+    it("names a judge on langwatch/instant-evals Instant Preview with the router flag off", async () => {
+      renderWithDesignSystem(
+        <LLMModelDisplay model="langwatch/instant-evals" builtInModels={ROUTER_OFF} />,
+      );
+
+      expect(await screen.findByText("Instant Preview")).toBeInTheDocument();
+      expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A judge saved on the old id shows Evals Preview where routing is on" */
+    it("names a judge on langwatch/instant-evals Evals Preview with the router flag on", async () => {
+      renderWithDesignSystem(
+        <LLMModelDisplay model="langwatch/instant-evals" builtInModels={ROUTER_ON} />,
+      );
+
+      expect(await screen.findByText("Evals Preview")).toBeInTheDocument();
+      expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A judge on Instant Preview's id keeps its name where routing is on" */
+    it("names a judge on langwatch/instant-preview Instant Preview with the router flag on", async () => {
+      renderWithDesignSystem(
+        <LLMModelDisplay model="langwatch/instant-preview" builtInModels={ROUTER_ON} />,
+      );
+
+      expect(await screen.findByText("Instant Preview")).toBeInTheDocument();
+      expect(screen.queryByText("Evals Preview")).not.toBeInTheDocument();
+    });
+
+    it("names a Default models value on the written id by the option it reads as", async () => {
+      renderWithDesignSystem(
+        <LLMModelDisplay model="langwatch/instant-evals" builtInModels={[BUILT_IN]} />,
+      );
+
+      expect(await screen.findByText("Instant Preview")).toBeInTheDocument();
+      expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
+    });
+  });
+
   describe("given a built-in model whose prefix heads no group of the project's", () => {
     it("shows its label and asks for no update", async () => {
       storedProviders.current = [STORED_OPENAI];

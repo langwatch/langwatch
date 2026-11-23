@@ -7,6 +7,7 @@
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { INSTANT_EVALS_FLAG } from "@langwatch/instant-eval-contract";
+import { findSelectedOptions } from "@langwatch/model-provider-contract";
 import { cleanup, screen } from "@testing-library/react";
 import { FormProvider, useForm, useWatch } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -67,6 +68,7 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => ({
   },
 }));
 
+// The display's own lookup, so a name read here is the name the real display shows.
 vi.mock("../../../../behavior/lent-model-provider.tsx", () => ({
   LLMModelDisplay: ({
     model,
@@ -76,7 +78,7 @@ vi.mock("../../../../behavior/lent-model-provider.tsx", () => ({
     builtInModels?: { value: string; label: string }[];
   }) => (
     <span data-testid="model display" data-model={model}>
-      {builtInModels?.find((known) => known.value === model)?.label ?? "Update needed"}
+      {findSelectedOptions({ options: builtInModels ?? [], model })[0]?.label ?? "Update needed"}
     </span>
   ),
 }));

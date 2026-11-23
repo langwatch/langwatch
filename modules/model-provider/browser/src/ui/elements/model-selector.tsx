@@ -20,6 +20,7 @@ import {
   type BuiltInModel,
   canonicalModelId,
   type GroupedModelOptions,
+  findSelectedOptions,
   isServedOnlyAsBuiltIn,
   modelSelectionFrom,
   type ModelOption,
@@ -37,7 +38,7 @@ import { api } from "../../behavior/model-provider-api.ts";
 
 export const useModelSelectionOptions = ({
   options,
-  model: storedModel,
+  model,
   mode = "chat",
   featureKey,
   builtInModels,
@@ -49,7 +50,6 @@ export const useModelSelectionOptions = ({
   /** Models LangWatch serves itself, listed first and needing no provider. */
   builtInModels?: readonly BuiltInModel[] | undefined;
 }) => {
-  const model = canonicalModelId(storedModel);
   const { project } = useOrganizationTeamProject();
   // `listAllForProjectForFrontend` returns only providers actually stored
   // against a scope reachable from this project, unlike the legacy
@@ -67,7 +67,7 @@ export const useModelSelectionOptions = ({
     ...(builtInModels ? { builtInModels } : {}),
   });
 
-  const modelOption = selectOptions.find((opt) => opt.value === model);
+  const [modelOption] = findSelectedOptions({ options: selectOptions, model });
 
   // THE LOCAL DEV ESCAPE HATCH DID NOT TRAVEL. It read `import.meta.env.PROD`,
   // and a reusable package may not read the environment (ADR-101) — the same
@@ -372,13 +372,15 @@ export function ModelSelector({
   /** Models LangWatch serves itself, listed first even with no provider configured. */
   builtInModels?: readonly BuiltInModel[];
 }) {
-  const model = canonicalModelId(storedModel);
-  const { selectOptions, groupedByProvider, isEmpty, isLoading } = useModelSelectionOptions({
+  const { groupedByProvider, isEmpty, isLoading, modelOption } = useModelSelectionOptions({
     options,
-    model,
+    model: storedModel,
     mode,
     builtInModels,
   });
+  const selectedItem = modelOption;
+  // The select holds the option's own id, so a legacy stored id still shows as picked.
+  const model = selectedItem?.value ?? canonicalModelId(storedModel);
 
   // ALL hooks must run unconditionally — keep the empty-state early
   // return *after* every hook below so we don't violate React's rules
@@ -393,8 +395,6 @@ export function ModelSelector({
   const modelCollection = createListCollection({
     items: allFilteredModels,
   });
-
-  const selectedItem = selectOptions.find((option) => option.value === model);
 
   // Model might not be in the list if it's a custom model or unknown
   const isUnknown = !selectedItem;

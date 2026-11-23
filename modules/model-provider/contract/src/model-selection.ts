@@ -1,6 +1,10 @@
 /** Which models a picker offers, from the providers a project has stored. Pure: consumers fetch. */
 import { isCodexModel, isModelAllowedForFeature } from "./catalog/codex-restrictions.ts";
-import { findDecisionModel, isOwnDecisionModelId } from "./catalog/decision-models.ts";
+import {
+  canonicalModelId,
+  findDecisionModel,
+  isOwnDecisionModelId,
+} from "./catalog/decision-models.ts";
 import { isLatestAlias } from "./catalog/latest-aliases.ts";
 import { allLitellmModels, isChatSurfaceCatalogModel } from "./catalog/model-catalog.ts";
 import type { ModelOption } from "./model-options.ts";
@@ -328,4 +332,23 @@ export function modelSelectionFrom({
     selectOptions: [...builtInOptions, ...selectOptions],
     groupedByProvider: [...builtInGroups, ...groupOptionsByProvider(selectOptions)],
   };
+}
+
+/**
+ * The options a stored model selects, best first: the one with its exact id, then the ones it reads
+ * as (a legacy LangWatch id, ADR-182). Exact first, so two names on related ids stay apart.
+ */
+export function findSelectedOptions<T extends { value: string }>({
+  options,
+  model,
+}: {
+  options: readonly T[];
+  model: string;
+}): T[] {
+  const canonical = canonicalModelId(model);
+  const exact = options.filter((option) => option.value === model);
+  const read = options.filter(
+    (option) => option.value !== model && canonicalModelId(option.value) === canonical,
+  );
+  return [...exact, ...read];
 }

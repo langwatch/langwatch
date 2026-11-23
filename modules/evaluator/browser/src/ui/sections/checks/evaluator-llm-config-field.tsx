@@ -4,6 +4,7 @@ import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
 import { allModelOptions, judgeShownModelIdOf } from "@langwatch/model-provider-contract";
 import type { LLMConfig } from "@langwatch/workflow-contract";
+import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { useFormContext, useWatch } from "react-hook-form";
 
@@ -54,29 +55,34 @@ export const EvaluatorLLMConfigField = ({
   }) as (string | number | undefined)[];
 
   // Construct LLMConfig object from watched values
-  const config: Partial<Record<(typeof LLM_CONFIG_KEYS)[number], string | number>> = {};
-  LLM_CONFIG_KEYS.forEach((key, index) => {
-    const val = watchedValues[index];
-    if (val !== undefined) {
-      config[key] = val;
-    }
-  });
-  config.model = (config.model as string) ?? "";
-  const llmConfig = config as LLMConfig;
+  const llmConfig: LLMConfig = useMemo(() => {
+    const config: Partial<Record<(typeof LLM_CONFIG_KEYS)[number], string | number>> = {};
+    LLM_CONFIG_KEYS.forEach((key, index) => {
+      const val = watchedValues[index];
+      if (val !== undefined) {
+        config[key] = val;
+      }
+    });
+    config.model = (config.model as string) ?? "";
+    return config as LLMConfig;
+  }, [watchedValues]);
 
   // Handle changes from LLMConfigPopover — write all keys back to form.
   // We iterate over LLM_CONFIG_KEYS (not just newConfig entries) so that
   // cleared fields (e.g. reasoning removed on model switch) are set to
   // undefined, preventing stale values from persisting.
-  const handleChange = (newConfig: LLMConfig) => {
-    const incoming = new Map<string, string | number | undefined>();
-    for (const [key, value] of Object.entries(newConfig)) {
-      incoming.set(toInternalKey(key), value as string | number | undefined);
-    }
-    for (const key of LLM_CONFIG_KEYS) {
-      setValue(`${prefix}.${key}`, incoming.get(key), { shouldDirty: true });
-    }
-  };
+  const handleChange = useCallback(
+    (newConfig: LLMConfig) => {
+      const incoming = new Map<string, string | number | undefined>();
+      for (const [key, value] of Object.entries(newConfig)) {
+        incoming.set(toInternalKey(key), value as string | number | undefined);
+      }
+      for (const key of LLM_CONFIG_KEYS) {
+        setValue(`${prefix}.${key}`, incoming.get(key), { shouldDirty: true });
+      }
+    },
+    [prefix, setValue],
+  );
 
   // Zero enabled providers shows the empty state shared with the prompt playground and
   // workflow pickers; a skeleton renders while either query is in flight. An unanswered
