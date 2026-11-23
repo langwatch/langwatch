@@ -24,9 +24,8 @@ export class SpanAnalyticsFloorReadService {
     );
   }
 
-  /** The floor when `needed`; the unknown floor (stored_spans) otherwise or when unreadable. */
-  async floorFor(needed: boolean): Promise<SpanAnalyticsFloor> {
-    if (!needed) return UNKNOWN_SPAN_ANALYTICS_FLOOR;
+  /** The floor, or the unknown floor (stored_spans) when it cannot be read. */
+  async floor(): Promise<SpanAnalyticsFloor> {
     try {
       return await this.read();
     } catch (error) {
@@ -40,6 +39,6 @@ export class SpanAnalyticsFloorReadService {
 
   /** The floor as a read's optional field, present only when `needed`. */
   async floorFieldFor(needed: boolean): Promise<{ spanAnalyticsFloor?: SpanAnalyticsFloor }> {
-    return needed ? { spanAnalyticsFloor: await this.floorFor(true) } : {};
+    return needed ? { spanAnalyticsFloor: await this.floor() } : {};
   }
 }

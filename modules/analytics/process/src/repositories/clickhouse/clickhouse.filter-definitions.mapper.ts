@@ -385,9 +385,9 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
   "spans.type": {
     tableName: "stored_spans",
     buildQuery: (params) => {
-      const scopeJoin = buildTraceScopeJoin(params);
       const source = spanTypeOptionsSource(params);
       if (source.kind !== "stored_spans") return buildLightSpanTypeOptionsQuery(params, source);
+      const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT
           SpanAttributes['langwatch.span.type'] as field,

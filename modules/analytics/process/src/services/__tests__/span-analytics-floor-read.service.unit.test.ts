@@ -20,7 +20,7 @@ describe("SpanAnalyticsFloorReadService", () => {
     it("answers the floor trace recorded", async () => {
       const service = SpanAnalyticsFloorReadService.create({ read: () => Promise.resolve(FLOOR) });
 
-      await expect(service.floorFor(true)).resolves.toEqual(FLOOR);
+      await expect(service.floor()).resolves.toEqual(FLOOR);
     });
 
     /** @scenario "A floor that cannot be read keeps stored_spans instead of failing" */
@@ -31,7 +31,7 @@ describe("SpanAnalyticsFloorReadService", () => {
         logger,
       });
 
-      await expect(service.floorFor(true)).resolves.toBe(UNKNOWN_SPAN_ANALYTICS_FLOOR);
+      await expect(service.floor()).resolves.toBe(UNKNOWN_SPAN_ANALYTICS_FLOOR);
       expect(lines.findLine("warn", "span_analytics floor unreadable")).toBeDefined();
     });
   });
@@ -42,7 +42,7 @@ describe("SpanAnalyticsFloorReadService", () => {
       const read = vi.fn(() => Promise.resolve(FLOOR));
       const service = SpanAnalyticsFloorReadService.create({ read });
 
-      await expect(service.floorFor(false)).resolves.toBe(UNKNOWN_SPAN_ANALYTICS_FLOOR);
+      await expect(service.floorFieldFor(false)).resolves.toEqual({});
       expect(read).not.toHaveBeenCalled();
     });
   });

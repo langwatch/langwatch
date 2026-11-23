@@ -13,6 +13,13 @@ Feature: Span facets read the span table without attribute maps
     Then the pass reads span_analytics on StartTime with its SpanType column
 
   @unit
+  Scenario: One span facet's values inside the floor read span_analytics
+    Given span_analytics holds every span from the floor on
+    When the values of the span type facet are listed for a window that starts at or after the floor
+    Then the read uses span_analytics with its SpanType column
+    And when the floor cannot be read, it uses stored_spans with the map expression
+
+  @unit
   Scenario: A window that starts before the floor reads stored_spans
     When the span facets are counted for a window that starts before the floor
     Then the pass reads stored_spans as before
