@@ -91,8 +91,8 @@ async function refusalOf(answer: Promise<unknown>) {
 
 describe("resolving a board of the organization by id", () => {
   describe("given a Project board of a project the member reads", () => {
-    /** @scenario "A Project board's org-level address redirects to its project" */
-    it("answers its scope and names its project, where its own address is", async () => {
+    /** @scenario "A Project board opens at its org-level address" */
+    it("answers its scope and names its project, opening it in place", async () => {
       const { board, resolve } = await organization({ readable: [SHOP, OPS] });
       const id = await board({ projectId: SHOP, name: "Shop board" });
 

@@ -8,13 +8,13 @@ import {
   type StarredDashboard,
 } from "@langwatch/dashboard-contract";
 
-import type {
-  BoardReach,
-  BoardRecord,
-  BoardRepository,
-  BoardSummaryRecord,
-  BoardUpdate,
-  MemberStars,
+import {
+  type BoardReach,
+  type BoardRecord,
+  type BoardRepository,
+  type BoardSummaryRecord,
+  type BoardUpdate,
+  type MemberStars,
   starredBoardRow,
 } from "../board.repository.ts";
 import { MemoryDashboardDatabase, type StoredFavourite } from "./memory.dashboard.database.ts";

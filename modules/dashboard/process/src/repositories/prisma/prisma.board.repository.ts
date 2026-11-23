@@ -12,13 +12,13 @@ import {
 import { isRecordNotFoundError, PrismaRepository } from "@langwatch/prisma-client";
 import type { DashboardsV2, Prisma } from "@langwatch/prisma-client/generated";
 
-import type {
-  BoardReach,
-  BoardRecord,
-  BoardRepository,
-  BoardSummaryRecord,
-  BoardUpdate,
-  MemberStars,
+import {
+  type BoardReach,
+  type BoardRecord,
+  type BoardRepository,
+  type BoardSummaryRecord,
+  type BoardUpdate,
+  type MemberStars,
   starredBoardRow,
 } from "../board.repository.ts";
 
