@@ -89,6 +89,18 @@ describe("given a production deployment and its public address", () => {
     });
   });
 
+  describe("when the public address cannot be parsed as a URL", () => {
+    it("keeps upgrade-insecure-requests and HSTS", () => {
+      const headers = browserBundleDefaults({
+        production: true,
+        publicBaseUrl: "langwatch.internal",
+      });
+
+      expect(upgrades(headers)).toBe(true);
+      expect(headers.read("Strict-Transport-Security")).toBeDefined();
+    });
+  });
+
   describe("when the public address is plain http on a host other than localhost", () => {
     /** @scenario "A self-hosted install over plain HTTP is not forced onto HTTPS" */
     it("drops upgrade-insecure-requests and HSTS, still enforcing the rest of the policy", () => {

@@ -31,10 +31,7 @@ export type SurfaceDefaultsOptions = Readonly<{
  * answer is never a document a browser should treat as one.
  */
 export function trpcSurfaceDefaults(options: SurfaceDefaultsOptions = {}): SecurityHeaders {
-  return SecurityHeaders.strict(transportSecurity(options)).with(
-    "Cross-Origin-Resource-Policy",
-    "same-origin",
-  );
+  return SecurityHeaders.strict(options).with("Cross-Origin-Resource-Policy", "same-origin");
 }
 
 /** The REST surface's headers: the same floor and the same non-document statement. */
@@ -51,7 +48,7 @@ export function browserBundleDefaults(options: SurfaceDefaultsOptions = {}): Sec
   const production = options.production === true;
 
   return (
-    SecurityHeaders.strict(transportSecurity(options))
+    SecurityHeaders.strict(options)
       // The shell is framed by nothing, and the policy's own `frame-ancestors`
       // is the modern statement of it; the legacy header stays for the browsers
       // that only read that one.
@@ -59,7 +56,7 @@ export function browserBundleDefaults(options: SurfaceDefaultsOptions = {}): Sec
         ContentSecurityPolicy.app()
           .withConnectSource(...(options.storage ? storageConnectSources(options.storage) : []))
           .withAssetOrigin(options.assetOrigin ?? null)
-          .upgradingInsecureRequests(enforcesHttps(transportSecurity(options)))
+          .upgradingInsecureRequests(enforcesHttps(options))
           .reportOnly(!production),
       )
       // microphone=(self): the voice panel captures audio on this origin.
@@ -70,8 +67,4 @@ export function browserBundleDefaults(options: SurfaceDefaultsOptions = {}): Sec
         "geolocation=(), microphone=(self), camera=(), payment=(), usb=()",
       )
   );
-}
-
-function transportSecurity(options: SurfaceDefaultsOptions) {
-  return { production: options.production === true, publicBaseUrl: options.publicBaseUrl };
 }

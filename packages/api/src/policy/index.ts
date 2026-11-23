@@ -14,7 +14,6 @@ export {
   type StorageEndpoints,
 } from "./content-security-policy.ts";
 export {
-  enforcesHttps,
   SecurityHeaders,
   servesPlainHttp,
   type TransportSecurityOptions,
