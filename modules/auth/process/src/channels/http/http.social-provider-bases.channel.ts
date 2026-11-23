@@ -15,6 +15,14 @@ const GOOGLE_ACCOUNTS = "https://accounts.google.com";
 const GITHUB_WEB = "https://github.com";
 const FETCH_TIMEOUT_MS = 10_000;
 
+/** The fields of GitHub's `/user` answer read here; the rest passes through as profile data. */
+type GitHubUser = Record<string, unknown> & {
+  email?: string | null;
+  name?: string | null;
+  login?: string;
+  avatar_url?: string;
+};
+
 /**
  * Better Auth's Google and GitHub providers hard-wire their hosts, so when a base is set for
  * one the mounted provider is replaced by the same provider speaking to that base. Unset, the
@@ -80,7 +88,8 @@ function githubAt({ provider, base }: { provider: SocialProvider; base: string }
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (!response.ok) return null;
-      const data = await response.json();
+      // `Response.json()` is typed `unknown`; the token endpoint answers a JSON object.
+      const data = (await response.json()) as Record<string, unknown>;
       return "error" in data ? null : getOAuth2Tokens(data);
     },
     getUserInfo: async (token) => {
@@ -91,13 +100,19 @@ function githubAt({ provider, base }: { provider: SocialProvider; base: string }
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (!profileResponse.ok) return null;
-      const profile = await profileResponse.json();
+      const profile = (await profileResponse.json()) as GitHubUser;
       const emailsResponse = await fetch(`${base}/user/emails`, {
         headers,
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       const emails: { email: string; primary?: boolean; verified?: boolean }[] | null =
-        emailsResponse.ok ? await emailsResponse.json() : null;
+        emailsResponse.ok
+          ? ((await emailsResponse.json()) as {
+              email: string;
+              primary?: boolean;
+              verified?: boolean;
+            }[])
+          : null;
       if (!profile.email && emails) {
         profile.email = (emails.find((entry) => entry.primary) ?? emails[0])?.email;
       }

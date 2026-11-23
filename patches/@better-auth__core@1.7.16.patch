@@ -1,0 +1,26 @@
+diff --git a/dist/oauth2/oauth-provider.d.mts b/dist/oauth2/oauth-provider.d.mts
+index 07d08fa..3c76c66 100644
+--- a/dist/oauth2/oauth-provider.d.mts
++++ b/dist/oauth2/oauth-provider.d.mts
+@@ -29,6 +29,8 @@ export type OAuthIdTokenConfig = {
+   algorithms?: string[] | undefined;
+   /** Maximum token age passed to jose (e.g. `"1h"`). */
+   maxTokenAge?: string | undefined;
++  /** Clock skew tolerance passed to jose for `exp`, `nbf` and `iat` (e.g. `120` or `"2m"`). */
++  clockTolerance?: (number | string) | undefined;
+   /**
+    * How the `nonce` claim is compared to the expected nonce.
+    * - `"exact"` (default): strict equality.
+diff --git a/dist/oauth2/verify-id-token.mjs b/dist/oauth2/verify-id-token.mjs
+index 9151107..ed8dc89 100644
+--- a/dist/oauth2/verify-id-token.mjs
++++ b/dist/oauth2/verify-id-token.mjs
+@@ -30,7 +30,7 @@ function getIdTokenVerifyOptions(options) {
+ 		algorithms: options.algorithms,
+ 		maxTokenAge: options.maxTokenAge,
+ 		requiredClaims: ID_TOKEN_REQUIRED_CLAIMS,
+-		clockTolerance: ID_TOKEN_CLOCK_TOLERANCE_SECONDS
++		clockTolerance: options.clockTolerance ?? ID_TOKEN_CLOCK_TOLERANCE_SECONDS
+ 	};
+ }
+ async function sha256Hex(value) {

@@ -43,7 +43,11 @@ function httpSource(raw: string): StoredEventSource {
       output_format_json_quote_64bit_integers: "0",
       ...Object.fromEntries(Object.entries(params).map(([key, value]) => [`param_${key}`, value])),
     });
-    const response = await fetch(`${endpoint}?${search}`, { method: "POST", headers, body: sql });
+    const response = await fetch(`${endpoint}?${search.toString()}`, {
+      method: "POST",
+      headers,
+      body: sql,
+    });
     if (!response.ok || !response.body) {
       throw new Error(
         `ClickHouse ${url.host} answered ${response.status}: ${await response.text()}`,

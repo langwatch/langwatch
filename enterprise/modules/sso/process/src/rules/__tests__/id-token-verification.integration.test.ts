@@ -4,7 +4,13 @@
  * builds. Only the identity provider is local; discovery, JWKS, RS256 and the callback are real.
  * Spec: specs/identity/mfa-and-session-shape.feature
  */
-import { createSign, generateKeyPairSync, type KeyObject, randomUUID } from "node:crypto";
+import {
+  createSign,
+  generateKeyPairSync,
+  type KeyObject,
+  randomUUID,
+  type webcrypto,
+} from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
@@ -33,7 +39,7 @@ let idp: Server;
 let issuer: string;
 let signingKey: KeyObject;
 let wrongSigningKey: KeyObject;
-let publicJwk: JsonWebKey & { alg: string; kid: string; use: string };
+let publicJwk: webcrypto.JsonWebKey & { alg: string; kid: string; use: string };
 let publishesSigningKeys = true;
 
 const json = (response: ServerResponse, value: unknown) => {
