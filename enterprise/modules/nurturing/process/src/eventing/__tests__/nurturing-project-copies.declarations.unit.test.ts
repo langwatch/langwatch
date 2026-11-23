@@ -53,9 +53,9 @@ describe("the five subscriber lanes the personal-project and traced-project maps
     return buildNurturingProjectUsagePipeline({
       store: repositories.projectUsage,
       evaluationDays: repositories.evaluationDays,
+      traceDays: repositories.traceDays,
       copies: {
         placements: repositories.placements,
-        copyLanded: async () => undefined,
         organizationsCreated: repositories.organizationsCreated,
         admins: repositories.milestones,
         members: repositories.members,

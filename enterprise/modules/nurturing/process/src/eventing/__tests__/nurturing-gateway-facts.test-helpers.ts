@@ -140,9 +140,9 @@ function registeredCopyLanes({
   const pipeline = buildNurturingProjectUsagePipeline({
     store: others.projectUsage,
     evaluationDays: others.evaluationDays,
+    traceDays: others.traceDays,
     copies: {
       placements: others.placements,
-      copyLanded: async () => undefined,
       organizationsCreated: others.organizationsCreated,
       admins: others.milestones,
       members,

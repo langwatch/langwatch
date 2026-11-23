@@ -286,6 +286,14 @@ export class NurturingOrganizationUsageService {
   }
 
   /**
+   * Drops every project's trace days before `beforeDay`, those of projects that never synced or
+   * were never placed included: the folds count every trace, and no read reaches them.
+   */
+  async pruneTraceDaysBefore({ beforeDay }: Readonly<{ beforeDay: string }>): Promise<void> {
+    await this.dependencies.traceDays.pruneEveryProjectBefore({ beforeDay });
+  }
+
+  /**
    * The onboarding emails are person-triggered and read person attributes, so each member gets the
    * traits too, unless they joined another organization since: that one's traits are theirs, or
    * were erased. A refused call throws; each caller decides whether it is retried.

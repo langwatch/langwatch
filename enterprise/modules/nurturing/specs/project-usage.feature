@@ -5,32 +5,26 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   are four folds, one per owner pipeline, each keeping its own row per project. Evaluation's
   settled facts add their project's UTC day to nurturing's evaluation-day copy, a peer map written
   insert-ignore and filled at deploy from evaluation's log; the evaluation rows a retired
-  subscriber kept in the usage table stay there, unread. Traces are counted by a peer
-  subscriber on trace's span_received, which queues root spans only: a root span is one trace.
-  Failed traces are counted from trace's own lw.trace.trace_failed fact, recorded once per trace
-  by trace's rule (any span's error), so nurturing keeps no copy of that rule. Sample and Langy
-  traces are left out, as trace leaves them out of a project's first trace. Root spans and failed
-  traces of one project and day are batched, and each batch adds its traces to that day's row in
-  one Postgres statement: it counts the batch's traces and adds them, with no record of which
-  traces were counted before. A redelivered batch can count a trace twice, and so can a root span
-  stored more than once (a re-emitted span_received); accepted (owner decision, issue 9378).
-  Traces are counted only while their organization is inside its counting window (its creation
-  plus the 14-day free window and a week), so the trace-day rows scale with new organizations'
-  traffic alone. An hourly sweep (a scheduled process, since an organization that stopped tracing
-  syncs no more) sends each organization's trace traits once as null when its window ends, so
-  Customer.io removes them and a rolling trait never says "active" for ever; later syncs leave
-  them out, and its trace rows are dropped. Nurturing's placement copy is written by its own
-  peer map, so a new project's first traces can arrive before it: for a project without a copy
-  the batch fails and the queue retries it, until the copy lands, for five minutes of real time
-  from when any worker first saw the project uncopied (the measured lag is seconds). That first
-  sighting is a row nurturing keeps, so every worker shares the window and a restart does not open
-  a new one. Past the window the trace is dropped and the drop is cached in a bounded per-process
-  set for ten minutes, so its later batches are dropped at once with no read and no retry; once the
-  cached drop is older, the copy is read again. The copy landing deletes the row and that worker's
-  cached drop, so the project's later traces count; another worker counts them once its cache expires. A placed project whose organization has no creation copy belongs to an
-  organization created before the copy existed: its traces are dropped at once, as such
-  organizations get no trace traits. Nothing else is read. Rows are kept 30 days: inside its
-  counting window no organization has an older one, so a sync deletes old rows only past it. No span body reaches nurturing, and the rows are not rebuilt by a projection replay.
+  subscriber kept in the usage table stay there, unread. Traces are counted by two peer folds, one
+  per owner pipeline, since a peer fold re-folds from one owner's log: one over trace's
+  span_received, whose enqueue filter stages root spans only (a root span is one trace), and one
+  over trace's own lw.trace.trace_failed fact, recorded once per trace by trace's rule (any span's
+  error), so nurturing keeps no copy of that rule. Sample and Langy traces are left out, as trace
+  leaves them out of a project's first trace. Each fold keeps its own row per project and UTC day
+  of append (NurturingProjectTraceDayCount, keyed by project, day and source), with the event ids
+  of its last delivery, so a redelivered batch folds once; a root span stored again under a new
+  event id (a re-emitted span_received) still counts again, accepted (owner decision, issue 9378).
+  The read sums a day's two rows. The folds count every project's traces, placed or not and
+  whatever its organization's age, so a new project's first traces count before its placement
+  copy lands; the counting window (its organization's creation plus the 14-day free window and a
+  week) gates the read, so an organization past it gets no trace trait. An hourly sweep (a
+  scheduled process, since an organization that stopped tracing syncs no more) sends each
+  organization's trace traits once as null when its window ends, so Customer.io removes them and a
+  rolling trait never says "active" for ever; later syncs leave them out, and its trace rows are
+  dropped. The same sweep drops every trace day older than the 30-day usage window, those of
+  projects that never synced included. A deploy replay rebuilds the trace days from trace's log,
+  one counting window back, as live delivery wrote them; the retired NurturingProjectTraceDay
+  table stays, unread. No span body reaches nurturing.
   Nurturing reads no trace data: trace counts start at the count's deploy, and no cost is sent (a
   span carries no price). When a project's usage changes, or its organization traced (throttled
   to once per 15 minutes, and only inside the counting window), nurturing places it in its organization from its own copy, written
@@ -61,7 +55,8 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   and organization's facts, filled at deploy by replaying those logs, so a project or organization
   whose creation the owner's log holds is copied however old; one it does not hold sends nothing. It never pulls owner state on a
   schedule, and sends counts and times only, never content. flagged_count waits on its
-  definition. Without a Customer.io channel no fold, trace count or sync is registered: nothing is
+  definition. Without a Customer.io channel no usage fold or sync is registered, and the
+  evaluation-day and trace-day lanes register for their replay steps but keep no row: nothing is
   counted. The placement, organization-creation and member copies always register, so a channel
   configured later finds them already kept.
 
@@ -188,30 +183,31 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   @unit @integration
   Scenario: A trace is its root span, counted on its project's day
     Given root spans of a project's traces appended on one UTC day
-    When the trace-day count takes them
+    When the trace-day spans fold takes them
     Then each adds one trace to the project's row for that day
     And a root span appended on the next UTC day counts on the next day's row
 
   @unit
-  Scenario: Only a root span mints a trace-day job
+  Scenario: Only a root span mints a trace-day fold job
     Given a trace's root span and its child spans
     When trace appends them
-    Then only the root span is queued to the trace-day count, so a child span costs no job
+    Then only the root span is staged on the trace-day spans fold, so a child span costs no job
+    And a child span a replay hands the fold counts nothing
 
   @unit
   Scenario: Sample and Langy traces are not counted
     Given root spans whose langwatch.origin, on the span or else its resource, is sample or langy
     When trace appends them
-    Then none is queued to the trace-day count, as trace keeps them out of a project's first trace
-    And one already queued is not counted
-    And a root span of any other origin, or none, is queued
-    And a trace_failed of a sample or Langy trace counts no failed trace
+    Then none is staged on the trace-day spans fold, as trace keeps them out of a project's first trace
+    And one a replay hands the fold is not counted
+    And a root span of any other origin, or none, is staged
+    And a trace_failed of a sample or Langy trace mints no failures fold job and counts no failed trace
 
   @unit
   Scenario: A failed trace is counted from trace's trace_failed fact
     Given trace records trace_failed for a project's trace, by its own rule
-    When the failed-trace count takes it
-    Then the project's day of the fact counts 1 failed trace, and its time
+    When the trace-day failures fold takes it
+    Then the project's failures row of the fact's day counts 1 failed trace, and its time
     And a root span's error status alone counts no failed trace
 
   @unit
@@ -223,27 +219,36 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   @unit
   Scenario: Traces arriving out of order count the same
     Given two traces' root spans of one project and day, the older arriving after the newer
-    When the trace-day count takes them
+    When the trace-day spans fold takes them
     Then both are counted, and the row keeps the newer one's time
 
   @unit @integration
-  Scenario: Root spans of one project and day are written as one increment
-    Given root spans of one project queued on one UTC day
-    When the queue drains them as one batch
-    Then the day's row gets one upsert adding their trace counts, and failed traces the same
-    And two writers adding to one day at once lose no count
+  Scenario: The spans and failures folds keep their own rows of a day, which the read sums
+    Given a project's root spans and trace_failed facts on one UTC day
+    When both trace-day folds store their rows
+    Then the day holds one spans row and one failures row, each with its own applied event ids
+    And neither fold's write changes the other's row
+    And the organization's read sums both rows into one day
 
   @unit
-  Scenario: A redelivered batch can count a trace twice; accepted
+  Scenario: A redelivered span_received folds once
     Given a trace's root span counted on its project's day
-    When its batch is delivered again, or the root span is stored again (a re-emitted span_received)
-    Then the trace counts again; accepted (owner decision, issue 9378)
+    When the same span_received is delivered again, with the same event id
+    Then the day's trace count is unchanged
+    And a root span stored again under a new event id counts again; accepted (issue 9378)
+
+  @unit @integration
+  Scenario: A trace of a project with no placement copy yet is counted, and syncs once the copy lands
+    Given a project whose placement nurturing has not copied yet
+    When its trace is folded
+    Then it is counted, with no retry and no failure
+    And once the placement and organization copies land, the organization's sync sends the count
 
   @unit
-  Scenario: An organization past its counting window writes no counts
-    Given an organization created more than 21 days before a trace or failure, or never seen created
-    When the trace or failure is counted
-    Then no count is written for it
+  Scenario: An organization past its counting window gets no trace trait
+    Given an organization created more than 21 days ago, or never seen created, whose project traced
+    When the trace is folded
+    Then it is counted on the project's day
     And its organization's sync sends no trace trait
 
   @unit
@@ -256,36 +261,20 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     And a refused call, a member's identify included, fails the sweep, so it is retried
     And the retried sweep sends the same nulls again
 
-  @unit
-  Scenario: A new project whose copy lands within the retry window is counted
-    Given a trace of a new project whose placement nurturing has not copied yet
-    When the trace is counted
-    Then the batch fails after counting the rest, and the queue retries it
-    And when the copy lands about 30 seconds in, the next retry counts the trace once
-    And a copy landing a second before the window ends is counted on the next retry
-
-  @unit
-  Scenario: A project with no copy after the retries is dropped, and its later batches at once
-    Given a project nurturing has no placement copy of
-    When its trace batch is still uncopied once the retry window from first seen has passed
-    Then the batch is dropped without failing, and no count is written
-    And a later batch of the project is dropped at once, with no read, no retry and no failure
-    And once the project's copy lands, its first-seen row and that worker's cached drop are deleted
-    And its next trace counts
-    And on another worker, once its cached drop is ten minutes old, the copy is read again and its next trace counts
-
   @unit @integration
-  Scenario: The retry window is real time from first seen, shared by every worker and kept across a restart
-    Given a project nurturing has no placement copy of, first seen by one worker
-    When the window has passed and another worker, or the same one restarted, sees its trace batch
-    Then that batch is dropped at once, with no new window
-    And concurrent first sightings keep one first-seen time
+  Scenario: The hourly sweep drops every trace day older than the usage window
+    Given trace days older than the 30-day usage window, of a project that never synced and of one that did
+    When the hourly sweep runs
+    Then every such day is deleted, and the days inside the window are kept
+    And a failed prune is logged and left to the next sweep, without failing the sweep
 
   @unit
-  Scenario: A trace of an organization older than nurturing's creation copy is dropped
-    Given a project nurturing placed in an organization it has no creation copy of
-    When a trace of the project is counted, however young
-    Then it is dropped without failing the batch, and no count is written
+  Scenario: The deploy replay rebuilds the trace days as live delivery wrote them
+    Given trace's log holds root spans, child, sample and Langy spans and trace_failed facts
+    When the trace-day replay steps run over an empty table
+    Then each project's day rows equal the rows live delivery of the same facts wrote
+    And running the steps again leaves every row as it was
+    And no sync, count or creation hook is called, so nothing is sent
 
   @unit
   Scenario: Folds keyed across aggregates never re-fold from one aggregate's log
@@ -493,9 +482,10 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   Scenario: Without a Customer.io channel nothing is counted, but the copies are kept
     Given nurturing runs without a Customer.io channel
     When its usage pipeline is built
-    Then it registers no fold, no trace count and no sync, so a root span writes no trace day
+    Then it registers no usage fold and no sync
     And it registers the placement, organization-creation, admin and member copies
     And its evaluation-day lane registers, so its replay step runs, but keeps no day
+    And its trace-day lanes register, so their replay steps run, but a root span writes no trace day
 
   @integration
   Scenario: Each owner's fold keeps its own row per project

@@ -254,7 +254,6 @@ describe("given a deployment with a Customer.io channel", () => {
   /** @scenario "Replaying the organization copies sends nothing" */
   it("runs no sync when the copies replay over facts a live delivery would sync", async () => {
     const sync = {
-      countTraces: vi.fn(async () => undefined),
       usageChanged: vi.fn(async () => undefined),
       tracesChanged: vi.fn(async () => undefined),
       organizationCreated: vi.fn(async () => undefined),
@@ -266,7 +265,6 @@ describe("given a deployment with a Customer.io channel", () => {
     expect(sync.organizationCreated).not.toHaveBeenCalled();
     expect(sync.usageChanged).not.toHaveBeenCalled();
     expect(sync.tracesChanged).not.toHaveBeenCalled();
-    expect(sync.countTraces).not.toHaveBeenCalled();
     await expect(
       worker.repositories.organizationsCreated.findOrganizationCreatedAt({
         organizationId: "org-1",

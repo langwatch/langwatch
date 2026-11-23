@@ -427,6 +427,22 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "nurturing:replay-trace-day-spans",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's trace days from trace's span log, one counting window back.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-trace-day-failures",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's failed-trace days from trace's trace_failed log, one counting window back.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "ops:copy-automation-migration-state",
     "kind": "data",
     "mode": "blocking",

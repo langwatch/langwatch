@@ -23,10 +23,7 @@ import {
   foldProjectUsage,
   TRACE_COUNTING_WINDOW_MS,
 } from "../../rules/nurturing-project-usage.rules.ts";
-import type {
-  NurturingCountedTrace,
-  NurturingTraceDay,
-} from "../../rules/nurturing-trace-day.rules.ts";
+import { type NurturingTraceDay, traceDayKeyOf } from "../../rules/nurturing-trace-day.rules.ts";
 import { NurturingCopiedProjectsService } from "../nurturing-copied-projects.service.ts";
 import { NurturingOrganizationUsageService } from "../nurturing-organization-usage.service.ts";
 
@@ -169,7 +166,7 @@ const memberTraitsOf = (call: CioBatchCall | undefined) =>
 
 const storeContext = (key: string) => ({ aggregateId: key, tenantId: createTenantId(key), key });
 
-/** Arranges one project's trace day by counting its traces and failures, each a trace. */
+/** Arranges one project's trace day as the two trace-day folds store it: spans and failures rows. */
 async function seedTraceDay(
   traceDays: MemoryNurturingTraceDayRepository,
   {
@@ -183,17 +180,13 @@ async function seedTraceDay(
       lastFailedTraceAt?: number;
     },
 ) {
-  const traces = (kind: NurturingCountedTrace["kind"], count: number, at: number) =>
-    Array.from({ length: count }, () => ({
-      projectId,
-      kind,
-      day,
-      at,
-    }));
-  await traceDays.countTraces([
-    ...traces("trace", traceCount, NOW - DAY_MS),
-    ...traces("failed", errorCount, lastFailedTraceAt),
-  ]);
+  const key = traceDayKeyOf({ projectId, day });
+  const context = { aggregateId: key, tenantId: createTenantId(projectId), key };
+  const empty = { projectId, day, traceCount: 0, errorCount: 0, lastTraceAt: null };
+  await traceDays
+    .forSource("spans")
+    .store({ ...empty, traceCount, lastTraceAt: NOW - DAY_MS, lastFailedTraceAt: null }, context);
+  await traceDays.forSource("failures").store({ ...empty, errorCount, lastFailedTraceAt }, context);
 }
 
 describe("NurturingOrganizationUsageService", () => {
@@ -547,7 +540,7 @@ describe("NurturingOrganizationUsageService", () => {
     });
   });
 
-  /** @scenario "An organization past its counting window writes no counts" */
+  /** @scenario "An organization past its counting window gets no trace trait" */
   it("sends no trace traits for an organization past its counting window", async () => {
     const { service, traceDays, sent } = await serviceOver({
       placed: new Map([["project-1", "org-1"]]),

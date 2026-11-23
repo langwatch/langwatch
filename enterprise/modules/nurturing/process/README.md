@@ -6,7 +6,7 @@ The server half of [nurturing](../README.md). Product analytics and lifecycle me
 
 ## Installation
 
-`defineProcessModule("nurturing").withRepositories(nurturingRepositories).withChannels(nurturingChannels).withApi(NurturingModule).withEventing(nurturingEventing).withEventing(nurturingProjectUsageEventing).withEventing(nurturingTraceWindowEndEventing).withMigrations(…)`, `src/nurturing.module.ts:42`.
+`defineProcessModule("nurturing").withRepositories(nurturingRepositories).withChannels(nurturingChannels).withApi(NurturingModule).withEventing(nurturingEventing).withEventing(nurturingProjectUsageEventing).withEventing(nurturingTraceWindowEndEventing).withMigrations(…)`, `src/nurturing.module.ts:46`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -40,43 +40,43 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `nurturing_project_usage` (aggregate `nurturing_project_usage_view`)
 
-Declared at `src/eventing/nurturing-project-usage.pipeline.ts:560`.
+Declared at `src/eventing/nurturing-project-usage.pipeline.ts:609`.
 
 | Kind                 | Name                                                                                           | Handles                                                                                   | Declared at                                            |
 | -------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| peer subscriber      | `traceDayCount`                                                                                | `lw.obs.trace.span_received` from [trace](../../../../modules/trace/README.md)            | `src/eventing/nurturing-project-usage.pipeline.ts:615` |
-| peer subscriber      | `failedTraceDayCount`                                                                          | `lw.trace.trace_failed` from [trace](../../../../modules/trace/README.md)                 | `src/eventing/nurturing-project-usage.pipeline.ts:616` |
-| peer subscriber      | `firstTraceUsageSync`                                                                          | `lw.trace.first_trace_recorded` from [trace](../../../../modules/trace/README.md)         | `src/eventing/nurturing-project-usage.pipeline.ts:619` |
-| peer subscriber      | `traceUsageSync`                                                                               | `lw.trace.trace_received` from [trace](../../../../modules/trace/README.md)               | `src/eventing/nurturing-project-usage.pipeline.ts:620` |
-| peer subscriber      | `organizationCreatedSync`                                                                      | `lw.organization.created` from [organization](../../../../modules/organization/README.md) | `src/eventing/nurturing-project-usage.pipeline.ts:621` |
-| peer map projection  | `≈ nurturingUserErasureMarksMap(virtualKeys)`                                                  | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:567` |
-| peer map projection  | `≈ nurturingIdentityErasureMarksMap(virtualKeys)`                                              | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:568` |
-| peer map projection  | `≈ nurturingVirtualKeysMap(virtualKeys)`                                                       | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:569` |
-| peer map projection  | `≈ nurturingProjectPlacementsMap(copies)`                                                      | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:570` |
-| peer map projection  | `≈ nurturingOrganizationCreationsMap(organizationsCreated)`                                    | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:571` |
-| peer map projection  | `≈ nurturingOrganizationAdminsMap(admins)`                                                     | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:572` |
-| peer map projection  | `≈ nurturingOrganizationMembersMap(members)`                                                   | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:573` |
-| peer map projection  | `≈ nurturingAuthMembersMap(members)`                                                           | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:574` |
-| peer map projection  | `≈ nurturingPersonalOwnersOfOrganizationMap(personalProjects)`                                 | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:575` |
-| peer map projection  | `≈ nurturingPersonalOwnersOfProjectMap(personalProjects)`                                      | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:576` |
-| peer map projection  | `≈ nurturingTracedProjectsOfTraceMap({ tracedProjects, logger })`                              | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:577` |
-| peer map projection  | `≈ nurturingTracedProjectsOfProjectMap({ tracedProjects, logger })`                            | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:578` |
-| peer map projection  | `≈ nurturingLastTracesMap(lastTraces)`                                                         | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:579` |
-| peer map projection  | `≈ nurturingEvaluationDaysMap(sync ? evaluationDays : KEEP_NO_EVALUATION_DAYS)`                | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:580` |
-| peer fold projection | `≈ nurturingOrganizationPlanFold(plans.store)`                                                 | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:584` |
-| lane aliases         | `≈ [ ...ORGANIZATION_COPY_LANE_ALIASES, ...PERSONAL_AND_TRACED_PROJECT_LANE_ALIASES, ...NURT…` | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:587` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "prompt", store })`                                  | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:599` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "evaluator", store })`                               | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:603` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "scenario", store })`                                | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:607` |
-| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "simulation", store })`                              | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:611` |
+| peer subscriber      | `firstTraceUsageSync`                                                                          | `lw.trace.first_trace_recorded` from [trace](../../../../modules/trace/README.md)         | `src/eventing/nurturing-project-usage.pipeline.ts:672` |
+| peer subscriber      | `traceUsageSync`                                                                               | `lw.trace.trace_received` from [trace](../../../../modules/trace/README.md)               | `src/eventing/nurturing-project-usage.pipeline.ts:673` |
+| peer subscriber      | `organizationCreatedSync`                                                                      | `lw.organization.created` from [organization](../../../../modules/organization/README.md) | `src/eventing/nurturing-project-usage.pipeline.ts:674` |
+| peer map projection  | `≈ nurturingUserErasureMarksMap(virtualKeys)`                                                  | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:616` |
+| peer map projection  | `≈ nurturingIdentityErasureMarksMap(virtualKeys)`                                              | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:617` |
+| peer map projection  | `≈ nurturingVirtualKeysMap(virtualKeys)`                                                       | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:618` |
+| peer map projection  | `≈ nurturingProjectPlacementsMap(copies)`                                                      | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:619` |
+| peer map projection  | `≈ nurturingOrganizationCreationsMap(organizationsCreated)`                                    | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:620` |
+| peer map projection  | `≈ nurturingOrganizationAdminsMap(admins)`                                                     | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:621` |
+| peer map projection  | `≈ nurturingOrganizationMembersMap(members)`                                                   | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:622` |
+| peer map projection  | `≈ nurturingAuthMembersMap(members)`                                                           | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:623` |
+| peer map projection  | `≈ nurturingPersonalOwnersOfOrganizationMap(personalProjects)`                                 | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:624` |
+| peer map projection  | `≈ nurturingPersonalOwnersOfProjectMap(personalProjects)`                                      | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:625` |
+| peer map projection  | `≈ nurturingTracedProjectsOfTraceMap({ tracedProjects, logger })`                              | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:626` |
+| peer map projection  | `≈ nurturingTracedProjectsOfProjectMap({ tracedProjects, logger })`                            | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:627` |
+| peer map projection  | `≈ nurturingLastTracesMap(lastTraces)`                                                         | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:628` |
+| peer map projection  | `≈ nurturingEvaluationDaysMap(sync ? evaluationDays : KEEP_NO_EVALUATION_DAYS)`                | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:629` |
+| peer fold projection | `≈ nurturingTraceDaySpansFold(sync ? traceDays.forSource("spans") : KEEP_NO_TRACE_DAYS)`       | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:632` |
+| peer fold projection | `≈ nurturingTraceDayFailuresFold(sync ? traceDays.forSource("failures") : KEEP_NO_TRACE_DAYS)` | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:635` |
+| peer fold projection | `≈ nurturingOrganizationPlanFold(plans.store)`                                                 | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:639` |
+| lane aliases         | `≈ [ ...ORGANIZATION_COPY_LANE_ALIASES, ...PERSONAL_AND_TRACED_PROJECT_LANE_ALIASES, ...NURT…` | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:642` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "prompt", store })`                                  | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:654` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "evaluator", store })`                               | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:658` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "scenario", store })`                                | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:662` |
+| peer fold projection | `≈ nurturingProjectUsagePeerFold({ owner: "simulation", store })`                              | –                                                                                         | `src/eventing/nurturing-project-usage.pipeline.ts:666` |
 
 ### Pipeline `nurturing_trace_window_end` (aggregate `global`)
 
-Declared at `src/eventing/nurturing-trace-window-end.pipeline.ts:33`.
+Declared at `src/eventing/nurturing-trace-window-end.pipeline.ts:34`.
 
 | Kind            | Name                      | Handles                                                                               | Declared at                                              |
 | --------------- | ------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| process manager | `nurturingTraceWindowEnd` | every 1 h (`TRACE_WINDOW_END_INTERVAL_MS = 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/nurturing-trace-window-end.pipeline.ts:39` |
+| process manager | `nurturingTraceWindowEnd` | every 1 h (`TRACE_WINDOW_END_INTERVAL_MS = 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/nurturing-trace-window-end.pipeline.ts:40` |
 
 ### Pipeline `nurturing` (aggregate `nurturing_signal`)
 
@@ -127,7 +127,7 @@ Declared at `src/eventing/nurturing.pipeline.ts:296`. Events: `nurturingSignalRe
 
 | Kind   | Leaf                | Environment variable   | Declared at                              |
 | ------ | ------------------- | ---------------------- | ---------------------------------------- |
-| secret | `–`                 | `CUSTOMER_IO_API_KEY`  | `src/app/nurturing.app.ts:52`            |
+| secret | `–`                 | `CUSTOMER_IO_API_KEY`  | `src/app/nurturing.app.ts:49`            |
 | config | `customerIoRegion`  | `CUSTOMER_IO_REGION`   | `../contract/src/nurturing.config.ts:8`  |
 | config | `customerIoBaseUrl` | `CUSTOMER_IO_BASE_URL` | `../contract/src/nurturing.config.ts:10` |
 | config | `posthogKey`        | `POSTHOG_KEY`          | `../contract/src/nurturing.config.ts:11` |

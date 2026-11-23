@@ -82,6 +82,10 @@ import {
   USER_MARKS_STEP,
 } from "./nurturing-replay-steps.test-helpers.ts";
 import { NurturingSeededLog } from "./nurturing-seeded-log.test-helpers.ts";
+import {
+  TRACE_DAY_FAILURES_STEP,
+  TRACE_DAY_SPANS_STEP,
+} from "./nurturing-trace-days.test-helpers.ts";
 import { RecordingCustomerIoChannel } from "./recording-customer-io-channel.test-helpers.ts";
 
 const BASE_MS = 1_700_000_000_000;
@@ -177,9 +181,9 @@ function deploy({
   const pipeline = buildNurturingProjectUsagePipeline({
     store: repositories.projectUsage,
     evaluationDays: repositories.evaluationDays,
+    traceDays: repositories.traceDays,
     copies: {
       placements: repositories.placements,
-      copyLanded: async () => undefined,
       organizationsCreated: repositories.organizationsCreated,
       admins: repositories.milestones,
       members: repositories.members,
@@ -618,6 +622,8 @@ const MODULE_STEPS = [
   TRACED_PROJECTS_OF_TRACE_STEP,
   TRACED_PROJECTS_OF_PROJECT_STEP,
   LAST_TRACES_STEP,
+  TRACE_DAY_SPANS_STEP,
+  TRACE_DAY_FAILURES_STEP,
 ] as const;
 
 /**

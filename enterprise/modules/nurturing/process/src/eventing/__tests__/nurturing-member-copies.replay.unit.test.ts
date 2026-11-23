@@ -247,7 +247,6 @@ describe("given a deployment with a Customer.io channel", () => {
   /** @scenario "Replaying the member copy sends nothing" */
   it("runs no sync when the member steps replay", async () => {
     const sync = {
-      countTraces: vi.fn(async () => undefined),
       usageChanged: vi.fn(async () => undefined),
       tracesChanged: vi.fn(async () => undefined),
       organizationCreated: vi.fn(async () => undefined),

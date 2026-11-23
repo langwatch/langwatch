@@ -45,6 +45,8 @@ import {
 import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   PROJECT_TRACED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+  TRACE_FAILED_EVENT_TYPE,
   TRACE_RECEIVED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import {
@@ -132,7 +134,14 @@ export const nurturingOwnerStandIns = {
         PROJECT_TRACED_EVENT_TYPE,
         FIRST_TRACE_RECORDED_EVENT_TYPE,
         TRACE_RECEIVED_EVENT_TYPE,
+        TRACE_FAILED_EVENT_TYPE,
       ],
+    }),
+  traceProcessing: () =>
+    standIn({
+      name: "trace_processing",
+      aggregateType: "trace",
+      eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
     }),
   auth: () =>
     standIn({

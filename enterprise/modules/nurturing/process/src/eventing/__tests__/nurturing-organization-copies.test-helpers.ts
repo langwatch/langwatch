@@ -210,7 +210,6 @@ export function nurturingCopyOwnerPipelines(): ReturnType<typeof ownerStandIn>[]
 export function copiesOver(repositories: NurturingRepositories): NurturingUsageCopies {
   return {
     placements: repositories.placements,
-    copyLanded: async () => undefined,
     organizationsCreated: repositories.organizationsCreated,
     admins: repositories.milestones,
     members: repositories.members,
@@ -278,10 +277,11 @@ export function liveMapsOver(
   copies: NurturingUsageCopies,
   sync?: NurturingUsageSync,
 ): (event: ReplayEvent) => Promise<void> {
-  const { projectUsage, evaluationDays, plans } = MemoryNurturingRepositories.create();
+  const { projectUsage, evaluationDays, traceDays, plans } = MemoryNurturingRepositories.create();
   const pipeline = buildNurturingProjectUsagePipeline({
     store: projectUsage,
     evaluationDays,
+    traceDays,
     copies,
     plans: { store: plans, deliver: async () => undefined },
     sync,
@@ -336,6 +336,7 @@ export function copiesDeploy({
   const pipeline = buildNurturingProjectUsagePipeline({
     store: repositories.projectUsage,
     evaluationDays: repositories.evaluationDays,
+    traceDays: repositories.traceDays,
     copies,
     plans: { store: repositories.plans, deliver: async () => undefined },
     sync,
