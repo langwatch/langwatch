@@ -13,23 +13,19 @@ export class GovernanceIngestLandingService {
     return new GovernanceIngestLandingService(members);
   }
 
-  async governanceTenantOf(source: GovernanceIngestionSource): Promise<string> {
-    const project = await this.ensureProject(source);
-
-    return project.id;
-  }
-
   /**
-   * The monthly allowance the `/api/otel/v1/*` receivers ask, asked of the governance project:
-   * throws `ERR_PLAN_LIMIT` (402) for an organization past it, so no door is the way around it.
+   * The governance project a batch lands in, once the monthly allowance the `/api/otel/v1/*`
+   * receivers ask allows it: throws `ERR_PLAN_LIMIT` (402) for an organization past it.
    */
-  async assertWithinAllowance(source: GovernanceIngestionSource): Promise<void> {
+  async tenantWithinAllowance(source: GovernanceIngestionSource): Promise<string> {
     const project = await this.ensureProject(source);
 
     await this.members.allowance.otlpUsageLimit({
       project: { id: project.id, teamId: project.teamId, organizationId: source.organizationId },
       customerTraceIds: [],
     });
+
+    return project.id;
   }
 
   recordEvent(source: GovernanceIngestionSource): Promise<unknown> {

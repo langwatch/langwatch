@@ -237,7 +237,9 @@ describe("breakdownGapMessage", () => {
     expect(breakdownGapMessage({ ...ok, isProjectsUnavailable: true })).toMatch(
       /^The month by project /,
     );
-    expect(breakdownGapMessage({ ...ok, isError: true })).toMatch(/by day and by project/);
+    expect(breakdownGapMessage({ ...ok, isError: true })).toMatch(
+      /^The month by day, by type and by project could not be loaded\./,
+    );
     expect(breakdownGapMessage({ ...ok, isByCategoryUnavailable: true })).toMatch(
       /^The month by type /,
     );

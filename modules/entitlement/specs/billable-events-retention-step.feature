@@ -1,9 +1,9 @@
 Feature: Existing billable events get the 13-month retention
   As the owner of the billable-events meter
-  I want parts written before goose 00128 to apply its delete TTL
+  I want parts written before goose 00132 to apply its delete TTL
   So that rows older than 13 months leave the table everywhere, not only after a later merge
 
-  Goose 00128 adds the TTL as metadata only (materialize_ttl_after_modify = 0). The background
+  Goose 00132 adds the TTL as metadata only (materialize_ttl_after_modify = 0). The background
   step `entitlement:materialise-billable-events-ttl` starts one `MATERIALIZE TTL` on the worker
   and waits on it, so its progress and failure reach the upgrade ledger.
 

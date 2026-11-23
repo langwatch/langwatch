@@ -245,11 +245,10 @@ export function breakdownGapMessage({
   isProjectsUnavailable: boolean;
 }): string | null {
   const retry = "Refresh the page to try again.";
-  if (isError) return `The month by day and by project could not be loaded. ${retry}`;
   const failed = [
-    isDailyUnavailable ? "by day" : null,
-    isByCategoryUnavailable ? "by type" : null,
-    isProjectsUnavailable ? "by project" : null,
+    isError || isDailyUnavailable ? "by day" : null,
+    isError || isByCategoryUnavailable ? "by type" : null,
+    isError || isProjectsUnavailable ? "by project" : null,
   ].filter((part): part is string => part !== null);
   if (failed.length === 0) return null;
   const parts =

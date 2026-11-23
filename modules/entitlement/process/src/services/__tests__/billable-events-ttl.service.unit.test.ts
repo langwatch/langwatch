@@ -1,5 +1,5 @@
 /**
- * The background step applying goose 00128's TTL to existing billable_events parts.
+ * The background step applying goose 00132's TTL to existing billable_events parts.
  * @see ../../../../specs/billable-events-retention-step.feature
  */
 import { describe, expect, it } from "vitest";

@@ -13,7 +13,7 @@ Feature: A consumer's slots follow the throughput the system absorbs
   measurements before it probes again. It shrinks by a fifth when the event loop is over 95%
   busy, the heap over 80% of its limit, the median duration doubles against its recent baseline
   without throughput rising, or failures reach a tenth of finished jobs and twice their baseline,
-  then holds for 30 measurements; at the floor there is nothing to shrink, so nothing holds.
+  then holds for 30 measurements; at the floor there is nothing to shrink, so it starts no new hold.
   It never runs more than 1000 jobs at once. No setting changes this (Alex, 2026-10-20).
 
   @integration
@@ -58,6 +58,7 @@ Feature: A consumer's slots follow the throughput the system absorbs
   @unit
   Scenario: A busy moment at the configured concurrency does not hold the count
     Given a consumer at its configured concurrency with every slot taken
+    And no hold from an earlier step is active
     When its event loop is near full for one measurement and then idle again
     Then its slots grow by a quarter on the next measurement
 

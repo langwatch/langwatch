@@ -393,13 +393,13 @@ describe("the usage page", () => {
       expect(screen.queryByTestId("usage-events-empty")).not.toBeInTheDocument();
     });
 
-    it("says the month by day and by project could not be loaded when that read fails", () => {
+    it("says the month by day, by type and by project could not be loaded when that read fails", () => {
       given({ plan: FREE_PLAN, count: 31_800 });
       state.breakdownError = true;
       renderPage();
 
       expect(screen.getByTestId("usage-breakdown-unavailable")).toHaveTextContent(
-        "The month by day and by project could not be loaded.",
+        "The month by day, by type and by project could not be loaded.",
       );
       expect(screen.getByTestId("usage-events-count")).toHaveTextContent("31,800");
     });

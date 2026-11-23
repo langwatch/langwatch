@@ -10,7 +10,7 @@ export const ttlMutationSchema = z.object({
 });
 export type TtlMutation = z.infer<typeof ttlMutationSchema>;
 
-/** The `billable_events` delete TTL (goose 00128) applied to parts written before it. */
+/** The `billable_events` delete TTL (goose 00132) applied to parts written before it. */
 export abstract class BillableEventsTtlRepository {
   /** Newest first; empty before one was started or once ClickHouse pruned the finished one. */
   abstract findTtlMutations(): Promise<TtlMutation[]>;

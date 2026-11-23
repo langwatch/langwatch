@@ -45,7 +45,7 @@ export class GovernanceIngestMetricReceiverService {
     const { source } = batch;
 
     // Before the guard below, which turns every throw into a hint: the plan limit must reach the caller.
-    await this.landing.assertWithinAllowance(source);
+    const tenantId = await this.landing.tenantWithinAllowance(source);
 
     let bodyBytes = 0;
     let metricCount = 0;
@@ -68,7 +68,11 @@ export class GovernanceIngestMetricReceiverService {
         if (hasMetricPayload(parsed.request)) {
           // Scoped away from the outer catch, which turns anything it sees
           // into a `hint` on an acknowledgement.
-          const collected = await this.collectParsedMetrics(parsed.request, source);
+          const collected = await this.collectParsedMetrics({
+            parsedRequest: parsed.request,
+            source,
+            tenantId,
+          });
 
           if (collected.outcome !== "ok") return collected;
 
@@ -98,10 +102,15 @@ export class GovernanceIngestMetricReceiverService {
   }
 
   /** Project resolution, provenance stamping and collection, in one step. */
-  private async collectParsedMetrics(
-    parsedRequest: IExportMetricsServiceRequest,
-    source: GovernanceIngestionSource,
-  ): Promise<
+  private async collectParsedMetrics({
+    parsedRequest,
+    source,
+    tenantId,
+  }: {
+    parsedRequest: IExportMetricsServiceRequest;
+    source: GovernanceIngestionSource;
+    tenantId: string;
+  }): Promise<
     | Readonly<{ outcome: "unavailable"; errorMessage?: string | undefined }>
     | Readonly<{ outcome: "error" }>
     | Readonly<{
@@ -114,8 +123,6 @@ export class GovernanceIngestMetricReceiverService {
     const { metricCollection } = this.members;
 
     try {
-      const tenantId = await this.landing.governanceTenantOf(source);
-
       stampMetricOriginAttrs({ request: parsedRequest, source });
       applyOtlpReceiverPolicy({ request: parsedRequest, signal: "metrics", apiKeyId: null });
 
