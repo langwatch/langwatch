@@ -2,7 +2,7 @@
  * Pins the sign-in error codes the installed Better Auth redirects with against the contract's
  * normaliser, so an upgrade that adds or renames one fails here instead of falling through to
  * the generic error screen.
- * @see specs/identity/scim-sso-signin.feature
+ * @see specs/identity/sso-signin-error-boundary.feature
  */
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";

@@ -1,7 +1,4 @@
-/**
- * @see specs/identity/scim-sso-signin.feature
- * @see specs/identity/sso-signin-error-boundary.feature
- */
+/** @see specs/identity/sso-signin-error-boundary.feature */
 import { describe, expect, it } from "vitest";
 
 import {
