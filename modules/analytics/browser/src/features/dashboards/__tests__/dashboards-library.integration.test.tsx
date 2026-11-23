@@ -157,6 +157,46 @@ describe("the Dashboards library", () => {
     });
   });
 
+  describe("when a group lists more than eight boards", () => {
+    const ELEVEN = Array.from({ length: 11 }, (_, index) => {
+      const name = `Board ${String(index + 1).padStart(2, "0")}`;
+      return row({ id: `board-${index + 1}`, name });
+    });
+    const boardLinks = (group: HTMLElement) =>
+      within(group)
+        .queryAllByRole("link", { name: /^Board \d+$/ })
+        .map((link) => link.textContent);
+
+    /** @scenario 'A long group shows 8 boards, then "Show N more" and "Show less"' */
+    it("shows eight, opens the rest with Show 3 more, and folds back with Show less", async () => {
+      const { user } = renderLibrary({ listed: ELEVEN });
+      const group = await screen.findByRole("region", { name: "LLM Ops" });
+      const firstEight = ELEVEN.slice(0, 8).map((board) => board.name);
+
+      expect(boardLinks(group)).toEqual(firstEight);
+      expect(within(group).getByText(`LLM Ops · ${CURATED_BOARDS.length + 11}`)).toBeVisible();
+
+      await user.click(within(group).getByRole("button", { name: "Show 3 more" }));
+
+      expect(boardLinks(group)).toEqual(ELEVEN.map((board) => board.name));
+      expect(within(group).queryByRole("button", { name: "Show 3 more" })).toBeNull();
+
+      await user.click(within(group).getByRole("button", { name: "Show less" }));
+
+      expect(boardLinks(group)).toEqual(firstEight);
+      expect(within(group).getByRole("button", { name: "Show 3 more" })).toBeVisible();
+    });
+
+    /** @scenario 'A long group shows 8 boards, then "Show N more" and "Show less"' */
+    it("offers no toggle with eight boards or fewer", async () => {
+      renderLibrary({ listed: ELEVEN.slice(0, 8) });
+      const group = await screen.findByRole("region", { name: "LLM Ops" });
+
+      expect(boardLinks(group)).toHaveLength(8);
+      expect(within(group).queryByRole("button", { name: /^Show / })).toBeNull();
+    });
+  });
+
   describe("when no project of the organization has Dashboards on", () => {
     it("answers the app's not-found page", async () => {
       renderLibrary({ listed: new UiProcedureRefusal("dashboards_not_enabled", 403) });

@@ -1,13 +1,11 @@
 import {
   ORGANIZATION_DASHBOARDS_FLAGS,
   ORGANIZATION_DASHBOARDS_FLAGS_STALE_TIME_MS,
+  organizationDashboardsArea,
+  type OrganizationDashboardsArea,
 } from "@langwatch/analytics-client";
 
 import { useNavigationHost } from "../model/navigation-host.ts";
-import {
-  organizationDashboardsArea,
-  type OrganizationDashboardsArea,
-} from "../model/organization-dashboards-area.ts";
 import { isOrganizationDashboardsPath } from "../model/products.ts";
 import { navigationApi } from "./navigation-api.ts";
 

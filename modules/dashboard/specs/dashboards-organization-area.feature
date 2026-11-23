@@ -186,14 +186,23 @@ Feature: Organization-wide Dashboards area
     And an Organization board of an archived project is not listed
     # Evidence: the quoted boards.listInOrganization answer for that member
 
+  @integration
+  Scenario: A long group shows 8 boards, then "Show N more" and "Show less"
+    Given 11 boards homed in LLM Ops
+    Then the LLM Ops group shows its From LangWatch boards and 8 boards, and a "Show 3 more" that opens the rest in place
+    And then it reads "Show less", which folds the group back to 8
+    And a group of 8 boards or fewer offers neither
+    # Evidence: haven browser screenshots before and after each click
+
   # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
-  Scenario: A long group shows 8 boards, then "Show N more" and "Show less"
-    Given 11 boards homed in Gateway
-    Then the Gateway group shows 8 and a "Show 3 more" that opens the rest in place
-    And then it reads "Show less", which folds the group back to 8
-    And the group stays open or folded after a reload
-    # Evidence: haven browser screenshots before and after each click
+  Scenario: A long group stays open or folded after a reload
+    Given 11 boards homed in LLM Ops
+    When I press "Show 3 more" and reload the library
+    Then the LLM Ops group still lists all 11 boards and reads "Show less"
+    When I press "Show less" and reload the library
+    Then the group shows 8 and a "Show 3 more" again
+    # Evidence: haven browser screenshots after each reload
 
   # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented

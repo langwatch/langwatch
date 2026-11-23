@@ -34,7 +34,7 @@ const deleteMessage = (name: string) =>
 
 export default function DashboardsLibraryScreen() {
   const library = useOrganizationLibrary();
-  const [isCreating, setIsCreating] = useState(false);
+  const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<LibraryBoard | undefined>();
   const { storeProject } = library;
   // The store project is one where the member may create, so having one is the permission.
@@ -51,7 +51,7 @@ export default function DashboardsLibraryScreen() {
     : {};
   const groups = libraryGroups({ boards: library.boards, curated: CURATED_BOARDS });
   const newButton = mayCreate ? (
-    <Button size="sm" colorPalette="teal" onClick={() => setIsCreating(true)}>
+    <Button size="sm" colorPalette="teal" onClick={() => setIsNewDialogOpen(true)}>
       <Plus size={14} aria-hidden />
       New dashboard
     </Button>
@@ -72,8 +72,8 @@ export default function DashboardsLibraryScreen() {
       />
       <LibraryDialogs
         library={library}
-        isCreating={isCreating}
-        onCloseCreate={() => setIsCreating(false)}
+        isNewDialogOpen={isNewDialogOpen}
+        onCloseNewDialog={() => setIsNewDialogOpen(false)}
         pendingDelete={pendingDelete}
         onSettleDelete={() => setPendingDelete(void 0)}
       />
@@ -146,14 +146,14 @@ function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) 
 /** The create dialog and the delete confirmation; the screen owns which is open. */
 function LibraryDialogs({
   library,
-  isCreating,
-  onCloseCreate,
+  isNewDialogOpen,
+  onCloseNewDialog,
   pendingDelete,
   onSettleDelete,
 }: {
   library: ReturnType<typeof useOrganizationLibrary>;
-  isCreating: boolean;
-  onCloseCreate: () => void;
+  isNewDialogOpen: boolean;
+  onCloseNewDialog: () => void;
   pendingDelete: LibraryBoard | undefined;
   onSettleDelete: () => void;
 }) {
@@ -161,7 +161,7 @@ function LibraryDialogs({
   const { storeProject } = library;
   return (
     <>
-      {isCreating && storeProject && (
+      {isNewDialogOpen && storeProject && (
         <NewDashboardDialog
           takenNames={library.namesInStore}
           projectName={storeProject.name}
@@ -169,7 +169,7 @@ function LibraryDialogs({
           mayShare={library.mayShare}
           isCreating={library.isCreating}
           onCreate={library.createBoard}
-          onClose={onCloseCreate}
+          onClose={onCloseNewDialog}
         />
       )}
       <ConfirmDialog
