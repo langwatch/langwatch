@@ -358,7 +358,7 @@ describe("PiiRedactionModelService", () => {
           expect(outcomes()).toEqual([["info", "not_licensed"]]);
           expect(usage[0]?.fields).toMatchObject({
             organizationId: ORGANIZATION_ID,
-            spansFound: 0,
+            findings: 0,
           });
 
           await vi.advanceTimersByTimeAsync(1);

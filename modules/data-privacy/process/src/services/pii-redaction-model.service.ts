@@ -173,7 +173,7 @@ export class PiiRedactionModelService {
       this.metrics.modelFellBack("not_licensed");
       if (routing.firstInAMinute) {
         this.log.info(
-          { ...call, spansFound: 0, outcome: "not_licensed", durationMs: 0 },
+          { ...call, findings: 0, outcome: "not_licensed", durationMs: 0 },
           USAGE_MESSAGE,
         );
       }
