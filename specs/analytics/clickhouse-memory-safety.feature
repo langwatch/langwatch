@@ -160,3 +160,13 @@ Feature: ClickHouse Query Memory Safety Regression Tests
     When ClickHouse refuses a query for exceeding the query or user memory limit
     Then the client does not run the same statement again
     And the caller gets a query memory exceeded error with the reasons preserved
+
+  # A 30-day dashboard on a project with about 30,000 traces failed on every widget that read
+  # the traces view's Attributes: the content filter ran a lambda over 28 key prefixes for each
+  # map key, which copied every key 28 times and went past the 1 GB widget cap.
+  @integration @regression
+  Scenario: The content filter on a view's map column stays within a widget's memory cap
+    Given 30,000 traces with 14 attribute keys each in one block
+    When the content filter of the LangWatchQL views drops the content keys from their attributes
+    Then the read stays under 200 MB of memory
+    And ClickHouse drops exactly the keys the data privacy catalog calls content

@@ -16,7 +16,9 @@ import {
   LangWatchQLCatalogShapesService,
   LWQL_COLUMN_UNITS,
 } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { clickHouseLiteral } from "../langwatch-ql-sql-literal.rules.ts";
 import {
+  CONTENT_ATTRIBUTE_KEY_PATTERN,
   CONTENT_ATTRIBUTE_KEYS,
   contentKeyExclusionSql,
   gateForContentCategory,
@@ -387,11 +389,15 @@ describe("given the LangWatchQL view catalog when the map filter is compared wit
     ).toEqual(expected);
 
     const sql = contentKeyExclusionSql("k");
+    expect(sql).toBe(`NOT match(k, ${clickHouseLiteral(CONTENT_ATTRIBUTE_KEY_PATTERN)})`);
+    expect(sql, "the filter must not run a lambda per key").not.toContain("arrayExists");
     for (const key of expected) {
-      expect(sql, `the filter never mentions ${key}`).toContain(`'${key}'`);
-      expect(sql, `the filter does not exclude the exploded form of ${key}`).toContain(`'${key}.'`);
       expect(isContentAttributeKey(key)).toBe(true);
       expect(isContentAttributeKey(`${key}.0.content`)).toBe(true);
+      for (const probe of [`${key}x`, `x${key}`]) {
+        const isContent = expected.some((k) => probe === k || probe.startsWith(`${k}.`));
+        expect(isContentAttributeKey(probe), probe).toBe(isContent);
+      }
     }
     // A dimension the analytics views exist to group by must survive.
     expect(isContentAttributeKey("gen_ai.request.model")).toBe(false);
