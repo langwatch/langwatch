@@ -140,6 +140,71 @@ Feature: A PII redaction model call is priced per character, written to the spen
       Then no priced fact is recorded, so no call is fixed at a price of zero
       And the failure is logged at error with the organization, the project and the full price
 
+  Rule: The Cloud price holds for each kind of customer
+
+    Decided 2026-11-23: 0.50 dollars per 1M characters, no free monthly amount, no minimum per
+    call, and the free list stays with no end date. Each case is an organization with the PII
+    redaction model flag on; the price is fixed in data-privacy, so every case asserts exact amounts.
+
+    @unit
+    Scenario: A paying organization's long and simple spans are each priced by their characters
+      Given an organization not on the free list, with a Strict project
+      When the model answers a long span of 7,900 characters and a simple span of 50 characters
+      Then the long span is one priced fact of 3,950,000 nano dollars
+      And the simple span is one priced fact of 25,000 nano dollars, raised to no minimum
+      And both carry the rate version pii_redaction@500nano_per_char and a request id of their own
+
+    @unit
+    Scenario: The characters priced are the ones sent to the model, after standard detection
+      Given an organization not on the free list, with a Strict project
+      When it sends a span whose text holds a phone number
+      Then standard detection masks the phone number in-process before the model is called
+      And the priced fact counts the characters of the masked text the model was sent
+
+    @unit
+    Scenario: A free organization's long spans are recorded at zero with our cost kept
+      Given an organization on the release_pii_redaction_model_free list, with a Strict project
+      When the model answers a long span of 7,900 characters
+      Then one priced fact is recorded with its 7,900 characters, a price of zero and our cost above zero
+
+    @unit
+    Scenario: A span over the model's length cap is redacted by Presidio and priced for nobody
+      Given an organization with a Strict project, on the free list or not
+      When it sends a span of 12,000 characters
+      Then Presidio redacts the span and the model is not called
+      And no priced fact is recorded
+      # Splitting a long text across model calls is tasks#1226, not built: such a span
+      # costs nothing today.
+
+    @unit
+    Scenario: An organization that declined Strict at a price stays on Essential and is never priced
+      Given an organization with the flag whose level stayed Essential, because it cancelled Strict's price
+      When it sends a long span and a simple span
+      Then neither the model nor Presidio is called and no priced fact is recorded
+
+    @unit
+    Scenario: The model's routing does not read the subscription
+      Given an organization with a Strict project whose subscription carries no PII redaction price
+      When the model answers its span of 7,900 characters
+      Then it is priced at 3,950,000 nano dollars, like any paying organization's
+      # The flag and Strict's confirmation are the only gates; the meter holds the usage until
+      # the subscription carries the price ("Usage is held while the subscription carries no PII
+      # redaction price"). A level already on Strict when the flag goes on is not asked again.
+
+    @integration
+    Scenario: A paying organization's month reaches Stripe at 0.50 dollars per million characters
+      Given a usage-billed organization whose Growth subscription in dollars carries the PII redaction price
+      And a month of 2,095,000 characters answered by the model, with no free amount taken off
+      When the month is reported against the payment simulator
+      Then the simulator's usage for langwatch_pii_redaction_usd is 1.0475
+
+    @integration
+    Scenario: A free organization's month sends nothing to Stripe
+      Given a usage-billed organization whose Growth subscription in dollars carries the PII redaction price
+      And a month of model calls all recorded at a price of zero
+      When the month is reported against the payment simulator
+      Then the simulator holds no usage for langwatch_pii_redaction_usd
+
   Rule: Gateway writes one ledger row per priced fact
 
     @unit

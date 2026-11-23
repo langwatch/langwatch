@@ -10,6 +10,7 @@ import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 
 import { RestHost } from "@langwatch/api/rest";
+import { PII_REDACTION_NANO_USD_PER_CHARACTER } from "@langwatch/data-privacy-contract/pii-redaction-spend";
 import { BILLING_REPORT_COMMAND_TYPES } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { createTenantId } from "@langwatch/eventing";
@@ -348,10 +349,19 @@ describe.skipIf(!goPresent)(
       expect(totals).toEqual([expect.objectContaining({ value: 1234, events: 1 })]);
     }, 30_000);
 
-    /** @scenario "The month's PII redaction total reaches the Stripe simulator" */
-    /** @scenario "Usage is held while the subscription carries no PII redaction price" */
-    it("holds the month until the subscription carries the PII redaction price, then reports it once", async () => {
-      const organizationId = "org-pii";
+    /**
+     * A usage-billed organization on a Growth subscription in dollars, with or without the PII
+     * redaction line at the provider, whose ledger holds `nanoUsd` of pii_redaction rows.
+     */
+    async function piiRedactionCustomer({
+      organizationId,
+      withPiiRedactionLine,
+      nanoUsd,
+    }: {
+      organizationId: string;
+      withPiiRedactionLine: boolean;
+      nanoUsd: number;
+    }) {
       const customer = (await stripe("/customers", { name: organizationId })).id;
       store.organizations.set(organizationId, {
         id: organizationId,
@@ -368,13 +378,13 @@ describe.skipIf(!goPresent)(
         plan: "GROWTH_SEAT_USD_MONTHLY",
       });
       await subscriptions.updateStatus({ id: pending.id, status: "ACTIVE" });
-      // A Growth subscription at the provider bought before the PII redaction price existed.
       const session = await stripe("/checkout/sessions", {
         mode: "subscription",
         customer,
         success_url: "http://langwatch.test/settings/subscription",
         "line_items[0][price]": GROWTH_SEAT_USD_MONTHLY,
         "line_items[0][quantity]": "1",
+        ...(withPiiRedactionLine ? { "line_items[1][price]": GROWTH_PII_REDACTION_USD } : {}),
       });
       const completed = z
         .object({ subscription: z.string() })
@@ -394,11 +404,10 @@ describe.skipIf(!goPresent)(
       const ledgerReads: { requestType: string }[] = [];
       const piiRedactionSpend = PiiRedactionSpendQueryService.create({
         isSpendSourceAvailable: () => true,
-        listProjectIds: async () => ["project-pii-1", "project-pii-2"],
-        // 0.60 + 0.5234 dollars of pii_redaction rows across the two projects.
+        listProjectIds: async () => [`${organizationId}-project-1`, `${organizationId}-project-2`],
         sumSpendNanoUsdByRequestType: async (input) => {
           ledgerReads.push({ requestType: input.requestType });
-          return 1_123_400_000;
+          return nanoUsd;
         },
       });
       const handler = ReportUsageForMonthCommandHandler.create({
@@ -429,34 +438,88 @@ describe.skipIf(!goPresent)(
       });
       const now = new Date();
       const billingMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-      const command = {
-        tenantId: createTenantId(organizationId),
-        aggregateId: organizationId,
-        type: BILLING_REPORT_COMMAND_TYPES.REPORT_USAGE_FOR_MONTH,
-        data: { organizationId, billingMonth, tenantId: organizationId, occurredAt: Date.now() },
-      };
-
+      const reportMonth = () =>
+        handler.handle({
+          tenantId: createTenantId(organizationId),
+          aggregateId: organizationId,
+          type: BILLING_REPORT_COMMAND_TYPES.REPORT_USAGE_FOR_MONTH,
+          data: { organizationId, billingMonth, tenantId: organizationId, occurredAt: Date.now() },
+        });
       const piiUsage = async () =>
         usageTotals.parse(
           await control(`/usage?customer=${customer}&event_name=langwatch_pii_redaction_usd`),
         ).totals;
+      return {
+        subscription: completed.subscription,
+        reportMonth,
+        piiUsage,
+        errors,
+        ledgerReads,
+      };
+    }
 
-      await handler.handle(command);
-      expect(await piiUsage()).toEqual([]);
+    /** @scenario "The month's PII redaction total reaches the Stripe simulator" */
+    /** @scenario "Usage is held while the subscription carries no PII redaction price" */
+    it("holds the month until the subscription carries the PII redaction price, then reports it once", async () => {
+      // A Growth subscription at the provider bought before the PII redaction price existed,
+      // with 0.60 + 0.5234 dollars of pii_redaction rows across its two projects.
+      const customer = await piiRedactionCustomer({
+        organizationId: "org-pii",
+        withPiiRedactionLine: false,
+        nanoUsd: 1_123_400_000,
+      });
 
-      await stripe(`/subscriptions/${completed.subscription}`, {
+      await customer.reportMonth();
+      expect(await customer.piiUsage()).toEqual([]);
+
+      await stripe(`/subscriptions/${customer.subscription}`, {
         "items[0][price]": GROWTH_PII_REDACTION_USD,
       });
-      await handler.handle(command);
-      await handler.handle(command);
+      await customer.reportMonth();
+      await customer.reportMonth();
 
-      const totals = await piiUsage();
-      expect(errors).toEqual([]);
-      expect(ledgerReads).toEqual([
+      expect(customer.errors).toEqual([]);
+      expect(customer.ledgerReads).toEqual([
         { requestType: "pii_redaction" },
         { requestType: "pii_redaction" },
       ]);
-      expect(totals).toEqual([expect.objectContaining({ value: 1.1234, events: 1 })]);
+      expect(await customer.piiUsage()).toEqual([
+        expect.objectContaining({ value: 1.1234, events: 1 }),
+      ]);
+    }, 30_000);
+
+    /** @scenario "A paying organization's month reaches Stripe at 0.50 dollars per million characters" */
+    it("sends a paying organization's whole month at the published rate, nothing taken off", async () => {
+      // 250 long spans of 7,900 characters and 1,000 simple ones of 120, all answered by the model.
+      const characters = 250 * 7_900 + 1_000 * 120;
+      const customer = await piiRedactionCustomer({
+        organizationId: "org-pii-paying",
+        withPiiRedactionLine: true,
+        nanoUsd: characters * PII_REDACTION_NANO_USD_PER_CHARACTER,
+      });
+
+      await customer.reportMonth();
+
+      expect(characters).toBe(2_095_000);
+      expect(customer.errors).toEqual([]);
+      expect(await customer.piiUsage()).toEqual([
+        expect.objectContaining({ value: 1.0475, events: 1 }),
+      ]);
+    }, 30_000);
+
+    /** @scenario "A free organization's month sends nothing to Stripe" */
+    it("sends a free organization nothing when every row of its month is priced at zero", async () => {
+      const customer = await piiRedactionCustomer({
+        organizationId: "org-pii-free",
+        withPiiRedactionLine: true,
+        nanoUsd: 0,
+      });
+
+      await customer.reportMonth();
+
+      expect(customer.errors).toEqual([]);
+      expect(customer.ledgerReads).toEqual([{ requestType: "pii_redaction" }]);
+      expect(await customer.piiUsage()).toEqual([]);
     }, 30_000);
 
     /** @scenario "A failed renewal payment is recorded" */
