@@ -21,6 +21,7 @@ import { type RefObject, useCallback, useRef, useState } from "react";
 
 import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
+import { unmarkNewlyTyped } from "../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";
 import { explainAnyError } from "../../errors/index.ts";
 import type { InstantEvalConfirmation } from "../instant-eval-confirm-dialog.tsx";
@@ -225,7 +226,13 @@ function useInstantEvalOutcome(): {
     pendingRef.current = null;
     setConfirmation(null);
     setRefusal(null);
-    if (pending) applyQueryText(pending.payload.fallbackQuery);
+    if (!pending) return;
+    // Declined or closed, as Skip: a mark this submit made goes, one made earlier stays.
+    unmarkNewlyTyped({
+      projectId: useFilterStore.getState().projectId ?? "",
+      questions: pending.payload.newlyTypedQuestions,
+    });
+    applyQueryText(pending.payload.fallbackQuery);
   }, [applyQueryText]);
 
   const refuse = useCallback(
@@ -456,8 +463,13 @@ function useInstantEvalSwitch({
     return refused;
   }, [heldRef, pendingRef, refusedRef, seqRef, setRefusal]);
 
+  // Closed, as Skip or a decline: a mark this submit made goes, one made earlier stays.
   const dismissRefusal = useCallback(() => {
-    skipRefusal();
+    const refused = skipRefusal();
+    unmarkNewlyTyped({
+      projectId: useFilterStore.getState().projectId ?? "",
+      questions: refused?.newlyTypedQuestions,
+    });
   }, [skipRefusal]);
 
   return {
@@ -528,8 +540,12 @@ export function useInstantEvalRoute({
   }, [pendingRef, startRun]);
 
   const { refusedRef } = outcome;
+  // A later Enter drops this submit's marks; a resubmit marks them again.
   const abandonPendingRun = useCallback(() => {
     seqRef.current += 1;
+    const projectId = useFilterStore.getState().projectId ?? "";
+    unmarkNewlyTyped({ projectId, questions: pendingRef.current?.payload.newlyTypedQuestions });
+    unmarkNewlyTyped({ projectId, questions: refusedRef.current?.newlyTypedQuestions });
     pendingRef.current = null;
     refusedRef.current = null;
     setConfirmation(null);

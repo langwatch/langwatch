@@ -32,7 +32,7 @@ describe("given the deployment and the reader", () => {
 });
 
 describe("given the plan read", () => {
-  const answered = (type: string) => ({ isLoading: false, data: { type } });
+  const answered = (type: string) => ({ isLoading: false, isError: false, data: { type } });
 
   it("reads an Enterprise plan as the license", () => {
     expect(licenceOf({ mayRead: true, plan: answered("ENTERPRISE") })).toBe("enterprise");
@@ -44,14 +44,23 @@ describe("given the plan read", () => {
   });
 
   it("is loading while the read is in flight", () => {
-    expect(licenceOf({ mayRead: true, plan: { isLoading: true, data: undefined } })).toBe(
-      "loading",
-    );
+    expect(
+      licenceOf({ mayRead: true, plan: { isLoading: true, isError: false, data: undefined } }),
+    ).toBe("loading");
   });
 
   it("is unknown when the plan may not be read or the read failed", () => {
     expect(licenceOf({ mayRead: false, plan: answered("ENTERPRISE") })).toBe("unknown");
-    expect(licenceOf({ mayRead: true, plan: { isLoading: false, data: undefined } })).toBe(
+    expect(
+      licenceOf({ mayRead: true, plan: { isLoading: false, isError: true, data: undefined } }),
+    ).toBe("unknown");
+  });
+
+  it("is unknown when a refresh failed, even with an earlier answer still cached", () => {
+    expect(licenceOf({ mayRead: true, plan: { ...answered("OPEN_SOURCE"), isError: true } })).toBe(
+      "unknown",
+    );
+    expect(licenceOf({ mayRead: true, plan: { ...answered("ENTERPRISE"), isError: true } })).toBe(
       "unknown",
     );
   });

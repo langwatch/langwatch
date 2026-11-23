@@ -42,6 +42,7 @@ Feature: A release publishes the PII redaction model image
     When that release is not the repository's latest release on GitHub
     Then langwatch/pii-redaction-model:latest stays where it is
     And a re-run of an older release never moves latest back to its image
+    And two release runs at once take turns, so an older one never moves latest back after a newer one
 
   @unit
   Scenario: No plain model image fails the release
