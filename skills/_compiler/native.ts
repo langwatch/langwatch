@@ -20,10 +20,10 @@ const __dirname = path.dirname(__filename);
 const skillsRoot = path.resolve(__dirname, "..");
 
 /**
- * Setup partials both renders leave out: Langy already has credentials, endpoint
- * and CLI, and the CLI bundle has always shipped without them. The public skills keep them.
+ * Setup partials both renders leave out: both readers already run the CLI with
+ * credentials available, so install and key-setup steps are moot.
  */
-const CLI_PRESENT_PARTIALS = ["cli-setup", "projects-and-api-keys"];
+const ALWAYS_EXCLUDED_PARTIALS = ["cli-setup", "projects-and-api-keys"];
 
 /**
  * Login partials: Langy already holds a key, so they would have it tell a
@@ -46,12 +46,12 @@ const TARGETS: Record<
   { excluded: string[]; list: (skillsRoot: string) => PublishedSkill[]; outDir: string }
 > = {
   langy: {
-    excluded: [...CLI_PRESENT_PARTIALS, ...LOGIN_PARTIALS],
+    excluded: [...ALWAYS_EXCLUDED_PARTIALS, ...LOGIN_PARTIALS],
     list: listNativeSkills,
     outDir: path.join(skillsRoot, "_compiled", "native"),
   },
   cli: {
-    excluded: CLI_PRESENT_PARTIALS,
+    excluded: ALWAYS_EXCLUDED_PARTIALS,
     list: listPublishedSkills,
     outDir: path.join(skillsRoot, "_compiled", "cli"),
   },

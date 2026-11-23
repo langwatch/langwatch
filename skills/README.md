@@ -19,13 +19,14 @@ content. Read "The pipeline" below before editing anything.
 | `_lib/`                                          | Shared tooling: `feature-skills.ts` (the ONE definition of "our published skill set"), `mdx-inline.ts` (partial inliner), `frontmatter.ts`.                                                           |
 | `_compiler/`                                     | Generators: `compile.ts` (copy-paste prompts) and `native.ts` (opencode `SKILL.md` files for Langy).                                                                                                  |
 | `_compiled/*.txt`                                | **Gitignored** copy-paste prompts consumed by the docs pipeline.                                                                                                                                      |
-| `_compiled/native/`                              | **Committed** opencode skills consumed by the Langy agent image.                                                                                                                                      |
+| `_compiled/native/`                              | **Committed** opencode skills consumed by the Langy agent image. Also the login-free render the Langy image bundles into its CLI (`LANGWATCH_SKILLS_RENDER=native`).                                  |
+| `_compiled/cli/`                                 | **Committed** renders of the same published set (`native.ts --target cli`) that `generate-skills-bundle.mjs` embeds in the public CLI's `langwatch skills` bundle. Keeps the login steps. Default for `LANGWATCH_SKILLS_RENDER`. |
 | `_publish/sync.ts`                               | Publisher: wipes and re-fills a checkout of the public [langwatch/skills](https://github.com/langwatch/skills) repo.                                                                                  |
 | `_tests/`                                        | Dogfood scenario tests (drive a real sub-agent against each skill; local-only, cost money) plus fast structural tests (`native-skills.test.ts`, `publish-sync.test.ts`) that run with plain `vitest`. |
 | `initial-prompt.md`                              | Historical: the original kickoff brief this workspace was built from. Context only — nothing consumes it.                                                                                             |
 | `version.txt`, `CHANGELOG.md`                    | Version stamp copied into the public repo on publish, and its log.                                                                                                                                    |
 
-## The pipeline: one source, three consumers
+## The pipeline: one source, four consumers
 
 ```
 skills/<name>/SKILL.mdx  +  skills/_shared/*.mdx
@@ -45,7 +46,7 @@ skills/<name>/SKILL.mdx  +  skills/_shared/*.mdx
         │     docs/skills/directory.mdx + pms-and-domain-experts.mdx (committed)
         │     docs-ci fails if those pages are stale.
         │
-        └─ 3. LANGY, THE IN-PRODUCT AGENT
+        ├─ 3. LANGY, THE IN-PRODUCT AGENT
               _compiler/native.ts → _compiled/native/<slug>/SKILL.md (committed;
               recipes flattened — opencode discovers skills one level deep)
               → Dockerfile.langyagent COPYs _compiled/native/ into
@@ -53,6 +54,14 @@ skills/<name>/SKILL.mdx  +  skills/_shared/*.mdx
               → //go:embed bakes the tree into the manager binary
               → the worker pool materializes it to disk at startup and each
                 worker's $HOME/.config/opencode/skills symlinks to it
+              → the same image builds the CLI with LANGWATCH_SKILLS_RENDER=native,
+                so the bundled CLI (which Langy's bash tool can run) reads _compiled/native/
+
+        └─ 4. CLI `langwatch skills` BUNDLE
+              _compiler/native.ts --target cli → _compiled/cli/<slug>/SKILL.md (committed)
+              → sdks/typescript/scripts/generate-skills-bundle.mjs (default
+                LANGWATCH_SKILLS_RENDER=cli) → src/internal/generated/cli/skills.generated.ts
+              → the CLI binary embeds it; login steps are kept
               → opencode discovers each <slug>/SKILL.md as an invokable skill.
 ```
 
@@ -78,7 +87,7 @@ and `_tests/native-skills.test.ts` pins it to the root-compiled output.
    ```bash
    bash skills/_compiled/generate.sh
    ```
-   and commit the `_compiled/native/` changes together with the source change.
+   and commit the `_compiled/native/` and `_compiled/cli/` changes together with the source change.
    `_tests/native-skills.test.ts` fails if the committed native output drifts
    from the sources.
 4. If Langy should route to the new skill from user phrasing, add a row to the
