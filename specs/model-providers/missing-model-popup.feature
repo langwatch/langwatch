@@ -248,3 +248,12 @@ Feature: Missing-model toast when a feature can't resolve a model
       Given AI Search retries five times in two seconds
       And every attempt throws MODEL_PROVIDER_DISABLED for the same scope/feature
       Then exactly one toast renders for that error signature
+
+  Rule: The settings link leaves the page it was opened from
+
+    @integration @regression
+    Scenario: Opening settings from the AI-call-failed toast stays on Model Providers
+      Given the trace details drawer is open and an inline translation failed
+      When the user clicks "Open settings" on the toast
+      Then the address moves to /settings/model-providers and stays there
+      And the drawer's own address writes as it unmounts never send the user back to the traces page
