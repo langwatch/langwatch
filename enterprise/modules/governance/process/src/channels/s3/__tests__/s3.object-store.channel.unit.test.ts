@@ -64,6 +64,70 @@ describe("S3ObjectStoreChannel", () => {
   });
 });
 
+describe("S3ObjectStoreChannel.readBytes", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function serve({ chunks, contentLength }: { chunks: Uint8Array[]; contentLength?: number }) {
+    vi.spyOn(S3Client.prototype, "send").mockImplementation(async () => ({
+      ContentLength: contentLength,
+      Body: (async function* () {
+        yield* chunks;
+      })(),
+    }));
+  }
+
+  function read(maxBytes = 1024) {
+    return S3ObjectStoreChannel.create().readBytes({
+      bucket: "logs",
+      key: "a.parquet",
+      region: "us-east-1",
+      credentials,
+      maxBytes,
+    });
+  }
+
+  const parts = [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5])];
+
+  describe.each([
+    ["a declared length", 5],
+    ["no declared length", undefined],
+  ])("given a body with %s", (_label, contentLength) => {
+    it("returns the bytes in a buffer that owns its whole ArrayBuffer", async () => {
+      serve({ chunks: parts, contentLength });
+
+      const bytes = await read();
+
+      expect([...bytes]).toEqual([1, 2, 3, 4, 5]);
+      expect(bytes.byteOffset).toBe(0);
+      expect(bytes.buffer.byteLength).toBe(5);
+    });
+  });
+
+  describe("given a declared length past the cap", () => {
+    it("refuses before reading the body", async () => {
+      let pulled = false;
+      vi.spyOn(S3Client.prototype, "send").mockImplementation(async () => ({
+        ContentLength: 4096,
+        Body: (async function* () {
+          pulled = true;
+          yield new Uint8Array(4096);
+        })(),
+      }));
+
+      await expect(read(1024)).rejects.toThrow(/exceeds 1024 bytes/);
+      expect(pulled).toBe(false);
+    });
+  });
+
+  describe("given a body longer than its declared length", () => {
+    it("refuses it", async () => {
+      serve({ chunks: parts, contentLength: 4 });
+
+      await expect(read()).rejects.toThrow(/exceeds 4 bytes/);
+    });
+  });
+});
+
 describe("MemoryObjectStoreChannel", () => {
   describe("given seeded objects under a prefix", () => {
     it("lists them in key order after the cursor, truncated at the limit", async () => {

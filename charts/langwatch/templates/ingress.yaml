@@ -268,9 +268,16 @@ spec:
     - host: {{ $gwRoute.host | quote }}
       http:
         paths:
-          {{- /* Only the client API and the status endpoint. The probes,
-                 /metrics, /debug and /internal stay in-cluster. */}}
+          {{- /* Only the client API, the A2A proxy and the status endpoint.
+                 The probes, /metrics, /debug and /internal stay in-cluster. */}}
           - path: /v1
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-gateway
+                port:
+                  number: {{ $gwPort }}
+          - path: /a2a
             pathType: Prefix
             backend:
               service:

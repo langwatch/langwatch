@@ -729,10 +729,10 @@ findDailyAttributedSpend(input: { projectId: string; matches: readonly TraceAttr
 
 #### `countAttributedTracesByValue`
 
-Matching traces since `sinceMs`, counted per `valueKey` value among `values`.
+Matching traces since `sinceMs`, counted per `valueKey` value that equals one of `values` or starts with one of `valuePrefixes`.
 
 ```typescript
-countAttributedTracesByValue(input: { projectId: string; matches: readonly TraceAttributeMatch[]; valueKey: string; values: readonly string[]; sinceMs: number; }): Promise<{ value: string; count: number }[]>;
+countAttributedTracesByValue(input: { projectId: string; matches: readonly TraceAttributeMatch[]; valueKey: string; values: readonly string[]; valuePrefixes?: readonly string[]; sinceMs: number; }): Promise<{ value: string; count: number }[]>;
 ```
 
 #### `findAttributedTracesBefore`

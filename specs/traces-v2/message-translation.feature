@@ -130,3 +130,11 @@ Feature: Message translation in the trace details drawer
       When the user translates it
       Then the call fails with the code "ai_content_filtered", not retryable
       And its copy names the provider's content filter, not the Fast model configuration
+
+  Rule: Translate reaches the NLP engine the way every other model call does
+
+    @unit @regression
+    Scenario: Translate built through the app sends the NLP engine its internal secret
+      Given a deployment whose NLP engine requires its internal secret
+      When a trace message is translated through the model provider app
+      Then the engine call carries the X-LangWatch-NLP-Secret header
