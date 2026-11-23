@@ -122,7 +122,9 @@ describe("a board made in the library", () => {
       renderDashboards({ element: <Pages host={host} />, host, answer: server() });
       const user = userEvent.setup({ pointerEventsCheck: 0 });
 
-      await user.click((await screen.findAllByRole("button", { name: "New dashboard" }))[0]);
+      const [newDashboard] = await screen.findAllByRole("button", { name: "New dashboard" });
+      if (!newDashboard) throw new Error("no New dashboard button");
+      await user.click(newDashboard);
       await user.click(await screen.findByRole("radio", { name: new RegExp(visibility) }));
       await user.click(screen.getByRole("button", { name: "Create" }));
 
