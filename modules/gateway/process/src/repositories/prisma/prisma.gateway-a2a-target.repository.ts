@@ -44,15 +44,15 @@ export class PrismaGatewayA2aTargetRepository extends GatewayA2aTargetRepository
     return rows.map((row) => this.#toResource(row, options?.headers ?? true));
   }
 
-  async findByProject(input: {
-    organizationId: string;
-    projectId: string;
-  }): Promise<GatewayA2aTargetResource[]> {
+  async findByProject(
+    input: { organizationId: string; projectId: string },
+    options?: { headers?: boolean },
+  ): Promise<GatewayA2aTargetResource[]> {
     const rows = await this.prisma.gatewayA2ATarget.findMany({
       where: { organizationId: input.organizationId, projectId: input.projectId, archivedAt: null },
       orderBy: [{ name: "asc" }, { id: "asc" }],
     });
-    return rows.map((row) => this.#toResource(row, true));
+    return rows.map((row) => this.#toResource(row, options?.headers ?? true));
   }
 
   async findById(input: {

@@ -99,6 +99,28 @@ describe("GatewayA2aTargetService", () => {
     ).resolves.toMatchObject({ name: "billing" });
   });
 
+  it("lists an organization's and a project's targets without unsealing their headers", async () => {
+    const repository = sealedA2aTargetRepository();
+    const targets = service({ repository });
+    await repository.create({
+      ...base,
+      projectId: "p1",
+      name: "billing",
+      upstreamHeaders: { "X-Token": "s3cret" },
+    });
+
+    const listed = await targets.list(base.organizationId);
+    const projectListed = await targets.listForProject({
+      organizationId: base.organizationId,
+      projectId: "p1",
+    });
+
+    expect([...listed, ...projectListed].map((target) => target.name)).toEqual([
+      "billing",
+      "billing",
+    ]);
+  });
+
   /** @scenario "a target URL that holds credentials is refused at save time" */
   it("refuses credentials inside a target URL without echoing them", async () => {
     for (const field of ["upstreamUrl", "cardUrl"] as const) {
