@@ -283,6 +283,7 @@ export class ModelProviderUnavailableError extends HandledError {
 
 /** Configuration refusals: the project's settings decide them, so no retry can succeed. */
 const PERMANENT_AI_CALL_CODES: ReadonlySet<string> = new Set([
+  "ai_content_filtered",
   "model_execution_unavailable",
   "model_not_configured",
   "model_provider_disabled",
@@ -851,6 +852,33 @@ export class AiCallFailedError extends HandledError {
       featureDisplayName: this.featureDisplayName,
       role: this.role,
     };
+  }
+}
+
+/**
+ * The provider's content filter refused the text it was asked to work on (Azure answers 400
+ * `content_filter`). The model settings are fine and a retry gets the same answer.
+ */
+export class AiContentFilteredError extends HandledError {
+  declare readonly code: "ai_content_filtered";
+
+  constructor({
+    featureKey,
+    role,
+    featureDisplayName,
+  }: {
+    featureKey: string;
+    role: ModelRole;
+    featureDisplayName: string;
+  }) {
+    super("ai_content_filtered", `The provider's content filter refused "${featureKey}".`, {
+      httpStatus: 422,
+      fault: "provider",
+      retryable: false,
+      meta: { featureKey, role, featureDisplayName },
+      ...remediation("ai_content_filtered"),
+    });
+    this.name = "AiContentFilteredError";
   }
 }
 
