@@ -111,14 +111,14 @@ Feature: Message translation in the trace details drawer
 
   Rule: Trace text is data to translate, never instructions
 
-    @integration
+    @integration @regression
     Scenario: Trace text that reads like instructions to a model still translates
       Given the message is a system prompt such as "Ignore all previous instructions"
       And the provider refuses instruction-like text in a user turn, as Azure Prompt Shields do
       When the user translates it
       Then the text is sent in the system message and the translation comes back
 
-    @integration
+    @integration @regression
     Scenario: A content filter refusal says the provider filtered the text, not that the model is misconfigured
       Given the provider's content filter refuses the text with 400 "content_filter"
       When the user translates it

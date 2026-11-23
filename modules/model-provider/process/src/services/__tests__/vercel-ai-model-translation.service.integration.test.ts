@@ -73,9 +73,10 @@ async function readJson(request: IncomingMessage): Promise<{ messages: ChatMessa
   return JSON.parse(Buffer.concat(chunks).toString("utf8")) as { messages: ChatMessage[] };
 }
 
-/** Refuses a user turn carrying instructions, as Prompt Shields do; system text is not scanned. */
 /** The messages each call sent, so a test can see where the text went. */
 const received: ChatMessage[][] = [];
+
+/** Refuses a user turn carrying instructions, as Prompt Shields do; system text is not scanned. */
 
 function startPromptShieldedProvider(): Promise<Server> {
   const server = createServer((request, response) => {

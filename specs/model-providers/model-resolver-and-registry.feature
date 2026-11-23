@@ -94,7 +94,7 @@ Feature: Model resolver and feature registry
     Then it is "ai_call_failed" and not retryable
     And background callers treat it as a permanent failure
 
-  @unit
+  @unit @regression
   Scenario: A provider content filter refusal is told apart from a model configuration failure
     Given the provider answers a model call with 400 and the error code "content_filter"
     When the AI call wrapper rethrows it

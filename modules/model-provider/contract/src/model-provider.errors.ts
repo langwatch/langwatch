@@ -281,7 +281,7 @@ export class ModelProviderUnavailableError extends HandledError {
   }
 }
 
-/** Configuration refusals: the project's settings decide them, so no retry can succeed. */
+/** Refusals no retry can fix: project settings or a provider's content filter decide them. */
 const PERMANENT_AI_CALL_CODES: ReadonlySet<string> = new Set([
   "ai_content_filtered",
   "model_execution_unavailable",
