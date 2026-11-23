@@ -9,14 +9,6 @@ export const GENERIC_LINK_REFUSAL =
   "We could not connect this sign-in method. Try again in a moment.";
 
 const LINK_REFUSAL_COPY: ReadonlyMap<string, string> = new Map([
-  [
-    "SOCIAL_ACCOUNT_ALREADY_LINKED",
-    "That account is already connected to a different LangWatch account. Sign in to that LangWatch account and disconnect it there, or connect a different account.",
-  ],
-  [
-    "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED",
-    "The account you picked uses a different email from your LangWatch address. Connect an account that has your LangWatch address as a verified email.",
-  ],
   ["PROVIDER_NOT_FOUND", "This sign-in method is not available here."],
 ]);
 

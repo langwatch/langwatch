@@ -223,20 +223,15 @@ describe("given a reader linking an additional sign-in method", () => {
     });
 
     /** @scenario "A refused link says why in plain words, never the server's raw answer" */
-    it.each([
-      [
-        "SOCIAL_ACCOUNT_ALREADY_LINKED",
-        "That account is already connected to a different LangWatch account. Sign in to that LangWatch account and disconnect it there, or connect a different account.",
-      ],
-      [
-        "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED",
-        "The account you picked uses a different email from your LangWatch address. Connect an account that has your LangWatch address as a verified email.",
-      ],
-      ["PROVIDER_NOT_FOUND", "This sign-in method is not available here."],
-    ])("explains %s in a plain sentence", async (code, sentence) => {
-      refusal(JSON.stringify({ code, message: "Account not linked - raw server text" }));
+    it("explains PROVIDER_NOT_FOUND in a plain sentence", async () => {
+      refusal(
+        JSON.stringify({ code: "PROVIDER_NOT_FOUND", message: "Account not linked - raw text" }),
+      );
 
-      await expect(link()).resolves.toEqual({ ok: false, reason: sentence });
+      await expect(link()).resolves.toEqual({
+        ok: false,
+        reason: "This sign-in method is not available here.",
+      });
     });
 
     /** @scenario "A refused link says why in plain words, never the server's raw answer" */
