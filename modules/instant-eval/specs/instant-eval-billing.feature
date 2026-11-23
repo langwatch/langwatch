@@ -188,6 +188,65 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       # later, so reporting early would skip the usage for good. The first
       # report after the meter is mapped carries the month from zero.
 
+    # Stripe bills a meter event no subscription line prices at nothing, so
+    # sending it would advance the checkpoint and lose the charge (ADR-174, v20).
+    @unit
+    Scenario: Usage is held while the subscription carries no Instant Evals price
+      Given a Stripe mode whose catalog maps the Instant Evals meter
+      And an organization whose active Growth subscription in dollars has no Instant Evals price
+      And Instant Eval spend this month
+      When the month is reported
+      Then no Instant Eval meter event is sent and its checkpoint is not advanced
+      And no other report is scheduled for it
+      And the billable events meter is reported as usual
+
+    @unit
+    Scenario: A Growth subscription in euros holds its Instant Eval usage
+      Given an organization whose active Growth subscription is in euros
+      And Instant Eval spend this month
+      When the month is reported
+      Then no Instant Eval meter event is sent and its checkpoint is not advanced
+      # The price is in dollars; a euro subscription cannot carry it.
+
+    @unit
+    Scenario: Usage is reported once the subscription carries the Instant Evals price
+      Given an organization whose active subscription has the Instant Evals price
+      And Instant Eval spend of 5.0428 dollars this month
+      When the month is reported
+      Then the Instant Eval meter event's value is 5.0428
+
+    @unit
+    Scenario: The first report after the Instant Evals price is added carries the month from zero
+      Given an organization whose usage was held for want of the Instant Evals price
+      When the price is added to its subscription and the month is reported
+      Then the Instant Eval meter event carries the month's total from zero
+
+    @unit
+    Scenario: A subscription that cannot be read holds the Instant Eval usage and retries
+      Given an organization whose subscription cannot be read from Stripe
+      And Instant Eval spend this month
+      When the month is reported
+      Then no Instant Eval meter event is sent and its checkpoint is not advanced
+      And another report is scheduled
+
+    @unit
+    Scenario: A connected customer's hosted usage is priced by its quarterly usage line
+      Given a connected self-hosted customer whose usage subscription has the connected hosted usage price
+      And hosted spend this month
+      When the month is reported
+      Then the subscription is asked for the connected hosted usage price, not the Growth one
+      And the hosted usage is reported
+
+    @integration
+    Scenario: Only a subscription with the Instant Evals price reaches the Stripe simulator
+      Given three usage-billed organizations with Instant Eval spend this month
+      And one has a Growth subscription in dollars with no Instant Evals price
+      And one has a Growth subscription in euros
+      And one has a Growth subscription in dollars with the Instant Evals price
+      When the month is reported against the payment simulator
+      Then the simulator holds no Instant Eval usage for the first two
+      And the third's Instant Eval usage equals the month's price in dollars
+
     @unit
     Scenario: A month with no Instant Eval spend reports nothing on that meter
       Given an organization whose Instant Eval spend this month is zero

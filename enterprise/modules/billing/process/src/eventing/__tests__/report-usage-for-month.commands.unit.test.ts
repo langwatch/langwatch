@@ -21,7 +21,7 @@ const {
   mockQueryInstantEvalSpendTotal,
   mockQueryPiiRedactionSpendTotal,
   mockConnectedUsageCeiling,
-  mockHasPiiRedactionPrice,
+  mockSubscriptionCarriesPrice,
   mockLogger,
 } = vi.hoisted(() => {
   const reportUsageDeltaFn = vi.fn();
@@ -48,7 +48,8 @@ const {
   };
 
   const connectedUsageCeilingFn = vi.fn(async () => null);
-  const hasPiiRedactionPriceFn = vi.fn<(input: { stripeCustomerId: string }) => Promise<boolean>>();
+  const subscriptionCarriesPriceFn =
+    vi.fn<(input: { stripeCustomerId: string; price: string }) => Promise<boolean>>();
 
   const billingCheckpointsPort = {
     findCheckpoint: vi.fn(),
@@ -68,7 +69,7 @@ const {
     mockQueryInstantEvalSpendTotal: queryInstantEvalSpendTotalFn,
     mockQueryPiiRedactionSpendTotal: queryPiiRedactionSpendTotalFn,
     mockConnectedUsageCeiling: connectedUsageCeilingFn,
-    mockHasPiiRedactionPrice: hasPiiRedactionPriceFn,
+    mockSubscriptionCarriesPrice: subscriptionCarriesPriceFn,
     mockLogger: loggerInstance,
   };
 });
@@ -106,6 +107,8 @@ let countedEventId: string | undefined;
 let instantEvalMeterProvisioned = true;
 /** Whether the catalogue maps the PII redaction meter in the mode under test. */
 let piiRedactionMeterProvisioned = true;
+/** The prices the customer's subscription has no line on; every other price it carries. */
+let missingPrices: string[] = [];
 
 function makeCommand(
   organizationId = "org-1",
@@ -181,7 +184,7 @@ async function createHandler() {
     isInstantEvalMeterProvisioned: () => instantEvalMeterProvisioned,
     queryPiiRedactionSpendTotal: mockQueryPiiRedactionSpendTotal,
     isPiiRedactionMeterProvisioned: () => piiRedactionMeterProvisioned,
-    hasPiiRedactionPrice: mockHasPiiRedactionPrice,
+    subscriptionCarriesPrice: mockSubscriptionCarriesPrice,
     selfDispatch: mockSelfDispatch,
     organizationCache: missingOrganizationCache,
     errorReporter: errorReporter as any,
@@ -204,7 +207,10 @@ describe("ReportUsageForMonthCommand", () => {
     // meter stays out of the way of every assertion about the events one.
     mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "unavailable" });
     mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "unavailable" });
-    mockHasPiiRedactionPrice.mockResolvedValue(true);
+    missingPrices = [];
+    mockSubscriptionCarriesPrice.mockImplementation(
+      async ({ price }) => !missingPrices.includes(price),
+    );
   });
 
   // ========================================================================
@@ -640,6 +646,142 @@ describe("ReportUsageForMonthCommand", () => {
     });
   });
 
+  describe("given a Growth subscription in dollars with no Instant Evals price", () => {
+    beforeEach(() => {
+      missingPrices = ["GROWTH_INSTANT_EVAL_USD"];
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      // 0.30 dollars of Instant Eval spend, which Stripe would bill at nothing.
+      mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 3_000 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+    });
+
+    /** @scenario "Usage is held while the subscription carries no Instant Evals price" */
+    it("sends no Instant Eval event, leaves its checkpoint alone and schedules nothing", async () => {
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
+        stripeCustomerId: "cus_123",
+        price: "GROWTH_INSTANT_EVAL_USD",
+      });
+      expect(mockQueryInstantEvalSpendTotal).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.findCheckpoint).not.toHaveBeenCalledWith(
+        expect.objectContaining({ meter: "langwatch_instant_eval_usd" }),
+      );
+      expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
+      expect(mockSelfDispatch).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Usage is held while the subscription carries no Instant Evals price" */
+    it("still reports the billable events meter", async () => {
+      countedTotal = 150;
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      const sent = mockReportUsageDelta.mock.calls.map(([input]) => input.events[0].eventName);
+      expect(sent).toEqual(["langwatch_billable_events"]);
+    });
+
+    /** @scenario "The first report after the Instant Evals price is added carries the month from zero" */
+    it("carries the month from zero on the first report after the price is added", async () => {
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+      missingPrices = [];
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockReportUsageDelta.mock.calls[0]?.[0].events[0]).toMatchObject({
+        eventName: "langwatch_instant_eval_usd",
+        identifier: "org-1:2026-02:langwatch_instant_eval_usd:from:0:to:3000",
+        value: 0.3,
+      });
+    });
+  });
+
+  describe("given a Growth subscription in euros", () => {
+    /** @scenario "A Growth subscription in euros holds its Instant Eval usage" */
+    it("sends no Instant Eval event and leaves its checkpoint alone", async () => {
+      // A euro subscription's lines; the Instant Evals price is in dollars, so it is never one.
+      const euroLines = ["GROWTH_SEAT_EUR_MONTHLY", "GROWTH_EVENTS_EUR_MONTHLY"];
+      mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) =>
+        euroLines.includes(price),
+      );
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 3_000 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.confirm).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a Growth subscription in dollars with the Instant Evals price", () => {
+    /** @scenario "Usage is reported once the subscription carries the Instant Evals price" */
+    it("sends the month's 5.0428 dollars and checkpoints it", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 50_428 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
+        stripeCustomerId: "cus_123",
+        price: "GROWTH_INSTANT_EVAL_USD",
+      });
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockReportUsageDelta.mock.calls[0]?.[0]).toMatchObject({
+        stripeCustomerId: "cus_123",
+        events: [
+          expect.objectContaining({
+            eventName: "langwatch_instant_eval_usd",
+            identifier: "org-1:2026-02:langwatch_instant_eval_usd:from:0:to:50428",
+            value: 5.0428,
+          }),
+        ],
+      });
+      expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith({
+        meter: "langwatch_instant_eval_usd",
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        lastReportedTotal: 50_428,
+      });
+    });
+  });
+
+  describe("given a subscription whose Instant Evals price cannot be read", () => {
+    /** @scenario "A subscription that cannot be read holds the Instant Eval usage and retries" */
+    it("sends no Instant Eval event, leaves its checkpoint alone and schedules another report", async () => {
+      mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
+        if (price === "GROWTH_INSTANT_EVAL_USD") throw new Error("stripe unavailable");
+        return true;
+      });
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 3_000 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.incrementFailures).not.toHaveBeenCalled();
+      expect(mockSelfDispatch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("given the Instant Eval checkpoint reported 1.0000 dollars and the month is now 1.5000", () => {
     /** @scenario "A second report sends only the delta since the checkpoint" */
     it("sends 0.5000 under an identifier naming the meter, the month and both totals", async () => {
@@ -761,7 +903,7 @@ describe("ReportUsageForMonthCommand", () => {
   describe("given an active subscription with no PII redaction price", () => {
     /** @scenario "Usage is held while the subscription carries no PII redaction price" */
     it("sends no PII redaction event, leaves its checkpoint alone and schedules nothing", async () => {
-      mockHasPiiRedactionPrice.mockResolvedValue(false);
+      missingPrices = ["GROWTH_PII_REDACTION_USD"];
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
       mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
@@ -770,7 +912,10 @@ describe("ReportUsageForMonthCommand", () => {
 
       await handler.handle(makeCommand());
 
-      expect(mockHasPiiRedactionPrice).toHaveBeenCalledWith({ stripeCustomerId: "cus_123" });
+      expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
+        stripeCustomerId: "cus_123",
+        price: "GROWTH_PII_REDACTION_USD",
+      });
       expect(mockQueryPiiRedactionSpendTotal).not.toHaveBeenCalled();
       expect(mockReportUsageDelta).not.toHaveBeenCalled();
       expect(mockBillingCheckpoints.findCheckpoint).not.toHaveBeenCalledWith(
@@ -787,8 +932,9 @@ describe("ReportUsageForMonthCommand", () => {
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       const handler = await createHandler();
 
-      mockHasPiiRedactionPrice.mockResolvedValueOnce(false);
+      missingPrices = ["GROWTH_PII_REDACTION_USD"];
       await handler.handle(makeCommand());
+      missingPrices = [];
       await handler.handle(makeCommand());
 
       expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
@@ -801,7 +947,7 @@ describe("ReportUsageForMonthCommand", () => {
 
     /** @scenario "The other meters do not wait on the PII redaction price" */
     it("still reports the billable events and Instant Evals meters", async () => {
-      mockHasPiiRedactionPrice.mockResolvedValue(false);
+      missingPrices = ["GROWTH_PII_REDACTION_USD"];
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
       countedTotal = 150;
@@ -839,7 +985,10 @@ describe("ReportUsageForMonthCommand", () => {
   describe("given a subscription Stripe cannot read", () => {
     /** @scenario "A subscription that cannot be read holds the usage and retries" */
     it("sends no PII redaction event, leaves its checkpoint alone and schedules another report", async () => {
-      mockHasPiiRedactionPrice.mockRejectedValue(new Error("stripe unavailable"));
+      mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
+        if (price === "GROWTH_PII_REDACTION_USD") throw new Error("stripe unavailable");
+        return true;
+      });
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
       mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
@@ -1211,6 +1360,38 @@ describe("ReportUsageForMonthCommand", () => {
       await handler.handle(makeCommand());
 
       expect(hostedUsageEvent()?.value).toBe(9);
+    });
+
+    /** @scenario "A connected customer's hosted usage is priced by its quarterly usage line" */
+    it("asks the subscription for the connected hosted usage price, not the Growth one", async () => {
+      arrange({ measured: 90_000, ceiling: null });
+      missingPrices = ["GROWTH_INSTANT_EVAL_USD"];
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
+        stripeCustomerId: "cus_123",
+        price: "CONNECTED_HOSTED_USAGE_QUARTERLY",
+      });
+      expect(mockSubscriptionCarriesPrice).not.toHaveBeenCalledWith(
+        expect.objectContaining({ price: "GROWTH_INSTANT_EVAL_USD" }),
+      );
+      expect(hostedUsageEvent()?.value).toBe(9);
+    });
+
+    /** @scenario "A connected customer's hosted usage is priced by its quarterly usage line" */
+    it("holds hosted usage while the usage subscription has no quarterly line", async () => {
+      arrange({ measured: 90_000, ceiling: null });
+      missingPrices = ["CONNECTED_HOSTED_USAGE_QUARTERLY"];
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(hostedUsageEvent()).toBeUndefined();
+      expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalledWith(
+        expect.objectContaining({ meter: "langwatch_instant_eval_usd" }),
+      );
     });
 
     it("dates the event at the end of the month, because the quarter is still open", async () => {

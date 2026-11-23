@@ -32,7 +32,7 @@ import { MemoryBillingWebhookSubscriptionRepository } from "../repositories/memo
 import { MemoryBillingRepositories } from "../repositories/memory/memory.billing.repositories.ts";
 import { MemoryBillingStore } from "../repositories/memory/memory.billing.store.ts";
 import { MemoryBillingSubscriptionRepository } from "../repositories/memory/memory.subscription.repository.ts";
-import { carriesPiiRedactionPrice } from "../rules/pii-redaction-meter.rules.ts";
+import { carriesPrice } from "../rules/subscription-price.rules.ts";
 import { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import { PiiRedactionSpendQueryService } from "../services/pii-redaction-spend-query.service.ts";
 import type { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
@@ -44,6 +44,9 @@ const WEBHOOK_SECRET = "whsec_paymentsim";
 const LAUNCH_PRICE = "price_1R9LHnIMsTw08cudoc9eO4L8";
 const GROWTH_SEAT_USD_MONTHLY = "price_1SzP11IMsTw08cudRhGETYNa";
 const GROWTH_PII_REDACTION_USD = "price_1Uat9tIMsTw08cudpWWrZG4a";
+const GROWTH_SEAT_EUR_MONTHLY = "price_1SyxCwIMsTw08cudPPOqniRl";
+const GROWTH_INSTANT_EVAL_USD = "price_instant_eval_usd_sim";
+const INSTANT_EVAL_METER = "mtr_instant_eval_usd_sim";
 const REPO_ROOT = fileURLToPath(new URL("../../../../../../", import.meta.url));
 const CATALOG = fileURLToPath(
   new URL("../../../contract/src/stripe-catalog.json", import.meta.url),
@@ -425,12 +428,12 @@ describe.skipIf(!goPresent)(
         queryPiiRedactionSpendTotal: (input) =>
           piiRedactionSpend.queryPiiRedactionSpendTotal(input),
         isPiiRedactionMeterProvisioned: () => true,
-        hasPiiRedactionPrice: async ({ stripeCustomerId }) =>
-          carriesPiiRedactionPrice({
+        subscriptionCarriesPrice: async ({ stripeCustomerId, price }) =>
+          carriesPrice({
             subscriptions: await stripeChannels.subscriptions.listCustomerSubscriptions({
               customerId: stripeCustomerId,
             }),
-            priceId: GROWTH_PII_REDACTION_USD,
+            priceId: price === "GROWTH_PII_REDACTION_USD" ? GROWTH_PII_REDACTION_USD : undefined,
           }),
         selfDispatch: async () => {},
         errorReporter,
@@ -519,6 +522,145 @@ describe.skipIf(!goPresent)(
       expect(customer.errors).toEqual([]);
       expect(customer.ledgerReads).toEqual([{ requestType: "pii_redaction" }]);
       expect(await customer.piiUsage()).toEqual([]);
+    }, 30_000);
+
+    /** @scenario "Only a subscription with the Instant Evals price reaches the Stripe simulator" */
+    it("reports Instant Eval usage only to the subscription that carries its price", async () => {
+      // The catalog maps no Instant Evals meter or price in test mode yet, so both are seeded here.
+      await control("/meters", {
+        body: { id: INSTANT_EVAL_METER, event_name: "langwatch_instant_eval_usd" },
+      });
+      await control("/prices", {
+        body: {
+          id: GROWTH_INSTANT_EVAL_USD,
+          currency: "usd",
+          unit_amount: 100,
+          interval: "month",
+          usage_type: "metered",
+          meter: INSTANT_EVAL_METER,
+          lookup_key: "GROWTH_INSTANT_EVAL_USD",
+        },
+      });
+      const growth = async ({
+        organizationId,
+        currency,
+        lines,
+      }: {
+        organizationId: string;
+        currency: "USD" | "EUR";
+        lines: string[];
+      }) => {
+        const customer = (await stripe("/customers", { name: organizationId })).id;
+        store.organizations.set(organizationId, {
+          id: organizationId,
+          name: organizationId,
+          stripeCustomerId: customer,
+          pricingModel: "SEAT_EVENT",
+          currency,
+          selfHostedCustomer: false,
+          teamIds: [],
+          signupData: {},
+        });
+        const pending = await subscriptions.createPending({
+          organizationId,
+          plan: `GROWTH_SEAT_${currency}_MONTHLY`,
+        });
+        await subscriptions.updateStatus({ id: pending.id, status: "ACTIVE" });
+        const session = await stripe("/checkout/sessions", {
+          mode: "subscription",
+          customer,
+          success_url: "http://langwatch.test/settings/subscription",
+          ...Object.fromEntries(
+            lines.map((price, index) => [`line_items[${index}][price]`, price]),
+          ),
+          "line_items[0][quantity]": "1",
+        });
+        await control(`/checkout/${session.id}/complete`, { body: {} });
+        return customer;
+      };
+      // Bought before the Instant Evals price existed, a euro plan, and a paying dollar plan.
+      const oldUsd = await growth({
+        organizationId: "org-instant-old-usd",
+        currency: "USD",
+        lines: [GROWTH_SEAT_USD_MONTHLY],
+      });
+      const eur = await growth({
+        organizationId: "org-instant-eur",
+        currency: "EUR",
+        lines: [GROWTH_SEAT_EUR_MONTHLY],
+      });
+      const paying = await growth({
+        organizationId: "org-instant-paying",
+        currency: "USD",
+        lines: [GROWTH_SEAT_USD_MONTHLY, GROWTH_INSTANT_EVAL_USD],
+      });
+      // The month's Instant Eval spend in the meter's units: 0.30, 0.30 and 5.0428 dollars.
+      const spend: Record<string, number> = {
+        "org-instant-old-usd": 3_000,
+        "org-instant-eur": 3_000,
+        "org-instant-paying": 50_428,
+      };
+      const stripeChannels = composeHttpBillingStripe({
+        secretKey: SECRET_KEY,
+        nodeEnvironment: "test",
+        apiBase: simBase,
+      });
+      const repositories = MemoryBillingRepositories.create();
+      const errors: Error[] = [];
+      const handler = ReportUsageForMonthCommandHandler.create({
+        organizations: MemoryBillingReportOrganizationRepository.create(store),
+        billingCheckpoints: repositories.checkpoints,
+        organizationCache: repositories.organizationCache,
+        getUsageReportingService: () =>
+          createStripeUsageReporting({
+            secretKey: SECRET_KEY,
+            nodeEnvironment: "test",
+            apiBase: simBase,
+          }),
+        queryInstantEvalSpendTotal: async ({ organizationId }) => ({
+          outcome: "counted",
+          total: spend[organizationId] ?? 0,
+        }),
+        isInstantEvalMeterProvisioned: () => true,
+        queryPiiRedactionSpendTotal: async () => ({ outcome: "unavailable" }),
+        isPiiRedactionMeterProvisioned: () => false,
+        subscriptionCarriesPrice: async ({ stripeCustomerId, price }) =>
+          carriesPrice({
+            subscriptions: await stripeChannels.subscriptions.listCustomerSubscriptions({
+              customerId: stripeCustomerId,
+            }),
+            priceId: price === "GROWTH_INSTANT_EVAL_USD" ? GROWTH_INSTANT_EVAL_USD : undefined,
+          }),
+        selfDispatch: async () => {},
+        errorReporter: new (class extends BillingErrorReporter {
+          capture(error: Error): void {
+            errors.push(error);
+          }
+        })(),
+        connectedUsageCeiling: async () => null,
+      });
+      const now = new Date();
+      const billingMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+      const instantUsage = async (customer: string) =>
+        usageTotals.parse(
+          await control(`/usage?customer=${customer}&event_name=langwatch_instant_eval_usd`),
+        ).totals;
+
+      for (const organizationId of Object.keys(spend)) {
+        await handler.handle({
+          tenantId: createTenantId(organizationId),
+          aggregateId: organizationId,
+          type: BILLING_REPORT_COMMAND_TYPES.REPORT_USAGE_FOR_MONTH,
+          data: { organizationId, billingMonth, tenantId: organizationId, occurredAt: Date.now() },
+        });
+      }
+
+      expect(errors).toEqual([]);
+      expect(await instantUsage(oldUsd)).toEqual([]);
+      expect(await instantUsage(eur)).toEqual([]);
+      expect(await instantUsage(paying)).toEqual([
+        expect.objectContaining({ value: 5.0428, events: 1 }),
+      ]);
     }, 30_000);
 
     /** @scenario "A failed renewal payment is recorded" */

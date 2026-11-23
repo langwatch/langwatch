@@ -2,6 +2,7 @@ import {
   BILLING_REPORT_COMMAND_TYPES,
   reportUsageForMonthCommandDataSchema,
   type ReportUsageForMonthCommandData,
+  type StripePriceName,
   type UsageBillingContract,
 } from "@langwatch/enterprise-billing-contract";
 import type { Command, CommandHandler } from "@langwatch/eventing";
@@ -56,7 +57,10 @@ interface BillingMeter {
   /** Whether Stripe holds a meter under this name, so an event sent is aggregated. */
   readonly isProvisioned: () => boolean;
   /** Whether the customer's subscription prices this meter, so an event sent is invoiced. */
-  readonly isPriced: (input: { stripeCustomerId: string }) => Promise<boolean>;
+  readonly isPriced: (input: {
+    stripeCustomerId: string;
+    contract: UsageBillingContract;
+  }) => Promise<boolean>;
   /** Whether the total is usage's month_counted snapshot, ordered by that event's id. */
   readonly followsCountedEvent: boolean;
   /** The most this month may report for a capped contract, or null for no cap. */
@@ -108,11 +112,14 @@ export interface ReportUsageForMonthCommandDeps {
   /** Whether Stripe holds the PII redaction meter in this mode; creating it starts charging. */
   isPiiRedactionMeterProvisioned: () => boolean;
   /**
-   * Whether the customer's subscription has a line on the PII redaction price. Stripe bills a
-   * meter event no line prices at nothing, so the month waits until one does (ADR-201
-   * decision 10). A throw holds the month too, and schedules another report.
+   * Whether the customer's subscription has a line on the price. Stripe bills a meter event no
+   * line prices at nothing, so a priced meter's month waits until one does (ADR-201 decision
+   * 10, ADR-174 v20). A throw holds the month too, and schedules another report.
    */
-  hasPiiRedactionPrice: (input: { stripeCustomerId: string }) => Promise<boolean>;
+  subscriptionCarriesPrice: (input: {
+    stripeCustomerId: string;
+    price: StripePriceName;
+  }) => Promise<boolean>;
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
   /** Shared organization-read cache; see `billing-organization-cache.repository.ts`. */
   organizationCache: BillingOrganizationCacheRepository;
@@ -246,8 +253,15 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       {
         eventName: INSTANT_EVAL_USD_EVENT_NAME,
         isProvisioned: deps.isInstantEvalMeterProvisioned,
-        // Unchanged here; the same gap is followed up for Instant Evals on its own.
-        isPriced: async () => true,
+        // A connected customer's hosted usage rides its quarterly line (ADR-156 section 7).
+        isPriced: ({ stripeCustomerId, contract }) =>
+          deps.subscriptionCarriesPrice({
+            stripeCustomerId,
+            price:
+              contract === "connected"
+                ? "CONNECTED_HOSTED_USAGE_QUARTERLY"
+                : "GROWTH_INSTANT_EVAL_USD",
+          }),
         followsCountedEvent: false,
         ceiling: ({ contract, ...args }) =>
           contract === "connected" ? deps.connectedUsageCeiling(args) : Promise.resolve(null),
@@ -259,7 +273,8 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       {
         eventName: PII_REDACTION_USD_EVENT_NAME,
         isProvisioned: deps.isPiiRedactionMeterProvisioned,
-        isPriced: deps.hasPiiRedactionPrice,
+        isPriced: ({ stripeCustomerId }) =>
+          deps.subscriptionCarriesPrice({ stripeCustomerId, price: "GROWTH_PII_REDACTION_USD" }),
         followsCountedEvent: false,
         ceiling: async () => null,
         queryTotal: ({ organizationId, billingMonth }) =>
@@ -431,7 +446,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       return false;
     }
     // A throw here reaches reportOneMeter, which schedules another report: nothing is written.
-    if (!(await meter.isPriced({ stripeCustomerId }))) {
+    if (!(await meter.isPriced({ stripeCustomerId, contract }))) {
       // Nothing is read or written, so the first report after the price is added carries the month.
       logger.debug(
         { organizationId, billingMonth, meter: meter.eventName },
