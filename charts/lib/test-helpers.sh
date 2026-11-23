@@ -115,14 +115,16 @@ helm_install() {
 helm_uninstall() {
   hc uninstall "${RELEASE}" --wait 2>/dev/null || true
   kubectl --context "$KUBE_CTX" delete namespace "${NAMESPACE}" --wait=false 2>/dev/null || true
-  # Wait for namespace to be fully gone before next suite
+  # Wait for namespace to be fully gone before next suite. A 3-replica
+  # ClickHouse StatefulSet can take over a minute to drain on CI runners.
   local attempts=0
   while kubectl --context "$KUBE_CTX" get namespace "${NAMESPACE}" &>/dev/null \
-        && [[ $attempts -lt 30 ]]; do
+        && [[ $attempts -lt 90 ]]; do
     sleep 2; attempts=$((attempts + 1))
   done
   if kubectl --context "$KUBE_CTX" get namespace "${NAMESPACE}" &>/dev/null; then
-    fail "namespace ${NAMESPACE} still exists after 60s — aborting to prevent flakes"
+    kubectl --context "$KUBE_CTX" -n "${NAMESPACE}" get all 2>/dev/null || true
+    fail "namespace ${NAMESPACE} still exists after 180s, aborting to prevent flakes"
   fi
 }
 
