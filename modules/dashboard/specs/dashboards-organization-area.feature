@@ -241,8 +241,7 @@ Feature: Organization-wide Dashboards area
     Then the group shows 8 and a "Show 3 more" again
     # Evidence: haven browser screenshots after each reload
 
-  # Next PR: home products (ADR-002, decision 8).
-  @integration @unimplemented
+  @integration
   Scenario: A library row's menu offers what I may do
     Given my Organization board homed in Gateway, owned by "Shop", where I hold analytics:update and analytics:delete
     Then its menu offers Rename, Move to product…, Duplicate and Delete
@@ -253,8 +252,7 @@ Feature: Organization-wide Dashboards area
     # The hover on My dashboard's Delete is an addition: the approved design disables it with no hover
     # Evidence: haven browser screenshots of each menu and hover
 
-  # Next PR: home products (ADR-002, decision 8).
-  @integration @unimplemented
+  @integration
   Scenario: Duplicate and Delete from the library
     When I duplicate my Organization board homed in Gateway, owned by "Shop" where I may create
     Then a toast says "Duplicated as "<name> copy"", and the copy is homed in Gateway, Organization, mine, stored in "Shop", and it opens
@@ -551,8 +549,7 @@ Feature: Organization-wide Dashboards area
     Then a toast says "Dashboard created", it opens at "/dashboards/<id>" whatever its scope, it is listed in that product's sidebar and in the library, and its scope is the one I picked
     # Evidence: screenshots of the dialog per product and of the toast, the quoted create answer, and a screenshot as a member who never opened a project
 
-  # Next PR: home products (ADR-002, decision 8).
-  @integration @unimplemented
+  @integration
   Scenario: A product's "+" fixes the product and says where the board lives
     When I press "+" in the Gateway sidebar's Dashboards section
     Then the dialog has no product choice and reads "Lives in Gateway. Move it from Dashboards."
@@ -604,8 +601,7 @@ Feature: Organization-wide Dashboards area
     # Evidence: screenshots of the library and the four sections
 
   # ---- Move (D3; B12, S3; E16) ----
-  # Next PR: home products (ADR-002, decision 8).
-  @integration @unimplemented
+  @integration
   Scenario: Move an Organization board to Gateway
     Given an Organization board homed in LLM Ops that I may edit
     When I choose "Move to product…" in its library menu
@@ -646,8 +642,7 @@ Feature: Organization-wide Dashboards area
     And a move of another member's Only me board is refused with "dashboard_not_found"
     # Evidence: the quoted refusals, and the board before and after
 
-  # Next PR: home products (ADR-002, decision 8).
-  @integration @unimplemented
+  @integration
   Scenario: Move edge cases
     Given boards I may edit
     Then "Move" is disabled while the picked product is the board's current one, marked "Current"
@@ -661,7 +656,7 @@ Feature: Organization-wide Dashboards area
     And moving "Agent spend" to LLM Ops keeps it personal and Only me: it lists in the LLM Ops section in every project and in the library's LLM Ops group, and still follows me to "Beta"
     # Evidence: a screenshot per case, and the quoted board after each move
 
-  @integration @unimplemented
+  @integration
   Scenario: Move needs edit rights in the owning project
     Given I may only view dashboards in "Shop"
     Then the library shows "Move to product…" on "Shop" boards disabled, saying "You can view this dashboard but not change it."
@@ -711,6 +706,7 @@ Feature: Organization-wide Dashboards area
   Scenario: The LLM Ops section ends with Browse templates
     When I am in a product in "Shop"
     Then the last row of its Dashboards section is "Browse templates", which opens "/shop/dashboards/templates"
+    And the Gateway, Coding agents and Governance sections have no "Browse templates", because every template reads LLM Ops data
     # Evidence: screenshot of the section and the address after the click
 
   @integration @unimplemented

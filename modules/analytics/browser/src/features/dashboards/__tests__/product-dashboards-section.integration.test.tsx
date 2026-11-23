@@ -115,6 +115,14 @@ describe("a product's Dashboards section", () => {
         "/test-project/dashboards/templates",
       );
     });
+
+    /** @scenario "The LLM Ops section ends with Browse templates" */
+    it("is the only section with Browse templates: Gateway has none", async () => {
+      render({ element: <ProductDashboardsSection product="gateway" />, listed: [] });
+
+      await screen.findByRole("region", { name: "Dashboards" });
+      expect(screen.queryByRole("link", { name: "Browse templates" })).toBeNull();
+    });
   });
 
   describe("given no board homed in the product and no From LangWatch board", () => {

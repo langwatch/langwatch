@@ -339,7 +339,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Opens the organization-wide Dashboards area (ADR-002 in modules/dashboard; spec: modules/dashboard/specs/dashboards-organization-area.feature): the /dashboards library of every board the member may see, boards opened by id at /dashboards/<id>, the org-level templates and From LangWatch pages, and Dashboards in the product switcher and rail opening the library. Still needs release_dashboards; both are evaluated for the organization, and the area exists only while at least one of its projects has Dashboards on. With release_dashboards_in_every_product also on, Gateway, Coding agents and Governance list the member's starred dashboards. Default off; while off /dashboards forwards to the member's project as before. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards_organization_area.",
+      "Opens the organization-wide Dashboards area (ADR-002 in modules/dashboard; spec: modules/dashboard/specs/dashboards-organization-area.feature): the /dashboards library of every board the member may see, boards opened by id at /dashboards/<id>, the org-level templates and From LangWatch pages, and Dashboards in the product switcher and rail opening the library. Still needs release_dashboards; both are evaluated for the organization, and the area exists only while at least one of its projects has Dashboards on. With release_dashboards_in_every_product also on, each of those products' sidebars lists its own boards. Default off; while off /dashboards forwards to the member's project as before. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards_organization_area.",
   },
   {
     key: "release_insights",

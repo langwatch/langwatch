@@ -340,6 +340,7 @@ function SectionItemsNav({
  */
 function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
   const host = useNavigationHost();
+  const hasOrganizationArea = useOrganizationLibrary();
   if (isOrganizationDashboardsPath(host.pathname())) {
     return <OrganizationDashboardsSidebarBody showExpanded={showExpanded} />;
   }
@@ -347,7 +348,9 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
     pathname: host.pathname(),
     projectSlug: host.project()?.slug,
   });
-  if (!showExpanded) return null;
+  if (!showExpanded || hasOrganizationArea === void 0) return null;
+  // The pinned list is the flag-off sidebar; with the area on, boards list as in every product.
+  if (hasOrganizationArea) return <ProductDashboards product="llm-ops" />;
   return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
 }
 

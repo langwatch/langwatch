@@ -1,6 +1,6 @@
 /**
- * Product sidebar "Dashboards" section, lent via `ProductDashboardsToken` (§10.1): My dashboard,
- * boards, From LangWatch, "Browse templates"; "No dashboards yet" when empty, in every product.
+ * Product sidebar "Dashboards" section: My dashboard, boards, From LangWatch. "No dashboards yet"
+ * when empty, in every product. "Browse templates" only in LLM Ops: templates read its data.
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
@@ -94,7 +94,7 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           )}
         </>
       )}
-      {projectSlug && (
+      {projectSlug && product === "llm-ops" && (
         <RowList label="Templates">
           <SidebarLinkRow
             name="Browse templates"
