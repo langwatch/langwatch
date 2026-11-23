@@ -51,6 +51,8 @@ const errorTitle = (error: string, idp: string | null): string => {
   switch (error) {
     case "OAuthAccountNotLinked":
       return "Account already exists";
+    case "ACCOUNT_ALREADY_LINKED_TO_DIFFERENT_USER":
+      return "Already linked to another account";
     case "DIFFERENT_EMAIL_NOT_ALLOWED":
       return "Can't link this account";
     case "SSO_PROVIDER_NOT_ALLOWED":
@@ -238,6 +240,20 @@ function SignInErrorDescription({
         </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
           <a href={UI_SIGN_OUT_PATH}>Sign out and try again</a>
+        </Button>
+      </VStack>
+    );
+  }
+
+  if (error === "ACCOUNT_ALREADY_LINKED_TO_DIFFERENT_USER") {
+    return (
+      <VStack gap={4} align="stretch">
+        <Text>
+          This sign-in method is already connected to a different LangWatch account. Sign in to that
+          account and disconnect it first, or link a different sign-in method.
+        </Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <Link href="/settings/security">Back to Settings</Link>
         </Button>
       </VStack>
     );

@@ -60,6 +60,18 @@ describe("<SignInError/>", () => {
     });
   });
 
+  describe("when linking a sign-in method already connected to another user", () => {
+    /** @scenario "Linking an account already connected to another user shows settings-appropriate advice" */
+    it("shows settings-appropriate advice instead of telling the user to sign out and connect it in Settings", () => {
+      renderError("account_already_linked_to_different_user");
+      expect(screen.getByText("Already linked to another account")).toBeTruthy();
+      expect(screen.getByText(/already connected to a different langwatch account/i)).toBeTruthy();
+      const backToSettings = screen.getByRole("link", { name: /back to settings/i });
+      expect(backToSettings.getAttribute("href")).toBe("/settings/security");
+      expect(screen.queryByText(/sign in the way you did before/i)).toBeNull();
+    });
+  });
+
   describe("when single sign-on meets a confirmed account on a domain the connection has not verified", () => {
     /** @scenario "A confirmed account on a domain the connection has not verified is refused with the missing proof named" */
     it("names the domain proof that is missing, not another sign-in method", () => {

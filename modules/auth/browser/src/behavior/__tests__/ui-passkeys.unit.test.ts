@@ -219,5 +219,45 @@ describe("given a reader linking an additional sign-in method", () => {
         linkUiSignInMethod("github", { callbackUrl: "/settings/authentication" }),
       ).resolves.toEqual({ ok: false, reason: "account already linked" });
     });
+
+    /** @scenario "Settings link failures show a mapped message instead of raw JSON" */
+    it("maps a Better Auth JSON error body instead of returning raw JSON", async () => {
+      stubFetch({
+        ok: false,
+        status: 400,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify({
+              code: "ACCOUNT_ALREADY_LINKED_TO_DIFFERENT_USER",
+              message: "Account already linked to different user",
+            }),
+          ),
+      });
+
+      const outcome = await linkUiSignInMethod("github", {
+        callbackUrl: "/settings/authentication",
+      });
+      expect(outcome).toEqual({
+        ok: false,
+        reason: "This sign-in method is already connected to a different LangWatch account.",
+      });
+    });
+
+    /** @scenario "Settings link failures show a mapped message instead of raw JSON" */
+    it("falls back cleanly when the error response is an unknown JSON body", async () => {
+      stubFetch({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve(JSON.stringify({ code: "INTERNAL_ERROR" })),
+      });
+
+      const outcome = await linkUiSignInMethod("github", {
+        callbackUrl: "/settings/authentication",
+      });
+      expect(outcome).toEqual({
+        ok: false,
+        reason: "Could not link this sign-in method.",
+      });
+    });
   });
 });

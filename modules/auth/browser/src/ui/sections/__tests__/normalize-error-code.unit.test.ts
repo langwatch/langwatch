@@ -45,10 +45,12 @@ describe("normalizeSignInErrorCode", () => {
       expect(isStableAuthError(code)).toBe(true);
     });
 
-    it("maps account_already_linked_to_different_user to OAuthAccountNotLinked", () => {
-      expect(normalizeSignInErrorCode("account_already_linked_to_different_user")).toBe(
-        "OAuthAccountNotLinked",
-      );
+    /** @scenario "Linking an account already connected to another user shows settings-appropriate advice" */
+    it("maps account_already_linked_to_different_user to ACCOUNT_ALREADY_LINKED_TO_DIFFERENT_USER", () => {
+      const code = normalizeSignInErrorCode("account_already_linked_to_different_user");
+      expect(code).toBe("ACCOUNT_ALREADY_LINKED_TO_DIFFERENT_USER");
+      expect(signInErrorMayCross("account_already_linked_to_different_user")).toBe(true);
+      expect(isStableAuthError(code)).toBe(true);
     });
   });
 

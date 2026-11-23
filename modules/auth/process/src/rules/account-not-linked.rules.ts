@@ -1,8 +1,12 @@
 /** What the door does with one redirect Better Auth answered for a sign-in it would not link. */
 type AccountNotLinkedRedirect = { kind: "pass" } | { kind: "rewrite"; location: string };
 
-/** Better Auth's code when an address's account exists under a method it may not link. */
-const ACCOUNT_NOT_LINKED = "account_not_linked";
+/** Better Auth's codes when an address's account exists under a method it may not link. */
+const ACCOUNT_NOT_LINKED_CODES = new Set(["account_not_linked", "account not linked"]);
+
+function isAccountNotLinkedError(error: string | null): boolean {
+  return error !== null && ACCOUNT_NOT_LINKED_CODES.has(error);
+}
 
 /**
  * Names the connection that governs the address on a refused link, in `error_description` as the
@@ -21,7 +25,7 @@ export function accountNotLinkedRedirectOf({
   const target = parsedLocation(location);
   if (!target.parsed) return { kind: "pass" };
   const { url } = target;
-  if (url.searchParams.get("error") !== ACCOUNT_NOT_LINKED) return { kind: "pass" };
+  if (!isAccountNotLinkedError(url.searchParams.get("error"))) return { kind: "pass" };
   url.searchParams.set("error_description", connectionId);
   return {
     kind: "rewrite",
@@ -33,7 +37,7 @@ export function accountNotLinkedRedirectOf({
 export function isAccountNotLinkedRedirect({ location }: { location: string | null }): boolean {
   if (!location) return false;
   const target = parsedLocation(location);
-  return target.parsed && target.url.searchParams.get("error") === ACCOUNT_NOT_LINKED;
+  return target.parsed && isAccountNotLinkedError(target.url.searchParams.get("error"));
 }
 
 function parsedLocation(location: string): { parsed: true; url: URL } | { parsed: false } {

@@ -560,6 +560,22 @@ describe("given an OAuth sign-in Better Auth would not link to the account holdi
       expect(target.searchParams.get("error")).toBe("account_not_linked");
       expect(target.searchParams.get("error_description")).toBe("ssoc_acme");
     });
+
+    /** @scenario "Spaced account-not-linked redirects still name the governing connection" */
+    it("names that connection when the SSO callback redirects with the spaced spelling", async () => {
+      const { service, asked } = doorRefusingLink({
+        governing: { "andrei@acme.com": ["ssoc_acme"] },
+        location: `${BASE_URL}/auth/error?error=account+not+linked`,
+      });
+
+      const response = await service.betterAuthHandshake(callback());
+      const target = new URL(response.headers.get("location") ?? "");
+
+      expect(asked).toEqual(["andrei@acme.com"]);
+      expect(target.pathname).toBe("/auth/error");
+      expect(target.searchParams.get("error")).toBe("account not linked");
+      expect(target.searchParams.get("error_description")).toBe("ssoc_acme");
+    });
   });
 
   describe("when no connection governs the address", () => {
