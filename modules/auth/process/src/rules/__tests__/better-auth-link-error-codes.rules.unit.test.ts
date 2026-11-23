@@ -14,34 +14,37 @@ import { describe, expect, it } from "vitest";
 const DIFFERENT_EMAIL = "DIFFERENT_EMAIL_NOT_ALLOWED";
 const NOT_LINKED = "OAuthAccountNotLinked";
 
-/** Every `?error=` code of Better Auth's OAuth callback, and the screen code it must reach. */
+/**
+ * The codes of `OAUTH_CALLBACK_ERROR_CODES` and of `link-account.mjs`'s `result.error` strings,
+ * and the screen code each must reach. Literal redirects (`state_not_found`, ...) are not read.
+ */
 const CLASSIFIED: Record<string, string> = {
-  no_code: "not a link refusal",
-  oauth_provider_not_found: "not a link refusal",
-  issuer_missing: "not a link refusal",
-  issuer_mismatch: "not a link refusal",
-  invalid_code: "not a link refusal",
-  nonce_binding_missing: "not a link refusal",
-  unable_to_get_user_info: "not a link refusal",
-  no_callback_url: "not a link refusal",
-  unable_to_link_account: "not a link refusal",
+  no_code: "no specific screen",
+  oauth_provider_not_found: "no specific screen",
+  issuer_missing: "no specific screen",
+  issuer_mismatch: "no specific screen",
+  invalid_code: "no specific screen",
+  nonce_binding_missing: "no specific screen",
+  unable_to_get_user_info: "no specific screen",
+  no_callback_url: "no specific screen",
+  unable_to_link_account: "no specific screen",
   email_does_not_match: DIFFERENT_EMAIL,
   account_already_linked_to_different_user: NOT_LINKED,
-  email_not_found: "not a link refusal",
-  email_not_verified: "not a link refusal",
+  email_not_found: "no specific screen",
+  email_not_verified: "no specific screen",
   // The sign-in path's refusal for an existing account under another method; the callback
   // swaps the spaces of "account not linked" for underscores before it redirects.
   account_not_linked: NOT_LINKED,
   "account not linked": NOT_LINKED,
-  "unable to link account": "not a link refusal",
-  "unable to update account": "not a link refusal",
-  "unable to create user": "not a link refusal",
-  "unable to create session": "not a link refusal",
-  "signup disabled": "not a link refusal",
-  unable_to_update_account: "not a link refusal",
-  unable_to_create_user: "not a link refusal",
-  unable_to_create_session: "not a link refusal",
-  signup_disabled: "not a link refusal",
+  "unable to link account": "no specific screen",
+  "unable to update account": "no specific screen",
+  "unable to create user": "no specific screen",
+  "unable to create session": "no specific screen",
+  "signup disabled": "no specific screen",
+  unable_to_update_account: "no specific screen",
+  unable_to_create_user: "no specific screen",
+  unable_to_create_session: "no specific screen",
+  signup_disabled: "no specific screen",
 };
 
 /** What the normaliser answered for each code before its dead spellings were pruned. */
@@ -54,6 +57,8 @@ const BEFORE_PRUNING: Record<string, string> = {
 
 const libraryDir = path.dirname(createRequire(import.meta.url).resolve("better-auth/oauth2"));
 const libraryFile = (name: string): string => readFileSync(path.join(libraryDir, name), "utf8");
+const ssoFile = (): string =>
+  readFileSync(createRequire(import.meta.url).resolve("@better-auth/sso"), "utf8");
 
 /** The codes of `OAUTH_CALLBACK_ERROR_CODES`, which `better-auth/oauth2` does not export. */
 function callbackCodes(): string[] {
@@ -83,12 +88,16 @@ describe("given the installed Better Auth", () => {
       expect(live.filter((code) => !(code in CLASSIFIED))).toEqual([]);
     });
 
+    it("still has the SSO plugin's OIDC callback redirect the raw result.error", () => {
+      expect(ssoFile()).toMatch(/redirectOIDCError\(linked\.error\)/);
+    });
+
     it("still sends every code this suite classifies", () => {
       expect(Object.keys(CLASSIFIED).filter((code) => !live.includes(code))).toEqual([]);
     });
 
     /** @scenario "Every link refusal the installed library redirects with has a specific screen code" */
-    it.each(Object.entries(CLASSIFIED).filter(([, screen]) => screen !== "not a link refusal"))(
+    it.each(Object.entries(CLASSIFIED).filter(([, screen]) => screen !== "no specific screen"))(
       "maps %s to the specific screen code %s, which is stable",
       (code, screen) => {
         expect(normalizeSignInErrorCode(code)).toBe(screen);
@@ -96,7 +105,7 @@ describe("given the installed Better Auth", () => {
       },
     );
 
-    it.each(Object.entries(CLASSIFIED).filter(([, screen]) => screen === "not a link refusal"))(
+    it.each(Object.entries(CLASSIFIED).filter(([, screen]) => screen === "no specific screen"))(
       "leaves %s as it is, for the generic error screen",
       (code) => {
         expect(normalizeSignInErrorCode(code)).toBe(code);

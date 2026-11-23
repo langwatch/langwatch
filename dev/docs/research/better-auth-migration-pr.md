@@ -1006,8 +1006,8 @@ this is okay.
 
 1. Manually visit `/auth/error?error=email_doesn't_match`. **Expected:**
    friendly message about linking a different email.
-2. Manually visit `/auth/error?error=LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`.
-   **Expected:** same friendly message (both map to the
+2. Manually visit `/auth/error?error=email_does_not_match` (the 1.7.x
+   spelling). **Expected:** same friendly message (both map to the
    `DIFFERENT_EMAIL_NOT_ALLOWED` legacy UI code).
 3. Visit `/auth/error?error=OAuthAccountNotLinked`. **Expected:**
    the original NextAuth-era message still works.

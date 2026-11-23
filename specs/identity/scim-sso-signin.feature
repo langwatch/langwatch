@@ -50,11 +50,12 @@ Feature: First sign-in for a provisioned directory member
 
   @unit @regression
   Scenario: Every link refusal the installed library redirects with has a specific screen code
-    Given the codes the installed authentication library redirects with
+    Given the callback error codes and sign-in result codes the installed authentication library defines
     Then email_does_not_match is treated as DIFFERENT_EMAIL_NOT_ALLOWED
     And account_already_linked_to_different_user is treated as OAuthAccountNotLinked
     And the refusal for an existing account under another method is treated as OAuthAccountNotLinked
-    And every other code the library redirects with is classified as not a link refusal
+    And the SSO plugin still redirects the raw sign-in refusal to the error screen
+    And every other code read is classified as having no specific screen
 
   @unit @regression
   Scenario: An upgrade that adds or renames a library code fails until the code is classified
