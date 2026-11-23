@@ -507,18 +507,21 @@ function AskingState({
           disabled={!onChoiceSelect}
           onClick={onPickLocal}
         />
-        <OptionRow
-          icon={<GitHubIcon size={15} />}
-          label={GITHUB_LABEL}
-          subtitle={GITHUB_SUBTITLE}
-          note={githubInstallNote({
-            known: !!organizationId && !github.isLoading,
-            installed,
-            account: installations[0]?.accountLogin,
-          })}
-          disabled={!onChoiceSelect || rememberChoice.isPending}
-          onClick={chooseGithub}
-        />
+        {/* An instance with no GitHub App has nothing to install: the folder is the only way. */}
+        {github.data?.configured === false ? null : (
+          <OptionRow
+            icon={<GitHubIcon size={15} />}
+            label={GITHUB_LABEL}
+            subtitle={GITHUB_SUBTITLE}
+            note={githubInstallNote({
+              known: !!organizationId && !github.isLoading,
+              installed,
+              account: installations[0]?.accountLogin,
+            })}
+            disabled={!onChoiceSelect || rememberChoice.isPending}
+            onClick={chooseGithub}
+          />
+        )}
         {installing && organizationId ? (
           <LangyGitHubConnectCard
             organizationId={organizationId}
