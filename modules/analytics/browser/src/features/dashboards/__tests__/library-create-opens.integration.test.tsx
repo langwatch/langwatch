@@ -98,6 +98,7 @@ function server() {
           project: IN_VIEW,
           openProject: IN_VIEW,
           starPosition: null,
+          ownerName: null,
         });
       }
       default:

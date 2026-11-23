@@ -38,6 +38,7 @@ const resolved = ({
   project,
   openProject,
   starPosition: null,
+  ownerName: null,
 });
 
 /** The board as the project it opens in lists it: an Organization board that project owns. */
