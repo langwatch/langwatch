@@ -2292,6 +2292,24 @@ export interface LwqlPrismaRows {
     readonly createdById: "String?";
     readonly updatedById: "String?";
   };
+  readonly GatewayA2ATarget: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly projectId: "String?";
+    readonly name: "String";
+    readonly agentName: "String";
+    readonly cardUrl: "String";
+    readonly upstreamUrl: "String";
+    readonly encryptedUpstreamHeaders: "String?";
+    readonly restrictToAllowList: "Boolean";
+    readonly allowedVirtualKeyIds: "String[]";
+    readonly blocked: "Boolean";
+    readonly blockReason: "String?";
+    readonly createdById: "String";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+    readonly archivedAt: "DateTime?";
+  };
   readonly GatewayConnectUpstream: {
     readonly organizationId: "String";
     readonly baseUrl: "String";
