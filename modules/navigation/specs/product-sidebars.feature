@@ -202,7 +202,7 @@ Feature: Product sidebars
     Then the sidebar shows no Dashboards section
     And the Dashboards sidebar keeps its own lists instead
 
-  # Product request, 2026-11-18, behind release_dashboards_in_every_product (default off).
+  # Product request, 2026-11-18, behind release_dashboards_in_every_product (default on since 2026-11-23).
   # Gateway and Coding agents are about no project: the section works in the one LLM Ops opens.
   # Retired in S6 by "Each product's sidebar lists its own boards" in modules/dashboard/specs/dashboards-organization-area.feature.
   @integration

@@ -103,7 +103,7 @@ folded into projections owned by the dashboard module.
    `seatReachesProduct` untouched, so developer seats still get in. They see
    only boards from projects they can read, the same rule as today.
 6. **One flag (amended; D4).** Everything ships behind the existing frontend
-   flag `release_dashboards_in_every_product`, default off, which needs
+   flag `release_dashboards_in_every_product`, default on since 2026-11-23, which needs
    `release_dashboards`. On a page with no project both are evaluated for the
    organization, and the area exists only when at least one of its projects has
    Dashboards on. While the flag is off the `/dashboards` addresses answer as
