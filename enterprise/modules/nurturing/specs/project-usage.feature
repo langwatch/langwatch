@@ -277,6 +277,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     And a sync skipped for want of an admin, a placement or a counting window logs its reason at debug
     And a counter records each sync attempt's outcome, never an id
     And a refused group call counts as send_failed and the sync still rejects, so the job retries
+    And a failed trace_active_day claim or batch counts as events_failed and the sync still rejects
     And any other failure of a sync counts once as error and the sync still rejects
     And the hourly trace-window sweep logs one info line with how many ended, synced and had no admin
     And the run lines and the counter carry no organization, user or project id
@@ -317,6 +318,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     When its usage syncs
     Then trace_active_day goes for today's and yesterday's traced days only, so a sync just past midnight still sends the day before
     And no older day is sent again once its claim has lapsed
+    And a traced day before the signup day is not sent
 
   @unit
   Scenario: trace_active_day is never sent twice for a member and day
@@ -326,11 +328,18 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     And its message id is stable per member and day, so Customer.io drops a repeat too
 
   @unit
-  Scenario: A refused trace_active_day gives its claims back, so a later sync sends it
+  Scenario: A failed trace_active_day send fails the sync, and its retry sends the events once
     Given Customer.io refuses a batch of trace_active_day events, or a claim fails midway
     When the sync runs
-    Then the batch's claims are given back, the failure is reported as a mirror failure and swallowed
-    And the next sync of the day sends the events
+    Then the batch's claims are given back, the sync counts as events_failed and rejects, so the job retries
+    And the retried job sends each event once
+
+  @unit
+  Scenario: A refused identify does not hold back trace_active_day
+    Given Customer.io refuses the members' identify
+    When an organization that traced today syncs
+    Then the identify failure is reported and swallowed
+    And each member the traits are mirrored onto is still tracked trace_active_day, in its own step after the mirror
 
   @unit
   Scenario: A habit is activity on 3 or more days at least 7 days apart, or in 3 ISO weeks

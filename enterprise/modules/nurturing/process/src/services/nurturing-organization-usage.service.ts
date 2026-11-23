@@ -20,15 +20,12 @@ import {
   endedTraceWindowTraits,
   isTraceCounted,
   organizationUsageTraits,
-  TRACE_ACTIVE_DAY_CLAIM_SECONDS,
-  type TraceActiveDayCall,
-  traceActiveDayCall,
-  traceActiveDaysToSend,
   windowStartDayOf,
 } from "../rules/nurturing-project-usage.rules.ts";
+import { traceActiveDaysToSend } from "../rules/nurturing-trace-active-day.rules.ts";
 import { traceCountsOf } from "../rules/nurturing-trace-day.rules.ts";
-import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 import type { NurturingCopiedProjectsService } from "./nurturing-copied-projects.service.ts";
+import { NurturingTraceActiveDayService } from "./nurturing-trace-active-day.service.ts";
 
 /** Members read and identified per request, so a large organization never opens a burst. */
 const MEMBER_BATCH_SIZE = 100;
@@ -53,14 +50,15 @@ type OrganizationUsageDependencies = Readonly<{
    */
   erasedUsers: Pick<NurturingErasedUserRepository, "findErased">;
   /** Lets each member's trace_active_day of a day out once, across retries and redeliveries. */
-  claims: NurturingClaimRepository;
+  claims: Pick<NurturingClaimRepository, "claim" | "release">;
   /** Rejects when Customer.io did not take the call, so the subscriber's job retries. */
   sendBatch: (calls: CioBatchCall[]) => Promise<void>;
   clock: Readonly<{ nowMs: () => number }>;
   /**
    * One increment per sync attempt, its `outcome` the only attribute, never an id: `synced`,
-   * `mirror_failed`, `send_failed` (the group call was refused), `error` (anything else threw),
-   * `no_admin`, `not_placed` or `outside_counting_window`.
+   * `mirror_failed`, `send_failed` (the group call was refused), `events_failed` (a
+   * trace_active_day claim or batch failed), `error` (anything else threw), `no_admin`,
+   * `not_placed` or `outside_counting_window`.
    */
   syncs: CounterHandle;
   /** Run lines carry counts and reasons only, never an organization, user or project id. */
@@ -71,8 +69,8 @@ type OrganizationUsageDependencies = Readonly<{
   }>;
 }>;
 
-/** What mirroring onto members has sent so far, kept as it goes so a failed batch loses no count. */
-type MirroredCounts = { members: number; identifyCalls: number; trackCalls: number };
+/** The identifies mirroring has sent so far, kept as it goes so a failed batch loses no count. */
+type MirroredCounts = { identifyCalls: number };
 
 /** Why a sync sent nothing, as counted and logged. */
 type SkipReason = "no_admin" | "not_placed" | "outside_counting_window";
@@ -96,7 +94,11 @@ export class NurturingOrganizationUsageService {
     return new NurturingOrganizationUsageService(dependencies);
   }
 
-  private constructor(private readonly dependencies: OrganizationUsageDependencies) {}
+  private readonly traceActiveDays: NurturingTraceActiveDayService;
+
+  private constructor(private readonly dependencies: OrganizationUsageDependencies) {
+    this.traceActiveDays = NurturingTraceActiveDayService.create(dependencies);
+  }
 
   /** The project's usage changed: its organization's traits go to Customer.io. */
   async usageChanged({ projectId }: Readonly<{ projectId: string }>): Promise<void> {
@@ -205,18 +207,12 @@ export class NurturingOrganizationUsageService {
       throw error;
     }
     // An out-parameter, so a batch that fails midway still reports the identifies already sent.
-    const mirrored: MirroredCounts = { members: 0, identifyCalls: 0, trackCalls: 0 };
+    const mirrored: MirroredCounts = { identifyCalls: 0 };
+    let userIds: readonly string[] = [];
     let mirrorFailed = false;
     try {
-      const userIds = await this.mirrorOntoMembers({ organizationId, traits, counts: mirrored });
-      if (traces) {
-        await this.sendTraceActiveDays({
-          userIds,
-          days: traceActiveDaysToSend({ activeDays: traces.activeDays, now }),
-          organizationCreatedAt,
-          counts: mirrored,
-        });
-      }
+      userIds = await this.membersToMirrorOnto({ organizationId });
+      await this.mirrorOntoMembers({ userIds, traits, counts: mirrored });
     } catch (error) {
       mirrorFailed = true;
       // The group call stands, and the next sync mirrors again, as the other sinks' failures.
@@ -224,6 +220,26 @@ export class NurturingOrganizationUsageService {
         { error, organizationId },
         "an organization's usage could not be mirrored onto its members",
       );
+    }
+    let trackCalls = 0;
+    try {
+      // Apart from the mirror, so a refused identify skips no event; a failure here fails the job,
+      // whose retry sends the events its released claims let out again.
+      if (traces) {
+        trackCalls = await this.traceActiveDays.send({
+          userIds,
+          days: traceActiveDaysToSend({
+            activeDays: traces.activeDays,
+            now,
+            organizationCreatedAt,
+          }),
+          organizationCreatedAt,
+        });
+      }
+    } catch (error) {
+      state.counted = true;
+      this.dependencies.syncs.inc({ outcome: "events_failed" });
+      throw error;
     }
     this.dependencies.syncs.inc({ outcome: mirrorFailed ? "mirror_failed" : "synced" });
     // Debug: it fires for every changed project, so the counter carries the volume.
@@ -233,8 +249,8 @@ export class NurturingOrganizationUsageService {
         projects: projectIds.length,
         groupCalls: 1,
         identifyCalls: mirrored.identifyCalls,
-        trackCalls: mirrored.trackCalls,
-        members: mirrored.members,
+        trackCalls,
+        members: userIds.length,
         mirrorFailed,
       },
       "nurturing organization usage synced",
@@ -260,7 +276,7 @@ export class NurturingOrganizationUsageService {
     let synced = 0;
     let skippedNoAdmin = 0;
     // Shared across organizations, so identifyCalls totals the sweep even if it fails midway.
-    const mirrored: MirroredCounts = { members: 0, identifyCalls: 0, trackCalls: 0 };
+    const mirrored: MirroredCounts = { identifyCalls: 0 };
     try {
       for (const organizationId of ended) {
         // Nothing reads its trace rows past the window, and a quiet organization never syncs again.
@@ -274,7 +290,8 @@ export class NurturingOrganizationUsageService {
           continue;
         }
         await sendBatch([{ type: "group", userId: adminUserId, groupId: organizationId, traits }]);
-        await this.mirrorOntoMembers({ organizationId, traits, counts: mirrored });
+        const userIds = await this.membersToMirrorOnto({ organizationId });
+        await this.mirrorOntoMembers({ userIds, traits, counts: mirrored });
         synced += 1;
       }
     } finally {
@@ -292,72 +309,38 @@ export class NurturingOrganizationUsageService {
   }
 
   /**
-   * The onboarding emails are person-triggered and read person attributes, so each member gets the
-   * traits too, unless they joined another organization since: that one's traits are theirs, or
-   * were erased. A refused call throws; each caller decides whether it is retried. Answers the
-   * members identified.
+   * The members the organization's traits are mirrored onto. The onboarding emails are
+   * person-triggered and read person attributes, so each member gets the traits too, unless they
+   * joined another organization since: that one's traits are theirs, or were erased.
    */
-  private async mirrorOntoMembers({
+  private async membersToMirrorOnto({
     organizationId,
-    traits,
-    counts,
-  }: Readonly<{
-    organizationId: string;
-    traits: CioOrganizationUsageTraits;
-    counts: MirroredCounts;
-  }>): Promise<readonly string[]> {
-    const { members, erasedUsers, sendBatch } = this.dependencies;
+  }: Readonly<{ organizationId: string }>): Promise<readonly string[]> {
+    const { members, erasedUsers } = this.dependencies;
     const latestHere = membersWhoseLatestOrganizationIs({
       memberships: await members.findMembershipsOfMembers({ organizationId }),
       organizationId,
     });
     const erased = new Set(await erasedUsers.findErased({ userIds: latestHere }));
-    const userIds = latestHere.filter((userId) => !erased.has(userId));
-    counts.members = userIds.length;
-    for (let start = 0; start < userIds.length; start += MEMBER_BATCH_SIZE) {
-      const batch = userIds.slice(start, start + MEMBER_BATCH_SIZE);
-      await sendBatch(batch.map((userId) => ({ type: "identify" as const, userId, traits })));
-      counts.identifyCalls += batch.length;
-    }
-    return userIds;
+    return latestHere.filter((userId) => !erased.has(userId));
   }
 
-  /**
-   * Each member's trace_active_day for each recent traced day, claimed per member and day before
-   * it is sent, so a retry, a redelivery or the next sync never sends it twice. A refused batch
-   * gives its claims back and throws, so a later sync of the day sends it.
-   */
-  private async sendTraceActiveDays({
+  /** Identifies each member with the traits. A refused call throws; its caller decides on retries. */
+  private async mirrorOntoMembers({
     userIds,
-    days,
-    organizationCreatedAt,
+    traits,
     counts,
   }: Readonly<{
     userIds: readonly string[];
-    days: readonly string[];
-    organizationCreatedAt: number;
+    traits: CioOrganizationUsageTraits;
     counts: MirroredCounts;
   }>): Promise<void> {
-    const { claims, sendBatch } = this.dependencies;
-    const due = userIds.flatMap((userId) =>
-      days.map((day) => traceActiveDayCall({ userId, day, organizationCreatedAt })),
-    );
-    for (let start = 0; start < due.length; start += MEMBER_BATCH_SIZE) {
-      const claimed: TraceActiveDayCall[] = [];
-      try {
-        for (const entry of due.slice(start, start + MEMBER_BATCH_SIZE)) {
-          if (await claims.claim(entry.claimKey, TRACE_ACTIVE_DAY_CLAIM_SECONDS)) {
-            claimed.push(entry);
-          }
-        }
-        if (claimed.length > 0) await sendBatch(claimed.map(({ call }) => call));
-      } catch (error) {
-        return NurturingClaimReleaseService.create(claims).rethrowAfterReleasing({
-          error,
-          keys: claimed.map(({ claimKey }) => claimKey),
-        });
-      }
-      counts.trackCalls += claimed.length;
+    for (let start = 0; start < userIds.length; start += MEMBER_BATCH_SIZE) {
+      const batch = userIds.slice(start, start + MEMBER_BATCH_SIZE);
+      await this.dependencies.sendBatch(
+        batch.map((userId) => ({ type: "identify" as const, userId, traits })),
+      );
+      counts.identifyCalls += batch.length;
     }
   }
 }

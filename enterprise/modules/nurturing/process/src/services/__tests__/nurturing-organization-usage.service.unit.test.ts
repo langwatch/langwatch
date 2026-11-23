@@ -1023,30 +1023,47 @@ describe("NurturingOrganizationUsageService given an organization that traced to
     expect(tracksOf(sent)).toEqual([]);
   });
 
-  /** @scenario "A refused trace_active_day gives its claims back, so a later sync sends it" */
-  it("gives the claims back when Customer.io refuses the events, so the next sync sends them", async () => {
-    let refuse = true;
+  /** @scenario "A failed trace_active_day send fails the sync, and its retry sends the events once" */
+  it("rejects when the events are refused once, gives their claims back, and the retry sends each once", async () => {
+    let refusals = 1;
     const observed = runObserved();
+    const claims = MemoryNurturingClaimRepository.create();
     const { service, sent } = await tracedOrganization({
+      claims,
       syncs: observed.syncs,
       logger: observed.logger,
       send: async (calls) => {
-        if (refuse && calls.some((call) => call.type === "track")) throw new Error("refused");
+        if (refusals > 0 && calls.some((call) => call.type === "track")) {
+          refusals -= 1;
+          throw new Error("refused");
+        }
       },
     });
 
-    await expect(service.tracesChanged({ projectId: "project-1" })).resolves.toBeUndefined();
+    await expect(service.tracesChanged({ projectId: "project-1" })).rejects.toThrow("refused");
     expect(tracksOf(sent)).toEqual([]);
-    expect(observed.outcomes).toEqual([{ outcome: "mirror_failed" }]);
+    expect(observed.outcomes).toEqual([{ outcome: "events_failed" }]);
+    const releasedKey = "nurturing:trace_active_day:admin-1:2026-11-19";
+    await expect(claims.claim(releasedKey, 60)).resolves.toBe(true);
+    await claims.release(releasedKey);
 
-    refuse = false;
+    // The job's retry runs the same sync again, then a later sync of the day.
+    await service.tracesChanged({ projectId: "project-1" });
     await service.tracesChanged({ projectId: "project-1" });
 
-    expect(tracksOf(sent)).toHaveLength(2);
+    expect(observed.outcomes).toEqual([
+      { outcome: "events_failed" },
+      { outcome: "synced" },
+      { outcome: "synced" },
+    ]);
+    expect(tracksOf(sent).map((call) => call.messageId)).toEqual([
+      "trace_active_day:admin-1:2026-11-19",
+      "trace_active_day:admin-1:2026-11-20",
+    ]);
   });
 
-  /** @scenario "A refused trace_active_day gives its claims back, so a later sync sends it" */
-  it("gives back the claims already taken when a later claim fails", async () => {
+  /** @scenario "A failed trace_active_day send fails the sync, and its retry sends the events once" */
+  it("gives back the claims already taken when another claim fails, and the retry sends them", async () => {
     const memory = MemoryNurturingClaimRepository.create();
     let failing = true;
     const claims: NurturingClaimRepository = {
@@ -1058,7 +1075,9 @@ describe("NurturingOrganizationUsageService given an organization that traced to
     };
     const { service, sent } = await tracedOrganization({ claims });
 
-    await service.tracesChanged({ projectId: "project-1" });
+    await expect(service.tracesChanged({ projectId: "project-1" })).rejects.toThrow(
+      "claims unavailable",
+    );
     expect(tracksOf(sent)).toEqual([]);
 
     failing = false;
@@ -1067,6 +1086,33 @@ describe("NurturingOrganizationUsageService given an organization that traced to
     expect(tracksOf(sent).map((call) => call.messageId)).toEqual([
       "trace_active_day:admin-1:2026-11-19",
       "trace_active_day:admin-1:2026-11-20",
+    ]);
+  });
+
+  /** @scenario "A refused identify does not hold back trace_active_day" */
+  it("still tracks trace_active_day on each member when their identify is refused", async () => {
+    const observed = runObserved();
+    const { service, sent } = await tracedOrganization({
+      members: new Map([
+        ["admin-1", ["org-1"]],
+        ["member-2", ["org-1"]],
+      ]),
+      syncs: observed.syncs,
+      logger: observed.logger,
+      send: async (calls) => {
+        if (calls.some((call) => call.type === "identify")) throw new Error("refused");
+      },
+    });
+
+    await expect(service.tracesChanged({ projectId: "project-1" })).resolves.toBeUndefined();
+
+    expect(observed.outcomes).toEqual([{ outcome: "mirror_failed" }]);
+    expect(observed.at(WARN)).toHaveLength(1);
+    expect(tracksOf(sent).map((call) => call.messageId)).toEqual([
+      "trace_active_day:admin-1:2026-11-19",
+      "trace_active_day:admin-1:2026-11-20",
+      "trace_active_day:member-2:2026-11-19",
+      "trace_active_day:member-2:2026-11-20",
     ]);
   });
 });
