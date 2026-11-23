@@ -5,10 +5,12 @@ import { PrismaDataRetentionDirectoryRepository } from "./prisma.data-retention-
 import { PrismaDataRetentionProjectScopeRepository } from "./prisma.data-retention-project-scope.repository.ts";
 import { PrismaDataRetentionRepository } from "./prisma.data-retention.repository.ts";
 import { PrismaPinnedTraceRepository } from "./prisma.pinned-trace.repository.ts";
+import { PrismaRetentionApplyStatusRepository } from "./prisma.retention-apply-status.repository.ts";
 
 const ownedRepositories = prismaRepositories({
   policies: PrismaDataRetentionRepository,
   pins: PrismaPinnedTraceRepository,
+  applyStatus: PrismaRetentionApplyStatusRepository,
 });
 
 /**
@@ -19,7 +21,10 @@ export const PostgresDataRetentionRepositories = {
   ...ownedRepositories,
   create: (
     input: Parameters<typeof ownedRepositories.create>[0],
-  ): Pick<DataRetentionRepositories, "policies" | "pins" | "projectScopes" | "directory"> => ({
+  ): Pick<
+    DataRetentionRepositories,
+    "policies" | "pins" | "applyStatus" | "projectScopes" | "directory"
+  > => ({
     ...ownedRepositories.create(input),
     directory: PrismaDataRetentionDirectoryRepository.create(input.prisma),
     projectScopes: PrismaDataRetentionProjectScopeRepository.create(input.prisma),
