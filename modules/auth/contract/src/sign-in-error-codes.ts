@@ -17,6 +17,11 @@ export const normalizeSignInErrorCode = (error: string | null | undefined): stri
   }
   if (
     error === "account_already_linked_to_different_user" ||
+    error === "ACCOUNT_ALREADY_LINKED_TO_DIFFERENT_USER"
+  ) {
+    return "ACCOUNT_ALREADY_LINKED_TO_DIFFERENT_USER";
+  }
+  if (
     error === "account_not_linked" ||
     error === "account not linked" ||
     error === "OAuthAccountNotLinked"
@@ -44,6 +49,7 @@ export type CutoverSignInErrorCode = (typeof CUTOVER_SIGN_IN_ERROR_CODES)[number
  */
 export const STABLE_AUTH_ERRORS = [
   "OAuthAccountNotLinked",
+  "ACCOUNT_ALREADY_LINKED_TO_DIFFERENT_USER",
   "DIFFERENT_EMAIL_NOT_ALLOWED",
   "SSO_PROVIDER_NOT_ALLOWED",
   // Stable: what has to change is an administrator's decision, not the attempt.

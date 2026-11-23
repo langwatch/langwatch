@@ -42,3 +42,21 @@ Feature: First sign-in for a provisioned directory member
   Scenario: The different-email refusal in every spelling shows the specific message
     When the authentication library reports "email_does_not_match"
     Then the error is treated as DIFFERENT_EMAIL_NOT_ALLOWED
+
+  @unit @regression
+  Scenario: Linking an account already connected to another user shows settings-appropriate advice
+    When the authentication library reports "account_already_linked_to_different_user"
+    Then the error is treated as ACCOUNT_ALREADY_LINKED_TO_DIFFERENT_USER
+    And it is classified as a stable sign-in error
+    And the error screen directs the user back to Settings instead of telling them to sign out and connect it in Settings
+
+  @unit @regression
+  Scenario: Spaced account-not-linked redirects still name the governing connection
+    Given an organization connection governs the user's email address
+    When an SSO callback redirects with the spaced "account not linked" error
+    Then the redirect names the governing connection in error_description
+
+  @unit @regression
+  Scenario: Settings link failures show a mapped message instead of raw JSON
+    When the /api/auth/link-social endpoint fails with a JSON error body
+    Then the link outcome returns a mapped human-readable reason instead of raw JSON
