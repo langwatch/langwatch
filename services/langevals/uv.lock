@@ -36,7 +36,7 @@ constraints = [
     { name = "fastmcp-slim", specifier = ">=3.4.10,<4" },
     { name = "filelock", specifier = ">=4.2.1" },
     { name = "fsspec", specifier = ">=2026.6.0" },
-    { name = "joserfc", specifier = ">=1.7.6" },
+    { name = "joserfc", specifier = ">=1.7.7" },
     { name = "langgraph", specifier = ">=1.2.14" },
     { name = "langgraph-sdk", specifier = ">=0.4.6" },
     { name = "mako", specifier = ">=1.4.2" },

@@ -156,7 +156,7 @@ constraint-dependencies = [
   "multidict>=6.9.1", # multidict advisory covering 6.7.0-6.9.0
   "langgraph-sdk>=0.4.6", # langgraph-sdk advisories covering <=0.4.3 and 0.4.0-0.4.5 (#3301)
   "langgraph>=1.2.14", # LangGraph SDK v3 streaming identifiers advisory (#3302)
-  "joserfc>=1.7.6", # joserfc JWE recipients and compact JWS size advisories (#3364, #3365)
+  "joserfc>=1.7.7", # joserfc advisories covering <1.7.5 (high) and <1.7.6, then JWE recipients and compact JWS size (#3364, #3365)
   "filelock>=4.2.1", # filelock lock-file advisories covering <=4.2.0 (#3303, #3304)
   # pydantic-ai: 2.30.0 is the highest floor that resolves. From 2.44.0 its
   # openai extra needs openai>=3.8.0, whose jiter requirement every

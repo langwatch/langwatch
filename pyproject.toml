@@ -28,8 +28,7 @@ constraint-dependencies = [
   "onnx>=1.22.0", # security: onnx advisory (#1560)
   "transformers>=5.10.0", # security: transformers advisory (#2196)
   "mistune>=3.3.3", # security: mistune advisory (#2216)
-  "tornado>=6.6; python_full_version >= '3.11'", # security: tornado advisories covering <6.6 (#3334-#3336); 6.6 needs Python 3.11
-  "tornado>=6.5.9", # security: tornado advisories covering <=6.5.8 (#2803-#2805)
+  "tornado>=6.6", # security: tornado advisories covering <=6.5.8 (#2803-#2805) and <6.6 (#3334-#3336)
   "anyio>=4.14.2", # security: anyio advisories (#2434, #2435)
   "soupsieve>=2.9.0", # security: soupsieve advisories (#2422, #2423)
   "accelerate>=1.15.0", # security: accelerate advisory covers <=1.14.0 (#2787)
