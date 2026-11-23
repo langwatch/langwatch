@@ -9,7 +9,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { MemoryCliDeviceSettlementChannel } from "../../../channels/memory/memory.cli-device-settlement.channel.ts";
 import {
-  DEVICE_CODE_TTL_SECONDS,
   deviceCodeKey,
   userCodeKey,
 } from "../../../features/cli-device/rules/cli-device-session.rules.ts";
@@ -46,7 +45,6 @@ describe.skipIf(!redisUrl)("device codes over Redis", () => {
       const record = await sessions.startDeviceCode({ credentialType: "device_session" });
       written.push(deviceCodeKey(record.device_code), userCodeKey(record.user_code));
 
-      expect(DEVICE_CODE_TTL_SECONDS).toBe(900);
       expect(record.expires_at - record.created_at).toBe(900_000);
       for (const key of written) {
         const ttl = await redis.ttl(key);

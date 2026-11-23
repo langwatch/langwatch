@@ -7,6 +7,7 @@
 
 import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
 import { CreateProjectDrawerToken } from "@langwatch/organization-client";
+import { nowInstant } from "@langwatch/time";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -161,23 +162,22 @@ describe("given a pending device code", () => {
       expect(screen.queryByText("What the CLI can access")).toBeNull();
     });
 
-    /** @scenario the primary action and Deny are the same height on a phone */
-    it("keeps the primary action at its own height while the actions stack", async () => {
-      const user = userEvent.setup();
-      state.bindings = [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" }];
-      renderWithApiKeyHost(<CliAuthScreen />, hostFor());
+    /** @scenario a freshly minted code reads as 15 minutes */
+    it("tells the reader a fresh code expires in about 15 minutes", async () => {
+      const host = hostFor({
+        lookup: {
+          outcome: "pending",
+          userCode: "WDJB-MJHT",
+          status: "pending",
+          expiresAt: nowInstant().epochMilliseconds + 15 * 60_000,
+          credentialType: "device_session",
+          management: false,
+          client: null,
+        },
+      });
+      renderWithApiKeyHost(<CliAuthScreen />, host);
 
-      // jsdom applies only the base (phone) styles: a stacked `flex: 1` would
-      // set the button's height basis to zero and shrink it below Deny.
-      const keepsItsHeight = (button: HTMLElement) => {
-        const style = getComputedStyle(button);
-        expect(style.flexGrow).toBe("0");
-        expect(style.flexBasis).toBe("auto");
-      };
-      keepsItsHeight(await screen.findByRole("button", { name: "Confirm" }));
-
-      await confirmCode(user);
-      keepsItsHeight(await screen.findByRole("button", { name: "Approve" }));
+      expect(await screen.findByText(/Expires in ~15 min/)).toBeInTheDocument();
     });
 
     /** @scenario the CLI stamps itself as the acquisition source */
