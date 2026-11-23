@@ -28,8 +28,7 @@ import {
 } from "../blocks/library-row.tsx";
 
 /** Every From LangWatch board ships homed in LLM Ops (ADR-002, decision 8). */
-const CURATED_MOVE_REFUSAL =
-  `Built for ${HOME_PRODUCT_LABELS["llm-ops"]}. Duplicate it, then move the copy.`;
+const CURATED_MOVE_REFUSAL = `Built for ${HOME_PRODUCT_LABELS["llm-ops"]}. Duplicate it, then move the copy.`;
 
 /** Why a board the member may only view offers no move. */
 const VIEW_ONLY_MOVE_REFUSAL = "You can view this dashboard but not change it.";

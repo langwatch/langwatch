@@ -448,7 +448,7 @@ describe("the Dashboards library", () => {
     });
   });
 
-  describe("when a product's \"+\" opens the new dashboard dialog", () => {
+  describe('when a product\'s "+" opens the new dashboard dialog', () => {
     /** @scenario A product's "+" fixes the product and says where the board lives */
     it("asks no product, says where it lives, and makes it there", async () => {
       const made: unknown[] = [];

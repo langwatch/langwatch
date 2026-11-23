@@ -82,8 +82,15 @@ export function LibraryRow({
   actions: LibraryRowActions;
   renaming?: LibraryRowRenaming | undefined;
 }) {
-  const { star, starMoves, onRename, move, onDuplicate, duplicateLabel = "Duplicate", remove } =
-    actions;
+  const {
+    star,
+    starMoves,
+    onRename,
+    move,
+    onDuplicate,
+    duplicateLabel = "Duplicate",
+    remove,
+  } = actions;
   // While renaming the menu is gone, so closing it cannot hand focus back and end the edit.
   const hasMenu =
     renaming === void 0 &&

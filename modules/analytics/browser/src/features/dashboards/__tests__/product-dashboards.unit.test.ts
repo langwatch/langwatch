@@ -99,9 +99,7 @@ describe("boardsHomedOutside", () => {
   it("leaves out the sidebar's own product, and keeps every board in the library", () => {
     const boards = [board({ id: "gw" }), board({ id: "llm", homeProduct: "llm-ops" })];
 
-    expect(boardsHomedOutside({ boards, product: "gateway" }).map(({ id }) => id)).toEqual([
-      "llm",
-    ]);
+    expect(boardsHomedOutside({ boards, product: "gateway" }).map(({ id }) => id)).toEqual(["llm"]);
     expect(boardsHomedOutside({ boards, product: void 0 })).toHaveLength(2);
   });
 });

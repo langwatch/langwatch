@@ -247,13 +247,16 @@ describe("a board's home product", () => {
 
       const refused = await Promise.all([
         codeOf(as(AUTHOR).move({ projectId: OPS, dashboardId: shared.id, homeProduct: "gateway" })),
-        codeOf(as(TEAMMATE).move({ projectId: SHOP, dashboardId: mine.id, homeProduct: "gateway" })),
+        codeOf(
+          as(TEAMMATE).move({ projectId: SHOP, dashboardId: mine.id, homeProduct: "gateway" }),
+        ),
       ]);
 
       expect(refused).toEqual(["dashboard_read_only_here", "dashboard_not_found"]);
-      expect([(await stored(shared.id))?.homeProduct, (await stored(mine.id))?.homeProduct]).toEqual(
-        ["llm-ops", "llm-ops"],
-      );
+      expect([
+        (await stored(shared.id))?.homeProduct,
+        (await stored(mine.id))?.homeProduct,
+      ]).toEqual(["llm-ops", "llm-ops"]);
     });
   });
 });

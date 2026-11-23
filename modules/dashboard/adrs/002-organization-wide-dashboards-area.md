@@ -103,6 +103,7 @@ home product is a column on `DashboardsV2` (decision 8, amended 2026-11-23).
    redirects to a project address. Older `/:project/dashboards/<id>` links still
    open. Dashboards also shows no project switcher; a board reads "Data from
    <project>", read-only.
+
 5. **Per-route "no picker" flag.** Hide the picker on the `/dashboards` routes
    with a flag on the route, not a new scope kind. Do not switch Dashboards to
    `scopeKind` `"organization"`. This is smaller and leaves
@@ -112,6 +113,7 @@ home product is a column on `DashboardsV2` (decision 8, amended 2026-11-23).
    **Amended 2026-11-23 (D1, by the owner).** With the organisation area flag on,
    `/:project/dashboards...` draws LLM Ops chrome, and a board draws its home
    product's chrome.
+
 6. **One flag for the area (amended; D4, 2026-11-23).** The organization-wide
    area ships behind its own frontend flag `release_dashboards_organization_area`,
    default off, which needs `release_dashboards`. On a page with no project both
@@ -142,7 +144,7 @@ home product is a column on `DashboardsV2` (decision 8, amended 2026-11-23).
 
    **Amended 2026-11-23, by the owner's direction to ship the full feature in one
    PR.** The home product is a column, `"DashboardsV2"."homeProduct" TEXT NOT NULL
-   DEFAULT 'llm-ops'`, added by migration
+DEFAULT 'llm-ops'`, added by migration
    `20261123120000_dashboards_v2_home_product`. It is not an event and projection,
    because the dashboard module has no eventing pipeline; the constant default
    homes every existing board in LLM Ops with no rewrite. The wording above about
@@ -152,6 +154,7 @@ home product is a column on `DashboardsV2` (decision 8, amended 2026-11-23).
    no organisation-level permission exists and only the author may widen who sees
    a board. This departs from the prototype, which widens other people's moves to
    Organization.
+
 9. **"All projects" at the organization level (new; D1).** On an org-level page
    a widget whose query stores no projects reads `projects: "all"`, at most 100
    projects; the card says so above that. A project view still reads its own
@@ -166,6 +169,7 @@ home product is a column on `DashboardsV2` (decision 8, amended 2026-11-23).
    reads the project in view, switched from LLM Ops's top bar, not "All projects".
    Gateway and Governance boards read every project the viewer can read. Data
    always stays under each viewer's own project permissions.
+
 10. **Personal boards, a member-owned aggregate (new).** My dashboard (one per
     member) and the boards made in Coding agents as Only me belong to the
     member, not to a project or an organization. They are a separate
@@ -186,6 +190,7 @@ home product is a column on `DashboardsV2` (decision 8, amended 2026-11-23).
     **Cut by the owner, 2026-11-23 (D3).** There is no `personal_board` aggregate,
     no member-owned store and no cross-organisation personal board. Only me boards
     are ordinary boards in one organisation.
+
 11. **Gateway traces in the governance project (new; D2).** An org-level
     board's "All projects" run also reads the organization's governance
     project, limited to Gateway traffic of the virtual keys the member may read:
@@ -204,6 +209,7 @@ home product is a column on `DashboardsV2` (decision 8, amended 2026-11-23).
     **Amended 2026-11-23, by the coordinator's direction.** The governance-project
     read is not in this PR and waits for a security review. Until then, Gateway
     and Governance boards read every project the viewer can read (D2, decision 9).
+
 12. **A read-only port into the gateway (new).** Analytics reads the readable
     keys through `GatewayApi.listVirtualKeyIdsReadableInDashboards({
 organizationId, userId }) -> { virtualKeyIds }`, with the narrow type
