@@ -5,6 +5,7 @@ import type { GovernanceObjectStore } from "../object-store.channel.ts";
 /** A source's bucket in memory: it lists and reads what a test seeded, in key order. */
 export class MemoryObjectStoreChannel implements GovernanceObjectStore {
   private readonly objects = new Map<string, string>();
+  private readonly binaries = new Map<string, Uint8Array>();
 
   private constructor() {}
 
@@ -34,5 +35,20 @@ export class MemoryObjectStoreChannel implements GovernanceObjectStore {
       throw new Error(`file exceeds ${input.maxBytes} bytes: s3://${input.bucket}/${input.key}`);
     }
     return text;
+  }
+
+  seedBytes({ bucket, key, bytes }: { bucket: string; key: string; bytes: Uint8Array }): void {
+    this.binaries.set(`${bucket}/${key}`, bytes);
+  }
+
+  async readBytes(input: Parameters<GovernanceObjectStore["readText"]>[0]): Promise<Uint8Array> {
+    const bytes = this.binaries.get(`${input.bucket}/${input.key}`);
+    if (bytes === undefined) {
+      return new TextEncoder().encode(await this.readText(input));
+    }
+    if (bytes.byteLength > input.maxBytes) {
+      throw new Error(`file exceeds ${input.maxBytes} bytes: s3://${input.bucket}/${input.key}`);
+    }
+    return bytes;
   }
 }

@@ -748,12 +748,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
     groupBy: TraceDailySpendGroup;
     window: TraceModelSpendWindow;
   }): Promise<TraceDailyGroupSpend[]>;
-  /** Matching traces since `sinceMs`, counted per `valueKey` value among `values`. */
+  /**
+   * Matching traces since `sinceMs`, counted per `valueKey` value that equals one of `values` or
+   * starts with one of `valuePrefixes`.
+   */
   countAttributedTracesByValue(input: {
     projectId: string;
     matches: readonly TraceAttributeMatch[];
     valueKey: string;
     values: readonly string[];
+    valuePrefixes?: readonly string[];
     sinceMs: number;
   }): Promise<{ value: string; count: number }[]>;
   /** The newest matching traces before `beforeMs`, at most `limit`, with the asked attributes. */

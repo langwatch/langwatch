@@ -19,7 +19,7 @@ export type CreateIngestionSourceRecord = {
   parserConfig: Record<string, unknown>;
   pullSchedule: string | null;
   status: "awaiting_first_event";
-  createdById: string;
+  createdById: string | null;
   providerAccountId: string | null;
 };
 

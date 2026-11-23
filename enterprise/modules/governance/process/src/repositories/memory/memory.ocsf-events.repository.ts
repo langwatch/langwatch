@@ -2,6 +2,7 @@
 import {
   type GovernanceOcsfExportRow,
   OCSF_PUSHED_SOURCE_TYPE,
+  SECURITY_LAKE_SOURCE_TYPE,
 } from "@langwatch/enterprise-governance-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -20,6 +21,10 @@ import {
   type GovernanceOcsfEventsReader,
   type GovernanceOcsfEventWriter,
 } from "../governance.repositories.ts";
+import type {
+  SecurityLakeCallerRepository,
+  SecurityLakeCallerRow,
+} from "../security-lake-caller.repository.ts";
 
 /**
  * The OCSF-events twin: the newest write per (tenantId, eventId) wins, same
@@ -31,7 +36,8 @@ export class MemoryOcsfEventsRepository
     GovernanceOcsfEventWriter,
     OcsfEventBatchWriter,
     OcsfSeatReportReader,
-    OcsfIngestOrderedReader
+    OcsfIngestOrderedReader,
+    SecurityLakeCallerRepository
 {
   private readonly eventsByKey = new Map<string, GovernanceOcsfEvent>();
   private readonly ingestedAtByKey = new Map<string, number>();
@@ -105,6 +111,7 @@ export class MemoryOcsfEventsRepository
     for (const row of this.eventsByKey.values()) {
       if (row.tenantId !== input.tenantId || row.actionName !== input.actionName) continue;
       if (row.sourceType === OCSF_PUSHED_SOURCE_TYPE) continue;
+      if (row.sourceType === SECURITY_LAKE_SOURCE_TYPE) continue;
       const pool = `${row.sourceId}:${row.targetName}`;
       const held = latest.get(pool);
       if (!held || held.eventTime.epochMilliseconds <= row.eventTime.epochMilliseconds) {
@@ -121,5 +128,49 @@ export class MemoryOcsfEventsRepository
           rawOcsfJson: row.rawOcsfJson,
         }),
       );
+  }
+
+  async countSecurityLakeEvents(input: { tenantId: string; sourceId: string }): Promise<number> {
+    return [...this.eventsByKey.values()].filter(
+      (row) =>
+        row.tenantId === input.tenantId &&
+        row.sourceType === SECURITY_LAKE_SOURCE_TYPE &&
+        row.sourceId === input.sourceId,
+    ).length;
+  }
+
+  async findSecurityLakeCallers(input: {
+    tenantId: string;
+    sinceMs: number;
+    limit: number;
+  }): Promise<SecurityLakeCallerRow[]> {
+    const byPrincipal = new Map<string, SecurityLakeCallerRow>();
+    for (const row of this.eventsByKey.values()) {
+      if (row.tenantId !== input.tenantId || row.sourceType !== SECURITY_LAKE_SOURCE_TYPE) continue;
+      if (row.eventTime.epochMilliseconds < input.sinceMs) continue;
+      const raw = JSON.parse(row.rawOcsfJson) as {
+        actor?: { session?: { issuer?: string }; user?: { uid?: string } };
+        cloud?: { region?: string };
+      };
+      const principalArn = raw.actor?.session?.issuer || raw.actor?.user?.uid || "";
+      if (!principalArn) continue;
+      const caller = byPrincipal.get(principalArn) ?? {
+        principalArn,
+        models: [],
+        regions: [],
+        lastCallMs: 0,
+        callCount: 0,
+      };
+      if (row.targetName && !caller.models.includes(row.targetName))
+        caller.models.push(row.targetName);
+      const region = raw.cloud?.region ?? "";
+      if (region && !caller.regions.includes(region)) caller.regions.push(region);
+      caller.lastCallMs = Math.max(caller.lastCallMs, row.eventTime.epochMilliseconds);
+      caller.callCount += 1;
+      byPrincipal.set(principalArn, caller);
+    }
+    return [...byPrincipal.values()]
+      .toSorted((a, b) => b.lastCallMs - a.lastCallMs)
+      .slice(0, input.limit);
   }
 }

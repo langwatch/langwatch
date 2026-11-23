@@ -537,6 +537,19 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     ],
   },
   {
+    name: "Security Lake Sources",
+    dirName: "governance-security-lake",
+    pathPrefixes: ["/api/governance/security-lake"],
+    overviewDescription:
+      "Add an AWS Security Lake subscriber as a source, test its queue and read its health. LangWatch reads the subscriber queue on the source's schedule and stores the AI activity it finds as OCSF events.",
+    endpointOrder: [
+      "POST /api/v1/governance/security-lake/sources",
+      "PATCH /api/v1/governance/security-lake/sources/{sourceId}",
+      "POST /api/v1/governance/security-lake/sources/{sourceId}/test",
+      "GET /api/v1/governance/security-lake/sources/{sourceId}/health",
+    ],
+  },
+  {
     name: "SCIM",
     dirName: "scim",
     pathPrefixes: ["/api/scim/v2"],
