@@ -43,6 +43,7 @@ import {
 import {
   appendSingleFileRecords,
   isSingleFileDataset,
+  pageOf,
   parseSingleFileRecords,
   removeSingleFileRecords,
   storedRecordTimestampsSchema,
@@ -58,11 +59,18 @@ type DatasetKey = { datasetId: string; projectId: string };
 /** The fields a write needs from either a dataset or its stored row. */
 type DatasetRef = Pick<Dataset, "id" | "projectId">;
 
-/** Where a write goes when the dataset was converted to chunks while it waited for the lock. */
+/** Where a write, or a read giving ids, goes when the dataset was converted while it waited. */
 type ConvertedContent = {
   content: Pick<
     DatasetContent,
-    "upsertRecord" | "batchCreateRecords" | "deleteRecords" | "updateColumns"
+    | "listRecords"
+    | "searchRecords"
+    | "getDatasetWithRecords"
+    | "getDatasetHead"
+    | "upsertRecord"
+    | "batchCreateRecords"
+    | "deleteRecords"
+    | "updateColumns"
   >;
   reload: (key: DatasetKey) => Promise<Dataset>;
 };
@@ -109,8 +117,14 @@ export class DatasetSingleFileService implements Omit<
     dataset: Dataset;
     input: DatasetPageInput;
   }): Promise<DatasetRecordPage> {
-    const records = await this.readRecords(input.dataset);
-    return pageOf({ records, page: input.input.page ?? 1, limit: input.input.limit ?? 50 });
+    return this.orConverted(
+      input.dataset,
+      async () => {
+        const records = await this.readRecords(input.dataset);
+        return pageOf({ records, page: input.input.page ?? 1, limit: input.input.limit ?? 50 });
+      },
+      (content, dataset) => content.listRecords({ ...input, dataset }),
+    );
   }
 
   async getDatasetPage(input: { dataset: Dataset; input: DatasetPageInput }): Promise<DatasetPage> {
@@ -136,12 +150,18 @@ export class DatasetSingleFileService implements Omit<
     search: string;
     caps: DatasetSearchCaps;
   }): Promise<DatasetRecordPage> {
-    const records = await this.readRecords(input.dataset, input.caps.maxBytes);
-    refuseSearchScan(records.length, 0, input.caps);
-    const matches = records.filter((record) =>
-      matchesDatasetSearch({ entry: record.entry, search: input.search }),
+    return this.orConverted(
+      input.dataset,
+      async () => {
+        const records = await this.readRecords(input.dataset, input.caps.maxBytes);
+        refuseSearchScan(records.length, 0, input.caps);
+        const matches = records.filter((record) =>
+          matchesDatasetSearch({ entry: record.entry, search: input.search }),
+        );
+        return pageOf({ records: matches, page: input.page, limit: input.limit });
+      },
+      (content, dataset) => content.searchRecords({ ...input, dataset }),
     );
-    return pageOf({ records: matches, page: input.page, limit: input.limit });
   }
 
   async getDatasetWithRecords(input: {
@@ -150,24 +170,36 @@ export class DatasetSingleFileService implements Omit<
     entrySelection: DatasetEntrySelection;
     limitBytes: number;
   }): Promise<DatasetWithRecords> {
-    const records = await this.readRecords(input.dataset);
-    const selected = selectDatasetRecords(records, input.entrySelection);
-    const bounded = limitDatasetRecordsByBytes(selected, input.limitBytes);
-    return {
-      dataset: input.dataset,
-      records: bounded.records,
-      truncated: bounded.truncated,
-      totalRows: selected.length,
-    };
+    return this.orConverted(
+      input.dataset,
+      async () => {
+        const records = await this.readRecords(input.dataset);
+        const selected = selectDatasetRecords(records, input.entrySelection);
+        const bounded = limitDatasetRecordsByBytes(selected, input.limitBytes);
+        return {
+          dataset: input.dataset,
+          records: bounded.records,
+          truncated: bounded.truncated,
+          totalRows: selected.length,
+        };
+      },
+      (content, dataset) => content.getDatasetWithRecords({ ...input, dataset }),
+    );
   }
 
   async getDatasetHead(input: { dataset: Dataset }): Promise<DatasetHead> {
-    const records = await this.readRecords(input.dataset);
-    return {
-      dataset: input.dataset,
-      records: records.slice(0, HEAD_RECORDS),
-      total: records.length,
-    };
+    return this.orConverted(
+      input.dataset,
+      async () => {
+        const records = await this.readRecords(input.dataset);
+        return {
+          dataset: input.dataset,
+          records: records.slice(0, HEAD_RECORDS),
+          total: records.length,
+        };
+      },
+      (content, dataset) => content.getDatasetHead({ dataset }),
+    );
   }
 
   async findEntries(input: {
@@ -455,17 +487,4 @@ export class DatasetSingleFileService implements Omit<
 
 function keyOf(dataset: DatasetRef): DatasetKey {
   return { datasetId: dataset.id, projectId: dataset.projectId };
-}
-
-function pageOf(input: {
-  records: DatasetRecord[];
-  page: number;
-  limit: number;
-}): DatasetRecordPage {
-  const { records, page, limit } = input;
-  const total = records.length;
-  return {
-    data: records.slice((page - 1) * limit, page * limit),
-    pagination: { page, limit, total, totalPages: total === 0 ? 0 : Math.ceil(total / limit) },
-  };
 }

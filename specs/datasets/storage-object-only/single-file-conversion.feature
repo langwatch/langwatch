@@ -118,6 +118,14 @@ Feature: Single-file datasets are converted to chunks
       Then the row is added after the conversion, to the dataset's chunks
       And the dataset holds every row it had plus the new one
 
+    @unit
+    Scenario: A first read that waited while the dataset was converted reads its chunks
+      Given a single-file dataset holding a record stored without an id
+      And the conversion step converts it while the first read waits to give that record an id
+      When the read goes on
+      Then it answers with the dataset's rows from its chunks
+      And every later read shows the same ids
+
   Rule: The conversion is resumable and reports what it would do
 
     @unit

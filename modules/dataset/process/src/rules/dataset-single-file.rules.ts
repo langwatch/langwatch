@@ -1,3 +1,4 @@
+import type { DatasetRecord, DatasetRecordPage } from "@langwatch/dataset-contract";
 import { z } from "zod";
 
 import { assertNoTraversal } from "./dataset-chunking.rules.ts";
@@ -100,4 +101,18 @@ export function removeSingleFileRecords(input: {
     (record) => record.id === undefined || !removing.has(record.id),
   );
   return { records, deleted: input.records.length - records.length };
+}
+
+/** One page of a single-file dataset's records, which are always read whole. */
+export function pageOf(input: {
+  records: DatasetRecord[];
+  page: number;
+  limit: number;
+}): DatasetRecordPage {
+  const { records, page, limit } = input;
+  const total = records.length;
+  return {
+    data: records.slice((page - 1) * limit, page * limit),
+    pagination: { page, limit, total, totalPages: total === 0 ? 0 : Math.ceil(total / limit) },
+  };
 }
