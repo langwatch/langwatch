@@ -154,13 +154,13 @@ Feature: Stock trace widgets read the light trace table
       And its body is never mounted, so its queries never run
 
     @unit @integration
-    Scenario: A period reaching before the replay's start says from when versions are known
+    Scenario: A period reaching before the replay's start shows its rows and says from when versions are known
       Given a widget whose query reads LastUsedPromptVersionId
       And the managed prompt version replay is done with a recorded since
-      When the widget's period, with the period before it, starts before that since
-      Then the widget shows "Prompt versions known from" and the since's day
-      And its body is never mounted
-      But a period whose previous period starts at or after the since shows the body
+      When the widget's period, with the period before it, starts before that since, as a 90d or 1y board's does
+      Then the widget's body is mounted, so it keeps the rows it shows today
+      And a note on it says "Prompt versions known from" and the since's day
+      But a period whose previous period starts at or after the since shows the body with no note
 
     @unit @integration
     Scenario: A replay that failed after its retries shows the history as unknown, never the rows

@@ -37,12 +37,13 @@ const MAIN = new Map(
 const STOCK = new Map(fixture("stock-widget-queries.json").map((q) => [q.label, q.sql]));
 export type Form = "main" | "catalogue";
 
-/** One run's cost, read from the query log the server wrote for it. */
+/** One run's cost, and the rows it read, from the query log the server wrote for it. */
 export type Run = {
   type: string;
   peakBytes: number;
   exceptionCode: number;
   durationMs: number;
+  rowsRead: number;
   refusal?: string;
 };
 
@@ -51,7 +52,11 @@ export const median = (runs: readonly Run[]): number =>
 export const mib = (bytes: number) => Number((bytes / 2 ** 20).toFixed(1));
 export const described = (runs: readonly Run[]) =>
   runs
-    .map((run) => `${run.type} code ${run.exceptionCode} at ${mib(run.peakBytes)} MiB`)
+    .map(
+      (run) =>
+        `${run.type} code ${run.exceptionCode} at ${mib(run.peakBytes)} MiB, ` +
+        `${run.rowsRead} rows read`,
+    )
     .join("; ");
 
 export function sqlOf({ form, label }: { form: Form; label: QueryLabel }): string {
@@ -60,11 +65,17 @@ export function sqlOf({ form, label }: { form: Form; label: QueryLabel }): strin
   return sql;
 }
 
-/** Fails if any run was refused or carries a server exception code. */
+/**
+ * Fails if any run was refused, carries a server exception code, or read no rows: a run over no
+ * data would pass the cap and the drift checks with a meaningless peak. att-change/change may
+ * rightly return none, as no version first appears inside the seed's period.
+ */
 export function expectAnswered({ runs, context }: { runs: readonly Run[]; context: string }): void {
+  expect(runs.length, context).toBeGreaterThan(0);
   for (const run of runs) {
     expect(run.refusal, `${context}: ${described(runs)}`).toBeUndefined();
     expect(run.exceptionCode, `${context}: ${described(runs)}`).toBe(0);
+    expect(run.rowsRead, `${context}: ${described(runs)}`).toBeGreaterThan(0);
   }
 }
 
@@ -89,9 +100,11 @@ export function createMeasurer({
           memory_usage: string;
           exception_code: string;
           query_duration_ms: string;
+          read_rows: string;
         }>(
           harness().admin,
-          `SELECT type, memory_usage, exception_code, query_duration_ms FROM system.query_log ` +
+          `SELECT type, memory_usage, exception_code, query_duration_ms, read_rows ` +
+            `FROM system.query_log ` +
             `WHERE log_comment = '${comment}' AND type != 'QueryStart' ` +
             `ORDER BY event_time_microseconds DESC LIMIT 1`,
         );
@@ -103,6 +116,7 @@ export function createMeasurer({
           peakBytes: Number(entry.memory_usage),
           exceptionCode: Number(entry.exception_code),
           durationMs: Number(entry.query_duration_ms),
+          rowsRead: Number(entry.read_rows),
         };
       },
       { timeout: 15_000, interval: 250 },

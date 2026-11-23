@@ -13,7 +13,7 @@ const REBUILDING = { from: null, rebuilding: true, unknown: false };
 const UNKNOWN = { from: null, rebuilding: false, unknown: true };
 
 describe("managedPromptVersionFloorOf", () => {
-  /** @scenario "A period reaching before the replay's start says from when versions are known" */
+  /** @scenario "A period reaching before the replay's start shows its rows and says from when versions are known" */
   it("is the recorded since once the replay is done", () => {
     expect(
       managedPromptVersionFloorOf([

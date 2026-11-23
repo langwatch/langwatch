@@ -1,12 +1,13 @@
 /**
  * @vitest-environment jsdom
- * A widget reading LastUsedPromptVersionId from trace_metrics mounts its body only once its rows
- * cannot be wrong, else a notice stands in; one reading it from traces is never gated. Only the
- * sandboxed frame is stood in for, since jsdom cannot run it.
+ * A widget reading LastUsedPromptVersionId from trace_metrics mounts its body only once the replay
+ * is done, else a notice stands in, and notes where versions start when its window reaches before
+ * them; one reading it from traces is never gated. Only the sandboxed frame is stood in for.
  * @see specs/lwql/stock-widgets-on-trace-metrics.feature
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
+import { Temporal } from "@langwatch/time";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -41,6 +42,7 @@ const PERIOD: BoardPeriod = {
 const VERSION_SQL =
   "SELECT LastUsedPromptVersionId AS version, count() AS n FROM trace_metrics GROUP BY version";
 const TRACE_SQL = "SELECT count() AS n FROM trace_metrics";
+const DAY_MS = 86_400_000;
 
 const REBUILDING = { from: null, rebuilding: true, unknown: false };
 
@@ -99,10 +101,12 @@ function renderCard({
   sql = VERSION_SQL,
   queries = [{ name: "main", sql }],
   floor,
+  period = PERIOD,
 }: {
   sql?: string;
   queries?: WidgetQuery[];
   floor: FloorAnswer;
+  period?: BoardPeriod;
 }) {
   const door = floorDoor(floor);
   renderDashboards({
@@ -113,7 +117,7 @@ function renderCard({
         projectSlug="test-project"
         dashboardId="board-1"
         boardName="Weekly review"
-        period={PERIOD}
+        period={period}
         periodKey="30d:auto"
         isWriting={false}
       />
@@ -164,12 +168,36 @@ describe("given a widget that reads LastUsedPromptVersionId", () => {
   });
 
   describe("when the replay is done and its since falls inside the window", () => {
-    /** @scenario "A period reaching before the replay's start says from when versions are known" */
-    it("says from when versions are known and never mounts the body", async () => {
+    /** @scenario "A period reaching before the replay's start shows its rows and says from when versions are known" */
+    it("mounts the body and notes from when versions are known", async () => {
       renderCard({ floor: { from: "2026-10-10T08:30:00Z", rebuilding: false, unknown: false } });
 
-      expect(await noticeInPlaceOfBody()).toHaveTextContent(
+      await screen.findByTestId("sandboxed-frame");
+      expect(screen.getByTestId("widget-prompt-version-note")).toHaveTextContent(
         "Prompt versions known from 10 Oct 2026",
+      );
+      expect(screen.queryByTestId("widget-prompt-version-notice")).toBeNull();
+    });
+
+    /** @scenario "A period reaching before the replay's start shows its rows and says from when versions are known" */
+    it.each([
+      ["90d", 90],
+      ["1y", 365],
+    ])("mounts att-change on a %s board the 122-day replay cannot cover", async (_, days) => {
+      const now = Date.UTC(2026, 10, 23);
+      renderCard({
+        queries: ATT_CHANGE,
+        floor: {
+          from: Temporal.Instant.fromEpochMilliseconds(now - 122 * DAY_MS).toString(),
+          rebuilding: false,
+          unknown: false,
+        },
+        period: { periodStart: now - days * DAY_MS, periodEnd: now, granularitySeconds: 604_800 },
+      });
+
+      await screen.findByTestId("sandboxed-frame");
+      expect(screen.getByTestId("widget-prompt-version-note")).toHaveTextContent(
+        "Prompt versions known from 24 Jul 2026",
       );
     });
   });

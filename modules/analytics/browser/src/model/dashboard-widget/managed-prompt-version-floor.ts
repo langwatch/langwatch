@@ -1,7 +1,7 @@
 /**
  * Whether a widget reading `LastUsedPromptVersionId` from trace_metrics may show its rows. Older
- * rows carry it only once the managed prompt version replay is done, so until then, and over a
- * window reaching before the replay's since, the rows could be wrong: a notice replaces them.
+ * rows carry it only once the managed prompt version replay is done, so until then a notice
+ * replaces them; over a window reaching before the replay's since, a note says where they start.
  * @see specs/lwql/stock-widgets-on-trace-metrics.feature
  */
 
@@ -14,11 +14,11 @@ export type ManagedPromptVersionFloorRead =
   | { readonly status: "failed" }
   | { readonly status: "read"; readonly floor: LangWatchQLManagedPromptVersionFloor };
 
-/** What the widget shows: nothing yet, a notice in place of its body, or its body. */
+/** What the widget shows: nothing yet, a notice in place of its body, or its body with any note. */
 export type ManagedPromptVersionGate =
   | { readonly kind: "loading" }
   | { readonly kind: "notice"; readonly notice: string }
-  | { readonly kind: "body" };
+  | { readonly kind: "body"; readonly note?: string };
 
 export const PROMPT_VERSION_HISTORY_REBUILDING_NOTICE =
   "Prompt version history is still being rebuilt";
@@ -102,7 +102,8 @@ export function readsManagedPromptVersionFromTraceMetrics(
 
 /**
  * The gate over a widget reading the managed prompt version. Its window is the period and the
- * one before it, as att-change reads both, so it starts one period length before the period.
+ * one before it, as att-change reads both. A window reaching before the since keeps its rows,
+ * since 90d and 1y reach past the replay's 122 days, and notes where versions are known from.
  */
 export function managedPromptVersionGate({
   read,
@@ -123,5 +124,5 @@ export function managedPromptVersionGate({
   const from = Temporal.Instant.from(read.floor.from).epochMilliseconds;
   const windowStart = timeWindow.start - (timeWindow.end - timeWindow.start);
   if (windowStart >= from) return BODY;
-  return { kind: "notice", notice: `Prompt versions known from ${DAY.format(from)}` };
+  return { kind: "body", note: `Prompt versions known from ${DAY.format(from)}` };
 }

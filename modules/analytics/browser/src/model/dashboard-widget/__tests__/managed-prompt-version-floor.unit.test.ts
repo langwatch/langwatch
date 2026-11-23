@@ -1,7 +1,7 @@
 /**
- * A widget reading the managed prompt version shows its rows only once they cannot be wrong: the
- * replay done and its window inside the known history, or nothing to replay. Otherwise a notice.
- * The server maps the ledger rows (none, pending, running, done, not-needed, failed) to the floor.
+ * A widget reading the managed prompt version shows its rows once the replay is done, or when there
+ * is nothing to replay, with a note when its window reaches before the known history. Otherwise a
+ * notice. The server maps the ledger rows (none, pending, running, done, not-needed, failed).
  * @see specs/lwql/stock-widgets-on-trace-metrics.feature
  */
 
@@ -54,20 +54,45 @@ describe("managedPromptVersionGate", () => {
     ).toEqual({ kind: "body" });
   });
 
-  /** @scenario "A period reaching before the replay's start says from when versions are known" */
-  it("says from when versions are known once done, when the window starts before the since", () => {
+  /** @scenario "A period reaching before the replay's start shows its rows and says from when versions are known" */
+  it("shows the body with a note once done, when the window starts before the since", () => {
     expect(
       managedPromptVersionGate({ read: DONE, timeWindow: periodWhoseWindowStarts(-1) }),
-    ).toEqual({ kind: "notice", notice: "Prompt versions known from 18 Jul 2026" });
+    ).toEqual({ kind: "body", note: "Prompt versions known from 18 Jul 2026" });
   });
 
   it("counts the previous period: a period inside the history whose previous one is not", () => {
     const period = { start: SINCE_MS + 10 * DAY_MS, end: SINCE_MS + 70 * DAY_MS };
 
     expect(managedPromptVersionGate({ read: DONE, timeWindow: period })).toEqual({
-      kind: "notice",
-      notice: "Prompt versions known from 18 Jul 2026",
+      kind: "body",
+      note: "Prompt versions known from 18 Jul 2026",
     });
+  });
+
+  describe("given the 122-day replay finished today", () => {
+    const now = SINCE_MS + 122 * DAY_MS;
+    const lastDays = (days: number) => ({ start: now - days * DAY_MS, end: now });
+
+    it("shows the body without a note for a 30d board, whose window fits in the history", () => {
+      expect(managedPromptVersionGate({ read: DONE, timeWindow: lastDays(30) })).toEqual({
+        kind: "body",
+      });
+    });
+
+    /** @scenario "A period reaching before the replay's start shows its rows and says from when versions are known" */
+    it.each([
+      ["90d", 90],
+      ["1y", 365],
+    ])(
+      "keeps the body of a %s board, whose window reaches past the history, and notes it",
+      (_, days) => {
+        expect(managedPromptVersionGate({ read: DONE, timeWindow: lastDays(days) })).toEqual({
+          kind: "body",
+          note: "Prompt versions known from 18 Jul 2026",
+        });
+      },
+    );
   });
 
   it("shows the body on a fresh install, where the replay is not needed", () => {

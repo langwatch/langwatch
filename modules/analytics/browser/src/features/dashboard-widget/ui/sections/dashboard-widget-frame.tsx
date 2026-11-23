@@ -158,7 +158,8 @@ export function DashboardWidgetFrameOverWindow(props: DashboardWidgetFrameOverWi
 
 /**
  * A widget reading LastUsedPromptVersionId mounts its body, and so runs its queries, only once
- * its rows cannot be wrong; until the floor answers it shows the loading face (ADR-006).
+ * the replay is done; over a window reaching before its since the body carries a note. Until the
+ * floor answers it shows the loading face (ADR-006).
  */
 function ManagedPromptVersionGate({
   projectId,
@@ -171,7 +172,25 @@ function ManagedPromptVersionGate({
 }) {
   const read = useManagedPromptVersionFloor({ projectId });
   const gate = managedPromptVersionGate({ read, timeWindow });
-  if (gate.kind === "body") return <>{children}</>;
+  if (gate.kind === "body" && !gate.note) return <>{children}</>;
+  if (gate.kind === "body") {
+    return (
+      <Box position="relative" height="full">
+        {children}
+        <Text
+          as="output"
+          position="absolute"
+          bottom={1}
+          left={2}
+          textStyle="xs"
+          color="fg.muted"
+          data-testid="widget-prompt-version-note"
+        >
+          {gate.note}
+        </Text>
+      </Box>
+    );
+  }
   if (gate.kind === "loading") return <WidgetLoadingFace slow={false} />;
   return (
     <Box height="full" display="flex" alignItems="center" justifyContent="center" padding={4}>

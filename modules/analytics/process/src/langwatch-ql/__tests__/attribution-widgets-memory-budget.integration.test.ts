@@ -309,8 +309,10 @@ describe("given three tenants' attribution traces, read over a 60-day period and
       "keeps the new form within a tenth of no older history at every size, median of three",
       async () => {
         const bare = await sweepMeasured({ form: "catalogue", label, tenant: TENANTS.BARE });
+        expectAnswered({ runs: bare, context: `${label} on BARE` });
         for (const tenant of SWEEP_TENANTS) {
           const runs = await sweepMeasured({ form: "catalogue", label, tenant });
+          expectAnswered({ runs, context: `${label} on ${tenant.name}` });
           const drift = Math.abs(median(runs) - median(bare)) / median(bare);
           const context = `${tenant.name}: ${described(runs)} against ${described(bare)}`;
           expect(drift, context).toBeLessThanOrEqual(HISTORY_TOLERANCE);
