@@ -3,7 +3,7 @@
  * A record write that read the dataset in the records table, then waited on its lock while the
  * content move flipped it, lands in the chunks (write-paths.feature).
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { createDatasetTestApp } from "../../app/__tests__/dataset.fixture.ts";
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";
@@ -13,7 +13,9 @@ import { DatasetMigrationService } from "../dataset-migration.service.ts";
 const PROJECT = "project-1";
 
 /** A records-table dataset whose move runs while the next record write waits on the lock. */
-async function movedWhileWaiting() {
+async function movedWhileWaiting({
+  input = (id: string) => `row ${id}`,
+}: { input?: (id: string) => string } = {}) {
   const repositories: DatasetRepositories = MemoryDatasetRepositories.create();
   const app = createDatasetTestApp({ repositories });
   const created = await app.upsertDataset({
@@ -36,7 +38,7 @@ async function movedWhileWaiting() {
   await repositories.records.createMany({
     datasetId,
     projectId: PROJECT,
-    entries: ["a", "b", "c"].map((id) => ({ id, input: `row ${id}` })),
+    entries: ["a", "b", "c"].map((id) => ({ id, input: input(id) })),
   });
   const lock = repositories.records.withDatasetLock.bind(repositories.records);
   let moved = false;
@@ -158,8 +160,7 @@ describe("a column edit that waited while the content move flipped the dataset",
 
   /** @scenario "A column edit that waited while the dataset moved is applied to object storage" */
   it("changes the column's type in the chunks", async () => {
-    const { app, datasetId, repositories } = await movedWhileWaiting();
-    const writeChunks = vi.spyOn(repositories.chunks, "writeChunks");
+    const { app, datasetId } = await movedWhileWaiting({ input: (id) => `{"row":"${id}"}` });
 
     const edited = await app.upsertDataset({
       projectId: PROJECT,
@@ -170,8 +171,16 @@ describe("a column edit that waited while the content move flipped the dataset",
 
     expect(edited).toMatchObject({ contentLayout: "s3_jsonl" });
     expect(edited.columnTypes).toEqual([{ name: "input", type: "json" }]);
-    // The move's copy, then the edit's rewrite of the chunks under the new type.
-    expect(writeChunks).toHaveBeenCalledTimes(2);
+    const { records } = await app.getDatasetWithRecords({
+      projectId: PROJECT,
+      slugOrId: datasetId,
+      limitMb: null,
+    });
+    expect(records.map((record) => record.entry)).toEqual([
+      { input: { row: "a" } },
+      { input: { row: "b" } },
+      { input: { row: "c" } },
+    ]);
   });
 
   /** @scenario "A column edit that waited while the dataset moved is applied to object storage" */
