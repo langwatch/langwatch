@@ -292,5 +292,52 @@ describe("<FilterSidebar />", () => {
         expect(screen.getAllByTestId("section-renderer").length).toBeGreaterThan(0);
       });
     });
+
+    describe("when the only descriptor left is the deferred span type, listed without values", () => {
+      /** @scenario "An empty window still falls back to the default sections" */
+      it("falls back to the default minimal facet set (not a blank rail)", () => {
+        mockHasAnyTraces = true;
+        mockFacetsLoading = false;
+        // Discovery lists span type on every read, with no values until its
+        // section opens. It must not count as content, or an empty window
+        // keeps it as the only section and comfortable density hides it.
+        mockDescriptors = [
+          { kind: "categorical", key: "status", label: "Status", topValues: [] },
+          {
+            kind: "categorical",
+            key: "spanType",
+            label: "Span type",
+            topValues: [],
+            deferred: true,
+          },
+        ];
+
+        renderSidebar();
+
+        expect(screen.getAllByTestId("section-renderer").length).toBeGreaterThan(0);
+      });
+    });
+
+    describe("when span type was counted and came back empty", () => {
+      /** @scenario "An empty window still falls back to the default sections" */
+      it("falls back to the default minimal facet set (not a blank rail)", () => {
+        mockHasAnyTraces = true;
+        mockFacetsLoading = false;
+        mockDescriptors = [
+          { kind: "categorical", key: "status", label: "Status", topValues: [] },
+          {
+            kind: "categorical",
+            key: "spanType",
+            label: "Span type",
+            topValues: [],
+            deferred: false,
+          },
+        ];
+
+        renderSidebar();
+
+        expect(screen.getAllByTestId("section-renderer").length).toBeGreaterThan(0);
+      });
+    });
   });
 });

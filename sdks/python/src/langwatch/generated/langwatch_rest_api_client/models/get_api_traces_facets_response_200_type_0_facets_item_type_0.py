@@ -9,6 +9,7 @@ from attrs import field as _attrs_field
 from ..models.get_api_traces_facets_response_200_type_0_facets_item_type_0_group import (
     GetApiTracesFacetsResponse200Type0FacetsItemType0Group,
 )
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.get_api_traces_facets_response_200_type_0_facets_item_type_0_top_values_item import (
@@ -29,6 +30,7 @@ class GetApiTracesFacetsResponse200Type0FacetsItemType0:
         group (GetApiTracesFacetsResponse200Type0FacetsItemType0Group):
         top_values (list[GetApiTracesFacetsResponse200Type0FacetsItemType0TopValuesItem]):
         total_distinct (float):
+        deferred (bool | Unset):
     """
 
     key: str
@@ -37,6 +39,7 @@ class GetApiTracesFacetsResponse200Type0FacetsItemType0:
     group: GetApiTracesFacetsResponse200Type0FacetsItemType0Group
     top_values: list[GetApiTracesFacetsResponse200Type0FacetsItemType0TopValuesItem]
     total_distinct: float
+    deferred: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -55,6 +58,8 @@ class GetApiTracesFacetsResponse200Type0FacetsItemType0:
 
         total_distinct = self.total_distinct
 
+        deferred = self.deferred
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -67,6 +72,8 @@ class GetApiTracesFacetsResponse200Type0FacetsItemType0:
                 "totalDistinct": total_distinct,
             }
         )
+        if deferred is not UNSET:
+            field_dict["deferred"] = deferred
 
         return field_dict
 
@@ -98,6 +105,8 @@ class GetApiTracesFacetsResponse200Type0FacetsItemType0:
 
         total_distinct = d.pop("totalDistinct")
 
+        deferred = d.pop("deferred", UNSET)
+
         get_api_traces_facets_response_200_type_0_facets_item_type_0 = cls(
             key=key,
             kind=kind,
@@ -105,6 +114,7 @@ class GetApiTracesFacetsResponse200Type0FacetsItemType0:
             group=group,
             top_values=top_values,
             total_distinct=total_distinct,
+            deferred=deferred,
         )
 
         get_api_traces_facets_response_200_type_0_facets_item_type_0.additional_properties = d

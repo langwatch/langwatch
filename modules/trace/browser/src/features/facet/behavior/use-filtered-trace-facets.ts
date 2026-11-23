@@ -18,11 +18,13 @@ interface FilteredTraceFacetsResult {
 }
 
 /**
- * The sidebar's counts: `traces.discover` under the input the list reads, so a
- * number beside a value is what the table shows after selecting it. Naming the
- * query — empty string included — is what asks for counts rather than keys.
+ * The sidebar's counts under the input the list reads; naming the query, empty
+ * included, asks for counts rather than keys. `facetKeys` counts only those
+ * facets (how a deferred facet loads); an empty list reads nothing.
  */
-export function useFilteredTraceFacets(): FilteredTraceFacetsResult {
+export function useFilteredTraceFacets({
+  facetKeys,
+}: { facetKeys?: readonly string[] } = {}): FilteredTraceFacetsResult {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
@@ -40,9 +42,10 @@ export function useFilteredTraceFacets(): FilteredTraceFacetsResult {
       },
       query: queryText ?? "",
       ...(evalRuns ? { evalRuns } : {}),
+      ...(facetKeys ? { facetKeys: [...facetKeys] } : {}),
     },
     {
-      enabled: !!projectId && !isSamplePreview,
+      enabled: !!projectId && !isSamplePreview && facetKeys?.length !== 0,
       placeholderData: keepPreviousData,
     },
   );

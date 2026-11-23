@@ -45,10 +45,13 @@ import { useFilteredTraceFacets } from "../../../../../features/facet/behavior/u
 import { useTraceFacets } from "../../../../../features/facet/behavior/use-trace-facets.ts";
 import { hashColor } from "../../../../../model/display-formatters.ts";
 import {
+  deferredFacetKeysToLoad,
   type FacetCountState,
+  fillDeferredFacets,
   mergeFacetDescriptors,
 } from "../../../../../model/explorer/filter-sidebar/merge-facet-descriptors.ts";
 import { routeToggleViaOrGroups } from "../../../../../model/explorer/filter-sidebar/route-toggle-via-or-groups.ts";
+import { isSectionOpen } from "../../../../../model/explorer/filter-sidebar/section-open.ts";
 import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode.ts";
 import { facetLabel, sortBySectionOrder } from "../utils.ts";
 
@@ -293,7 +296,12 @@ function facetItemsFor({
 }): Map<string, FacetItem[]> {
   const map = new Map<string, FacetItem[]>();
   for (const cat of categoricals) {
-    const items = buildFacetItems({ cat, isSynthetic: cat.synthetic ?? isSynthetic, countState });
+    const items = buildFacetItems({
+      cat,
+      isSynthetic: cat.synthetic ?? isSynthetic,
+      // A deferred facet's values are not counted until its section opens.
+      countState: cat.deferred ? "pending" : countState,
+    });
     map.set(
       cat.key,
       withQueryValues({ items, ast, key: cat.key, extra: () => ({ dimmed: true }) }),
@@ -326,7 +334,7 @@ function sectionsOf({
   activeFields: ReadonlySet<string>;
 }) {
   const real = partitionDescriptors(descriptors ?? [], activeFields);
-  if (!isPartitionEmpty(real)) return { ...real, isSynthetic: false };
+  if (!isPartitionEmpty(real, activeFields)) return { ...real, isSynthetic: false };
   return {
     ...partitionDescriptors(synthesizeDefaultDescriptors(), activeFields),
     isSynthetic: true,
@@ -356,7 +364,7 @@ export function useFilterSidebarData() {
   const { data: discovered, isLoading: facetsLoading } = useTraceFacets();
   const filtered = useFilteredTraceFacets();
   const isSamplePreview = usePreviewTracesActive();
-  const { descriptors, countState } = useMemo(
+  const merged = useMemo(
     () =>
       isSamplePreview
         ? { descriptors: discovered, countState: "settled" as const }
@@ -369,6 +377,7 @@ export function useFilterSidebarData() {
   );
 
   const lensSectionOrder = useFacetLensStore((s) => s.lens.sectionOrder);
+  const sectionOpen = useFacetLensStore((s) => s.lens.sectionOpen);
   const setSectionOrder = useFacetLensStore((s) => s.setSectionOrder);
   const setAllSectionsOpen = useFacetLensStore((s) => s.setAllSectionsOpen);
   const density = useDensityStore((s) => s.density);
@@ -383,6 +392,22 @@ export function useFilterSidebarData() {
       isSectionShown({ key, activeFields, explicitlyHidden, explicitlyShown, density }),
     [density, activeFields, explicitlyHidden, explicitlyShown],
   );
+
+  // A deferred facet is counted only while its section shows and is open.
+  const deferred = useFilteredTraceFacets({
+    facetKeys: deferredFacetKeysToLoad({
+      descriptors: merged.descriptors,
+      isOpen: (key) =>
+        isSectionVisibleForDensity(key) &&
+        isSectionOpen({ readerChoice: sectionOpen[key], filtered: activeFields.has(key) }),
+    }),
+  });
+  const descriptors = fillDeferredFacets({
+    descriptors: merged.descriptors,
+    loaded: deferred.data,
+    loadedIsPlaceholder: deferred.isPlaceholderData,
+  });
+  const { countState } = merged;
 
   const sections = useMemo(
     () => sectionsOf({ descriptors, activeFields }),
@@ -484,7 +509,8 @@ function keptCategoricalSections({
   activeFieldSet: ReadonlySet<string>;
 }): CategoricalSection[] {
   const isSynthetic = (d as { synthetic?: boolean }).synthetic;
-  const isKept = d.topValues.length > 0 || activeFieldSet.has(d.key) || isSynthetic;
+  const isDeferred = d.deferred !== undefined;
+  const isKept = d.topValues.length > 0 || activeFieldSet.has(d.key) || isSynthetic || isDeferred;
   if (!isKept) return [];
   return [
     {
@@ -494,6 +520,7 @@ function keptCategoricalSections({
       group: d.group,
       topValues: d.topValues,
       synthetic: isSynthetic,
+      ...(d.deferred ? { deferred: true } : {}),
     },
   ];
 }
@@ -564,12 +591,16 @@ function partitionDescriptors(
 }
 
 /**
- * True when a partition surfaced no renderable section at all — no categoricals, no
- * ranges, no attribute keys.
+ * True when a partition surfaced nothing to show. A deferred section kept with no
+ * values and no filter is not content, counted or not, or an empty window would
+ * never fall back to the default sections.
  */
-function isPartitionEmpty(partition: ReturnType<typeof partitionDescriptors>): boolean {
+function isPartitionEmpty(
+  partition: ReturnType<typeof partitionDescriptors>,
+  activeFieldSet: ReadonlySet<string>,
+): boolean {
   return (
-    partition.categoricals.length === 0 &&
+    partition.categoricals.every((c) => c.topValues.length === 0 && !activeFieldSet.has(c.key)) &&
     partition.ranges.length === 0 &&
     partition.traceAttributeKeys.length === 0 &&
     partition.metadataAttributeKeys.length === 0 &&

@@ -22,7 +22,11 @@ import type {
 } from "#features/facet/rules/trace-facet-registry.rules";
 
 import { settleCapped } from "../features/facet/rules/facet-read-concurrency.rules.ts";
-import { isExpressionCategorical } from "../features/facet/rules/trace-facet-classification.rules.ts";
+import {
+  isDeferredFacet,
+  isExpressionCategorical,
+  selectFacetsToRead,
+} from "../features/facet/rules/trace-facet-classification.rules.ts";
 import type { FacetFilterResolver } from "../features/facet/rules/trace-facet-filter.rules.ts";
 import { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
 import type { TraceTopicNamingService } from "../features/topic/services/trace-topic-naming.service.ts";
@@ -33,6 +37,7 @@ import {
   snapToWindowPreset,
   type DiscoverParams,
 } from "../rules/trace-list-cache-key.rules.ts";
+import { TraceDeferredCountService } from "./trace-deferred-count.service.ts";
 import {
   TraceDiscoverTaskService,
   type BatchedRegistrySlots,
@@ -138,6 +143,19 @@ function partitionFacetRegistry({
   }
 
   return { batched, standalone };
+}
+
+/** A deferred facet as discovery lists it: present, its values left for a keyed read. */
+function deferredDescriptor(def: FacetDefinition & { kind: "categorical" }): FacetDescriptor {
+  return {
+    key: def.key,
+    kind: "categorical",
+    label: def.label,
+    group: def.group,
+    topValues: [],
+    totalDistinct: 0,
+    deferred: true,
+  };
 }
 
 /** Sorts settled task results into their three indexes; a failed task omits its facets. */
@@ -257,19 +275,39 @@ export class TraceDiscoverService {
   }
 
   /**
-   * Every registry facet counted under the active query, in the window the list
-   * reads: uncached, and without the attribute keys, which are a vocabulary the
-   * sidebar keeps from the cached discovery. ADR-139.
+   * Every registry facet counted under the active query in the list's window,
+   * uncached and without the attribute keys (ADR-139); `facetKeys` narrows it
+   * to those facets, the one way a deferred facet's values are counted.
    */
   getFilteredFacets({
     params,
     filterFor,
+    facetKeys,
   }: {
     params: DiscoverParams;
     filterFor: FacetFilterResolver;
+    facetKeys?: readonly string[];
   }): Promise<FacetDescriptor[]> {
-    return this.computeFacets({ params, filterFor, includeDynamicKeys: false });
+    return this.computeFacets({
+      params,
+      filterFor,
+      includeDynamicKeys: false,
+      ...(facetKeys ? { facetKeys } : {}),
+    });
   }
+
+  /** Deferred facets counted unfiltered over the snapped discovery window, kept a minute. */
+  getDeferredCounts(input: {
+    params: DiscoverParams;
+    facetKeys: readonly string[];
+  }): Promise<FacetDescriptor[]> {
+    return this.deferredCounts.get(input);
+  }
+
+  private readonly deferredCounts = TraceDeferredCountService.create({
+    count: ({ params, facetKeys }) =>
+      this.getFilteredFacets({ params, filterFor: () => undefined, facetKeys }),
+  });
 
   private refreshDiscoverInBackground({
     params,
@@ -355,14 +393,20 @@ export class TraceDiscoverService {
     params,
     filterFor,
     includeDynamicKeys,
+    facetKeys,
   }: {
     params: DiscoverParams;
     filterFor: FacetFilterResolver;
     includeDynamicKeys: boolean;
+    facetKeys?: readonly string[];
   }): Promise<FacetDescriptor[]> {
     const filters = facetFilters(filterFor);
-    const { batched, standalone } = partitionFacetRegistry({
+    const selected = selectFacetsToRead({
       registry: this.facets.registry,
+      ...(facetKeys ? { facetKeys } : {}),
+    });
+    const { batched, standalone } = partitionFacetRegistry({
+      registry: selected,
       filters,
       includeDynamicKeys,
     });
@@ -382,7 +426,7 @@ export class TraceDiscoverService {
     const tasks = [
       ...this.tasks.batchTasks(params, batched),
       ...this.tasks.standaloneTasks({ params, standalone, filters }),
-      ...this.tasks.discreteTasks(params, filters),
+      ...this.tasks.discreteTasks({ params, registry: selected, filters }),
     ].map(timed);
 
     const settled = await settleCapped(tasks, DISCOVER_PASS_MAX_CONCURRENT_STATEMENTS);
@@ -397,7 +441,12 @@ export class TraceDiscoverService {
 
     // Assemble in registry order so the sidebar's group ordering is preserved.
     const facets: FacetDescriptor[] = [];
+    const read = new Set(selected);
     for (const def of this.facets.registry) {
+      if (!read.has(def)) {
+        if (!facetKeys && isDeferredFacet(def)) facets.push(deferredDescriptor(def));
+        continue;
+      }
       const descriptor = await this.descriptors.buildDescriptor({
         def,
         params,

@@ -404,6 +404,9 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "span",
     table: "stored_spans",
     expression: "SpanAttributes['langwatch.span.type']",
+    // One map key decompresses the whole SpanAttributes map per span, over
+    // 100x the cost of spanName and spanStatus beside it: read on demand only.
+    deferred: true,
   },
   EVENT_FACET,
   EVENT_ATTRIBUTE_KEYS_FACET,

@@ -23,6 +23,7 @@ import {
 import { useFacetLensStore } from "../../../../features/facet/behavior/facet-lens.store.ts";
 import { useFacetSearch } from "../../../../features/facet/behavior/use-facet-search.ts";
 import { dedupeByValue } from "../../../../model/dedupe-by-value.ts";
+import { isSectionOpen } from "../../../../model/explorer/filter-sidebar/section-open.ts";
 import { NoneFacetRow } from "../../../blocks/explorer/filter-sidebar/none-facet-row.tsx";
 import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section.tsx";
 import { FacetRow } from "./facet-row.tsx";
@@ -389,9 +390,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     />
   );
 
-  // Collapsed by default, open when a value is filtered on; the reader's own
-  // open or close always wins. See specs/traces-v2/filter-bar-interactions.feature.
-  const effectiveOpen = lensOverride ?? activeCount > 0;
+  const effectiveOpen = isSectionOpen({ readerChoice: lensOverride, filtered: activeCount > 0 });
 
   return (
     <Box onMouseEnter={freeze} onMouseLeave={thaw}>
