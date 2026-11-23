@@ -29,6 +29,19 @@ export const drawerRouterRef: { current: DrawerRouter | undefined } = { current:
 /** Every router a mounted component registered, oldest first; each takes only itself back. */
 const mounted = new Set<DrawerRouter>();
 
+/** Routers built over the address bar (not a memory router), so the bar says where the page is. */
+const overAddressBar = new WeakSet<DrawerRouter>();
+
+/**
+ * Whether the address bar has moved to another page since `router` was built: a link landed
+ * and this page is unmounting. A write through it would send the reader back to the page they
+ * left, so it writes nothing. Spec: specs/model-providers/missing-model-popup.feature.
+ */
+export function isLeftBehind(router: DrawerRouter): boolean {
+  if (typeof window === "undefined" || !overAddressBar.has(router)) return false;
+  return window.location.pathname !== router.pathname;
+}
+
 function latestMounted(): DrawerRouter | undefined {
   return [...mounted].at(-1);
 }
@@ -106,6 +119,7 @@ export function useDrawerRouter(): DrawerRouter {
       pathname,
       state: location.state,
       push: (url, options) => {
+        if (isLeftBehind(self)) return;
         // Drawers are `lazy()`, so this often mounts one for the first time.
         // Under a transition, first-time Suspense keeps the old UI on screen
         // instead of the fallback. React Router 8 only wraps navigation in
@@ -125,6 +139,9 @@ export function useDrawerRouter(): DrawerRouter {
         });
       },
     };
+    if (typeof window !== "undefined" && window.location.pathname === pathname) {
+      overAddressBar.add(self);
+    }
     return self;
   }, [location.pathname, location.search, location.hash, location.state, navigate]);
 

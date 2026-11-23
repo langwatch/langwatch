@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useFilterStore } from "../../../behavior/explorer.store.ts";
 import { api } from "../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useHasPendingNegatedEval } from "../../instant-eval/behavior/use-has-pending-negated-eval.ts";
 import { useInstantEvalRuns } from "../../instant-eval/behavior/use-instant-eval-runs.ts";
 import { useRefreshUIStore } from "./refresh-ui.store.ts";
 import { useSseStatusStore } from "./sse-status.store.ts";
@@ -103,6 +104,8 @@ export function useTraceNewCount(): TraceNewCountResult {
   // suppress the 0→N pulse.
   const prevCountRef = useRef<number | null>(null);
   const { evalRuns } = useInstantEvalRuns();
+  // A pending NOT chip's rows are not results yet, as in the table: none is new.
+  const hasPendingNegatedEval = useHasPendingNegatedEval();
   useEffect(() => {
     prevCountRef.current = null;
     // A run registering for a chip changes what is counted, so the baseline
@@ -114,7 +117,7 @@ export function useTraceNewCount(): TraceNewCountResult {
     {
       // Honour the store contract: paused = "no updates, no pill". Stops the
       // query from firing at all.
-      enabled: !!project?.id && liveUpdatesMode !== "paused",
+      enabled: !!project?.id && liveUpdatesMode !== "paused" && !hasPendingNegatedEval,
       staleTime: 0,
       // A failing count is almost always ClickHouse easing us off under
       // concurrent load. One client-side retry is enough.
@@ -147,8 +150,8 @@ export function useTraceNewCount(): TraceNewCountResult {
   }, [refresh]);
 
   return {
-    count: query.data?.count ?? 0,
-    isLoading: query.isLoading,
+    count: hasPendingNegatedEval ? 0 : (query.data?.count ?? 0),
+    isLoading: !hasPendingNegatedEval && query.isLoading,
     acknowledge,
   };
 }

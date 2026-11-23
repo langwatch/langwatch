@@ -66055,6 +66055,7 @@ The table lists each limit's current value; the **Kind** column marks which ones
 | GitHub pull requests per day           | 20                             | Hardcoded       | `LANGY_GITHUB_PRS_PER_DAY` (a code constant, not an env var)     |
 | Max concurrent workers                 | 20 (default)                   | Configurable    | `LANGY_MAX_WORKERS`                                              |
 | Idle worker reap                       | 10 minutes (600000 ms default) | Configurable    | `LANGY_WORKER_IDLE_MS`                                           |
+| Max worker age                         | 5 hours (18000000 ms default)  | Configurable    | `LANGY_WORKER_MAX_AGE_MS`                                        |
 | Per-session LangWatch API key lifetime | Short-lived, auto-expiring     | Fixed by design | Minted per chat, owned by the requesting user                    |
 | GitHub installation token lifetime     | 1 hour                         | Fixed by GitHub | Minted per turn, cached in Redis just under 1 hour, self-expires |
 
@@ -66070,7 +66071,7 @@ Langy runs one isolated worker per conversation. `LANGY_MAX_WORKERS` caps how ma
 
 ### Idle worker reap
 
-A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so no sensitive data stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. See [Sandbox](/langy/security/sandbox).
+A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so no sensitive data stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. A worker older than `LANGY_WORKER_MAX_AGE_MS` (default 5 hours) is replaced between turns, never during one, so its session key never expires mid-conversation; the next turn gets a fresh worker and key and resumes the session. See [Sandbox](/langy/security/sandbox).
 
 ### Per-session LangWatch API key
 
@@ -69752,7 +69753,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.26.0 # x-release-please-version
+    targetRevision: 3.27.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -69807,7 +69808,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.26.0 # x-release-please-version
+      targetRevision: 3.27.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -70216,7 +70217,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.26.0 # x-release-please-version
+VERSION=3.27.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -70232,13 +70233,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.26.0" # x-release-please-version
+    tag: "3.27.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.26.0" # x-release-please-version
+    tag: "3.27.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.26.0" # x-release-please-version
+    tag: "3.27.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -71643,6 +71644,7 @@ The agent-side variables (`LANGY_*` apart from the one below) are set on the `la
 |---|---|---|---|
 | `LANGY_MAX_WORKERS` | Max concurrent worker subprocesses before the pod returns 503. | No | `20` |
 | `LANGY_WORKER_IDLE_MS` | Idle-worker reap timeout. | No | `600000` (10 min) |
+| `LANGY_WORKER_MAX_AGE_MS` | Max worker age. A worker older than this is replaced between turns, so its session key (6 hours) never expires mid-conversation. | No | `18000000` (5 hours) |
 | `LANGY_READINESS_TIMEOUT_MS` | How long to wait for a freshly spawned worker to report ready. The Go default is 15000; the chart raises it to 60000 for gVisor cold boot. | No | `60000` (chart) |
 | `LANGY_WORKSPACE_ROOT` | Writable workspace root (an `emptyDir` mount). | No | `/workspace` |
 
@@ -75244,7 +75246,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.26.0 \
+  --version 3.27.0 \
   -f values-production.yaml
 # x-release-please-end
 ```

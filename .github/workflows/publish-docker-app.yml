@@ -331,6 +331,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: [extract-version]
     if: needs.extract-version.outputs.is_release == 'true'
+    # The workflow group above is per ref, so two releases could overlap and an
+    # older run could move latest back after a newer one. One group for every
+    # release run makes them take turns. Trade-off: GitHub keeps one waiting run
+    # per group, so a third release queued meanwhile cancels the waiting one
+    # before it starts. That release then needs a re-run, and its chart release
+    # waits for it. A wrong latest, by contrast, would go unnoticed.
+    concurrency:
+      group: publish-pii-redaction-model-latest
+      cancel-in-progress: false
     permissions:
       contents: write # upload the SBOMs to the release
       id-token: write # AWS OIDC and keyless signing via Sigstore
