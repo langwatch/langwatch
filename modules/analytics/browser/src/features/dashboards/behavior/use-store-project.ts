@@ -13,7 +13,12 @@ export type StoreProject = {
   storeProject: DashboardProject | undefined;
   /** The names the boards stored there already have, so a new one is numbered past them. */
   namesInStore: readonly string[];
+  /** Whether it also grants `analytics:update`, which a board made Only me or Organization asks. */
+  mayShare: boolean;
   isLoading: boolean;
+  /** Why the store projects could not be read, after their retries; null while none failed. */
+  error: unknown;
+  retry: () => void;
 };
 
 export function useStoreProject({ enabled = true }: { enabled?: boolean } = {}): StoreProject {
@@ -32,11 +37,14 @@ export function useStoreProject({ enabled = true }: { enabled?: boolean } = {}):
   const isPending = (read: { data?: unknown; isError: boolean }) =>
     read.data === void 0 && !read.isError;
   const isLoading = asks && (isPending(candidates) || isPending(listed));
+  const read = { isLoading, error: candidates.error, retry: () => void candidates.refetch() };
   const projects = candidates.data ?? [];
   const storeProject = projects.find((project) => project.id === lastUsedId) ?? projects[0];
-  if (!storeProject) return { storeProject, namesInStore: [], isLoading };
+  if (!storeProject) return { storeProject, namesInStore: [], mayShare: false, ...read };
+  const update = { projectId: storeProject.id, permission: "analytics:update" };
+  const mayShare = host.hasPermissionIn(update);
   const namesInStore = (listed.data ?? [])
     .filter((board) => board.project?.id === storeProject.id)
     .map((board) => board.name);
-  return { storeProject, namesInStore, isLoading };
+  return { storeProject, namesInStore, mayShare, ...read };
 }

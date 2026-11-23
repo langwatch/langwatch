@@ -7,6 +7,7 @@
 import {
   PrismaConfigService,
   PrismaConnectionService,
+  PrismaShutdownService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -166,6 +167,7 @@ describe.skipIf(connection === null)("given the Postgres project repository", ()
     await prisma.project.deleteMany({ where: { id: { in: made.projects } } });
     await prisma.team.deleteMany({ where: { id: made.team } });
     await prisma.organization.deleteMany({ where: { id: made.organization } });
+    if (connection) await PrismaShutdownService.create().shutdown(connection);
   });
 
   contractCases(() => ({

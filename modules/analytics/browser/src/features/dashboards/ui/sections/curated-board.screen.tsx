@@ -75,7 +75,10 @@ function OpenCuratedBoard({
   // Whoever may create dashboards picks a widget for a new one; the rest ask Langy.
   const reader = useBoardReader();
   const store = useStoreProject({ enabled: atOrganization });
-  const mayCreate = atOrganization ? store.storeProject !== void 0 : reader.mayCreate;
+  // At the organization level the copy is Only me, which asks analytics:update too.
+  const mayCreate = atOrganization
+    ? store.storeProject !== void 0 && store.mayShare
+    : reader.mayCreate;
   const { createWithWidget } = useBoardFromTemplate({
     atOrganization,
     storeProject: store.storeProject,

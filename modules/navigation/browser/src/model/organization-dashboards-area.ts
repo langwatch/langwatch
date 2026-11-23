@@ -13,7 +13,10 @@ export type OrganizationFlagRead = {
 
 export type OrganizationDashboardsArea = "loading" | "open" | "closed" | "legacy";
 
-/** A failed read answers off rather than "not yet", or a refused reader waits forever. */
+/**
+ * A read that failed with no answer held is off rather than "not yet", or a refused reader
+ * waits forever; a failed refetch keeps the answer it held, as every held read does.
+ */
 export function organizationDashboardsArea({
   organizationId,
   organizationArea,

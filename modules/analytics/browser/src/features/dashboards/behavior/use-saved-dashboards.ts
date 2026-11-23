@@ -180,6 +180,8 @@ export function useSavedDashboards() {
     organizationBoards,
     /** True until the first list answer arrives, so a board lookup never reads "missing" early. */
     isLoading: list.data === void 0 && !list.isError,
+    /** A held list being read again: a board just made elsewhere may not be in it yet. */
+    isRefreshing: list.isFetching,
     loadError: list.error,
     isCreating: isMakingBoard || create.isPending || star.isPending,
     isDeleting: remove.isPending,

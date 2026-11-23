@@ -1,7 +1,7 @@
 /**
- * One row of the `/dashboards` library: the board's name linking to it, who sees it, its owner
- * and a "⋮" menu with what this member may do. A From LangWatch row reads "Read-only" and
- * "LangWatch", and offers only Star and "Duplicate to edit".
+ * One row of the `/dashboards` library: a star toggle, the board's name linking to it, who sees
+ * it, its owner and a "⋮" menu with what this member may do. A From LangWatch row reads
+ * "Read-only" and "LangWatch", and offers only Star and "Duplicate to edit".
  */
 
 import { Menu } from "@langwatch/design-system/menu";
@@ -20,8 +20,8 @@ import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
 import { InlineTextField } from "../elements/inline-text-field.tsx";
 
-/** Name, who sees it, owner, menu: the columns every row lines up on. */
-const ROW_COLUMNS = "minmax(0, 1fr) 150px 96px 28px";
+/** Star, name, who sees it, owner, menu: the columns every row lines up on. */
+const ROW_COLUMNS = "24px minmax(0, 1fr) 150px 96px 28px";
 
 /** The member's star on a row, offered as Star or Unstar. */
 export type LibraryRowStar = { isStarred: boolean; onToggle: () => void };
@@ -62,7 +62,7 @@ export function LibraryRow({
   // While renaming the menu is gone, so closing it cannot hand focus back and end the edit.
   const hasMenu =
     renaming === void 0 && [star, onRename, onDuplicate, remove].some((entry) => entry !== void 0);
-  const frame = { name, href, whoSees, isPrivate, owner, renaming };
+  const frame = { name, href, whoSees, isPrivate, owner, renaming, star };
   return (
     <RowFrame {...frame}>
       {hasMenu && (
@@ -103,7 +103,7 @@ export function CuratedLibraryRow({
   onDuplicate?: () => void;
 }) {
   return (
-    <RowFrame name={name} href={href} whoSees="Read-only" owner="LangWatch">
+    <RowFrame name={name} href={href} whoSees="Read-only" owner="LangWatch" star={star}>
       {(star !== void 0 || onDuplicate !== void 0) && (
         <RowMenu name={name}>
           {star && <StarItem star={star} />}
@@ -128,6 +128,25 @@ function StarItem({ star }: { star: LibraryRowStar }) {
   );
 }
 
+/** The row's own star: outline, filled once starred; the same write as the menu's Star. */
+function StarToggle({ name, star }: { name: string; star: LibraryRowStar | undefined }) {
+  // A board that opens nowhere cannot be starred; its column stays, so rows line up.
+  if (!star) return <Box />;
+  return (
+    <IconButton
+      size="2xs"
+      variant="ghost"
+      color={star.isStarred ? "orange.solid" : "fg.subtle"}
+      _hover={{ color: star.isStarred ? "orange.solid" : "fg" }}
+      aria-label={star.isStarred ? `Unstar ${name}` : `Star ${name}`}
+      aria-pressed={star.isStarred}
+      onClick={star.onToggle}
+    >
+      <Star size={14} fill={star.isStarred ? "currentColor" : "none"} aria-hidden />
+    </IconButton>
+  );
+}
+
 function DeleteItem({ onDelete }: { onDelete: (() => void) | undefined }) {
   return (
     <Menu.Item
@@ -149,6 +168,7 @@ function RowFrame({
   isPrivate = false,
   owner,
   renaming,
+  star,
   children,
 }: {
   name: string;
@@ -157,6 +177,7 @@ function RowFrame({
   isPrivate?: boolean;
   owner: string | undefined;
   renaming?: LibraryRowRenaming | undefined;
+  star: LibraryRowStar | undefined;
   children: ReactNode;
 }) {
   return (
@@ -172,6 +193,7 @@ function RowFrame({
       _hover={{ "& .row-menu": { opacity: 1 } }}
       _focusWithin={{ "& .row-menu": { opacity: 1 } }}
     >
+      <StarToggle name={name} star={star} />
       {renaming ? (
         <InlineTextField
           value={name}

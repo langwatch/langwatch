@@ -99,7 +99,7 @@ describe("a board opened at /dashboards/<id>", () => {
       expect(await screen.findByRole("heading", { name: UNAVAILABLE })).toBeVisible();
       expect(screen.queryByText("Everyone's board")).not.toBeInTheDocument();
       expect(host.replacements).toEqual([]);
-      await user.click(screen.getByRole("button", { name: "Back to Dashboards" }));
+      await user.click(screen.getByRole("link", { name: "Back to Dashboards" }));
       expect(host.navigations).toEqual(["/dashboards"]);
     });
   });
@@ -171,7 +171,7 @@ describe("a board of a project the member cannot read, opened at a project's add
     const { host } = openUnavailable({ libraryOpen: true });
 
     expect(await screen.findByRole("heading", { name: UNAVAILABLE })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Back to Dashboards" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Back to Dashboards" })).toBeVisible();
     expect(host.navigations).toEqual([]);
     expect(document.body.textContent).not.toContain("Ops");
   });
@@ -179,7 +179,7 @@ describe("a board of a project the member cannot read, opened at a project's add
   it("goes back to the library while the organization's flags open the area", async () => {
     const { host, user } = openUnavailable({ libraryOpen: true });
 
-    await user.click(await screen.findByRole("button", { name: "Back to Dashboards" }));
+    await user.click(await screen.findByRole("link", { name: "Back to Dashboards" }));
 
     expect(host.navigations).toEqual(["/dashboards"]);
   });
@@ -189,7 +189,7 @@ describe("a board of a project the member cannot read, opened at a project's add
 
     const heading = await screen.findByRole("heading", { name: "This dashboard is not available" });
     expect(heading).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Back to Dashboards" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Back to Dashboards" })).not.toBeInTheDocument();
   });
 });
 

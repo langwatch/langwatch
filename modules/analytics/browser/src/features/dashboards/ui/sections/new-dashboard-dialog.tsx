@@ -6,7 +6,7 @@
 
 import type { DashboardScope } from "@langwatch/dashboard-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Field, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, Field, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { useState } from "react";
 
@@ -18,12 +18,21 @@ type SharingChoice = { scope: DashboardScope; title: string; hint: string };
 function sharingChoices({
   projectName,
   organizationName,
+  mayShare,
 }: {
   projectName: string;
   organizationName: string;
+  mayShare: boolean;
 }): SharingChoice[] {
+  const project: SharingChoice = {
+    scope: "PROJECT",
+    title: "Project",
+    hint: `Everyone in ${projectName}`,
+  };
+  // Another scope asks analytics:update too, so a seat without it is offered Project alone.
+  if (!mayShare) return [project];
   return [
-    { scope: "PROJECT", title: "Project", hint: `Everyone in ${projectName}` },
+    project,
     { scope: "ORGANIZATION", title: "Organization", hint: `Everyone in ${organizationName}` },
     { scope: "PRIVATE", title: "Only me", hint: "You can share it later" },
   ];
@@ -58,13 +67,15 @@ function SharingFieldset({
   onScope,
   projectName,
   organizationName,
+  mayShare,
 }: {
   scope: DashboardScope;
   onScope: (scope: DashboardScope) => void;
   projectName: string;
   organizationName: string;
+  mayShare: boolean;
 }) {
-  const choices = sharingChoices({ projectName, organizationName });
+  const choices = sharingChoices({ projectName, organizationName, mayShare });
   return (
     <VStack as="fieldset" align="stretch" gap={1.5}>
       <Text as="legend" textStyle="caption" fontWeight="medium" color="fg.muted">
@@ -100,6 +111,7 @@ export function NewDashboardDialog({
   takenNames,
   projectName,
   organizationName,
+  mayShare,
   isCreating,
   onCreate,
   onClose,
@@ -108,6 +120,8 @@ export function NewDashboardDialog({
   takenNames: readonly string[];
   projectName: string;
   organizationName: string;
+  /** Whether the member may make it Only me or Organization there too. */
+  mayShare: boolean;
   isCreating: boolean;
   /** Makes the board; true once it is made, which closes the dialog. */
   onCreate: (input: { name: string; scope: DashboardScope }) => Promise<boolean>;
@@ -133,8 +147,19 @@ export function NewDashboardDialog({
       onClose={onClose}
       title="New dashboard"
       busy={isCreating}
+      showCloseButton={false}
       onSubmit={() => void submit()}
-      primaryAction={{ label: "Create", type: "submit", loading: isCreating }}
+      // The approved design's teal Create, which the frame's accent primary cannot paint.
+      footerContent={
+        <HStack justify="flex-end" gap={2} width="full">
+          <Button size="sm" variant="ghost" disabled={isCreating} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button size="sm" type="submit" colorPalette="teal" loading={isCreating}>
+            Create
+          </Button>
+        </HStack>
+      }
     >
       <VStack align="stretch" gap={4}>
         <NameField name={name} onName={setName} isMissing={attempted && !name.trim()} />
@@ -143,6 +168,7 @@ export function NewDashboardDialog({
           onScope={setScope}
           projectName={projectName}
           organizationName={organizationName}
+          mayShare={mayShare}
         />
         <Text textStyle="caption" color="fg.subtle">
           Lives in LLM Ops, stored in {projectName}.

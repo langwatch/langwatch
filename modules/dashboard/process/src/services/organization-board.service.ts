@@ -67,9 +67,9 @@ export class OrganizationBoardService {
       .filter((board) => board.scope === "ORGANIZATION" && board.organizationId === organizationId)
       .map((board) => board.projectId);
     const enabled = await this.#enabledIds([...readable.map(({ id }) => id), ...sharedOwnerIds]);
-    if (enabled.length === 0) throw new DashboardsNotEnabledError({ scope: "organization" });
-
     const opensIn = byName(readable.filter(({ id }) => enabled.includes(id)));
+    // No readable project with Dashboards on: no board could open, an Organization one included.
+    if (opensIn.length === 0) throw new DashboardsNotEnabledError({ scope: "organization" });
     const opensInById = new Map(opensIn.map((project) => [project.id, project]));
     // An unreadable owner's Organization board opens as a guest in a project the member reads.
     const [guestProject] = opensIn;

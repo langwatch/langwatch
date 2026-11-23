@@ -191,6 +191,17 @@ describe("the organization's Dashboards library", () => {
     });
   });
 
+  describe("given Dashboards off in every project the member reads, but on in another", () => {
+    it("refuses the library as not enabled, since no Organization board could open", async () => {
+      const { board, caller } = await library({ readable: [SHOP], dashboardsOffIn: [SHOP] });
+      await board({ projectId: OPS, name: "Ops for everyone", scope: "ORGANIZATION" });
+
+      await expect(caller.listInOrganization({ organizationId: ACME })).rejects.toMatchObject({
+        cause: { code: "dashboards_not_enabled" },
+      });
+    });
+  });
+
   describe("given boards the member starred", () => {
     it("places each listed board in the member's star order, and the rest nowhere", async () => {
       const { board, caller, star } = await library({ readable: [SHOP] });

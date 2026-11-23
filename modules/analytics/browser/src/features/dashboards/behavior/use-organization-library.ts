@@ -36,12 +36,19 @@ export function useOrganizationLibrary() {
   return {
     organizationId,
     storeProject,
+    mayShare: store.mayShare,
     boards: (list.data ?? []).map(libraryBoardOf),
     namesInStore,
     // With no organization the read never starts, so it is not loading either.
     isLoading: organizationId !== "" && list.data === void 0 && !list.isError,
-    loadError: list.error,
-    retry: () => void list.refetch(),
+    /** Whether a list is held, so a failed read beside it keeps the rows on screen. */
+    hasList: list.data !== void 0,
+    // A failed store read hides the create paths, so it is said and retried like the list.
+    loadError: list.error ?? store.error,
+    retry: () => {
+      void list.refetch();
+      store.retry();
+    },
     ...creating,
     ...deleting,
     duplicateBoard,

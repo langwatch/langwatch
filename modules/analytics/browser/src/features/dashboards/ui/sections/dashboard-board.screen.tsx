@@ -306,11 +306,13 @@ function OpenBoard({ board, atOrganization }: { board: SavedBoard; atOrganizatio
 /** The board the address names, in the project in view; the org-level page runs it too. */
 export function Board({ atOrganization = false }: { atOrganization?: boolean }) {
   const dashboardId = useAnalyticsHost().route().params.dashboardId;
-  const { boards, organizationBoards, isLoading, loadError } = useSavedDashboards();
+  const { boards, organizationBoards, isLoading, isRefreshing, loadError } = useSavedDashboards();
   if (isLoading) return <UiPageLoading />;
   // A member the list refuses sees the page the flag being off shows (AC21).
   if (loadError) return <UiPageNotFound />;
   const board = [...boards, ...organizationBoards].find(({ id }) => id === dashboardId);
+  // A board made a moment ago is missing from the list held before it; wait for the re-read.
+  if (!board && isRefreshing) return <UiPageLoading />;
   // A deleted board and one set to Only me read the same: the server tells neither apart.
   if (!board) return <ProjectBoardUnavailable />;
   // Keyed so a board's in-flight edits never leak into the next board.

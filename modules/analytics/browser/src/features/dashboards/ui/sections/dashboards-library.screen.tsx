@@ -11,7 +11,7 @@ import { Box, Button, Heading, HStack, Text, VStack } from "@langwatch/design-sy
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { LayoutDashboard, Plus } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { useBoardReader } from "../../behavior/use-board-access.ts";
 import { useOrganizationLibrary } from "../../behavior/use-organization-library.ts";
@@ -34,7 +34,6 @@ const deleteMessage = (name: string) =>
 
 export default function DashboardsLibraryScreen() {
   const library = useOrganizationLibrary();
-  const { organizationName } = useBoardReader();
   const [isCreating, setIsCreating] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<LibraryBoard | undefined>();
   const { storeProject } = library;
@@ -52,36 +51,21 @@ export default function DashboardsLibraryScreen() {
     : {};
   const groups = libraryGroups({ boards: library.boards, curated: CURATED_BOARDS });
   const newButton = mayCreate ? (
-    <Button size="sm" onClick={() => setIsCreating(true)}>
+    <Button size="sm" colorPalette="teal" onClick={() => setIsCreating(true)}>
       <Plus size={14} aria-hidden />
       New dashboard
     </Button>
   ) : null;
+  const loadError = library.loadError ? (
+    <LoadError error={library.loadError} onRetry={library.retry} />
+  ) : null;
 
   return (
     <Box width="full" maxWidth="960px" marginX="auto" paddingX={6} paddingY={8}>
-      <HStack justify="space-between" align="start" marginBottom={6}>
-        <VStack align="start" gap={1}>
-          <Heading as="h1" textStyle="pageTitle">
-            {LIBRARY_HEADER.title}
-          </Heading>
-          <Text textStyle="bodySm" color="fg.muted">
-            {LIBRARY_HEADER.hint}
-          </Text>
-        </VStack>
-        {newButton}
-      </HStack>
-
-      {library.loadError ? (
-        <VStack align="start" gap={2}>
-          <HandledErrorAlert
-            error={library.loadError}
-            fallbackTitle="Couldn't load your dashboards."
-          />
-          <Button size="xs" variant="outline" onClick={library.retry}>
-            Retry
-          </Button>
-        </VStack>
+      <LibraryHeader action={newButton} />
+      {/* A failed read with a list held keeps the rows, saying the failure above them. */}
+      {loadError && !library.hasList ? (
+        loadError
       ) : groups.length === 0 ? (
         <NoDataInfoBlock
           icon={<LayoutDashboard size={20} />}
@@ -91,6 +75,7 @@ export default function DashboardsLibraryScreen() {
         />
       ) : (
         <VStack align="stretch" gap={6}>
+          {loadError}
           {groups.map((group) => (
             <ProductGroup
               key={group.label}
@@ -101,21 +86,77 @@ export default function DashboardsLibraryScreen() {
           ))}
         </VStack>
       )}
+      <LibraryDialogs
+        library={library}
+        isCreating={isCreating}
+        onCloseCreate={() => setIsCreating(false)}
+        pendingDelete={pendingDelete}
+        onSettleDelete={() => setPendingDelete(void 0)}
+      />
+    </Box>
+  );
+}
 
+function LibraryHeader({ action }: { action: ReactNode }) {
+  return (
+    <HStack justify="space-between" align="start" marginBottom={6}>
+      <VStack align="start" gap={1}>
+        <Heading as="h1" textStyle="pageTitle">
+          {LIBRARY_HEADER.title}
+        </Heading>
+        <Text textStyle="bodySm" color="fg.muted">
+          {LIBRARY_HEADER.hint}
+        </Text>
+      </VStack>
+      {action}
+    </HStack>
+  );
+}
+
+function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  return (
+    <VStack align="start" gap={2}>
+      <HandledErrorAlert error={error} fallbackTitle="Couldn't load your dashboards." />
+      <Button size="xs" variant="outline" onClick={onRetry}>
+        Retry
+      </Button>
+    </VStack>
+  );
+}
+
+/** The create dialog and the delete confirmation; the screen owns which is open. */
+function LibraryDialogs({
+  library,
+  isCreating,
+  onCloseCreate,
+  pendingDelete,
+  onSettleDelete,
+}: {
+  library: ReturnType<typeof useOrganizationLibrary>;
+  isCreating: boolean;
+  onCloseCreate: () => void;
+  pendingDelete: LibraryBoard | undefined;
+  onSettleDelete: () => void;
+}) {
+  const { organizationName } = useBoardReader();
+  const { storeProject } = library;
+  return (
+    <>
       {isCreating && storeProject && (
         <NewDashboardDialog
           takenNames={library.namesInStore}
           projectName={storeProject.name}
           organizationName={organizationName}
+          mayShare={library.mayShare}
           isCreating={library.isCreating}
           onCreate={library.createBoard}
-          onClose={() => setIsCreating(false)}
+          onClose={onCloseCreate}
         />
       )}
       <ConfirmDialog
         open={pendingDelete !== void 0}
         onOpenChange={(isOpen) => {
-          if (!isOpen) setPendingDelete(void 0);
+          if (!isOpen) onSettleDelete();
         }}
         title="Delete dashboard"
         message={deleteMessage(pendingDelete?.name ?? "")}
@@ -124,10 +165,10 @@ export default function DashboardsLibraryScreen() {
         loading={library.isDeleting}
         onConfirm={() => {
           if (!pendingDelete) return;
-          library.deleteBoard({ board: pendingDelete, onDeleted: () => setPendingDelete(void 0) });
+          library.deleteBoard({ board: pendingDelete, onDeleted: onSettleDelete });
         }}
       />
-    </Box>
+    </>
   );
 }
 

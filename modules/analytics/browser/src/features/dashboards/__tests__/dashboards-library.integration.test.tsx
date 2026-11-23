@@ -91,7 +91,10 @@ function renderLibrary({
   ...options
 }: StubAnalyticsHostOptions & { listed?: unknown } = {}) {
   const host = new StubAnalyticsHost({
-    projectPermissions: { [SHOP.id]: ["analytics:view", "analytics:update", "analytics:delete"] },
+    projectPermissions: {
+      [SHOP.id]: ["analytics:view", "analytics:update", "analytics:delete"],
+      [IN_VIEW.id]: ["analytics:create", "analytics:update"],
+    },
     ...options,
   });
   const server = libraryServer(listed);
@@ -255,6 +258,28 @@ describe("the Dashboards library", () => {
       await waitFor(() =>
         expect(inputsTo(calls, "boards.unstar")).toEqual([
           { projectId: SHOP.id, star: { kind: "board", dashboardId: "board-shop" } },
+        ]),
+      );
+    });
+
+    /** @scenario "Delete, rename, star and duplicate from the library" */
+    it("stars and unstars from the row's own toggle, filled once starred", async () => {
+      const { calls, user } = renderLibrary({
+        listed: [
+          row({ id: "board-shop", name: "Shop board", starPosition: 0 }),
+          row({ id: "board-org", name: "Everyone's board", scope: "ORGANIZATION", project: null }),
+        ],
+      });
+
+      const starred = await screen.findByRole("button", { name: "Unstar Shop board" });
+      expect(starred).toHaveAttribute("aria-pressed", "true");
+      await user.click(starred);
+      await user.click(screen.getByRole("button", { name: "Star Everyone's board" }));
+
+      await waitFor(() =>
+        expect([...inputsTo(calls, "boards.unstar"), ...inputsTo(calls, "boards.star")]).toEqual([
+          { projectId: SHOP.id, star: { kind: "board", dashboardId: "board-shop" } },
+          { projectId: IN_VIEW.id, star: { kind: "board", dashboardId: "board-org" } },
         ]),
       );
     });

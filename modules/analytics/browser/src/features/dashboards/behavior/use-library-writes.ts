@@ -14,11 +14,16 @@ import { dashboardCreated, dashboardDeleted } from "../model/dashboard-usage-eve
 import type { LibraryBoard } from "../model/organization-library.ts";
 import { useStoreProject } from "./use-store-project.ts";
 
-/** Re-reads the library after a write, so the list shows it. */
+/** Re-reads the library and the written project's lists, so every sidebar and list shows it. */
 function useLibraryRefresh() {
   const utils = analyticsApi.useUtils();
   const organizationId = useAnalyticsHost().organizationId() ?? "";
-  return () => utils.boards.listInOrganization.invalidate({ organizationId });
+  return ({ projectId }: { projectId: string }) =>
+    Promise.all([
+      utils.boards.listInOrganization.invalidate({ organizationId }),
+      utils.boards.getAll.invalidate({ projectId }),
+      utils.boards.listStarred.invalidate({ projectId }),
+    ]);
 }
 
 export function useLibraryCreate() {
@@ -40,7 +45,7 @@ export function useLibraryCreate() {
           ? await create.mutateAsync({ projectId, name })
           : await createAtScope.mutateAsync({ projectId, name, scope });
       analytics.track(dashboardCreated({ createdFrom: "blank" }));
-      void refresh();
+      void refresh({ projectId });
       host.succeeded({ title: "Dashboard created" });
       // Only a Project board lives at its project's address (ADR-002, decision 4).
       host.navigate(
@@ -67,13 +72,14 @@ export function useLibraryDelete() {
 
   const deleteBoard = ({ board, onDeleted }: { board: LibraryBoard; onDeleted: () => void }) => {
     if (!board.project) return;
+    const projectId = board.project.id;
     remove.mutate(
-      { projectId: board.project.id, dashboardId: board.id },
+      { projectId, dashboardId: board.id },
       {
         onSuccess: () => {
           analytics.track(dashboardDeleted());
           host.succeeded({ title: `"${board.name}" deleted` });
-          void refresh();
+          void refresh({ projectId });
           // The plan limit counts dashboards, so a delete frees an allowance.
           void utils.licenseEnforcement.checkLimit.invalidate();
           onDeleted();

@@ -6,7 +6,8 @@
  */
 
 import { SidebarSection, SidebarSectionLabel } from "@langwatch/design-system/app-shell";
-import { VStack } from "@langwatch/design-system/primitives";
+import { HStack, VStack } from "@langwatch/design-system/primitives";
+import { ChevronDown, LayoutDashboard } from "lucide-react";
 import { useState } from "react";
 
 import { useOrganizationStars } from "../../behavior/use-organization-stars.ts";
@@ -23,7 +24,13 @@ export function OrganizationStarredSection() {
   return (
     <SidebarSection
       label={LABEL}
-      heading={<SidebarSectionLabel label={LABEL} />}
+      heading={
+        // The design's chevron shows open too; folded, the section draws its own.
+        <HStack gap={1}>
+          <SidebarSectionLabel label={LABEL} />
+          {isExpanded && <ChevronDown size={11} aria-hidden opacity={0.5} />}
+        </HStack>
+      }
       isExpanded={isExpanded}
       onToggle={() => setIsExpanded(!isExpanded)}
       showExpanded
@@ -38,7 +45,12 @@ export function OrganizationStarredSection() {
         width="full"
       >
         {links.slice(0, STARRED_SHOWN_MAX).map((link) => (
-          <SidebarLinkRow key={link.key} name={link.name} href={link.href} />
+          <SidebarLinkRow
+            key={link.key}
+            name={link.name}
+            href={link.href}
+            icon={<LayoutDashboard size={14} />}
+          />
         ))}
         {links.length > STARRED_SHOWN_MAX && (
           <SidebarLinkRow

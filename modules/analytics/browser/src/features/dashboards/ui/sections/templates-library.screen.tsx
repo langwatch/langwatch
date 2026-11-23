@@ -122,8 +122,9 @@ export function TemplatesLibrary({ atOrganization = false }: { atOrganization?: 
   const saved = useSavedDashboards();
   const store = useStoreProject({ enabled: atOrganization });
   const fromTemplate = useBoardFromTemplate({ atOrganization, storeProject: store.storeProject });
-  // At the organization level, with no project to store it in, nothing makes a board (ADR-002).
-  const offersAdd = !atOrganization || store.storeProject !== void 0;
+  // At the organization level a board is made Only me in the store project, so it needs both
+  // grants there (ADR-002); with none, nothing makes a board.
+  const offersAdd = !atOrganization || (store.storeProject !== void 0 && store.mayShare);
   const langy = useLangyAsk();
   // The library's address carries no period, so this is the one a new board opens on.
   const { period } = useBoardPeriod();

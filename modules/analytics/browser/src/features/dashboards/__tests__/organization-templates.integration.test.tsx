@@ -76,7 +76,10 @@ function inMemoryServer() {
 
 function openTemplates() {
   const server = inMemoryServer();
-  const host = new StubAnalyticsHost({ flags: { release_dashboards: true } });
+  const host = new StubAnalyticsHost({
+    flags: { release_dashboards: true },
+    projectPermissions: { [STORE.id]: ["analytics:create", "analytics:update"] },
+  });
   renderDashboards({ element: <OrganizationTemplatesScreen />, host, answer: server.answer });
   const inputsTo = (path: string) =>
     server.state.calls.filter((call) => call.path === path).map((call) => call.input);

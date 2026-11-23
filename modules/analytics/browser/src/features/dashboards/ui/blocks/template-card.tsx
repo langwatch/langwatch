@@ -206,7 +206,7 @@ export function AddTemplateButton({
     <Button
       size="sm"
       variant="solid"
-      colorPalette="accent"
+      colorPalette="teal"
       aria-label={inProject ? `Add ${name} to this project` : `Add ${name}`}
       loading={isCreating}
       loadingText="Adding…"

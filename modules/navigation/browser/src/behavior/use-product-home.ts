@@ -16,9 +16,15 @@ export function useHasOrganizationLibrary(): boolean {
   return useOrganizationLibrary() === true;
 }
 
-/** Where the product switcher and the rail open each product. */
+/**
+ * Where the product switcher and the rail open each product. Dashboards has none while the
+ * library's flags load, so a click then opens nothing rather than the wrong Dashboards.
+ */
 export function useProductHome(): (product: ProductDefinition) => string | null {
   const projectSlug = useLlmOpsProjectSlug();
-  const hasOrganizationLibrary = useHasOrganizationLibrary();
-  return (product) => productHomeHref({ product, projectSlug, hasOrganizationLibrary });
+  const library = useOrganizationLibrary();
+  return (product) => {
+    if (product.id === "dashboards" && library === void 0) return null;
+    return productHomeHref({ product, projectSlug, hasOrganizationLibrary: library === true });
+  };
 }

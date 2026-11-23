@@ -8,7 +8,7 @@ import { Button, Heading, Text, VStack } from "@langwatch/design-system/primitiv
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
+import { Link } from "../../../../ui/elements/analytics-link.tsx";
 import { BOARD_UNAVAILABLE } from "../../model/board-scope.ts";
 import { ORGANIZATION_DASHBOARDS_PATH } from "../../model/boards.ts";
 import { ORGANIZATION_BOARD_UNAVAILABLE } from "../../model/organization-board.ts";
@@ -38,19 +38,16 @@ export function BoardUnavailable({
   );
 }
 
-/** The organization's area's wording (ADR-002), with the way back to its library. */
+/** The organization's area's wording (ADR-002), with a link back to its library. */
 export function OrganizationBoardUnavailable() {
-  const host = useAnalyticsHost();
   return (
     <BoardUnavailable
       copy={{ title: ORGANIZATION_BOARD_UNAVAILABLE.title }}
       action={
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => host.navigate(ORGANIZATION_DASHBOARDS_PATH)}
-        >
-          {ORGANIZATION_BOARD_UNAVAILABLE.back}
+        <Button asChild size="sm" variant="outline">
+          <Link href={ORGANIZATION_DASHBOARDS_PATH} _hover={{ textDecoration: "none" }}>
+            {ORGANIZATION_BOARD_UNAVAILABLE.back}
+          </Link>
         </Button>
       }
     />
