@@ -11844,7 +11844,7 @@
         },
         {
           "name": "analytics.gateway_budget_bucket_boundaries",
-          "description": "Rows of the GatewayBudgetBucketBoundary table, one row per (GatewayBudgetBucketBoundaryId), counted once across the projects read, under the lowest project id.",
+          "description": "Rows of the GatewayBudgetBucketBoundary table, one row per (GatewayBudgetBucketBoundaryId), counted once across the projects read, under the lowest project id. Boundaries of a budget that gateway_budgets leaves out are not queryable either.",
           "grain": "one row per (GatewayBudgetBucketBoundaryId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
@@ -12057,7 +12057,7 @@
         },
         {
           "name": "analytics.gateway_budgets",
-          "description": "Rows of the GatewayBudget table, one row per (GatewayBudgetId), counted once across the projects read, under the lowest project id. Budgets scoped to one member or to a personal key are not queryable.",
+          "description": "Rows of the GatewayBudget table, one row per (GatewayBudgetId), counted once across the projects read, under the lowest project id. Budgets scoped to one member or to a personal key, or capping each end user of a personal key, are not queryable.",
           "grain": "one row per (GatewayBudgetId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",

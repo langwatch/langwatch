@@ -865,6 +865,7 @@ describe("the gateway budget routes behind the key door", () => {
       const app = createApiFixture<GatewayApi>({
         getKeyCaller,
         createBudget,
+        assertBudgetScopeOpensFor: async () => undefined,
         groupMemberCounts: async () => new Map<string, number>(),
         budgetScopeReach: async () => ({
           reachable: true,
