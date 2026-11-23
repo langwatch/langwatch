@@ -17,8 +17,11 @@ const DEVICE_CODE_PREFIX = "lwcli:device:";
 /** Redis key prefix for the per-device-code poll window. */
 const POLL_RATE_PREFIX = "lwcli:poll:";
 
-/** Lifetime of an unredeemed device_code, in seconds. */
-export const DEVICE_CODE_TTL_SECONDS = 600; // 10 min
+/**
+ * Lifetime of an unredeemed device_code: 15 min, RFC 8628's example and GitHub's, long enough
+ * for a person to read a link an agent sent them minutes later.
+ */
+export const DEVICE_CODE_TTL_SECONDS = 15 * 60;
 /** Minimum poll interval the CLI should respect. */
 export const MIN_POLL_INTERVAL_SECONDS = 5;
 /** Access token lifetime. Short; refresh is the rotation path. */

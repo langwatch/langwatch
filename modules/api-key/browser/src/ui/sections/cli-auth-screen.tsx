@@ -82,7 +82,7 @@ function expiryTextFor(lookup: DeviceCodeLookupState): string | null {
     0,
     Math.round((lookup.expiresAt - nowInstant().epochMilliseconds) / 1000),
   );
-  const minutes = Math.floor(seconds / 60);
+  const minutes = Math.round(seconds / 60);
   return minutes > 0 ? `Expires in ~${minutes} min` : `Expires in ${seconds}s`;
 }
 
@@ -559,7 +559,7 @@ export default function CliAuthScreen() {
             <Stack direction={{ base: "column", sm: "row" }} gap={3}>
               <Button
                 colorPalette="orange"
-                flex={1}
+                flex={PRIMARY_ACTION_FLEX}
                 onClick={() => void handleApprove()}
                 loading={isSubmitting}
                 disabled={isSelectionIncomplete}
@@ -576,6 +576,12 @@ export default function CliAuthScreen() {
     </CliAuthContainer>
   );
 }
+
+/**
+ * The primary action takes the spare width only once the actions sit in a row: stacked, a
+ * `flex: 1` sets its height basis to zero and shrinks it below the Deny button.
+ */
+const PRIMARY_ACTION_FLEX = { base: "none", sm: 1 } as const;
 
 function DenyButton({ isSubmitting, onDeny }: { isSubmitting: boolean; onDeny: () => void }) {
   return (
@@ -689,7 +695,7 @@ function CodeConfirmation({
         ) : null}
       </Text>
       <Stack direction={{ base: "column", sm: "row" }} gap={3}>
-        <Button colorPalette="orange" flex={1} onClick={onConfirm}>
+        <Button colorPalette="orange" flex={PRIMARY_ACTION_FLEX} onClick={onConfirm}>
           Confirm
         </Button>
         <DenyButton isSubmitting={isSubmitting} onDeny={onDeny} />

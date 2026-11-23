@@ -82,6 +82,8 @@ You'll see two questions:
 
 The browser shows an "Approve" or "Send API key" button (depending on the chosen mode); after you click, the credential is delivered back to the CLI over the same RFC 8628 device-code poll. **You never copy-paste a key.**
 
+The code in the link is valid for 15 minutes. If the command stops before you approve, for example when an agent's command times out, run the same `langwatch login` again (from the same folder for a project key login): it waits on the code it already printed instead of starting a new one, and picks up an approval you gave while no command was running.
+
 ### What the login key can access
 
 The AI-tools login mints a login key that inherits your own access. The authorize screen shows the scopes and permissions before you approve:

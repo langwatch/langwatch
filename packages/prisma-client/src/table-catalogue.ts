@@ -106,6 +106,7 @@ export const prismaTableCatalogue = {
   "TraceEditOverlay": "TraceEditOverlay",
   "TraceIngestSourceBilling": "TraceIngestSourceBilling",
   "RetentionPolicy": "RetentionPolicy",
+  "RetentionApplyStatus": "RetentionApplyStatus",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
   "InstantEvalJudgeProject": "InstantEvalJudgeProject",
   "InstantEvalJudgeUsageBilling": "InstantEvalJudgeUsageBilling",
@@ -1912,6 +1913,22 @@ export const prismaModelFieldCatalogue = {
     "retentionDays",
     "createdAt",
     "updatedAt"
+  ],
+  "RetentionApplyStatus": [
+    "id",
+    "organizationId",
+    "scopeType",
+    "scopeId",
+    "changedAt",
+    "appliedAt",
+    "raisedAt",
+    "shortenedAt",
+    "createdAt",
+    "updatedAt",
+    "occurredAt",
+    "acceptedAt",
+    "lastEventId",
+    "projectionVersion"
   ],
   "DataPrivacyPolicy": [
     "id",
@@ -3840,6 +3857,7 @@ export const prismaRelationCatalogue = {
   },
   "TraceIngestSourceBilling": {},
   "RetentionPolicy": {},
+  "RetentionApplyStatus": {},
   "DataPrivacyPolicy": {},
   "InstantEvalJudgeProject": {},
   "InstantEvalJudgeUsageBilling": {},
