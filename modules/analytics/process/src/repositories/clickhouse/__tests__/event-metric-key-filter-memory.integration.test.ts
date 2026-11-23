@@ -14,8 +14,9 @@ const TABLE = `event_metric_keys_${nanoid(8).replace(/[^A-Za-z0-9]/g, "x")}`;
 const SPAN_COUNT = 70_000;
 const EVENTS_PER_SPAN = 8;
 const KEYS_PER_EVENT = 20;
+const SEED_SLICE = 10_000;
 const FILTER_KEYS = ["zz1", "zz2", "zz3", "zz4", "zz5", "event.metrics.k3_4"];
-/** A lambda over the keys peaked near 100 MiB here; one hasAny per event near 43 MiB. */
+/** A lambda over the keys peaked near 99 MiB here; one hasAny per event near 50 MiB. */
 const MEMORY_CAP_BYTES = "70000000";
 
 /** The span-side condition of the translated filter, with the table's own column names. */
@@ -42,15 +43,21 @@ describe("given spans whose events carry attribute maps", () => {
       query: `CREATE TABLE ${TABLE} (id UInt64, Events Nested(Name String, Attributes Map(String, String)))
         ENGINE = MergeTree ORDER BY id`,
     });
-    await ch.command({
-      query: `INSERT INTO ${TABLE} SELECT number,
-        arrayMap(e -> concat('evt', toString((number + e) % 3)), range(${EVENTS_PER_SPAN})),
-        arrayMap(e -> CAST(mapFromArrays(
-          arrayMap(i -> concat('event.metrics.k', toString(i), '_', toString(number % 11)), range(${KEYS_PER_EVENT})),
-          arrayMap(i -> concat(repeat('v', 40), toString(number)), range(${KEYS_PER_EVENT}))
-        ) AS Map(String, String)), range(${EVENTS_PER_SPAN}))
-        FROM numbers(${SPAN_COUNT})`,
-    });
+    // Seeded in slices: one 70k-row insert of generated maps passes the 1 GiB a CI server allows.
+    for (let start = 0; start < SPAN_COUNT; start += SEED_SLICE) {
+      await ch.command({
+        query: `INSERT INTO ${TABLE} SELECT number,
+          arrayMap(e -> concat('evt', toString((number + e) % 3)), range(${EVENTS_PER_SPAN})),
+          arrayMap(e -> CAST(mapFromArrays(
+            arrayMap(i -> concat('event.metrics.k', toString(i), '_', toString(number % 11)), range(${KEYS_PER_EVENT})),
+            arrayMap(i -> concat(repeat('v', 40), toString(number)), range(${KEYS_PER_EVENT}))
+          ) AS Map(String, String)), range(${EVENTS_PER_SPAN}))
+          FROM numbers(${start}, ${SEED_SLICE})`,
+        clickhouse_settings: { max_threads: 1, max_insert_threads: 1, max_block_size: "4096" },
+      });
+    }
+    // One part again, so the filter reads blocks as large as one insert gave.
+    await ch.command({ query: `OPTIMIZE TABLE ${TABLE} FINAL` });
   }, 120_000);
 
   afterAll(async () => {
