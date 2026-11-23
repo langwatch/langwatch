@@ -82,7 +82,6 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   schedule: "Pull schedule",
   region: "Region",
   subscriberRoleArn: "Subscriber role ARN",
-  externalId: "External ID",
   queueUrl: "SQS queue URL",
   sources: "Sources",
 };

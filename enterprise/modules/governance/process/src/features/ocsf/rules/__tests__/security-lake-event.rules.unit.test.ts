@@ -135,6 +135,7 @@ describe("isAiActivityEvent and aiTargetOf", () => {
     expect(isAiActivityEvent(call("sagemaker.amazonaws.com", "InvokeEndpoint"))).toBe(true);
     expect(isAiActivityEvent(call("bedrock.amazonaws.com", "ListFoundationModels"))).toBe(false);
     expect(isAiActivityEvent(call("s3.amazonaws.com", "GetObject"))).toBe(false);
+    expect(isAiActivityEvent(call("q.amazonaws.com", "SendMessage"))).toBe(false);
   });
 
   it.each([

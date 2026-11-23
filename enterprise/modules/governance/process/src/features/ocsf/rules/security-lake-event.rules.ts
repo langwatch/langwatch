@@ -171,7 +171,6 @@ const AI_SERVICES: ReadonlyMap<string, (operation: string) => boolean> = new Map
         operation,
       ),
   ],
-  ["q.amazonaws.com", (operation) => ["SendMessage", "Chat", "ChatSync"].includes(operation)],
 ]);
 
 function apiOf(event: Json): { service: string; operation: string } {

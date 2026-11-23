@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { EmptyState, Table, Text } from "@langwatch/design-system/primitives";
 import type { SecurityLakeCaller } from "@langwatch/enterprise-governance-contract";
-import { Temporal } from "@langwatch/time";
 
 type Caller = SecurityLakeCaller;
 
@@ -57,7 +57,7 @@ export function SecurityLakeCallersList({
             <Table.Cell>{caller.regions.join(", ")}</Table.Cell>
             <Table.Cell textAlign="end">{caller.callCount}</Table.Cell>
             <Table.Cell>
-              {Temporal.Instant.fromEpochMilliseconds(caller.lastCallMs).toLocaleString()}
+              <FormattedDate value={caller.lastCallMs} />
             </Table.Cell>
           </Table.Row>
         ))}

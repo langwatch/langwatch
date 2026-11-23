@@ -320,6 +320,7 @@ describe("SecurityLakeCallersList", () => {
     expect(within(table).getByText("arn:aws:iam::123456789012:role/agent")).toBeInTheDocument();
     expect(within(table).getByText("anthropic.claude-sonnet, amazon.titan")).toBeInTheDocument();
     expect(within(table).getByText("42")).toBeInTheDocument();
+    expect(table.querySelector('time[datetime="2026-11-16T00:00:00Z"]')).not.toBeNull();
   });
 
   it("says every caller sends traces when a source is connected and the list is empty", () => {
