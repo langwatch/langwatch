@@ -7,10 +7,10 @@ const logger = createLogger("langwatch:langy:virtual-key");
 
 /** A new project's gateway key, minted ahead of its first chat so it is listed from day one. */
 export class LangyVirtualKeyProvisioningService {
-  private constructor(private readonly virtualKeys: LangyVirtualKeyService) {}
+  private constructor(private readonly virtualKeys: Pick<LangyVirtualKeyService, "provision">) {}
 
   static create(input: {
-    virtualKeys: LangyVirtualKeyService;
+    virtualKeys: Pick<LangyVirtualKeyService, "provision">;
   }): LangyVirtualKeyProvisioningService {
     return new LangyVirtualKeyProvisioningService(input.virtualKeys);
   }

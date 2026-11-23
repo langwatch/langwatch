@@ -1,5 +1,6 @@
 import {
   LangyCredentialResolutionError,
+  LangyVirtualKeyMissingError,
   langyEgressAllowlistSchema,
   type LangyCredentialSession,
   type LangyMirrorTier,
@@ -35,6 +36,13 @@ export interface LangyVirtualKeyService {
     organizationId: string;
     actorUserId: string;
   }): Promise<string>;
+  /** Writes the models every live Langy key of the project may serve; answers how many. */
+  setModelsAllowed(input: {
+    projectId: string;
+    organizationId: string;
+    modelsAllowed: readonly string[] | null;
+    actorUserId: string;
+  }): Promise<{ written: number }>;
 }
 
 export interface LangyGithubService {
@@ -243,6 +251,35 @@ export class LangyCredentialService {
     const allowed = virtualKeyConfigSchema.parse(config ?? {}).modelsAllowed;
 
     return allowed && allowed.length > 0 ? allowed : null;
+  }
+
+  /**
+   * Replaces the project's Langy model list (trimmed, deduplicated; empty allows every model).
+   * Mints a missing Langy key first and refuses when no key took the write. Answers the saved
+   * list, empty meaning every model.
+   */
+  async setModelsAllowedForProject(input: {
+    projectId: string;
+    actorUserId: string;
+    modelsAllowed: readonly string[];
+  }): Promise<string[]> {
+    const { organizationId } = await this.deps.repository.getProject(input.projectId);
+    const unique = [...new Set(input.modelsAllowed.map((model) => model.trim()))].filter(Boolean);
+    const target = {
+      projectId: input.projectId,
+      organizationId,
+      modelsAllowed: unique.length > 0 ? unique : null,
+      actorUserId: input.actorUserId,
+    };
+    const { written } = await this.deps.virtualKeys.setModelsAllowed(target);
+    if (written === 0) {
+      await this.deps.virtualKeys.provision(target);
+      const retried = await this.deps.virtualKeys.setModelsAllowed(target);
+      // provision() keeps a stored secret whose key was revoked, so nothing may hold the list.
+      if (retried.written === 0) throw new LangyVirtualKeyMissingError(input.projectId);
+    }
+
+    return (await this.findModelsAllowed({ projectId: input.projectId, organizationId })) ?? [];
   }
 
   async resolveMirrorTier({ projectId }: { projectId: string }): Promise<LangyMirrorTier> {

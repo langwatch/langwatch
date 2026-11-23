@@ -26,5 +26,10 @@ export function useLangyModelOptions({
     [providers.data, options, featureKey],
   );
   const modelOption = selectOptions.find((option) => option.value === model);
-  return { selectOptions, modelOption };
+  return {
+    selectOptions,
+    modelOption,
+    isLoading: providers.isLoading,
+    error: providers.error ?? undefined,
+  };
 }

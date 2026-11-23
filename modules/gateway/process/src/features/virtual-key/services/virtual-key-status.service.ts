@@ -159,6 +159,51 @@ export class VirtualKeyStatusService {
     });
   }
 
+  /**
+   * Writes the models every unrevoked LANGY key of a project may serve, null for every model.
+   * Only `modelsAllowed` changes: the secret and the rest of the config stay as stored. Each key
+   * written is audited and re-fetched by every gateway. Answers the ids written.
+   */
+  async setLangyModelsAllowedInternal(input: {
+    organizationId: string;
+    projectId: string;
+    modelsAllowed: readonly string[] | null;
+    actorUserId: string;
+  }): Promise<{ virtualKeyIds: string[] }> {
+    return this.transactions.run(async (tx) => {
+      const keys = await this.repository.findLangyKeysForProject(input, tx);
+      const virtualKeyIds: string[] = [];
+      for (const key of keys) {
+        const config = { ...storedConfigOf(key.config), modelsAllowed: input.modelsAllowed };
+        const written = await this.repository.setLangyConfig(
+          { id: key.id, organizationId: input.organizationId, config },
+          tx,
+        );
+        if (!written) continue;
+        virtualKeyIds.push(key.id);
+        await this.changeEvents.append(
+          { organizationId: input.organizationId, kind: "VK_CONFIG_UPDATED", virtualKeyId: key.id },
+          tx,
+        );
+        await this.auditLog.append(
+          {
+            organizationId: input.organizationId,
+            projectId: input.projectId,
+            actorUserId: input.actorUserId,
+            action: "gateway.virtual_key.updated",
+            targetKind: "virtual_key",
+            targetId: key.id,
+            before: VirtualKeyValidationService.serialiseForAudit(key),
+            after: VirtualKeyValidationService.serialiseForAudit({ ...key, config }),
+          },
+          tx,
+        );
+      }
+
+      return { virtualKeyIds };
+    });
+  }
+
   private async revokeExisting(
     existing: VirtualKeyWithScopes,
     input: RevokeVirtualKeyInput,
@@ -355,4 +400,11 @@ export class VirtualKeyStatusService {
   }
 
   /** Advance `lastUsedAt` — called from resolve-key hot path. */
+}
+
+/** The stored config as an object to merge into; anything else stored reads as empty. */
+function storedConfigOf(config: unknown): Record<string, unknown> {
+  return config !== null && typeof config === "object" && !Array.isArray(config)
+    ? { ...(config as Record<string, unknown>) }
+    : {};
 }

@@ -159,6 +159,22 @@ export class LangyModelNotAllowedError extends HandledError {
   }
 }
 
+/**
+ * The project has no live Langy key to hold its model list, and provisioning could not mint one
+ * because the key's secret is still stored (HTTP 409). Nothing was saved.
+ */
+export class LangyVirtualKeyMissingError extends HandledError {
+  declare readonly code: "langy_virtual_key_missing";
+  constructor(projectId: string) {
+    super("langy_virtual_key_missing", "This project's Langy key is missing; nothing was saved.", {
+      meta: { projectId },
+      httpStatus: 409,
+      ...remediation("langy_virtual_key_missing"),
+    });
+    this.name = "LangyVirtualKeyMissingError";
+  }
+}
+
 /** The project's Langy egress allow-list is misconfigured; fail closed (HTTP 409). */
 export class LangyEgressMisconfiguredError extends HandledError {
   declare readonly code: "langy_egress_misconfigured";

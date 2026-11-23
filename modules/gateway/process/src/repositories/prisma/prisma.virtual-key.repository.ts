@@ -501,6 +501,40 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
     return count > 0;
   }
 
+  async findLangyKeysForProject(
+    input: { organizationId: string; projectId: string },
+    tx?: GatewayPersistenceTransaction,
+  ): Promise<VirtualKeyWithScopes[]> {
+    return toVirtualKeyRecordsFrom(
+      this.client(tx).virtualKey.findMany({
+        where: {
+          organizationId: input.organizationId,
+          purpose: "LANGY",
+          status: { not: "REVOKED" },
+          scopes: { some: { scopeType: "PROJECT", scopeId: input.projectId } },
+        },
+        include: {
+          scopes: true,
+          principalUser: { select: { id: true, name: true, email: true } },
+          routingPolicy: { select: gatewayRoutingPolicySelect },
+        },
+        orderBy: { updatedAt: "desc" },
+      }),
+    );
+  }
+
+  async setLangyConfig(
+    input: { id: string; organizationId: string; config: unknown },
+    tx?: GatewayPersistenceTransaction,
+  ): Promise<boolean> {
+    const { count } = await this.client(tx).virtualKey.updateMany({
+      where: { id: input.id, organizationId: input.organizationId, purpose: "LANGY" },
+      data: { config: jsonInput(input.config), revision: { increment: 1n } },
+    });
+
+    return count > 0;
+  }
+
   async findByLicenseTokenHash(tokenHash: string): Promise<GatewayLicensedKey | null> {
     const row = await this.client().virtualKey.findUnique({
       where: { licenseTokenHash: tokenHash },

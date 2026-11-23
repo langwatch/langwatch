@@ -183,6 +183,19 @@ export abstract class GatewayVirtualKeyRepository {
     },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<boolean>;
+  /** Unrevoked LANGY keys scoped to one project of the organization, newest first. */
+  abstract findLangyKeysForProject(
+    input: { organizationId: string; projectId: string },
+    transaction?: GatewayPersistenceTransaction,
+  ): Promise<GatewayVirtualKeyRecord[]>;
+  /**
+   * Replaces a LANGY key's stored config and bumps its revision. False when no
+   * such LANGY key exists in the organization.
+   */
+  abstract setLangyConfig(
+    input: { id: string; organizationId: string; config: unknown },
+    transaction?: GatewayPersistenceTransaction,
+  ): Promise<boolean>;
   /** The CONNECT key a license token resolves to, by the token's registry hash. */
   abstract findByLicenseTokenHash(tokenHash: string): Promise<GatewayLicensedKey | null>;
   /** Unrevoked CONNECT keys of one licence in one organization, oldest first. */

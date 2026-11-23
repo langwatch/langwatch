@@ -334,6 +334,10 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/settings/data-retention",
           },
           {
+            path: "/settings/langy",
+            page: "pages/settings/langy",
+          },
+          {
             path: "/settings/integrations",
             page: "pages/settings/integrations",
           },

@@ -133,4 +133,23 @@ describe("LangyVirtualKeyGatewayService", () => {
       await expect(service.provision(PROVISION)).resolves.toBe("vk-secret-winner");
     });
   });
+
+  describe("when the project's model list is saved", () => {
+    it("asks the gateway's Langy write, never a mint, and counts the keys it wrote", async () => {
+      const asked: unknown[] = [];
+      const service = LangyVirtualKeyGatewayService.create({
+        secrets: createApiFixture<SecretApi>(),
+        gateway: createApiFixture<GatewayApi>({
+          setLangyModelsAllowed: async (input) => {
+            asked.push(input);
+            return { virtualKeyIds: ["vk_1", "vk_2"] };
+          },
+        }),
+      });
+      const input = { ...PROVISION, modelsAllowed: ["openai/gpt-5"] };
+
+      await expect(service.setModelsAllowed(input)).resolves.toEqual({ written: 2 });
+      expect(asked).toEqual([input]);
+    });
+  });
 });

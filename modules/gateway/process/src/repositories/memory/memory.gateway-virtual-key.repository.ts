@@ -309,6 +309,41 @@ export class MemoryGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
       .map((key) => key.id);
   }
 
+  async findLangyKeysForProject(input: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<GatewayVirtualKeyRecord[]> {
+    return this.#keys()
+      .filter(
+        (key) =>
+          key.organizationId === input.organizationId &&
+          key.purpose === "LANGY" &&
+          key.status !== "REVOKED" &&
+          key.scopes.some(
+            (scope) => scope.scopeType === "PROJECT" && scope.scopeId === input.projectId,
+          ),
+      )
+      .toSorted((left, right) => Temporal.Instant.compare(right.updatedAt, left.updatedAt))
+      .map((key) => this.#joined(key));
+  }
+
+  async setLangyConfig(input: {
+    id: string;
+    organizationId: string;
+    config: unknown;
+  }): Promise<boolean> {
+    const key = this.store.virtualKeys.get(input.id);
+    if (key?.organizationId !== input.organizationId || key.purpose !== "LANGY") return false;
+    this.store.virtualKeys.set(key.id, {
+      ...key,
+      config: structuredClone(input.config),
+      revision: key.revision + 1n,
+      updatedAt: nowInstant(),
+    });
+
+    return true;
+  }
+
   async findByLicenseTokenHash(tokenHash: string): Promise<GatewayLicensedKey | null> {
     const match = [...this.store.connectColumns].find(
       ([, columns]) => columns.licenseTokenHash === tokenHash,

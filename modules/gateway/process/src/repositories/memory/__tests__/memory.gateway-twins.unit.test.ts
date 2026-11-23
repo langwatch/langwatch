@@ -120,6 +120,31 @@ describe("memory gateway twins", () => {
       expect(rest).toHaveLength(2);
     });
 
+    it("finds a project's live LANGY keys and rewrites only a LANGY key's config", async () => {
+      const store = MemoryGatewayStore.create();
+      const keys = MemoryGatewayVirtualKeyRepository.create(store);
+      const projectScope = [{ scopeType: "PROJECT" as const, scopeId: PROJECT }];
+      await keys.create({ ...keyInput("vk_l"), purpose: "LANGY", scopes: projectScope });
+      await keys.create({ ...keyInput("vk_gone"), purpose: "LANGY", scopes: projectScope });
+      await keys.create({ ...keyInput("vk_other"), purpose: "LANGY" });
+      await keys.create({ ...keyInput("vk_u"), scopes: projectScope });
+      await keys.revoke({ id: "vk_gone", organizationId: ORG, revokedById: "usr_1" });
+
+      const found = await keys.findLangyKeysForProject({ organizationId: ORG, projectId: PROJECT });
+      expect(found.map((key) => key.id)).toEqual(["vk_l"]);
+
+      const config = { modelsAllowed: ["openai/gpt-5-mini"] };
+      expect(await keys.setLangyConfig({ id: "vk_l", organizationId: ORG, config })).toBe(true);
+      expect(await keys.setLangyConfig({ id: "vk_u", organizationId: ORG, config })).toBe(false);
+      expect(await keys.setLangyConfig({ id: "vk_l", organizationId: "org_2", config })).toBe(
+        false,
+      );
+
+      const written = await keys.findById({ id: "vk_l", organizationId: ORG });
+      expect(written).toMatchObject({ config, revision: 2n });
+      expect((await keys.findById({ id: "vk_u", organizationId: ORG }))?.config).toEqual({});
+    });
+
     it("records a CONNECT key's services and licence, and reads the key back by its licence", async () => {
       const store = MemoryGatewayStore.create();
       const keys = MemoryGatewayVirtualKeyRepository.create(store);

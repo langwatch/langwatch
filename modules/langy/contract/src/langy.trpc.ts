@@ -35,6 +35,7 @@ import {
   langyRenameInputSchema,
   langySetCodeAccessPreferenceInputSchema,
   langySetLocalPolicyInputSchema,
+  langySetModelsAllowedInputSchema,
   langyStopTurnPanelInputSchema,
   langyTurnStreamInputSchema,
   langyWarmWorkerInputSchema,
@@ -171,6 +172,11 @@ export const langyTrpc = defineTrpcContract("langy")
 
   .query("modelsAllowed")
   .withInput(langyProjectInputSchema)
+  .withOutput(langyModelsAllowedSchema)
+
+  /** Replaces the models Langy may run on in the project; wants `langy:manage`. */
+  .mutation("setModelsAllowed")
+  .withInput(langySetModelsAllowedInputSchema)
   .withOutput(langyModelsAllowedSchema)
 
   .mutation("recordFeedback")

@@ -9,6 +9,7 @@ import {
   BadgeCheck,
   Cloud,
   Blocks,
+  Bot,
   Brain,
   Bug,
   Building2,
@@ -357,6 +358,7 @@ function dataControlsGroup({ hasPermission }: SettingsMenuGates): SettingsMenuGr
 
 function projectGroup({
   isLiteMember,
+  hasPermission,
   enterprisePlan,
   braidsEnabled,
   braidsPresent = false,
@@ -381,6 +383,9 @@ function projectGroup({
           ]
         : []),
       { label: "Integrations", href: "/settings/integrations", icon: Blocks },
+      ...(!isLiteMember && hasPermission("langy:view")
+        ? [{ label: "Langy", href: "/settings/langy", icon: Bot }]
+        : []),
       ...(!isLiteMember && (braidsEnabled || braidsPresent)
         ? enterpriseEntry({
             item: {
