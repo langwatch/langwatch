@@ -17,6 +17,7 @@ const calls = vi.hoisted(() => ({
   callers: [] as { input: unknown; options: { enabled?: boolean } | undefined }[],
   tested: [] as unknown[],
   testFailure: null as Error | null,
+  readFailure: null as Error | null,
 }));
 
 /** A connection-test mutation that keeps its last answer until reset, as the real hook does. */
@@ -49,11 +50,24 @@ vi.mock("../../../../behavior/governance-api.ts", () => {
         securityLakeGet: {
           useQuery: () => ({ data: { externalId: "lw-0123456789abcdef0123456789abcdef" } }),
         },
-        securityLakeHealth: { useQuery: () => ({ data: undefined, isLoading: true }) },
+        securityLakeHealth: {
+          useQuery: () =>
+            calls.readFailure === null
+              ? { data: undefined, isLoading: true, error: null }
+              : { data: undefined, isLoading: false, error: calls.readFailure, refetch: vi.fn() },
+        },
         securityLakeCallersWithoutTraces: {
           useQuery: (input: unknown, options?: { enabled?: boolean }) => {
             calls.callers.push({ input, options });
-            return { data: undefined, isLoading: false };
+            if (calls.readFailure !== null) {
+              return {
+                data: undefined,
+                isLoading: false,
+                error: calls.readFailure,
+                refetch: vi.fn(),
+              };
+            }
+            return { data: undefined, isLoading: false, error: null };
           },
         },
       },
@@ -91,6 +105,7 @@ beforeEach(() => {
   calls.callers.length = 0;
   calls.tested.length = 0;
   calls.testFailure = null;
+  calls.readFailure = null;
 });
 afterEach(cleanup);
 
@@ -172,5 +187,14 @@ describe("SecurityLakeSection", () => {
         fallbackTitle: "Couldn't test the connection",
       }),
     ]);
+  });
+
+  it("says the callers and the source health could not be read instead of showing none", () => {
+    calls.readFailure = new Error("network down");
+    renderSection({ organizationId: "org_1", sources: [lake] });
+
+    expect(screen.getByText("Couldn't load the model callers")).toBeInTheDocument();
+    expect(screen.queryByText(/Every model caller sends traces/)).not.toBeInTheDocument();
+    expect(screen.getByText("Couldn't load this source's health")).toBeInTheDocument();
   });
 });

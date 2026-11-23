@@ -31,6 +31,7 @@ import {
   type SecurityLakeObjectRef,
   securityLakeRowToEvent,
 } from "../rules/security-lake-event.rules.ts";
+import { tallyWrittenRows } from "../rules/security-lake-health.rules.ts";
 import {
   DEFAULT_DECODE_LIMITS,
   DecodeLimitError,
@@ -82,8 +83,8 @@ export type SecurityLakeReadResult = {
 };
 
 type ReaderScope = { tenantId: string; sourceId: string };
-/** What one run has spent of its budget. */
-type RunProgress = { startedAtMs: number; bytes: number };
+/** What one run has spent of its budget, and the failed messages it holds until it ends. */
+type RunProgress = { startedAtMs: number; bytes: number; retryLater: SecurityLakeQueueMessage[] };
 
 type MessageOutcome =
   | {
@@ -104,26 +105,6 @@ type DoneOutcome = Extract<MessageOutcome, { kind: "done" }>;
 function findWrittenParts(outcome: Exclude<MessageOutcome, { kind: "deferred" }>): DoneOutcome[] {
   if (outcome.kind === "done") return [outcome];
   return outcome.partial === undefined ? [] : [outcome.partial];
-}
-
-function tallyWritten({
-  result,
-  outcome,
-}: {
-  result: SecurityLakeReadResult;
-  outcome: Extract<MessageOutcome, { kind: "done" }>;
-}): void {
-  result.objects += outcome.objects;
-  result.rows += outcome.decoded;
-  result.written += outcome.rows.length;
-  result.dropped += outcome.dropped;
-  result.invalid += outcome.invalid;
-  for (const row of outcome.rows) {
-    const at = row.eventTime.epochMilliseconds;
-    if (result.oldestEventTimeMs === undefined || at < result.oldestEventTimeMs) {
-      result.oldestEventTimeMs = at;
-    }
-  }
 }
 
 /**
@@ -194,7 +175,7 @@ export class SecurityLakeReaderService {
       ...(signal === undefined ? {} : { signal }),
     };
     const seen = new Set<string>();
-    const run: RunProgress = { startedAtMs: this.deps.now(), bytes: 0 };
+    const run: RunProgress = { startedAtMs: this.deps.now(), bytes: 0, retryLater: [] };
 
     const settle = (message: SecurityLakeQueueMessage) =>
       this.settleMessage({
@@ -208,21 +189,27 @@ export class SecurityLakeReaderService {
         credentials,
         signal,
       });
-    while (result.messages < config.maxMessagesPerRun) {
-      if (this.isPastBudget(run) || signal?.aborted) break;
-      const batch = await this.deps.queue.receive({
-        ...target,
-        maxMessages: Math.min(SQS_RECEIVE_MAX, config.maxMessagesPerRun - result.messages),
-      });
-      const fresh = batch.filter((message) => !seen.has(message.messageId));
-      if (fresh.length === 0) return result;
-      for (const message of fresh) seen.add(message.messageId);
-      const finished = await this.settleBatch({ fresh, run, target, signal, settle });
-      if (!finished) break;
+    try {
+      while (result.messages < config.maxMessagesPerRun) {
+        if (this.isPastBudget(run) || signal?.aborted) break;
+        const batch = await this.deps.queue.receive({
+          ...target,
+          maxMessages: Math.min(SQS_RECEIVE_MAX, config.maxMessagesPerRun - result.messages),
+        });
+        const fresh = batch.filter((message) => !seen.has(message.messageId));
+        if (fresh.length === 0) return result;
+        for (const message of fresh) seen.add(message.messageId);
+        if (!(await this.settleBatch({ fresh, run, target, signal, settle }))) break;
+      }
+      // Any way out but an empty receive may leave messages on the queue.
+      result.stoppedEarly = true;
+      return result;
+    } finally {
+      // Held through the run, so a receive cannot skip one as seen and spend its try for nothing.
+      for (const message of run.retryLater) {
+        await this.setVisibility({ target, message, seconds: SECURITY_LAKE_RETRY_DELAY_SECONDS });
+      }
     }
-    // Any way out but an empty receive may leave messages on the queue.
-    result.stoppedEarly = true;
-    return result;
   }
 
   /**
@@ -311,23 +298,21 @@ export class SecurityLakeReaderService {
       credentials,
       signal,
     });
-    if (outcome.kind === "deferred") {
+    const retry = outcome.kind === "retry" && message.receiveCount < config.maxReceives;
+    if (outcome.kind === "deferred" || retry) {
       result.retried += 1;
       result.stoppedEarly = true;
-      await this.setVisibility({ target, message, seconds: 0 });
-      return;
-    }
-    if (outcome.kind === "retry" && message.receiveCount < config.maxReceives) {
-      result.retried += 1;
-      // Back for the next run rather than hidden for the whole hold.
-      await this.setVisibility({ target, message, seconds: SECURITY_LAKE_RETRY_DELAY_SECONDS });
+      // A deferred one goes back now, as the run is over; a failed one is held until it ends.
+      const deferred = outcome.kind === "deferred";
+      if (!deferred) run.retryLater.push(message);
+      await this.setVisibility({ target, message, ...(deferred ? { seconds: 0 } : {}) });
       return;
     }
     // Rows decoded before a failed object are written too; a rewrite on redelivery is idempotent.
     for (const written of findWrittenParts(outcome)) {
       // A failed write throws before the delete, leaving the message to come back.
       if (written.rows.length > 0) await this.deps.events.insertEvents(written.rows);
-      tallyWritten({ result, outcome: written });
+      tallyWrittenRows({ tally: result, written });
     }
     if (outcome.kind !== "done") {
       result.poison.push({

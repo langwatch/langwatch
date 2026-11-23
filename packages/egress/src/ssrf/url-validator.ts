@@ -130,7 +130,10 @@ export function isBlockedCloudDomain(hostname: string): boolean {
   );
 }
 
-/** A named AWS service endpoint, regional or VPC (`vpce-*`), as opposed to an EC2 internal name. */
+/**
+ * Any name under amazonaws.com: service, regional and VPC (`vpce-*`) endpoints, but EC2 public
+ * names too. Not a filter on its own: the resolved address is still judged and pinned.
+ */
 function isAwsServiceHost(hostname: string): boolean {
   const lower = withoutTrailingDot(hostname.toLowerCase());
   return lower.endsWith(".amazonaws.com") && isIP(lower) === 0;

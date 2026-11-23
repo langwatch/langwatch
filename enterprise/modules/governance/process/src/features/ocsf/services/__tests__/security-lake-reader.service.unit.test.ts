@@ -251,8 +251,34 @@ describe("SecurityLakeReaderService", () => {
 
       const result = await read();
 
-      expect(result).toMatchObject({ retried: 1, deleted: 0, poison: [] });
+      expect(result).toMatchObject({ retried: 1, deleted: 0, poison: [], stoppedEarly: true });
       expect(queue.pending()).toEqual([messageId]);
+    });
+
+    it("gives it every try when the run goes on past the retry delay", async () => {
+      const holder: { clock?: { ms: number } } = {};
+      const reads: string[] = [];
+      const { queue, objects, read, clock } = setup({
+        config: { maxReceives: 3 },
+        onRead: (key) => {
+          reads.push(key);
+          holder.clock!.ms += 20_000;
+        },
+      });
+      holder.clock = clock;
+      objects.seedBytes({ bucket: BUCKET, key: MGMT_KEY, bytes: new TextEncoder().encode("nope") });
+      queue.send({ body: notification(MGMT_KEY) });
+      for (const n of [1, 2, 3]) {
+        const key = MGMT_KEY.replace("a.parquet", `ok-${n}.parquet`);
+        objects.seedBytes({ bucket: BUCKET, key, bytes: cloudTrailParquet(MIXED_CALLS) });
+        queue.send({ body: notification(key) });
+      }
+
+      const results = [await read(), await read(), await read()];
+
+      expect(reads.filter((key) => key === MGMT_KEY)).toHaveLength(3);
+      expect(results.map((result) => result.poison.length)).toEqual([0, 0, 1]);
+      expect(queue.pending()).toEqual([]);
     });
 
     /** @scenario An object past its receive limit is recorded as poison and deleted */

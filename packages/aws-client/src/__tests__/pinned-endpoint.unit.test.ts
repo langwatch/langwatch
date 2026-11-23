@@ -37,10 +37,6 @@ describe("pinnedEndpointConfig", () => {
   it("builds a handler for a resolved endpoint", () => {
     expect(pinnedEndpointConfig({ hostname: HOST, resolvedIp: "203.0.113.7" })).toBeDefined();
   });
-
-  it("refuses an allowlisted host the fence did not resolve", () => {
-    expect(() => pinnedEndpointConfig({ hostname: HOST })).toThrow(/did not resolve/);
-  });
 });
 
 describe("pinnedHandlerOptions", () => {

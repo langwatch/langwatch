@@ -48,8 +48,9 @@ export function securityLakeCredentialsOf(
   const secretAccessKey = credentials?.aws_secret_access_key?.trim();
   // Without the source's own pair the SDK would sign with the worker's identity.
   if (!accessKeyId || !secretAccessKey) throw new MissingStaticAwsCredentialsError();
-  // An S3 or SQS store outside AWS (a local emulator) has no STS, so the keys sign directly there.
-  const emulated = [config.s3Endpoint, config.sqsEndpoint].some(
+  // Only an emulator for both stores (no STS) signs with the keys directly; one store left on AWS
+  // keeps the role and its external id, since the credentials serve both.
+  const emulated = [config.s3Endpoint, config.sqsEndpoint].every(
     (endpoint) => endpoint !== undefined && !isAwsHostedEndpoint(endpoint),
   );
   const externalId = credentials?.[SECURITY_LAKE_EXTERNAL_ID_KEY]?.trim();

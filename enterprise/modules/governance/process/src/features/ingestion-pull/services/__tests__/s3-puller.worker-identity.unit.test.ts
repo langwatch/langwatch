@@ -126,6 +126,16 @@ describe("Saving an S3 polling source", () => {
       }),
     ).toEqual([]);
   });
+
+  it("refuses an OpenAI compliance source with no keys, which the same S3 puller would refuse", () => {
+    expect(findPullCredentialComplaints({ adapter: "openai_compliance" })).toHaveLength(1);
+    expect(
+      findPullCredentialComplaints(
+        { adapter: "openai_compliance" },
+        { deploymentAwsIdentity: true },
+      ),
+    ).toEqual([]);
+  });
 });
 
 describe("given a self-hosted deployment that reads AWS as its own identity", () => {

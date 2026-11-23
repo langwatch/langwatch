@@ -638,7 +638,7 @@ describe("IngestionSourceService", () => {
             region: "us-east-1",
             prefix: "logs/",
             schedule: "*/30 * * * *",
-            credentials: { accessKeyId: "AKIA", secretAccessKey: "secret" },
+            credentials: { aws_access_key_id: "AKIA", aws_secret_access_key: "secret" },
           },
           pullSchedule: "*/30 * * * *",
           actorUserId: "user-1",

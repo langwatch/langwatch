@@ -104,9 +104,26 @@ describe("SecurityLakePullerService", () => {
 
   describe("given a source on a local S3 and SQS emulator", () => {
     it("signs with the stored keys directly", async () => {
-      const seen = await run({ sqsEndpoint: "http://localhost:4566" });
+      const seen = await run({
+        sqsEndpoint: "http://localhost:4566",
+        s3Endpoint: "http://localhost:4566",
+      });
 
       expect(seen[0]?.assumeRole).toBeUndefined();
+    });
+  });
+
+  describe("given an emulator for S3 but SQS on AWS", () => {
+    it("still reads the queue as the subscriber role, assumed with the external id", async () => {
+      const seen = await run({ s3Endpoint: "http://localhost:4566" });
+
+      expect(seen[0]?.assumeRole).toEqual({ roleArn: ROLE, externalId: "acme-external-id" });
+    });
+
+    it("refuses without the generated external id", async () => {
+      await expect(
+        run({ s3Endpoint: "http://localhost:4566" }, { externalId: null }),
+      ).rejects.toMatchObject({ retryable: false });
     });
   });
 
@@ -190,6 +207,7 @@ describe("SecurityLakePullerService", () => {
         subscriberRoleArn: ROLE,
         queueUrl: "https://sqs.eu-west-1.amazonaws.com/123456789012/acme-subscriber",
         sqsEndpoint: "http://localhost:4566",
+        s3Endpoint: "http://localhost:4566",
       });
 
       const result = await puller.runOnce(

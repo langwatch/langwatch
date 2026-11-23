@@ -48,6 +48,33 @@ export function parseSecurityLakeHealth(cursor: string | null | undefined): Secu
   }
 }
 
+/** Adds the rows one message wrote to the run's tally, keeping the oldest event time for the lag. */
+export function tallyWrittenRows({
+  tally,
+  written,
+}: {
+  tally: SecurityLakeRunTally;
+  written: {
+    objects: number;
+    decoded: number;
+    dropped: number;
+    invalid: number;
+    rows: readonly { eventTime: { epochMilliseconds: number } }[];
+  };
+}): void {
+  tally.objects += written.objects;
+  tally.rows += written.decoded;
+  tally.written += written.rows.length;
+  tally.dropped += written.dropped;
+  tally.invalid += written.invalid;
+  for (const row of written.rows) {
+    const at = row.eventTime.epochMilliseconds;
+    if (tally.oldestEventTimeMs === undefined || at < tally.oldestEventTimeMs) {
+      tally.oldestEventTimeMs = at;
+    }
+  }
+}
+
 /** Adds one run to the health: counts sum, lag is the last run's, poison keeps the newest. */
 export function foldSecurityLakeRun({
   previous,

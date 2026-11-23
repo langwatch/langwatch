@@ -5,8 +5,9 @@ import {
   SECURITY_LAKE_SOURCE_TYPE,
   type SecurityLakeConnectionTest,
 } from "@langwatch/enterprise-governance-contract";
+import { HandledErrorAlert } from "@langwatch/error-views";
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { api } from "../../../../behavior/governance-api.ts";
 import {
@@ -133,15 +134,40 @@ export function SecurityLakeSection({
         hint="Principals seen calling a model in Security Lake in the last 30 days that send no traces."
       >
         <VStack align="stretch" padding={4}>
-          {sources === undefined || callers.isLoading ? (
-            <Spinner />
-          ) : (
-            <SecurityLakeCallersList hasSource={hasSource} callers={callers.data?.callers ?? []} />
-          )}
+          <UnlessReadFailed
+            error={callers.error}
+            fallbackTitle="Couldn't load the model callers"
+            onRetry={() => void callers.refetch()}
+          >
+            {sources === undefined || callers.isLoading ? (
+              <Spinner />
+            ) : (
+              <SecurityLakeCallersList
+                hasSource={hasSource}
+                callers={callers.data?.callers ?? []}
+              />
+            )}
+          </UnlessReadFailed>
         </VStack>
       </SettingsCard>
     </VStack>
   );
+}
+
+/** A failed read says so, rather than showing what it would show for an empty answer. */
+function UnlessReadFailed({
+  error,
+  fallbackTitle,
+  onRetry,
+  children,
+}: {
+  error: unknown;
+  fallbackTitle: string;
+  onRetry: () => void;
+  children: ReactNode;
+}) {
+  if (!error) return <>{children}</>;
+  return <HandledErrorAlert error={error} fallbackTitle={fallbackTitle} onRetry={onRetry} />;
 }
 
 /** The edit form of a saved source, with the external id from the admin-only Security Lake read. */
@@ -190,7 +216,13 @@ function LakeSourceHealth({
           </Button>
         )}
       </HStack>
-      {health.data ? <SecurityLakeHealthPanel health={health.data} /> : <Spinner size="sm" />}
+      <UnlessReadFailed
+        error={health.error}
+        fallbackTitle="Couldn't load this source's health"
+        onRetry={() => void health.refetch()}
+      >
+        {health.data ? <SecurityLakeHealthPanel health={health.data} /> : <Spinner size="sm" />}
+      </UnlessReadFailed>
     </VStack>
   );
 }
