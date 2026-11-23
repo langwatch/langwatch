@@ -354,43 +354,43 @@ describe("the single-file conversion step", () => {
   });
 
   describe("given a first read that waits to give an id-less record its id while the dataset is converted", () => {
-    function convertingOnFirstLock(input: ReturnType<typeof install>) {
-      const lock = input.repositories.content.withDatasetLock.bind(input.repositories.content);
+    /** An id-less single-file dataset whose first lock taker meets the conversion first. */
+    async function convertingOnFirstRead() {
+      const installed = install();
+      const datasetId = await installed.singleFile({
+        file: [{ entry: { question: "no id" }, datasetId: "", projectId }],
+      });
+      const content = installed.repositories.content;
+      const lock = content.withDatasetLock.bind(content);
       let converting = true;
-      vi.spyOn(input.repositories.content, "withDatasetLock").mockImplementation(
-        async (id, mutate) => {
-          if (converting) {
-            converting = false;
-            await input.conversion.runStep(stepArgs());
-          }
-          return lock(id, mutate);
-        },
-      );
+      vi.spyOn(content, "withDatasetLock").mockImplementation(async (id, mutate) => {
+        if (converting) {
+          converting = false;
+          await installed.conversion.runStep(stepArgs());
+        }
+        return lock(id, mutate);
+      });
+      return { ...installed, datasetId };
     }
-    const idless = [{ entry: { question: "no id" }, datasetId: "", projectId }];
 
     /** @scenario "A first read that waited while the dataset was converted reads its chunks" */
     it("answers the records from the chunks, with the ids every later read shows", async () => {
-      const installed = install();
-      const datasetId = await installed.singleFile({ file: idless });
-      convertingOnFirstLock(installed);
+      const { read, datasetId } = await convertingOnFirstRead();
 
-      const first = await installed.read(datasetId);
+      const first = await read(datasetId);
 
       expect(first.map((record) => record.entry)).toEqual([{ question: "no id" }]);
-      expect((await installed.read(datasetId)).map((record) => record.id)).toEqual(
+      expect((await read(datasetId)).map((record) => record.id)).toEqual(
         first.map((record) => record.id),
       );
     });
 
     /** @scenario "A first read that waited while the dataset was converted reads its chunks" */
     it("answers a page and a head from the chunks too", async () => {
-      const installed = install();
-      const datasetId = await installed.singleFile({ file: idless });
-      convertingOnFirstLock(installed);
+      const { app, datasetId } = await convertingOnFirstRead();
 
-      const page = await installed.app.listRecords({ slugOrId: datasetId, projectId });
-      const head = await installed.app.getDatasetHead({ slugOrId: datasetId, projectId });
+      const page = await app.listRecords({ slugOrId: datasetId, projectId });
+      const head = await app.getDatasetHead({ slugOrId: datasetId, projectId });
 
       expect(page.data.map((record) => record.entry)).toEqual([{ question: "no id" }]);
       expect(head.records.map((record) => record.id)).toEqual(page.data.map((r) => r.id));
