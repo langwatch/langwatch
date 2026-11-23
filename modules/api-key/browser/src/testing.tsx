@@ -64,6 +64,8 @@ export class FakeApiKeyHost extends ApiKeyHostApi {
       query?: Readonly<Record<string, string | undefined>>;
       fragment?: string;
       copySucceeds?: boolean;
+      /** Copies stay unresolved until `settleCopy` is called. */
+      copyPending?: boolean;
       lookup?: CliDeviceCodeLookup;
       approve?: CliDeviceActionResult;
       deny?: CliDeviceActionResult;
@@ -146,8 +148,16 @@ export class FakeApiKeyHost extends ApiKeyHostApi {
 
   copyToClipboard(request: { text: string; succeeded: ApiKeySuccessNotice }): Promise<boolean> {
     this.copies.push(request);
+    if (this.options.copyPending) {
+      return new Promise<boolean>((resolve) => {
+        this.settleCopy = resolve;
+      });
+    }
     return Promise.resolve(this.options.copySucceeds ?? true);
   }
+
+  /** Resolves the latest pending copy; a no-op until one is made. */
+  settleCopy: (succeeded: boolean) => void = () => undefined;
 
   recordLeadSourceIfAbsent(source: string): void {
     this.leadSources.push(source);

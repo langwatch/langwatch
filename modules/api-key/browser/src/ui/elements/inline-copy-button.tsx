@@ -7,7 +7,7 @@ import { Button } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, Clipboard } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useApiKeyHost } from "../../model/api-key-host.ts";
 
@@ -23,6 +23,18 @@ export function InlineCopyButton({
 }): React.ReactElement {
   const host = useApiKeyHost();
   const [copied, setCopied] = useState(false);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const mounted = useRef(true);
+
+  // The reset timer must not outlive the button:
+  // a late setState can run in a torn-down test environment.
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      clearTimeout(resetTimer.current);
+    };
+  }, []);
 
   async function handleCopy(): Promise<void> {
     const ok = await host.copyToClipboard({
@@ -30,8 +42,12 @@ export function InlineCopyButton({
       succeeded: { title: "Copied", description: `${label} copied to clipboard` },
     });
     if (ok) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      // The copy is awaited, so the button may have unmounted meanwhile.
+      if (mounted.current) {
+        setCopied(true);
+        clearTimeout(resetTimer.current);
+        resetTimer.current = setTimeout(() => setCopied(false), 2000);
+      }
       onCopied?.();
     }
   }
