@@ -1,7 +1,6 @@
 package a2aproxy
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -25,7 +24,7 @@ func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
 			c.span.SetAttributes(attribute.String(attrAgentName, name))
 		}
 	}
-	rewriteCard(card, target.UpstreamURL, proxyBase(h.cfg.PublicBaseURL, c.r, target.Name))
+	rewriteCard(card, target.UpstreamURL, proxyBase(h.cfg.PublicBaseURL, target.Name))
 	out, _ := json.Marshal(card)
 	setJSONReply(c.w.Header())
 	c.w.WriteHeader(http.StatusOK)
@@ -33,12 +32,13 @@ func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
 }
 
 // fetchCard reads the upstream Agent Card, parsed and raw, refusing the call
-// when it cannot. The target's upstream headers go only to a card on the
+// when it cannot. Without a card URL it reads the discovery path the caller
+// asked for. The target's upstream headers go only to a card on the
 // upstream's own origin: a card elsewhere is fetched without them.
 func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, []byte, bool) {
 	cardURL := target.CardURL
 	if cardURL == "" {
-		cardURL = upstreamEndpoint(target.UpstreamURL, cardPath, "")
+		cardURL = upstreamEndpoint(target.UpstreamURL, c.cardPath, "")
 	}
 	req, err := http.NewRequestWithContext(c.ctx, http.MethodGet, cardURL, nil)
 	if err != nil {
@@ -53,7 +53,7 @@ func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, [
 	propagation.TraceContext{}.Inject(c.ctx, propagation.HeaderCarrier(req.Header))
 	resp, err := h.cfg.Client.Do(req)
 	if err != nil {
-		c.refuse(upstreamRefusal(err))
+		h.refuseUpstreamFailure(c, err)
 		return nil, nil, false
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -159,32 +159,7 @@ func replyCard(reply map[string]any) (map[string]any, bool) {
 	return reply, true
 }
 
-func proxyBase(public string, r *http.Request, target string) string {
-	if public != "" {
-		return strings.TrimSuffix(public, "/") + strings.TrimSuffix(PathPrefix, "/") + "/" + target
-	}
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	if p := r.Header.Get("X-Forwarded-Proto"); p == "http" || p == "https" {
-		scheme = p
-	}
-	return scheme + "://" + r.Host + strings.TrimSuffix(PathPrefix, "/") + "/" + target
-}
-
-// BundleRegistry finds targets in the caller's config bundle, which the
-// control plane fills from the project's A2A target registry.
-type BundleRegistry struct{}
-
-// Lookup implements Registry.
-func (BundleRegistry) Lookup(_ context.Context, bundle *domain.Bundle, name string) (domain.A2ATarget, error) {
-	if bundle != nil {
-		for _, t := range bundle.Config.A2ATargets {
-			if t.Name == name {
-				return t, nil
-			}
-		}
-	}
-	return domain.A2ATarget{}, domain.ErrA2ATargetNotFound
+// proxyBase is the target's endpoint on the gateway's configured public origin.
+func proxyBase(public, target string) string {
+	return strings.TrimSuffix(public, "/") + strings.TrimSuffix(PathPrefix, "/") + "/" + target
 }

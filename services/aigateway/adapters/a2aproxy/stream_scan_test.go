@@ -1,6 +1,8 @@
 package a2aproxy
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -185,4 +187,49 @@ func TestArtifactThatReplacesItsTextStartsAFreshTail(t *testing.T) {
 	rec = f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
 	assert.Contains(t, rec.Body.String(), `"reason":"a2a_content_blocked"`)
 	assert.NotContains(t, rec.Body.String(), "4111")
+}
+
+// chunkOnlyEvaluator is fakeEvaluator whose stream_chunk evaluation can fail.
+type chunkOnlyEvaluator struct {
+	fakeEvaluator
+	chunkErr error
+}
+
+func (e chunkOnlyEvaluator) EvaluateChunk(ctx context.Context, b *domain.Bundle, r *domain.Request, chunk []byte) (domain.GuardrailVerdict, error) {
+	if e.chunkErr != nil {
+		return domain.GuardrailVerdict{Action: domain.GuardrailAllow}, e.chunkErr
+	}
+	return e.fakeEvaluator.EvaluateChunk(ctx, b, r, chunk)
+}
+
+// @scenario "a key's stream_chunk guardrails judge every streamed event"
+func TestStreamChunkGuardrailEndsTheStream(t *testing.T) {
+	f := newFixture(t)
+	f.bundle.Config.Guardrails.StreamChunk = []domain.GuardrailEntry{{ID: "g3"}}
+	f.scanner = GuardrailScanner{Evaluator: chunkOnlyEvaluator{fakeEvaluator: fakeEvaluator{deny: "card number"}}}
+	first := `{"jsonrpc":"2.0","id":7,"result":{"artifactUpdate":{"taskId":"t1","artifact":{"parts":[{"text":"hello"}]}}}}`
+	f.reply = sseReply(first,
+		`{"jsonrpc":"2.0","id":7,"result":{"artifactUpdate":{"taskId":"t1","artifact":{"parts":[{"text":"card number 4111"}]}}}}`)
+	rec := f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
+
+	chunks := strings.Split(strings.TrimSpace(rec.Body.String()), "\n\n")
+	require.Len(t, chunks, 2, rec.Body.String())
+	assert.Equal(t, "data: "+first, chunks[0])
+	assert.Contains(t, chunks[1], `"reason":"a2a_content_blocked"`)
+	assert.NotContains(t, rec.Body.String(), "4111")
+}
+
+// @scenario "a key's stream_chunk guardrails judge every streamed event"
+func TestStreamChunkGuardrailFailureFailsOpen(t *testing.T) {
+	f := newFixture(t)
+	f.bundle.Config.Guardrails.StreamChunk = []domain.GuardrailEntry{{ID: "g3"}}
+	f.scanner = GuardrailScanner{Evaluator: chunkOnlyEvaluator{chunkErr: errors.New("policy service slow")}}
+	events := []string{
+		`{"jsonrpc":"2.0","id":7,"result":{"artifactUpdate":{"taskId":"t1","artifact":{"parts":[{"text":"hello"}]}}}}`,
+		`{"jsonrpc":"2.0","id":7,"result":{"statusUpdate":{"taskId":"t1","status":{"state":"TASK_STATE_COMPLETED"}}}}`,
+	}
+	f.reply = sseReply(events...)
+	rec := f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
+
+	assert.Equal(t, "data: "+events[0]+"\n\ndata: "+events[1]+"\n\n", rec.Body.String())
 }

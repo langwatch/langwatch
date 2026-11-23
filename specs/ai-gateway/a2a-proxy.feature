@@ -81,6 +81,12 @@ Feature: A2A proxy on the gateway
     Then the upstream receives POST /a2a/message:send under its base URL
 
   @unit
+  Scenario: a task id with an escaped colon is a task id, not an action
+    When the caller sends GET /a2a/billing/tasks/team%3A42
+    Then the gateway forwards it as GetTask for task "team:42"
+    And POST /a2a/billing/tasks/team%3A42:cancel is forwarded as CancelTask
+
+  @unit
   Scenario: a target with no allow list accepts any key of its project
     Given the target "billing" has no policy
     When the caller sends a JSON-RPC "GetTask" to POST /a2a/billing
@@ -140,11 +146,20 @@ Feature: A2A proxy on the gateway
     And the stream ends without the second event
 
   @unit
+  Scenario: a key's stream_chunk guardrails judge every streamed event
+    Given the caller's key has a stream_chunk guardrail that denies "card number"
+    When the second streamed event carries a text part saying "card number"
+    Then the caller receives the first event
+    And then one error event with reason "a2a_content_blocked"
+    And a stream_chunk check that cannot complete lets the event through, as on the LLM routes
+
+  @unit
   Scenario: the trace continues through the hop
     When the caller sends a call with traceparent "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
     Then the upstream receives a traceparent with trace id "4bf92f3577b34da6a3ce929d0e0e4736"
     And the gateway records a span "invoke_agent billing" in that trace
     And the span carries "gen_ai.agent.name", "a2a.method", "a2a.protocol.binding" and "langwatch.a2a.caller.virtual_key_id"
+    And a JSON-RPC reply without a result never records the request id as "a2a.task.id"
 
   @unit
   Scenario: the hop's span is routed to the caller's project
@@ -172,9 +187,10 @@ Feature: A2A proxy on the gateway
     Then the caller receives a JSON-RPC error with reason "a2a_content_blocked"
 
   @unit
-  Scenario: a payload is read without building a tree, and only when a guardrail applies
+  Scenario: a payload is served with bounded allocations with and without a guardrail
     When the caller sends a 1 MiB body made of many small parts
     Then serving it allocates a small multiple of the body size, with or without a guardrail
+    And the payload's text is collected only when a guardrail applies
 
   @unit
   Scenario: a virtual key with too many calls in flight is refused
@@ -183,6 +199,7 @@ Feature: A2A proxy on the gateway
     Then the caller receives HTTP 429 with reason "a2a_too_many_requests"
     When it sends another call over JSON-RPC
     Then the caller receives a JSON-RPC error with code -32020 and reason "a2a_too_many_requests"
+    And the error carries the request id
     And the upstream is not called
 
   @unit
@@ -228,14 +245,16 @@ Feature: A2A proxy on the gateway
     And the interface at the other path is left out
 
   @unit
-  Scenario: a path refusal says the path is not allowed
-    When the caller sends a path with an encoded slash
-    Then the error message is "the A2A path is not allowed"
+  Scenario: an A2A v0.2 card request reads the agent's v0.2 card path
+    Given the target "billing" has no Agent Card URL
+    When the caller fetches GET /a2a/billing/.well-known/agent.json
+    Then the gateway fetches the card from /.well-known/agent.json under the target's upstream
+    And a target with an Agent Card URL is fetched from that URL on either path
 
   @unit
   Scenario: content outside text parts is scanned before the upstream
     Given the caller's key has a request guardrail that denies a token
-    When the token sits in a data part, in the bytes of a text file part, or in message metadata
+    When the token sits in a data part, in the bytes of a text file part (padded or unpadded, standard or URL-safe base64), or in message metadata
     Then the upstream is not called
     And the caller receives reason "a2a_content_blocked"
 
@@ -254,9 +273,10 @@ Feature: A2A proxy on the gateway
 
   @unit
   Scenario: an extended Agent Card error reply is relayed without a gateway card URL
-    When the upstream answers the extended Agent Card call with a JSON-RPC or HTTP+JSON error
+    When the upstream answers the extended Agent Card call with a JSON-RPC or HTTP+JSON error, or with HTTP 503 and a body such as {"message":"unavailable"} that has no error wrapper
     Then the caller receives the error reply unchanged
     And the reply carries no gateway card URL
+    And the error reply is still scanned by the key's response guardrails
 
   @unit
   Scenario: the Agent Card is scanned before it reaches the caller
@@ -297,6 +317,12 @@ Feature: A2A proxy on the gateway
     Then the caller receives none of them
 
   @unit
+  Scenario: caller headers named in Connection are not forwarded
+    When the caller sends "A2A-Extensions" and names it in its Connection header
+    Then the upstream does not receive the caller's "A2A-Extensions"
+    And an "A2A-Extensions" header configured on the target is still sent
+
+  @unit
   Scenario: an A2A reply is never marked cacheable by a shared cache
     When the upstream replies with "Cache-Control: public"
     Then the caller receives "Cache-Control: no-store" on replies, streams, Agent Cards and refusals
@@ -324,6 +350,12 @@ Feature: A2A proxy on the gateway
     When the target's upstream resolves to a loopback, private, link-local or metadata address
     Then the upstream is not called
     And the caller receives HTTP 502 with reason "a2a_upstream_unreachable"
+
+  @unit
+  Scenario: a refusal caused by an error keeps the cause for the operator
+    When a call is refused with "a2a_scan_unavailable" or "a2a_upstream_unreachable"
+    Then the error behind it is recorded on the hop span and in a gateway log line
+    And the caller's reply does not carry it
 
   @unit
   Scenario: the config version token reads the same A2A targets as the bundle
@@ -382,6 +414,14 @@ Feature: A2A proxy on the gateway
     Then every interface URL in the card starts with "https://gateway.acme.test/a2a/billing"
 
   @unit
+  Scenario: an Agent Card is refused when the gateway has no public base URL
+    Given the gateway has no public base URL configured
+    When the caller fetches the Agent Card or calls GetExtendedAgentCard, with any Host header
+    Then the upstream is not called
+    And the caller receives reason "a2a_public_url_unset", with HTTP 503 or JSON-RPC code -32024
+    And other A2A calls are still forwarded
+
+  @unit
   Scenario: a phrase split across streamed events is scanned whole
     Given the key scans replies for "card number"
     When the upstream streams "your card num" and then "ber 4111" as appended artifact text
@@ -409,4 +449,5 @@ Feature: A2A proxy on the gateway
     Given local addresses are blocked
     Then a target on a local address is not called
     And a host listed in ALLOWED_PROXY_HOSTS may resolve to a local address
+    And an IP address listed in ALLOWED_PROXY_HOSTS admits a URL naming that IP, never a hostname that resolves to it
     And the upstream client uses no environment proxy

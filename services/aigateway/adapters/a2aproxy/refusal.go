@@ -6,6 +6,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -35,6 +36,7 @@ var (
 	refuseRateLimited     = refusal{-32021, "a2a_rate_limited", "this virtual key is over its rate limit", http.StatusTooManyRequests}
 	refuseBudgetExceeded  = refusal{-32022, "a2a_budget_exceeded", "a budget for this virtual key is used up", http.StatusPaymentRequired}
 	refuseNotHTTPS        = refusal{-32023, "a2a_target_not_https", "this gateway calls A2A agents over https only", http.StatusBadGateway}
+	refusePublicURLUnset  = refusal{-32024, "a2a_public_url_unset", "this gateway has no public URL to put in an Agent Card: set A2A_PUBLIC_BASE_URL", http.StatusServiceUnavailable}
 	refuseUnsupported     = refusal{-32601, "a2a_operation_not_supported", "this method and path, or this JSON-RPC method, is not an A2A operation", http.StatusNotFound}
 )
 
@@ -43,6 +45,19 @@ var (
 	refuseReplyUnscannable = refusal{refuseUnscannable.code, refuseUnscannable.reason, "the A2A agent reply is not JSON the guardrail scan can read", http.StatusBadGateway}
 	refuseReplyTooLarge    = refusal{refuseTooLarge.code, refuseTooLarge.reason, "the A2A agent reply is over the size limit", http.StatusBadGateway}
 )
+
+// refuseWithCause refuses the call and keeps the error behind it for the operator.
+func (h *Handler) refuseWithCause(c *call, r refusal, cause error) {
+	h.recordCause(c, r.reason, cause)
+	c.refuse(r)
+}
+
+// recordCause puts the error behind a refusal on the hop span and in a log
+// line, as app/pipeline/guardrail.go does; the caller's reply never holds it.
+func (h *Handler) recordCause(c *call, reason string, cause error) {
+	c.span.RecordError(cause)
+	h.cfg.Logger.Warn(reason, zap.String("a2a.target", c.name), zap.String("a2a.method", c.method), zap.Error(cause))
+}
 
 func (r refusal) withMessage(msg string) refusal {
 	r.msg = msg
