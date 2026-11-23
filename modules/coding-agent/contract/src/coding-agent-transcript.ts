@@ -2,7 +2,7 @@ import type { Named } from "@langwatch/module";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import { collectLogEntries } from "./coding-agent-transcript-log.ts";
+import { collectDeliveredPolls, collectLogEntries } from "./coding-agent-transcript-log.ts";
 import { collectSpanEntries } from "./coding-agent-transcript-span.ts";
 import {
   type SpanReply,
@@ -128,7 +128,12 @@ export function buildCodingAgentTranscript({
   // A log event is the richer record of a prompt; the span's copy fills in when none arrived.
   const logsReportPrompts = fromLogs.entries.some(isUserPromptEntry);
   const spanPrompts = logsReportPrompts ? [] : fromSpans.spanPrompts;
-  const entries = [...fromSpans.entries, ...spanPrompts, ...logEntries];
+  const entries = [
+    ...fromSpans.entries,
+    ...spanPrompts,
+    ...logEntries,
+    ...collectDeliveredPolls(logs),
+  ];
 
   addUnduplicatedSpanReplies(entries, fromSpans.spanReplies, fromLogs.entries);
   entries.sort((left, right) => left.atMs - right.atMs);

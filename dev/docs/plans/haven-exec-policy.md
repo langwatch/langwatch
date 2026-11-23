@@ -122,7 +122,7 @@ head of the queue.
 
 ## 5. The Vitest launcher patch
 
-`patches/vitest@5.0.1.patch` on `vitest.mjs` (two lines today: it imports
+`patches/vitest@5.0.5.patch` on `vitest.mjs` (two lines today: it imports
 `dist/cli.js`), the same shape as the typescript patch.
 
 | Invocation                                                                  | Behaviour                                                                                  |

@@ -323,9 +323,192 @@ jobs:
           set -euo pipefail
           gh release upload "${RELEASE_TAG}" sboms/*.cdx.json --clobber --repo "${GITHUB_REPOSITORY}"
 
+  # The PII redaction model's code is private: langwatch-saas pushes its plain
+  # image for amd64 and arm64 to the artifacts ECR as http-git-<sha> (DECISIONS
+  # 4.10 there). A release copies the newest one unchanged, then signs it like
+  # the images above. Spec: specs/ci/pii-redaction-model-release.feature
+  pii-redaction-model:
+    runs-on: ubuntu-latest
+    needs: [extract-version]
+    if: needs.extract-version.outputs.is_release == 'true'
+    # The workflow group above is per ref, so two releases could overlap and an
+    # older run could move latest back after a newer one. One group for every
+    # release run makes them take turns. Trade-off: GitHub keeps one waiting run
+    # per group, so a third release queued meanwhile cancels the waiting one
+    # before it starts. That release then needs a re-run, and its chart release
+    # waits for it. A wrong latest, by contrast, would go unnoticed.
+    concurrency:
+      group: publish-pii-redaction-model-latest
+      cancel-in-progress: false
+    permissions:
+      contents: write # upload the SBOMs to the release
+      id-token: write # AWS OIDC and keyless signing via Sigstore
+    env:
+      AWS_REGION: eu-central-1
+      COSIGN_YES: "true"
+      REPO: langwatch/pii-redaction-model
+      VERSION: ${{ needs.extract-version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - name: Set up Go for cmd/newestimage
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      # langwatch-oss-pii-model-reader trusts only this workflow on a langwatch@v
+      # tag, and may only read langwatch-pii-redaction-model. It lives in the
+      # artifacts account, which ARTIFACTS_ECR_OIDC_ROLE_ARN names, so the
+      # account id stays in that secret, as in publish-docker-ecr.yml.
+      - name: Name the role and the registry
+        id: account
+        env:
+          ARTIFACTS_ROLE_ARN: ${{ secrets.ARTIFACTS_ECR_OIDC_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(printf '%s' "${ARTIFACTS_ROLE_ARN}" | cut -d: -f5)"
+          echo "::add-mask::${ACCOUNT_ID}"
+          echo "role=arn:aws:iam::${ACCOUNT_ID}:role/langwatch-oss-pii-model-reader" >> "$GITHUB_OUTPUT"
+          echo "registry=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ steps.account.outputs.role }}
+          role-session-name: publish-pii-redaction-model-${{ github.run_id }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        env:
+          REGISTRY: ${{ steps.account.outputs.registry }}
+        run: |
+          set -euo pipefail
+          echo "registry=${REGISTRY}" >> "$GITHUB_OUTPUT"
+          aws ecr get-login-password --region "${AWS_REGION}" \
+            | docker login --username AWS --password-stdin "${REGISTRY}"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # A re-run (this job fails until langwatch-saas has pushed an image) must
+      # not move the version to a newer model build: the version keeps the
+      # image it was first published and signed with. Any answer other than
+      # "not found" fails, so an outage never looks like a first run.
+      - name: Look for the image this release already published
+        id: released
+        run: |
+          set -euo pipefail
+          if digest="$(docker buildx imagetools inspect "${REPO}:${VERSION}" --format '{{.Manifest.Digest}}' 2>inspect.err)"; then
+            echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          elif grep -q ': not found' inspect.err; then
+            echo "digest=" >> "$GITHUB_OUTPUT"
+          else
+            cat inspect.err >&2
+            exit 1
+          fi
+
+      - name: Pick the newest model image, or the one already published
+        id: pick
+        env:
+          RELEASED: ${{ steps.released.outputs.digest }}
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          aws ecr describe-images --repository-name langwatch-pii-redaction-model \
+            --filter tagStatus=TAGGED --output json \
+            | go run ./cmd/newestimage -prefix http-git- -released "${RELEASED}" > pick.out
+          cat pick.out >> "$GITHUB_OUTPUT"
+          # Self-hosters run both chip types: look inside the index.
+          if [ -z "${RELEASED}" ]; then
+            DIGEST="$(sed -n 's/^digest=//p' pick.out)"
+            docker buildx imagetools inspect --raw "${REGISTRY}/langwatch-pii-redaction-model@${DIGEST}" \
+              | go run ./cmd/newestimage -platforms linux/amd64,linux/arm64
+          fi
+
+      # latest moves only for the highest published langwatch@v release, never
+      # a draft or prerelease. So a re-run of an older release, after a newer
+      # one shipped, leaves latest on the newer image. GitHub's own "latest
+      # release" will not do: other packages (python-sdk@v...) release here too.
+      - name: Decide whether this release moves latest
+        id: newest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          NEWEST_TAG="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' \
+            | grep -E '^langwatch@v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
+          if [ "${NEWEST_TAG}" = "${RELEASE_TAG}" ]; then
+            echo "latest=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "latest=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # By digest, so the copy is the index ECR holds, byte for byte.
+      - name: Copy it to Docker Hub as the release
+        env:
+          SOURCE: ${{ steps.ecr.outputs.registry }}/langwatch-pii-redaction-model@${{ steps.pick.outputs.digest }}
+          DIGEST: ${{ steps.pick.outputs.digest }}
+          REUSED: ${{ steps.pick.outputs.reused }}
+          TAG: ${{ steps.pick.outputs.tag }}
+          NEWEST: ${{ steps.newest.outputs.latest }}
+        run: |
+          set -euo pipefail
+          if [ "${REUSED}" != "true" ]; then
+            echo "Copying ${TAG} as ${REPO}:${VERSION}"
+            docker buildx imagetools create -t "${REPO}:${VERSION}" "${SOURCE}"
+          else
+            echo "${REPO}:${VERSION} already holds ${DIGEST}; a re-run keeps it"
+          fi
+          if [ "${NEWEST}" = "true" ]; then
+            docker buildx imagetools create -t "${REPO}:latest" "${REPO}@${DIGEST}"
+          fi
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          # 2.x for Docker Hub; see the note in sign-and-attest.
+          cosign-release: v2.6.3
+
+      - name: Install syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+
+      - name: Sign it and attach a CycloneDX SBOM per platform
+        env:
+          CERT_IDENTITY_REGEX: ^https://github\.com/langwatch/langwatch/
+          CERT_OIDC_ISSUER: https://token.actions.githubusercontent.com
+          NEWEST: ${{ steps.newest.outputs.latest }}
+        run: |
+          set -euo pipefail
+          mkdir -p sboms
+          EXTRA_TAGS=""
+          if [ "${NEWEST}" = "true" ]; then
+            EXTRA_TAGS="latest"
+          fi
+          IMAGE_NAME="pii-redaction-model" \
+          INSPECT_TAG="${VERSION}" \
+          SBOM_DIR="sboms" \
+          EXTRA_TAGS="${EXTRA_TAGS}" \
+          bash .github/scripts/sign-image.sh
+
+      - name: Attach SBOMs to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          gh release upload "${RELEASE_TAG}" sboms/*.cdx.json --clobber --repo "${GITHUB_REPOSITORY}"
+
   notify:
     runs-on: ubuntu-latest
-    needs: [extract-version, create-manifest, sign-and-attest]
+    needs: [extract-version, create-manifest, sign-and-attest, pii-redaction-model]
     if: needs.extract-version.outputs.is_release == 'true'
 
     steps:

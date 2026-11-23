@@ -39,7 +39,7 @@ global:
       drop:
         - ALL
     readOnlyRootFilesystem: true
-  ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
+  ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, PII redaction model, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
   ## @param global.nodeHeapCeiling.enabled [default: true] Give the app and workers containers a JavaScript heap of three quarters of their memory limit (NODE_OPTIONS=--max-old-space-size-percentage=75). Rendered only for a container with a memory limit and no NODE_OPTIONS in its extraEnvs. Set false when NODE_OPTIONS reaches the containers another way, such as extraEnvFrom: the chart's entry would replace it.
   nodeHeapCeiling:
@@ -72,7 +72,7 @@ global:
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
   ## @param global.scheduling.affinity [object] Affinity rules for all pods.
   ## @param global.scheduling.tolerations [array] Tolerations applied to all pods.
-  ## @param global.scheduling.priorityClassName [string] PriorityClass for every pod this chart renders (app, workers, nlp, langevals, cronjobs, and the bundled postgresql/redis). Set a per-component priorityClassName to override. Bundled SUBCHARTS (gateway, langyagent, clickhouse) manage their own scheduling and are not covered.
+  ## @param global.scheduling.priorityClassName [string] PriorityClass for every pod this chart renders (app, workers, nlp, langevals, PII redaction model, cronjobs, and the bundled postgresql/redis). Set a per-component priorityClassName to override. Bundled SUBCHARTS (gateway, langyagent, clickhouse) manage their own scheduling and are not covered.
   scheduling:
     nodeSelector: {}
     affinity: {}
@@ -155,21 +155,30 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.26.0 # x-release-please-version
+    tag: 3.27.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.26.0 # x-release-please-version
+    tag: 3.27.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.26.0 # x-release-please-version
+    tag: 3.27.0 # x-release-please-version
+    pullPolicy: IfNotPresent
+  # The PII redaction model's public image (piiRedactionModel below), used
+  # only when piiRedactionModel.enabled.
+  ## @param images.pii_redaction_model.repository [string] PII redaction model image repository.
+  ## @param images.pii_redaction_model.tag [string] PII redaction model image tag.
+  ## @param images.pii_redaction_model.pullPolicy [string] PII redaction model image pull policy.
+  pii_redaction_model:
+    repository: langwatch/pii-redaction-model
+    tag: 3.27.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -1527,6 +1536,79 @@ langevals:
   extraVolumeMounts: []
 
 # =============================================================================
+# PII Redaction Model
+# =============================================================================
+# The model the app and workers call for Strict PII analysis instead of
+# Presidio; any failure falls back to Presidio. Off by default; see the chart
+# README. Sizing and measured memory: docs/self-hosting/configuration/sizing-and-scaling.mdx
+## @section PII redaction model service
+piiRedactionModel:
+  ## @param piiRedactionModel.enabled [default: false] Deploy the PII redaction model (Deployment, Service and PDB) and point the app and workers at it.
+  enabled: false
+
+  # Like enabled, it forces release_pii_redaction_model_enabled: Strict
+  # organizations with an Enterprise license go to the model, the rest stay on
+  # Presidio. Self-hosted calls are never priced.
+  ## @param piiRedactionModel.externalEndpoint [string] PII_REDACTION_MODEL_ENDPOINT for a model this release does not deploy: an http(s) address, or a Lambda alias ARN when global.serviceAccount carries an IAM role allowed lambda:InvokeFunction. Ignored when enabled. Like enabled, it routes Strict organizations with an Enterprise license to the model; the rest stay on Presidio.
+  externalEndpoint: ""
+
+  ## @param piiRedactionModel.imagePullSecrets [array] Optional, only for a private mirror of images.pii_redaction_model (the default image is public), e.g. [{ name: my-registry }].
+  imagePullSecrets: []
+
+  ## @param piiRedactionModel.replicaCount [default: 1] Number of PII redaction model replicas.
+  replicaCount: 1
+  ## @extra piiRedactionModel.service Service for the PII redaction model.
+  ## @param piiRedactionModel.service.port [default: 8080] Service port.
+  service: { port: 8080 }
+  ## @extra piiRedactionModel.resources Resource requests and limits.
+  ## @param piiRedactionModel.resources.requests.cpu [string, default: 2] Requested CPU.
+  ## @param piiRedactionModel.resources.requests.memory [string, default: 7Gi] Requested memory.
+  ## @param piiRedactionModel.resources.limits.cpu [string, default: 4] CPU limit (the model's threads follow it).
+  ## @param piiRedactionModel.resources.limits.memory [string, default: 7Gi] Memory limit.
+  resources:
+    requests: { cpu: 2, memory: 7Gi }
+    limits: { cpu: 4, memory: 7Gi }
+  ## @param piiRedactionModel.terminationGracePeriodSeconds [default: 80] Time a stopping pod gets to answer requests in flight: 30 s body read + the 45 s request deadline + 5 s.
+  terminationGracePeriodSeconds: 80
+  ## @param piiRedactionModel.scratchSizeLimit [string, default: 256Mi] Size cap for the /tmp emptyDir under the read-only root filesystem.
+  scratchSizeLimit: 256Mi
+
+  ## @param piiRedactionModel.podSecurityContext [object] Pod security context overrides.
+  podSecurityContext: {}
+  ## @param piiRedactionModel.containerSecurityContext [object] Container security context overrides.
+  containerSecurityContext: {}
+  ## @param piiRedactionModel.podDisruptionBudget [object] PodDisruptionBudget spec overrides (rendered with more than one replica).
+  podDisruptionBudget: {}
+  ## @param piiRedactionModel.nodeSelector [object] Node selector overrides.
+  nodeSelector: {}
+  ## @param piiRedactionModel.tolerations [array] Tolerations overrides.
+  tolerations: []
+  ## @param piiRedactionModel.affinity [object] Affinity overrides.
+  affinity: {}
+  ## @param piiRedactionModel.topologySpreadConstraints [array] Topology spread constraints.
+  topologySpreadConstraints: []
+  ## @param piiRedactionModel.priorityClassName [string] PriorityClass for PII redaction model pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
+  ## @extra piiRedactionModel.pod Pod-level metadata.
+  pod:
+    ## @param piiRedactionModel.pod.annotations [object] Additional pod annotations.
+    annotations: {}
+    ## @param piiRedactionModel.pod.labels [object] Additional pod labels.
+    labels: {}
+  ## @extra piiRedactionModel.deployment Deployment-level metadata and strategy.
+  deployment:
+    ## @param piiRedactionModel.deployment.annotations [object] Additional deployment annotations.
+    annotations: {}
+    ## @param piiRedactionModel.deployment.labels [object] Additional deployment labels.
+    labels: {}
+    ## @param piiRedactionModel.deployment.strategy [object] Deployment strategy overrides.
+    strategy: {}
+    ## @param piiRedactionModel.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
+    revisionHistoryLimit: 10
+  ## @param piiRedactionModel.extraEnvs [array] Additional environment variables for the model container. An entry named PII_COMPONENTS, PII_WARMUP, PII_MAX_CONCURRENT_REQUESTS or PII_REQUEST_TIMEOUT_SECONDS replaces the chart's value (raise terminationGracePeriodSeconds with a longer timeout). PORT is refused.
+  extraEnvs: []
+
+# =============================================================================
 # CronJobs Configuration
 # =============================================================================
 # Scheduled tasks that run automatically to maintain LangWatch
@@ -2201,7 +2283,7 @@ clickhouse:
   # ClickHouse; rotate a live secret with `kubectl rollout restart statefulset`.
   ## @param clickhouse.podAnnotations [object] Annotations on the ClickHouse pod template (carries the LWQL catalog version so upgrades re-mount the access Secret).
   podAnnotations:
-    langwatch.com/lwql-access-catalog: "3.26.0" # x-release-please-version
+    langwatch.com/lwql-access-catalog: "3.27.0" # x-release-please-version
 
 # =============================================================================
 # LangWatchQL (LWQL) Configuration
