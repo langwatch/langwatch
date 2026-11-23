@@ -46,7 +46,7 @@ ingress:
   className: nginx
   # ...your app hosts, tls and annotations
   gateway:
-    host: gateway.acme.com        # publishes /v1 and /health on this host
+    host: gateway.acme.com        # publishes /v1, /a2a and /health on this host
     tls:
       secretName: gateway-tls
   # className nginx adds the streaming, timeout and body-size annotations

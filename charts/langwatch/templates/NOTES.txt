@@ -79,15 +79,15 @@ dev's Personal Workspace at https://<your-host>/coding-agents .
       curl http://{{ .Release.Name }}-gateway/healthz
 {{- $gwHost := ((.Values.ingress | default dict).gateway | default dict).host }}
 {{- if and .Values.ingress.enabled $gwHost }}
-  • AI Gateway public route: Ingress {{ .Release.Name }}-gateway-ingress for {{ $gwHost }}, paths /v1 and /health.
+  • AI Gateway public route: Ingress {{ .Release.Name }}-gateway-ingress for {{ $gwHost }}, paths /v1, /a2a and /health.
 {{- else if .Values.gateway.publicUrl }}
   • AI Gateway public URL: {{ .Values.gateway.publicUrl }} (no Ingress
-    rendered; your own route must send /v1 and /health to Service
+    rendered; your own route must send /v1, /a2a and /health to Service
     {{ .Release.Name }}-gateway port 80).
 {{- else }}
   • The AI Gateway has no public route. LLM clients and the CLI need one.
     Either set ingress.gateway.host on the app Ingress, or route
-    /v1 and /health on your gateway hostname to Service
+    /v1, /a2a and /health on your gateway hostname to Service
     {{ .Release.Name }}-gateway port 80 (Gateway API HTTPRoute, a load
     balancer) and set gateway.publicUrl. Routes, timeouts and body size:
       https://docs.langwatch.ai/self-hosting/deployment/routing
