@@ -15732,6 +15732,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/langy-client':
+        specifier: workspace:*
+        version: link:../../langy/client
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
@@ -15892,6 +15895,9 @@ importers:
       '@langwatch/span-normalisation':
         specifier: workspace:*
         version: link:../../../packages/span-normalisation
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config

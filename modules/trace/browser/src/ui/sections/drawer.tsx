@@ -7,10 +7,9 @@ import * as React from "react";
 
 import { useLangyStore } from "../../behavior/langy/langy.store.ts";
 import {
-  LANGY_DOCK_GAP,
   LANGY_DODGE_STAGGER_MS,
+  LANGY_DRAWER_YIELD_PX,
   LANGY_TRANSITION,
-  SIDEBAR_PANEL_WIDTH,
 } from "../../model/langy/langy-panel-layout.ts";
 import { IsolatedErrorBoundary } from "./isolated-error-boundary.tsx";
 
@@ -58,9 +57,7 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
     // strip of space between the two cards.
     // Spec: specs/langy/langy-panel-layout.feature
     const isLangyDockedCompanion = useLangyStore((s) => s.isOpen && s.panelMode === "sidebar");
-    const langyYieldMarginEnd = isLangyDockedCompanion
-      ? `${8 + SIDEBAR_PANEL_WIDTH + LANGY_DOCK_GAP}px`
-      : undefined;
+    const langyYieldMarginEnd = isLangyDockedCompanion ? `${LANGY_DRAWER_YIELD_PX}px` : undefined;
 
     // Floating Langy dodges to the left when a drawer opens.
     const isLangyOpenFloating = useLangyStore((s) => s.isOpen && s.panelMode === "floating");

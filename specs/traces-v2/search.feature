@@ -1813,6 +1813,9 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     When the user opens the Langy ask surface
     Then it says the active search goes with the question
 
+  # Regression: the trace host's ask once handed the question to nothing, so the
+  # surface dissolved and no panel opened.
+  @integration @regression
   Scenario: Enter hands the question and the search to the panel
     Given the Langy ask surface is open with "why are these failing?" typed
     And the search bar contains the applied query "status:error"
