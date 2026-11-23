@@ -36,7 +36,7 @@ describe("queryWithoutFacet", () => {
       ).toBe("spanName:llm");
     });
 
-    /** @scenario "A facet term under a NOT is removed with the rest" */
+    /** @scenario "A facet term under a NOT over an OR group is removed with the rest" */
     it("removes the term from under a NOT instead of keeping the group whole", () => {
       const without = queryWithoutFacet({
         queryText: "NOT (status:error OR service:api)",

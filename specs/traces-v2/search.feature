@@ -221,7 +221,7 @@ Rule: Query syntax
     When the user searches for "NOT (@status:error AND @model:gpt-4o-mini)"
     Then only the errors on "gpt-4o-mini" are excluded
     And "NOT (@status:error OR @model:gpt-4o-mini)" excludes every error and every "gpt-4o-mini" trace
-    And a NOT inside the group cancels the outer one, as in "NOT (NOT @status:error AND @model:gpt-4o-mini)"
+    And a NOT inside the group cancels only on its own term while the AND still becomes an OR, so "NOT (NOT @status:error AND @model:gpt-4o-mini)" keeps every error and every trace not on "gpt-4o-mini"
     And the trace list and an automation's match on a single trace give the same answer
 
   @unit
@@ -2754,8 +2754,8 @@ Rule: Enter routes a sentence
       And a query that named only that facet becomes empty
 
     @unit
-    Scenario: A facet term under a NOT is removed with the rest
-      Given a query negating a group that names the facet
+    Scenario: A facet term under a NOT over an OR group is removed with the rest
+      Given a query negating an OR group that names the facet, which reads as an AND
       When the query is rewritten for that facet's count
       Then the negated group no longer carries the facet's term
 
