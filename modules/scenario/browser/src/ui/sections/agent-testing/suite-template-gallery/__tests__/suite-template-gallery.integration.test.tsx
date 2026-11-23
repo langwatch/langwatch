@@ -180,6 +180,24 @@ describe("SuiteTemplateGallery", () => {
     expect(await screen.findByTestId(`suite-template-card-${RED_TEAM.id}`)).toBeInTheDocument();
   });
 
+  /** @scenario "Each template card shows an icon for the kind of agent it tests" */
+  it("shows the agent's icon on its card and a generic one for an unknown template", () => {
+    const voice = { ...ARCHETYPE, id: "voice-support-agent", title: "Voice support agent" };
+    const technician = { ...ARCHETYPE, id: "technician-copilot", title: "Technician copilot" };
+    const agenticRag = { ...ARCHETYPE, id: "agentic-rag", title: "Agentic RAG" };
+    const unknown = { ...ARCHETYPE, id: "new-archetype", title: "New archetype" };
+    answer({ data: [voice, technician, agenticRag, unknown] });
+    renderGallery();
+    expect(screen.getByTestId("suite-template-icon-voice-support-agent")).toHaveClass("lucide-mic");
+    expect(screen.getByTestId("suite-template-icon-technician-copilot")).toHaveClass(
+      "lucide-wrench",
+    );
+    expect(screen.getByTestId("suite-template-icon-agentic-rag")).toHaveClass("lucide-file-search");
+    expect(screen.getByTestId("suite-template-icon-new-archetype")).toHaveClass(
+      "lucide-layout-template",
+    );
+  });
+
   /** @scenario "The gallery shows loading while the templates are read" */
   it("shows a loading state before the templates answer", () => {
     answer({ isLoading: true });

@@ -6,7 +6,7 @@ The server half of [governance](../README.md). AI governance: ingestion sources 
 
 ## Installation
 
-`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, agentRegistryRest, ocsfSiemRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withEventing(agentRegistryEventing).withEventing(ocsfPushEventing).withMigrations(…)`, `src/governance.module.ts:74`.
+`defineProcessModule("governance").withRepositories(governanceRepositories).withApi(GovernanceModule).withTransports(governanceRest, agentRegistryRest, agentKillSwitchRest, ocsfSiemRest, governanceCliRest, governanceIngestRest, meUsageRest, departmentsTrpcTransport, ingestionTemplatesTrpcTransport, aiToolsTrpcTransport, ingestionSourcesTrpcTransport, governanceTrpcTransport, anomalyRulesTrpcTransport, activityMonitorTrpcTransport, governanceKillSwitchTrpcTransport, personalSessionsTrpcTransport, ingestionKeyTrpcTransport, sessionPolicyTrpcTransport, governancePeopleTrpcTransport, governanceAgentsTrpcTransport, governanceCostTrpcTransport).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(pulledUsageEventing).withEventing(ingestionPullEventing).withEventing(ingestionPullReconcileEventing).withEventing(governanceActivityMonitorEventing).withEventing(codingAssistantBillingEventing).withEventing(agentRegistryEventing).withEventing(agentStopEventing).withEventing(ocsfPushEventing).withMigrations(…)`, `src/governance.module.ts:77`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The ingestion-template operations the governance REST family calls.
 
-Peers call these through the token, declared at `../contract/src/governance.api.ts:190`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/governance.api.ts:202`; nothing else in this package is public.
 
 #### `registerMcpTools`
 
@@ -752,6 +752,104 @@ getRegistryArdManifest(input: { organizationId: string }): Promise<ArdManifest>;
 searchRegistryArd(input: { organizationId: string; request: ArdSearchRequest; }): Promise<ArdSearchResponse>;
 ```
 
+#### `findAgentKillSwitchSummaries`
+
+```typescript
+findAgentKillSwitchSummaries(input: { organizationId: string; }): Promise<AgentKillSwitchSummary[]>;
+```
+
+#### `findPendingAgentStops`
+
+```typescript
+findPendingAgentStops(input: { organizationId: string }): Promise<AgentStopView[]>;
+```
+
+#### `getAgentStopPlan`
+
+Throws `agent_registry_entry_not_found` for an agent outside the organisation.
+
+```typescript
+getAgentStopPlan(input: { organizationId: string; agentId: string }): Promise<AgentStopPlan>;
+```
+
+#### `setAgentStopPlan`
+
+Throws `agent_stop_target_invalid` for a target the organisation does not hold, and `agent_stop_plan_conflict` when `expectedVersion` is given and the plan was saved since. Writes one audit row naming the agent and `caller`, refused saves included.
+
+```typescript
+setAgentStopPlan(input: { organizationId: string; agentId: string; targets: readonly AgentStopTarget[]; expectedVersion?: number; caller: AgentStopCaller; }): Promise<AgentStopPlan>;
+```
+
+#### `findAwsConnections`
+
+```typescript
+findAwsConnections(input: { organizationId: string }): Promise<AwsConnectionView[]>;
+```
+
+#### `createAwsConnection`
+
+Writes an audit row naming `userId`, the person who added it.
+
+```typescript
+createAwsConnection(input: { organizationId: string; connection: AwsConnectionInput; userId: string | null; /** The operator behind an impersonated person, recorded beside `userId`. */ impersonatorId?: string; }): Promise<AwsConnectionView>;
+```
+
+#### `deleteAwsConnection`
+
+Throws `governance_aws_connection_in_use` while a plan target or unrestored stop uses it; a delete that removed a connection writes an audit row naming `userId`.
+
+```typescript
+deleteAwsConnection(input: { organizationId: string; connectionId: string; userId: string | null; /** The operator behind an impersonated person, recorded beside `userId`. */ impersonatorId?: string; }): Promise<{ deleted: boolean }>;
+```
+
+#### `requestAgentStop`
+
+```typescript
+requestAgentStop(input: { organizationId: string; agentId: string; reason: string; severity: AgentStopSeverity; /** Throws `agent_stop_plan_changed` when given and the plan no longer holds exactly these. */ expectedTargetIds?: readonly string[]; caller: AgentStopCaller; }): Promise<AgentStopView>;
+```
+
+#### `approveAgentStop`
+
+```typescript
+approveAgentStop(input: { organizationId: string; stopId: string; note?: string; /** Throws `agent_stop_plan_changed` when given and the stop no longer holds exactly these. */ expectedTargetIds?: readonly string[]; caller: AgentStopCaller; }): Promise<AgentStopView>;
+```
+
+#### `denyAgentStop`
+
+```typescript
+denyAgentStop(input: { organizationId: string; stopId: string; note?: string; caller: AgentStopCaller; }): Promise<AgentStopView>;
+```
+
+#### `restoreAgentStop`
+
+```typescript
+restoreAgentStop(input: { organizationId: string; stopId: string; caller: AgentStopCaller; }): Promise<AgentStopView>;
+```
+
+#### `retryAgentStop`
+
+Applies again every target the stop has not stopped, plus plan targets added since; throws `agent_stop_not_retryable` unless the stop is quarantined, stop_failed or restore_failed.
+
+```typescript
+retryAgentStop(input: { organizationId: string; stopId: string; caller: AgentStopCaller; }): Promise<AgentStopView>;
+```
+
+#### `getLatestAgentStop`
+
+The agent's latest stop; throws `agent_stop_not_found` when it was never stopped.
+
+```typescript
+getLatestAgentStop(input: { organizationId: string; agentId: string }): Promise<AgentStopView>;
+```
+
+#### `listAgentStops`
+
+Latest request first, `limit` at a time; a cursor it never returned is a validation error.
+
+```typescript
+listAgentStops(input: { organizationId: string; statuses?: readonly AgentStopStatus[]; limit: number; cursor?: string; }): Promise<AgentStopPage>;
+```
+
 #### `listOcsfEvents`
 
 The organisation's governance events as OCSF 1.9.0, after the cursor.
@@ -786,6 +884,158 @@ ingestOcsfEvents(input: OcsfIngestRequest & { organizationId: string }): Promise
 
 ## REST transport
 
+### `agentKillSwitchRest`
+
+|             |                                              |
+| ----------- | -------------------------------------------- |
+| Declared at | `src/transport/agent-kill-switch.rest.ts:50` |
+| Base URL    | none: each route's path is its address       |
+| Addressing  | literal                                      |
+| Credential  | organization                                 |
+
+#### `GET /api/governance/agents/:agentId/stop-plan` · `getAgentStopPlan`
+
+Get an agent's stop plan
+
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-kill-switch.rest.ts:57`.
+
+Answers at `/api/governance/agents/:agentId/stop-plan`, `/api/v1/governance/agents/:agentId/stop-plan`.
+
+```typescript
+// Params: agentStopAgentParamsSchema, ../contract/src/features/kill-switch/agent-kill-switch.ts:308
+interface Params {
+  agentId: string;
+}
+type Response = z.infer<typeof agentStopPlanResponseSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:332
+```
+
+#### `PUT /api/governance/agents/:agentId/stop-plan` · `setAgentStopPlan`
+
+Replace an agent's stop plan
+
+Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:78`.
+
+Answers at `/api/governance/agents/:agentId/stop-plan`, `/api/v1/governance/agents/:agentId/stop-plan`.
+
+```typescript
+type Params = z.infer<typeof agentStopAgentParamsSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:308
+type Body = z.infer<typeof setAgentStopPlanInputSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:89
+type Response = z.infer<typeof agentStopPlanResponseSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:332
+```
+
+#### `POST /api/governance/agents/:agentId/stop` · `requestAgentStop`
+
+Stop an agent
+
+Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:110`.
+
+Answers at `/api/governance/agents/:agentId/stop`, `/api/v1/governance/agents/:agentId/stop`.
+
+```typescript
+type Params = z.infer<typeof agentStopAgentParamsSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:308
+// Body: requestAgentStopInputSchema, ../contract/src/features/kill-switch/agent-kill-switch.ts:263
+interface Body {
+  reason: string;
+  severity?: "low" | "medium" | "high" | "critical";
+  expectedTargetIds?: string[];
+}
+type Response = z.infer<typeof agentStopResponseSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:336
+```
+
+#### `GET /api/governance/agents/:agentId/stop` · `getLatestAgentStop`
+
+Get an agent's latest stop
+
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-kill-switch.rest.ts:144`.
+
+Answers at `/api/governance/agents/:agentId/stop`, `/api/v1/governance/agents/:agentId/stop`.
+
+```typescript
+type Params = z.infer<typeof agentStopAgentParamsSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:308
+type Response = z.infer<typeof agentStopResponseSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:336
+```
+
+#### `GET /api/governance/agent-stops` · `listAgentStops`
+
+List the organisation's agent stops
+
+Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Declared at `src/transport/agent-kill-switch.rest.ts:165`.
+
+Answers at `/api/governance/agent-stops`, `/api/v1/governance/agent-stops`.
+
+```typescript
+type Query = z.infer<typeof agentStopListQuerySchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:325
+type Response = z.infer<typeof agentStopListResponseSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:347
+```
+
+#### `POST /api/governance/agent-stops/:stopId/approve` · `approveAgentStop`
+
+Approve a pending stop
+
+Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:187`.
+
+Answers at `/api/governance/agent-stops/:stopId/approve`, `/api/v1/governance/agent-stops/:stopId/approve`.
+
+```typescript
+// Params: agentStopParamsSchema, ../contract/src/features/kill-switch/agent-kill-switch.ts:312
+interface Params {
+  stopId: string;
+}
+// Body: approveAgentStopInputSchema, ../contract/src/features/kill-switch/agent-kill-switch.ts:283
+interface Body {
+  note?: string;
+  expectedTargetIds?: string[];
+}
+type Response = z.infer<typeof agentStopResponseSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:336
+```
+
+#### `POST /api/governance/agent-stops/:stopId/deny` · `denyAgentStop`
+
+Deny a pending stop
+
+Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:219`.
+
+Answers at `/api/governance/agent-stops/:stopId/deny`, `/api/v1/governance/agent-stops/:stopId/deny`.
+
+```typescript
+type Params = z.infer<typeof agentStopParamsSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:312
+// Body: decideAgentStopInputSchema, ../contract/src/features/kill-switch/agent-kill-switch.ts:272
+interface Body {
+  note?: string;
+}
+type Response = z.infer<typeof agentStopResponseSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:336
+```
+
+#### `POST /api/governance/agent-stops/:stopId/restore` · `restoreAgentStop`
+
+Restore a stopped agent
+
+Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:250`.
+
+Answers at `/api/governance/agent-stops/:stopId/restore`, `/api/v1/governance/agent-stops/:stopId/restore`.
+
+```typescript
+type Params = z.infer<typeof agentStopParamsSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:312
+// Body: restoreAgentStopInputSchema, ../contract/src/features/kill-switch/agent-kill-switch.ts:299
+type Body = Record<string, unknown>;
+type Response = z.infer<typeof agentStopResponseSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:336
+```
+
+#### `POST /api/governance/agent-stops/:stopId/retry` · `retryAgentStop`
+
+Retry a stop
+
+Permission `governance:manage`. Entitlement `enterprise` (feature `AGENT_REGISTRY`). Credential `organization`. Declared at `src/transport/agent-kill-switch.rest.ts:281`.
+
+Answers at `/api/governance/agent-stops/:stopId/retry`, `/api/v1/governance/agent-stops/:stopId/retry`.
+
+```typescript
+type Params = z.infer<typeof agentStopParamsSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:312
+// Body: retryAgentStopInputSchema, ../contract/src/features/kill-switch/agent-kill-switch.ts:291
+type Body = Record<string, unknown>;
+type Response = z.infer<typeof agentStopResponseSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:336
+```
+
 ### `agentRegistryRest`
 
 |             |                                           |
@@ -804,14 +1054,14 @@ Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`
 Answers at `/api/governance/registry/agents`, `/api/v1/governance/registry/agents`.
 
 ```typescript
-// Query: agentRegistryListQuerySchema, ../contract/src/features/registry/agent-registry.ts:147
+// Query: agentRegistryListQuerySchema, ../contract/src/features/registry/agent-registry.ts:173
 interface Query {
   limit?: number;
   cursor?: string;
   updated_since?: string;
   status?: "active" | "removed";
 }
-type Response = z.infer<typeof agentRegistryListResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:157
+type Response = z.infer<typeof agentRegistryListResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:183
 ```
 
 #### `GET /api/governance/registry/agents/:agentId` · `getRegistryAgent`
@@ -823,11 +1073,11 @@ Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`
 Answers at `/api/governance/registry/agents/:agentId`, `/api/v1/governance/registry/agents/:agentId`.
 
 ```typescript
-// Params: agentRegistryParamsSchema, ../contract/src/features/registry/agent-registry.ts:165
+// Params: agentRegistryParamsSchema, ../contract/src/features/registry/agent-registry.ts:191
 interface Params {
   agentId: string;
 }
-type Response = z.infer<typeof agentRegistryDetailResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:172
+type Response = z.infer<typeof agentRegistryDetailResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:198
 ```
 
 #### `GET /api/governance/registry/agents/:agentId/versions` · `listRegistryAgentVersions`
@@ -839,13 +1089,13 @@ Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`
 Answers at `/api/governance/registry/agents/:agentId/versions`, `/api/v1/governance/registry/agents/:agentId/versions`.
 
 ```typescript
-type Params = z.infer<typeof agentRegistryParamsSchema>; // ../contract/src/features/registry/agent-registry.ts:165
-// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:192
+type Params = z.infer<typeof agentRegistryParamsSchema>; // ../contract/src/features/registry/agent-registry.ts:191
+// Query: agentRegistryEventsQuerySchema, ../contract/src/features/registry/agent-registry.ts:218
 interface Query {
   limit?: number;
   cursor?: string;
 }
-type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:203
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:229
 ```
 
 #### `GET /api/governance/registry/events` · `listRegistryEvents`
@@ -857,8 +1107,8 @@ Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`
 Answers at `/api/governance/registry/events`, `/api/v1/governance/registry/events`.
 
 ```typescript
-type Query = z.infer<typeof agentRegistryEventsQuerySchema>; // ../contract/src/features/registry/agent-registry.ts:192
-type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:203
+type Query = z.infer<typeof agentRegistryEventsQuerySchema>; // ../contract/src/features/registry/agent-registry.ts:218
+type Response = z.infer<typeof agentRegistryEventsResponseSchema>; // ../contract/src/features/registry/agent-registry.ts:229
 ```
 
 #### `GET /api/governance/registry/schema` · `getRegistrySchema`
@@ -870,7 +1120,7 @@ Permission `governance:view`. Entitlement `enterprise` (feature `AGENT_REGISTRY`
 Answers at `/api/governance/registry/schema`, `/api/v1/governance/registry/schema`.
 
 ```typescript
-// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:215
+// Response: agentRegistrySchemaResponseSchema, ../contract/src/features/registry/agent-registry.ts:241
 interface Response {
   entry: Record<string, unknown>;
   event: Record<string, unknown>;
@@ -1890,6 +2140,145 @@ type Input = z.infer<typeof governanceCostWindowInputSchema>; // ../contract/src
 type Output = z.infer<typeof governanceSpenderBreakdownSchema>; // ../contract/src/features/cost/governance-cost.ts:154
 ```
 
+### `governanceKillSwitch`
+
+Contract `../contract/src/features/kill-switch/agent-kill-switch.ts:582`, router `src/transport/governance-kill-switch.trpc.ts:33`.
+
+| Procedure                                  | Kind     | Gate                                                                                | Input  | Output                    |
+| ------------------------------------------ | -------- | ----------------------------------------------------------------------------------- | ------ | ------------------------- |
+| `governanceKillSwitch.summaries`           | query    | Permission `governance:view`; Entitlement `enterprise` (feature `AGENT_REGISTRY`)   | inline | inline                    |
+| `governanceKillSwitch.pendingApprovals`    | query    | Permission `governance:view`; Entitlement `enterprise` (feature `AGENT_REGISTRY`)   | inline | inline                    |
+| `governanceKillSwitch.plan`                | query    | Permission `governance:view`; Entitlement `enterprise` (feature `AGENT_REGISTRY`)   | inline | `agentStopPlanSchema`     |
+| `governanceKillSwitch.setPlan`             | mutation | Permission `governance:manage`; Entitlement `enterprise` (feature `AGENT_REGISTRY`) | inline | `agentStopPlanSchema`     |
+| `governanceKillSwitch.awsConnections`      | query    | Permission `governance:view`; Entitlement `enterprise` (feature `AGENT_REGISTRY`)   | inline | inline                    |
+| `governanceKillSwitch.createAwsConnection` | mutation | Permission `governance:manage`; Entitlement `enterprise` (feature `AGENT_REGISTRY`) | inline | `awsConnectionViewSchema` |
+| `governanceKillSwitch.deleteAwsConnection` | mutation | Permission `governance:manage`; Entitlement `enterprise` (feature `AGENT_REGISTRY`) | inline | inline                    |
+| `governanceKillSwitch.requestStop`         | mutation | Permission `governance:manage`; Entitlement `enterprise` (feature `AGENT_REGISTRY`) | inline | `agentStopViewSchema`     |
+| `governanceKillSwitch.approveStop`         | mutation | Permission `governance:manage`; Entitlement `enterprise` (feature `AGENT_REGISTRY`) | inline | `agentStopViewSchema`     |
+| `governanceKillSwitch.denyStop`            | mutation | Permission `governance:manage`; Entitlement `enterprise` (feature `AGENT_REGISTRY`) | inline | `agentStopViewSchema`     |
+| `governanceKillSwitch.restore`             | mutation | Permission `governance:manage`; Entitlement `enterprise` (feature `AGENT_REGISTRY`) | inline | `agentStopViewSchema`     |
+| `governanceKillSwitch.retryStop`           | mutation | Permission `governance:manage`; Entitlement `enterprise` (feature `AGENT_REGISTRY`) | inline | `agentStopViewSchema`     |
+
+```typescript
+// governanceKillSwitch.summaries
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:584
+interface Input {
+  organizationId: string;
+}
+// Output: agentKillSwitchSummarySchema.array() (inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:585)
+
+// governanceKillSwitch.pendingApprovals
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:588
+interface Input {
+  organizationId: string;
+}
+// Output: agentStopViewSchema.array() (inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:589)
+
+// governanceKillSwitch.plan
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:592
+interface Input {
+  organizationId: string;
+  agentId: string;
+}
+type Output = z.infer<typeof agentStopPlanSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:75
+
+// governanceKillSwitch.setPlan
+// Input: z.object({ ...agentScope, targets: setAgentStopPlanInputSchema.shape.targets, expectedVer… (inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:597)
+type Output = z.infer<typeof agentStopPlanSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:75
+
+// governanceKillSwitch.awsConnections
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:606
+interface Input {
+  organizationId: string;
+}
+// Output: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:607
+type Output = {
+  id: string;
+  name: string;
+  accessKeyIdLastFour: string | null;
+  roleArn: string | null;
+  externalId: string | null;
+  createdAt: string;
+}[];
+
+// governanceKillSwitch.createAwsConnection
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:610
+interface Input {
+  organizationId: string;
+  connection: {
+    name: string;
+    accessKeyId?: string;
+    secretAccessKey?: string;
+    roleArn?: string;
+  };
+}
+// Output: awsConnectionViewSchema, ../contract/src/features/kill-switch/agent-kill-switch.ts:133
+interface Output {
+  id: string;
+  name: string;
+  accessKeyIdLastFour: string | null;
+  roleArn: string | null;
+  externalId: string | null;
+  createdAt: string;
+}
+
+// governanceKillSwitch.deleteAwsConnection
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:614
+interface Input {
+  organizationId: string;
+  connectionId: string;
+}
+// Output: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:615
+interface Output {
+  deleted: boolean;
+}
+
+// governanceKillSwitch.requestStop
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:619
+interface Input {
+  organizationId: string;
+  agentId: string;
+  reason: string;
+  expectedTargetIds?: string[];
+}
+type Output = z.infer<typeof agentStopViewSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:248
+
+// governanceKillSwitch.approveStop
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:629
+interface Input {
+  organizationId: string;
+  stopId: string;
+  note?: string;
+  expectedTargetIds?: string[];
+}
+type Output = z.infer<typeof agentStopViewSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:248
+
+// governanceKillSwitch.denyStop
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:638
+interface Input {
+  organizationId: string;
+  stopId: string;
+  note?: string;
+}
+type Output = z.infer<typeof agentStopViewSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:248
+
+// governanceKillSwitch.restore
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:642
+interface Input {
+  organizationId: string;
+  stopId: string;
+}
+type Output = z.infer<typeof agentStopViewSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:248
+
+// governanceKillSwitch.retryStop
+// Input: inline, ../contract/src/features/kill-switch/agent-kill-switch.ts:646
+interface Input {
+  organizationId: string;
+  stopId: string;
+}
+type Output = z.infer<typeof agentStopViewSchema>; // ../contract/src/features/kill-switch/agent-kill-switch.ts:248
+```
+
 ### `governancePeople`
 
 Contract `../contract/src/governance-people.ts:72`, router `src/transport/governance-people.trpc.ts:9`.
@@ -1981,7 +2370,7 @@ type Output = {
 interface Input {
   organizationId: string;
 }
-// Output: personaResolutionSchema, ../contract/src/features/personal/persona-home.ts:53
+// Output: personaResolutionSchema, ../contract/src/features/personal/persona-home.ts:54
 interface Output {
   persona: "personal_only" | "mixed" | "project_only" | "governance_admin";
   destination: string;
@@ -2473,6 +2862,26 @@ Declared at `src/eventing/pulled-usage.pipeline.ts:167`. Events: `pulledUsageObs
 | ClickHouse fold projection | `≈ this.costRollup`       | –                                                 | `src/eventing/pulled-usage.pipeline.ts:183` |
 | ClickHouse map projection  | `≈ this.costCharges`      | –                                                 | `src/eventing/pulled-usage.pipeline.ts:186` |
 
+### Pipeline `governance_agent_stop` (aggregate `agent_stop`)
+
+Declared at `src/features/kill-switch/eventing/agent-stop.pipeline.ts:97`. Events: `agentStopRequestedEventSchema`, `agentStopApprovedEventSchema`, `agentStopDeniedEventSchema`, `agentStopTargetAppliedEventSchema`, `agentStopTargetFailedEventSchema`, `agentStopRestoreRequestedEventSchema`, `agentStopTargetRevertedEventSchema`, `agentStopTargetRevertFailedEventSchema`, `agentStopRetryRequestedEventSchema`, `agentStopTargetsDroppedEventSchema`.
+
+| Kind                | Name                           | Handles                                                                                                               | Declared at                                                    |
+| ------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| command             | `request`                      | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:114` |
+| command             | `approve`                      | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:115` |
+| command             | `deny`                         | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:116` |
+| command             | `recordTargetApplied`          | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:117` |
+| command             | `recordTargetFailed`           | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:118` |
+| command             | `requestRestore`               | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:119` |
+| command             | `recordTargetReverted`         | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:120` |
+| command             | `recordTargetRevertFailed`     | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:121` |
+| command             | `retry`                        | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:122` |
+| command             | `dropTargets`                  | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:123` |
+| process manager     | `agentStop`                    | intents `announce`, `revertTarget`, `applyTarget` (outbox)                                                            | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:124` |
+| process manager     | `killSwitchAudit`              | every 1 d (`KILL_SWITCH_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox) | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:128` |
+| Postgres projection | `≈ agentStopProjection(store)` | –                                                                                                                     | `src/features/kill-switch/eventing/agent-stop.pipeline.ts:113` |
+
 ### Pipeline `governance_ocsf_push` (aggregate `global`)
 
 Declared at `src/features/ocsf/eventing/ocsf-push.pipeline.ts:40`.
@@ -2496,7 +2905,7 @@ Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:89`.
 
 | Kind   | Leaf                       | Environment variable                  | Declared at                               |
 | ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:545`           |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:577`           |
 | config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
 | config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
 | config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |
@@ -2508,8 +2917,9 @@ Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:89`.
 | config | `microsoftGraphApiBase`    | `MICROSOFT_GRAPH_API_BASE`            | `../contract/src/governance.config.ts:51` |
 | config | `databricksWorkspaceBase`  | `DATABRICKS_WORKSPACE_BASE`           | `../contract/src/governance.config.ts:53` |
 | config | `dataverseEnvironmentBase` | `DATAVERSE_ENVIRONMENT_BASE`          | `../contract/src/governance.config.ts:55` |
-| config | `isSaas`                   | `IS_SAAS`                             | `../contract/src/governance.config.ts:57` |
-| config | `publicBaseUrl`            | `BASE_HOST`                           | `../contract/src/governance.config.ts:59` |
-| config | `ingestRateLimitDisabled`  | `LW_INGEST_RATE_LIMIT_DISABLED`       | `../contract/src/governance.config.ts:61` |
+| config | `bedrockAgentEndpoint`     | `BEDROCK_AGENT_ENDPOINT`              | `../contract/src/governance.config.ts:57` |
+| config | `isSaas`                   | `IS_SAAS`                             | `../contract/src/governance.config.ts:59` |
+| config | `publicBaseUrl`            | `BASE_HOST`                           | `../contract/src/governance.config.ts:61` |
+| config | `ingestRateLimitDisabled`  | `LW_INGEST_RATE_LIMIT_DISABLED`       | `../contract/src/governance.config.ts:63` |
 
 <!-- readme:generated:end -->

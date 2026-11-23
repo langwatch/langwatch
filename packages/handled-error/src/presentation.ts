@@ -427,12 +427,16 @@ const presentations = {
   trace_not_found: {
     title: "Trace not found",
     describe: () =>
-      "It may have been deleted, or it may still be arriving. Traces take a few seconds to appear.",
+      "No project you can read holds this id yet. If it was just sent, it may still be arriving: try again in a few seconds. Otherwise it may have passed the retention window.",
   },
   trace_attribute_values_withheld: {
     title: "Attribute values withheld",
     describe: () =>
       "This project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in. Facet a named field instead, such as model, status or evaluator, or call the facets endpoint with no field to see what this project has.",
+  },
+  scenario_run_has_many_traces: {
+    title: "That is a scenario run id",
+    describe: () => "The run produced several traces. Pick one of the listed trace ids to open it.",
   },
   trace_withheld_over_plan: {
     title: "Trace held until your plan is sorted",
@@ -499,7 +503,8 @@ const presentations = {
     title: "Unknown filter field",
     describe: (error) => {
       const field = str(error, "field", "");
-      return field ? `There's no field called "${field}".` : "";
+      const hint = str(error, "hint", "");
+      return field ? [`There's no field called "${field}".`, hint].filter(Boolean).join(" ") : "";
     },
   },
   filter_value_refused: {
@@ -3820,6 +3825,63 @@ const presentations = {
   agent_registry_entry_not_found: {
     title: "Agent not found in the registry",
     describe: () => "No agent in this organisation's registry has that id.",
+  },
+  agent_stop_already_open: {
+    title: "This agent already has an open stop",
+    describe: () =>
+      "Approve, deny or restore the stop that is open before you request another one.",
+  },
+  agent_stop_not_found: {
+    title: "Stop not found",
+    describe: () => "No kill switch stop in this organisation has that id.",
+  },
+  agent_stop_not_pending: {
+    title: "This stop is no longer waiting for an approval",
+    describe: () => "Someone already approved or denied it. Reload to see its status.",
+  },
+  agent_stop_not_restorable: {
+    title: "This stop cannot be restored",
+    describe: () => "Only a quarantined stop, or one that failed, can be restored.",
+  },
+  agent_stop_not_retryable: {
+    title: "This stop cannot be retried",
+    describe: () => "Only a stop that is quarantined, or one that failed, can be stopped again.",
+  },
+  agent_stop_plan_changed: {
+    title: "The stop plan changed",
+    describe: () => "Someone edited this agent's stop plan. Check the targets again, then confirm.",
+  },
+  agent_stop_plan_conflict: {
+    title: "Someone else saved this stop plan",
+    describe: () => "Your changes were not saved. Reload the plan, then make your changes again.",
+  },
+  agent_stop_plan_empty: {
+    title: "This agent has no stop plan",
+    describe: () =>
+      "Add a serving endpoint, a Bedrock agent alias or a virtual key to its stop plan first.",
+  },
+  agent_stop_self_approval: {
+    title: "The credential that requested a stop cannot approve it",
+    describe: () => "Ask another person or API key with governance:manage to approve it.",
+  },
+  agent_stop_target_invalid: {
+    title: "A stop plan target is not valid",
+    describe: () =>
+      "Each target must name a Databricks source, an AWS connection or a virtual key of this organisation.",
+  },
+  agent_stop_target_not_found: {
+    title: "A stop plan target does not exist",
+    describe: () =>
+      "The Bedrock agent alias or serving endpoint was not found. Check its region, ids or name.",
+  },
+  governance_aws_connection_in_use: {
+    title: "This AWS connection is still in use",
+    describe: () =>
+      "A stop plan target or a stop that is not restored yet signs with it. Remove those targets or restore the stop first.",
+  },
+  governance_aws_connection_not_found: {
+    title: "AWS connection not found",
+    describe: () => "No AWS connection in this organisation has that id.",
   },
   anomaly_rule_not_found: {
     title: "Anomaly rule not found",

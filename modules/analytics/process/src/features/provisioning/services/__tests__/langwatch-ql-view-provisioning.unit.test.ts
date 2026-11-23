@@ -683,3 +683,47 @@ describe("given the views over trace_evaluation_analytics", () => {
     expect(exposed).not.toContain("Revision");
   });
 });
+
+describe("given PostgreSQL-resident views that repeat a row per project", () => {
+  const render = (name: string) => {
+    const view = pickLwqlViewByName(name);
+    if (!view) throw new Error(`${name} is not in the catalog`);
+    return viewStatements.viewStatement({
+      names: NAMES,
+      sourceDatabase: SOURCE_DATABASE,
+      view,
+      dedup: SHIPPED_LWQL_DEDUP,
+    });
+  };
+
+  describe("when an organization-scoped view is rendered", () => {
+    /** @scenario "A fanned-out view keeps one row per entity across the projects read" */
+    it("keeps one row per budget, the lowest project's, after the tenant predicate", () => {
+      const sql = render("gateway_budgets");
+
+      const tenantAt = sql.indexOf("WHERE src.`TenantId` >=");
+      expect(tenantAt).toBeGreaterThan(-1);
+      expect(tenantAt).toBeLessThan(sql.indexOf("\nORDER BY"));
+      expect(sql).toMatch(
+        /\nORDER BY src\.`GatewayBudgetId`, src\.`TenantId`\nLIMIT 1 BY src\.`GatewayBudgetId`$/,
+      );
+    });
+  });
+
+  describe("when a team-scoped view is rendered", () => {
+    /** @scenario "A fanned-out view keeps one row per entity across the projects read" */
+    it("keeps one row per ingestion source", () => {
+      expect(render("ingestion_sources")).toMatch(/\nLIMIT 1 BY src\.`IngestionSourceId`$/);
+    });
+  });
+
+  describe("when a project-scoped view is rendered", () => {
+    /** @scenario "A fanned-out view keeps one row per entity across the projects read" */
+    it("reads its rows with no collapse", () => {
+      const sql = render("topics");
+
+      expect(sql).not.toContain("LIMIT 1 BY");
+      expect(sql).not.toContain("ORDER BY");
+    });
+  });
+});

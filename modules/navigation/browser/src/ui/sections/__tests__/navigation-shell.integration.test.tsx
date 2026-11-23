@@ -426,7 +426,7 @@ describe("the seat gate on a page", () => {
       /** @scenario A Developer cannot open an organisation-wide product by address */
       it("opens the page", () => {
         renderShell({
-          readings: { organizationRole: "DEVELOPER", pathname: "/me/sessions" },
+          readings: { organizationRole: "DEVELOPER", pathname: "/coding-agents/sessions" },
           personalScope: true,
         });
 
@@ -493,7 +493,7 @@ describe("the product-switcher top bar", () => {
     /** @scenario A Developer is offered the Me product and nothing organisation-wide */
     it("offers a Developer the Me product and no organization-wide one, whatever the flags and permissions say", async () => {
       renderShell({
-        readings: { organizationRole: "DEVELOPER", pathname: "/me" },
+        readings: { organizationRole: "DEVELOPER", pathname: "/coding-agents" },
         personalScope: true,
       });
       await openProductSwitcher();
@@ -902,7 +902,11 @@ describe("the product-switcher top bar", () => {
     it("shows the user name with a Personal badge", () => {
       renderShell({
         personalScope: true,
-        readings: { pathname: "/me", project: personalTeam.projects[0], team: personalTeam },
+        readings: {
+          pathname: "/coding-agents",
+          project: personalTeam.projects[0],
+          team: personalTeam,
+        },
       });
 
       expect(screen.getByText("Ada")).toBeInTheDocument();
@@ -915,7 +919,7 @@ describe("the product-switcher top bar", () => {
       renderShell({
         personalScope: true,
         readings: {
-          pathname: "/me",
+          pathname: "/coding-agents",
           project: personalTeam.projects[0],
           team: personalTeam,
           rememberedProjectSlug: "support-bot",
@@ -936,7 +940,11 @@ describe("the product-switcher top bar", () => {
     it("opens a project of a team it can open when nothing is remembered", async () => {
       renderShell({
         personalScope: true,
-        readings: { pathname: "/me", project: personalTeam.projects[0], team: personalTeam },
+        readings: {
+          pathname: "/coding-agents",
+          project: personalTeam.projects[0],
+          team: personalTeam,
+        },
       });
       const user = await openProductSwitcher();
 
@@ -952,7 +960,7 @@ describe("the product-switcher top bar", () => {
       renderShell({
         personalScope: true,
         readings: {
-          pathname: "/me",
+          pathname: "/coding-agents",
           project: personalTeam.projects[0],
           team: personalTeam,
           openableTeams: [{ ...teamA, projects: [] }, personalTeam],

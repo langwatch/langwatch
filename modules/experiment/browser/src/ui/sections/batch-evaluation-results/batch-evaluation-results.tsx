@@ -98,6 +98,7 @@ const sidebarRunsOf = (runs: BatchRunSummary[] | undefined): BatchRunSummary[] =
     progress: run.progress,
     total: run.total,
     concurrency: run.concurrency,
+    repeat: run.repeat,
     targets: run.targets,
     summary: {
       datasetCost: run.summary.datasetCost,
@@ -498,6 +499,7 @@ export function BatchEvaluationResults({
           experiment={experiment}
           shownRunId={sidebarSelectedRun?.runId}
           shownRunConcurrency={sidebarSelectedRun?.concurrency}
+          shownRunRepeat={sidebarSelectedRun?.repeat}
           data={transformedData}
           charts={{ available: canShowCharts, visible: chartsVisible, onChange: setChartsVisible }}
           displayControls={

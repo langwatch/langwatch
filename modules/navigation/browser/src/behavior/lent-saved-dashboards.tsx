@@ -4,6 +4,7 @@ import {
   SavedDashboardsToken,
   type SavedDashboardsProps,
   StarredDashboardsToken,
+  type StarredDashboardsProps,
 } from "@langwatch/analytics-client";
 import { Lent } from "@langwatch/browser-host/lent";
 
@@ -12,6 +13,6 @@ export function SavedDashboards(props: SavedDashboardsProps) {
 }
 
 /** The Dashboards section: the member's pinned dashboards and the "+" that adds one. */
-export function StarredDashboards() {
-  return <Lent of={StarredDashboardsToken} props={{}} />;
+export function StarredDashboards(props: StarredDashboardsProps) {
+  return <Lent of={StarredDashboardsToken} props={props} />;
 }

@@ -1,12 +1,14 @@
 /**
  * @vitest-environment jsdom
  * @see modules/dashboard/specs/dashboards-v1.feature
+ * @see modules/navigation/specs/product-sidebars.feature
  */
 
 import {
   SavedDashboardsToken,
   type SavedDashboardsProps,
   StarredDashboardsToken,
+  type StarredDashboardsProps,
 } from "@langwatch/analytics-client";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -17,10 +19,53 @@ const declarations: { current: UiDeclarations | undefined } = vi.hoisted(() => (
   current: undefined,
 }));
 
+/** `release_dashboards` as each project resolves it; `fallback` for a project not named. */
+const dashboardsRelease: {
+  byProject: Readonly<Record<string, boolean>>;
+  fallback: boolean;
+} = vi.hoisted(() => ({ byProject: {}, fallback: false }));
+
+/**
+ * The reader's own permissions as each project resolves them; `fallback` for a project not named.
+ */
+const grants: {
+  byProject: Readonly<Record<string, readonly string[]>>;
+  fallback: readonly string[];
+} = vi.hoisted(() => ({ byProject: {}, fallback: [] }));
+
 vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useUiDeclarations: () => declarations.current,
 }));
+
+/** The server's flag answer per project; a read this browser's `?ff_` override holds gets none. */
+vi.mock("@langwatch/api/web", async (importOriginal) => {
+  const original = await importOriginal<{ createModuleApi: () => object }>();
+  const featureFlag = {
+    isEnabled: {
+      useQuery: (
+        { flag, projectId }: { flag: string; projectId?: string | null },
+        { enabled }: { enabled: boolean },
+      ) => ({
+        data: enabled
+          ? {
+              enabled:
+                flag === "release_dashboards" &&
+                (dashboardsRelease.byProject[projectId ?? ""] ?? dashboardsRelease.fallback),
+            }
+          : undefined,
+        isLoading: false,
+      }),
+    },
+  };
+  return {
+    ...original,
+    createModuleApi: () =>
+      new Proxy(original.createModuleApi(), {
+        get: (target, key) => (key === "featureFlag" ? featureFlag : Reflect.get(target, key)),
+      }),
+  };
+});
 
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
@@ -29,24 +74,62 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
     limits: { getUsage: { useQuery: () => ({}) } },
     ops: { getBadgeCounts: { useQuery: () => ({}) } },
     featureFlag: { isEnabledForEachOrganization: { useQuery: () => ({}) } },
+    authz: {
+      effectivePermissions: {
+        useQuery: ({ projectId }: { projectId: string }) => ({
+          data: { permissions: grants.byProject[projectId] ?? grants.fallback },
+        }),
+      },
+    },
   },
 }));
 
-import type { NavigationProject } from "@langwatch/navigation-contract";
+import {
+  applyFeatureFlagOverridesFromSearch,
+  clearAllFeatureFlagOverrides,
+} from "@langwatch/feature-flag-client";
+import type {
+  NavigationOrganization,
+  NavigationProject,
+  NavigationTeam,
+} from "@langwatch/navigation-contract";
 
 import { WithStubNavigationHost } from "../../../testing.tsx";
 import { ProductSidebar } from "../product-sidebar.tsx";
 
 const PROJECT: NavigationProject = { id: "project-1", slug: "demo", name: "Demo" };
+const SHOP: NavigationProject = { id: "project-shop", slug: "shop", name: "Shop" };
+const PERSONAL: NavigationProject = {
+  id: "project-mine",
+  slug: "my-workspace",
+  name: "My workspace",
+  isPersonal: true,
+};
+const SHOP_TEAM: NavigationTeam = { id: "team-shop", name: "Shop team", projects: [SHOP] };
+const PERSONAL_TEAM: NavigationTeam = {
+  id: "team-mine",
+  name: "My workspace",
+  isPersonal: true,
+  projects: [PERSONAL],
+};
+const ORGANIZATION: NavigationOrganization = {
+  id: "organization-1",
+  name: "Demo organization",
+  teams: [],
+};
 
 /** Stands in for analytics' lent list, echoing the address it was told is open. */
 function LentList({ openPath }: SavedDashboardsProps) {
   return <div data-testid="saved-dashboards">Saved dashboards open:{openPath || "none"}</div>;
 }
 
-/** Stands in for analytics' lent Dashboards section, which decides itself what it draws. */
-function LentStarred() {
-  return <div data-testid="starred-dashboards">Pinned dashboards</div>;
+/** Stands in for analytics' lent Dashboards section, echoing the project it was handed. */
+function LentStarred({ project }: StarredDashboardsProps) {
+  return (
+    <div data-testid="starred-dashboards">
+      {project ? `Pinned dashboards in ${project.name} (${project.id})` : "Pinned dashboards"}
+    </div>
+  );
 }
 
 const analyticsLends = uiDeclarations([
@@ -70,24 +153,54 @@ function renderSidebar({
   dashboardsLoading = false,
   organizationLoading = false,
   kind,
+  everyProductFlag = false,
+  project = kind ? { ...PROJECT, kind } : PROJECT,
+  openableTeams,
+  rememberedProjectSlug,
+  dashboardsFlagByProject = {},
+  permissionsByProject = {},
+  organization = ORGANIZATION,
 }: {
   surface: "llm-ops" | "dashboards" | "gateway" | "governance" | "me" | "settings";
   pathname: string;
+  /** The page's own grants, and the grants in any project not named below. */
   permissions?: string[];
+  /** The reader's own grants in a named project, by project id. */
+  permissionsByProject?: Readonly<Record<string, readonly string[]>>;
+  /** `release_dashboards` for the page's own scope, and for any project not named below. */
   dashboardsFlag?: boolean;
+  /** `release_dashboards` resolved for a named project, by project id. */
+  dashboardsFlagByProject?: Readonly<Record<string, boolean>>;
   dashboardsLoading?: boolean;
   organizationLoading?: boolean;
   kind?: string;
+  /** `release_dashboards_in_every_product`. */
+  everyProductFlag?: boolean;
+  project?: NavigationProject;
+  openableTeams?: readonly NavigationTeam[];
+  rememberedProjectSlug?: string;
+  /** `null` while the page's organization has not arrived. */
+  organization?: NavigationOrganization | null;
 }) {
   declarations.current = analyticsLends;
+  dashboardsRelease.byProject = dashboardsFlagByProject;
+  dashboardsRelease.fallback = dashboardsFlag;
+  grants.byProject = permissionsByProject;
+  grants.fallback = permissions;
   return renderWithDesignSystem(
     <WithStubNavigationHost
       readings={{
-        project: kind ? { ...PROJECT, kind } : PROJECT,
+        project,
         pathname,
         permissions,
         isLoading: organizationLoading,
-        flags: { release_dashboards: { enabled: dashboardsFlag, isLoading: dashboardsLoading } },
+        ...(organization ? { organization } : {}),
+        ...(openableTeams ? { openableTeams } : {}),
+        ...(rememberedProjectSlug ? { rememberedProjectSlug } : {}),
+        flags: {
+          release_dashboards: { enabled: dashboardsFlag, isLoading: dashboardsLoading },
+          release_dashboards_in_every_product: { enabled: everyProductFlag, isLoading: false },
+        },
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: null },
       }}
     >
@@ -98,6 +211,7 @@ function renderSidebar({
 
 afterEach(() => {
   cleanup();
+  clearAllFeatureFlagOverrides();
   declarations.current = undefined;
 });
 
@@ -249,7 +363,7 @@ describe("the Dashboards section analytics lends", () => {
     it.each([
       { surface: "gateway", pathname: "/gateway/virtual-keys" },
       { surface: "governance", pathname: "/governance" },
-      { surface: "me", pathname: "/me" },
+      { surface: "me", pathname: "/coding-agents" },
     ] as const)("draws no section in $surface", async ({ surface, pathname }) => {
       renderSidebar({ surface, pathname });
 
@@ -273,6 +387,181 @@ describe("the Dashboards section analytics lends", () => {
       renderSidebar({ surface: "llm-ops", pathname: "/demo", permissions: [] });
 
       await expectNoSection();
+    });
+  });
+});
+
+describe("the Dashboards section with Dashboards in every product on", () => {
+  /** Gateway stands on the remembered project; Coding agents on the member's own workspace. */
+  const outsideLlmOps = [
+    { surface: "gateway", pathname: "/gateway/virtual-keys", project: SHOP },
+    { surface: "me", pathname: "/coding-agents", project: PERSONAL },
+  ] as const;
+
+  describe("given a member who can reach Dashboards, in Gateway or Coding agents", () => {
+    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    it.each(outsideLlmOps)(
+      "hands the section the project LLM Ops would open, in $surface",
+      async ({ surface, pathname, project }) => {
+        renderSidebar({
+          surface,
+          pathname,
+          project,
+          everyProductFlag: true,
+          openableTeams: [PERSONAL_TEAM, SHOP_TEAM],
+          rememberedProjectSlug: "shop",
+        });
+
+        expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
+          "Pinned dashboards in Shop (project-shop)",
+        );
+      },
+    );
+  });
+
+  describe("given the same member, in Governance", () => {
+    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    it("draws no section", async () => {
+      renderSidebar({ surface: "governance", pathname: "/governance", everyProductFlag: true });
+
+      await expectNoSection();
+    });
+  });
+
+  describe("given a member who cannot reach Dashboards, in Gateway or Coding agents", () => {
+    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    it.each(outsideLlmOps)("draws no section in $surface", async ({ surface, pathname }) => {
+      renderSidebar({ surface, pathname, permissions: [], everyProductFlag: true });
+
+      await expectNoSection();
+    });
+  });
+
+  describe("given no project LLM Ops could open", () => {
+    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    it("draws no section in Coding agents", async () => {
+      renderSidebar({
+        surface: "me",
+        pathname: "/coding-agents",
+        project: PERSONAL,
+        everyProductFlag: true,
+        openableTeams: [PERSONAL_TEAM],
+      });
+
+      await expectNoSection();
+    });
+  });
+
+  describe("given Coding agents on the member's own workspace, with LLM Ops opening Shop", () => {
+    const codingAgents = {
+      surface: "me",
+      pathname: "/coding-agents",
+      project: PERSONAL,
+      everyProductFlag: true,
+      openableTeams: [PERSONAL_TEAM, SHOP_TEAM],
+      rememberedProjectSlug: "shop",
+    } as const;
+
+    describe("when Dashboards is released for the workspace but not for Shop", () => {
+      /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's release flag" */
+      it("draws no section, so no '+' makes a board Shop's Dashboards cannot open", async () => {
+        renderSidebar({
+          ...codingAgents,
+          dashboardsFlag: true,
+          dashboardsFlagByProject: { [PERSONAL.id]: true, [SHOP.id]: false },
+        });
+
+        await expectNoSection();
+      });
+    });
+
+    describe("when Dashboards is released for Shop but not for the workspace", () => {
+      /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's release flag" */
+      it("hands the section Shop", async () => {
+        renderSidebar({
+          ...codingAgents,
+          dashboardsFlag: false,
+          dashboardsFlagByProject: { [PERSONAL.id]: false, [SHOP.id]: true },
+        });
+
+        expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
+          "Pinned dashboards in Shop (project-shop)",
+        );
+      });
+    });
+
+    describe("when the page's organization has not arrived", () => {
+      /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's release flag" */
+      it("draws no section until the release flag can be asked", async () => {
+        renderSidebar({
+          ...codingAgents,
+          organization: null,
+          dashboardsFlagByProject: { [SHOP.id]: true },
+        });
+
+        await expectNoSection();
+      });
+    });
+
+    describe("when this browser turned Dashboards on but Shop is not released", () => {
+      /** @scenario "This browser's Dashboards override decides the named project's section" */
+      it("hands the section Shop", async () => {
+        applyFeatureFlagOverridesFromSearch("?ff_release_dashboards=on");
+        renderSidebar({ ...codingAgents, dashboardsFlagByProject: { [SHOP.id]: false } });
+
+        expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
+          "Pinned dashboards in Shop (project-shop)",
+        );
+      });
+    });
+
+    describe("when this browser turned Dashboards off but Shop is released", () => {
+      /** @scenario "This browser's Dashboards override decides the named project's section" */
+      it("draws no section", async () => {
+        applyFeatureFlagOverridesFromSearch("?ff_release_dashboards=off");
+        renderSidebar({ ...codingAgents, dashboardsFlagByProject: { [SHOP.id]: true } });
+
+        await expectNoSection();
+      });
+    });
+
+    describe("when the member may view dashboards in the workspace but not in Shop", () => {
+      /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's view grant" */
+      it("draws no section, so no '+' offers Dashboards Shop will not open", async () => {
+        renderSidebar({
+          ...codingAgents,
+          permissions: ["analytics:view"],
+          permissionsByProject: { [PERSONAL.id]: ["analytics:view"], [SHOP.id]: [] },
+        });
+
+        await expectNoSection();
+      });
+    });
+
+    describe("when the member may view dashboards in Shop but not in the workspace", () => {
+      /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's view grant" */
+      it("hands the section Shop", async () => {
+        renderSidebar({
+          ...codingAgents,
+          permissions: [],
+          permissionsByProject: { [SHOP.id]: ["analytics:view"] },
+        });
+
+        expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
+          "Pinned dashboards in Shop (project-shop)",
+        );
+      });
+    });
+  });
+
+  describe("given the same member, in LLM Ops", () => {
+    /** @scenario "The LLM Ops sidebar's Dashboards section names no project" */
+    it("hands the section no project, so it works in the one in scope", async () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo", everyProductFlag: true });
+
+      expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
+        /^Pinned dashboards$/,
+      );
     });
   });
 });

@@ -31,7 +31,7 @@ const ORGANIZATIONS = [
   { id: "org-beta", slug: "beta" },
 ];
 
-const ROUTE_PATHS = ["/me", "/settings", "/gateway/virtual-keys"];
+const ROUTE_PATHS = ["/coding-agents", "/settings", "/gateway/virtual-keys"];
 
 const query = vi.fn((_path: string) => Promise.resolve(ORGANIZATIONS as unknown));
 
@@ -136,10 +136,10 @@ describe("given a reader who belongs to more than one organization", () => {
     /** @scenario "Visiting an org-scoped page with `?org=<slug>` selects that org" */
     it("selects that organization and strips the parameter", async () => {
       rememberOrganization("org-alpha");
-      const page = openAt("/me?org=beta");
+      const page = openAt("/coding-agents?org=beta");
 
       await waitFor(() => expect(selectedOrganization()).toBe("org-beta"));
-      await waitFor(() => expect(page.address()).toBe("/me"));
+      await waitFor(() => expect(page.address()).toBe("/coding-agents"));
     });
 
     /** @scenario "The `?org=` switch works on any org-scoped page, preserving the path" */
@@ -164,9 +164,9 @@ describe("given a reader who belongs to more than one organization", () => {
     /** @scenario "An `?org=<slug>` the user does not belong to is ignored" */
     it("keeps the organization they were on and still strips the parameter", async () => {
       rememberOrganization("org-alpha");
-      const page = openAt("/me?org=not-a-member");
+      const page = openAt("/coding-agents?org=not-a-member");
 
-      await waitFor(() => expect(page.address()).toBe("/me"));
+      await waitFor(() => expect(page.address()).toBe("/coding-agents"));
       expect(selectedOrganization()).toBe("org-alpha");
     });
   });
@@ -175,9 +175,9 @@ describe("given a reader who belongs to more than one organization", () => {
     /** @scenario "A page without `?org` leaves the remembered organization untouched" */
     it("leaves the remembered organization alone and asks for no graph", async () => {
       rememberOrganization("org-beta");
-      const page = openAt("/me");
+      const page = openAt("/coding-agents");
 
-      await waitFor(() => expect(page.address()).toBe("/me"));
+      await waitFor(() => expect(page.address()).toBe("/coding-agents"));
       expect(selectedOrganization()).toBe("org-beta");
       expect(query).not.toHaveBeenCalled();
     });
