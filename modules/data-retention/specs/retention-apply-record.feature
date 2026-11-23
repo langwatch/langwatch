@@ -67,6 +67,12 @@ Feature: Each retention change and each apply to stored data is recorded
     And an unchanged or longer save is never held as shorter
 
   @unit
+  Scenario: A first override shorter than the period it inherited blocks a later raise
+    Given the organization keeps traces for 91 days
+    When an admin saves the project's first override of 56 days for traces
+    Then the save is recorded as keeping fewer days
+
+  @unit
   Scenario: A raise after a lengthening save marks the scope applied
     Given a scope lengthened at 10:00 and raised at 11:00
     Then the scope reads as applied at 11:00

@@ -56,7 +56,7 @@ function lengthensRetention({ from, to }: { from: number | undefined; to: number
   return to === 0 || to > from;
 }
 
-/** Whether a save keeps fewer days than the rule it replaced; an unchanged period does not. */
+/** Whether a save keeps fewer days than the scope resolved to before; an unchanged one does not. */
 function shortensRetention({ from, to }: { from: number | undefined; to: number }): boolean {
   if (from === undefined || from === to) return false;
   return !lengthensRetention({ from, to });
@@ -178,6 +178,7 @@ export class DataRetentionService {
   /**
    * As `setForScope`, also saying whether the save may lengthen what stored rows keep: no rule
    * before, or one keeping fewer days. A raise where it did not is a no-op, so this errs to true.
+   * `shortens` compares with what the scope resolved to before, its own rule or inherited.
    */
   async saveForScope(input: {
     organizationId: string;
@@ -195,6 +196,8 @@ export class DataRetentionService {
         row.scopeId === input.scope.scopeId &&
         row.category === input.category,
     );
+    const before =
+      previous?.retentionDays ?? (await this.previewScopeRemoval(input))[input.category];
 
     const policy = await this.options.policies.upsertForScope({
       organizationId: input.organizationId,
@@ -207,7 +210,7 @@ export class DataRetentionService {
     return {
       policy,
       lengthens: lengthensRetention({ from: previous?.retentionDays, to: retentionDays }),
-      shortens: shortensRetention({ from: previous?.retentionDays, to: retentionDays }),
+      shortens: shortensRetention({ from: before, to: retentionDays }),
     };
   }
 
