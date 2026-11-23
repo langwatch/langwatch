@@ -118,18 +118,25 @@ export function productById(id: ProductId): ProductDefinition {
 
 export { ORGANIZATION_DASHBOARDS_PATH };
 
+/** The address without its trailing slashes; a walk, not a regex, so it stays linear. */
+function withoutTrailingSlashes(pathname: string): string {
+  let end = pathname.length;
+  while (end > 0 && pathname[end - 1] === "/") end -= 1;
+  return pathname.slice(0, end);
+}
+
 /**
  * Whether the address is in the organization's Dashboards area: the library and the org-level
  * board, template and From LangWatch pages under it. "dashboards" is a reserved project slug.
  */
 export function isOrganizationDashboardsPath(pathname: string): boolean {
-  const trimmed = pathname.replace(/\/+$/, "");
+  const trimmed = withoutTrailingSlashes(pathname);
   return isPathUnder({ pathname: trimmed, base: ORGANIZATION_DASHBOARDS_PATH });
 }
 
 /** Whether the address is the organization's library itself, not a page under it. */
 export function isOrganizationLibraryPath(pathname: string): boolean {
-  return pathname.replace(/\/+$/, "") === ORGANIZATION_DASHBOARDS_PATH;
+  return withoutTrailingSlashes(pathname) === ORGANIZATION_DASHBOARDS_PATH;
 }
 
 /**

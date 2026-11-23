@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   isEntityAddressedDetourRoute,
+  isOrganizationDashboardsPath,
+  isOrganizationLibraryPath,
   PRODUCTS,
   productById,
   productFromPathname,
@@ -156,6 +158,24 @@ describe("productFromPathname", () => {
           }
         }
       });
+    });
+  });
+});
+
+describe("the organization's Dashboards addresses", () => {
+  describe("given an address with trailing slashes", () => {
+    it("trims them, so the library and its area match however many there are", () => {
+      expect({
+        library: isOrganizationLibraryPath("/dashboards///"),
+        inArea: isOrganizationDashboardsPath("/dashboards///"),
+      }).toEqual({ library: true, inArea: true });
+    });
+
+    it("trims the root to nothing, which is neither the library nor in its area", () => {
+      expect({
+        library: isOrganizationLibraryPath("/"),
+        inArea: isOrganizationDashboardsPath("/"),
+      }).toEqual({ library: false, inArea: false });
     });
   });
 });
