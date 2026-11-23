@@ -211,6 +211,7 @@ export async function gatewayFor({
     open: (id = BUDGET_ID) => procedures.get({ id, organizationId: ORG_ID }),
     rename: (id = BUDGET_ID) => procedures.update({ id, organizationId: ORG_ID, name: "renamed" }),
     archive: (id = BUDGET_ID) => procedures.archive({ id, organizationId: ORG_ID }),
+    reset: (id = BUDGET_ID) => procedures.reset({ id, organizationId: ORG_ID }),
     asked,
     lookedUp: () => sorted(channels.users.asked),
   };

@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * Who may open, edit and archive a budget scoped to one member, off the real control plane.
+ * Who may open, edit, reset and archive a budget scoped to one member, off the real control plane.
  * @see modules/gateway/specs/gateway-budget-service.feature
  */
 import { describe, expect, it } from "vitest";
@@ -13,7 +13,7 @@ import {
   refusalOf,
 } from "./support/gateway-budget-visibility.fixture.ts";
 
-describe("gatewayBudgets get, update and archive, a budget scoped to one member", () => {
+describe("gatewayBudgets get, update, archive and reset, a budget scoped to one member", () => {
   const personalBudgets = [
     ["one member", budgetScopedTo({ scopeType: "PRINCIPAL", scopeId: "usr_owner" })],
     ["a personal key", budgetScopedTo({ scopeType: "VIRTUAL_KEY", scopeId: "vk_personal" })],
@@ -64,6 +64,26 @@ describe("gatewayBudgets get, update and archive, a budget scoped to one member"
 
         expect(await gateway.rename()).toMatchObject({ id: BUDGET_ID, name: "renamed" });
         expect((await gateway.archive()).archivedAt).not.toBeNull();
+      });
+
+      /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
+      it("answers a viewer's reset exactly as for a budget that does not exist", async () => {
+        const gateway = await gatewayFor({ caller: "usr_viewer", budget });
+
+        const reset = await refusalOf(gateway.reset());
+
+        expect(reset).toMatchObject(BUDGET_NOT_FOUND);
+        expect(reset).toEqual(await refusalOf(gateway.reset("bdg_unknown")));
+      });
+
+      /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
+      it("lets its owner reset it", async () => {
+        const gateway = await gatewayFor({ caller: "usr_owner", budget });
+
+        const reset = await gateway.reset();
+
+        expect(reset.id).toBe(BUDGET_ID);
+        expect(reset.lastResetAt).not.toBeNull();
       });
     });
   }

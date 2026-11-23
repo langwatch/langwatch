@@ -214,6 +214,8 @@ export const gatewayBudgetTrpcTransport: TrpcRouterDeclaration<
   .procedure("reset")
   .withPermission("gatewayBudgets:update")
   .handle(async ({ app, input, actor }) => {
+    const reader = { kind: "member", userId: actor.id } as const;
+    await app.assertBudgetOpensFor({ id: input.id, organizationId: input.organizationId, reader });
     const row = await app.resetBudget({
       id: input.id,
       organizationId: input.organizationId,

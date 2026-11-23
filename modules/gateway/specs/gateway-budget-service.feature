@@ -85,7 +85,7 @@ Feature: Gateway budget decision service
   @integration
   Scenario: A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys
     Given a budget scoped to one member, and a budget scoped to that member's personal key
-    When the member, an organization admin and a viewer each open, edit or archive it
+    When the member, an organization admin and a viewer each open, edit, reset or archive it
     Then the member and the admin reach it
     And the viewer is answered exactly as for a budget that does not exist
     And over the REST API, a key acting for the member or holding that permission at the organization reads it
