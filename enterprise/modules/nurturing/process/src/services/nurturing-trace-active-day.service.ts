@@ -65,9 +65,15 @@ export class NurturingTraceActiveDayService {
     const releasing = (error: unknown) =>
       NurturingClaimReleaseService.create(claims).rethrowAfterReleasing({
         error,
-        // Every key: a claim that rejected (a timeout) may still have been saved; releasing a key
-        // not held is a plain delete, so harmless.
-        keys: batch.map(({ claimKey }) => claimKey),
+        // Ours (claimed) plus rejected ones, which a timeout may still have saved. Never a key whose
+        // claim returned false: another sync holds it and has sent, or is sending, that event, and
+        // releasing it (a plain delete) would let a retry send it twice.
+        keys: batch
+          .filter((_, index) => {
+            const result = results[index];
+            return result?.status === "rejected" || result?.value === true;
+          })
+          .map(({ claimKey }) => claimKey),
       });
     const failed = results.find(
       (result): result is PromiseRejectedResult => result.status === "rejected",

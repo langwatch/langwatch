@@ -518,6 +518,32 @@ describe("NurturingOrganizationUsageService", () => {
         "member copy unavailable",
       );
     });
+
+    /** @scenario "A failed member read fails the sync" */
+    it("sends the events on the retry once the members read is healthy again", async () => {
+      const healthy = await membersOver(new Map([["admin-1", ["org-1"]]]));
+      let failing = true;
+      const { service, traceDays, sent } = await serviceOver({
+        placed,
+        createdAt: new Map([["org-1", NOW - 13 * DAY_MS]]),
+        members: {
+          findMembershipsOfMembers: (...args) =>
+            failing
+              ? Promise.reject(new Error("member copy unavailable"))
+              : healthy.findMembershipsOfMembers(...args),
+        },
+      });
+      await seedTraceDay(traceDays, { projectId: "project-1", day: "2026-11-20" });
+
+      await expect(service.tracesChanged({ projectId: "project-1" })).rejects.toThrow(
+        "member copy unavailable",
+      );
+      failing = false;
+      await service.tracesChanged({ projectId: "project-1" });
+
+      const tracked = sent.flat().filter((call) => call.type === "track");
+      expect(tracked.map((call) => call.messageId)).toEqual(["trace_active_day:admin-1:2026-11-20"]);
+    });
   });
 
   /** @scenario "An organization past its counting window writes no counts" */
@@ -1086,6 +1112,26 @@ describe("NurturingOrganizationUsageService given an organization that traced to
       "trace_active_day:admin-1:2026-11-19",
       "trace_active_day:admin-1:2026-11-20",
     ]);
+  });
+
+  /** @scenario "A failed trace_active_day send fails the sync, and its retry sends the events once" */
+  it("keeps a claim another sync holds when the send fails, and gives back the others", async () => {
+    const claims = MemoryNurturingClaimRepository.create();
+    const heldKey = "nurturing:trace_active_day:admin-1:2026-11-19";
+    await claims.claim(heldKey, 60);
+    const { service } = await tracedOrganization({
+      claims,
+      send: async (calls) => {
+        if (calls.some((call) => call.type === "track")) throw new Error("refused");
+      },
+    });
+
+    await expect(service.tracesChanged({ projectId: "project-1" })).rejects.toThrow("refused");
+
+    await expect(claims.claim(heldKey, 60)).resolves.toBe(false);
+    await expect(claims.claim("nurturing:trace_active_day:admin-1:2026-11-20", 60)).resolves.toBe(
+      true,
+    );
   });
 
   /** @scenario "A failed trace_active_day send fails the sync, and its retry sends the events once" */
