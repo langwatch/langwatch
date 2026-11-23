@@ -7,7 +7,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-const { getScopeGraph, hasFirstMessage, reading, row } = vi.hoisted(() => {
+const { getScopeGraph, hasFirstMessage, reading, row, lentLangy } = vi.hoisted(() => {
   const projectRow = { presenceEnabled: true };
   const organizationRow = { presenceEnabled: true };
   const graph = () => [
@@ -27,8 +27,13 @@ const { getScopeGraph, hasFirstMessage, reading, row } = vi.hoisted(() => {
       useQuery: vi.fn(),
     },
     reading: { actor: { id: "user_1" } } as { actor: { id: string } | null },
+    lentLangy: { ask: vi.fn(), onScreen: vi.fn() },
   };
 });
+
+vi.mock("@langwatch/browser-host/lent", () => ({
+  useLentOperations: () => () => Promise.resolve(lentLangy),
+}));
 
 vi.mock("../trace-api.ts", () => ({
   traceApi: {
@@ -64,7 +69,7 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
 });
 
 import TraceHostMount from "../trace-host-mount.tsx";
-import { useTraceHost } from "../trace-host.ts";
+import { type TraceLangyAskRequest, useTraceHost } from "../trace-host.ts";
 
 function ProjectReading() {
   const host = useTraceHost();
@@ -160,6 +165,33 @@ describe("TraceHostMount", () => {
 
       expect(screen.getByLabelText("organization presence")).toHaveTextContent("false");
       expect(screen.getByLabelText("project presence")).toHaveTextContent("false");
+    });
+  });
+
+  describe("when the explorer asks Langy about the traces", () => {
+    /** @scenario "Enter hands the question and the search to the panel" */
+    it("hands the question to the Langy panel that Langy lends", async () => {
+      const request: TraceLangyAskRequest = {
+        question: "why are these failing?",
+        context: [{ kind: "filter", ref: "@status:error", label: "filtered: @status:error" }],
+      };
+      function Asker() {
+        const host = useTraceHost();
+        return (
+          <button type="button" onClick={() => host.askLangy(request)}>
+            ask
+          </button>
+        );
+      }
+      render(
+        <TraceHostMount>
+          <Asker />
+        </TraceHostMount>,
+      );
+
+      screen.getByRole("button", { name: "ask" }).click();
+
+      await vi.waitFor(() => expect(lentLangy.ask).toHaveBeenCalledWith(request));
     });
   });
 });

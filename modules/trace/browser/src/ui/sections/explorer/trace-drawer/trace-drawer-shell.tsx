@@ -2,6 +2,7 @@ import {
   DRAWER_DEFAULT_WIDTH_PX,
   DRAWER_MIN_WIDTH_PX,
 } from "../../../../behavior/drawer-chrome.store.ts";
+import { useFittedDrawerWidth } from "../../../../behavior/explorer/trace-drawer/use-fitted-drawer-width.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { Drawer } from "../../drawer.tsx";
 import { DrawerSpotlights } from "../onboarding/spotlights/drawer-spotlights.tsx";
@@ -59,6 +60,11 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const shortcutsOpen = useTraceDrawer((s) => s.shortcutsOpen);
   const pinned = useTraceDrawer((s) => s.pinned);
   const setShortcutsOpen = useTraceDrawer((s) => s.setShortcutsOpen);
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : Infinity;
+  const effectiveWidthPx = useFittedDrawerWidth({
+    preferredPx: widthPx ?? DRAWER_DEFAULT_WIDTH_PX,
+    viewportWidth,
+  });
 
   // `open` is hardcoded `true` because the parent (`TracesPage`'s `<TraceDrawerMount>`)
   // only mounts this shell while the drawer store holds a `traceId`. Click → store
@@ -86,11 +92,9 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     );
   }
 
-  // The drawer width is driven by the operator's drag (persisted in
-  // useDrawerChrome.widthPx).
-  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : Infinity;
+  // The operator's drag sets the preferred width (useDrawerChrome.widthPx); the drawer
+  // renders narrower when that would cover Ask Langy or run under the docked Langy panel.
   const isCompactViewport = viewportWidth < 768;
-  const effectiveWidthPx = Math.min(widthPx ?? DRAWER_DEFAULT_WIDTH_PX, viewportWidth);
   const contentWidthStyle = isCompactViewport
     ? undefined
     : {

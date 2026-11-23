@@ -129,6 +129,28 @@ Rule: Drawer maximise and restore
     And `drawerChrome.widthPx` returns to the previously remembered width
 
 
+Rule: The drawer never covers Ask Langy
+  The dragged width is a preference. The drawer renders narrower when that width
+  would reach over the search bar's Ask Langy button, and narrows again (instead
+  of sliding left at the same width) while the docked Langy panel holds the right edge.
+
+  @unit @integration @regression
+  Scenario: A wide trace drawer leaves the Ask Langy button visible
+    Given the reader dragged the trace drawer wider than the space beside Ask Langy
+    When the drawer is open on Trace Explorer
+    Then the drawer's left edge stops a gap to the right of the Ask Langy button
+    And the button can still be clicked
+
+  @unit @integration @regression
+  Scenario: Opening Langy beside a wide trace drawer narrows the drawer
+    Given a wide trace drawer is open on Trace Explorer and the Langy panel is closed
+    When the reader clicks Ask Langy
+    Then the Langy panel opens, not the floating ask bar that would sit under the drawer
+    And with the panel docked the drawer gets narrower and sits left of it
+    And the Ask Langy button stays uncovered
+    And closing Langy brings back the width the reader dragged
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # UNIFIED DRAWER MODEL
 # ─────────────────────────────────────────────────────────────────────────────
