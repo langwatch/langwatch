@@ -20,11 +20,17 @@ type step struct {
 	With map[string]string `yaml:"with"`
 }
 
+type concurrency struct {
+	Group            string `yaml:"group"`
+	CancelInProgress *bool  `yaml:"cancel-in-progress"`
+}
+
 type workflow struct {
 	Jobs map[string]struct {
-		If    string `yaml:"if"`
-		Needs any    `yaml:"needs"`
-		Steps []step `yaml:"steps"`
+		If          string      `yaml:"if"`
+		Needs       any         `yaml:"needs"`
+		Concurrency concurrency `yaml:"concurrency"`
+		Steps       []step      `yaml:"steps"`
 	} `yaml:"jobs"`
 }
 
@@ -218,4 +224,17 @@ func TestLatestMovesOnlyForTheNewestRelease(t *testing.T) {
 
 	_, _, err = runNewestStep(t, steps[i].Run, "broken")
 	require.Error(t, err, "when GitHub cannot say which release is latest, the job fails")
+}
+
+// @scenario "latest moves only for the newest release"
+func TestReleaseRunsTakeTurnsOnLatest(t *testing.T) {
+	wf, _ := readWorkflow(t, "publish-docker-app.yml")
+	got := wf.Jobs["pii-redaction-model"].Concurrency
+	require.NotEmpty(t, got.Group,
+		"the job deciding and writing latest needs a concurrency group, or an older release run can move latest back")
+	assert.NotContains(t, got.Group, "${{",
+		"one fixed group for every release run, not one per ref")
+	require.NotNil(t, got.CancelInProgress, "cancel-in-progress must be set")
+	assert.False(t, *got.CancelInProgress,
+		"a cancel between the copy and cosign sign leaves an unsigned image")
 }

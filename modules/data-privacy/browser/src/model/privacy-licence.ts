@@ -26,10 +26,11 @@ export function licenceOf({
   plan,
 }: {
   mayRead: boolean;
-  plan: { isLoading: boolean; data: { type: string } | undefined };
+  plan: { isLoading: boolean; isError: boolean; data: { type: string } | undefined };
 }): PrivacyLicence {
   if (!mayRead) return "unknown";
   if (plan.isLoading) return "loading";
-  if (!plan.data) return "unknown";
+  // A failed refresh keeps the last answer in data: the failure wins over it.
+  if (plan.isError || !plan.data) return "unknown";
   return isEnterpriseTier(plan.data.type) ? "enterprise" : "none";
 }
