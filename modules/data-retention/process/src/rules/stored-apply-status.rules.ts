@@ -1,8 +1,8 @@
 /**
- * Whether a scope's last change reached its stored data. An apply covers its own scope and every
- * scope it holds (organization > team > project), since it rewrites each project to the period
- * that project resolves to. Pure. Spec: modules/data-retention/specs/retention-apply-record.feature
- */
+ * Whether a scope's last change reached its stored data. An exact apply covers its own scope and
+ * every scope it holds (organization > team > project); a raise covers only its own scope, and
+ * only when no shorter save since the last exact apply left stamps above it. Pure. Spec:
+ * modules/data-retention/specs/retention-apply-record.feature */
 import type { RetentionScopeType, StoredApplyStatus } from "@langwatch/data-retention-contract";
 
 type ScopeRef = Readonly<{ scopeType: RetentionScopeType; scopeId: string }>;
@@ -10,9 +10,14 @@ type ScopeRef = Readonly<{ scopeType: RetentionScopeType; scopeId: string }>;
 /** A saved rule; `savedAt` (epoch ms) counts as a change even when the record of it was lost. */
 type ScopeRule = ScopeRef & Readonly<{ savedAt?: number }>;
 
-/** What the status projection keeps per scope. */
+/** What the status projection keeps per scope (see `RetentionApplyStatusState`). */
 export type ScopeApplyRecord = ScopeRef &
-  Readonly<{ changedAt: number | null; appliedAt: number | null }>;
+  Readonly<{
+    changedAt: number | null;
+    appliedAt: number | null;
+    raisedAt?: number | null;
+    shortenedAt?: number | null;
+  }>;
 
 export function retentionApplyStatusKey({
   organizationId,
@@ -42,6 +47,22 @@ function lastChanges({
     changes.set(key, { scope: changes.get(key)?.scope ?? pick(scope), changedAt });
   }
   return [...changes.values()];
+}
+
+/** A raise covers the change when it came after it, with no shorter save since the last apply. */
+function raiseCovers({
+  record,
+  changedAt,
+  lastExactApply,
+}: {
+  record: ScopeApplyRecord | undefined;
+  changedAt: number;
+  lastExactApply: number | null;
+}): boolean {
+  const raisedAt = record?.raisedAt ?? null;
+  if (raisedAt === null || raisedAt < changedAt) return false;
+  const shortenedAt = record?.shortenedAt ?? null;
+  return shortenedAt === null || (lastExactApply !== null && shortenedAt <= lastExactApply);
 }
 
 /**
@@ -75,12 +96,16 @@ export function storedApplyStatuses({
     ];
   };
 
-  return lastChanges({ scopes, byScope }).map(({ scope, changedAt }) => {
-    const covering = coveringScopes(scope)
+  return lastChanges({ scopes, byScope }).map(({ scope, changedAt }): StoredApplyStatus => {
+    const exactApplies = coveringScopes(scope)
       .map(appliedAt)
-      .filter((at): at is number => at !== null && at >= changedAt);
-    return covering.length > 0
-      ? { ...scope, status: "applied", at: Math.max(...covering) }
+      .filter((at): at is number => at !== null);
+    const covering = exactApplies.filter((at) => at >= changedAt);
+    if (covering.length > 0) return { ...scope, status: "applied", at: Math.max(...covering) };
+    const record = byScope.get(refKey(scope));
+    const lastExactApply = exactApplies.length > 0 ? Math.max(...exactApplies) : null;
+    return raiseCovers({ record, changedAt, lastExactApply })
+      ? { ...scope, status: "applied", at: record?.raisedAt ?? changedAt }
       : { ...scope, status: "pending", at: changedAt };
   });
 }

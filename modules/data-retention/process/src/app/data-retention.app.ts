@@ -514,7 +514,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
       retentionDays,
     });
     await this.#syncStorageLine({ organizationId, addLine: through === "billing" });
-    await this.#recordChange({ organizationId, scope, policy });
+    await this.#recordChange({ organizationId, scope, policy, lengthens });
     if (lengthens) await this.#extendFromSave({ organizationId, scope, policy });
     return policy;
   }
@@ -556,10 +556,12 @@ export class DataRetentionModule implements DataRetentionApiContract {
     organizationId,
     scope,
     policy,
+    lengthens,
   }: {
     organizationId: string;
     scope: ScopeAssignment;
     policy: RetentionPolicy;
+    lengthens: boolean;
   }): Promise<void> {
     try {
       await this.#extensions.recordChange({
@@ -567,6 +569,7 @@ export class DataRetentionModule implements DataRetentionApiContract {
         scope,
         category: policy.category,
         retentionDays: policy.retentionDays,
+        lengthens,
         changeId: `save:${policy.id}:${policy.updatedAt.getTime()}`,
         at: policy.updatedAt.getTime(),
       });

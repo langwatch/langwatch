@@ -15,6 +15,8 @@ type Row = {
   scopeId: string;
   changedAt: number | null;
   appliedAt: number | null;
+  raisedAt: number | null;
+  shortenedAt: number | null;
   createdAt: number;
   updatedAt: number;
   occurredAt: number;
@@ -31,6 +33,8 @@ function fromRow(row: Row): StoredProjection<RetentionApplyStatusState> {
       scopeId: row.scopeId,
       changedAt: row.changedAt,
       appliedAt: row.appliedAt,
+      raisedAt: row.raisedAt,
+      shortenedAt: row.shortenedAt,
     },
     cursor: { acceptedAt: row.acceptedAt, eventId: row.lastEventId },
     occurredAt: row.occurredAt,
@@ -59,10 +63,13 @@ export class PrismaRetentionApplyStatusRepository
     context: ProjectionStoreContext,
   ): Promise<void> {
     const id = context.key ?? context.aggregateId;
-    const { organizationId, scopeType, scopeId, changedAt, appliedAt } = projection.state;
+    const { organizationId, scopeType, scopeId, changedAt, appliedAt, raisedAt, shortenedAt } =
+      projection.state;
     const data = {
       changedAt,
       appliedAt,
+      raisedAt,
+      shortenedAt,
       createdAt: projection.createdAt,
       updatedAt: projection.updatedAt,
       occurredAt: projection.occurredAt,
@@ -84,7 +91,14 @@ export class PrismaRetentionApplyStatusRepository
   }): Promise<ScopeApplyRecord[]> {
     return this.prisma.retentionApplyStatus.findMany({
       where: { organizationId },
-      select: { scopeType: true, scopeId: true, changedAt: true, appliedAt: true },
+      select: {
+        scopeType: true,
+        scopeId: true,
+        changedAt: true,
+        appliedAt: true,
+        raisedAt: true,
+        shortenedAt: true,
+      },
     });
   }
 }

@@ -1921,6 +1921,8 @@ export const prismaModelFieldCatalogue = {
     "scopeId",
     "changedAt",
     "appliedAt",
+    "raisedAt",
+    "shortenedAt",
     "createdAt",
     "updatedAt",
     "occurredAt",

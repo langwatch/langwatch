@@ -58,7 +58,6 @@ export interface RetroactiveRetentionRepository {
   findKeepForeverRewrites(input: ClickHouseTarget): Promise<KeepForeverRewrite[]>;
   /** Re-stamps every never-expiring event-log row on one target to be kept forever. */
   startKeepForeverRewrite(input: ClickHouseTarget): Promise<void>;
-  /** The id indexes among `indexes` that retention governs and the target already holds. */
   /**
    * The category's stamps in the given windows, with their row counts: a sample read over the
    * tenant's primary key and the partitions the windows touch, never the whole table.
@@ -68,6 +67,7 @@ export interface RetroactiveRetentionRepository {
     category: RetentionCategory;
     windows: readonly RetentionDriftWindow[];
   }): Promise<StoredRetentionStamp[]>;
+  /** The id indexes among `indexes` that retention governs and the target already holds. */
   findHeldIdIndexes(input: ClickHouseTarget & { indexes: readonly string[] }): Promise<string[]>;
   /** The tenants with rows in any of the named id indexes on one target. */
   findIdIndexTenantIds(input: ClickHouseTarget & { indexes: readonly string[] }): Promise<string[]>;

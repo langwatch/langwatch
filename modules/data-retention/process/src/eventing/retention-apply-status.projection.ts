@@ -1,6 +1,6 @@
 /**
- * Per scope, the latest change saved there and the latest apply that scope asked for, keyed
- * `organizationId:scopeType:scopeId`. Both keep their maximum, so the fold is order-free.
+ * Per scope, the latest change, exact apply, raise and non-lengthening change, keyed
+ * `organizationId:scopeType:scopeId`. Each keeps its maximum, so the fold is order-free.
  * Spec: modules/data-retention/specs/retention-apply-record.feature
  */
 import type { RetentionScopeType } from "@langwatch/data-retention-contract";
@@ -14,7 +14,7 @@ import {
 } from "./retention-extension.events.ts";
 
 export const RETENTION_APPLY_STATUS_PROJECTION_NAME = "retentionApplyStatus";
-export const RETENTION_APPLY_STATUS_PROJECTION_VERSION = "2026-11-22";
+export const RETENTION_APPLY_STATUS_PROJECTION_VERSION = "2026-11-23";
 
 export interface RetentionApplyStatusState {
   readonly organizationId: string;
@@ -22,7 +22,12 @@ export interface RetentionApplyStatusState {
   readonly scopeId: string;
   /** Epoch milliseconds, each null until it first happened. */
   readonly changedAt: number | null;
+  /** An exact rewrite, which also lowers stamps. */
   readonly appliedAt: number | null;
+  /** A rewrite that only raised stamps after a lengthening save. */
+  readonly raisedAt: number | null;
+  /** A change that did not lengthen the period, so a raise cannot cover it. */
+  readonly shortenedAt: number | null;
 }
 
 const latest = (current: number | null, next: number): number =>
@@ -52,9 +57,17 @@ export function applyRetentionApplyStatusEvent(
   const base = { ...state, ...scope };
   switch (event.type) {
     case RETENTION_POLICY_CHANGED_EVENT_TYPE:
-      return { ...base, changedAt: latest(state.changedAt, event.data.changedAt) };
+      return {
+        ...base,
+        changedAt: latest(state.changedAt, event.data.changedAt),
+        shortenedAt: event.data.lengthens
+          ? state.shortenedAt
+          : latest(state.shortenedAt, event.data.changedAt),
+      };
     case RETENTION_APPLIED_EVENT_TYPE:
-      return { ...base, appliedAt: latest(state.appliedAt, event.data.appliedAt) };
+      return event.data.mode === "apply"
+        ? { ...base, appliedAt: latest(state.appliedAt, event.data.appliedAt) }
+        : { ...base, raisedAt: latest(state.raisedAt, event.data.appliedAt) };
     default:
       return state;
   }
@@ -73,6 +86,8 @@ export function createRetentionApplyStatusProjection(deps: {
       scopeId: "",
       changedAt: null,
       appliedAt: null,
+      raisedAt: null,
+      shortenedAt: null,
     }),
     apply: applyRetentionApplyStatusEvent,
     store: deps.store,

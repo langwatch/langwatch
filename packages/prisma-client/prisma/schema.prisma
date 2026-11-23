@@ -4042,6 +4042,8 @@ model RetentionApplyStatus {
   scopeId           String
   changedAt         Float?
   appliedAt         Float?
+  raisedAt          Float?
+  shortenedAt       Float?
   createdAt         Float
   updatedAt         Float
   occurredAt        Float

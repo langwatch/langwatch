@@ -30,7 +30,7 @@ const TEN = Date.UTC(2026, 10, 22, 10);
 const ELEVEN = Date.UTC(2026, 10, 22, 11);
 const teamOfProject = new Map([["project-1", "team-1"]]);
 
-const changed = (at: number): RetentionPolicyChangedEvent =>
+const changed = (at: number, { lengthens = false } = {}): RetentionPolicyChangedEvent =>
   EventUtils.createEvent<RetentionPolicyChangedEvent>({
     aggregateType: RETENTION_EXTENSION_AGGREGATE_TYPE,
     aggregateId: organizationId,
@@ -43,13 +43,14 @@ const changed = (at: number): RetentionPolicyChangedEvent =>
       scope: organization,
       category: "traces",
       retentionDays: 30,
+      lengthens,
       changedAt: at,
     },
     metadata: {},
     occurredAt: at,
   });
 
-const applied = (at: number): RetentionAppliedEvent =>
+const applied = (at: number, mode: "apply" | "raise" = "apply"): RetentionAppliedEvent =>
   EventUtils.createEvent<RetentionAppliedEvent>({
     aggregateType: RETENTION_EXTENSION_AGGREGATE_TYPE,
     aggregateId: "project-1",
@@ -62,7 +63,7 @@ const applied = (at: number): RetentionAppliedEvent =>
       extensionId: `apply:${at}`,
       category: "traces",
       retentionDays: 30,
-      mode: "apply",
+      mode,
       tables: [],
       appliedAt: at,
       scope: organization,
@@ -81,10 +82,29 @@ describe("the apply status fold", () => {
   describe("when a change at 10:00 and an apply at 11:00 arrive in either order", () => {
     /** @scenario "The status keeps the latest change and the latest apply whatever their order" */
     it("holds the change at 10:00 and the apply at 11:00", () => {
-      const expected = { ...organization, organizationId, changedAt: TEN, appliedAt: ELEVEN };
+      const expected = {
+        ...organization,
+        organizationId,
+        changedAt: TEN,
+        appliedAt: ELEVEN,
+        raisedAt: null,
+        shortenedAt: TEN,
+      };
       expect(fold([changed(TEN), applied(ELEVEN)])).toEqual(expected);
       expect(fold([applied(ELEVEN), changed(TEN)])).toEqual(expected);
       expect(fold([applied(ELEVEN), changed(TEN), applied(TEN)])).toEqual(expected);
+    });
+
+    /** @scenario "The status keeps raises apart from exact applies" */
+    it("holds a raise apart from exact applies and a lengthening save apart from shorter ones", () => {
+      expect(fold([changed(TEN, { lengthens: true }), applied(ELEVEN, "raise")])).toEqual({
+        ...organization,
+        organizationId,
+        changedAt: TEN,
+        appliedAt: null,
+        raisedAt: ELEVEN,
+        shortenedAt: null,
+      });
     });
 
     it("keys both facts to the scope they name", () => {
@@ -124,6 +144,87 @@ describe("a scope's stored apply status", () => {
           teamOfProject,
         }),
       ).toEqual([{ ...organization, status: "pending", at: ELEVEN }]);
+    });
+  });
+
+  describe("when a lengthening save at 10:00 was raised at 11:00", () => {
+    /** @scenario "A raise after a lengthening save marks the scope applied" */
+    it("reads as applied at 11:00", () => {
+      expect(
+        storedApplyStatuses({
+          organizationId,
+          scopes: [organization],
+          records: [
+            {
+              ...organization,
+              changedAt: TEN,
+              appliedAt: null,
+              raisedAt: ELEVEN,
+              shortenedAt: null,
+            },
+          ],
+          teamOfProject,
+        }),
+      ).toEqual([{ ...organization, status: "applied", at: ELEVEN }]);
+    });
+
+    it("never lets a scope's raise cover the scopes it holds", () => {
+      expect(
+        storedApplyStatuses({
+          organizationId,
+          scopes: [project],
+          records: [
+            { ...project, changedAt: TEN, appliedAt: null },
+            { ...organization, changedAt: null, appliedAt: null, raisedAt: ELEVEN },
+          ],
+          teamOfProject,
+        }),
+      ).toEqual([{ ...project, status: "pending", at: TEN }]);
+    });
+  });
+
+  describe("when a shorter save after the last exact apply was never applied before a raise", () => {
+    /** @scenario "A raise after an unapplied shorter save leaves the scope pending" */
+    it("reads as pending since the lengthening save", () => {
+      const NINE = Date.UTC(2026, 10, 22, 9);
+      const NOON = Date.UTC(2026, 10, 22, 12);
+      expect(
+        storedApplyStatuses({
+          organizationId,
+          scopes: [organization],
+          records: [
+            {
+              ...organization,
+              changedAt: ELEVEN,
+              appliedAt: NINE,
+              raisedAt: NOON,
+              shortenedAt: TEN,
+            },
+          ],
+          teamOfProject,
+        }),
+      ).toEqual([{ ...organization, status: "pending", at: ELEVEN }]);
+    });
+
+    it("reads as applied once an exact apply followed the shorter save", () => {
+      const NOON = Date.UTC(2026, 10, 22, 12);
+      const ONE = Date.UTC(2026, 10, 22, 13);
+      expect(
+        storedApplyStatuses({
+          organizationId,
+          scopes: [organization],
+          records: [
+            {
+              ...organization,
+              changedAt: NOON,
+              appliedAt: ELEVEN,
+              raisedAt: ONE,
+              shortenedAt: TEN,
+            },
+          ],
+          teamOfProject,
+        }),
+      ).toEqual([{ ...organization, status: "applied", at: ONE }]);
     });
   });
 

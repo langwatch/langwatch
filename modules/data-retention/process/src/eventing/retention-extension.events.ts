@@ -80,6 +80,8 @@ export const retentionPolicyChangedEventDataSchema = z
     category: retentionCategorySchema,
     /** The period saved; 0 keeps forever. */
     retentionDays: z.number().int().nonnegative(),
+    /** Whether the save lengthened the period; a raise covers only lengthening changes. */
+    lengthens: z.boolean().optional(),
     changedAt: z.number().int().nonnegative(),
   })
   .strict();

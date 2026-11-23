@@ -4,8 +4,10 @@ Feature: Each retention change and each apply to stored data is recorded
   page says, per scope, whether its last change was applied. Every save records
   a retention_policy_changed fact for its scope, and every project's rewrite
   records a retention_applied fact naming the scope that asked for it. A scope
-  is applied once an apply at that scope, or at a scope that holds it, landed at
-  or after its last change.
+  is applied once an exact apply at that scope, or at a scope that holds it,
+  landed at or after its last change. A lengthening save only raises stamps, so
+  its raise counts as applied only when no shorter save since the last exact
+  apply left stamps above the period.
 
   Background:
     Given an organization on a paid plan with a team and two projects
@@ -49,6 +51,23 @@ Feature: Each retention change and each apply to stored data is recorded
   @unit
   Scenario: A change after the last apply marks the scope pending
     Given a scope applied at 10:00 and changed again at 11:00
+    Then the scope reads as pending since 11:00
+
+  @unit
+  Scenario: The status keeps raises apart from exact applies
+    Given a lengthening save at 10:00 raised at 11:00
+    When the facts are folded
+    Then the scope's status holds the raise at 11:00 and no exact apply
+
+  @unit
+  Scenario: A raise after a lengthening save marks the scope applied
+    Given a scope lengthened at 10:00 and raised at 11:00
+    Then the scope reads as applied at 11:00
+
+  @unit
+  Scenario: A raise after an unapplied shorter save leaves the scope pending
+    Given a scope applied at 09:00, shortened at 10:00 and lengthened at 11:00
+    And the lengthening save was raised at 12:00
     Then the scope reads as pending since 11:00
 
   @unit

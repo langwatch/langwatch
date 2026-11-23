@@ -26,6 +26,17 @@ Feature: A daily check flags stored rows on a period other than the setting
     And the failure is counted and logged
 
   @unit
+  Scenario: The daily sweep prunes the check's sent outbox rows
+    When the drift check wakes
+    Then the check's dispatched outbox rows older than a week are deleted
+
+  @unit
+  Scenario: A failed outbox prune does not fail the drift sweep
+    Given deleting the dispatched outbox rows fails
+    When the drift check wakes
+    Then the sweep still resolves
+
+  @unit
   Scenario: The windows sampled are a few short slices spread over the stored age
     When the windows to sample are chosen
     Then each window is one hour long and none is newer than a day

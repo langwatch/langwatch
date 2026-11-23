@@ -89,7 +89,8 @@ export class RecordRetentionPolicyChangeCommand implements CommandHandler<
   async handle(
     command: Command<RecordRetentionPolicyChangeCommandData>,
   ): Promise<RetentionPolicyChangedEvent[]> {
-    const { organizationId, changeId, scope, category, retentionDays, changedAt } = command.data;
+    const { organizationId, changeId, scope, category, retentionDays, lengthens, changedAt } =
+      command.data;
     return [
       EventUtils.createEvent<RetentionPolicyChangedEvent>({
         aggregateType: RETENTION_EXTENSION_AGGREGATE_TYPE,
@@ -97,7 +98,7 @@ export class RecordRetentionPolicyChangeCommand implements CommandHandler<
         tenantId: createTenantId(command.tenantId),
         type: RETENTION_POLICY_CHANGED_EVENT_TYPE,
         version: RETENTION_EXTENSION_EVENT_VERSION,
-        data: { organizationId, changeId, scope, category, retentionDays, changedAt },
+        data: { organizationId, changeId, scope, category, retentionDays, lengthens, changedAt },
         metadata: {},
         occurredAt: changedAt,
         idempotencyKey: `retention-policy-changed:${changeId}`,

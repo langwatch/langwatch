@@ -76,6 +76,8 @@ describe("given the Prisma apply-status repository behind the tenancy guard", ()
             scopeId: "organization_1",
             changedAt: 1,
             appliedAt: null,
+            raisedAt: null,
+            shortenedAt: 1,
           },
           cursor: { acceptedAt: 1, eventId: "event_1" },
           occurredAt: 1,

@@ -1495,6 +1495,8 @@ export interface LwqlPrismaRows {
     readonly scopeId: "String";
     readonly changedAt: "Float?";
     readonly appliedAt: "Float?";
+    readonly raisedAt: "Float?";
+    readonly shortenedAt: "Float?";
     readonly createdAt: "Float";
     readonly updatedAt: "Float";
     readonly occurredAt: "Float";
