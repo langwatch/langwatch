@@ -85,6 +85,13 @@ describe("given the span facets of the ClickHouse catalogue", () => {
       );
       expect(sourceFor({ floor: null, fromMs: FLOOR_MS }).table).toBe("stored_spans");
     });
+
+    /** @scenario "While span_analytics is rebuilding the span facets read stored_spans" */
+    it("reads stored_spans when the floor does not parse, instead of failing", () => {
+      const floor = { from: "not a time", rebuilding: false };
+
+      expect(sourceFor({ floor, fromMs: FLOOR_MS }).table).toBe("stored_spans");
+    });
   });
 
   describe("when a batch holds a facet without a light expression", () => {

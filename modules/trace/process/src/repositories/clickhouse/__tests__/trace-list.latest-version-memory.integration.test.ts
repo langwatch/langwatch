@@ -21,8 +21,12 @@ const READ_SETTINGS = { max_threads: 2, max_memory_usage: "900000000" } as const
 
 let ch: ClickHouseClient;
 
+const seededTenants: string[] = [];
+
 function freshTenant(): string {
-  return `project_${nanoid(21).replace(/[^A-Za-z0-9]/g, "x")}`;
+  const tenant = `project_${nanoid(21).replace(/[^A-Za-z0-9]/g, "x")}`;
+  seededTenants.push(tenant);
+  return tenant;
 }
 
 function windowOf(tenant: string): string {
@@ -105,7 +109,14 @@ describe.skipIf(!clickHouseConfigured)("given trace_summaries with superseded ve
   });
 
   afterAll(async () => {
-    await ch?.command({ query: "SYSTEM START MERGES trace_summaries" });
+    if (!ch) return;
+    await ch.command({ query: "SYSTEM START MERGES trace_summaries" });
+    for (const tenantId of seededTenants) {
+      await ch.command({
+        query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId },
+      });
+    }
   });
 
   describe("when a trace has one version inside the window and a newer one after it", () => {

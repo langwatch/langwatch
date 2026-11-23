@@ -4,8 +4,11 @@
  * @see specs/traces-v2/facet-light-twin.feature
  */
 
-import { Temporal } from "@langwatch/time";
-import type { FacetTableName, SpanAnalyticsFloor } from "@langwatch/trace-contract";
+import {
+  spanAnalyticsSourceOf,
+  type FacetTableName,
+  type SpanAnalyticsFloor,
+} from "@langwatch/trace-contract";
 
 import type {
   ExpressionCategoricalDef,
@@ -19,18 +22,6 @@ export interface BatchedFacetSource {
   table: FacetTableName;
   timeColumn: string;
   expressionOf: (def: ExpressionCategoricalDef | RangeFacetDef) => string;
-}
-
-/** Whether the twin holds every row from `fromMs` on. */
-export function twinCoversWindow({
-  floor,
-  fromMs,
-}: {
-  floor: SpanAnalyticsFloor | null;
-  fromMs: number;
-}): boolean {
-  if (!floor || floor.rebuilding) return false;
-  return floor.from === null || fromMs >= Temporal.Instant.from(floor.from).epochMilliseconds;
 }
 
 export function batchedFacetSource({
@@ -57,7 +48,9 @@ export function batchedFacetSource({
   const twin = catalog.lightTwins?.[table];
   if (!twin || ranges.length > 0 || categoricals.length === 0) return own;
   if (categoricals.some((def) => def.lightExpression === undefined)) return own;
-  if (!twinCoversWindow({ floor, fromMs })) return own;
+  if (spanAnalyticsSourceOf({ floor, windowStartMs: fromMs }).kind !== "span_analytics") {
+    return own;
+  }
   return {
     table: twin.table,
     timeColumn: twin.timeColumn,
