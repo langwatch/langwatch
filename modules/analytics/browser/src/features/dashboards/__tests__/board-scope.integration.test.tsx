@@ -148,6 +148,9 @@ function scopeServer({
         state.widgets.push(created);
         return Promise.resolve({ ...created });
       }
+      // The organization's Dashboards area is off, so a missing board reads as AC183's page.
+      case "featureFlag.isEnabledForEachOrganization":
+        return Promise.resolve({ enabledByOrganizationId: {} });
       default:
         return NO_PROCEDURES(call);
     }
