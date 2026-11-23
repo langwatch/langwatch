@@ -53,7 +53,7 @@ describe("given spans whose events carry attribute maps", () => {
             arrayMap(i -> concat(repeat('v', 40), toString(number)), range(${KEYS_PER_EVENT}))
           ) AS Map(String, String)), range(${EVENTS_PER_SPAN}))
           FROM numbers(${start}, ${SEED_SLICE})`,
-        clickhouse_settings: { max_threads: 1, max_insert_threads: 1, max_block_size: "4096" },
+        clickhouse_settings: { max_threads: 1, max_insert_threads: "1", max_block_size: "4096" },
       });
     }
     // One part again, so the filter reads blocks as large as one insert gave.
