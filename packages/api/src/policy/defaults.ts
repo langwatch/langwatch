@@ -8,7 +8,7 @@ import {
   storageConnectSources,
   type StorageEndpoints,
 } from "./content-security-policy.ts";
-import { SecurityHeaders } from "./security-headers.ts";
+import { enforcesHttps, SecurityHeaders } from "./security-headers.ts";
 
 /** What every default needs to know about the deployment it is composed in. */
 export type SurfaceDefaultsOptions = Readonly<{
@@ -18,6 +18,8 @@ export type SurfaceDefaultsOptions = Readonly<{
    * local run rather than after a deploy.
    */
   production?: boolean;
+  /** The public address; a plain `http:` one gets no HSTS and no HTTPS upgrade. */
+  publicBaseUrl?: string | undefined;
   /** The object-storage endpoints a direct upload reaches (ADR-032 R3). */
   storage?: StorageEndpoints | undefined;
   /** The origin serving content-hashed assets, where one is configured (ADR-086). */
@@ -29,7 +31,7 @@ export type SurfaceDefaultsOptions = Readonly<{
  * answer is never a document a browser should treat as one.
  */
 export function trpcSurfaceDefaults(options: SurfaceDefaultsOptions = {}): SecurityHeaders {
-  return SecurityHeaders.strict({ production: options.production === true }).with(
+  return SecurityHeaders.strict(transportSecurity(options)).with(
     "Cross-Origin-Resource-Policy",
     "same-origin",
   );
@@ -49,7 +51,7 @@ export function browserBundleDefaults(options: SurfaceDefaultsOptions = {}): Sec
   const production = options.production === true;
 
   return (
-    SecurityHeaders.strict({ production })
+    SecurityHeaders.strict(transportSecurity(options))
       // The shell is framed by nothing, and the policy's own `frame-ancestors`
       // is the modern statement of it; the legacy header stays for the browsers
       // that only read that one.
@@ -57,7 +59,7 @@ export function browserBundleDefaults(options: SurfaceDefaultsOptions = {}): Sec
         ContentSecurityPolicy.app()
           .withConnectSource(...(options.storage ? storageConnectSources(options.storage) : []))
           .withAssetOrigin(options.assetOrigin ?? null)
-          .upgradingInsecureRequests(production)
+          .upgradingInsecureRequests(enforcesHttps(transportSecurity(options)))
           .reportOnly(!production),
       )
       // microphone=(self): the voice panel captures audio on this origin.
@@ -68,4 +70,8 @@ export function browserBundleDefaults(options: SurfaceDefaultsOptions = {}): Sec
         "geolocation=(), microphone=(self), camera=(), payment=(), usb=()",
       )
   );
+}
+
+function transportSecurity(options: SurfaceDefaultsOptions) {
+  return { production: options.production === true, publicBaseUrl: options.publicBaseUrl };
 }

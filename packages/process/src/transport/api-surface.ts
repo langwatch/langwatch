@@ -223,7 +223,12 @@ class ApiSurface {
     });
     const mux = HttpMux.create({ reporter: composition.logger })
       .use(clientAddress)
-      .use(SecurityHeaders.strict({ production: composition.production }))
+      .use(
+        SecurityHeaders.strict({
+          production: composition.production,
+          publicBaseUrl: composition.publicBaseUrl,
+        }),
+      )
       .route("/api", api, { onFailure: answerApiFailure });
     for (const path of apiRootPaths(api))
       mux.route(path, api, { onFailure: answerApiFailure, exact: true });
