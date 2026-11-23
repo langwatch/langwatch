@@ -144,9 +144,7 @@ describe("gatewayBudgets create, on one member or on a personal key", () => {
 
       /** @scenario "A budget on one person or on a personal key is created only by that person and those allowed to see other members' personal keys" */
       it("refuses another member exactly as an admin is refused a target that does not exist", async () => {
-        const refused = await refusalOf(
-          (await gatewayFor({ caller: "usr_member" })).create(scope),
-        );
+        const refused = await refusalOf((await gatewayFor({ caller: "usr_member" })).create(scope));
         const absentForAdmin = await refusalOf(
           (await gatewayFor({ caller: "usr_admin" })).create(absent),
         );

@@ -130,10 +130,9 @@ function personalUsageSeed({ tenant }: { tenant: string }): string[] {
       ].join(", "),
     `INSERT INTO "GatewayBudgetBucketBoundary" ("id", "organizationId", "budgetId", ` +
       `"bucketScopeId", "periodStartedAt") VALUES ` +
-      [
-        boundary("attributed", `${tenant}-vk`),
-        boundary("attributed-personal", personal),
-      ].join(", "),
+      [boundary("attributed", `${tenant}-vk`), boundary("attributed-personal", personal)].join(
+        ", ",
+      ),
   ];
 }
 
