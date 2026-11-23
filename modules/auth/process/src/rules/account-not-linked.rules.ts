@@ -1,14 +1,8 @@
 /** What the door does with one redirect Better Auth answered for a sign-in it would not link. */
 type AccountNotLinkedRedirect = { kind: "pass" } | { kind: "rewrite"; location: string };
 
-/**
- * Better Auth's code when an address's account exists under a method it may not link: underscored
- * from the OAuth callback, raw and spaced from the SSO plugin's OIDC callback.
- */
-const ACCOUNT_NOT_LINKED: ReadonlySet<string | null> = new Set([
-  "account_not_linked",
-  "account not linked",
-]);
+/** Better Auth's code when an address's account exists under a method it may not link. */
+const ACCOUNT_NOT_LINKED = "account_not_linked";
 
 /**
  * Names the connection that governs the address on a refused link, in `error_description` as the
@@ -27,7 +21,7 @@ export function accountNotLinkedRedirectOf({
   const target = parsedLocation(location);
   if (!target.parsed) return { kind: "pass" };
   const { url } = target;
-  if (!ACCOUNT_NOT_LINKED.has(url.searchParams.get("error"))) return { kind: "pass" };
+  if (url.searchParams.get("error") !== ACCOUNT_NOT_LINKED) return { kind: "pass" };
   url.searchParams.set("error_description", connectionId);
   return {
     kind: "rewrite",
@@ -39,7 +33,7 @@ export function accountNotLinkedRedirectOf({
 export function isAccountNotLinkedRedirect({ location }: { location: string | null }): boolean {
   if (!location) return false;
   const target = parsedLocation(location);
-  return target.parsed && ACCOUNT_NOT_LINKED.has(target.url.searchParams.get("error"));
+  return target.parsed && target.url.searchParams.get("error") === ACCOUNT_NOT_LINKED;
 }
 
 function parsedLocation(location: string): { parsed: true; url: URL } | { parsed: false } {

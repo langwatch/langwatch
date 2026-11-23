@@ -573,33 +573,6 @@ describe("given an OAuth sign-in Better Auth would not link to the account holdi
     });
   });
 
-  describe("when the SSO plugin redirects with the refusal's raw, spaced spelling", () => {
-    const SPACED_AT = `${BASE_URL}/auth/error?error=account+not+linked`;
-
-    /** @scenario "The SSO plugin's spaced account-link refusal also names the governing connection" */
-    it("names the governing connection in error_description too", async () => {
-      const { service } = doorRefusingLink({
-        governing: { "andrei@acme.com": ["ssoc_acme"] },
-        location: SPACED_AT,
-      });
-
-      const response = await service.betterAuthHandshake(callback());
-      const target = new URL(response.headers.get("location") ?? "");
-
-      expect(target.searchParams.get("error")).toBe("account not linked");
-      expect(target.searchParams.get("error_description")).toBe("ssoc_acme");
-    });
-
-    /** @scenario "The SSO plugin's spaced account-link refusal also names the governing connection" */
-    it("names no connection when none governs the address", async () => {
-      const { service } = doorRefusingLink({ governing: {}, location: SPACED_AT });
-
-      const response = await service.betterAuthHandshake(callback());
-
-      expect(response.headers.get("location")).toBe(SPACED_AT);
-    });
-  });
-
   describe("when the redirect is some other refusal", () => {
     it("asks nobody who governs the address", async () => {
       const { service, asked } = doorRefusingLink({
