@@ -2601,7 +2601,9 @@ The gateway forwards the body to the target's `upstreamUrl` and returns the upst
 
 The gateway serves both A2A bindings. The HTTP+JSON binding goes to the same prefix, for example `POST /a2a/billing/message:send`, which the gateway forwards to `message:send` under the upstream base URL.
 
-Fetch the Agent Card at `GET /a2a/billing/.well-known/agent-card.json`. The gateway fetches the card from the target's `cardUrl` and rewrites every interface URL to point at `/a2a/billing` on the gateway, so callers never learn the upstream address. The gateway builds those URLs from the scheme and `Host` of the request. If a proxy in front of it changes them, set the gateway's `A2A_PUBLIC_BASE_URL` environment variable to its public origin.
+Fetch the Agent Card at `GET /a2a/billing/.well-known/agent-card.json`. The gateway fetches the card from the target's `cardUrl` and rewrites every interface URL to point at `/a2a/billing` on the gateway, so callers never learn the upstream address. The gateway builds those URLs only from its public base URL, never from the request's `Host` header. Without it the gateway refuses Agent Card fetches and extended-card calls with `a2a_public_url_unset` (HTTP 503, JSON-RPC `-32024`). Other A2A calls still work.
+
+Set `A2A_PUBLIC_BASE_URL` on the gateway to its public origin, for example `https://gateway.acme.com`. With the Helm chart, set `gateway.publicUrl` in the umbrella chart (`publicUrl` in the gateway chart). It is not derived from `ingress.gateway.host` for the gateway, so set it even when the chart Ingress publishes the gateway.
 
 ## What can refuse a call
 
@@ -3511,8 +3513,9 @@ Calls to `/a2a/{target}` answer in the A2A binding the caller used. A JSON-RPC c
 | `a2a_rate_limited`            | -32021        | 429  | The key is over its requests-per-minute or requests-per-day limit.                 |
 | `a2a_budget_exceeded`         | -32022        | 402  | A budget on the key is used up.                                                    |
 | `a2a_target_not_https`        | -32023        | 502  | The gateway calls customer endpoints over https only and the agent's URL is http.  |
+| `a2a_public_url_unset`        | -32024        | 503  | The gateway has no `A2A_PUBLIC_BASE_URL`, so it refuses Agent Card calls.          |
 
-The gateway calls an A2A agent under the same egress rule as provider endpoints. With `BLOCK_LOCAL_HTTP_CALLS` on, a private address is refused (`a2a_upstream_unreachable`) unless the agent's host, or the IP address it resolves to, is in `ALLOWED_PROXY_HOSTS`. Listing an IP address therefore admits every hostname that resolves to it. A query parameter the agent's registered URL sets always wins: the gateway drops a caller parameter of the same name.
+The gateway calls an A2A agent under the same egress rule as provider endpoints. With `BLOCK_LOCAL_HTTP_CALLS` on, a private address is refused (`a2a_upstream_unreachable`) unless the host in the agent's URL is in `ALLOWED_PROXY_HOSTS`. An entry matches only the host the URL names, never an address that a name resolves to: to admit an agent whose URL names an IP address, list that IP address; to admit one whose URL names a hostname, list the hostname. A query parameter the agent's registered URL sets always wins: the gateway drops a caller parameter of the same name.
 
 ## Streaming errors
 
@@ -12189,8 +12192,9 @@ gateway:
   chartManaged: true
 
   # Externally reachable URL the control plane hands to CLI users at login.
-  # Leave empty to derive https://<ingress.gateway.host> from the ingress below.
-  publicUrl: ""
+  # The gateway also builds A2A Agent Card URLs from it and refuses Agent
+  # Card calls while it is empty, so set it to https://<ingress.gateway.host>.
+  publicUrl: https://gateway.acme.com
 
   # Where the gateway reaches the control plane. Empty resolves to
   # http://<release>-app:5560, the app Service of this install.

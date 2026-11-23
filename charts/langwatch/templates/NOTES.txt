@@ -80,6 +80,12 @@ dev's Personal Workspace at https://<your-host>/coding-agents .
 {{- $gwHost := ((.Values.ingress | default dict).gateway | default dict).host }}
 {{- if and .Values.ingress.enabled $gwHost }}
   • AI Gateway public route: Ingress {{ .Release.Name }}-gateway-ingress for {{ $gwHost }}, paths /v1, /a2a and /health.
+{{- if not .Values.gateway.publicUrl }}
+{{- $gwScheme := "http" }}
+{{- if (((.Values.ingress).gateway).tls).secretName }}{{- $gwScheme = "https" }}{{- end }}
+  • A2A Agent Cards: the gateway refuses them (a2a_public_url_unset) until
+    gateway.publicUrl is set. Set it to {{ $gwScheme }}://{{ $gwHost }}.
+{{- end }}
 {{- else if .Values.gateway.publicUrl }}
   • AI Gateway public URL: {{ .Values.gateway.publicUrl }} (no Ingress
     rendered; your own route must send /v1, /a2a and /health to Service
