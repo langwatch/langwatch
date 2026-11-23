@@ -51,7 +51,6 @@ function inMemoryServer() {
             updatedAt: new Date("2026-01-01"),
             project: STORE,
             openProject: STORE,
-            starPosition: null,
             ownerName: null,
           })),
         );

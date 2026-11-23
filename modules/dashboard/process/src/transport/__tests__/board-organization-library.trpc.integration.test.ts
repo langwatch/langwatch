@@ -90,11 +90,7 @@ async function library({
     .mount(boardTrpcTransport, () => app)
     .createCaller({ actor: { id: ME } });
 
-  /** The member stars a board, the row stored under the project that owns it. */
-  const star = ({ projectId, dashboardId }: { projectId: string; dashboardId: string }) =>
-    repositories.boards.addStar({ projectId, userId: ME, star: { kind: "board", dashboardId } });
-
-  return { board, caller, star };
+  return { board, caller };
 }
 
 /** Each listed board as the library names it: its name and the project named as owner. */
@@ -199,25 +195,6 @@ describe("the organization's Dashboards library", () => {
       await expect(caller.listInOrganization({ organizationId: ACME })).rejects.toMatchObject({
         cause: { code: "dashboards_not_enabled" },
       });
-    });
-  });
-
-  describe("given boards the member starred", () => {
-    it("places each listed board in the member's star order, and the rest nowhere", async () => {
-      const { board, caller, star } = await library({ readable: [SHOP] });
-      const second = await board({ projectId: SHOP, name: "Second" });
-      const first = await board({ projectId: SHOP, name: "First" });
-      await board({ projectId: SHOP, name: "Unstarred" });
-      await star({ projectId: SHOP, dashboardId: first.id });
-      await star({ projectId: SHOP, dashboardId: second.id });
-
-      const rows = await caller.listInOrganization({ organizationId: ACME });
-
-      expect(rows.map((row) => [row.name, row.starPosition])).toEqual([
-        ["Second", 1],
-        ["First", 0],
-        ["Unstarred", null],
-      ]);
     });
   });
 

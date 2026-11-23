@@ -57,6 +57,20 @@ function sharingChoices({
   ];
 }
 
+/**
+ * Whether the member is offered any scope for a board homed in `product`: Project where the
+ * home allows it, the others with `mayShare`. A product with none offers no create at all.
+ */
+export function hasSharingChoice({
+  product,
+  mayShare,
+}: {
+  product: DashboardHomeProduct;
+  mayShare: boolean;
+}): boolean {
+  return mayShare || homeAllowsScope({ homeProduct: product, scope: "PROJECT" });
+}
+
 /** The product's own default where it is offered, else the first scope offered. */
 function defaultScope({
   choices,
@@ -216,7 +230,9 @@ export function NewDashboardDialog({
 }) {
   const choicesIn = (product: DashboardHomeProduct) =>
     sharingChoices({ product, projectName, organizationName, mayShare });
-  const products = DASHBOARD_HOME_PRODUCTS.filter((product) => choicesIn(product).length > 0);
+  const products = DASHBOARD_HOME_PRODUCTS.filter((product) =>
+    hasSharingChoice({ product, mayShare }),
+  );
   const [home, setHome] = useState<DashboardHomeProduct>(fixedProduct ?? "llm-ops");
   const [name, setName] = useState(() => firstUntitledName(takenNamesIn(home)));
   const [scope, setScope] = useState<DashboardScope>(() =>

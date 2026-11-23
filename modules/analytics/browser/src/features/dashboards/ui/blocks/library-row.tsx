@@ -1,41 +1,25 @@
 /**
  * One row of the `/dashboards` library: the board's name linking to it, who sees it, its owner
- * and a "⋮" menu with what this member may do. A From LangWatch row reads "Read-only" and
- * "LangWatch", and offers "Duplicate to edit" and a Move it cannot do.
+ * and the board's "⋮" menu (`board-menu.tsx`) with what this member may do. A From LangWatch
+ * row reads "Read-only" and "LangWatch", and offers "Duplicate to edit" and a Move it cannot do.
  */
 
-import { Menu } from "@langwatch/design-system/menu";
-import {
-  Box,
-  Grid,
-  HStack,
-  IconButton,
-  Link as ChakraLink,
-  Text,
-} from "@langwatch/design-system/primitives";
-import { Copy, FolderInput, Lock, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Box, Grid, HStack, Link as ChakraLink, Text } from "@langwatch/design-system/primitives";
+import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
 import { InlineTextField } from "../elements/inline-text-field.tsx";
+import {
+  BoardMenu,
+  type BoardMenuActions,
+  hasBoardMenuItems,
+  revealsBoardMenu,
+} from "./board-menu.tsx";
 
 /** Name, who sees it, owner, menu: the columns every row lines up on. */
 const ROW_COLUMNS = "minmax(0, 1fr) 150px 96px 28px";
-
-/** "Move to product…": `onMove` where the member may move it, else why not, shown disabled. */
-export type LibraryRowMove = { onMove: () => void } | { refusal: string };
-
-/** What the menu offers; an entry left out is not shown. */
-export type LibraryRowActions = {
-  onRename?: () => void;
-  move?: LibraryRowMove;
-  onDuplicate?: () => void;
-  /** "Duplicate to edit" on a row the member cannot edit. */
-  duplicateLabel?: string;
-  /** `onDelete` is absent for My dashboard, whose Delete shows disabled. */
-  remove?: { onDelete?: () => void };
-};
 
 /** The name edited in place: Enter or leaving the field saves it, Escape cancels. */
 export type LibraryRowRenaming = { onCommit: (name: string) => void; onCancel: () => void };
@@ -55,67 +39,13 @@ export function LibraryRow({
   whoSees: string;
   isPrivate?: boolean;
   owner: string | undefined;
-  actions: LibraryRowActions;
+  actions: BoardMenuActions;
   renaming?: LibraryRowRenaming | undefined;
 }) {
-  const { onRename, move, onDuplicate, duplicateLabel = "Duplicate", remove } = actions;
   // While renaming the menu is gone, so closing it cannot hand focus back and end the edit.
-  const hasMenu =
-    renaming === void 0 && [onRename, move, onDuplicate, remove].some((entry) => entry !== void 0);
+  const hasMenu = renaming === void 0 && hasBoardMenuItems(actions);
   const frame = { name, href, whoSees, isPrivate, owner, renaming };
-  return (
-    <RowFrame {...frame}>
-      {hasMenu && (
-        <RowMenu name={name}>
-          {onRename && (
-            <Menu.Item value="rename" onClick={onRename}>
-              <MenuRow icon={<Pencil size={13} />}>Rename</MenuRow>
-            </Menu.Item>
-          )}
-          {move && <MoveItem move={move} />}
-          {onDuplicate && (
-            <Menu.Item value="duplicate" onClick={onDuplicate}>
-              <MenuRow icon={<Copy size={13} />}>{duplicateLabel}</MenuRow>
-            </Menu.Item>
-          )}
-          {remove && (
-            <>
-              <Menu.Separator />
-              <DeleteItem onDelete={remove.onDelete} />
-            </>
-          )}
-        </RowMenu>
-      )}
-    </RowFrame>
-  );
-}
-
-function MoveItem({ move }: { move: LibraryRowMove }) {
-  const onMove = "onMove" in move ? move.onMove : void 0;
-  return (
-    <Menu.Item
-      value="move"
-      disabled={!onMove}
-      title={"refusal" in move ? move.refusal : void 0}
-      onClick={onMove}
-    >
-      <MenuRow icon={<FolderInput size={13} />}>Move to product…</MenuRow>
-    </Menu.Item>
-  );
-}
-
-function DeleteItem({ onDelete }: { onDelete: (() => void) | undefined }) {
-  return (
-    <Menu.Item
-      value="delete"
-      color={onDelete ? "red.fg" : void 0}
-      disabled={!onDelete}
-      title={onDelete ? void 0 : "Your default dashboard can't be deleted"}
-      onClick={onDelete}
-    >
-      <MenuRow icon={<Trash2 size={13} />}>Delete</MenuRow>
-    </Menu.Item>
-  );
+  return <RowFrame {...frame}>{hasMenu && <BoardMenu name={name} actions={actions} />}</RowFrame>;
 }
 
 function RowFrame({
@@ -145,8 +75,7 @@ function RowFrame({
       paddingX={3}
       paddingY={2}
       textStyle="bodySm"
-      _hover={{ "& .row-menu": { opacity: 1 } }}
-      _focusWithin={{ "& .row-menu": { opacity: 1 } }}
+      {...revealsBoardMenu}
     >
       {renaming ? (
         <InlineTextField
@@ -203,45 +132,5 @@ function NameCell({ name, href }: { name: string; href: string | undefined }) {
     >
       {name}
     </ChakraLink>
-  );
-}
-
-function RowMenu({ name, children }: { name: string; children: ReactNode }) {
-  return (
-    <Box
-      className="row-menu"
-      display="flex"
-      opacity={0}
-      transition="opacity 0.2s"
-      css={{ "&:has([aria-expanded=true])": { opacity: 1 } }}
-    >
-      <Menu.Root>
-        <Menu.Trigger asChild>
-          <IconButton
-            size="xs"
-            variant="ghost"
-            color="fg.subtle"
-            _hover={{ color: "fg", background: "bg.muted" }}
-            aria-label={`Actions for ${name}`}
-          >
-            <MoreVertical size={14} aria-hidden />
-          </IconButton>
-        </Menu.Trigger>
-        <Menu.Content minWidth="188px">{children}</Menu.Content>
-      </Menu.Root>
-    </Box>
-  );
-}
-
-function MenuRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
-  return (
-    <HStack width="full" gap={2} textStyle="bodySm">
-      <Box as="span" display="flex" flexShrink={0}>
-        {icon}
-      </Box>
-      <Text as="span" flex="1">
-        {children}
-      </Text>
-    </HStack>
   );
 }

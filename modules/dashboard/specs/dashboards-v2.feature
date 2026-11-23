@@ -1386,6 +1386,31 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: Boards: no pin or pencil by the board title
     Then the board title has no pin and no rename pencil; both live in the sidebar menu
 
+  # Owner, 2026-11-23: "I want to be able to click to edit the title of the dashboards on the
+  # dashboard pages". Rename is offered by the rule the library and sidebar menus use.
+  @integration
+  Scenario: Boards: clicking the title renames the board
+    Given a board of a project where the member holds analytics:update, not their My dashboard
+    When they click the board's title
+    Then the title becomes a field holding the name
+    When they type a new name and press Enter, or leave the field
+    Then the name, trimmed, is saved in the project that owns the board, a toast says "Dashboard renamed" and the title shows it
+    And a blank or unchanged name saves nothing and shows the title again
+    # Evidence: haven browser screenshots of the title, the field and the renamed title, light and dark, and the quoted boards.update input
+
+  @integration
+  Scenario: Boards: Escape cancels a rename from the title
+    Given the member is renaming a board from its title
+    When they press Escape
+    Then the title shows the old name and nothing is saved
+    # Evidence: a haven browser screenshot after Escape, and no boards.update call
+
+  @integration
+  Scenario: Boards: a reader who may not rename sees a plain title
+    Given a board of a project where the member does not hold analytics:update, or their own My dashboard
+    Then its title is plain text, and clicking it edits nothing
+    # Evidence: a haven browser screenshot of a view-only member's board title
+
   @integration
   Scenario: Boards: My dashboard has no description placeholder
     Given the member's My dashboard with no description

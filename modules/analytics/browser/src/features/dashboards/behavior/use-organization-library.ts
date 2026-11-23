@@ -1,36 +1,26 @@
 /**
- * The `/dashboards` library's list over `boards.listInOrganization`, and what the screen does
- * with a row: create, delete and move (`use-library-writes.ts`) and duplicate, each made in the
- * store project. Failures travel raw to the host (#5984). ADR-002, dashboards-organization-area.
+ * The `/dashboards` library's list over `boards.listInOrganization`, its create and duplicate
+ * (`use-library-writes.ts`), each made in the store project; delete and move are the board menu
+ * dialogs' own. Failures travel raw to the host (#5984). ADR-002, dashboards-organization-area.
  */
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import { type LibraryBoard, libraryBoardOf } from "../model/organization-library.ts";
-import { useBoardFromTemplate } from "./use-board-from-template.ts";
-import { useLibraryCreate, useLibraryDelete, useLibraryMove } from "./use-library-writes.ts";
+import { libraryBoardOf } from "../model/organization-library.ts";
+import { useLibraryCreate, useLibraryDuplicate } from "./use-library-writes.ts";
 import { useStoreProject } from "./use-store-project.ts";
 
 export function useOrganizationLibrary() {
   const host = useAnalyticsHost();
   const store = useStoreProject();
   const { storeProject, namesInStore } = store;
-  const fromTemplate = useBoardFromTemplate({ atOrganization: true, storeProject });
   const creating = useLibraryCreate();
-  const deleting = useLibraryDelete();
-  const moving = useLibraryMove();
+  const { duplicateBoard } = useLibraryDuplicate();
   const organizationId = host.organizationId() ?? "";
   const list = analyticsApi.boards.listInOrganization.useQuery(
     { organizationId },
     { enabled: organizationId !== "" },
   );
-
-  /** Copies the board and its widgets into the store project, keeping its scope, and opens it. */
-  const duplicateBoard = (board: LibraryBoard) => {
-    if (!board.openProject) return;
-    const readFrom = board.openProject.id;
-    void fromTemplate.duplicateBoard({ board, existingNames: namesInStore, readFrom });
-  };
 
   return {
     organizationId,
@@ -49,8 +39,6 @@ export function useOrganizationLibrary() {
       store.retry();
     },
     ...creating,
-    ...deleting,
-    ...moving,
     duplicateBoard,
   };
 }

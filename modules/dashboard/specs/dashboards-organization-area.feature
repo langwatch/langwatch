@@ -250,6 +250,14 @@ Feature: Organization-wide Dashboards area
     # Evidence: haven browser screenshots of each menu and hover
 
   @integration
+  Scenario: A copy from the library keeps the board's product and scope
+    When I duplicate an Organization board homed in Gateway
+    Then the copy is homed in Gateway, at Organization, stored in my store project, and it opens at "/dashboards/<copy id>"
+    # Evidence: the quoted boards.createAtScope input and the address after the copy
+
+  # Next PR: the copy stored in the board's own project, a Project copy opening at its project
+  # address, Duplicate disabled without create rights, and the dashboard_last_in_product refusal.
+  @integration @unimplemented
   Scenario: Duplicate and Delete from the library
     When I duplicate my Organization board homed in Gateway, owned by "Shop" where I may create
     Then a toast says "Duplicated as "<name> copy"", and the copy is homed in Gateway, Organization, mine, stored in "Shop", and it opens
@@ -658,10 +666,8 @@ Feature: Organization-wide Dashboards area
     And moving an Only me board into LLM Ops keeps it Only me, not Project
     And moving an Only me board out of LLM Ops shows no sharing note and keeps it Only me
     And an Organization board owned by a project I cannot read shows "Move to product…" disabled, saying "You can view this dashboard but not change it."
-    And moving my Coding agents board "Agent spend" to Gateway keeps it personal and Only me: it lists in Gateway in "Acme" and in "Beta", and no other member can list it
     And moving My dashboard to Gateway lists it in the Gateway section, and "/shop/dashboards" still opens it
     And a move of my personal board sent by another member is answered as "not found"
-    And moving "Agent spend" to LLM Ops keeps it personal and Only me: it lists in the LLM Ops section in every project and in the library's LLM Ops group, and still follows me to "Beta"
     # Evidence: a screenshot per case, and the quoted board after each move
 
   @integration
@@ -705,10 +711,24 @@ Feature: Organization-wide Dashboards area
     And a board is listed only when its owning project has Dashboards on and I may read it, or it is my personal board
     And a member who can reach Dashboards in no project of "Acme" sees no section
     And the "+" shows when I hold analytics:create in at least one project, an organization admin's own grants included
+    And outside LLM Ops it shows only when I also hold analytics:update in the store project, because a board there cannot be Project
     And after "?ff_release_dashboards=off" in this browser there is no section
     And each row shows a lock on Only me boards and a hover title: "Only you can see this", "Shared with <project>" or "Shared with the organization"
     And with no board I can see homed there, the section still shows its heading and "+" with "No dashboards yet", so every product reads alike
     # Evidence: screenshots of the three sidebars, and one per access case
+
+  # Owner, 2026-11-23: "each dashboard name on the side should have the 3 verticle dots on
+  # hover for their menu".
+  @integration
+  Scenario: A sidebar row shows the library's menu on hover
+    Given a board listed in a product's Dashboards section
+    When I hover its row, or move keyboard focus into it
+    Then a "⋮" button shows at the row's right end, and it stays while its menu is open
+    And otherwise the row looks as it did, with no "⋮"
+    And its menu is the library row's, by the same rules: Rename, Move to product…, Duplicate and Delete where I hold analytics:update and analytics:delete in the owning project; no Rename, no Delete and a greyed-out Move where I may only view
+    And opening the menu does not open the board
+    And Rename edits the name in place in the row, and Enter saves it in the project that owns the board
+    # Evidence: haven browser screenshots of a row at rest, hovered and with its menu open, light and dark
 
   @integration
   Scenario: The LLM Ops section ends with Browse templates

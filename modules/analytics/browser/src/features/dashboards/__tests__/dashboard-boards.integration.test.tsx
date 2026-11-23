@@ -259,6 +259,7 @@ function openBoard({
   withSidebar = false,
   userId = "user-1",
   permissions,
+  projectPermissions,
   flags = FLAG_ON,
 }: {
   server: ReturnType<typeof inMemoryServer>;
@@ -267,12 +268,15 @@ function openBoard({
   withSidebar?: boolean;
   userId?: string;
   permissions?: string[];
+  /** Grants by project id, which a rename asks of the project that owns the board. */
+  projectPermissions?: Record<string, string[]>;
   flags?: Record<string, boolean>;
 }) {
   const host = new StubAnalyticsHost({
     flags,
     userId,
     permissions,
+    ...(projectPermissions ? { projectPermissions } : {}),
     route: { params: { dashboardId }, query },
   });
   const view = renderDashboards({
@@ -959,6 +963,94 @@ describe("a member's board", () => {
       expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /Pin dashboard|Unpin dashboard/ })).toBeNull();
       expect(screen.queryByRole("button", { name: "Rename dashboard" })).toBeNull();
+    });
+  });
+
+  describe("given a member who may edit in the project that owns the board", () => {
+    const EDITOR = { "proj-1": ["analytics:update"] };
+
+    describe("when they click the title, type a new name and press Enter", () => {
+      /** @scenario "Boards: clicking the title renames the board" */
+      it("saves the trimmed name in the owning project, says so and shows it as the title", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        const { host } = openBoard({ server, projectPermissions: EDITOR });
+
+        const title = await screen.findByRole("heading", { name: "Weekly review" });
+        await user.click(within(title).getByRole("button", { name: "Weekly review" }));
+        const field = screen.getByRole("textbox", { name: "Dashboard name" });
+        expect(field).toHaveValue("Weekly review");
+        await user.clear(field);
+        await user.type(field, "  Launch week {Enter}");
+
+        await waitFor(() =>
+          expect(callsTo(server, "boards.update").map((call) => call.input)).toEqual([
+            { projectId: "proj-1", dashboardId: "board-1", name: "Launch week" },
+          ]),
+        );
+        expect(await screen.findByRole("heading", { name: "Launch week" })).toBeInTheDocument();
+        await waitFor(() =>
+          expect(host.successes.map((notice) => notice.title)).toEqual(["Dashboard renamed"]),
+        );
+      });
+    });
+
+    describe("when they leave the name blank or unchanged", () => {
+      /** @scenario "Boards: clicking the title renames the board" */
+      it("saves nothing and shows the title again", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        openBoard({ server, projectPermissions: EDITOR });
+
+        await user.click(await screen.findByRole("button", { name: "Weekly review" }));
+        await user.clear(screen.getByRole("textbox", { name: "Dashboard name" }));
+        await user.keyboard("{Enter}");
+        await user.click(await screen.findByRole("button", { name: "Weekly review" }));
+        await user.keyboard("{Enter}");
+
+        expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
+        expect(callsTo(server, "boards.update")).toEqual([]);
+      });
+    });
+
+    describe("when they press Escape while renaming", () => {
+      /** @scenario "Boards: Escape cancels a rename from the title" */
+      it("keeps the old name and saves nothing", async () => {
+        const user = userEvent.setup({ pointerEventsCheck: 0 });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        openBoard({ server, projectPermissions: EDITOR });
+
+        await user.click(await screen.findByRole("button", { name: "Weekly review" }));
+        await user.type(screen.getByRole("textbox", { name: "Dashboard name" }), " draft{Escape}");
+
+        expect(await screen.findByRole("heading", { name: "Weekly review" })).toBeInTheDocument();
+        expect(screen.queryByRole("textbox", { name: "Dashboard name" })).toBeNull();
+        expect(callsTo(server, "boards.update")).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a reader who may not rename the board", () => {
+    /** @scenario "Boards: a reader who may not rename sees a plain title" */
+    it("shows the title as plain text without edit rights in the owning project", async () => {
+      openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
+
+      const title = await screen.findByRole("heading", { name: "Weekly review" });
+      expect(within(title).queryByRole("button")).toBeNull();
+    });
+
+    /** @scenario "Boards: a reader who may not rename sees a plain title" */
+    it("shows My dashboard's title as plain text, edit rights or not", async () => {
+      openBoard({
+        server: inMemoryServer({
+          boards: [{ ...OWN_BOARDS[0]!, id: "mine", name: "My dashboard" }],
+        }),
+        dashboardId: "mine",
+        projectPermissions: { "proj-1": ["analytics:update"] },
+      });
+
+      const title = await screen.findByRole("heading", { name: "My dashboard" });
+      expect(within(title).queryByRole("button")).toBeNull();
     });
   });
 

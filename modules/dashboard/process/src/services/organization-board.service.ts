@@ -52,8 +52,8 @@ export class OrganizationBoardService {
 
   /**
    * The member's boards in readable projects, and every Organization board, its owner named
-   * only where readable, each with its place among the member's stars. Refused as not enabled
-   * when none of the projects it reads has Dashboards on.
+   * only where readable. Stars stay stored but no longer place a board, so none is read here.
+   * Refused as not enabled when none of the projects it reads has Dashboards on.
    */
   async findBoards({ organizationId, viewer }: Reading): Promise<OrganizationBoard[]> {
     const liveIds = await this.#liveIds({ organizationId });
@@ -83,18 +83,13 @@ export class OrganizationBoardService {
     const namedAuthors = listed.flatMap(({ board, project }) =>
       project ? [board.createdById] : [],
     );
-    const [starredIds, ownerNames] = await Promise.all([
-      this.#starredIds({ projectIds: enabled, viewer }),
-      this.#ownerNames(namedAuthors),
-    ]);
+    const ownerNames = await this.#ownerNames(namedAuthors);
     return listed.map(({ board, project }) => {
-      const starIndex = starredIds.indexOf(board.id);
       const author = authorOf({ board, isReadable: project !== null, viewer, ownerNames });
       return libraryRow({
         board: { ...board, createdById: author.createdById },
         project,
         openProject: project ?? guestProject ?? null,
-        starPosition: starIndex === -1 ? null : starIndex,
         ownerName: author.ownerName,
       });
     });
@@ -141,28 +136,11 @@ export class OrganizationBoardService {
     return byName(mayCreate.filter(({ id }) => enabled.includes(id)));
   }
 
-  /** The member's starred board ids across the organization, in their star order. */
-  async #starredIds({
-    projectIds,
-    viewer,
-  }: {
-    projectIds: readonly string[];
-    viewer: DashboardViewer;
-  }): Promise<string[]> {
-    const [projectId, ...sharedProjectIds] = projectIds;
-    if (projectId === void 0) return [];
-    return this.#repository.findStarredDashboardIds({
-      projectId,
-      userId: viewer.userId,
-      sharedProjectIds,
-    });
-  }
-
   #liveIds({ organizationId }: { organizationId: string }): Promise<string[]> {
     return this.#projects.findLiveNonGovernanceIdsByOrganization({ organizationId });
   }
 
-  /** Those of these projects with Dashboards on, each read once, sorted so stars read alike. */
+  /** Those of these projects with Dashboards on, each read once, in a stable order. */
   async #enabledIds(projectIds: readonly string[]): Promise<string[]> {
     const unique = [...new Set(projectIds)].toSorted((a, b) => a.localeCompare(b));
     const enabled = await Promise.all(
@@ -222,13 +200,11 @@ function libraryRow({
   board,
   project,
   openProject,
-  starPosition,
   ownerName,
 }: {
   board: BoardRecord;
   project: DashboardProject | null;
   openProject: DashboardProject | null;
-  starPosition: number | null;
   ownerName: string | null;
 }): OrganizationBoard {
   const { id, name, description, createdById, scope, homeProduct, updatedAt } = board;
@@ -242,7 +218,6 @@ function libraryRow({
     updatedAt,
     project,
     openProject,
-    starPosition,
     ownerName,
   };
 }

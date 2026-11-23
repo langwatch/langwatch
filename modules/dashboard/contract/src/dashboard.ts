@@ -141,8 +141,6 @@ const organizationBoardSchemaDefinition = z
     updatedAt: z.date(),
     project: dashboardProjectSchema.nullable(),
     openProject: dashboardProjectSchema.nullable(),
-    /** Where the board sits in the reader's star order, 0 first; null when not starred. */
-    starPosition: z.number().int().nonnegative().nullable(),
     /** The author's display name; null when the board has no author or the author no name. */
     ownerName: z.string().nullable(),
   })

@@ -1,6 +1,7 @@
 /**
- * Product sidebar "Dashboards" section: My dashboard, then the product's boards. "No dashboards
- * yet" when empty, in every product. "Browse templates" only in LLM Ops: templates read its data.
+ * Product sidebar "Dashboards" section: My dashboard, then the product's boards, each with the
+ * library's "⋮" menu on hover. "No dashboards yet" when empty, in every product. "Browse
+ * templates" only in LLM Ops: templates read its data.
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
@@ -12,7 +13,8 @@ import { type ReactNode, useState } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardReader } from "../../behavior/use-board-access.ts";
-import { useLibraryCreate } from "../../behavior/use-library-writes.ts";
+import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
+import { useLibraryCreate, useLibraryDuplicate } from "../../behavior/use-library-writes.ts";
 import { useProductDashboards } from "../../behavior/use-product-dashboards.ts";
 import { type StoreProject, useStoreProject } from "../../behavior/use-store-project.ts";
 import { dashboardTemplatesPath } from "../../model/boards.ts";
@@ -22,9 +24,12 @@ import {
   namesInProduct,
 } from "../../model/organization-library.ts";
 import { PRODUCT_BOARDS_SHOWN_MAX, sharingTitle } from "../../model/product-dashboards.ts";
+import { BoardMenu, hasBoardMenuItems } from "../blocks/board-menu.tsx";
 import { SidebarLinkRow } from "../blocks/sidebar-link-row.tsx";
 import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
-import { NewDashboardDialog } from "./new-dashboard-dialog.tsx";
+import { BoardMenuDialogs } from "./board-menu-dialogs.tsx";
+import { boardMenuActions } from "./library-board-rows.tsx";
+import { hasSharingChoice, NewDashboardDialog } from "./new-dashboard-dialog.tsx";
 
 /** One title in every product, never with a project name (the G13 title rule). */
 const LABEL = "Dashboards";
@@ -35,20 +40,31 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
   const store = useStoreProject();
   const [isShowingAll, setIsShowingAll] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [pendingMove, setPendingMove] = useState<LibraryBoard | undefined>();
+  const [pendingDelete, setPendingDelete] = useState<LibraryBoard | undefined>();
+  const { duplicateBoard } = useLibraryDuplicate();
   if (!isLoaded) return null;
   const projectSlug = host.project()?.slug;
   const openId = host.route().params.dashboardId;
   const hiddenCount = boards.length - PRODUCT_BOARDS_SHOWN_MAX;
   const shownRows = isShowingAll ? boards : boards.slice(0, PRODUCT_BOARDS_SHOWN_MAX);
   const boardRow = (board: LibraryBoard) => (
-    <BoardRow key={board.id} board={board} isOpen={board.id === openId} />
+    <BoardRow
+      key={board.id}
+      board={board}
+      isOpen={board.id === openId}
+      // A copy goes to the store project, so with none nothing is copied.
+      onDuplicate={store.storeProject ? () => duplicateBoard(board) : void 0}
+      onMove={() => setPendingMove(board)}
+      onDelete={() => setPendingDelete(board)}
+    />
   );
 
   return (
     <VStack as="section" aria-label={LABEL} align="stretch" gap={0.5} width="full">
       <HStack minHeight="28px" paddingX={2} paddingTop={2.5} paddingBottom={0.5} gap={1}>
         <SidebarSectionLabel label={LABEL} />
-        {store.storeProject && (
+        {store.storeProject && hasSharingChoice({ product, mayShare: store.mayShare }) && (
           <NewDashboardButton isCreating={false} onCreate={() => setIsCreating(true)} />
         )}
       </HStack>
@@ -86,15 +102,56 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           onClose={() => setIsCreating(false)}
         />
       )}
+      <BoardMenuDialogs
+        pendingMove={pendingMove}
+        onSettleMove={() => setPendingMove(void 0)}
+        pendingDelete={pendingDelete}
+        onSettleDelete={() => setPendingDelete(void 0)}
+      />
     </VStack>
   );
 }
 
-/** A board as a plain link: a lock on an Only me board, and who sees it on hover. */
-function BoardRow({ board, isOpen }: { board: LibraryBoard; isOpen: boolean }) {
+/**
+ * A board as a link: a lock on an Only me board, and who sees it on hover. Its "⋮" menu is the
+ * library row's, with the same rules; Rename edits the name in place.
+ */
+function BoardRow({
+  board,
+  isOpen,
+  onDuplicate,
+  onMove,
+  onDelete,
+}: {
+  board: LibraryBoard;
+  isOpen: boolean;
+  onDuplicate: (() => void) | undefined;
+  onMove: () => void;
+  onDelete: () => void;
+}) {
+  const host = useAnalyticsHost();
+  const edits = useLibraryBoardEdits();
+  const [isRenaming, setIsRenaming] = useState(false);
   const href = libraryBoardPath(board);
   if (!href) return null;
   const Icon = board.scope === "PRIVATE" ? Lock : LayoutDashboard;
+  const actions = boardMenuActions({
+    board,
+    host,
+    on: {
+      rename: () => setIsRenaming(true),
+      move: onMove,
+      duplicate: onDuplicate,
+      delete: onDelete,
+    },
+  });
+  const renaming = {
+    onCommit: (name: string) => {
+      setIsRenaming(false);
+      edits.renameBoard({ board, name });
+    },
+    onCancel: () => setIsRenaming(false),
+  };
   return (
     <SidebarLinkRow
       name={board.name}
@@ -102,6 +159,8 @@ function BoardRow({ board, isOpen }: { board: LibraryBoard; isOpen: boolean }) {
       icon={<Icon size={14} />}
       iconTitle={sharingTitle(board)}
       isActive={isOpen}
+      menu={hasBoardMenuItems(actions) ? <BoardMenu name={board.name} actions={actions} /> : null}
+      renaming={isRenaming ? renaming : void 0}
     />
   );
 }

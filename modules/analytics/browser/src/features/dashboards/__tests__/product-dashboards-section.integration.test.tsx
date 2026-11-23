@@ -6,7 +6,7 @@
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
@@ -24,13 +24,11 @@ const board = ({
   homeProduct = "gateway",
   scope = "ORGANIZATION",
   project = SHOP,
-  starPosition = null,
 }: {
   id: string;
   homeProduct?: string;
   scope?: string;
   project?: typeof SHOP;
-  starPosition?: number | null;
 }) => ({
   id,
   name: id,
@@ -42,19 +40,32 @@ const board = ({
   updatedAt: new Date("2026-11-01"),
   project,
   openProject: project,
-  starPosition,
 });
 
-function render({ element, listed }: { element: ReactElement; listed: unknown[] }) {
+function render({
+  element,
+  listed,
+  host = new StubAnalyticsHost(),
+}: {
+  element: ReactElement;
+  listed: unknown[];
+  host?: StubAnalyticsHost;
+}) {
+  const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall): Promise<unknown> => {
+    calls.push(call);
     if (call.path === "boards.listInOrganization") return Promise.resolve(listed);
     if (call.path === "boards.listStarred") return Promise.resolve([]);
     if (call.path === "boards.storeProjects") return Promise.resolve([SHOP]);
+    if (call.path === "boards.update") return Promise.resolve({});
     return NO_PROCEDURES(call);
   };
-  renderDashboards({ element, host: new StubAnalyticsHost(), answer });
-  return { user: userEvent.setup({ pointerEventsCheck: 0 }) };
+  renderDashboards({ element, host, answer });
+  return { host, calls, user: userEvent.setup({ pointerEventsCheck: 0 }) };
 }
+
+const inputsTo = (calls: UiProcedureCall[], path: string) =>
+  calls.filter((call) => call.path === path).map((call) => call.input);
 
 const linkNames = (list: HTMLElement) =>
   within(list)
@@ -81,13 +92,13 @@ describe("a product's Dashboards section", () => {
     });
   });
 
-  describe("given LLM Ops boards at every scope, some starred, with a project in view", () => {
+  describe("given LLM Ops boards at every scope, with a project in view", () => {
     /** @scenario "The LLM Ops section in a project lists the same boards, filtered" */
-    it("lists each in the section by name, a star changing nothing, and no other project's", async () => {
+    it("lists each in the section by name, stars read nowhere, and no other project's", async () => {
       render({
         element: <ProductDashboardsSection product="llm-ops" />,
         listed: [
-          board({ id: "Organization board", homeProduct: "llm-ops", starPosition: 0 }),
+          board({ id: "Organization board", homeProduct: "llm-ops" }),
           board({ id: "Only me board", homeProduct: "llm-ops", scope: "PRIVATE" }),
           board({
             id: "Project board",
@@ -142,7 +153,8 @@ describe("a product's Dashboards section", () => {
     it("still draws the heading, New dashboard and the quiet line, and no other product's", async () => {
       render({
         element: <ProductDashboardsSection product="gateway" />,
-        listed: [board({ id: "Elsewhere", homeProduct: "llm-ops", starPosition: 0 })],
+        listed: [board({ id: "Elsewhere", homeProduct: "llm-ops" })],
+        host: new StubAnalyticsHost({ projectPermissions: { [SHOP.id]: ["analytics:update"] } }),
       });
 
       const section = await screen.findByRole("region", { name: "Dashboards" });
@@ -150,6 +162,97 @@ describe("a product's Dashboards section", () => {
       expect(within(section).getByText("Dashboards")).toBeInTheDocument();
       expect(await within(section).findByRole("button", { name: "New dashboard" })).toBeVisible();
       expect(within(section).queryByRole("link", { name: "Elsewhere" })).toBeNull();
+    });
+  });
+
+  describe("given a store project where the member may create but not update", () => {
+    /** @scenario "Each product's sidebar lists its own boards" */
+    it("offers New dashboard in LLM Ops, where a board can be Project, and none in Gateway", async () => {
+      render({
+        element: (
+          <>
+            <ProductDashboardsSection product="llm-ops" />
+            <ProductDashboardsSection product="gateway" />
+          </>
+        ),
+        listed: [],
+      });
+
+      // Both sections read the same store project, so once LLM Ops offers it, Gateway has decided.
+      await screen.findByRole("button", { name: "New dashboard" });
+      const [llmOps, gateway] = screen.getAllByRole("region", { name: "Dashboards" });
+      if (!llmOps || !gateway) throw new Error("expected two Dashboards sections");
+      expect(within(llmOps).getByRole("button", { name: "New dashboard" })).toBeVisible();
+      expect(within(gateway).queryByRole("button", { name: "New dashboard" })).toBeNull();
+    });
+  });
+
+  describe("given a board of a project where the member may edit and delete", () => {
+    const editor = () =>
+      new StubAnalyticsHost({
+        projectPermissions: { [SHOP.id]: ["analytics:update", "analytics:delete"] },
+      });
+
+    describe("when they open its row's menu", () => {
+      /** @scenario "A sidebar row shows the library's menu on hover" */
+      it("offers the library's Rename, Move to product…, Duplicate and Delete, and opens nothing", async () => {
+        const { host, user } = render({
+          element: <ProductDashboardsSection product="gateway" />,
+          listed: [board({ id: "Checkout" })],
+          host: editor(),
+        });
+
+        await user.click(await screen.findByRole("button", { name: "Actions for Checkout" }));
+
+        const items = await screen.findAllByRole("menuitem");
+        expect(items.map((item) => item.textContent)).toEqual([
+          "Rename",
+          "Move to product…",
+          "Duplicate",
+          "Delete",
+        ]);
+        expect(host.navigations).toEqual([]);
+      });
+    });
+
+    describe("when they rename it from the menu", () => {
+      /** @scenario "A sidebar row shows the library's menu on hover" */
+      it("edits the name in place and saves it in the owning project on Enter", async () => {
+        const { calls, user } = render({
+          element: <ProductDashboardsSection product="gateway" />,
+          listed: [board({ id: "Checkout" })],
+          host: editor(),
+        });
+
+        await user.click(await screen.findByRole("button", { name: "Actions for Checkout" }));
+        await user.click(await screen.findByRole("menuitem", { name: "Rename" }));
+        const field = await screen.findByRole("textbox", { name: "Dashboard name" });
+        await user.clear(field);
+        await user.type(field, "Refunds{Enter}");
+
+        await waitFor(() =>
+          expect(inputsTo(calls, "boards.update")).toEqual([
+            { projectId: SHOP.id, dashboardId: "Checkout", name: "Refunds" },
+          ]),
+        );
+      });
+    });
+  });
+
+  describe("given a board of a project where the member may only view", () => {
+    /** @scenario "A sidebar row shows the library's menu on hover" */
+    it("offers no Rename and no Delete, and Move greyed out as the library does", async () => {
+      const { user } = render({
+        element: <ProductDashboardsSection product="gateway" />,
+        listed: [board({ id: "Checkout" })],
+      });
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Checkout" }));
+
+      const move = await screen.findByRole("menuitem", { name: "Move to product…" });
+      expect(move).toHaveAttribute("aria-disabled", "true");
+      expect(screen.queryByRole("menuitem", { name: "Rename" })).toBeNull();
+      expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
     });
   });
 });

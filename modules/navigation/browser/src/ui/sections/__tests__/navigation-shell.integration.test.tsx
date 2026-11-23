@@ -1010,8 +1010,8 @@ describe("the product-switcher top bar", () => {
       });
     });
 
-    /** @scenario "Dashboards has no project switcher, and a board says whose data it shows" */
-    it("names Dashboards in the switcher and shows no project chip on a board", () => {
+    /** @scenario "With the flag off, the Dashboards area is as it was" */
+    it("names Dashboards in the switcher and keeps the project chip on a board, the area off", () => {
       renderShell({
         readings: { ...dashboardsReadings, pathname: "/demo/dashboards/agent-flight-deck" },
       });
@@ -1019,7 +1019,7 @@ describe("the product-switcher top bar", () => {
       expect(screen.getByRole("button", { name: "Switch product" })).toHaveTextContent(
         "Dashboards",
       );
-      expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent("Demo");
       expect(screen.queryByRole("link", { name: "Home" })).not.toBeInTheDocument();
     });
 

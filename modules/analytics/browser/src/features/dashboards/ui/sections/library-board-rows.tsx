@@ -1,7 +1,7 @@
 /**
  * The `/dashboards` library's rows with what this member may do on each: Rename, Move and Delete
  * on a board, by the grants of the project that owns it; Duplicate wherever a store project is
- * (`onDuplicate` set).
+ * (`onDuplicate` set). `boardMenuActions` is that rule, which the product sidebars' rows share.
  */
 
 import { useState } from "react";
@@ -12,10 +12,12 @@ import {
   isOwnMyDashboard,
   libraryBoardPath,
   type LibraryBoard,
+  mayRenameBoard,
   ownerLabel,
   whoSees,
 } from "../../model/organization-library.ts";
-import { LibraryRow, type LibraryRowActions } from "../blocks/library-row.tsx";
+import type { BoardMenuActions } from "../blocks/board-menu.tsx";
+import { LibraryRow } from "../blocks/library-row.tsx";
 
 /** Why a board the member may only view offers no move. */
 const VIEW_ONLY_MOVE_REFUSAL = "You can view this dashboard but not change it.";
@@ -35,7 +37,7 @@ export function LibraryBoardRow({
   const edits = useLibraryBoardEdits();
   const [isRenaming, setIsRenaming] = useState(false);
   const userId = host.userId();
-  const actions = boardRowActions({
+  const actions = boardMenuActions({
     board,
     host,
     on: {
@@ -66,11 +68,11 @@ export function LibraryBoardRow({
 }
 
 /**
- * A board row's menu from the grants of the project that owns it. My dashboard keeps its name
- * and shows Delete disabled; a board that opens nowhere cannot be copied; one the member cannot
+ * A board's menu from the grants of the project that owns it. My dashboard keeps its name and
+ * shows Delete disabled; a board that opens nowhere cannot be copied; one the member cannot
  * edit shows Move disabled.
  */
-function boardRowActions({
+export function boardMenuActions({
   board,
   host,
   on,
@@ -83,15 +85,16 @@ function boardRowActions({
     duplicate: (() => void) | undefined;
     delete: () => void;
   };
-}): LibraryRowActions {
+}): BoardMenuActions {
   const owningProjectId = board.project?.id;
   const mayIn = (permission: string) =>
     owningProjectId !== void 0 && host.hasPermissionIn({ projectId: owningProjectId, permission });
-  const isMine = isOwnMyDashboard({ board, userId: host.userId() });
+  const userId = host.userId();
+  const isMine = isOwnMyDashboard({ board, userId });
   const canEdit = mayIn("analytics:update");
   const duplicate = board.openProject !== null ? on.duplicate : void 0;
   return {
-    ...(canEdit && !isMine ? { onRename: on.rename } : {}),
+    ...(mayRenameBoard({ board, userId, mayEditInOwner: canEdit }) ? { onRename: on.rename } : {}),
     move: canEdit ? { onMove: on.move } : { refusal: VIEW_ONLY_MOVE_REFUSAL },
     ...(duplicate
       ? { onDuplicate: duplicate, duplicateLabel: canEdit ? "Duplicate" : "Duplicate to edit" }

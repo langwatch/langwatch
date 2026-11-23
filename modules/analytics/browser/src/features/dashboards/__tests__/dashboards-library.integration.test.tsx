@@ -30,7 +30,6 @@ const row = ({
   project = SHOP,
   createdById = "someone",
   ownerName = null,
-  starPosition = null,
 }: {
   id: string;
   name: string;
@@ -39,7 +38,6 @@ const row = ({
   project?: typeof SHOP | null;
   createdById?: string;
   ownerName?: string | null;
-  starPosition?: number | null;
 }) => ({
   id,
   name,
@@ -51,7 +49,6 @@ const row = ({
   updatedAt: new Date("2026-11-01"),
   project,
   openProject: project ?? IN_VIEW,
-  starPosition,
 });
 
 const LISTED = [
@@ -603,11 +600,11 @@ describe("the Dashboards library", () => {
     });
   });
 
-  describe("when the member has starred a board", () => {
+  describe("given the member starred boards before stars were dropped", () => {
     /** @scenario "Delete, rename and duplicate from the library" */
-    it("offers no Star, Unstar or star toggle on any row, a starred one included", async () => {
+    it("offers no Star, Unstar or star toggle on any row, since the library reads no stars", async () => {
       const { user } = renderLibrary({
-        listed: [row({ id: "board-shop", name: "Shop board", starPosition: 0 })],
+        listed: [row({ id: "board-shop", name: "Shop board" })],
       });
 
       await user.click(await screen.findByRole("button", { name: "Actions for Shop board" }));
@@ -702,7 +699,7 @@ describe("the Dashboards library", () => {
       expect(inputsTo(calls, "boards.setScope")).toEqual([]);
     });
 
-    /** @scenario "Duplicate and Delete from the library" */
+    /** @scenario "A copy from the library keeps the board's product and scope" */
     it("keeps the product of a board homed outside LLM Ops, at its scope", async () => {
       const { host, calls, user } = renderLibrary({
         listed: [

@@ -97,7 +97,6 @@ function server() {
           updatedAt: new Date("2026-11-01"),
           project: IN_VIEW,
           openProject: IN_VIEW,
-          starPosition: null,
           ownerName: null,
         });
       }

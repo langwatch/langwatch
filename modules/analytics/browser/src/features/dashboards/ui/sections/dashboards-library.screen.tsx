@@ -5,7 +5,6 @@
  */
 
 import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
-import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, Button, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
@@ -13,7 +12,6 @@ import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { LayoutDashboard, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
-import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardReader } from "../../behavior/use-board-access.ts";
 import { useLibraryShowMore } from "../../behavior/use-library-show-more.ts";
 import { useOrganizationLibrary } from "../../behavior/use-organization-library.ts";
@@ -25,15 +23,12 @@ import {
   libraryGroups,
   namesInProduct,
 } from "../../model/organization-library.ts";
+import { BoardMenuDialogs } from "./board-menu-dialogs.tsx";
 import { LibraryBoardRow } from "./library-board-rows.tsx";
-import { MoveBoardDialog } from "./move-board-dialog.tsx";
 import { NewDashboardDialog } from "./new-dashboard-dialog.tsx";
 
 /** How many boards a group lists before "Show N more". */
 const GROUP_MAX = 8;
-
-const deleteMessage = (name: string) =>
-  `Delete "${name}" and every widget on it? This cannot be undone.`;
 
 export default function DashboardsLibraryScreen() {
   const library = useOrganizationLibrary();
@@ -166,7 +161,6 @@ function LibraryDialogs({
   onSettleDelete: () => void;
 }) {
   const { organizationName } = useBoardReader();
-  const host = useAnalyticsHost();
   const { storeProject } = library;
   return (
     <>
@@ -181,30 +175,11 @@ function LibraryDialogs({
           onClose={onCloseNewDialog}
         />
       )}
-      {pendingMove && (
-        <MoveBoardDialog
-          key={pendingMove.id}
-          board={pendingMove}
-          userId={host.userId()}
-          isMoving={library.isMoving}
-          onMove={(homeProduct) => library.moveBoard({ board: pendingMove, homeProduct })}
-          onClose={onSettleMove}
-        />
-      )}
-      <ConfirmDialog
-        open={pendingDelete !== void 0}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) onSettleDelete();
-        }}
-        title="Delete dashboard"
-        message={deleteMessage(pendingDelete?.name ?? "")}
-        confirmLabel="Delete"
-        tone="danger"
-        loading={library.isDeleting}
-        onConfirm={() => {
-          if (!pendingDelete) return;
-          library.deleteBoard({ board: pendingDelete, onDeleted: onSettleDelete });
-        }}
+      <BoardMenuDialogs
+        pendingMove={pendingMove}
+        onSettleMove={onSettleMove}
+        pendingDelete={pendingDelete}
+        onSettleDelete={onSettleDelete}
       />
     </>
   );

@@ -161,6 +161,23 @@ export function isOwnMyDashboard({
   return board.name === MY_DASHBOARD_NAME && userId !== void 0 && board.createdById === userId;
 }
 
+/**
+ * Whether a board may be renamed, wherever Rename is offered (a library row, a sidebar row, the
+ * board's title): by the member's edit grant in the project that owns it, never My dashboard.
+ */
+export function mayRenameBoard({
+  board,
+  userId,
+  mayEditInOwner,
+}: {
+  board: Pick<LibraryBoard, "name" | "createdById">;
+  userId: string | undefined;
+  /** `analytics:update` in the project that owns the board. */
+  mayEditInOwner: boolean;
+}): boolean {
+  return mayEditInOwner && !isOwnMyDashboard({ board, userId });
+}
+
 /** The first "Untitled dashboard N" no board in the project has taken. */
 export function firstUntitledName(taken: readonly string[]): string {
   const names = new Set(taken);

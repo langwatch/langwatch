@@ -1,7 +1,7 @@
 /**
- * The `/dashboards` library's create, delete and move over `boards.*`. A new board is stored in
- * the store project (`use-store-project.ts`); a delete goes to the board's own project.
- * Failures travel raw to the host (#5984). ADR-002, `dashboards-organization-area.feature`.
+ * A board's create, duplicate, delete and move over `boards.*`, from the library or a product
+ * sidebar. A new board or copy is stored in the store project (`use-store-project.ts`); a delete
+ * goes to the board's own project. Failures travel raw to the host (#5984). ADR-002.
  */
 
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
@@ -13,6 +13,7 @@ import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { organizationBoardPath } from "../model/boards.ts";
 import { dashboardCreated, dashboardDeleted } from "../model/dashboard-usage-events.ts";
 import { HOME_PRODUCT_LABELS, type LibraryBoard } from "../model/organization-library.ts";
+import { useBoardFromTemplate } from "./use-board-from-template.ts";
 import { useStoreProject } from "./use-store-project.ts";
 
 /** Re-reads the library and the written project's lists, so every sidebar and list shows it. */
@@ -66,6 +67,20 @@ export function useLibraryCreate() {
   };
 
   return { createBoard, isCreating: create.isPending || createAtScope.isPending };
+}
+
+/** Copies a board and its widgets into the store project, keeping its scope, and opens it. */
+export function useLibraryDuplicate() {
+  const { storeProject, namesInStore } = useStoreProject();
+  const fromTemplate = useBoardFromTemplate({ atOrganization: true, storeProject });
+
+  const duplicateBoard = (board: LibraryBoard) => {
+    if (!board.openProject) return;
+    const readFrom = board.openProject.id;
+    void fromTemplate.duplicateBoard({ board, existingNames: namesInStore, readFrom });
+  };
+
+  return { duplicateBoard };
 }
 
 export function useLibraryDelete() {

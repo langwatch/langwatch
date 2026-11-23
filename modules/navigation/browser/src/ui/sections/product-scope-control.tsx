@@ -14,7 +14,11 @@ import {
   useProjectPickGroups,
 } from "../../behavior/use-project-pick-groups.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
-import { isProjectScopedProduct, type ProductId } from "../../model/products.ts";
+import {
+  isOrganizationDashboardsPath,
+  isProjectScopedProduct,
+  type ProductId,
+} from "../../model/products.ts";
 import { ProjectSwitcherCombobox } from "../blocks/project-switcher-combobox.tsx";
 
 function ScopeDivider() {
@@ -88,11 +92,12 @@ function ProjectScopeMenu() {
 
 /**
  * The product-native scope in the top bar: project products show the project chip, Me a
- * Personal badge, and organization-wide products and Dashboards nothing (the organization
- * control already says it all; ADR-002). A board draws its home product's scope (D2).
+ * Personal badge, organization-wide products and the organization's Dashboards nothing
+ * (ADR-002). A board draws its home product's scope (D2); a project's Dashboards keeps its chip.
  */
 export function ProductScopeControl({ activeProductId }: { activeProductId: ProductId | null }) {
-  if (activeProductId === "dashboards") return null;
+  const pathname = useNavigationHost().pathname();
+  if (activeProductId === "dashboards" && isOrganizationDashboardsPath(pathname)) return null;
   // Each scope renders its own leading divider, so a scope that has
   // nothing to show leaves no separator behind it.
   if (isProjectScopedProduct(activeProductId)) return <ProjectScopeMenu />;

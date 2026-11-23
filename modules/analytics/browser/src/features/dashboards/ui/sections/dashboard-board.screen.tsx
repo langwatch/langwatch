@@ -31,6 +31,7 @@ import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
+import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
 import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useBoardLangyChip, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
@@ -45,11 +46,12 @@ import {
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
 import { myDashboardId, templateLinks } from "../../model/boards.ts";
 import { CURATED_BOARDS } from "../../model/curated-boards.ts";
+import { mayRenameBoard } from "../../model/organization-library.ts";
 import { AddBlockCard, EmptyBoard } from "../blocks/blank-board.tsx";
+import { BoardDataSourceLabel } from "../blocks/board-data-source-label.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
-import { BoardProjectChip } from "../blocks/board-project-chip.tsx";
 import { BoardScopeControl } from "../blocks/board-scope-control.tsx";
 import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
 import { LimitFailedWidgetsBanner } from "../blocks/limit-failed-widgets-banner.tsx";
@@ -93,7 +95,25 @@ function dataSourceLabel({
   projectName: string | undefined;
 }) {
   if (readsOrganization || !projectName) return {};
-  return { project: <BoardProjectChip name={projectName} /> };
+  return { project: <BoardDataSourceLabel name={projectName} /> };
+}
+
+/** Renames from the title, or undefined where the reader may not: asked in the project that
+ * owns the board, as the library and sidebar menus ask it. */
+function useBoardTitleRename(board: SavedBoard): ((name: string) => void) | undefined {
+  const host = useAnalyticsHost();
+  const edits = useLibraryBoardEdits();
+  const mayRename = mayRenameBoard({
+    board,
+    userId: host.userId(),
+    mayEditInOwner: host.hasPermissionIn({
+      projectId: board.projectId,
+      permission: "analytics:update",
+    }),
+  });
+  if (!mayRename) return void 0;
+  return (name) =>
+    edits.renameBoard({ board: { ...board, project: { id: board.projectId } }, name });
 }
 
 function OpenBoard({ board, atOrganization }: { board: SavedBoard; atOrganization: boolean }) {
@@ -150,6 +170,7 @@ function OpenBoard({ board, atOrganization }: { board: SavedBoard; atOrganizatio
   };
   const isEmpty = boardWidgets.status === "success" && widgets.length === 0;
   const isMyDashboard = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
+  const renameBoard = useBoardTitleRename(board);
   const templates = templateLinks({ projectSlug: saved.projectSlug, atOrganization });
 
   return (
@@ -167,6 +188,7 @@ function OpenBoard({ board, atOrganization }: { board: SavedBoard; atOrganizatio
                 onPick={(to) => scope.request({ board, names, to })}
               />
             }
+            onRename={renameBoard}
             onDescribe={canEdit && !isMyDashboard ? saveDescription : void 0}
             pointer={{
               boardKind: "dashboard",

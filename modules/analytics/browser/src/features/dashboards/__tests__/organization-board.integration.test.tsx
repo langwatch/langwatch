@@ -53,7 +53,6 @@ const resolved = ({
   updatedAt: new Date("2026-11-01"),
   project,
   openProject,
-  starPosition: null,
   ownerName: null,
 });
 
