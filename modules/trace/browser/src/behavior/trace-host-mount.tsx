@@ -127,7 +127,12 @@ class HostServiceTraceHost extends TraceHostApi {
   askLangy(request: TraceLangyAskRequest): void {
     const { langy } = this.actions;
     if (!langy) return;
-    void langy().then((lent) => lent.ask(request));
+    // A failed load reports itself; the button stays, so asking again retries the load.
+    langy()
+      .then((lent) => lent.ask(request))
+      .catch((error: unknown) =>
+        this.actions.failed({ error, fallbackTitle: "Couldn't open Langy" }),
+      );
   }
 }
 

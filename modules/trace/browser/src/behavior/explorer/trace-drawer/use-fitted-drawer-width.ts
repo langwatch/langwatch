@@ -35,8 +35,10 @@ function watchParent({
   return parent;
 }
 
-/** Reports the kept-clear control's right edge on every change until the returned stop runs. */
-function followKeepClearEdge(report: (right: number | null) => void): () => void {
+type LayoutReading = { keepClearRightPx: number | null; viewportWidth: number };
+
+/** Reports the viewport width and the kept-clear control's right edge until the stop runs. */
+function followLayout(report: (reading: LayoutReading) => void): () => void {
   let observed: Element | null = null;
   let retries = 0;
   let retry: ReturnType<typeof setTimeout> | undefined;
@@ -44,7 +46,10 @@ function followKeepClearEdge(report: (right: number | null) => void): () => void
     typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => measure());
   function measure() {
     const edge = readEdge();
-    report(edge ? Math.round(edge.right) : null);
+    report({
+      keepClearRightPx: edge ? Math.round(edge.right) : null,
+      viewportWidth: window.innerWidth,
+    });
     observed = watchParent({ observer, observed, element: edge?.element });
     if (edge || retries >= MAX_RETRIES) return;
     retries += 1;
@@ -60,33 +65,45 @@ function followKeepClearEdge(report: (right: number | null) => void): () => void
 }
 
 /**
- * The right edge of the control the drawer keeps clear, followed through window and
- * search-bar resizes; `null` while no such control is on the page.
+ * The viewport width and the right edge of the control the drawer keeps clear, followed through
+ * window and search-bar resizes; the edge is `null` while no such control is on the page.
  */
-export function useKeepClearEdge(): number | null {
-  const [right, setRight] = useState<number | null>(null);
-  useLayoutEffect(() => followKeepClearEdge(setRight), []);
-  return right;
+function useLayoutReading(): LayoutReading {
+  const [reading, setReading] = useState<LayoutReading>(() => ({
+    keepClearRightPx: null,
+    viewportWidth: typeof window === "undefined" ? Infinity : window.innerWidth,
+  }));
+  useLayoutEffect(
+    () =>
+      followLayout((next) =>
+        setReading((last) =>
+          last.keepClearRightPx === next.keepClearRightPx &&
+          last.viewportWidth === next.viewportWidth
+            ? last
+            : next,
+        ),
+      ),
+    [],
+  );
+  return reading;
 }
 
 /**
  * The width the trace drawer renders at for the reader's preferred one: clear of Ask
  * Langy, and narrowed rather than shifted while the docked Langy panel holds the right edge.
  */
-export function useFittedDrawerWidth({
-  preferredPx,
-  viewportWidth,
-}: {
-  preferredPx: number;
+export function useFittedDrawerWidth({ preferredPx }: { preferredPx: number }): {
+  widthPx: number;
   viewportWidth: number;
-}): number {
+} {
   const isLangyDocked = useLangyStore((s) => s.isOpen && s.panelMode === "sidebar");
-  const keepClearRightPx = useKeepClearEdge();
-  return fitDrawerWidth({
+  const { keepClearRightPx, viewportWidth } = useLayoutReading();
+  const widthPx = fitDrawerWidth({
     preferredPx,
     viewportWidth,
     rightReservePx: isLangyDocked ? LANGY_DRAWER_YIELD_PX : DRAWER_EDGE_MARGIN_PX,
     keepClearRightPx,
     minPx: DRAWER_MIN_WIDTH_PX,
   });
+  return { widthPx, viewportWidth };
 }

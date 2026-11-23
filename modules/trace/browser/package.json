@@ -102,6 +102,7 @@
   "devDependencies": {
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/span-normalisation": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@testing-library/jest-dom": "catalog:",

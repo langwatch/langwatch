@@ -60,10 +60,8 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const shortcutsOpen = useTraceDrawer((s) => s.shortcutsOpen);
   const pinned = useTraceDrawer((s) => s.pinned);
   const setShortcutsOpen = useTraceDrawer((s) => s.setShortcutsOpen);
-  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : Infinity;
-  const effectiveWidthPx = useFittedDrawerWidth({
+  const { widthPx: effectiveWidthPx, viewportWidth } = useFittedDrawerWidth({
     preferredPx: widthPx ?? DRAWER_DEFAULT_WIDTH_PX,
-    viewportWidth,
   });
 
   // `open` is hardcoded `true` because the parent (`TracesPage`'s `<TraceDrawerMount>`)
@@ -100,7 +98,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     : {
         width: `${effectiveWidthPx}px`,
         maxWidth: `${effectiveWidthPx}px`,
-        minWidth: `${DRAWER_MIN_WIDTH_PX}px`,
+        minWidth: `${Math.min(DRAWER_MIN_WIDTH_PX, effectiveWidthPx)}px`,
       };
 
   return (

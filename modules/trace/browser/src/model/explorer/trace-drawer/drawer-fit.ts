@@ -26,7 +26,10 @@ export function fitDrawerWidth({
 }): number {
   const leftEdge =
     keepClearRightPx === null ? DRAWER_EDGE_MARGIN_PX : keepClearRightPx + DRAWER_KEEP_CLEAR_GAP_PX;
-  return Math.max(minPx, Math.min(preferredPx, viewportWidth - rightReservePx - leftEdge));
+  const available = Math.max(0, viewportWidth - rightReservePx - leftEdge);
+  // Too little room for the minimum: keeping the control clear wins over the minimum width.
+  if (available < minPx) return available;
+  return Math.max(minPx, Math.min(preferredPx, available));
 }
 
 /** Marks the page control a wide drawer must leave visible. */

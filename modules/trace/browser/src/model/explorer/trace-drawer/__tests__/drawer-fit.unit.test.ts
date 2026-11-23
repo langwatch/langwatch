@@ -44,11 +44,24 @@ describe("fitDrawerWidth", () => {
     });
   });
 
-  describe("given a narrow window", () => {
-    it("never goes below the minimum width", () => {
-      expect(
-        fitDrawerWidth({ ...base, viewportWidth: 600, preferredPx: 900, keepClearRightPx: 323 }),
-      ).toBe(360);
+  describe("given a narrow preferred width", () => {
+    it("never goes below the minimum width while there is room for it", () => {
+      expect(fitDrawerWidth({ ...base, preferredPx: 200, keepClearRightPx: 323 })).toBe(360);
+    });
+  });
+
+  describe("given less room beside the button than the minimum width", () => {
+    it("keeps the button clear and takes only the room there is", () => {
+      const width = fitDrawerWidth({
+        ...base,
+        viewportWidth: 1024,
+        rightReservePx: 8 + 392 + 12,
+        preferredPx: 900,
+        keepClearRightPx: 323,
+      });
+
+      expect(width).toBe(1024 - 412 - 335);
+      expect(1024 - 412 - width).toBe(323 + 12);
     });
   });
 });

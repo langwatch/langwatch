@@ -25,7 +25,7 @@ const langy = defineSlice<LangySliceSurface>({
 });
 
 function WideTraceDrawer() {
-  const width = useFittedDrawerWidth({ preferredPx: 1200, viewportWidth: window.innerWidth });
+  const { widthPx: width } = useFittedDrawerWidth({ preferredPx: 1200 });
   return (
     <>
       <button
@@ -72,6 +72,20 @@ describe("given a trace drawer the reader dragged wider than the space beside As
 
     expect(drawer.left).toBeGreaterThanOrEqual(323 + 12 - 1);
     expect(buttonIsOnTop()).toBe(true);
+  });
+
+  describe("when the window gets narrower", () => {
+    it("narrows the drawer so the button stays uncovered", async () => {
+      renderWithDesignSystem(<WideTraceDrawer />);
+      await resting(await screen.findByTestId("trace-drawer"));
+
+      await page.viewport(1100, 800);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const after = await resting(screen.getByTestId("trace-drawer"));
+
+      expect(after.left).toBeGreaterThanOrEqual(323 + 12 - 1);
+      expect(buttonIsOnTop()).toBe(true);
+    });
   });
 
   describe("when Langy opens docked beside it", () => {

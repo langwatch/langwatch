@@ -132,6 +132,9 @@
       "path": "../../annotation/client/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     }
   ],
