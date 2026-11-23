@@ -202,6 +202,8 @@ export type CioEventName =
   | "experiment_ran"
   | "first_prompt_created"
   | "first_trace_integrated"
+  /** The person's latest organization traced on a UTC day: once per person and day. */
+  | "trace_active_day"
   | "first_evaluation_created"
   | "evaluation_ran"
   | "first_simulation_ran"

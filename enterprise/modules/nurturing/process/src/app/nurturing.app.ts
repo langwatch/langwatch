@@ -145,6 +145,7 @@ export class NurturingModule implements NurturingApi {
           milestones: repositories.milestones,
           members: repositories.members,
           erasedUsers: repositories.erasedUsers,
+          claims: repositories.claims,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),
           clock: { nowMs: () => nowInstant().epochMilliseconds },
           logger,

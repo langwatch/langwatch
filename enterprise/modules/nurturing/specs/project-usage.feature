@@ -304,6 +304,35 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     And active_day_12 and active_day_13 are sent
 
   @unit
+  Scenario: Each member gets trace_active_day once per UTC day their organization traced
+    Given an organization inside its counting window that traced today and yesterday
+    When its usage syncs
+    Then each member the traits are mirrored onto is tracked trace_active_day once for each of those days, after the identifies
+    And each event carries the day as date and its days_since_signup, the n of the active_day_<n> trait the same day sets
+    And the four active_day traits are still sent, as live campaigns branch on them
+
+  @unit
+  Scenario: A sync sends trace_active_day for today and yesterday only
+    Given an organization's traced days within the window
+    When its usage syncs
+    Then trace_active_day goes for today's and yesterday's traced days only, so a sync just past midnight still sends the day before
+    And no older day is sent again once its claim has lapsed
+
+  @unit
+  Scenario: trace_active_day is never sent twice for a member and day
+    Given a member already tracked trace_active_day for a day
+    When the organization syncs again, its sync job is redelivered or retried
+    Then no second trace_active_day goes for that member and day: each is claimed per member and day for 7 days
+    And its message id is stable per member and day, so Customer.io drops a repeat too
+
+  @unit
+  Scenario: A refused trace_active_day gives its claims back, so a later sync sends it
+    Given Customer.io refuses a batch of trace_active_day events, or a claim fails midway
+    When the sync runs
+    Then the batch's claims are given back, the failure is reported as a mirror failure and swallowed
+    And the next sync of the day sends the events
+
+  @unit
   Scenario: A habit is activity on 3 or more days at least 7 days apart, or in 3 ISO weeks
     Given an organization's active days within the window
     When the traits are built

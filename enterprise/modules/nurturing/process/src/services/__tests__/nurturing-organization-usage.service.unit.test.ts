@@ -16,6 +16,8 @@ import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
+import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
+import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../../repositories/nurturing-organization-member.repository.ts";
 import {
   emptyProjectUsage,
@@ -91,6 +93,8 @@ async function membersOver(memberships: Memberships): Promise<MembersCopy> {
 
 type MembersCopy = Pick<NurturingOrganizationMemberRepository, "findMembershipsOfMembers">;
 
+type TrackCall = Extract<CioBatchCall, { type: "track" }>;
+
 async function serviceOver({
   placed,
   // Inside its trace counting window, so its trace traits are sent.
@@ -100,6 +104,7 @@ async function serviceOver({
   logger: serviceLogger = logger,
   syncs = { inc: () => {} },
   milestonesFailure,
+  claims = MemoryNurturingClaimRepository.create(),
 }: {
   placed: ReadonlyMap<string, string>;
   createdAt?: ReadonlyMap<string, number>;
@@ -109,6 +114,7 @@ async function serviceOver({
   syncs?: UsageDependencies["syncs"];
   /** Makes reading the organization's admin throw, as a repository outage would. */
   milestonesFailure?: Error;
+  claims?: NurturingClaimRepository;
 }) {
   const projectUsage = MemoryNurturingProjectUsageRepository.create();
   const traceDays = MemoryNurturingTraceDayRepository.create();
@@ -134,6 +140,7 @@ async function serviceOver({
       : milestones,
     members,
     erasedUsers: MemoryNurturingErasedUserRepository.create(),
+    claims,
     sendBatch: async (calls) => {
       await send(calls);
       sent.push(calls);
@@ -908,5 +915,158 @@ describe("NurturingOrganizationUsageService", () => {
         service.traceWindowsEnded({ after: NOW - 60 * 60 * 1000, upTo: NOW }),
       ).rejects.toThrow("Customer.io unavailable");
     });
+  });
+});
+
+describe("NurturingOrganizationUsageService given an organization that traced today and yesterday", () => {
+  const placed = new Map([["project-1", "org-1"]]);
+  // Signed up 2026-11-07: yesterday, 11-19, is signup day 12 and today, 11-20, day 13.
+  const createdAt = new Map([["org-1", NOW - 13 * DAY_MS]]);
+  const tracksOf = (sent: readonly CioBatchCall[][]) =>
+    sent.flat().filter((call): call is TrackCall => call.type === "track");
+
+  /** One project's organization with traces on 11-10, yesterday and today. */
+  async function tracedOrganization({
+    members = new Map([["admin-1", ["org-1"]]]),
+    ...rest
+  }: Omit<Parameters<typeof serviceOver>[0], "placed" | "members"> & {
+    members?: Memberships;
+  } = {}) {
+    const over = await serviceOver({
+      placed,
+      createdAt,
+      ...rest,
+      members: await membersOver(members),
+    });
+    for (const day of ["2026-11-10", "2026-11-19", "2026-11-20"]) {
+      await seedTraceDay(over.traceDays, { projectId: "project-1", day });
+    }
+    return over;
+  }
+
+  /** @scenario "Each member gets trace_active_day once per UTC day their organization traced" */
+  it("tracks trace_active_day on each member for today and yesterday, after the identifies", async () => {
+    const observed = runObserved();
+    const { service, sent } = await tracedOrganization({
+      members: new Map([
+        ["admin-1", ["org-1"]],
+        ["member-2", ["org-1"]],
+      ]),
+      logger: observed.logger,
+    });
+
+    await service.tracesChanged({ projectId: "project-1" });
+
+    expect(sent.map((calls) => calls[0]?.type)).toEqual(["group", "identify", "track"]);
+    expect(tracksOf(sent)).toEqual(
+      [
+        ["admin-1", "2026-11-19", 12],
+        ["admin-1", "2026-11-20", 13],
+        ["member-2", "2026-11-19", 12],
+        ["member-2", "2026-11-20", 13],
+      ].map(([userId, date, daysSinceSignup]) => ({
+        type: "track",
+        userId,
+        event: "trace_active_day",
+        messageId: `trace_active_day:${userId}:${date}`,
+        properties: { date, days_since_signup: daysSinceSignup },
+      })),
+    );
+    expect(observed.at(DEBUG)).toEqual([expect.objectContaining({ trackCalls: 4 })]);
+  });
+
+  /** @scenario "Each member gets trace_active_day once per UTC day their organization traced" */
+  it("keeps sending the active_day traits beside the event", async () => {
+    const { service, sent } = await tracedOrganization();
+
+    await service.tracesChanged({ projectId: "project-1" });
+
+    expect(traitsOf(sent[0]?.[0])).toMatchObject({ active_day_12: true, active_day_13: true });
+  });
+
+  /** @scenario "trace_active_day is never sent twice for a member and day" */
+  it("never sends it twice for a member and day, however often the organization syncs", async () => {
+    const { service, sent } = await tracedOrganization();
+
+    await service.tracesChanged({ projectId: "project-1" });
+    await service.tracesChanged({ projectId: "project-1" });
+    await service.usageChanged({ projectId: "project-1" });
+
+    expect(tracksOf(sent).map((call) => call.messageId)).toEqual([
+      "trace_active_day:admin-1:2026-11-19",
+      "trace_active_day:admin-1:2026-11-20",
+    ]);
+  });
+
+  /** @scenario "A member who joined another organization since does not get this one's traits" */
+  it("tracks it only on the members the traits are mirrored onto", async () => {
+    const { service, sent } = await tracedOrganization({
+      members: new Map([
+        ["admin-1", ["org-1"]],
+        ["member-2", ["org-2", "org-1"]],
+      ]),
+    });
+
+    await service.tracesChanged({ projectId: "project-1" });
+
+    expect(new Set(tracksOf(sent).map((call) => call.userId))).toEqual(new Set(["admin-1"]));
+  });
+
+  /** @scenario "An organization past its counting window writes no counts" */
+  it("tracks none for an organization past its counting window", async () => {
+    const { service, sent } = await tracedOrganization({
+      createdAt: new Map([["org-1", NOW - 25 * DAY_MS]]),
+    });
+
+    await service.usageChanged({ projectId: "project-1" });
+
+    expect(tracksOf(sent)).toEqual([]);
+  });
+
+  /** @scenario "A refused trace_active_day gives its claims back, so a later sync sends it" */
+  it("gives the claims back when Customer.io refuses the events, so the next sync sends them", async () => {
+    let refuse = true;
+    const observed = runObserved();
+    const { service, sent } = await tracedOrganization({
+      syncs: observed.syncs,
+      logger: observed.logger,
+      send: async (calls) => {
+        if (refuse && calls.some((call) => call.type === "track")) throw new Error("refused");
+      },
+    });
+
+    await expect(service.tracesChanged({ projectId: "project-1" })).resolves.toBeUndefined();
+    expect(tracksOf(sent)).toEqual([]);
+    expect(observed.outcomes).toEqual([{ outcome: "mirror_failed" }]);
+
+    refuse = false;
+    await service.tracesChanged({ projectId: "project-1" });
+
+    expect(tracksOf(sent)).toHaveLength(2);
+  });
+
+  /** @scenario "A refused trace_active_day gives its claims back, so a later sync sends it" */
+  it("gives back the claims already taken when a later claim fails", async () => {
+    const memory = MemoryNurturingClaimRepository.create();
+    let failing = true;
+    const claims: NurturingClaimRepository = {
+      claim: async (key, ttlSeconds) => {
+        if (failing && key.endsWith(":2026-11-20")) throw new Error("claims unavailable");
+        return memory.claim(key, ttlSeconds);
+      },
+      release: (key) => memory.release(key),
+    };
+    const { service, sent } = await tracedOrganization({ claims });
+
+    await service.tracesChanged({ projectId: "project-1" });
+    expect(tracksOf(sent)).toEqual([]);
+
+    failing = false;
+    await service.tracesChanged({ projectId: "project-1" });
+
+    expect(tracksOf(sent).map((call) => call.messageId)).toEqual([
+      "trace_active_day:admin-1:2026-11-19",
+      "trace_active_day:admin-1:2026-11-20",
+    ]);
   });
 });
