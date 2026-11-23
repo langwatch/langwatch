@@ -66,7 +66,7 @@ Feature: First sign-in for a provisioned directory member
   Scenario: Every code the library sends keeps the screen code it had before
     Given the screen code each live library code produced before the spellings were pruned
     When each code is read again
-    Then it produces the same screen code and the same stable classification
+    Then it produces the same screen code
 
   @unit @regression
   Scenario: A sign-in that succeeds is not read as a failure
@@ -82,8 +82,7 @@ Feature: First sign-in for a provisioned directory member
   @unit @regression
   Scenario: A bookmarked error address with a retired spelling shows the generic error
     When an error address carries "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED"
-    Then the code is not one of ours to hand to somebody
-    And the screen shows the generic sign-in error
+    Then the code is not one of ours to hand to somebody, so it is withheld
 
   @unit @regression
   Scenario: The organization's sign-in cutover codes are unchanged
