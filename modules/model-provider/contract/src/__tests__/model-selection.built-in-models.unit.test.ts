@@ -11,7 +11,7 @@ import {
   modelSelectionFrom,
 } from "../model-selection.ts";
 
-const BUILT_IN = { value: "langwatch/evals-preview", label: "Instant Evals" };
+const BUILT_IN = { value: "langwatch/instant-preview", label: "Instant Evals" };
 const OWN_DECISION_BUILT_IN = {
   value: "openai/decisions:gpt-6-luna",
   label: "gpt-6-luna",
@@ -28,7 +28,7 @@ describe("modelSelectionFrom", () => {
         builtInModels: [BUILT_IN],
       });
 
-      expect(selectOptions.map((option) => option.value)).toEqual(["langwatch/evals-preview"]);
+      expect(selectOptions.map((option) => option.value)).toEqual(["langwatch/instant-preview"]);
       expect(selectOptions[0]?.label).toBe("Instant Evals");
       expect(groupedByProvider).toEqual([
         { provider: BUILT_IN_MODELS_GROUP_KEY, label: "Decision models", models: selectOptions },

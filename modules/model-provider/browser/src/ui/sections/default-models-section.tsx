@@ -365,7 +365,7 @@ function ConfigCell({
   onEdit: () => void;
   enabledProviderKeys: Set<string> | null;
   displayNames: Record<string, string>;
-  /** Whether Evals Preview may be offered; not, an unset Instant Evals cell reads "Not set". */
+  /** Whether Instant Preview may be offered; not, an unset Instant Evals cell reads "Not set". */
   isHostedOffered: boolean;
 }) {
   const isInvalid = (model: string) =>
@@ -426,8 +426,8 @@ function ConfigCell({
 }
 
 /**
- * The Instant Evals cell: unset, or an id the catalogue dropped, reads as the faded Evals Preview
- * default, never "Not configured" (ADR-182 decision 1). Where Evals Preview is not offered, unset
+ * The Instant Evals cell: unset, or an id the catalogue dropped, reads as the faded Instant Preview
+ * default, never "Not configured" (ADR-182 decision 1). Where Instant Preview is not offered, unset
  * or pinned to it reads "Not set". Only an own model can need an update: no hosted provider row.
  */
 function DecisionModelChip({

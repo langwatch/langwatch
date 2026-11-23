@@ -165,20 +165,20 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
       expect(saved.config).toEqual({ INSTANT_EVALS: MERCURY, FAST: "openai/gpt-5.4-mini" });
     });
 
-    it("accepts LangWatch Evals Preview", async () => {
+    it("accepts LangWatch Instant Preview", async () => {
       const writer = await writerOver({ isFlagOn: false });
 
       const saved = await writer.save({
-        config: { INSTANT_EVALS: "langwatch/evals-preview" },
+        config: { INSTANT_EVALS: "langwatch/instant-preview" },
         scopes: [SCOPE],
         authorId: null,
       });
 
-      expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/evals-preview" });
+      expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/instant-preview" });
     });
 
     /** @scenario "Saving a config that holds an earlier id stores the new id" */
-    it("stores an earlier Evals Preview id as the new one", async () => {
+    it("stores an earlier Instant Preview id as the new one", async () => {
       const writer = await writerOver({ isFlagOn: false });
 
       const saved = await writer.save({
@@ -187,7 +187,7 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
         authorId: null,
       });
 
-      expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/evals-preview" });
+      expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/instant-preview" });
     });
 
     /** @scenario "Saving a config that holds an earlier id stores the new id" */
@@ -203,7 +203,7 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
       });
 
       const [stored] = await defaults.findForOrganization(ORGANIZATION);
-      expect(stored?.config).toEqual({ INSTANT_EVALS: "langwatch/evals-preview" });
+      expect(stored?.config).toEqual({ INSTANT_EVALS: "langwatch/instant-preview" });
     });
   });
 

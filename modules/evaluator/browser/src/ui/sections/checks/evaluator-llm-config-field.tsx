@@ -81,8 +81,11 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
   // workflow pickers; a skeleton renders while either query is in flight. An unanswered
   // decision model list is not an empty one: showing the model against it marks a judge
   // saved on an own decision model as needing an update when nothing is wrong with it.
-  const { project } = useOrganizationTeamProject();
-  const instantEvals = useInstantEvalJudgeModels({ projectId: project?.id });
+  const { project, organization } = useOrganizationTeamProject();
+  const instantEvals = useInstantEvalJudgeModels({
+    projectId: project?.id,
+    organizationId: organization?.id,
+  });
   const { builtInModels } = instantEvals;
   const { isEmpty, isLoading } = useModelSelection({
     options: allModelOptions,

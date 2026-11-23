@@ -58,7 +58,7 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_instant_evals",
   // The own decision models in the Instant Evals column of Default models (ADR-182).
   "release_instant_evals_own_decision_model",
-  // LangWatch Evals Preview says it routes through the LangWatch Judge (ADR-190).
+  // LLM-judge evaluations offer LangWatch Evals Preview, the LangWatch Judge router (ADR-190).
   "release_instant_evals_judge_router",
   // The Data Privacy page's Essential or Strict organization picker, Strict's
   // price and its example (modules/data-privacy/specs/pii-redaction-level-picker.feature).

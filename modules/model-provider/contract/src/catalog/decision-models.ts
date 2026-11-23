@@ -1,21 +1,30 @@
 /**
  * The decision models the Instant Evals column may hold (ADR-182 decision 2): the hosted, metered
- * LangWatch Evals Preview, then own-key models behind the own-decision-model flag. Ids read
+ * LangWatch Instant Preview, then own-key models behind the own-decision-model flag. Ids read
  * `<provider>/decisions:<model>` so none collides with a chat model of the same name.
  */
 
 import type { ModelRole } from "./model-feature-registry.ts";
 
-/** Same id as `INSTANT_EVAL_JUDGE_MODEL_ID`; a contract never imports another module's contract. */
-export const LANGWATCH_DECISION_MODEL_ID = "langwatch/evals-preview";
+/**
+ * The hosted default, the decision model alone. Same id as `INSTANT_EVAL_JUDGE_MODEL_ID`; a
+ * contract never imports another module's contract.
+ */
+export const LANGWATCH_DECISION_MODEL_ID = "langwatch/instant-preview";
+
+/** The hosted judge router (ADR-190): an LLM judge picks it where the router flag is on. */
+export const LANGWATCH_EVALS_MODEL_ID = "langwatch/evals-preview";
+
+/** The hosted model's id before the -preview names; where the router flag is on it stays routed. */
+const LEGACY_INSTANT_EVALS_MODEL_ID = "langwatch/instant-evals";
 
 /**
  * Earlier public ids, still accepted wherever a stored or sent id is read: evaluator settings,
  * project default models, API calls. Pickers never list them.
  */
 export const LEGACY_LANGWATCH_MODEL_IDS: Readonly<Record<string, string>> = {
-  "langwatch/instant-evals": LANGWATCH_DECISION_MODEL_ID,
-  "langwatch/search-preview": "langwatch/instant-preview",
+  [LEGACY_INSTANT_EVALS_MODEL_ID]: LANGWATCH_DECISION_MODEL_ID,
+  "langwatch/search-preview": LANGWATCH_DECISION_MODEL_ID,
   "langwatch/scenario-judge-preview": "langwatch/judge-preview",
 };
 
@@ -24,6 +33,18 @@ export function canonicalModelId(id: string): string {
   return Object.hasOwn(LEGACY_LANGWATCH_MODEL_IDS, id) ? LEGACY_LANGWATCH_MODEL_IDS[id]! : id;
 }
 
+/**
+ * Whether an LLM judge naming this id goes through the judge router where its flag is on: Evals
+ * Preview, and the legacy id, which was routed before Instant Preview split from it.
+ */
+export function isJudgeRoutedModelId(id: string): boolean {
+  return id === LANGWATCH_EVALS_MODEL_ID || id === LEGACY_INSTANT_EVALS_MODEL_ID;
+}
+
+const INSTANT_PREVIEW = {
+  label: "Instant Preview",
+  description: "Optimized for search and quick classification",
+} as const;
 const EVALS_PREVIEW = { label: "Evals Preview", description: "Optimized for evals" } as const;
 
 /** One of LangWatch's own decision models, named for what it is optimized for. */
@@ -33,24 +54,22 @@ export type LangWatchDecisionPreview = Readonly<{
   description: string;
   /** The Default models columns it can fill; empty while it is not hosted yet. */
   fills: readonly ModelRole[];
+  /** Picked only on an LLM judge, where the judge router flag is on; no column lists it. */
+  isJudgeRouter?: true;
 }>;
 
 /**
- * LangWatch's decision models, first in the Instant Evals picker. Only Evals Preview is hosted;
- * the others are listed as coming soon. Making one pickable is adding its column here.
+ * LangWatch's decision models, first in the Instant Evals picker. Instant Preview is hosted for
+ * every column; Evals Preview only for LLM judges; the others are listed as coming soon. Making
+ * one pickable is adding its column here.
  */
 export const LANGWATCH_DECISION_PREVIEWS: readonly LangWatchDecisionPreview[] = [
-  { id: LANGWATCH_DECISION_MODEL_ID, ...EVALS_PREVIEW, fills: ["INSTANT_EVALS"] },
+  { id: LANGWATCH_DECISION_MODEL_ID, ...INSTANT_PREVIEW, fills: ["INSTANT_EVALS"] },
+  { id: LANGWATCH_EVALS_MODEL_ID, ...EVALS_PREVIEW, fills: [], isJudgeRouter: true },
   {
     id: "langwatch/judge-preview",
     label: "Judge Preview",
     description: "Optimized for scenario judge",
-    fills: [],
-  },
-  {
-    id: "langwatch/instant-preview",
-    label: "Instant Preview",
-    description: "Optimized for search",
     fills: [],
   },
 ];
@@ -119,6 +138,11 @@ const OPENROUTER_DECISIONS = "https://openrouter.ai/api/alpha/decisions";
 export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: LANGWATCH_DECISION_MODEL_ID,
+    provider: "langwatch",
+    ...INSTANT_PREVIEW,
+  },
+  {
+    id: LANGWATCH_EVALS_MODEL_ID,
     provider: "langwatch",
     ...EVALS_PREVIEW,
   },
@@ -296,7 +320,12 @@ export function isDecisionModelId(id: string): boolean {
 
 /** Whether a stored column value runs on the organization's own key. */
 export function isOwnDecisionModelId(id: string): boolean {
-  return isDecisionModelId(id) && canonicalModelId(id) !== LANGWATCH_DECISION_MODEL_ID;
+  return isDecisionModelId(id) && !isLangWatchDecisionModelId(id);
+}
+
+/** Whether an id names one of LangWatch's hosted decision models, under any of its ids. */
+export function isLangWatchDecisionModelId(id: string): boolean {
+  return findDecisionModel(id)?.provider === "langwatch";
 }
 
 /** Why a project's own decision model cannot run; none of them falls back to LangWatch. */

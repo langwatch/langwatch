@@ -24,6 +24,20 @@ describe("instantEvalJudgeOf", () => {
     });
   });
 
+  describe("given a boolean judge whose model is Evals Preview, or the id it had before", () => {
+    it.each(["langwatch/evals-preview", "langwatch/instant-evals"])(
+      "marks %s as one the judge router may answer",
+      (model) => {
+        expect(
+          instantEvalJudgeOf({
+            evaluatorType: "langevals/llm_boolean",
+            settings: { model, prompt: "is it polite?" },
+          }),
+        ).toMatchObject({ kind: "instant_eval", isRoutable: true });
+      },
+    );
+  });
+
   describe("given a score judge with a range", () => {
     it("keeps the range", () => {
       expect(

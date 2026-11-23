@@ -16,12 +16,13 @@ const OWN_DECISION_MODEL = {
   label: "gpt-6-luna",
 };
 const HOSTED_DECISION_MODEL = {
-  value: "langwatch/evals-preview",
-  label: "Evals Preview",
+  value: "langwatch/instant-preview",
+  label: "Instant Preview",
 };
 
 const state = vi.hoisted(() => ({
   flagReleased: false,
+  judgeRouted: false,
   released: false,
   providers: [] as unknown[],
   decisionModels: [] as { value: string; label: string }[],
@@ -37,7 +38,9 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 // Read at render time, after the constant's import has resolved.
 vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: ({ name }: { name: string }) => ({
-    enabled: name === INSTANT_EVALS_FLAG && state.flagReleased,
+    enabled:
+      (name === INSTANT_EVALS_FLAG && state.flagReleased) ||
+      (name === "release_instant_evals_judge_router" && state.judgeRouted),
     isLoading: false,
   }),
 }));
@@ -83,6 +86,7 @@ const CONFIGURED_PROVIDER = { provider: "openai", enabled: true, customModels: n
 
 beforeEach(() => {
   state.flagReleased = false;
+  state.judgeRouted = false;
   state.released = false;
   state.providers = [];
   state.decisionModels = [];
@@ -102,7 +106,7 @@ function renderField() {
 }
 
 function offersInstantEvals(): boolean {
-  return screen.queryByText("Evals Preview") !== null;
+  return screen.queryByText("Instant Preview") !== null;
 }
 
 function offeredLabels(): string[] {
@@ -160,7 +164,7 @@ describe("EvaluatorLLMConfigField", () => {
       it("offers Instant Evals first, then the own decision model", () => {
         renderField();
 
-        expect(offeredLabels()).toEqual(["Evals Preview", OWN_DECISION_MODEL.label]);
+        expect(offeredLabels()).toEqual(["Instant Preview", OWN_DECISION_MODEL.label]);
       });
     });
 
@@ -171,7 +175,28 @@ describe("EvaluatorLLMConfigField", () => {
         state.decisionModels = [HOSTED_DECISION_MODEL];
         renderField();
 
-        expect(offeredLabels()).toEqual(["Evals Preview"]);
+        expect(offeredLabels()).toEqual(["Instant Preview"]);
+      });
+    });
+
+    describe("when the server releases Instant Evals and the judge router flag is on", () => {
+      /** @scenario "An LLM judge is offered Evals Preview only where the judge router flag is on" */
+      it("offers Instant Preview, then Evals Preview", () => {
+        state.released = true;
+        state.judgeRouted = true;
+        state.decisionModels = [HOSTED_DECISION_MODEL];
+        renderField();
+
+        expect(offeredLabels()).toEqual(["Instant Preview", "Evals Preview"]);
+      });
+
+      /** @scenario "An LLM judge is offered Evals Preview only where the judge router flag is on" */
+      it("offers Instant Preview alone with the router flag off", () => {
+        state.released = true;
+        state.decisionModels = [HOSTED_DECISION_MODEL];
+        renderField();
+
+        expect(offeredLabels()).toEqual(["Instant Preview"]);
       });
     });
 

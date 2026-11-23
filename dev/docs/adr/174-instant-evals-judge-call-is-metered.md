@@ -101,7 +101,7 @@
 | --------------------------- | -------------------------------------- | ---------------------------------------------------------- |
 | Score range default         | min 0, max 1                           | Matches the default score prompt                           |
 | Most levels asked directly  | 10 (`maxScoreLevels`)                  | Wider or fractional ranges are asked as 1 to 10 and mapped |
-| Judge model id              | `langwatch/evals-preview`              | What the picker stores as the judge's model                |
+| Judge model id              | `langwatch/instant-preview`            | What the picker stores as the judge's model                |
 | Boolean threshold           | 0.5 (`INSTANT_EVAL_DEFAULT_THRESHOLD`) | `passed` on `llm_boolean`                                  |
 | Free budget                 | $1 (`INSTANT_EVAL_FREE_BUDGET_USD`)    | Unchanged, per free organization                           |
 | Flag                        | `release_instant_evals`                | Shows the picker entry, as does the organization's opt-in  |
@@ -223,7 +223,7 @@ The score judge's settings gain an optional `min` and `max` in the langevals set
   - The user capped paid tiered organizations at $1 (decision 12).
   - Wave 1 ships as one pull request stacked on #7536, picker included (decision 11). It first stacked on #8463, whose fixes #7536 now holds.
 - v4, 2026-10-07, after the second red-team pass. Captain: Sergio Esteban.
-  - The option works in wave 1: the evaluation module answers `langwatch/evals-preview` before any provider lookup (decision 11).
+  - The option works in wave 1: the evaluation module answers `langwatch/instant-preview` before any provider lookup (decision 11).
   - The cap reads the meter's own rule through billing's `isUsageBilled` (decision 12).
   - A budget refusal is an `error` result with the reason; guardrails and monitors handle it as any judge error (decision 7).
   - Each call holds its estimated price and releases it, replacing check then call (decision 8).

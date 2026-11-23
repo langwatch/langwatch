@@ -363,6 +363,7 @@ export class EvaluationExecutionService {
         ...params,
         judge: dispatch.judge,
         ...(dispatch.decisionModel === undefined ? {} : { decisionModel: dispatch.decisionModel }),
+        ...(dispatch.isRoutable ? { isRoutable: true } : {}),
         data,
         droppedCategories,
       });

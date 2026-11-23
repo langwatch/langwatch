@@ -36,7 +36,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
 import { LLMModelDisplay } from "../llm-model-display.tsx";
 import { ModelSelector } from "../model-selector.tsx";
 
-const BUILT_IN = { value: "langwatch/evals-preview", label: "Evals Preview" };
+const BUILT_IN = { value: "langwatch/instant-preview", label: "Instant Preview" };
 const OWN_DECISION_BUILT_IN = {
   value: "openai/decisions:gpt-6-luna",
   label: "gpt-6-luna",
@@ -78,7 +78,7 @@ describe("<ModelSelector/>", () => {
         );
 
         const listbox = screen.getByRole("listbox", { hidden: true });
-        expect(within(listbox).getByText("Evals Preview")).toBeInTheDocument();
+        expect(within(listbox).getByText("Instant Preview")).toBeInTheDocument();
         expect(screen.queryByTestId("no-models-configured-callout")).not.toBeInTheDocument();
       });
     });
@@ -218,22 +218,22 @@ describe("<LLMModelDisplay/>", () => {
   describe("given a chosen built-in model", () => {
     it("shows its label and asks for no update", async () => {
       renderWithDesignSystem(
-        <LLMModelDisplay model="langwatch/evals-preview" builtInModels={[BUILT_IN]} />,
+        <LLMModelDisplay model="langwatch/instant-preview" builtInModels={[BUILT_IN]} />,
       );
 
-      expect(await screen.findByText("Evals Preview")).toBeInTheDocument();
+      expect(await screen.findByText("Instant Preview")).toBeInTheDocument();
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
     });
   });
 
   describe("given a judge stored with an earlier LangWatch model id", () => {
-    /** @scenario "A judge stored with an earlier id shows as Evals Preview in the picker" */
+    /** @scenario "A judge stored with an earlier id shows as Instant Preview in the picker" */
     it("shows the renamed model's label and asks for no update", async () => {
       renderWithDesignSystem(
         <LLMModelDisplay model="langwatch/instant-evals" builtInModels={[BUILT_IN]} />,
       );
 
-      expect(await screen.findByText("Evals Preview")).toBeInTheDocument();
+      expect(await screen.findByText("Instant Preview")).toBeInTheDocument();
       expect(screen.queryByText("langwatch/instant-evals")).not.toBeInTheDocument();
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
     });

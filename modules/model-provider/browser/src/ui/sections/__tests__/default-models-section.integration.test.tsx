@@ -228,17 +228,17 @@ describe("given the Default Models table", () => {
   });
 
   describe("given the Instant Evals column", () => {
-    /** @scenario "The Default models table shows an Instant Evals column defaulting to LangWatch Evals Preview" */
-    it("reads Evals Preview where nothing is set, never Not configured", () => {
+    /** @scenario "The Default models table shows an Instant Evals column defaulting to LangWatch Instant Preview" */
+    it("reads Instant Preview where nothing is set, never Not configured", () => {
       renderSection();
 
       expect(screen.getByRole("columnheader", { name: "Instant Evals" })).toBeInTheDocument();
       const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
-      expect(cell.textContent).toBe("Evals Preview");
+      expect(cell.textContent).toBe("Instant Preview");
       expect(cell.textContent).not.toMatch(/Not configured/);
     });
 
-    describe("when Evals Preview is neither released nor one switch away", () => {
+    describe("when Instant Preview is neither released nor one switch away", () => {
       beforeEach(() => {
         mockInstantEvalAccess.mockReturnValue({
           data: { hostedReleased: false, offer: "contact_us" },
@@ -246,21 +246,24 @@ describe("given the Default Models table", () => {
         });
       });
 
-      /** @scenario "Without Evals Preview, the Instant Evals column reads Not set" */
-      it("reads Not set where nothing is set, never Evals Preview", () => {
+      /** @scenario "Without Instant Preview, the Instant Evals column reads Not set" */
+      it("reads Not set where nothing is set, never Instant Preview", () => {
         renderSection();
 
         const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
         expect(cell.textContent).toBe("Not set");
       });
 
-      /** @scenario "Without Evals Preview, the Instant Evals column reads Not set" */
-      it("reads Not set where the row pins Evals Preview", () => {
+      /** @scenario "Without Instant Preview, the Instant Evals column reads Not set" */
+      it("reads Not set where the row pins Instant Preview", () => {
         mockGetDefaultModels.mockReturnValue({
           data: {
             ...FAKE_PAYLOAD,
             configs: [
-              { ...FAKE_PAYLOAD.configs[0]!, config: { INSTANT_EVALS: "langwatch/evals-preview" } },
+              {
+                ...FAKE_PAYLOAD.configs[0]!,
+                config: { INSTANT_EVALS: "langwatch/instant-preview" },
+              },
             ],
           },
           isLoading: false,
