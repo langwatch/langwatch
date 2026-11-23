@@ -36,7 +36,7 @@ export function LangyGitHubConnectCard({
     { enabled: !!organizationId },
   );
   if (status.data?.configured === false) {
-    return <GitHubNotSetUp onShareLocalFolder={onShareLocalFolder} />;
+    return <LangyGitHubNotSetUpCard onShareLocalFolder={onShareLocalFolder} />;
   }
   return (
     <InstallGitHubApp
@@ -48,7 +48,11 @@ export function LangyGitHubConnectCard({
 }
 
 /** The instance has no GitHub App, so there is nothing to install: the local folder is the way. */
-function GitHubNotSetUp({ onShareLocalFolder }: { onShareLocalFolder?: (() => void) | undefined }) {
+export function LangyGitHubNotSetUpCard({
+  onShareLocalFolder,
+}: {
+  onShareLocalFolder?: (() => void) | undefined;
+}) {
   return (
     <CardFrame>
       <HStack gap={2}>
