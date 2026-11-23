@@ -1361,7 +1361,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And without Langy a stored board keeps it to find a widget, and a From LangWatch board has none unless the member may create dashboards
 
   # Owner, 2026-11-23: "templates should only be llm ops, not also on the dashboards page".
-  # A board homed elsewhere, or opened at "/dashboards/<id>", shows no templates
+  # A board homed elsewhere shows no templates; an LLM Ops one shows them at "/dashboards/<id>" too
   # (dashboards-organization-area.feature, "Only an empty LLM Ops board offers templates").
   @integration
   Scenario: Boards: every empty board shows one view

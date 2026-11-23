@@ -36,7 +36,7 @@ export default function OrganizationBoardScreen() {
   if (place.kind === "unavailable") return <OrganizationBoardUnavailable />;
   return (
     <InProject key={place.project.id} project={place.project}>
-      <Board atOrganization />
+      <Board />
     </InProject>
   );
 }

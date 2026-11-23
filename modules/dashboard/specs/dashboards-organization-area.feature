@@ -774,11 +774,12 @@ Feature: Organization-wide Dashboards area
   # Owner, 2026-11-23: "templates should only be llm ops, not also on the dashboards page".
   @integration
   Scenario: Only an empty LLM Ops board offers templates
-    Given an empty LLM Ops board in "Shop", the same board opened at org level, and an empty Gateway board
-    Then the "Shop" board's "Or start from a template" lists the From LangWatch boards and "View all templates" opens "/shop/dashboards/templates"
-    And the org-level board and the Gateway board show no "Or start from a template" and no "View all templates", as no Coding agents or Governance board does
+    Given an empty LLM Ops board in "Shop" and an empty Gateway board
+    When I open the "Shop" board at "/shop/dashboards/<id>", or at "/dashboards/<id>" as its sidebar row does
+    Then at either address its "Or start from a template" lists the From LangWatch boards and "View all templates" opens "/shop/dashboards/templates"
+    And the Gateway board shows no "Or start from a template" and no "View all templates" at either address, as no Coding agents or Governance board does
     And each still shows its ask bar, its suggested questions and its header's "Add a widget"
-    # Evidence: a screenshot of each empty board
+    # Evidence: a screenshot of each empty board, the LLM Ops one at both addresses
 
   @integration @unimplemented
   Scenario: A failed read or write says so, and never reads as deleted

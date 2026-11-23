@@ -7,7 +7,7 @@
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import type { DashboardHomeProduct } from "@langwatch/dashboard-contract";
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ReactNode, useState } from "react";
 import { describe, expect, it } from "vitest";
@@ -74,10 +74,16 @@ const LISTED_IN_SHOP = {
   updatedAt: new Date("2026-11-01"),
 };
 
-/** A member who may edit the board and ask Langy, so an empty board shows all it offers. */
+const LANGY_EDITOR_PERMISSIONS = [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"];
+
+/**
+ * A member who may edit the board and ask Langy, in the project in view and in "Shop", so an
+ * empty board shows all it offers.
+ */
 const LANGY_EDITOR: StubAnalyticsHostOptions = {
   flags: { release_dashboards: true, release_langy_enabled: true },
-  permissions: [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"],
+  permissions: LANGY_EDITOR_PERMISSIONS,
+  projectPermissions: { [SHOP.id]: LANGY_EDITOR_PERMISSIONS },
 };
 
 const hostIn = (
@@ -176,21 +182,56 @@ describe("a board opened at /dashboards/<id>", () => {
   });
 
   describe("when it is an empty board the member may edit", () => {
-    /** @scenario "Only an empty LLM Ops board offers templates" */
-    it("offers no template, and keeps the ask bar, its questions and Add a widget", async () => {
-      renderBoard({
-        answer: resolved({ id: "board-org", scope: "PROJECT", project: SHOP }),
-        projectInView: inView(SHOP),
-        asLangyEditor: true,
-      });
+    describe("given it is homed in LLM Ops", () => {
+      /** @scenario "Only an empty LLM Ops board offers templates" */
+      it("offers the From LangWatch boards and templates of the project it runs in", async () => {
+        renderBoard({
+          answer: resolved({ id: "board-org", scope: "PROJECT", project: SHOP }),
+          asLangyEditor: true,
+        });
 
-      expect(
-        await screen.findByRole("button", { name: "Where does my money go?" }),
-      ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "What do you want to know?" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
-      expect(screen.queryByText("Or start from a template")).not.toBeInTheDocument();
-      expect(screen.queryByRole("link", { name: "View all templates" })).not.toBeInTheDocument();
+        expect(await screen.findByText("Or start from a template")).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "What do you want to know?" }),
+        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Where does my money go?" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
+        const start = within(screen.getByRole("region", { name: "Start from a template" }));
+        expect(start.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
+          `/${SHOP.slug}/dashboards/curated/release`,
+          `/${SHOP.slug}/dashboards/curated/data`,
+          `/${SHOP.slug}/dashboards/curated/breaks`,
+          `/${SHOP.slug}/dashboards/templates`,
+        ]);
+        expect(start.getByRole("link", { name: "View all templates" })).toBeInTheDocument();
+      });
+    });
+
+    describe("given it is homed in Gateway", () => {
+      /** @scenario "Only an empty LLM Ops board offers templates" */
+      it("offers no template, and keeps the ask bar, its questions and Add a widget", async () => {
+        renderBoard({
+          answer: resolved({
+            id: "board-org",
+            scope: "PROJECT",
+            project: SHOP,
+            homeProduct: "gateway",
+          }),
+          homeProduct: "gateway",
+          projectInView: inView(SHOP),
+          asLangyEditor: true,
+        });
+
+        expect(
+          await screen.findByRole("button", { name: "Where does my money go?" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "What do you want to know?" }),
+        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
+        expect(screen.queryByText("Or start from a template")).not.toBeInTheDocument();
+        expect(screen.queryByRole("link", { name: "View all templates" })).not.toBeInTheDocument();
+      });
     });
   });
 

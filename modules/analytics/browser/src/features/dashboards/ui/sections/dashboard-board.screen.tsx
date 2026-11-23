@@ -116,7 +116,7 @@ function useBoardTitleRename(board: SavedBoard): ((name: string) => void) | unde
     edits.renameBoard({ board: { ...board, project: { id: board.projectId } }, name });
 }
 
-function OpenBoard({ board, atOrganization }: { board: SavedBoard; atOrganization: boolean }) {
+function OpenBoard({ board }: { board: SavedBoard }) {
   const host = useAnalyticsHost();
   const readsOrganization = ORGANIZATION_DATA_HOMES.includes(board.homeProduct);
   const projectId = host.project()?.id ?? "";
@@ -174,7 +174,6 @@ function OpenBoard({ board, atOrganization }: { board: SavedBoard; atOrganizatio
   const templates = templateLinks({
     projectSlug: saved.projectSlug,
     homeProduct: board.homeProduct,
-    atOrganization,
   });
 
   return (
@@ -334,7 +333,7 @@ function OpenBoard({ board, atOrganization }: { board: SavedBoard; atOrganizatio
 }
 
 /** The board the address names, in the project in view; the org-level page runs it too. */
-export function Board({ atOrganization = false }: { atOrganization?: boolean }) {
+export function Board() {
   const dashboardId = useAnalyticsHost().route().params.dashboardId;
   const { boards, organizationBoards, isLoading, isRefreshing, loadError } = useSavedDashboards();
   if (isLoading) return <UiPageLoading />;
@@ -349,7 +348,7 @@ export function Board({ atOrganization = false }: { atOrganization?: boolean }) 
   return (
     <>
       <OldAnalyticsBanner />
-      <OpenBoard key={board.id} board={board} atOrganization={atOrganization} />
+      <OpenBoard key={board.id} board={board} />
     </>
   );
 }

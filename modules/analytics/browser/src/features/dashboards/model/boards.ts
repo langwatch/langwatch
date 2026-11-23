@@ -72,18 +72,17 @@ export function organizationBoardPath({ dashboardId }: { dashboardId: string }):
 
 /**
  * Where an empty board's templates lead, or undefined where none is offered: templates read LLM
- * Ops data, so only an LLM Ops board in its project offers them (owner, 2026-11-23).
+ * Ops data, so only an LLM Ops board offers them (owner, 2026-11-23), at whichever address it is
+ * open, and they lead to the templates of the project it runs in.
  */
 export function templateLinks({
   projectSlug,
   homeProduct,
-  atOrganization,
 }: {
   projectSlug: string;
   homeProduct: DashboardHomeProduct;
-  atOrganization: boolean;
 }): { curatedHref: (templateId: string) => string; templatesHref: string } | undefined {
-  if (atOrganization || homeProduct !== DEFAULT_DASHBOARD_HOME_PRODUCT) return void 0;
+  if (projectSlug === "" || homeProduct !== DEFAULT_DASHBOARD_HOME_PRODUCT) return void 0;
   return {
     curatedHref: (templateId) => curatedBoardPath({ projectSlug, templateId }),
     templatesHref: dashboardTemplatesPath({ projectSlug }),
