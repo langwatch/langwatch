@@ -222,7 +222,8 @@ describe("given a SAML connection that signs with a known key", () => {
           }),
       });
 
-      expect(errorCodeOf(response)).toBe("invalid_saml_response");
+      // samlify 2.15 checks the audience itself while parsing, before better-auth's own check.
+      expect(errorCodeOf(response)).toBe("saml_error");
       expect(policyAsked).toEqual([]);
       nothingWritten({ database });
     });
@@ -237,7 +238,8 @@ describe("given a SAML connection that signs with a known key", () => {
           }),
       });
 
-      expect(errorCodeOf(response)).toBe("invalid_saml_response");
+      // samlify 2.15 checks the recipient itself while parsing, before better-auth's own check.
+      expect(errorCodeOf(response)).toBe("saml_error");
       expect(policyAsked).toEqual([]);
       nothingWritten({ database });
     });

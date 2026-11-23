@@ -55,14 +55,14 @@ Feature: Single sign-on believes an assertion or ID token only inside its own co
     Scenario: A SAML assertion for another service provider is refused
       Given a signed assertion whose audience is another service provider's entity id
       When it is posted to the assertion consumer address
-      Then the sign-in is refused as an invalid response binding
+      Then the sign-in is refused as an invalid response
       And no user, account or session is written
 
     @integration
     Scenario: A SAML assertion addressed to another recipient is refused
       Given a signed assertion whose recipient is another assertion consumer address
       When it is posted to the assertion consumer address
-      Then the sign-in is refused as an invalid response binding
+      Then the sign-in is refused as an invalid response
       And no user, account or session is written
 
     @integration
