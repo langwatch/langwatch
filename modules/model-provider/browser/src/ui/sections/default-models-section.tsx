@@ -414,7 +414,7 @@ function ConfigCell({
             {feature.displayName}
           </Text>
           <ModelChip
-            model={config[feature.key]!}
+            model={canonicalModelId(config[feature.key]!)}
             size="sm"
             invalid={isInvalid(config[feature.key]!)}
             displayNames={chipNames}

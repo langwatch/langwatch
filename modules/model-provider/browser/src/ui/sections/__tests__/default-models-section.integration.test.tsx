@@ -238,6 +238,57 @@ describe("given the Default Models table", () => {
       expect(cell.textContent).not.toMatch(/Not configured/);
     });
 
+    /** @scenario "Default models names the written id Instant Preview" */
+    it("reads Instant Preview where the row stores the written id", () => {
+      mockGetDefaultModels.mockReturnValue({
+        data: {
+          ...FAKE_PAYLOAD,
+          configs: [
+            { ...FAKE_PAYLOAD.configs[0]!, config: { INSTANT_EVALS: "langwatch/instant-evals" } },
+          ],
+        },
+        isLoading: false,
+      });
+      renderSection();
+
+      expect(screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals").textContent).toBe(
+        "Instant Preview",
+      );
+    });
+
+    /** @scenario "Default models names the written id Instant Preview" */
+    it("reads Instant Preview on an instant_eval.judge feature chip that stores the written id", () => {
+      mockGetDefaultModels.mockReturnValue({
+        data: {
+          ...FAKE_PAYLOAD,
+          configs: [
+            {
+              ...FAKE_PAYLOAD.configs[0]!,
+              config: {
+                INSTANT_EVALS: "inception/decisions:mercury-decide",
+                "instant_eval.judge": "langwatch/instant-evals",
+              },
+            },
+          ],
+          features: [
+            ...FAKE_PAYLOAD.features,
+            {
+              key: "instant_eval.judge",
+              role: "INSTANT_EVALS",
+              displayName: "Instant Evals",
+              description: "The decision model Instant Evals and their judged columns run on.",
+            },
+          ],
+        },
+        isLoading: false,
+      });
+      renderSection();
+
+      const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
+      expect(cell.textContent).toContain("Instant Preview");
+      expect(cell.textContent).not.toContain("instant-evals");
+    });
+
     describe("when Instant Preview is neither released nor one switch away", () => {
       beforeEach(() => {
         mockInstantEvalAccess.mockReturnValue({

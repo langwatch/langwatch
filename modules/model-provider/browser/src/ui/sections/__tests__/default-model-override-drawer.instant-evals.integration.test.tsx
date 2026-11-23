@@ -336,6 +336,66 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
     });
   });
 
+  describe("given a config row that stores the written id for the column and its feature", () => {
+    beforeEach(() => {
+      mockGetDefaultModels.mockReturnValue({
+        data: {
+          ...PAYLOAD,
+          configs: [
+            {
+              ...CONFIG_ROW,
+              config: {
+                INSTANT_EVALS: "langwatch/instant-evals",
+                "instant_eval.judge": "langwatch/instant-evals",
+              },
+            },
+          ],
+          features: [
+            {
+              key: "instant_eval.judge",
+              role: "INSTANT_EVALS",
+              displayName: "Instant Evals",
+              description: "The decision model Instant Evals and their judged columns run on.",
+            },
+          ],
+        },
+        isLoading: false,
+      });
+    });
+
+    /** @scenario "Default models names the written id Instant Preview" */
+    it("reads Instant Preview, checked, in the role row", () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+      const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
+      expect(trigger).toHaveTextContent("Instant Preview");
+      expect(trigger).not.toHaveTextContent("instant-evals");
+      expect(optionTitled("Instant Preview")).toHaveAttribute("aria-selected", "true");
+    });
+
+    /** @scenario "Default models names the written id Instant Preview" */
+    it("reads Instant Preview, checked, in the instant_eval.judge feature row", () => {
+      renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+      fireEvent.click(screen.getByTestId("role-row-instant_evals-expand"));
+
+      const trigger = within(screen.getByTestId("feature-row-instant_eval.judge")).getByRole(
+        "combobox",
+      );
+      expect(trigger).toHaveTextContent("Instant Preview");
+      expect(trigger).not.toHaveTextContent("instant-evals");
+      const listbox = document.getElementById(trigger.getAttribute("aria-controls") ?? "");
+      if (!listbox) throw new Error("no listbox for the Instant Evals feature row");
+      // The inherit entry beside it names the role's value, Instant Preview too.
+      const hosted = within(listbox)
+        .getAllByRole("option", { hidden: true })
+        .filter((option) => option.dataset.testid !== "provider-model-selector-inherit")
+        .filter((option) => within(option).queryByText("Instant Preview"));
+      expect(hosted).toHaveLength(1);
+      expect(hosted[0]).toHaveAttribute("aria-selected", "true");
+      expect(listbox).not.toHaveTextContent("instant-evals");
+    });
+  });
+
   describe("given the Instant Evals feature row is open and nothing is set", () => {
     beforeEach(() => {
       mockGetDefaultModels.mockReturnValue({

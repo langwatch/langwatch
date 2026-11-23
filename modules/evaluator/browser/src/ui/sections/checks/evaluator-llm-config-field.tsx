@@ -2,7 +2,11 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
-import { allModelOptions, judgeShownModelIdOf } from "@langwatch/model-provider-contract";
+import {
+  allModelOptions,
+  judgeShownModelIdOf,
+  LANGWATCH_DECISION_MODEL_ID,
+} from "@langwatch/model-provider-contract";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
@@ -67,23 +71,6 @@ export const EvaluatorLLMConfigField = ({
     return config as LLMConfig;
   }, [watchedValues]);
 
-  // Handle changes from LLMConfigPopover — write all keys back to form.
-  // We iterate over LLM_CONFIG_KEYS (not just newConfig entries) so that
-  // cleared fields (e.g. reasoning removed on model switch) are set to
-  // undefined, preventing stale values from persisting.
-  const handleChange = useCallback(
-    (newConfig: LLMConfig) => {
-      const incoming = new Map<string, string | number | undefined>();
-      for (const [key, value] of Object.entries(newConfig)) {
-        incoming.set(toInternalKey(key), value as string | number | undefined);
-      }
-      for (const key of LLM_CONFIG_KEYS) {
-        setValue(`${prefix}.${key}`, incoming.get(key), { shouldDirty: true });
-      }
-    },
-    [prefix, setValue],
-  );
-
   // Zero enabled providers shows the empty state shared with the prompt playground and
   // workflow pickers; a skeleton renders while either query is in flight. An unanswered
   // decision model list is not an empty one: showing the model against it marks a judge
@@ -98,6 +85,27 @@ export const EvaluatorLLMConfigField = ({
   // Any hosted id shows as the one the picker offers; the stored value changes only on a pick.
   const judgeModel = judgeShownModelIdOf({ id: llmConfig.model, isJudgeRouted });
   const shownConfig: LLMConfig = { ...llmConfig, model: judgeModel };
+  // A judge that holds Instant Preview's own id where the flag is on finds its row in the picker.
+  const popoverModels = judgeModel === LANGWATCH_DECISION_MODEL_ID ? shownModels : builtInModels;
+  // Handle changes from LLMConfigPopover — write all keys back to form.
+  // We iterate over LLM_CONFIG_KEYS (not just newConfig entries) so that
+  // cleared fields (e.g. reasoning removed on model switch) are set to
+  // undefined, preventing stale values from persisting.
+  const handleChange = useCallback(
+    (newConfig: LLMConfig) => {
+      const incoming = new Map<string, string | number | undefined>();
+      for (const [key, value] of Object.entries(newConfig)) {
+        incoming.set(toInternalKey(key), value as string | number | undefined);
+      }
+      // The popover holds the shown id; a model the user did not change keeps its stored id.
+      if (incoming.get("model") === judgeModel) incoming.set("model", llmConfig.model);
+      for (const key of LLM_CONFIG_KEYS) {
+        setValue(`${prefix}.${key}`, incoming.get(key), { shouldDirty: true });
+      }
+    },
+    [prefix, setValue, judgeModel, llmConfig.model],
+  );
+
   const { isEmpty, isLoading } = useModelSelection({
     options: allModelOptions,
     model: judgeModel,
@@ -135,7 +143,7 @@ export const EvaluatorLLMConfigField = ({
       <LLMConfigPopover
         values={shownConfig}
         onChange={handleChange}
-        builtInModels={builtInModels}
+        builtInModels={popoverModels}
       />
     </Popover.Root>
   );

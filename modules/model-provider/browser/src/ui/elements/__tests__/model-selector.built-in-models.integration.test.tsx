@@ -274,15 +274,6 @@ describe("<LLMModelDisplay/>", () => {
       expect(await screen.findByText("Instant Preview")).toBeInTheDocument();
       expect(screen.queryByText("Evals Preview")).not.toBeInTheDocument();
     });
-
-    it("names a Default models value on the written id by the option it reads as", async () => {
-      renderWithDesignSystem(
-        <LLMModelDisplay model="langwatch/instant-evals" builtInModels={[BUILT_IN]} />,
-      );
-
-      expect(await screen.findByText("Instant Preview")).toBeInTheDocument();
-      expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
-    });
   });
 
   describe("given a built-in model whose prefix heads no group of the project's", () => {

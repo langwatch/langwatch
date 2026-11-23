@@ -8,7 +8,7 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { INSTANT_EVALS_FLAG } from "@langwatch/instant-eval-contract";
 import { findSelectedOptions } from "@langwatch/model-provider-contract";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { FormProvider, useForm, useWatch } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -83,13 +83,27 @@ vi.mock("../../../../behavior/lent-model-provider.tsx", () => ({
   ),
 }));
 
+// Lists what it is handed, and edits a parameter the way the real popover does: every key back.
 vi.mock("../../../../behavior/lent-peers.tsx", () => ({
-  LLMConfigPopover: ({ builtInModels }: { builtInModels?: { label: string }[] }) => (
-    <ul aria-label="model options">
-      {builtInModels?.map((model) => (
-        <li key={model.label}>{model.label}</li>
-      ))}
-    </ul>
+  LLMConfigPopover: ({
+    builtInModels,
+    values,
+    onChange,
+  }: {
+    builtInModels?: { label: string }[];
+    values: Record<string, unknown>;
+    onChange: (config: Record<string, unknown>) => void;
+  }) => (
+    <>
+      <ul aria-label="model options">
+        {builtInModels?.map((model) => (
+          <li key={model.label}>{model.label}</li>
+        ))}
+      </ul>
+      <button type="button" onClick={() => onChange({ ...values, temperature: 0.3 })}>
+        change temperature
+      </button>
+    </>
   ),
 }));
 
@@ -261,6 +275,41 @@ describe("EvaluatorLLMConfigField", () => {
 
         expect(shownModel()).toBe("langwatch/instant-preview");
         expect(shownName()).toBe("Instant Preview");
+      });
+
+      /** @scenario "Editing a judge's parameters keeps its stored model id" */
+      it.each([
+        ["langwatch/instant-evals", true],
+        ["langwatch/instant-evals", false],
+        ["langwatch/evals-preview", true],
+        ["langwatch/evals-preview", false],
+        ["langwatch/instant-preview", true],
+        ["langwatch/instant-preview", false],
+      ])(
+        "keeps a judge stored as %s when a parameter changes (router flag on: %s)",
+        (model, isRouted) => {
+          state.judgeRouted = isRouted;
+          renderField({ model });
+
+          fireEvent.click(screen.getByRole("button", { name: "change temperature" }));
+
+          expect(screen.getByLabelText("form model")).toHaveTextContent(model);
+        },
+      );
+
+      /** @scenario "A judge on Instant Preview's id keeps its name where routing is on" */
+      it("lists Instant Preview in the open picker for a judge that holds its id, router flag on", () => {
+        state.judgeRouted = true;
+        renderField({ model: "langwatch/instant-preview" });
+
+        expect(offeredLabels()).toEqual(["Evals Preview", "Instant Preview"]);
+      });
+
+      it("lists only Evals Preview in the open picker for any other judge, router flag on", () => {
+        state.judgeRouted = true;
+        renderField({ model: "langwatch/instant-evals" });
+
+        expect(offeredLabels()).toEqual(["Evals Preview"]);
       });
 
       /** @scenario "The judge picker waits for the judge router flag before naming a model" */

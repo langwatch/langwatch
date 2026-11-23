@@ -550,6 +550,19 @@ Feature: Instant Evals decision model column in Default models
     Then the config stores "langwatch/instant-evals"
     And an own decision model is stored as it was sent
 
+  @integration
+  Scenario: Default models names the written id Instant Preview
+    Given a config row that stores "langwatch/instant-evals" for the Instant Evals column or its "instant_eval.judge" feature
+    When I open Settings > Model Providers > Default models, or edit that config row
+    Then the table cell and the drawer's role and feature pickers read "Instant Preview", checked in the picker
+    And no surface shows the raw "instant-evals"
+
+  @integration
+  Scenario: Editing a judge's parameters keeps its stored model id
+    Given an LLM judge whose model is stored as "langwatch/instant-evals", "langwatch/evals-preview" or "langwatch/instant-preview"
+    When I change a parameter such as the temperature, with the judge router flag on or off, and save
+    Then the judge's model is still stored as it was
+
   @unit
   Scenario: The column picker lists only the new LangWatch model ids
     When the Instant Evals picker lists LangWatch's decision models
