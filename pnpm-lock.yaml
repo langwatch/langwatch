@@ -453,8 +453,8 @@ catalogs:
       specifier: ^3.1.3
       version: 3.1.3
     hono:
-      specifier: ^4.13.5
-      version: 4.13.13
+      specifier: ^4.13.16
+      version: 4.13.21
     hono-openapi:
       specifier: ^1.3.1
       version: 1.3.1
@@ -1104,7 +1104,7 @@ importers:
         version: link:../../modules/workflow/process
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
@@ -2859,7 +2859,7 @@ importers:
         version: 5.0.202607010001
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
@@ -3574,10 +3574,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       hyparquet:
         specifier: 'catalog:'
         version: 1.32.0
@@ -4440,10 +4440,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -5011,7 +5011,7 @@ importers:
         version: 8.18.1
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
@@ -5411,10 +5411,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       langwatch:
         specifier: workspace:*
         version: link:../../../sdks/typescript
@@ -5652,10 +5652,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
@@ -5926,10 +5926,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
@@ -6355,7 +6355,7 @@ importers:
         version: 1.7.11(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.5)
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -6598,7 +6598,7 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -6925,10 +6925,10 @@ importers:
         version: 10.0.1
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
@@ -7163,10 +7163,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
@@ -7973,10 +7973,10 @@ importers:
         version: 6.0.217(zod@4.6.7)
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
@@ -8271,10 +8271,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       safe-regex2:
         specifier: 'catalog:'
         version: 5.1.1
@@ -8632,10 +8632,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       safe-regex2:
         specifier: 'catalog:'
         version: 5.1.1
@@ -9047,10 +9047,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
@@ -9570,10 +9570,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
@@ -9766,7 +9766,7 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       jsonwebtoken:
         specifier: 'catalog:'
         version: 9.0.3
@@ -9879,7 +9879,7 @@ importers:
         version: 1.9.1
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
@@ -10468,10 +10468,10 @@ importers:
         version: link:../../../packages/upgrade
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -10944,7 +10944,7 @@ importers:
         version: 6.0.217(zod@4.6.7)
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       langwatch:
         specifier: workspace:*
         version: link:../../../sdks/typescript
@@ -11072,7 +11072,7 @@ importers:
         version: 0.55.0(@opentelemetry/api@1.9.1)
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       langwatch:
         specifier: workspace:*
         version: link:../../../sdks/typescript
@@ -11176,7 +11176,7 @@ importers:
         version: 0.55.0(@opentelemetry/api@1.9.1)
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       langwatch:
         specifier: workspace:*
         version: link:../../../sdks/typescript
@@ -11480,10 +11480,10 @@ importers:
         version: 6.0.217(zod@4.6.7)
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       safe-regex2:
         specifier: 'catalog:'
         version: 5.1.1
@@ -12701,7 +12701,7 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
@@ -13056,10 +13056,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
@@ -13175,7 +13175,7 @@ importers:
         version: 1.9.1
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -13611,10 +13611,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
@@ -13948,10 +13948,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
@@ -14648,10 +14648,10 @@ importers:
         version: 6.0.217(zod@4.6.7)
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       langwatch:
         specifier: workspace:*
         version: link:../../../sdks/typescript
@@ -15289,7 +15289,7 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
@@ -15478,7 +15478,7 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1(supports-color@10.2.2)
@@ -15509,7 +15509,7 @@ importers:
         version: link:../../../packages/test-harness
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
@@ -16238,10 +16238,10 @@ importers:
         version: 6.0.217(zod@4.6.7)
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       langwatch:
         specifier: workspace:*
         version: link:../../../sdks/typescript
@@ -16541,10 +16541,10 @@ importers:
         version: 6.0.0
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -16685,10 +16685,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -17109,10 +17109,10 @@ importers:
         version: 9.0.0
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       monacopilot:
         specifier: 'catalog:'
         version: 1.2.12(monaco-editor@0.55.1)
@@ -17140,7 +17140,7 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: 'catalog:'
-        version: 2.1.8(hono@4.13.13)
+        version: 2.1.8(hono@4.13.21)
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../authorization
@@ -17176,10 +17176,10 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       hono-openapi:
         specifier: 'catalog:'
-        version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+        version: 1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3)
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -18361,7 +18361,7 @@ importers:
         version: 11.18.0(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2))
       hono:
         specifier: 'catalog:'
-        version: 4.13.13
+        version: 4.13.21
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -26960,6 +26960,10 @@ packages:
     resolution: {integrity: sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA==}
     engines: {node: '>=16.9.0'}
 
+  hono@4.13.21:
+    resolution: {integrity: sha512-h9UsguqfVk4kjUwLvQpHOmOaJpW10jz9lp8bvKUUa04wJG/fabKFBqXZ06D6LFaeKQZtUZRVeg0gfkTTEsX7Mw==}
+    engines: {node: '>=16.9.0'}
+
   hosted-git-info@9.0.3:
     resolution: {integrity: sha512-Hc+ghLoSt6QaYZUv0WBiIvmMDZuZZ7oaDvdH8MbfOO4lOsxdXLEvuC6ePoGs9H1X9oCLyq6+NVN0MKqD+ydxyg==}
     engines: {node: ^20.17.0 || >=22.9.0}
@@ -33048,10 +33052,14 @@ snapshots:
     dependencies:
       hono: 4.13.13
 
-  '@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.13)':
+  '@hono/node-server@2.1.8(hono@4.13.21)':
+    dependencies:
+      hono: 4.13.21
+
+  '@hono/standard-validator@0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.21)':
     dependencies:
       '@standard-schema/spec': 1.1.0
-      hono: 4.13.13
+      hono: 4.13.21
     optional: true
 
   '@hookform/resolvers@5.4.0(react-hook-form@7.80.0(react@19.2.8))':
@@ -39393,17 +39401,19 @@ snapshots:
     dependencies:
       react-is: 19.2.7
 
-  hono-openapi@1.3.1(f84d9ff9cf7810df4834d1fd27590923):
+  hono-openapi@1.3.1(@hono/standard-validator@0.2.3(hono@4.13.21))(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(@standard-community/standard-openapi@0.2.9(@standard-community/standard-json@0.3.5(@types/json-schema@7.0.15)(zod@4.6.7))(openapi-types@12.1.3)(zod@4.6.7))(@types/json-schema@7.0.15)(hono@4.13.21)(openapi-types@12.1.3):
     dependencies:
       '@standard-community/standard-json': 0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.22.4)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(zod-to-json-schema@3.25.2(zod@4.6.7))(zod@4.6.7)
       '@standard-community/standard-openapi': 0.2.9(@standard-community/standard-json@0.3.5(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(effect@3.22.4)(quansync@0.2.11)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(zod-to-json-schema@3.25.2(zod@4.6.7))(zod@4.6.7))(@standard-schema/spec@1.1.0)(effect@3.22.4)(openapi-types@12.1.3)(typebox@1.3.7)(valibot@1.4.2(typescript@7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)))(zod-openapi@4.2.4(zod@4.6.7))(zod@4.6.7)
       '@types/json-schema': 7.0.15
       openapi-types: 12.1.3
     optionalDependencies:
-      '@hono/standard-validator': 0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.13)
-      hono: 4.13.13
+      '@hono/standard-validator': 0.2.3(@standard-schema/spec@1.1.0)(hono@4.13.21)
+      hono: 4.13.21
 
   hono@4.13.13: {}
+
+  hono@4.13.21: {}
 
   hosted-git-info@9.0.3:
     dependencies:
