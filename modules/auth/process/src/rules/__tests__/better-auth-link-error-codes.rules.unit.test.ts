@@ -118,7 +118,6 @@ describe("given the installed Better Auth", () => {
     it.each(live)("keeps the screen code %s had before", (code) => {
       const before = BEFORE_PRUNING[code] ?? code;
       expect(normalizeSignInErrorCode(code)).toBe(before);
-      expect(isStableAuthError(normalizeSignInErrorCode(code))).toBe(isStableAuthError(before));
     });
   });
 });

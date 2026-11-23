@@ -59,6 +59,18 @@ describe("signInErrorRedirectOf", () => {
         expect(redirectTo(location)).toEqual({ kind: "pass" });
       },
     );
+
+    it("passes a callback that lands on the error screen with no error code through unchanged", () => {
+      expect(
+        signInErrorRedirectOf({
+          status: 302,
+          location: errorPageUrl,
+          errorPageUrl,
+          traceId: "trace_1",
+          isCallback: true,
+        }),
+      ).toEqual({ kind: "pass" });
+    });
   });
 
   describe("given a sign-in refused with a handled error", () => {
