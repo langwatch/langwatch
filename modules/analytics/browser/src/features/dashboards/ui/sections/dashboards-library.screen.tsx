@@ -63,29 +63,13 @@ export default function DashboardsLibraryScreen() {
   return (
     <Box width="full" maxWidth="960px" marginX="auto" paddingX={6} paddingY={8}>
       <LibraryHeader action={newButton} />
-      {/* A failed read with a list held keeps the rows, saying the failure above them. */}
-      {loadError && !library.hasList ? (
-        loadError
-      ) : groups.length === 0 ? (
-        <NoDataInfoBlock
-          icon={<LayoutDashboard size={20} />}
-          title="No dashboards yet"
-          description="Make one for any product. It shows in that product's sidebar."
-          primaryAction={newButton}
-        />
-      ) : (
-        <VStack align="stretch" gap={6}>
-          {loadError}
-          {groups.map((group) => (
-            <ProductGroup
-              key={group.label}
-              group={group}
-              {...duplicates}
-              onDelete={setPendingDelete}
-            />
-          ))}
-        </VStack>
-      )}
+      <LibraryBody
+        groups={groups}
+        loadError={loadError}
+        hasList={library.hasList}
+        newButton={newButton}
+        handlers={{ ...duplicates, onDelete: setPendingDelete }}
+      />
       <LibraryDialogs
         library={library}
         isCreating={isCreating}
@@ -94,6 +78,41 @@ export default function DashboardsLibraryScreen() {
         onSettleDelete={() => setPendingDelete(void 0)}
       />
     </Box>
+  );
+}
+
+/** The groups, or why there are none: a failed read with a list held keeps the rows. */
+function LibraryBody({
+  groups,
+  loadError,
+  hasList,
+  newButton,
+  handlers,
+}: {
+  groups: LibraryGroup[];
+  loadError: ReactNode;
+  hasList: boolean;
+  newButton: ReactNode;
+  handlers: BoardHandlers;
+}) {
+  if (loadError && !hasList) return <>{loadError}</>;
+  if (groups.length === 0) {
+    return (
+      <NoDataInfoBlock
+        icon={<LayoutDashboard size={20} />}
+        title="No dashboards yet"
+        description="Make one for any product. It shows in that product's sidebar."
+        primaryAction={newButton}
+      />
+    );
+  }
+  return (
+    <VStack align="stretch" gap={6}>
+      {loadError}
+      {groups.map((group) => (
+        <ProductGroup key={group.label} group={group} {...handlers} />
+      ))}
+    </VStack>
   );
 }
 

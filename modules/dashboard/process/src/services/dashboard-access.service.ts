@@ -168,10 +168,10 @@ export class DashboardAccessService {
 
   /**
    * What `setScope` holds a board to, before one is made at a scope other than its default:
-   * an author (the door asked for `analytics:update`). Answers the organization an Organization
-   * board is stamped with, else null; refuses by name otherwise, before anything is written.
+   * an author (the door asked for `analytics:update`). Answers the stamp: the organization an
+   * Organization board carries, else none; refuses by name otherwise, before anything is written.
    */
-  async requireScopeWrite({
+  async getScopeStamp({
     projectId,
     createdById,
     scope,
@@ -179,10 +179,11 @@ export class DashboardAccessService {
     projectId: string;
     createdById: string | undefined;
     scope: DashboardScope;
-  }): Promise<string | null> {
+  }): Promise<{ organizationId: string | null }> {
     if (createdById === undefined) throw new DashboardScopeAuthorOnlyError();
     // Stamped as setScope stamps it: what lists the board in the organization's other projects.
-    return scope === "ORGANIZATION" ? this.#projects.getOrganizationId(projectId) : null;
+    if (scope !== "ORGANIZATION") return { organizationId: null };
+    return { organizationId: await this.#projects.getOrganizationId(projectId) };
   }
 
   /** The repository reach of a place: its organization's live projects' shared boards (AC188). */

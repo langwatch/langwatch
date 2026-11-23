@@ -93,10 +93,10 @@ export class BoardService {
     const fallback = newDashboardScope({ name: parsed.name, createdById });
     const scope = asked ?? fallback;
     // Checked before the write, so a refused scope leaves no board behind.
-    const organizationId =
+    const { organizationId } =
       scope === fallback
-        ? null
-        : await this.#access.requireScopeWrite({ projectId: parsed.projectId, createdById, scope });
+        ? { organizationId: null }
+        : await this.#access.getScopeStamp({ projectId: parsed.projectId, createdById, scope });
 
     const board = await this.#repository.createBoard({
       id: generate(DASHBOARD_KSUID_RESOURCE).toString(),

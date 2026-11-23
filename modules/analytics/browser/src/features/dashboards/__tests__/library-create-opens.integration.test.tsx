@@ -107,7 +107,7 @@ function server() {
 }
 
 describe("a board made in the library", () => {
-  describe.each(["Only me", "Organization"])("at %s", (visibility) => {
+  describe.each(["Only me", "Organization"])("when it is made %s", (visibility) => {
     /** @scenario "A board made in the library is made at its scope in one write" */
     it("opens at its address and never reads as deleted", async () => {
       const host = new NavigatingHost({

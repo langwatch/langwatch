@@ -54,6 +54,55 @@ export type CreatedBoard = {
   widgets: readonly BoardTemplateWidget[];
 };
 
+type BoardsClient = ReturnType<typeof analyticsApi.useUtils>["client"];
+
+/** Made at its scope in the one write, so a refused scope leaves no board behind. */
+function makeBoard({
+  client,
+  projectId,
+  name,
+  scope,
+}: {
+  client: BoardsClient;
+  projectId: string;
+  name: string;
+  scope: DashboardScope | undefined;
+}) {
+  if (scope === void 0 || scope === "PROJECT")
+    return client.boards.create.mutate({ projectId, name });
+  return client.boards.createAtScope.mutate({ projectId, name, scope });
+}
+
+/** Removes a half-made board; best effort, as a leftover stays listed and can be deleted. */
+async function discard({
+  client,
+  projectId,
+  dashboardId,
+}: {
+  client: BoardsClient;
+  projectId: string;
+  dashboardId: string | undefined;
+}) {
+  if (dashboardId === void 0) return;
+  await client.boards.delete.mutate({ projectId, dashboardId }).catch(() => void 0);
+}
+
+/** Only a Project board, or any made in a project view, lives at its project's address. */
+function openingPath({
+  atOrganization,
+  projectSlug,
+  dashboardId,
+  scope,
+}: {
+  atOrganization: boolean;
+  projectSlug: string;
+  dashboardId: string;
+  scope: DashboardScope;
+}) {
+  if (!atOrganization || scope === "PROJECT") return dashboardsPath({ projectSlug, dashboardId });
+  return organizationBoardPath({ dashboardId });
+}
+
 /** `atOrganization`: made from an org-level page, stored in `storeProject`; none, nothing made. */
 export function useBoardFromTemplate({
   atOrganization = false,
@@ -105,16 +154,8 @@ export function useBoardFromTemplate({
    * Only a Project board lives at its project's address (ADR-002, decision 4).
    */
   const open = ({ dashboardId, scope, title }: Opening) => {
-    if (!atOrganization) {
-      host.navigate(dashboardsPath({ projectSlug, dashboardId }));
-      return;
-    }
-    host.succeeded({ title });
-    host.navigate(
-      scope === "PROJECT"
-        ? dashboardsPath({ projectSlug, dashboardId })
-        : organizationBoardPath({ dashboardId }),
-    );
+    if (atOrganization) host.succeeded({ title });
+    host.navigate(openingPath({ atOrganization, projectSlug, dashboardId, scope }));
   };
 
   const createFrom = async ({
@@ -134,6 +175,7 @@ export function useBoardFromTemplate({
   }): Promise<CreatedBoard | undefined> => {
     if (creatingId !== void 0 || projectId === "") return void 0;
     setCreatingId(source.id);
+    const asked = source.scope ?? (atOrganization ? "PRIVATE" : void 0);
     const refresh = () =>
       Promise.all([
         utils.boards.getAll.invalidate({ projectId }),
@@ -143,13 +185,8 @@ export function useBoardFromTemplate({
     let dashboardId: string | undefined;
     try {
       const widgets = await source.widgets();
-      // Made at its scope in the one write, so a refused scope leaves no board behind.
-      const asked = source.scope ?? (atOrganization ? "PRIVATE" : void 0);
       const name = templateBoardName({ templateName: source.name, existingNames });
-      const board =
-        asked === void 0 || asked === "PROJECT"
-          ? await client.boards.create.mutate({ projectId, name })
-          : await client.boards.createAtScope.mutate({ projectId, name, scope: asked });
+      const board = await makeBoard({ client, projectId, name, scope: asked });
       dashboardId = board.id;
       const scope = asked ?? board.scope;
       await fill({
@@ -165,11 +202,7 @@ export function useBoardFromTemplate({
       return { id: board.id, name: board.name, widgets };
     } catch (error) {
       host.failed({ error, fallbackTitle });
-      if (dashboardId !== void 0) {
-        await client.boards.delete.mutate({ projectId, dashboardId }).catch(() => {
-          // Best effort: a leftover board stays listed and can be deleted by hand.
-        });
-      }
+      await discard({ client, projectId, dashboardId });
       await refresh();
       return void 0;
     } finally {

@@ -50,8 +50,8 @@ function NameField({
   return (
     <Field.Root invalid={isMissing}>
       <Field.Label>Name</Field.Label>
+      {/* The dialog focuses its first field, so the name opens selected. */}
       <Input
-        autoFocus
         value={name}
         onChange={(event) => onName(event.target.value)}
         onFocus={(event) => event.target.select()}

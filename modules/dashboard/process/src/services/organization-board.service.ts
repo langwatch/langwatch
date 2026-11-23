@@ -89,14 +89,13 @@ export class OrganizationBoardService {
     ]);
     return listed.map(({ board, project }) => {
       const starIndex = starredIds.indexOf(board.id);
-      // An unreadable project's author goes unnamed by id too, unless it is the viewer.
-      const isAuthorShown = project !== null || board.createdById === viewer.userId;
+      const author = authorOf({ board, isReadable: project !== null, viewer, ownerNames });
       return libraryRow({
-        board: isAuthorShown ? board : { ...board, createdById: null },
+        board: { ...board, createdById: author.createdById },
         project,
         openProject: project ?? guestProject ?? null,
         starPosition: starIndex === -1 ? null : starIndex,
-        ownerName: project ? (ownerNames.get(board.createdById ?? "") ?? null) : null,
+        ownerName: author.ownerName,
       });
     });
   }
@@ -192,6 +191,31 @@ function isListed({
     return dashboardStanding({ board, viewer, place }) === "home";
   }
   return board.scope === "ORGANIZATION" && board.organizationId === organizationId;
+}
+
+/**
+ * Who a row names as its author. Only a readable project's author is named; an unreadable
+ * project's goes unnamed by id too, unless it is the viewer.
+ */
+function authorOf({
+  board,
+  isReadable,
+  viewer,
+  ownerNames,
+}: {
+  board: BoardRecord;
+  isReadable: boolean;
+  viewer: DashboardViewer;
+  ownerNames: ReadonlyMap<string, string>;
+}): { createdById: string | null; ownerName: string | null } {
+  if (isReadable) {
+    return {
+      createdById: board.createdById,
+      ownerName: ownerNames.get(board.createdById ?? "") ?? null,
+    };
+  }
+  const isViewers = board.createdById === viewer.userId;
+  return { createdById: isViewers ? board.createdById : null, ownerName: null };
 }
 
 function libraryRow({
