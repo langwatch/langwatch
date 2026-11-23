@@ -28,7 +28,9 @@ import {
   DashboardsNotEnabledError,
   dashboardConfig,
   type Dashboard,
+  type Board,
   type BoardSummary,
+  type DashboardHomeProduct,
   type DashboardProject,
   type DashboardScope,
   type DashboardScopeImpact,
@@ -463,7 +465,7 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     return this.#boards.getBoard(input);
   }
 
@@ -474,7 +476,8 @@ export class DashboardModule implements DashboardApi {
     createdById?: string;
     /** Made at this scope in the same write; the door asked what setting it later would. */
     scope?: DashboardScope;
-  }): Promise<Dashboard> {
+    homeProduct?: DashboardHomeProduct;
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.createBoard(input);
   }
@@ -486,7 +489,7 @@ export class DashboardModule implements DashboardApi {
     viewer?: DashboardViewer;
     name?: string;
     description?: string | null;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.updateBoard(input);
   }
@@ -496,9 +499,26 @@ export class DashboardModule implements DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#boards.deleteBoard(input);
+  }
+
+  /** Rehomes a board in the project that owns it; answers it as the library now lists it. */
+  async moveBoard(input: {
+    projectId: string;
+    dashboardId: string;
+    homeProduct: DashboardHomeProduct;
+    viewer: DashboardViewer;
+  }): Promise<OrganizationBoard> {
+    await this.#requireDashboardsEnabled(input.projectId);
+    const moved = await this.#scopes.move(input);
+    const organizationId = await this.#projects.getOrganizationId(moved.projectId);
+    return this.#organizationBoards.getBoard({
+      organizationId,
+      viewer: input.viewer,
+      dashboardId: moved.id,
+    });
   }
 
   /** Who sees a board: the author's call alone, made in the project that owns it. */
@@ -507,7 +527,7 @@ export class DashboardModule implements DashboardApi {
     dashboardId: string;
     scope: DashboardScope;
     viewer: DashboardViewer;
-  }): Promise<Dashboard> {
+  }): Promise<Board> {
     await this.#requireDashboardsEnabled(input.projectId);
     return this.#scopes.setScope(input);
   }

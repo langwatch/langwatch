@@ -6,22 +6,28 @@
  */
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
+import type { DashboardHomeProduct } from "@langwatch/dashboard-contract";
+import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost, type StubAnalyticsHostOptions } from "../../../testing.tsx";
 import { CURATED_BOARDS } from "../model/curated-boards.ts";
 import DashboardsLibraryScreen from "../ui/sections/dashboards-library.screen.tsx";
+import { NewDashboardDialog } from "../ui/sections/new-dashboard-dialog.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
 const SHOP = { id: "proj-shop", slug: "shop-abc123", name: "Shop" };
 const IN_VIEW = { id: "proj-1", slug: "test-project", name: "Test Project" };
+/** A store project that sorts before the project in view by name. */
+const ALPHA = { id: "proj-alpha", slug: "alpha", name: "Alpha" };
 
 const row = ({
   id,
   name,
   scope = "PROJECT",
+  homeProduct = "llm-ops",
   project = SHOP,
   createdById = "someone",
   ownerName = null,
@@ -30,6 +36,7 @@ const row = ({
   id: string;
   name: string;
   scope?: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+  homeProduct?: DashboardHomeProduct;
   project?: typeof SHOP | null;
   createdById?: string;
   ownerName?: string | null;
@@ -41,6 +48,7 @@ const row = ({
   createdById,
   ownerName,
   scope,
+  homeProduct,
   updatedAt: new Date("2026-11-01"),
   project,
   openProject: project ?? IN_VIEW,
@@ -58,8 +66,17 @@ const LISTED = [
   }),
 ];
 
-/** Answers the library, the project list the From LangWatch rows read, and every write. */
-function libraryServer(listed: unknown = LISTED) {
+/**
+ * Answers the library, the store projects, the project list the From LangWatch rows read, and
+ * every write.
+ */
+function libraryServer({
+  listed = LISTED,
+  storeProjects = [IN_VIEW],
+}: {
+  listed?: unknown;
+  storeProjects?: readonly (typeof IN_VIEW)[];
+} = {}) {
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
@@ -67,7 +84,15 @@ function libraryServer(listed: unknown = LISTED) {
       return listed instanceof Error ? Promise.reject(listed) : Promise.resolve(listed);
     }
     if (call.path === "boards.getAll") return Promise.resolve([]);
-    if (call.path === "boards.storeProjects") return Promise.resolve([IN_VIEW]);
+    if (call.path === "boards.storeProjects") return Promise.resolve(storeProjects);
+    if (call.path === "boards.move") {
+      const { dashboardId, homeProduct } = call.input as {
+        dashboardId: string;
+        homeProduct: DashboardHomeProduct;
+      };
+      return Promise.resolve(row({ id: dashboardId, name: "Moved", homeProduct }));
+    }
+    if (call.path === "boards.reorderStars") return Promise.resolve({ success: true });
     if (call.path === "boards.create" || call.path === "boards.createAtScope") {
       const { name } = call.input as { name: string };
       return Promise.resolve({ ...row({ id: "board-new", name }), projectId: IN_VIEW.id });
@@ -88,19 +113,39 @@ function libraryServer(listed: unknown = LISTED) {
 
 function renderLibrary({
   listed,
+  storeProjects,
   ...options
-}: StubAnalyticsHostOptions & { listed?: unknown } = {}) {
+}: StubAnalyticsHostOptions & {
+  listed?: unknown;
+  storeProjects?: readonly (typeof IN_VIEW)[];
+} = {}) {
   const host = new StubAnalyticsHost({
     projectPermissions: {
       [SHOP.id]: ["analytics:view", "analytics:update", "analytics:delete"],
       [IN_VIEW.id]: ["analytics:create", "analytics:update"],
+      [ALPHA.id]: ["analytics:create", "analytics:update"],
     },
     ...options,
   });
-  const server = libraryServer(listed);
-  renderDashboards({ element: <DashboardsLibraryScreen />, host, answer: server.answer });
-  return { host, calls: server.calls, user: userEvent.setup({ pointerEventsCheck: 0 }) };
+  const server = libraryServer({ listed, storeProjects });
+  const element = (
+    <>
+      <DashboardsLibraryScreen />
+      <Toaster />
+    </>
+  );
+  const view = renderDashboards({ element, host, answer: server.answer });
+  return {
+    host,
+    calls: server.calls,
+    unmount: view.unmount,
+    user: userEvent.setup({ pointerEventsCheck: 0 }),
+  };
 }
+
+afterEach(() => {
+  toaster.remove();
+});
 
 const inputsTo = (calls: readonly UiProcedureCall[], path: string) =>
   calls.filter((call) => call.path === path).map((call) => call.input);
@@ -148,12 +193,49 @@ describe("the Dashboards library", () => {
     });
 
     /** @scenario "The library lists the boards I may see, with who sees each and its owner" */
-    it("opens a Project board at its own project's address", async () => {
+    it("opens a Project board at the organization's address too", async () => {
       const { host, user } = renderLibrary();
 
       await user.click(await screen.findByRole("link", { name: "Shop board" }));
 
-      expect(host.navigations).toEqual([`/${SHOP.slug}/dashboards/board-shop`]);
+      expect(host.navigations).toEqual(["/dashboards/board-shop"]);
+    });
+  });
+
+  describe("when boards are homed in different products", () => {
+    const HOMED = [
+      row({ id: "board-gw", name: "Key spend", scope: "ORGANIZATION", homeProduct: "gateway" }),
+      row({ id: "board-me", name: "Agent spend", scope: "PRIVATE", homeProduct: "me" }),
+      row({ id: "board-ops", name: "Shop board" }),
+    ];
+    const groupLabels = () =>
+      screen
+        .getAllByRole("heading", { level: 2 })
+        .map((heading) => heading.textContent?.split(" · ")[0]);
+
+    /** @scenario "The library lists every board I may see, grouped by product" */
+    it("groups them by product in rail order, and gives a product with none no group", async () => {
+      renderLibrary({ listed: HOMED });
+      await screen.findByRole("region", { name: "LLM Ops" });
+
+      expect(groupLabels()).toEqual(["Coding agents", "LLM Ops", "Gateway"]);
+      expect(screen.queryByRole("region", { name: "Governance" })).toBeNull();
+    });
+
+    /** @scenario "The library lists every board I may see, grouped by product" */
+    it("lists each board in its own product's group, From LangWatch boards in LLM Ops alone", async () => {
+      renderLibrary({ listed: HOMED });
+      const llmOps = await screen.findByRole("region", { name: "LLM Ops" });
+      const gateway = screen.getByRole("region", { name: "Gateway" });
+
+      expect(within(llmOps).getByText(`LLM Ops · ${CURATED_BOARDS.length + 1}`)).toBeVisible();
+      expect(within(gateway).getByText("Gateway · 1")).toBeVisible();
+      expect(within(gateway).getAllByRole("listitem")).toEqual([
+        within(gateway).getByText("Key spend").closest("li"),
+      ]);
+      expect(
+        within(screen.getByRole("region", { name: "Coding agents" })).getByText("Agent spend"),
+      ).toBeVisible();
     });
   });
 
@@ -195,6 +277,27 @@ describe("the Dashboards library", () => {
       expect(boardLinks(group)).toHaveLength(8);
       expect(within(group).queryByRole("button", { name: /^Show / })).toBeNull();
     });
+
+    /** @scenario "A long group stays open or folded after a reload" */
+    it("keeps the group open when the library is opened again, and folded once folded", async () => {
+      const first = renderLibrary({ listed: ELEVEN });
+      const group = await screen.findByRole("region", { name: "LLM Ops" });
+      await first.user.click(within(group).getByRole("button", { name: "Show 3 more" }));
+      first.unmount();
+
+      const second = renderLibrary({ listed: ELEVEN });
+      const reopened = await screen.findByRole("region", { name: "LLM Ops" });
+
+      expect(boardLinks(reopened)).toEqual(ELEVEN.map((board) => board.name));
+      await second.user.click(within(reopened).getByRole("button", { name: "Show less" }));
+      second.unmount();
+
+      renderLibrary({ listed: ELEVEN });
+      const folded = await screen.findByRole("region", { name: "LLM Ops" });
+
+      expect(boardLinks(folded)).toHaveLength(8);
+      expect(within(folded).getByRole("button", { name: "Show 3 more" })).toBeVisible();
+    });
   });
 
   describe("when no project of the organization has Dashboards on", () => {
@@ -213,9 +316,9 @@ describe("the Dashboards library", () => {
       await user.click(await screen.findByRole("button", { name: "New dashboard" }));
       await user.click(await screen.findByRole("button", { name: "Create" }));
 
-      await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-new"]));
+      await waitFor(() => expect(host.navigations).toEqual(["/dashboards/board-new"]));
       expect(inputsTo(calls, "boards.create")).toEqual([
-        { projectId: IN_VIEW.id, name: "Untitled dashboard 1" },
+        { projectId: IN_VIEW.id, name: "Untitled dashboard 1", homeProduct: "llm-ops" },
       ]);
       expect(inputsTo(calls, "boards.createAtScope")).toEqual([]);
       expect(inputsTo(calls, "boards.setScope")).toEqual([]);
@@ -232,10 +335,244 @@ describe("the Dashboards library", () => {
 
       await waitFor(() => expect(host.navigations).toEqual(["/dashboards/board-new"]));
       expect(inputsTo(calls, "boards.createAtScope")).toEqual([
-        { projectId: IN_VIEW.id, name: "Untitled dashboard 1", scope: "PRIVATE" },
+        {
+          projectId: IN_VIEW.id,
+          name: "Untitled dashboard 1",
+          scope: "PRIVATE",
+          homeProduct: "llm-ops",
+        },
       ]);
       expect(inputsTo(calls, "boards.create")).toEqual([]);
       expect(inputsTo(calls, "boards.setScope")).toEqual([]);
+    });
+
+    /** @scenario "Create from the library with a name, product and who can see it" */
+    it("stores it in my last-used project, though another comes first by name", async () => {
+      const { host, calls, user } = renderLibrary({ storeProjects: [ALPHA, IN_VIEW] });
+
+      await user.click(await screen.findByRole("button", { name: "New dashboard" }));
+      await user.click(await screen.findByRole("button", { name: "Create" }));
+
+      await waitFor(() => expect(host.navigations).toEqual(["/dashboards/board-new"]));
+      expect(inputsTo(calls, "boards.create")).toEqual([
+        { projectId: IN_VIEW.id, name: "Untitled dashboard 1", homeProduct: "llm-ops" },
+      ]);
+    });
+
+    /** @scenario "Create from the library with a name, product and who can see it" */
+    it("stores it in the first by name when my last-used project is not among them", async () => {
+      const { host, calls, user } = renderLibrary({
+        storeProjects: [ALPHA, IN_VIEW],
+        project: {
+          id: "proj-elsewhere",
+          slug: "elsewhere",
+          name: "Elsewhere",
+          hasFirstMessage: true,
+        },
+      });
+
+      await user.click(await screen.findByRole("button", { name: "New dashboard" }));
+      await user.click(await screen.findByRole("button", { name: "Create" }));
+
+      await waitFor(() => expect(host.navigations).toEqual(["/dashboards/board-new"]));
+      expect(inputsTo(calls, "boards.create")).toEqual([
+        { projectId: ALPHA.id, name: "Untitled dashboard 1", homeProduct: "llm-ops" },
+      ]);
+    });
+  });
+
+  describe("when the member picks the product of a new dashboard", () => {
+    const openDialog = async () => {
+      const rendered = renderLibrary();
+      await rendered.user.click(await screen.findByRole("button", { name: "New dashboard" }));
+      const dialog = within(await screen.findByRole("dialog"));
+      return { ...rendered, dialog };
+    };
+
+    /** @scenario "Create from the library with a name, product and who can see it" */
+    it("starts in LLM Ops at Project, and resets who can see it per product", async () => {
+      const { dialog, user } = await openDialog();
+      const product = dialog.getByRole("combobox");
+
+      expect(product).toHaveValue("llm-ops");
+      expect(dialog.getByRole("radio", { name: /Project/ })).toBeChecked();
+      expect(dialog.getByText("Lives in LLM Ops. Move it from Dashboards.")).toBeVisible();
+
+      await user.selectOptions(product, "me");
+      expect(dialog.getByRole("radio", { name: /Only me/ })).toBeChecked();
+      expect(dialog.queryByRole("radio", { name: /Project/ })).toBeNull();
+
+      await user.selectOptions(product, "governance");
+      expect(dialog.getByRole("radio", { name: /Organization/ })).toBeChecked();
+
+      await user.selectOptions(product, "gateway");
+      expect(dialog.getByRole("radio", { name: /Organization/ })).toBeChecked();
+      expect(dialog.queryByRole("radio", { name: /Project/ })).toBeNull();
+      expect(dialog.getByText("Lives in Gateway. Move it from Dashboards.")).toBeVisible();
+      expect(dialog.getByText(`Stored in ${IN_VIEW.name}.`)).toBeVisible();
+    });
+
+    /** @scenario "Create from the library with a name, product and who can see it" */
+    it("makes it homed in the product picked, at that product's scope", async () => {
+      const { host, calls, dialog, user } = await openDialog();
+
+      await user.selectOptions(dialog.getByRole("combobox"), "gateway");
+      await user.click(dialog.getByRole("button", { name: "Create" }));
+
+      await waitFor(() => expect(host.navigations).toEqual(["/dashboards/board-new"]));
+      expect(inputsTo(calls, "boards.createAtScope")).toEqual([
+        {
+          projectId: IN_VIEW.id,
+          name: "Untitled dashboard 1",
+          scope: "ORGANIZATION",
+          homeProduct: "gateway",
+        },
+      ]);
+      expect(inputsTo(calls, "boards.create")).toEqual([]);
+    });
+
+    /** @scenario "The create dialog refuses an empty name, and Cancel makes nothing" */
+    it("disables Create while the name is empty or spaces, and Cancel makes nothing", async () => {
+      const { calls, dialog, user } = await openDialog();
+      const name = dialog.getByRole("textbox");
+
+      await user.clear(name);
+      expect(dialog.getByRole("button", { name: "Create" })).toBeDisabled();
+      await user.type(name, "   ");
+      expect(dialog.getByRole("button", { name: "Create" })).toBeDisabled();
+      await user.click(dialog.getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(inputsTo(calls, "boards.create")).toEqual([]);
+      expect(inputsTo(calls, "boards.createAtScope")).toEqual([]);
+    });
+  });
+
+  describe("when a product's \"+\" opens the new dashboard dialog", () => {
+    /** @scenario A product's "+" fixes the product and says where the board lives */
+    it("asks no product, says where it lives, and makes it there", async () => {
+      const made: unknown[] = [];
+      renderDashboards({
+        element: (
+          <NewDashboardDialog
+            product="gateway"
+            takenNamesIn={() => ["Untitled dashboard 1"]}
+            projectName={IN_VIEW.name}
+            organizationName="Acme"
+            mayShare
+            isCreating={false}
+            onCreate={(input) => {
+              made.push(input);
+              return Promise.resolve(true);
+            }}
+            onClose={() => void 0}
+          />
+        ),
+        host: new StubAnalyticsHost(),
+      });
+      const dialog = within(await screen.findByRole("dialog"));
+
+      expect(dialog.queryByRole("combobox")).toBeNull();
+      expect(dialog.getByText("Lives in Gateway. Move it from Dashboards.")).toBeVisible();
+      expect(dialog.getByRole("radio", { name: /Organization/ })).toBeChecked();
+      expect(dialog.queryByRole("radio", { name: /Project/ })).toBeNull();
+
+      await userEvent
+        .setup({ pointerEventsCheck: 0 })
+        .click(dialog.getByRole("button", { name: "Create" }));
+
+      await waitFor(() =>
+        expect(made).toEqual([
+          { name: "Untitled dashboard 2", scope: "ORGANIZATION", homeProduct: "gateway" },
+        ]),
+      );
+    });
+  });
+
+  describe("when the member moves a board to another product", () => {
+    /** @scenario "Move an Organization board to Gateway" */
+    it("moves it to the product picked, says so, and offers Open", async () => {
+      const { host, calls, user } = renderLibrary();
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Shop board" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Move to product…" }));
+      const dialog = within(await screen.findByRole("dialog"));
+      const hint = 'Pick the product whose sidebar lists "Shop board". Old links keep opening it.';
+      expect(dialog.getByText(hint)).toBeVisible();
+      expect(dialog.getByRole("button", { name: "Move" })).toBeDisabled();
+
+      await user.click(dialog.getByRole("radio", { name: /Gateway/ }));
+      expect(
+        dialog.getByText("Gateway has no projects, so only you will see it until you share it."),
+      ).toBeVisible();
+      await user.click(dialog.getByRole("button", { name: "Move" }));
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "boards.move")).toEqual([
+          { projectId: SHOP.id, dashboardId: "board-shop", homeProduct: "gateway" },
+        ]),
+      );
+      expect(await screen.findByText('Moved "Shop board" to Gateway')).toBeVisible();
+      await user.click(screen.getByRole("button", { name: "Open" }));
+      expect(host.navigations).toEqual(["/dashboards/board-shop"]);
+    });
+
+    /** @scenario "Only the author can move a Project board out of LLM Ops" */
+    it("keeps another member's Project board in LLM Ops, saying only its author can move it", async () => {
+      const { user } = renderLibrary({
+        listed: [row({ id: "board-team", name: "Team board", createdById: "someone" })],
+      });
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Team board" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Move to product…" }));
+      const dialog = within(await screen.findByRole("dialog"));
+
+      expect(dialog.getByRole("radio", { name: /LLM Ops/ })).toBeEnabled();
+      for (const product of [/Coding agents/, /Gateway/, /Governance/]) {
+        expect(dialog.getByRole("radio", { name: product })).toBeDisabled();
+      }
+      expect(
+        dialog.getByText("Only its author can move a Project board out of LLM Ops."),
+      ).toBeVisible();
+      expect(dialog.queryByText(/shared with the organization/)).toBeNull();
+      expect(dialog.getByRole("button", { name: "Move" })).toBeDisabled();
+    });
+
+    /** @scenario "Move edge cases" */
+    it("changes nothing on Cancel", async () => {
+      const { calls, user } = renderLibrary();
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Shop board" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Move to product…" }));
+      const dialog = within(await screen.findByRole("dialog"));
+      await user.click(dialog.getByRole("radio", { name: /Governance/ }));
+      await user.click(dialog.getByRole("button", { name: "Cancel" }));
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(inputsTo(calls, "boards.move")).toEqual([]);
+    });
+
+    /** @scenario "A library row's menu offers what I may do" */
+    it("greys out Move on a From LangWatch board, saying to move a copy", async () => {
+      const [curated] = CURATED_BOARDS;
+      const { user } = renderLibrary();
+
+      await user.click(await screen.findByRole("button", { name: `Actions for ${curated?.name}` }));
+      const move = await screen.findByRole("menuitem", { name: "Move to product…" });
+
+      expect(move).toHaveAttribute("aria-disabled", "true");
+      expect(move).toHaveAttribute("title", "Built for LLM Ops. Duplicate it, then move the copy.");
+    });
+
+    /** @scenario "Move needs edit rights in the owning project" */
+    it("greys out Move on a board they cannot edit, saying why", async () => {
+      const { user } = renderLibrary();
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Everyone's board" }));
+      const move = await screen.findByRole("menuitem", { name: "Move to product…" });
+
+      expect(move).toHaveAttribute("aria-disabled", "true");
+      expect(move).toHaveAttribute("title", "You can view this dashboard but not change it.");
     });
   });
 
@@ -325,6 +662,47 @@ describe("the Dashboards library", () => {
     });
   });
 
+  describe("when the member reorders their starred boards from the library", () => {
+    const STARRED = [
+      row({ id: "board-first", name: "First board", starPosition: 0 }),
+      row({ id: "board-second", name: "Second board", starPosition: 1 }),
+    ];
+
+    /** @scenario "A library row's menu offers what I may do" */
+    it("moves a star up, saving my whole star order where it opens", async () => {
+      const { calls, user } = renderLibrary({ listed: STARRED });
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Second board" }));
+      expect(await screen.findByRole("menuitem", { name: "Move down" })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+      await user.click(screen.getByRole("menuitem", { name: "Move up" }));
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "boards.reorderStars")).toEqual([
+          {
+            projectId: SHOP.id,
+            stars: [
+              { kind: "board", dashboardId: "board-second" },
+              { kind: "board", dashboardId: "board-first" },
+            ],
+          },
+        ]),
+      );
+    });
+
+    /** @scenario "A library row's menu offers what I may do" */
+    it("offers no Move up or Move down on a board not starred", async () => {
+      const { user } = renderLibrary();
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Shop board" }));
+
+      expect(await screen.findByRole("menuitem", { name: "Star" })).toBeVisible();
+      expect(screen.queryByRole("menuitem", { name: "Move up" })).toBeNull();
+    });
+  });
+
   describe("when the member renames a board they may edit", () => {
     /** @scenario "Delete, rename, star and duplicate from the library" */
     it("saves the name in place in its own project on Enter, and says so", async () => {
@@ -389,7 +767,7 @@ describe("the Dashboards library", () => {
         { projectId: SHOP.id, dashboardId: "board-shop" },
       ]);
       expect(inputsTo(calls, "boards.setScope")).toEqual([]);
-      expect(host.navigations).toEqual([`/${IN_VIEW.slug}/dashboards/board-new`]);
+      expect(host.navigations).toEqual(["/dashboards/board-new"]);
     });
 
     /** @scenario "Delete, rename, star and duplicate from the library" */
@@ -406,6 +784,29 @@ describe("the Dashboards library", () => {
         { projectId: IN_VIEW.id, name: "My notes copy", scope: "PRIVATE" },
       ]);
       expect(inputsTo(calls, "boards.setScope")).toEqual([]);
+    });
+
+    /** @scenario "Duplicate and Delete from the library" */
+    it("keeps the product of a board homed outside LLM Ops, at its scope", async () => {
+      const { host, calls, user } = renderLibrary({
+        listed: [
+          row({ id: "board-gw", name: "Key spend", scope: "ORGANIZATION", homeProduct: "gateway" }),
+        ],
+      });
+
+      await user.click(await screen.findByRole("button", { name: "Actions for Key spend" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Duplicate" }));
+
+      await waitFor(() => expect(host.navigations).toEqual(["/dashboards/board-new"]));
+      expect(inputsTo(calls, "boards.createAtScope")).toEqual([
+        {
+          projectId: IN_VIEW.id,
+          name: "Key spend copy",
+          scope: "ORGANIZATION",
+          homeProduct: "gateway",
+        },
+      ]);
+      expect(inputsTo(calls, "boards.create")).toEqual([]);
     });
   });
 });

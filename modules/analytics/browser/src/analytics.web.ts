@@ -10,6 +10,7 @@ import {
   FilterSidebarToken,
   LwqlReplayChartToken,
   OrganizationStarredDashboardsToken,
+  ProductDashboardsToken,
   SavedDashboardsToken,
   StarredDashboardsToken,
 } from "@langwatch/analytics-client";
@@ -131,7 +132,14 @@ export const analyticsWeb = defineBrowserModule("analytics")
         .StarredDashboardsSection,
     }),
   })
-  /** The "Starred dashboards" group, lent to the library's and Governance's sidebars. */
+  /** Each product's Dashboards section with the organization's area on: its boards and "+". */
+  .lends(ProductDashboardsToken, {
+    load: async () => ({
+      default: (await import("./features/dashboards/ui/sections/product-dashboards-section.tsx"))
+        .ProductDashboardsSection,
+    }),
+  })
+  /** The "Starred dashboards" group, lent to the library's and every product's sidebar. */
   .lends(OrganizationStarredDashboardsToken, {
     load: async () => ({
       default: (await import("./features/dashboards/ui/sections/organization-starred-section.tsx"))

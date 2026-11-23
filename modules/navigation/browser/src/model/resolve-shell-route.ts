@@ -70,9 +70,10 @@ function seatRefusalAt({
 }
 
 /**
- * The product the chrome draws. Dashboards wins over the personal plane: the Coding agents
- * sidebar has no saved-dashboards list. A reader who clicked in from LLM Ops stays there (the
- * hint), except in the organization's library, which is about no project; no hint, no change.
+ * The product the chrome draws. An open board draws its home product, whatever its address. With
+ * the organization's library on, a project's Dashboards pages are LLM Ops (owner decision D1);
+ * without it a reader who clicked in from LLM Ops stays there (the hint), except in the library.
+ * Dashboards wins over the personal plane: the Coding agents sidebar has no saved-dashboards list.
  */
 function activeProductFor({
   isSettingsRoute,
@@ -80,16 +81,23 @@ function activeProductFor({
   isOrganizationLibrary,
   addressedProductId,
   sidebarHint,
+  boardHomeProduct,
+  hasOrganizationLibrary,
 }: {
   isSettingsRoute: boolean;
   isPersonalScopeRoute: boolean;
   isOrganizationLibrary: boolean;
   addressedProductId: ProductId | null;
   sidebarHint: DashboardsSidebarHint | null;
+  boardHomeProduct: ProductId | null;
+  hasOrganizationLibrary: boolean;
 }): ProductId | null {
   if (isSettingsRoute) return null;
   if (addressedProductId === "dashboards") {
-    return sidebarHint === "llm-ops" && !isOrganizationLibrary ? "llm-ops" : "dashboards";
+    if (boardHomeProduct) return boardHomeProduct;
+    if (isOrganizationLibrary) return "dashboards";
+    if (hasOrganizationLibrary) return "llm-ops";
+    return sidebarHint === "llm-ops" ? "llm-ops" : "dashboards";
   }
   if (isPersonalScopeRoute) return "me";
   return addressedProductId ?? "llm-ops";
@@ -121,6 +129,8 @@ export function resolveShellRoute({
   isOnOwnPersonalProject,
   organizationRole,
   sidebarHint = null,
+  boardHomeProduct = null,
+  hasOrganizationLibrary = false,
 }: {
   pathname: string;
   isPersonalScope: boolean;
@@ -130,6 +140,10 @@ export function resolveShellRoute({
   organizationRole: string | null | undefined;
   /** The sidebar this tab last came from; only a Dashboards address reads it. */
   sidebarHint?: DashboardsSidebarHint | null;
+  /** The open board's home product, when the seat reaches it; only a Dashboards address reads it. */
+  boardHomeProduct?: ProductId | null;
+  /** Whether the organization's Dashboards library is on (ADR-002). */
+  hasOrganizationLibrary?: boolean;
 }): ShellRoute {
   const isSettingsRoute = isSettingsShellRoute(pathname);
   // The product the ADDRESS names, before any sticky scope is applied.
@@ -151,6 +165,8 @@ export function resolveShellRoute({
     isOrganizationLibrary,
     addressedProductId,
     sidebarHint,
+    boardHomeProduct,
+    hasOrganizationLibrary,
   });
   const isOrgScopeRoute =
     isOrgScope ||

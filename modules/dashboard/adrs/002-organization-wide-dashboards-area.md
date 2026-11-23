@@ -57,9 +57,8 @@ scope kind would lock developer seats out.
 ## Decision
 
 We will add an organization-wide Dashboards area. Every project board keeps its
-owning project, so the board, widget and favourite tables do not change. New
-facts (a board's home product, personal boards) are recorded as events and
-folded into projections owned by the dashboard module.
+owning project, so the widget and favourite tables do not change. A board's
+home product is a column on `DashboardsV2` (decision 8, amended 2026-11-23).
 
 1. **Anchor stays.** Every board in `DashboardsV2` keeps its owning project. For
    a board that is not in a project view (decision 8) the owning project is
@@ -97,11 +96,22 @@ folded into projections owned by the dashboard module.
    product-prefixed board routes. This differs on purpose from the approved design,
    which gives project boards the library address: here a project shows only at
    a project address, and every existing board link is a project address.
+
+   **Reversed by the owner, 2026-11-23.** A board made or opened from the
+   Dashboards library stays in `/dashboards`: it opens at `/dashboards/<id>`
+   whatever its scope, a `PROJECT` board included, and that address no longer
+   redirects to a project address. Older `/:project/dashboards/<id>` links still
+   open. Dashboards also shows no project switcher; a board reads "Data from
+   <project>", read-only.
 5. **Per-route "no picker" flag.** Hide the picker on the `/dashboards` routes
    with a flag on the route, not a new scope kind. Do not switch Dashboards to
    `scopeKind` `"organization"`. This is smaller and leaves
    `seatReachesProduct` untouched, so developer seats still get in. They see
    only boards from projects they can read, the same rule as today.
+
+   **Amended 2026-11-23 (D1, by the owner).** With the organisation area flag on,
+   `/:project/dashboards...` draws LLM Ops chrome, and a board draws its home
+   product's chrome.
 6. **One flag for the area (amended; D4, 2026-11-23).** The organization-wide
    area ships behind its own frontend flag `release_dashboards_organization_area`,
    default off, which needs `release_dashboards`. On a page with no project both
@@ -129,6 +139,19 @@ folded into projections owned by the dashboard module.
    never its owning project, and asks `analytics:update` there. Only the author
    may move a `PROJECT` board out of LLM Ops, and it becomes Only me in the same
    command (D3; `dashboard_scope_author_only`).
+
+   **Amended 2026-11-23, by the owner's direction to ship the full feature in one
+   PR.** The home product is a column, `"DashboardsV2"."homeProduct" TEXT NOT NULL
+   DEFAULT 'llm-ops'`, added by migration
+   `20261123120000_dashboards_v2_home_product`. It is not an event and projection,
+   because the dashboard module has no eventing pipeline; the constant default
+   homes every existing board in LLM Ops with no rewrite. The wording above about
+   events, an aggregate and an absent row is superseded. Moves: an author's move
+   of a `PROJECT` board out of LLM Ops makes it Only me (as in the prototype);
+   anyone else's such move is refused with `dashboard_scope_author_only`, because
+   no organisation-level permission exists and only the author may widen who sees
+   a board. This departs from the prototype, which widens other people's moves to
+   Organization.
 9. **"All projects" at the organization level (new; D1).** On an org-level page
    a widget whose query stores no projects reads `projects: "all"`, at most 100
    projects; the card says so above that. A project view still reads its own
@@ -138,6 +161,11 @@ folded into projections owned by the dashboard module.
    enforced once, in `LangWatchQLReadableProjectsService.listFor`. It is a
    deliberate change to the public "all": another member's personal workspace
    is theirs, and "all" should not quietly include it.
+
+   **Amended 2026-11-23 (D2, by the owner).** An LLM Ops board with no project
+   reads the project in view, switched from LLM Ops's top bar, not "All projects".
+   Gateway and Governance boards read every project the viewer can read. Data
+   always stays under each viewer's own project permissions.
 10. **Personal boards, a member-owned aggregate (new).** My dashboard (one per
     member) and the boards made in Coding agents as Only me belong to the
     member, not to a project or an organization. They are a separate
@@ -154,6 +182,10 @@ folded into projections owned by the dashboard module.
     kept as Only me boards; the personal one starts as a copy of the member's
     My dashboard in the current project, if any. Personal boards are deleted on
     `lw.user.erased`, and they appear in no REST, CLI or MCP answer.
+
+    **Cut by the owner, 2026-11-23 (D3).** There is no `personal_board` aggregate,
+    no member-owned store and no cross-organisation personal board. Only me boards
+    are ordinary boards in one organisation.
 11. **Gateway traces in the governance project (new; D2).** An org-level
     board's "All projects" run also reads the organization's governance
     project, limited to Gateway traffic of the virtual keys the member may read:
@@ -168,6 +200,10 @@ folded into projections owned by the dashboard module.
     outage reading the keys fails the run; only a denial reads as "no
     governance member". The per-view rule table is reviewed for security before
     any of this is built.
+
+    **Amended 2026-11-23, by the coordinator's direction.** The governance-project
+    read is not in this PR and waits for a security review. Until then, Gateway
+    and Governance boards read every project the viewer can read (D2, decision 9).
 12. **A read-only port into the gateway (new).** Analytics reads the readable
     keys through `GatewayApi.listVirtualKeyIdsReadableInDashboards({
 organizationId, userId }) -> { virtualKeyIds }`, with the narrow type
@@ -190,13 +226,15 @@ organizationId, userId }) -> { virtualKeyIds }`, with the narrow type
     store project. A `PROJECT` board's copy stays in its project, so it cannot be
     copied by a member who may not create there.
 
+    **Amended 2026-11-23, by the owner's direction to ship the full feature in one PR.**
+    The last-in-product guard (`dashboard_last_in_product`) is not in this PR: it
+    needs an organisation-wide read. Delete and copy keep the other rules above.
+
 ## Consequences
 
-- Two expand-only migrations, each adding tables and changing none: the home
-  projection, and the personal-board projections. Turning the flag off ignores
-  both, so the area reads as it did before; nothing is deleted.
-- Two new event-sourced aggregates. Their event names and payloads are permanent
-  once written, so they are reviewed before they land.
+- One expand-only migration adds the `homeProduct` column with a constant
+  default (amended 2026-11-23). Turning the flag off ignores it, so the area
+  reads as it did before; nothing is deleted.
 - The server lists boards across projects and resolves a board by id; each
   project is authorised separately with `analytics:view`.
 - The `release_dashboards` gate is checked per project on the server. The list
@@ -231,8 +269,8 @@ have no sensible owning project, get their own member-owned store instead
 **Switch Dashboards to `scopeKind` `"organization"`.** This is the smallest
 change, but it locks developer seats out of Dashboards. Rejected.
 
-**Home product as a column on `DashboardsV2`.** Smaller, but it records a new
-fact by a direct write; new facts go through events and projections. Rejected.
+**Home product as a column on `DashboardsV2`.** Rejected on 2026-11-21 for
+events and projections; adopted on 2026-11-23 (decision 8, amended).
 
 **Owning-project data at the organization level.** An org-level board would then
 show one project's data, which does not give organization-level graphs.

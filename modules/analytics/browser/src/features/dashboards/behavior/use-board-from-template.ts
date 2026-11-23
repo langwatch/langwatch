@@ -6,7 +6,13 @@
 
 import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { type UiAnalyticsEvent, useUiAnalytics } from "@langwatch/browser-host/analytics";
-import type { DashboardProject, DashboardScope } from "@langwatch/dashboard-contract";
+import {
+  DEFAULT_DASHBOARD_HOME_PRODUCT,
+  type DashboardHomeProduct,
+  type DashboardProject,
+  type DashboardScope,
+  homeAllowsScope,
+} from "@langwatch/dashboard-contract";
 import { useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
@@ -37,13 +43,15 @@ type BoardSource = {
   widgetSource: (widget: BoardTemplateWidget) => DashboardWidgetSource | undefined;
   /** The scope a copy keeps; unset, a board made at the organization level is Only me. */
   scope?: DashboardScope;
+  /** The product a copy keeps; unset, the board is homed in LLM Ops. */
+  homeProduct?: DashboardHomeProduct;
 };
 
 /** A template's widgets are catalogue widgets, keyed by their catalogue id. */
 const fromCatalogue = (widget: BoardTemplateWidget) => catalogueSource(widget.key);
 
 /** Where a new board opens and what the org-level notice says. */
-type Opening = { dashboardId: string; scope: DashboardScope; title: string };
+type Opening = { dashboardId: string; title: string };
 
 const duplicatedAs = (name: string) => `Duplicated as "${name}"`;
 
@@ -56,21 +64,26 @@ export type CreatedBoard = {
 
 type BoardsClient = ReturnType<typeof analyticsApi.useUtils>["client"];
 
-/** Made at its scope in the one write, so a refused scope leaves no board behind. */
+/** Made at its scope and home in the one write, so a refused one leaves no board behind. */
 function makeBoard({
   client,
   projectId,
   name,
   scope,
+  homeProduct,
 }: {
   client: BoardsClient;
   projectId: string;
   name: string;
   scope: DashboardScope | undefined;
+  homeProduct: DashboardHomeProduct | undefined;
 }) {
+  // LLM Ops is the server's own default home, so it is left unsaid.
+  const home =
+    homeProduct === void 0 || homeProduct === DEFAULT_DASHBOARD_HOME_PRODUCT ? {} : { homeProduct };
   if (scope === void 0 || scope === "PROJECT")
-    return client.boards.create.mutate({ projectId, name });
-  return client.boards.createAtScope.mutate({ projectId, name, scope });
+    return client.boards.create.mutate({ projectId, name, ...home });
+  return client.boards.createAtScope.mutate({ projectId, name, scope, ...home });
 }
 
 /** Removes a half-made board; best effort, as a leftover stays listed and can be deleted. */
@@ -87,19 +100,17 @@ async function discard({
   await client.boards.delete.mutate({ projectId, dashboardId }).catch(() => void 0);
 }
 
-/** Only a Project board, or any made in a project view, lives at its project's address. */
+/** A board made at the organization level stays in Dashboards, a Project one included. */
 function openingPath({
   atOrganization,
   projectSlug,
   dashboardId,
-  scope,
 }: {
   atOrganization: boolean;
   projectSlug: string;
   dashboardId: string;
-  scope: DashboardScope;
 }) {
-  if (!atOrganization || scope === "PROJECT") return dashboardsPath({ projectSlug, dashboardId });
+  if (!atOrganization) return dashboardsPath({ projectSlug, dashboardId });
   return organizationBoardPath({ dashboardId });
 }
 
@@ -151,11 +162,11 @@ export function useBoardFromTemplate({
 
   /**
    * Opens the new board where it lives; an org-level one says so first, as it opens elsewhere.
-   * Only a Project board lives at its project's address (ADR-002, decision 4).
+   * One made at the organization level stays at `/dashboards/<id>` (ADR-002, decision 4).
    */
-  const open = ({ dashboardId, scope, title }: Opening) => {
+  const open = ({ dashboardId, title }: Opening) => {
     if (atOrganization) host.succeeded({ title });
-    host.navigate(openingPath({ atOrganization, projectSlug, dashboardId, scope }));
+    host.navigate(openingPath({ atOrganization, projectSlug, dashboardId }));
   };
 
   const createFrom = async ({
@@ -186,9 +197,9 @@ export function useBoardFromTemplate({
     try {
       const widgets = await source.widgets();
       const name = templateBoardName({ templateName: source.name, existingNames });
-      const board = await makeBoard({ client, projectId, name, scope: asked });
+      const { homeProduct } = source;
+      const board = await makeBoard({ client, projectId, name, scope: asked, homeProduct });
       dashboardId = board.id;
-      const scope = asked ?? board.scope;
       await fill({
         description: source.description,
         widgets,
@@ -198,7 +209,7 @@ export function useBoardFromTemplate({
       analytics.track(made);
       // Re-read first, so the new board is listed by the time its address opens.
       await refresh();
-      open({ dashboardId, scope, title: titled(board.name) });
+      open({ dashboardId, title: titled(board.name) });
       return { id: board.id, name: board.name, widgets };
     } catch (error) {
       host.failed({ error, fallbackTitle });
@@ -229,25 +240,31 @@ export function useBoardFromTemplate({
     });
 
   /**
-   * Copies the board and every widget on it as "<name> copy", then opens the copy. `readFrom`
-   * names the project that shows the source where that is not the store (the library's rows);
-   * at the organization level the copy keeps the source's scope.
+   * Copies the board and its widgets as "<name> copy" and opens it. `readFrom`: the project that
+   * shows the source, where not the store. Keeps the product, and the scope at org level or where
+   * the product has no projects; a star row names no product, so its copy is LLM Ops.
    */
   const duplicateBoard = ({
     board,
     existingNames,
     readFrom = projectId,
   }: {
-    board: Pick<SavedBoard, "id" | "name" | "description" | "scope">;
+    board: Pick<SavedBoard, "id" | "name" | "description" | "scope"> & {
+      homeProduct?: DashboardHomeProduct;
+    };
     existingNames: readonly string[];
     readFrom?: string;
-  }) =>
-    createFrom({
+  }) => {
+    const { homeProduct } = board;
+    const hasProjects =
+      homeProduct === void 0 || homeAllowsScope({ homeProduct, scope: "PROJECT" });
+    return createFrom({
       source: {
         id: board.id,
         name: boardCopyName(board.name),
         description: board.description,
-        ...(atOrganization ? { scope: board.scope } : {}),
+        ...(atOrganization || !hasProjects ? { scope: board.scope } : {}),
+        ...(homeProduct === void 0 ? {} : { homeProduct }),
         widgetSource: ({ definition }) => definition.source,
         widgets: async () => {
           const stored = await utils.dashboardWidgets.list.fetch({
@@ -262,6 +279,7 @@ export function useBoardFromTemplate({
       made: dashboardCreated({ createdFrom: "duplicate" }),
       titled: duplicatedAs,
     });
+  };
 
   /** "Duplicate to edit": the From LangWatch board's built widgets as "<name> (copy)". */
   const duplicateCurated = ({

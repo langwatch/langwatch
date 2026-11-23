@@ -1,10 +1,11 @@
 /**
  * The "Starred dashboards" group, lent through `OrganizationStarredDashboardsToken` (§10.1):
- * the member's stars across the organization as plain links with no menu, the first 7 then
- * "All starred (N)", which opens the library. It folds and unfolds; nothing shows with no star.
+ * the member's stars as plain links with no menu, less those of the sidebar's own product, the
+ * first 7 then "All starred (N)", which opens the library. It folds; nothing shows with no star.
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
+import type { OrganizationStarredDashboardsProps } from "@langwatch/analytics-client";
 import { SidebarSection, SidebarSectionLabel } from "@langwatch/design-system/app-shell";
 import { HStack, VStack } from "@langwatch/design-system/primitives";
 import { ChevronDown, LayoutDashboard } from "lucide-react";
@@ -17,8 +18,8 @@ import { SidebarLinkRow } from "../blocks/sidebar-link-row.tsx";
 
 const LABEL = "Starred dashboards";
 
-export function OrganizationStarredSection() {
-  const links = useOrganizationStars();
+export function OrganizationStarredSection({ product }: OrganizationStarredDashboardsProps) {
+  const links = useOrganizationStars({ product });
   const [isExpanded, setIsExpanded] = useState(true);
   if (links.length === 0) return null;
   return (

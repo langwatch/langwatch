@@ -1,7 +1,10 @@
 import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import {
+  boardSchema,
   DashboardNotFoundError,
-  dashboardSchema,
+  dashboardHomeProductSchema,
+  DEFAULT_DASHBOARD_HOME_PRODUCT,
+  type DashboardHomeProduct,
   type DashboardScope,
   type DashboardStar,
   type StarredDashboard,
@@ -16,6 +19,7 @@ import type {
   BoardSummaryRecord,
   BoardUpdate,
   MemberStars,
+  starredBoardRow,
 } from "../board.repository.ts";
 
 /** The column a star matches on: the board id for a board, the template id for a template. */
@@ -55,8 +59,12 @@ const memberStars = (input: MemberStars): Prisma.DashboardFavouriteWhereInput =>
   ],
 });
 
+/** A home this release does not know (a newer one wrote it) lists where every old board does. */
+const homeProductOf = (stored: string): DashboardHomeProduct =>
+  dashboardHomeProductSchema.catch(DEFAULT_DASHBOARD_HOME_PRODUCT).parse(stored);
+
 const boardRow = (row: DashboardsV2): BoardRecord =>
-  dashboardSchema.parse({
+  boardSchema.parse({
     id: row.id,
     projectId: row.projectId,
     name: row.name,
@@ -65,6 +73,7 @@ const boardRow = (row: DashboardsV2): BoardRecord =>
     createdById: row.createdById,
     scope: row.scope,
     organizationId: row.organizationId,
+    homeProduct: homeProductOf(row.homeProduct),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -136,6 +145,7 @@ export class PrismaBoardRepository
     name: string;
     createdById?: string | null;
     scope?: DashboardScope;
+    homeProduct?: DashboardHomeProduct;
     organizationId?: string | null;
   }): Promise<BoardRecord> {
     return boardRow(
@@ -207,7 +217,7 @@ export class PrismaBoardRepository
       }
       const dashboard =
         favourite.dashboardId === null ? undefined : byId.get(favourite.dashboardId);
-      return dashboard ? [{ kind: "board", dashboard }] : [];
+      return dashboard ? [{ kind: "board", dashboard: starredBoardRow(dashboard) }] : [];
     });
   }
 

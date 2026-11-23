@@ -1,13 +1,13 @@
 /**
  * @vitest-environment jsdom
  * Board scope in the browser: the control in a board's header and the sidebar's menu, the
- * confirmation and Undo, the marks and the organization's group, the Project chip, the page
- * for a board that is not available, and view-only with "Duplicate to edit".
+ * confirmation and Undo, the marks and the organization's group, the read-only "Data from"
+ * label, the page for a board that is not available, and view-only with "Duplicate to edit".
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import type { DashboardScope } from "@langwatch/dashboard-contract";
+import type { DashboardHomeProduct, DashboardScope } from "@langwatch/dashboard-contract";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -34,6 +34,7 @@ type Board = {
   description: string | null;
   createdById: string | null;
   scope: DashboardScope;
+  homeProduct: DashboardHomeProduct;
   organizationId: string | null;
   ownerProject: Project | null;
   isStarred: boolean;
@@ -47,6 +48,7 @@ const VIEWER = ["analytics:view", "cost:view", "traces:view"];
 /** A board the project in view owns, made by the member unless a test says otherwise. */
 const own = (overrides: Partial<Board> & { id: string; name: string }): Board => ({
   ...HOME_BOARD,
+  homeProduct: "llm-ops",
   description: null,
   createdById: "user-1",
   isStarred: false,
@@ -85,12 +87,10 @@ function scopeServer({
   boards,
   widgets = [],
   otherStars = 0,
-  projects = [HERE, CHECKOUT],
 }: {
   boards: Board[];
   widgets?: ReturnType<typeof widget>[];
   otherStars?: number;
-  projects?: Project[];
 }) {
   const state = {
     boards: boards.map((board) => ({ ...board })),
@@ -116,10 +116,6 @@ function scopeServer({
         return Promise.resolve({ ...find(input.dashboardId) });
       case "boards.scopeImpact":
         return Promise.resolve({ otherStars });
-      case "boards.scopeProjects": {
-        const board = find(input.dashboardId);
-        return Promise.resolve({ ownerProject: board.ownerProject ?? HERE, projects });
-      }
       case "boards.create": {
         const created = own({
           id: `board-new-${state.boards.length + 1}`,
@@ -502,51 +498,40 @@ describe("a board's scope in the browser", () => {
     });
 
     /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
-    it("names the project whose data is on screen in a chip", async () => {
+    it("says whose data is on screen, read-only, with no project to switch to", async () => {
       open({ server: scopeServer({ boards: [spend] }) });
 
-      const chip = await screen.findByRole("button", { name: "Project: Test Project" });
+      const label = await screen.findByLabelText("Data from Test Project");
 
-      expect(chip.textContent).toBe("ProjectTest Project");
-    });
-
-    /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
-    it("lists the projects the reader can open, the owner marked, with no All projects", async () => {
-      const { user } = open({ server: scopeServer({ boards: [spend] }) });
-
-      await user.click(await screen.findByRole("button", { name: "Project: Test Project" }));
-
-      expect(await choices()).toEqual([
-        { name: "Test Project", ticked: true, text: "Test Projectowner" },
-        { name: "Checkout", ticked: false, text: "Checkout" },
-      ]);
-      expect(
-        screen.getByText("Whose data this dashboard shows. One project at a time."),
-      ).toBeInTheDocument();
-    });
-
-    /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
-    it("opens the same board under the project the reader chooses", async () => {
-      const { host, user } = open({ server: scopeServer({ boards: [spend] }) });
-
-      await user.click(await screen.findByRole("button", { name: "Project: Test Project" }));
-      await user.click(await screen.findByRole("menuitemradio", { name: "Checkout" }));
-
-      expect(host.navigations).toEqual(["/checkout/dashboards/board-1"]);
+      expect(label.textContent).toBe("Data fromTest Project");
+      expect(screen.queryByRole("button", { name: /^Project:/ })).toBeNull();
     });
   });
 
   describe("given a Project board", () => {
     /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
-    it("has no Project chip, and asks for no list of projects", async () => {
-      const server = scopeServer({ boards: [WEEKLY] });
-      open({ server });
+    it("says its own project's data is on screen, read-only", async () => {
+      open({ server: scopeServer({ boards: [WEEKLY] }) });
       await screen.findByRole("button", { name: "Scope: Project" });
 
-      expect({
-        chip: screen.queryByRole("button", { name: /^Project:/ }),
-        asked: inputsTo(server, "boards.scopeProjects"),
-      }).toEqual({ chip: null, asked: [] });
+      expect(screen.getByLabelText("Data from Test Project")).toBeVisible();
+      expect(screen.queryByRole("button", { name: /^Project:/ })).toBeNull();
+    });
+  });
+
+  describe("given an Organization board homed in Gateway, at a project's address", () => {
+    it("names no project, since it reads the organization's data (ADR-002, D2)", async () => {
+      const gateway = own({
+        id: "board-1",
+        name: "Gateway spend",
+        scope: "ORGANIZATION",
+        organizationId: "org-1",
+        homeProduct: "gateway",
+      });
+      open({ server: scopeServer({ boards: [gateway] }) });
+      await screen.findByRole("button", { name: "Scope: Organization" });
+
+      expect(screen.queryByLabelText(/^Data from /)).toBeNull();
     });
   });
 

@@ -14,6 +14,8 @@ type FlagQueryInput = { flag: string; organizationIds: string[] };
 let orgFlags: Record<string, Record<string, boolean>> = {};
 /** Whether the per-organization flag queries have answered yet. */
 let areOrgFlagsLoading = false;
+/** What `boards.resolve` answers per board id; a board not named fails to resolve. */
+let resolvedBoards: Record<string, { homeProduct: string; scope: string }> = {};
 
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
@@ -26,6 +28,14 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
                 data: { enabledByOrganizationId: orgFlags[input.flag] ?? {} },
                 isLoading: false,
               },
+      },
+    },
+    boards: {
+      resolve: {
+        useQuery: ({ dashboardId }: { dashboardId: string }, { enabled }: { enabled: boolean }) => {
+          const data = enabled ? resolvedBoards[dashboardId] : undefined;
+          return { data, isError: enabled && data === undefined };
+        },
       },
     },
     annotation: { getPendingItemsCount: { useQuery: () => ({ data: { count: 0 } }) } },
@@ -289,6 +299,7 @@ beforeEach(() => {
     release_ui_ai_gateway_menu_enabled: { org_1: true, org_2: true },
   };
   areOrgFlagsLoading = false;
+  resolvedBoards = {};
   navigateMock.mockReset();
   rememberScopeMock.mockReset();
   openDrawerMock.mockReset();
@@ -999,7 +1010,8 @@ describe("the product-switcher top bar", () => {
       });
     });
 
-    it("names Dashboards in the switcher and keeps the project chip on a board", () => {
+    /** @scenario "Dashboards has no project switcher, and a board says whose data it shows" */
+    it("names Dashboards in the switcher and shows no project chip on a board", () => {
       renderShell({
         readings: { ...dashboardsReadings, pathname: "/demo/dashboards/agent-flight-deck" },
       });
@@ -1007,26 +1019,30 @@ describe("the product-switcher top bar", () => {
       expect(screen.getByRole("button", { name: "Switch product" })).toHaveTextContent(
         "Dashboards",
       );
-      expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent("Demo");
+      expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Home" })).not.toBeInTheDocument();
     });
 
-    it("stays in Dashboards when another project is picked", async () => {
+    it("shows LLM Ops's project switcher on a board opened in LLM Ops chrome", () => {
+      orgFlags = {
+        ...orgFlags,
+        release_dashboards: { org_1: true },
+        release_dashboards_organization_area: { org_1: true },
+      };
+      resolvedBoards = { "agent-flight-deck": { homeProduct: "llm-ops", scope: "ORGANIZATION" } };
       renderShell({
-        readings: { ...dashboardsReadings, pathname: "/demo/dashboards/agent-flight-deck" },
+        readings: {
+          ...dashboardsReadings,
+          pathname: "/demo/dashboards/agent-flight-deck",
+          flags: {
+            ...dashboardsReadings.flags,
+            release_dashboards_organization_area: { enabled: true, isLoading: false },
+          },
+        },
       });
 
-      const user = userEvent.setup();
-      await user.click(screen.getByRole("button", { name: "Switch project" }));
-      await waitFor(() => {
-        expect(screen.getByText("Support Bot")).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByText("Support Bot"));
-
-      await waitFor(() => {
-        expect(navigateMock).toHaveBeenCalledWith("/support-bot/dashboards/agent-flight-deck");
-      });
+      expect(screen.getByRole("button", { name: "Switch product" })).toHaveTextContent("LLM Ops");
+      expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent("Demo");
     });
   });
 
@@ -1370,6 +1386,160 @@ describe("the organization's Dashboards library at /dashboards", () => {
       const user = await openProductSwitcher();
 
       await user.click(screen.getByText("Dashboards"));
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/dashboards");
+      });
+    });
+  });
+});
+
+describe("a board with the organization's library released", () => {
+  const releasedReadings: Partial<StubNavigationReadings> = {
+    permissions: [...(BASE_READINGS.permissions ?? []), "analytics:view"],
+    flags: {
+      ...BASE_READINGS.flags,
+      release_dashboards: { enabled: true, isLoading: false },
+      release_dashboards_organization_area: { enabled: true, isLoading: false },
+    },
+  };
+  const releaseLibrary = () => {
+    orgFlags = {
+      ...orgFlags,
+      release_dashboards: { org_1: true },
+      release_dashboards_organization_area: { org_1: true },
+    };
+  };
+  const productLabel = () => screen.getByRole("button", { name: "Switch product" });
+
+  async function pickSupportBot() {
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Switch project" }));
+    await waitFor(() => {
+      expect(screen.getByText("Support Bot")).toBeInTheDocument();
+    });
+    await user.click(screen.getByText("Support Bot"));
+  }
+
+  describe("when a Gateway or Governance board opens at the organization's address", () => {
+    /** @scenario "An org-level board draws its home product's chrome, with no project chip" */
+    it.each([
+      { homeProduct: "gateway", label: "Gateway" },
+      { homeProduct: "governance", label: "Governance" },
+    ])("draws the $label chrome with no project chip", ({ homeProduct, label }) => {
+      releaseLibrary();
+      resolvedBoards = { board_1: { homeProduct, scope: "ORGANIZATION" } };
+      renderShell({ readings: { ...releasedReadings, pathname: "/dashboards/board_1" } });
+
+      expect(productLabel()).toHaveTextContent(label);
+      expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+    });
+
+    /** @scenario "An org-level board draws its home product's chrome, with no project chip" */
+    it("draws the Dashboards chrome for a seat Gateway is closed to", () => {
+      releaseLibrary();
+      resolvedBoards = { board_1: { homeProduct: "gateway", scope: "ORGANIZATION" } };
+      renderShell({
+        readings: {
+          ...releasedReadings,
+          pathname: "/dashboards/board_1",
+          permissions: ["governance:view", "organization:view", "analytics:view"],
+        },
+      });
+
+      expect(productLabel()).toHaveTextContent("Dashboards");
+      expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when an LLM Ops board shared with the organization opens at its address", () => {
+    /** @scenario "An org-level board draws its home product's chrome, with no project chip" */
+    it("draws LLM Ops with its project switcher", () => {
+      releaseLibrary();
+      resolvedBoards = { board_1: { homeProduct: "llm-ops", scope: "ORGANIZATION" } };
+      renderShell({ readings: { ...releasedReadings, pathname: "/dashboards/board_1" } });
+
+      expect(productLabel()).toHaveTextContent("LLM Ops");
+      expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent("Demo");
+    });
+
+    /** @scenario "An org-level board draws its home product's chrome, with no project chip" */
+    it("keeps the board open and changes only the project in view on a pick", async () => {
+      releaseLibrary();
+      resolvedBoards = { board_1: { homeProduct: "llm-ops", scope: "ORGANIZATION" } };
+      renderShell({ readings: { ...releasedReadings, pathname: "/dashboards/board_1" } });
+
+      await pickSupportBot();
+
+      await waitFor(() => {
+        expect(rememberScopeMock).toHaveBeenCalledWith({
+          teamId: "team_1",
+          projectSlug: "support-bot",
+        });
+      });
+      expect(navigateMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an LLM Ops board shared with its project opens at the organization's address", () => {
+    it("opens the picked project's LLM Ops home", async () => {
+      releaseLibrary();
+      resolvedBoards = { board_1: { homeProduct: "llm-ops", scope: "PROJECT" } };
+      renderShell({ readings: { ...releasedReadings, pathname: "/dashboards/board_1" } });
+
+      await pickSupportBot();
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/support-bot");
+      });
+    });
+  });
+
+  describe("when a project's Dashboards area opens", () => {
+    it("draws the LLM Ops chrome and keeps the address", () => {
+      releaseLibrary();
+      renderShell({ readings: { ...releasedReadings, pathname: "/demo/dashboards" } });
+
+      expect(productLabel()).toHaveTextContent("LLM Ops");
+      expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent("Demo");
+      expect(replaceMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps a board with no project open in the picked project", async () => {
+      releaseLibrary();
+      resolvedBoards = { board_1: { homeProduct: "llm-ops", scope: "ORGANIZATION" } };
+      renderShell({ readings: { ...releasedReadings, pathname: "/demo/dashboards/board_1" } });
+
+      await pickSupportBot();
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/support-bot/dashboards/board_1");
+      });
+    });
+
+    it("opens the picked project's LLM Ops home from a Project board", async () => {
+      releaseLibrary();
+      resolvedBoards = { board_1: { homeProduct: "llm-ops", scope: "PROJECT" } };
+      renderShell({ readings: { ...releasedReadings, pathname: "/demo/dashboards/board_1" } });
+
+      await pickSupportBot();
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/support-bot");
+      });
+    });
+  });
+
+  describe("when the Dashboards rail tile is pressed", () => {
+    it("opens the library", async () => {
+      releaseLibrary();
+      renderShell({
+        readings: { ...releasedReadings, pathname: "/demo/dashboards" },
+        mode: "icon-rail",
+      });
+
+      await userEvent.setup().click(railTile("Dashboards") as HTMLElement);
 
       await waitFor(() => {
         expect(navigateMock).toHaveBeenCalledWith("/dashboards");

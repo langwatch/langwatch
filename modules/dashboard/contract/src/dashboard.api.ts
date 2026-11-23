@@ -11,8 +11,10 @@ import type { Trigger } from "@langwatch/automation-contract";
 import { moduleApi } from "@langwatch/module";
 
 import type {
+  Board,
   BoardSummary,
   Dashboard,
+  DashboardHomeProduct,
   DashboardProject,
   DashboardScope,
   DashboardScopeImpact,
@@ -129,18 +131,21 @@ export interface DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard>;
+  }): Promise<Board>;
   /**
    * A Dashboards board, at `scope` in the same write or else Project; `createdById` is its
    * author, absent for a project credential. A member's own My dashboard starts starred for them,
    * at Only me (AC160b, AC170). `dashboards_not_enabled` while `release_dashboards` is off (AC189).
+   * Homed in `homeProduct`, LLM Ops when absent; Project outside LLM Ops is
+   * `dashboard_home_needs_org_scope` (ADR-002, decision 8).
    */
   createBoard(input: {
     projectId: string;
     name: string;
     createdById?: string;
     scope?: DashboardScope;
-  }): Promise<Dashboard>;
+    homeProduct?: DashboardHomeProduct;
+  }): Promise<Board>;
   /**
    * The board's name and description, an absent field left as it is; `dashboards_not_enabled`
    * while `release_dashboards` is off.
@@ -151,7 +156,7 @@ export interface DashboardApi {
     viewer?: DashboardViewer;
     name?: string;
     description?: string | null;
-  }): Promise<Dashboard>;
+  }): Promise<Board>;
   /**
    * The board, its widgets, every star on it and its stale legacy copy (AC199b);
    * `dashboards_not_enabled` while `release_dashboards` is off.
@@ -160,7 +165,18 @@ export interface DashboardApi {
     projectId: string;
     dashboardId: string;
     viewer?: DashboardViewer;
-  }): Promise<Dashboard>;
+  }): Promise<Board>;
+  /**
+   * Rehomes a board in the project that owns it, the owner unchanged. A Project board leaving
+   * LLM Ops becomes Only me; anyone but its author is refused (ADR-002, decision 8).
+   * Answers the board as the organization's library lists it for this member.
+   */
+  moveBoard(input: {
+    projectId: string;
+    dashboardId: string;
+    homeProduct: DashboardHomeProduct;
+    viewer: DashboardViewer;
+  }): Promise<OrganizationBoard>;
 
   /** The member's stars for this project, boards and templates, in their own order. */
   listStarred(input: { projectId: string; userId: string }): Promise<StarredDashboard[]>;
@@ -193,7 +209,7 @@ export interface DashboardApi {
     dashboardId: string;
     scope: DashboardScope;
     viewer: DashboardViewer;
-  }): Promise<Dashboard>;
+  }): Promise<Board>;
   /** Dashboards area: how many other members starred the author's board. */
   getDashboardScopeImpact(input: {
     projectId: string;

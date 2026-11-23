@@ -1,7 +1,7 @@
 /**
- * The `/dashboards` library's rows with what this member may do on each: Star, Rename and Delete
- * on a board, by the grants of the project that owns it; Duplicate wherever a store project is
- * (`onDuplicate` set). Star on a From LangWatch board is kept in the project in view.
+ * The `/dashboards` library's rows with what this member may do on each: Star, Rename, Move and
+ * Delete on a board, by the grants of the project that owns it; Duplicate wherever a store
+ * project is (`onDuplicate` set). Star on a From LangWatch board is kept in the project in view.
  */
 
 import type { DashboardStar } from "@langwatch/dashboard-contract";
@@ -13,13 +13,26 @@ import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts"
 import { organizationCuratedPath } from "../../model/boards.ts";
 import { type CuratedBoard, CURATED_BOARDS } from "../../model/curated-boards.ts";
 import {
+  HOME_PRODUCT_LABELS,
   isOwnMyDashboard,
   libraryBoardPath,
   type LibraryBoard,
   ownerLabel,
   whoSees,
 } from "../../model/organization-library.ts";
-import { CuratedLibraryRow, LibraryRow, type LibraryRowActions } from "../blocks/library-row.tsx";
+import {
+  CuratedLibraryRow,
+  LibraryRow,
+  type LibraryRowActions,
+  type LibraryRowStarMoves,
+} from "../blocks/library-row.tsx";
+
+/** Every From LangWatch board ships homed in LLM Ops (ADR-002, decision 8). */
+const CURATED_MOVE_REFUSAL =
+  `Built for ${HOME_PRODUCT_LABELS["llm-ops"]}. Duplicate it, then move the copy.`;
+
+/** Why a board the member may only view offers no move. */
+const VIEW_ONLY_MOVE_REFUSAL = "You can view this dashboard but not change it.";
 
 export function LibraryCuratedRow({
   templateId,
@@ -52,6 +65,7 @@ export function LibraryCuratedRow({
           }
         : {})}
       {...(onDuplicate ? { onDuplicate: () => onDuplicate(curated) } : {})}
+      moveRefusal={CURATED_MOVE_REFUSAL}
     />
   );
 }
@@ -59,10 +73,12 @@ export function LibraryCuratedRow({
 export function LibraryBoardRow({
   board,
   onDuplicate,
+  onMove,
   onDelete,
 }: {
   board: LibraryBoard;
   onDuplicate?: () => void;
+  onMove: () => void;
   onDelete: () => void;
 }) {
   const host = useAnalyticsHost();
@@ -72,9 +88,11 @@ export function LibraryBoardRow({
   const actions = boardRowActions({
     board,
     host,
+    starMoves: edits.starMoves(board),
     on: {
       toggleStar: () => edits.toggleStar(board),
       rename: () => setIsRenaming(true),
+      move: onMove,
       duplicate: onDuplicate,
       delete: onDelete,
     },
@@ -101,18 +119,22 @@ export function LibraryBoardRow({
 
 /**
  * A board row's menu from the grants of the project that owns it. My dashboard keeps its name
- * and shows Delete disabled; a board that opens nowhere cannot be starred or copied.
+ * and shows Delete disabled; a board that opens nowhere cannot be starred or copied; one the
+ * member cannot edit shows Move disabled.
  */
 function boardRowActions({
   board,
   host,
+  starMoves,
   on,
 }: {
   board: LibraryBoard;
   host: AnalyticsHostApi;
+  starMoves: LibraryRowStarMoves;
   on: {
     toggleStar: () => void;
     rename: () => void;
+    move: () => void;
     duplicate: (() => void) | undefined;
     delete: () => void;
   };
@@ -125,8 +147,11 @@ function boardRowActions({
   const opens = board.openProject !== null;
   const duplicate = opens ? on.duplicate : void 0;
   return {
-    ...(opens ? { star: { isStarred: board.starPosition !== null, onToggle: on.toggleStar } } : {}),
+    ...(opens
+      ? { star: { isStarred: board.starPosition !== null, onToggle: on.toggleStar }, starMoves }
+      : {}),
     ...(canEdit && !isMine ? { onRename: on.rename } : {}),
+    move: canEdit ? { onMove: on.move } : { refusal: VIEW_ONLY_MOVE_REFUSAL },
     ...(duplicate
       ? { onDuplicate: duplicate, duplicateLabel: canEdit ? "Duplicate" : "Duplicate to edit" }
       : {}),

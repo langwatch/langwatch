@@ -1,7 +1,7 @@
 /**
  * The server half of `boards.*`, the Dashboards area's boards. Reading and starring take
- * `analytics:view`; creating `analytics:create`, editing and scope `analytics:update`, removing
- * `analytics:delete`. The service asks for a scope change's author.
+ * `analytics:view`; creating `analytics:create`, editing, scope and moving `analytics:update`,
+ * removing `analytics:delete`. The service asks for a scope change's author.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DashboardApi, boardTrpc } from "@langwatch/dashboard-contract";
@@ -66,7 +66,12 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
     .procedure("create")
     .withPermission("analytics:create")
     .handle(async ({ app, input, actor }) =>
-      app.createBoard({ projectId: input.projectId, name: input.name, createdById: actor.id }),
+      app.createBoard({
+        projectId: input.projectId,
+        name: input.name,
+        createdById: actor.id,
+        ...(input.homeProduct === undefined ? {} : { homeProduct: input.homeProduct }),
+      }),
     )
 
     // Making it and setting its scope, in one write: both grants, asked at the door.
@@ -78,6 +83,7 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
         name: input.name,
         createdById: actor.id,
         scope: input.scope,
+        ...(input.homeProduct === undefined ? {} : { homeProduct: input.homeProduct }),
       }),
     )
 
@@ -90,6 +96,18 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
         viewer: { userId: actor.id },
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.description === undefined ? {} : { description: input.description }),
+      }),
+    )
+
+    // Asked in the owning project, as an edit is; the service applies the scope a move implies.
+    .procedure("move")
+    .withPermission("analytics:update")
+    .handle(async ({ app, input, actor }) =>
+      app.moveBoard({
+        projectId: input.projectId,
+        dashboardId: input.dashboardId,
+        homeProduct: input.homeProduct,
+        viewer: { userId: actor.id },
       }),
     )
 

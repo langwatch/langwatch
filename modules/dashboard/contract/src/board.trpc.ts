@@ -7,12 +7,13 @@ import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {
-  dashboardReorderResponseSchema,
-  dashboardTrpcRowSchema,
+  boardTrpcRowSchema,
   boardTrpcSummarySchema,
+  dashboardReorderResponseSchema,
 } from "./dashboard.responses.ts";
 import {
   dashboardDescriptionSchema,
+  dashboardHomeProductSchema,
   dashboardNameSchema,
   dashboardProjectSchema,
   dashboardScopeImpactSchema,
@@ -65,21 +66,37 @@ export const boardTrpc = defineTrpcContract("boards")
 
   .query("getById")
   .withInput(boardRefSchema)
-  .withOutput(dashboardTrpcRowSchema)
+  .withOutput(boardTrpcRowSchema)
 
+  /**
+   * A new board at Project, homed in `homeProduct` (LLM Ops when absent); outside LLM Ops a
+   * board cannot be Project, so `dashboard_home_needs_org_scope` (ADR-002, decision 8).
+   */
   .mutation("create")
-  .withInput(z.object({ ...projectScopeSchema.shape, name: z.string() }))
-  .withOutput(dashboardTrpcRowSchema)
+  .withInput(
+    z.object({
+      ...projectScopeSchema.shape,
+      name: z.string(),
+      homeProduct: dashboardHomeProductSchema.optional(),
+    }),
+  )
+  .withOutput(boardTrpcRowSchema)
 
   /**
    * A new board made at `scope` in one write. It asks what `create` and `setScope` ask
    * together, so a seat refused the scope is refused at the door and nothing is written.
+   * `scope` Project outside LLM Ops is `dashboard_home_needs_org_scope`.
    */
   .mutation("createAtScope")
   .withInput(
-    z.object({ ...projectScopeSchema.shape, name: z.string(), scope: dashboardScopeSchema }),
+    z.object({
+      ...projectScopeSchema.shape,
+      name: z.string(),
+      scope: dashboardScopeSchema,
+      homeProduct: dashboardHomeProductSchema.optional(),
+    }),
   )
-  .withOutput(dashboardTrpcRowSchema)
+  .withOutput(boardTrpcRowSchema)
 
   /** The board's inline name and description; refused while `release_dashboards` is off. */
   .mutation("update")
@@ -90,17 +107,26 @@ export const boardTrpc = defineTrpcContract("boards")
       description: dashboardDescriptionSchema.nullable().optional(),
     }),
   )
-  .withOutput(dashboardTrpcRowSchema)
+  .withOutput(boardTrpcRowSchema)
+
+  /**
+   * Rehomes a board, asked as `update` is in the project that owns it; the owning project never
+   * changes. A Project board leaving LLM Ops becomes Only me, and only its author may move it
+   * (`dashboard_scope_author_only`; ADR-002, decision 8). Answers the board as the library lists it.
+   */
+  .mutation("move")
+  .withInput(z.object({ ...boardRefSchema.shape, homeProduct: dashboardHomeProductSchema }))
+  .withOutput(organizationBoardSchema)
 
   /** The board, its widgets and every star on it; a Reports board under the same id stays. */
   .mutation("delete")
   .withInput(boardRefSchema)
-  .withOutput(dashboardTrpcRowSchema)
+  .withOutput(boardTrpcRowSchema)
 
   /** Only the board's author changes its scope, in the project that owns it. */
   .mutation("setScope")
   .withInput(z.object({ ...boardRefSchema.shape, scope: dashboardScopeSchema }))
-  .withOutput(dashboardTrpcRowSchema)
+  .withOutput(boardTrpcRowSchema)
 
   /** What a narrower scope takes from other members; the author's to read. */
   .query("scopeImpact")

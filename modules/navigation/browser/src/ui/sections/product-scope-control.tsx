@@ -8,13 +8,13 @@ import { Badge, Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { CreateProjectDrawerToken } from "@langwatch/organization-client";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 
-import { useProjectPickGroups } from "../../behavior/use-project-pick-groups.ts";
-import { useNavigationHost } from "../../model/navigation-host.ts";
+import { useOpenBoardInShell } from "../../behavior/use-open-board.ts";
 import {
-  isOrganizationDashboardsPath,
-  isProjectScopedProduct,
-  type ProductId,
-} from "../../model/products.ts";
+  useProjectInViewPick,
+  useProjectPickGroups,
+} from "../../behavior/use-project-pick-groups.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
+import { isProjectScopedProduct, type ProductId } from "../../model/products.ts";
 import { ProjectSwitcherCombobox } from "../blocks/project-switcher-combobox.tsx";
 
 function ScopeDivider() {
@@ -46,15 +46,17 @@ function MeScopeChip() {
 }
 
 /**
- * The project scope (LLM Ops, Dashboards): the current project as a chip, opening a
- * searchable list of the organization's projects (plus a per-team create entry). Organization
- * choice lives in its own control, so this menu stays within the current one.
+ * The project scope (LLM Ops): the current project as a chip, opening a searchable list of the
+ * organization's projects (plus a per-team create entry). On a board, a pick follows the board's
+ * rule (`projectPickHref`). Organization choice lives in its own control.
  */
 function ProjectScopeMenu() {
   const host = useNavigationHost();
   const organization = host.organization();
   const project = host.project();
-  const groups = useProjectPickGroups();
+  const openBoard = useOpenBoardInShell();
+  const groups = useProjectPickGroups({ openBoard });
+  const onOpenProject = useProjectInViewPick({ openBoard });
 
   if (!organization || !project) return null;
 
@@ -78,6 +80,7 @@ function ProjectScopeMenu() {
         currentProjectIsAggregate={currentProjectIsAggregate}
         showTeamHeaders={showTeamHeaders}
         onCreateProjectForTeam={onCreateProjectForTeam}
+        onOpenProject={onOpenProject}
       />
     </>
   );
@@ -85,12 +88,11 @@ function ProjectScopeMenu() {
 
 /**
  * The product-native scope in the top bar: project products show the project chip, Me a
- * Personal badge, and organization-wide products and the organization's Dashboards area
- * nothing (the organization control already says it all; ADR-002).
+ * Personal badge, and organization-wide products and Dashboards nothing (the organization
+ * control already says it all; ADR-002). A board draws its home product's scope (D2).
  */
 export function ProductScopeControl({ activeProductId }: { activeProductId: ProductId | null }) {
-  const pathname = useNavigationHost().pathname();
-  if (isOrganizationDashboardsPath(pathname)) return null;
+  if (activeProductId === "dashboards") return null;
   // Each scope renders its own leading divider, so a scope that has
   // nothing to show leaves no separator behind it.
   if (isProjectScopedProduct(activeProductId)) return <ProjectScopeMenu />;

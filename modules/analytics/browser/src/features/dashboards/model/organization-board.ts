@@ -7,8 +7,6 @@
 
 import type { DashboardProject, DashboardScope } from "@langwatch/dashboard-contract";
 
-import { dashboardsPath } from "./boards.ts";
-
 /** What the page says of a board it cannot open; the same for every reason, deleted included. */
 export const ORGANIZATION_BOARD_UNAVAILABLE = {
   title: "This dashboard was deleted or isn't shared with you.",
@@ -25,18 +23,13 @@ export type ResolvedBoard = {
   readonly openProject: DashboardProject | null;
 };
 
-/** Where the page goes: a Project board's own address, the board in a project, or nowhere. */
+/** Where the page goes: the board in the project it opens in, or nowhere. */
 export type OrganizationBoardPlace =
-  | { readonly kind: "redirect"; readonly to: string }
   | { readonly kind: "open"; readonly project: DashboardProject }
   | { readonly kind: "unavailable" };
 
-/** The one redirect: a Project board lives at its project's address, whoever opens it by id. */
+/** Every board, a Project one included, stays at `/dashboards/<id>` (ADR-002, decision 4). */
 export function organizationBoardPlace(board: ResolvedBoard): OrganizationBoardPlace {
-  if (board.scope === "PROJECT" && board.project) {
-    const to = dashboardsPath({ projectSlug: board.project.slug, dashboardId: board.id });
-    return { kind: "redirect", to };
-  }
   if (!board.openProject) return { kind: "unavailable" };
   return { kind: "open", project: board.openProject };
 }

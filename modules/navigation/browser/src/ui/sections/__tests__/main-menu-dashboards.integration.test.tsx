@@ -7,6 +7,9 @@
 
 import {
   OrganizationStarredDashboardsToken,
+  type OrganizationStarredDashboardsProps,
+  ProductDashboardsToken,
+  type ProductDashboardsProps,
   SavedDashboardsToken,
   type SavedDashboardsProps,
   StarredDashboardsToken,
@@ -144,9 +147,18 @@ function LentStarred({ project }: StarredDashboardsProps) {
   );
 }
 
-/** Stands in for analytics' lent "Starred dashboards" group of the library's sidebar. */
-function LentOrganizationStarred() {
-  return <div data-testid="organization-starred">Starred dashboards</div>;
+/** Stands in for analytics' lent "Starred dashboards" group, echoing the product it leaves out. */
+function LentOrganizationStarred({ product }: OrganizationStarredDashboardsProps) {
+  return (
+    <div data-testid="organization-starred">
+      Starred dashboards{product ? ` outside ${product}` : ""}
+    </div>
+  );
+}
+
+/** Stands in for analytics' lent product Dashboards section, echoing its product. */
+function LentProductDashboards({ product }: ProductDashboardsProps) {
+  return <div data-testid="product-dashboards">Dashboards of {product}</div>;
 }
 
 const analyticsLends = uiDeclarations([
@@ -161,6 +173,7 @@ const analyticsLends = uiDeclarations([
           token: OrganizationStarredDashboardsToken,
           load: async () => ({ default: LentOrganizationStarred }),
         },
+        { token: ProductDashboardsToken, load: async () => ({ default: LentProductDashboards }) },
       ],
     },
   },
@@ -441,6 +454,41 @@ describe("the other products' sidebars once the organization's Dashboards area i
         await expectNoSection();
       },
     );
+  });
+
+  describe("given the area is on, in each product", () => {
+    /**
+     * @scenario "Each product's sidebar lists its own boards"
+     * @scenario "Every sidebar lists my stars from other products"
+     */
+    it.each(otherProducts)(
+      "lists $surface's own boards and the stars homed elsewhere",
+      async ({ surface, pathname, project }) => {
+        organizationLibrary.open = true;
+        renderSidebar({ surface, pathname, project, everyProductFlag: true, ...shopRemembered });
+
+        expect(await screen.findByTestId("product-dashboards")).toHaveTextContent(
+          `Dashboards of ${surface}`,
+        );
+        expect(screen.getByTestId("organization-starred")).toHaveTextContent(
+          `Starred dashboards outside ${surface}`,
+        );
+      },
+    );
+
+    /** @scenario "Each product's sidebar lists its own boards" */
+    it("lists LLM Ops's own boards in place of the project's pinned section", async () => {
+      organizationLibrary.open = true;
+      renderSidebar({ surface: "llm-ops", pathname: "/demo" });
+
+      expect(await screen.findByTestId("product-dashboards")).toHaveTextContent(
+        "Dashboards of llm-ops",
+      );
+      expect(screen.getByTestId("organization-starred")).toHaveTextContent(
+        "Starred dashboards outside llm-ops",
+      );
+      await expectNoSection();
+    });
   });
 
   describe("given the area is on but every product's flag is off", () => {

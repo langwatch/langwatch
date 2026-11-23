@@ -88,6 +88,7 @@ describe("the dashboard tRPC declarations", () => {
           { kind: "permission-all", permissions: ["analytics:create", "analytics:update"] },
         ],
         ["update", "mutation", "analytics:update"],
+        ["move", "mutation", "analytics:update"],
         ["delete", "mutation", "analytics:delete"],
         ["setScope", "mutation", "analytics:update"],
         ["scopeImpact", "query", "analytics:view"],

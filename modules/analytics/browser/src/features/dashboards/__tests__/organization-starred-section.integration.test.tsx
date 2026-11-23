@@ -66,7 +66,7 @@ describe("the library sidebar's Starred dashboards group", () => {
       expect(linkNames(list)).toEqual(["Board 3", "Board 1", CURATED?.name]);
       expect(within(list).getByRole("link", { name: "Board 3" })).toHaveAttribute(
         "href",
-        `/${SHOP.slug}/dashboards/board-3`,
+        "/dashboards/board-3",
       );
       expect(within(list).queryByRole("button")).toBeNull();
     });

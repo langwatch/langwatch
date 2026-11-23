@@ -62,6 +62,20 @@ export class DashboardScopeAuthorOnlyError extends HandledError {
   }
 }
 
+/** A board homed outside LLM Ops made or set to Project: no project lists it (ADR-002, decision 8). */
+export class DashboardHomeNeedsOrgScopeError extends HandledError {
+  declare readonly code: "dashboard_home_needs_org_scope";
+
+  constructor(homeProduct: string) {
+    super(
+      "dashboard_home_needs_org_scope",
+      "Only an LLM Ops dashboard can be shared with its project",
+      { httpStatus: 422, fault: "customer", meta: { homeProduct } },
+    );
+    this.name = "DashboardHomeNeedsOrgScopeError";
+  }
+}
+
 /**
  * A Dashboards-area procedure called while `release_dashboards` is off for the project, or, for
  * the organization's library, off in every project of the organization.

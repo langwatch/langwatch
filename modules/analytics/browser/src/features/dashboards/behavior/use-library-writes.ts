@@ -1,17 +1,18 @@
 /**
- * The `/dashboards` library's create and delete over `boards.*`. A new board is stored in the
- * store project (`use-store-project.ts`); a delete goes to the board's own project.
+ * The `/dashboards` library's create, delete and move over `boards.*`. A new board is stored in
+ * the store project (`use-store-project.ts`); a delete goes to the board's own project.
  * Failures travel raw to the host (#5984). ADR-002, `dashboards-organization-area.feature`.
  */
 
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
-import type { DashboardScope } from "@langwatch/dashboard-contract";
+import type { DashboardHomeProduct, DashboardScope } from "@langwatch/dashboard-contract";
+import { toaster } from "@langwatch/design-system/toaster";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import { dashboardsPath, organizationBoardPath } from "../model/boards.ts";
+import { organizationBoardPath } from "../model/boards.ts";
 import { dashboardCreated, dashboardDeleted } from "../model/dashboard-usage-events.ts";
-import type { LibraryBoard } from "../model/organization-library.ts";
+import { HOME_PRODUCT_LABELS, type LibraryBoard } from "../model/organization-library.ts";
 import { useStoreProject } from "./use-store-project.ts";
 
 /** Re-reads the library and the written project's lists, so every sidebar and list shows it. */
@@ -34,25 +35,29 @@ export function useLibraryCreate() {
   const create = analyticsApi.boards.create.useMutation();
   const createAtScope = analyticsApi.boards.createAtScope.useMutation();
 
-  /** Makes the board at the scope picked, in one write, and opens it; true once it is made. */
-  const createBoard = async ({ name, scope }: { name: string; scope: DashboardScope }) => {
+  /** Makes the board at the scope and home picked, in one write, and opens it; true once made. */
+  const createBoard = async ({
+    name,
+    scope,
+    homeProduct,
+  }: {
+    name: string;
+    scope: DashboardScope;
+    homeProduct: DashboardHomeProduct;
+  }) => {
     if (!storeProject) return false;
     const projectId = storeProject.id;
     try {
       // Another scope also asks analytics:update, so a seat refused it is refused before a write.
       const { id: dashboardId } =
         scope === "PROJECT"
-          ? await create.mutateAsync({ projectId, name })
-          : await createAtScope.mutateAsync({ projectId, name, scope });
+          ? await create.mutateAsync({ projectId, name, homeProduct })
+          : await createAtScope.mutateAsync({ projectId, name, scope, homeProduct });
       analytics.track(dashboardCreated({ createdFrom: "blank" }));
       void refresh({ projectId });
       host.succeeded({ title: "Dashboard created" });
-      // Only a Project board lives at its project's address (ADR-002, decision 4).
-      host.navigate(
-        scope === "PROJECT"
-          ? dashboardsPath({ projectSlug: storeProject.slug, dashboardId })
-          : organizationBoardPath({ dashboardId }),
-      );
+      // A board made in the library stays in Dashboards, whatever its scope (ADR-002, decision 4).
+      host.navigate(organizationBoardPath({ dashboardId }));
       return true;
     } catch (error) {
       host.failed({ error, fallbackTitle: "Couldn't create the dashboard" });
@@ -90,4 +95,48 @@ export function useLibraryDelete() {
   };
 
   return { deleteBoard, isDeleting: remove.isPending };
+}
+
+/** Long enough to read the toast and reach Open; the toast holds while hovered. */
+const MOVED_TOAST_MS = 8_000;
+
+export function useLibraryMove() {
+  const host = useAnalyticsHost();
+  const utils = analyticsApi.useUtils();
+  const organizationId = host.organizationId() ?? "";
+  const move = analyticsApi.boards.move.useMutation();
+
+  /** Gives the board another home, so that product's sidebar lists it; true once it moved. */
+  const moveBoard = async ({
+    board,
+    homeProduct,
+  }: {
+    board: LibraryBoard;
+    homeProduct: DashboardHomeProduct;
+  }) => {
+    // Asked in the owning project, as a rename is; the row offers no Move without one.
+    if (!board.project) return false;
+    try {
+      await move.mutateAsync({ projectId: board.project.id, dashboardId: board.id, homeProduct });
+    } catch (error) {
+      host.failed({ error, fallbackTitle: "Couldn't move the dashboard" });
+      return false;
+    }
+    // Every project's lists too, so each product's sidebar shows the move without a reload.
+    void Promise.all([
+      utils.boards.listInOrganization.invalidate({ organizationId }),
+      utils.boards.getAll.invalidate(),
+      utils.boards.listStarred.invalidate(),
+    ]);
+    const href = organizationBoardPath({ dashboardId: board.id });
+    toaster.create({
+      title: `Moved "${board.name}" to ${HOME_PRODUCT_LABELS[homeProduct]}`,
+      type: "success",
+      duration: MOVED_TOAST_MS,
+      action: { label: "Open", onClick: () => host.navigate(href) },
+    });
+    return true;
+  };
+
+  return { moveBoard, isMoving: move.isPending };
 }

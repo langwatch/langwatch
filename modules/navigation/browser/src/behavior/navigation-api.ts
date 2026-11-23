@@ -5,6 +5,7 @@
  */
 
 import type { AgentType } from "@langwatch/agent-contract";
+import type { DashboardHomeProduct } from "@langwatch/analytics-client";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { AuthzOwnStanding, AuthzOwnStandingInput } from "@langwatch/authz-contract";
 import type { identityTrpc } from "@langwatch/identity-contract";
@@ -184,6 +185,19 @@ export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
   workflow: {
     getAll: {
       query: { input: { projectId: string }; output: { id: string; name: string }[] };
+    };
+  };
+
+  boards: {
+    /**
+     * The board a Dashboards address opens, by the library's rule (ADR-002): the shell draws its
+     * home product's chrome, and a project pick keeps it open unless its project owns its view.
+     */
+    resolve: {
+      query: {
+        input: { organizationId: string; dashboardId: string };
+        output: { homeProduct: DashboardHomeProduct; scope: string };
+      };
     };
   };
 

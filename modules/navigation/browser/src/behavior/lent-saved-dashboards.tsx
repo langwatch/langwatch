@@ -2,6 +2,9 @@
 
 import {
   OrganizationStarredDashboardsToken,
+  type OrganizationStarredDashboardsProps,
+  ProductDashboardsToken,
+  type ProductDashboardsProps,
   SavedDashboardsToken,
   type SavedDashboardsProps,
   StarredDashboardsToken,
@@ -18,7 +21,12 @@ export function StarredDashboards(props: StarredDashboardsProps) {
   return <Lent of={StarredDashboardsToken} props={props} />;
 }
 
-/** The "Starred dashboards" group: the member's stars across the organization. */
-export function OrganizationStarredDashboards() {
-  return <Lent of={OrganizationStarredDashboardsToken} props={{}} />;
+/** The "Starred dashboards" group: the member's stars, less the sidebar's own product's. */
+export function OrganizationStarredDashboards(props: OrganizationStarredDashboardsProps) {
+  return <Lent of={OrganizationStarredDashboardsToken} props={props} />;
+}
+
+/** A product's "Dashboards" section with the organization's area on: its boards and "+". */
+export function ProductDashboards(props: ProductDashboardsProps) {
+  return <Lent of={ProductDashboardsToken} props={props} />;
 }

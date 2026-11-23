@@ -909,15 +909,13 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit @integration
   Scenario: AC182 Organization board: the Project chip says whose data it shows
-    Given an Organization board
-    Then its header has a chip "Project <project>", naming the project whose data is on screen
-    When the reader opens the chip
-    Then it lists the projects of the organization they can open, one to choose, with no
-      "All projects", and marks the project that owns the board "owner"
-    And choosing one opens the same board under that project
-    And a Project or Only me board has no such chip
-    # That holds in a project view. At org level the chip will also offer "All projects"
-    # (dashboards-organization-area.feature, @q1-all-projects).
+    Given an Organization board homed in LLM Ops
+    Then its header reads "Data from <project>", read-only, naming the project in view whose data is on screen
+    And it offers no project to switch to; the LLM Ops top bar switches the project in view
+    And a Project board's header reads "Data from <its own project>", read-only
+    And an Organization board homed in Gateway or Governance names no project, since it reads the organization's data
+    # Title kept for its bound tests; the chip became a read-only label (owner, 2026-11-23; D2,
+    # dashboards-organization-area.feature).
 
   @integration
   Scenario: AC183 A board the reader may not open is not available

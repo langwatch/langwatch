@@ -1,7 +1,7 @@
 /**
- * The `/dashboards` library's star and rename on a board row, over the `boards.*` writes the
- * sidebar already uses. A star is written where the board opens, a rename in the project that
- * owns it. Failures travel raw to the host (#5984).
+ * The `/dashboards` library's star, star order and rename on a board row, over the `boards.*`
+ * writes the sidebar already uses. A star is written where the board opens, a rename in the
+ * project that owns it. Failures travel raw to the host (#5984).
  */
 
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
@@ -9,7 +9,11 @@ import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { dashboardEdited, dashboardFavourited } from "../model/dashboard-usage-events.ts";
-import type { LibraryBoard } from "../model/organization-library.ts";
+import {
+  type LibraryBoard,
+  libraryBoardOf,
+  starOrderAfterMove,
+} from "../model/organization-library.ts";
 
 export function useLibraryBoardEdits() {
   const host = useAnalyticsHost();
@@ -19,6 +23,13 @@ export function useLibraryBoardEdits() {
   const starMutation = analyticsApi.boards.star.useMutation();
   const unstarMutation = analyticsApi.boards.unstar.useMutation();
   const rename = analyticsApi.boards.update.useMutation();
+  const reorder = analyticsApi.boards.reorderStars.useMutation();
+  // The library's own read, already cached: the star order spans every listed board.
+  const list = analyticsApi.boards.listInOrganization.useQuery(
+    { organizationId },
+    { enabled: organizationId !== "" },
+  );
+  const boards = (list.data ?? []).map(libraryBoardOf);
 
   // Every project's star list too, so each sidebar shows the change without a reload.
   const refresh = () =>
@@ -60,5 +71,24 @@ export function useLibraryBoardEdits() {
     );
   };
 
-  return { toggleStar, renameBoard };
+  /** Where the board can go in the member's star order: undefined at the end it faces. */
+  const starMoves = (board: LibraryBoard) => {
+    const moveTo = (direction: "up" | "down") => {
+      const stars = starOrderAfterMove({ boards, board, direction });
+      if (!stars || !board.openProject) return void 0;
+      const projectId = board.openProject.id;
+      return () =>
+        reorder.mutate(
+          { projectId, stars },
+          {
+            onSuccess: () => void refresh(),
+            onError: (error) =>
+              host.failed({ error, fallbackTitle: "Couldn't reorder your dashboards" }),
+          },
+        );
+    };
+    return { onUp: moveTo("up"), onDown: moveTo("down") };
+  };
+
+  return { toggleStar, renameBoard, starMoves };
 }

@@ -1,7 +1,7 @@
 /**
  * One row of the `/dashboards` library: a star toggle, the board's name linking to it, who sees
  * it, its owner and a "⋮" menu with what this member may do. A From LangWatch row reads
- * "Read-only" and "LangWatch", and offers only Star and "Duplicate to edit".
+ * "Read-only" and "LangWatch", and offers Star, "Duplicate to edit" and a Move it cannot do.
  */
 
 import { Menu } from "@langwatch/design-system/menu";
@@ -13,7 +13,19 @@ import {
   Link as ChakraLink,
   Text,
 } from "@langwatch/design-system/primitives";
-import { Copy, Lock, MoreVertical, Pencil, Sparkles, Star, StarOff, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  FolderInput,
+  Lock,
+  MoreVertical,
+  Pencil,
+  Sparkles,
+  Star,
+  StarOff,
+  Trash2,
+} from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
@@ -26,10 +38,22 @@ const ROW_COLUMNS = "24px minmax(0, 1fr) 150px 96px 28px";
 /** The member's star on a row, offered as Star or Unstar. */
 export type LibraryRowStar = { isStarred: boolean; onToggle: () => void };
 
+/** A starred row's place in the star order; a side left unset shows disabled, at that end. */
+export type LibraryRowStarMoves = {
+  onUp: (() => void) | undefined;
+  onDown: (() => void) | undefined;
+};
+
+/** "Move to product…": `onMove` where the member may move it, else why not, shown disabled. */
+export type LibraryRowMove = { onMove: () => void } | { refusal: string };
+
 /** What the menu offers; an entry left out is not shown. */
 export type LibraryRowActions = {
   star?: LibraryRowStar;
+  /** Offered while the row is starred. */
+  starMoves?: LibraryRowStarMoves;
   onRename?: () => void;
+  move?: LibraryRowMove;
   onDuplicate?: () => void;
   /** "Duplicate to edit" on a row the member cannot edit. */
   duplicateLabel?: string;
@@ -58,21 +82,25 @@ export function LibraryRow({
   actions: LibraryRowActions;
   renaming?: LibraryRowRenaming | undefined;
 }) {
-  const { star, onRename, onDuplicate, duplicateLabel = "Duplicate", remove } = actions;
+  const { star, starMoves, onRename, move, onDuplicate, duplicateLabel = "Duplicate", remove } =
+    actions;
   // While renaming the menu is gone, so closing it cannot hand focus back and end the edit.
   const hasMenu =
-    renaming === void 0 && [star, onRename, onDuplicate, remove].some((entry) => entry !== void 0);
+    renaming === void 0 &&
+    [star, onRename, move, onDuplicate, remove].some((entry) => entry !== void 0);
   const frame = { name, href, whoSees, isPrivate, owner, renaming, star };
   return (
     <RowFrame {...frame}>
       {hasMenu && (
         <RowMenu name={name}>
           {star && <StarItem star={star} />}
+          {star?.isStarred && starMoves && <StarMoveItems moves={starMoves} />}
           {onRename && (
             <Menu.Item value="rename" onClick={onRename}>
               <MenuRow icon={<Pencil size={13} />}>Rename</MenuRow>
             </Menu.Item>
           )}
+          {move && <MoveItem move={move} />}
           {onDuplicate && (
             <Menu.Item value="duplicate" onClick={onDuplicate}>
               <MenuRow icon={<Copy size={13} />}>{duplicateLabel}</MenuRow>
@@ -90,30 +118,34 @@ export function LibraryRow({
   );
 }
 
-/** A From LangWatch board: live and read-only, so a copy is the one thing to make of it. */
+/**
+ * A From LangWatch board: live and read-only, so a copy is the one thing to make of it. Its
+ * Move shows disabled, saying why (`moveRefusal`), so the member learns to move a copy.
+ */
 export function CuratedLibraryRow({
   name,
   href,
   star,
   onDuplicate,
+  moveRefusal,
 }: {
   name: string;
   href: string | undefined;
   star?: LibraryRowStar;
   onDuplicate?: () => void;
+  moveRefusal: string;
 }) {
   return (
     <RowFrame name={name} href={href} whoSees="Read-only" owner="LangWatch" star={star}>
-      {(star !== void 0 || onDuplicate !== void 0) && (
-        <RowMenu name={name}>
-          {star && <StarItem star={star} />}
-          {onDuplicate && (
-            <Menu.Item value="duplicate" onClick={onDuplicate}>
-              <MenuRow icon={<Sparkles size={13} />}>Duplicate to edit</MenuRow>
-            </Menu.Item>
-          )}
-        </RowMenu>
-      )}
+      <RowMenu name={name}>
+        {star && <StarItem star={star} />}
+        <MoveItem move={{ refusal: moveRefusal }} />
+        {onDuplicate && (
+          <Menu.Item value="duplicate" onClick={onDuplicate}>
+            <MenuRow icon={<Sparkles size={13} />}>Duplicate to edit</MenuRow>
+          </Menu.Item>
+        )}
+      </RowMenu>
     </RowFrame>
   );
 }
@@ -124,6 +156,33 @@ function StarItem({ star }: { star: LibraryRowStar }) {
       <MenuRow icon={star.isStarred ? <StarOff size={13} /> : <Star size={13} />}>
         {star.isStarred ? "Unstar" : "Star"}
       </MenuRow>
+    </Menu.Item>
+  );
+}
+
+function StarMoveItems({ moves }: { moves: LibraryRowStarMoves }) {
+  return (
+    <>
+      <Menu.Item value="star-up" disabled={!moves.onUp} onClick={moves.onUp}>
+        <MenuRow icon={<ChevronUp size={13} />}>Move up</MenuRow>
+      </Menu.Item>
+      <Menu.Item value="star-down" disabled={!moves.onDown} onClick={moves.onDown}>
+        <MenuRow icon={<ChevronDown size={13} />}>Move down</MenuRow>
+      </Menu.Item>
+    </>
+  );
+}
+
+function MoveItem({ move }: { move: LibraryRowMove }) {
+  const onMove = "onMove" in move ? move.onMove : void 0;
+  return (
+    <Menu.Item
+      value="move"
+      disabled={!onMove}
+      title={"refusal" in move ? move.refusal : void 0}
+      onClick={onMove}
+    >
+      <MenuRow icon={<FolderInput size={13} />}>Move to product…</MenuRow>
     </Menu.Item>
   );
 }

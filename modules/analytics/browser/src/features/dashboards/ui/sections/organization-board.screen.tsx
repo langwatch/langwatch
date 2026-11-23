@@ -1,7 +1,7 @@
 /**
  * `/dashboards/<id>`: a board opened by id at the organization level (ADR-002, decisions 3 and
- * 4). A Project board goes to its project's address; any other runs the project board screen in
- * the project it opens in, so every project-routed read and write works unchanged.
+ * 4). Every board runs the project board screen in the project it opens in, so every
+ * project-routed read and write works unchanged; a new project in view re-reads it from scratch.
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
@@ -9,21 +9,11 @@ import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks
 import { Button, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { useEffect } from "react";
 
 import { InProject } from "../../../../behavior/in-project.tsx";
-import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useOrganizationBoard } from "../../behavior/use-organization-board.ts";
 import { OrganizationBoardUnavailable } from "../blocks/board-unavailable.tsx";
 import { Board } from "./dashboard-board.screen.tsx";
-
-function Redirect({ to }: { to: string }) {
-  const host = useAnalyticsHost();
-  useEffect(() => {
-    host.navigate(to, { replace: true });
-  }, [host, to]);
-  return <UiPageLoading />;
-}
 
 export default function OrganizationBoardScreen() {
   const { place, isLoading, loadError, retry } = useOrganizationBoard();
@@ -43,10 +33,9 @@ export default function OrganizationBoardScreen() {
     );
   }
   if (isLoading || !place) return <UiPageLoading />;
-  if (place.kind === "redirect") return <Redirect to={place.to} />;
   if (place.kind === "unavailable") return <OrganizationBoardUnavailable />;
   return (
-    <InProject project={place.project}>
+    <InProject key={place.project.id} project={place.project}>
       <Board atOrganization />
     </InProject>
   );

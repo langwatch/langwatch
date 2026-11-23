@@ -1,7 +1,7 @@
 /**
  * `/dashboards`, the organization's Dashboards library (ADR-002): every board the member can
- * see, by product, From LangWatch boards first. A Project board opens at its project's address,
- * any other at `/dashboards/<id>`. The shell gates the flags. dashboards-organization-area.feature
+ * see, by home product, From LangWatch boards first; the one place a board moves between
+ * products. Every board opens at `/dashboards/<id>`. dashboards-organization-area.feature
  */
 
 import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
@@ -13,7 +13,9 @@ import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { LayoutDashboard, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
+import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardReader } from "../../behavior/use-board-access.ts";
+import { useLibraryShowMore } from "../../behavior/use-library-show-more.ts";
 import { useOrganizationLibrary } from "../../behavior/use-organization-library.ts";
 import { type CuratedBoard, CURATED_BOARDS } from "../../model/curated-boards.ts";
 import {
@@ -22,8 +24,10 @@ import {
   type LibraryBoard,
   type LibraryGroup,
   libraryGroups,
+  namesInProduct,
 } from "../../model/organization-library.ts";
 import { LibraryBoardRow, LibraryCuratedRow } from "./library-board-rows.tsx";
+import { MoveBoardDialog } from "./move-board-dialog.tsx";
 import { NewDashboardDialog } from "./new-dashboard-dialog.tsx";
 
 /** How many boards a group lists before "Show N more". */
@@ -36,6 +40,7 @@ export default function DashboardsLibraryScreen() {
   const library = useOrganizationLibrary();
   const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<LibraryBoard | undefined>();
+  const [pendingMove, setPendingMove] = useState<LibraryBoard | undefined>();
   const { storeProject } = library;
   // The store project is one where the member may create, so having one is the permission.
   const mayCreate = storeProject !== void 0;
@@ -68,12 +73,14 @@ export default function DashboardsLibraryScreen() {
         loadError={loadError}
         hasList={library.hasList}
         newButton={newButton}
-        handlers={{ ...duplicates, onDelete: setPendingDelete }}
+        handlers={{ ...duplicates, onMove: setPendingMove, onDelete: setPendingDelete }}
       />
       <LibraryDialogs
         library={library}
         isNewDialogOpen={isNewDialogOpen}
         onCloseNewDialog={() => setIsNewDialogOpen(false)}
+        pendingMove={pendingMove}
+        onSettleMove={() => setPendingMove(void 0)}
         pendingDelete={pendingDelete}
         onSettleDelete={() => setPendingDelete(void 0)}
       />
@@ -110,7 +117,7 @@ function LibraryBody({
     <VStack align="stretch" gap={6}>
       {loadError}
       {groups.map((group) => (
-        <ProductGroup key={group.label} group={group} {...handlers} />
+        <ProductGroup key={group.product} group={group} {...handlers} />
       ))}
     </VStack>
   );
@@ -143,33 +150,48 @@ function LoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) 
   );
 }
 
-/** The create dialog and the delete confirmation; the screen owns which is open. */
+/** The create and move dialogs and the delete confirmation; the screen owns which is open. */
 function LibraryDialogs({
   library,
   isNewDialogOpen,
   onCloseNewDialog,
+  pendingMove,
+  onSettleMove,
   pendingDelete,
   onSettleDelete,
 }: {
   library: ReturnType<typeof useOrganizationLibrary>;
   isNewDialogOpen: boolean;
   onCloseNewDialog: () => void;
+  pendingMove: LibraryBoard | undefined;
+  onSettleMove: () => void;
   pendingDelete: LibraryBoard | undefined;
   onSettleDelete: () => void;
 }) {
   const { organizationName } = useBoardReader();
+  const host = useAnalyticsHost();
   const { storeProject } = library;
   return (
     <>
       {isNewDialogOpen && storeProject && (
         <NewDashboardDialog
-          takenNames={library.namesInStore}
+          takenNamesIn={(product) => namesInProduct({ boards: library.boards, product })}
           projectName={storeProject.name}
           organizationName={organizationName}
           mayShare={library.mayShare}
           isCreating={library.isCreating}
           onCreate={library.createBoard}
           onClose={onCloseNewDialog}
+        />
+      )}
+      {pendingMove && (
+        <MoveBoardDialog
+          key={pendingMove.id}
+          board={pendingMove}
+          userId={host.userId()}
+          isMoving={library.isMoving}
+          onMove={(homeProduct) => library.moveBoard({ board: pendingMove, homeProduct })}
+          onClose={onSettleMove}
         />
       )}
       <ConfirmDialog
@@ -195,6 +217,7 @@ function LibraryDialogs({
 type BoardHandlers = {
   onDuplicate?: (board: LibraryBoard) => void;
   onDuplicateCurated?: (curated: CuratedBoard) => void;
+  onMove: (board: LibraryBoard) => void;
   onDelete: (board: LibraryBoard) => void;
 };
 
@@ -202,9 +225,10 @@ function ProductGroup({
   group,
   onDuplicate,
   onDuplicateCurated,
+  onMove,
   onDelete,
 }: BoardHandlers & { group: LibraryGroup }) {
-  const [showsAll, setShowsAll] = useState(false);
+  const { showsAll, toggle } = useLibraryShowMore(group.product);
   const shown = showsAll ? group.boards : group.boards.slice(0, GROUP_MAX);
   const hidden = group.boards.length - shown.length;
   return (
@@ -235,6 +259,7 @@ function ProductGroup({
             key={board.id}
             board={board}
             {...(onDuplicate ? { onDuplicate: () => onDuplicate(board) } : {})}
+            onMove={() => onMove(board)}
             onDelete={() => onDelete(board)}
           />
         ))}
@@ -246,7 +271,7 @@ function ProductGroup({
               width="full"
               justifyContent="flex-start"
               color="fg.muted"
-              onClick={() => setShowsAll(!showsAll)}
+              onClick={toggle}
             >
               {hidden > 0 ? `Show ${hidden} more` : "Show less"}
             </Button>

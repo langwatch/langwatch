@@ -157,6 +157,56 @@ function contractCases(backend: DashboardBackend): void {
       ).resolves.toMatchObject([{ id: created.id, name: "Renamed" }]);
     });
 
+    /** @scenario "A board made before home products is homed in LLM Ops" */
+    it("homes a board in LLM Ops unless one is named, and rehomes it on update", async () => {
+      const boards = backend.boards();
+      const plain = await board("Plain");
+      const gateway = await boards.createBoard({
+        id: id("dash"),
+        projectId: backend.projectId(),
+        name: "Spend",
+        createdById: "author",
+        scope: "ORGANIZATION",
+        homeProduct: "gateway",
+      });
+
+      const moved = await boards.updateBoard({
+        projectId: backend.projectId(),
+        dashboardId: plain.id,
+        data: { homeProduct: "governance" },
+      });
+      const listed = await boards.findBoards({ projectId: backend.projectId() });
+
+      expect([plain.homeProduct, gateway.homeProduct, moved.homeProduct]).toEqual([
+        "llm-ops",
+        "gateway",
+        "governance",
+      ]);
+      expect(new Map(listed.map((row) => [row.id, row.homeProduct]))).toEqual(
+        new Map([
+          [plain.id, "governance"],
+          [gateway.id, "gateway"],
+        ]),
+      );
+    });
+
+    /** @scenario "A board made before home products is homed in LLM Ops" */
+    it("lists a starred board without its home, as star lists always have", async () => {
+      const boards = backend.boards();
+      const starredBoard = await board("Starred");
+      await boards.addStar({
+        projectId: backend.projectId(),
+        userId: "u",
+        star: boardStar(starredBoard.id),
+      });
+
+      const rows = await boards.findStarred({ projectId: backend.projectId(), userId: "u" });
+      const dashboards = rows.flatMap((row) => (row.kind === "board" ? [row.dashboard] : []));
+
+      expect(dashboards.map(({ id: starredId }) => starredId)).toEqual([starredBoard.id]);
+      expect(dashboards.some((dashboard) => "homeProduct" in dashboard)).toBe(false);
+    });
+
     it("counts the widgets placed on each board, and no unplaced one", async () => {
       const [withWidgets, empty] = [await board("Widgets"), await board("Empty")];
       await widget(withWidgets.id);

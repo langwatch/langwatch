@@ -56,6 +56,17 @@ export type DashboardScope = z.infer<typeof dashboardScopeSchema>;
 /** Where every board starts, a member's My dashboard aside. */
 export const DEFAULT_DASHBOARD_SCOPE: DashboardScope = "PROJECT";
 
+/**
+ * The product whose sidebar lists a board (ADR-002, decision 8); the library orders its groups
+ * itself. A board stored before homes existed is LLM Ops; only an LLM Ops board can be Project.
+ */
+export const DASHBOARD_HOME_PRODUCTS = ["llm-ops", "me", "gateway", "governance"] as const;
+export const dashboardHomeProductSchema = z.enum(DASHBOARD_HOME_PRODUCTS);
+export type DashboardHomeProduct = z.infer<typeof dashboardHomeProductSchema>;
+
+/** Where a board is homed when nobody says, and every board made before homes existed. */
+export const DEFAULT_DASHBOARD_HOME_PRODUCT: DashboardHomeProduct = "llm-ops";
+
 const dashboardSchemaDefinition = z
   .object({
     id: dashboardIdSchema,
@@ -75,6 +86,14 @@ const dashboardSchemaDefinition = z
 export interface DashboardSchema extends Named<typeof dashboardSchemaDefinition> {}
 export const dashboardSchema: DashboardSchema = dashboardSchemaDefinition;
 export type Dashboard = z.infer<typeof dashboardSchema>;
+
+/** A Dashboards board (DashboardsV2): the stored row with the product it is homed in. */
+const boardSchemaDefinition = z
+  .object({ ...dashboardSchema.shape, homeProduct: dashboardHomeProductSchema })
+  .strict();
+export interface BoardSchema extends Named<typeof boardSchemaDefinition> {}
+export const boardSchema: BoardSchema = boardSchemaDefinition;
+export type Board = z.infer<typeof boardSchema>;
 
 /** A project as a board names it: who owns the board, or whose data it can show. */
 const dashboardProjectSchemaDefinition = z
@@ -96,6 +115,7 @@ export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
 const boardSummarySchemaDefinition = z
   .object({
     ...dashboardSummarySchema.shape,
+    homeProduct: dashboardHomeProductSchema,
     /** Whether the member reading the list has starred this board. */
     isStarred: z.boolean(),
     /** The project that owns an Organization board listed in another project; null at home. */
@@ -117,6 +137,7 @@ const organizationBoardSchemaDefinition = z
     description: z.string().nullable(),
     createdById: z.string().nullable(),
     scope: dashboardScopeSchema,
+    homeProduct: dashboardHomeProductSchema,
     updatedAt: z.date(),
     project: dashboardProjectSchema.nullable(),
     openProject: dashboardProjectSchema.nullable(),

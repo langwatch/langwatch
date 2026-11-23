@@ -231,13 +231,14 @@ function libraryRow({
   starPosition: number | null;
   ownerName: string | null;
 }): OrganizationBoard {
-  const { id, name, description, createdById, scope, updatedAt } = board;
+  const { id, name, description, createdById, scope, homeProduct, updatedAt } = board;
   return {
     id,
     name,
     description,
     createdById,
     scope,
+    homeProduct,
     updatedAt,
     project,
     openProject,
