@@ -5486,6 +5486,14 @@ const presentations = {
     title: "That model call didn't go through",
     describe: () => "Try again in a moment, or pick a different model.",
   },
+  ai_content_filtered: {
+    // fault: provider. The model settings work; the provider's content filter
+    // refused this text, so pointing at the model configuration would send the
+    // reader to fix something that is not broken.
+    title: "The provider's content filter blocked this text",
+    describe: () =>
+      "Your model provider refused this text under its content policy. Other text still works. To allow it, relax the content filter on your provider's deployment.",
+  },
   ai_query_provider_error: {
     // fault: provider. Same shape as above, but the reader is mid-search, so
     // rephrasing is the first thing worth trying.

@@ -267,3 +267,52 @@ describe("buildCodingAgentTranscript with no user_prompt log record", () => {
     expect(prompts.map((entry) => entry.text)).toEqual(["Check the ACME links"]);
   });
 });
+
+describe("buildCodingAgentTranscript with a result Claude Code delivered itself", () => {
+  const delivered =
+    '<event kind="repl-eval" eval="1" status="settled">\n<result>{ sum: 385 }</result>\n</event>';
+  function requestBody(timestampMs: number, body: string): TranscriptLogRecord {
+    return { timestampMs, attributes: { "event.name": "claude_code.api_request_body", body } };
+  }
+  const body = JSON.stringify({
+    messages: [
+      {
+        role: "assistant",
+        content: [
+          { type: "tool_use", id: "toolu_01ACME", name: "REPL", input: { code: "1" } },
+          { type: "tool_use", id: "poll_57be2cbf", name: "Poll", input: {} },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          { type: "tool_result", tool_use_id: "toolu_01ACME", content: "(dispatched #1)" },
+          { type: "tool_result", tool_use_id: "poll_57be2cbf", content: delivered },
+        ],
+      },
+    ],
+  });
+
+  /** @scenario "A script result Claude Code delivered without a Poll call is listed" */
+  it("lists the delivered result once as a Poll call", () => {
+    const { entries } = buildCodingAgentTranscript({
+      spans: [replSpan],
+      logs: [requestBody(2_000, body), requestBody(3_000, body)],
+    });
+
+    const polls = toolEntries(entries).filter((entry) => entry.name === "Poll");
+    expect(polls).toHaveLength(1);
+    expect(polls[0]).toMatchObject({ atMs: 2_000, output: delivered, failed: false });
+  });
+
+  /** @scenario "A script result Claude Code delivered without a Poll call is listed" */
+  it("adds nothing for a Poll the model called itself or a body cut short", () => {
+    const ownPoll = body.replaceAll("poll_57be2cbf", "toolu_01POLL");
+    const { entries } = buildCodingAgentTranscript({
+      spans: [replSpan],
+      logs: [requestBody(2_000, ownPoll), requestBody(3_000, body.slice(0, 120))],
+    });
+
+    expect(toolEntries(entries).filter((entry) => entry.name === "Poll")).toHaveLength(0);
+  });
+});

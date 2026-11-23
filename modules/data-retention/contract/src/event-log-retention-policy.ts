@@ -80,6 +80,7 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   coding_assistant_billing: "indefinite",
   connected_billing: "indefinite",
   dataset: "indefinite",
+  data_retention_drift: "indefinite",
   data_retention_extension: "indefinite",
   data_retention_storage: "indefinite",
   entitlement_organization: "indefinite",

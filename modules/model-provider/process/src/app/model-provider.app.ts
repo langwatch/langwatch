@@ -208,6 +208,8 @@ type ModelProviderBuildConfig = Readonly<{
   egress: Readonly<{ blockLocal: boolean; allowedHosts: string[]; verifyTls: boolean }>;
   /** Where a resolved model is executed, fully formed: nlpgo's `/go/proxy/v1`. */
   executionProxyBaseUrl: string;
+  /** Sent as X-LangWatch-NLP-Secret, which nlpgo requires on every `/go/*` route. */
+  nlpInternalSecret: string | undefined;
   /** The install-wide value a provider row falls back to for each field it left empty. */
   environment: Readonly<Record<string, string | undefined>>;
   /** Per provider, the API root the credential probe uses in place of the vendor's own. */
@@ -317,6 +319,7 @@ export class ModelProviderModule implements ModelProviderApi {
         verifyTls: true,
       },
       executionProxyBaseUrl,
+      nlpInternalSecret,
       environment,
       probeBaseUrls: config.probeBaseUrls,
       codexOAuthIssuer: config.codexOAuthIssuer,
@@ -372,6 +375,7 @@ export class ModelProviderModule implements ModelProviderApi {
       translation: VercelAiModelTranslationService.create({
         projects: dependencies.projects,
         executionProxyBaseUrl: config.executionProxyBaseUrl,
+        nlpInternalSecret: config.nlpInternalSecret,
       }),
       connectionPing: channels.connectionPing,
       codexGatewayPing: channels.codexGatewayPing,
