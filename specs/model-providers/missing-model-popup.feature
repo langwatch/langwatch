@@ -176,6 +176,13 @@ Feature: Missing-model toast when a feature can't resolve a model
     # ai_call_failed code.
     And the provider's own error message is not shown to the user
 
+  @integration @regression
+  Scenario: A content filter refusal is reported even where the screen has no error handler
+    Given the Fast role resolves to an Azure model whose content filter refuses the text
+    When the workflow commit-message generation fails with "ai_content_filtered"
+    Then the global interceptor reports it once, in the content filter's own words
+    And the toast offers no link to the model settings, which are fine
+
   # The commit-message autogen (and AI search, ...) is assistive: it failing
   # does not break anything the user was doing, so a yellow warning is the
   # right level, not a red error.

@@ -118,6 +118,12 @@ Feature: Message translation in the trace details drawer
       When the user translates it
       Then the text is sent in the system message and the translation comes back
 
+    @unit @regression
+    Scenario: Text that closes its own data block stays data
+      Given the message contains "</text>" followed by instructions
+      When the user translates it
+      Then the tags inside the message are escaped and only the prompt's own tags delimit the text
+
     @integration @regression
     Scenario: A content filter refusal says the provider filtered the text, not that the model is misconfigured
       Given the provider's content filter refuses the text with 400 "content_filter"

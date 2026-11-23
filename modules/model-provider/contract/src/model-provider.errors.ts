@@ -859,8 +859,14 @@ export class AiCallFailedError extends HandledError {
  * The provider's content filter refused the text it was asked to work on (Azure answers 400
  * `content_filter`). The model settings are fine and a retry gets the same answer.
  */
+export const AI_CONTENT_FILTERED_CAUSE = "AI_CONTENT_FILTERED" as const;
+
 export class AiContentFilteredError extends HandledError {
   declare readonly code: "ai_content_filtered";
+  readonly cause = AI_CONTENT_FILTERED_CAUSE;
+  readonly featureKey: string;
+  readonly role: ModelRole;
+  readonly featureDisplayName: string;
 
   constructor({
     featureKey,
@@ -879,6 +885,24 @@ export class AiContentFilteredError extends HandledError {
       ...remediation("ai_content_filtered"),
     });
     this.name = "AiContentFilteredError";
+    this.featureKey = featureKey;
+    this.role = role;
+    this.featureDisplayName = featureDisplayName;
+  }
+
+  /** Read by the global model-failure interceptor, so a caller with no onError still reports it. */
+  toResponseBody(): {
+    code: typeof AI_CONTENT_FILTERED_CAUSE;
+    featureKey: string;
+    featureDisplayName: string;
+    role: ModelRole;
+  } {
+    return {
+      code: this.cause,
+      featureKey: this.featureKey,
+      featureDisplayName: this.featureDisplayName,
+      role: this.role,
+    };
   }
 }
 

@@ -4,10 +4,13 @@
  * `isHandledBy*` and stays quiet. specs/model-providers/missing-model-popup.feature.
  */
 
+import { showErrorToast } from "@langwatch/browser-host/errors";
 import {
   extractAiCallFailedInfo,
+  extractAiContentFilteredInfo,
   extractMissingModelInfo,
   extractProviderDisabledInfo,
+  markAsHandledByContentFilterHandler,
   markAsHandledByMissingModelHandler,
   markAsHandledByProviderDisabledHandler,
   type ProviderDisabledExtracted,
@@ -51,6 +54,36 @@ function swapToAlternate(
     });
 }
 
+/** Resolved, but the chosen model's provider is switched off. */
+function reportProviderDisabled(error: unknown, remediation: ModelErrorRemediation): boolean {
+  const providerDisabled = extractProviderDisabledInfo(error);
+  if (!providerDisabled) return false;
+  if (error instanceof Error) markAsHandledByProviderDisabledHandler(error);
+  const onSwapToAlternate = swapToAlternate(providerDisabled, remediation);
+  showProviderDisabledToast({
+    ...providerDisabled,
+    navigate: remediation.navigate,
+    ...(onSwapToAlternate ? { onSwapToAlternate } : {}),
+  });
+  return true;
+}
+
+/**
+ * Resolved and configured, but the provider's content filter refused the text: no settings fix
+ * applies, so the registry's own copy says so and no settings link is offered.
+ */
+function reportContentFilterRefusal(error: unknown): boolean {
+  const contentFiltered = extractAiContentFilteredInfo(error);
+  if (!contentFiltered) return false;
+  showErrorToast({
+    error,
+    fallbackTitle: `${contentFiltered.featureDisplayName} failed`,
+    id: `ai-content-filtered:${contentFiltered.role}:${contentFiltered.featureKey}`,
+  });
+  if (error instanceof Error) markAsHandledByContentFilterHandler(error);
+  return true;
+}
+
 /**
  * Builds the interceptor. It answers whether it reported the failure, which is
  * the caller's signal that nothing else needs to.
@@ -82,18 +115,9 @@ export function createModelErrorInterceptor(
       reported = true;
     }
 
-    // Resolved, but the chosen model's provider is switched off.
-    const providerDisabled = extractProviderDisabledInfo(error);
-    if (providerDisabled) {
-      if (error instanceof Error) markAsHandledByProviderDisabledHandler(error);
-      const onSwapToAlternate = swapToAlternate(providerDisabled, remediation);
-      showProviderDisabledToast({
-        ...providerDisabled,
-        navigate,
-        ...(onSwapToAlternate ? { onSwapToAlternate } : {}),
-      });
-      reported = true;
-    }
+    if (reportContentFilterRefusal(error)) reported = true;
+
+    if (reportProviderDisabled(error, remediation)) reported = true;
 
     return reported;
   };
