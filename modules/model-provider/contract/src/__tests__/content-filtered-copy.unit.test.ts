@@ -2,7 +2,7 @@
  * A provider content filter refusal must send the reader to the provider's filter, never to the
  * Fast model settings, which work.
  */
-import { explainHandledError } from "@langwatch/handled-error/presentation";
+import { explainSerializedError } from "@langwatch/handled-error/presentation";
 import { AiContentFilteredError } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
@@ -16,7 +16,7 @@ describe("the copy a content filter refusal renders", () => {
         featureDisplayName: "Inline translation",
       });
 
-      const { title, description } = explainHandledError(refusal);
+      const { title, description } = explainSerializedError(refusal.serialize());
       const copy = `${title} ${description}`;
 
       expect(copy).toMatch(/content filter/i);
