@@ -1,6 +1,7 @@
 /**
  * Unit tests for the reportUsageForMonth command handler.
  * @see specs/licensing/billing-meter-dispatch.feature
+ * @see specs/self-hosting/connected-services/connected-billing.feature
  */
 
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
@@ -1362,7 +1363,7 @@ describe("ReportUsageForMonthCommand", () => {
       expect(hostedUsageEvent()?.value).toBe(9);
     });
 
-    /** @scenario "A connected customer's hosted usage is priced by its quarterly usage line" */
+    /** @scenario "Hosted usage is priced by the quarterly usage line, not the Growth price" */
     it("asks the subscription for the connected hosted usage price, not the Growth one", async () => {
       arrange({ measured: 90_000, ceiling: null });
       missingPrices = ["GROWTH_INSTANT_EVAL_USD"];
@@ -1380,7 +1381,7 @@ describe("ReportUsageForMonthCommand", () => {
       expect(hostedUsageEvent()?.value).toBe(9);
     });
 
-    /** @scenario "A connected customer's hosted usage is priced by its quarterly usage line" */
+    /** @scenario "Hosted usage is held while the usage subscription has no quarterly line" */
     it("holds hosted usage while the usage subscription has no quarterly line", async () => {
       arrange({ measured: 90_000, ceiling: null });
       missingPrices = ["CONNECTED_HOSTED_USAGE_QUARTERLY"];

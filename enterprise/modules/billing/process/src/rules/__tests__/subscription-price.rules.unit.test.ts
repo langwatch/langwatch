@@ -1,7 +1,6 @@
 /**
  * Whether a customer's subscriptions price a meter, the check PII and Instant Evals share.
  * @see modules/data-privacy/specs/pii-redaction-billing.feature
- * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -10,7 +9,6 @@ import type { BillingSubscription } from "../billing-stripe-shapes.rules.ts";
 import { carriesPrice } from "../subscription-price.rules.ts";
 
 const PII_PRICE = "price_pii";
-const INSTANT_EVAL_PRICE = "price_instant_eval_usd";
 
 function subscription(
   status: BillingSubscription["status"],
@@ -50,16 +48,6 @@ describe("carriesPrice", () => {
         carriesPrice({
           subscriptions: [subscription("active", ["price_seat", "price_events"])],
           priceId: PII_PRICE,
-        }),
-      ).toBe(false);
-    });
-
-    /** @scenario "A Growth subscription in euros holds its Instant Eval usage" */
-    it("does not hold for a euro subscription asked for the dollar Instant Evals price", () => {
-      expect(
-        carriesPrice({
-          subscriptions: [subscription("active", ["price_seat_eur", "price_events_eur"])],
-          priceId: INSTANT_EVAL_PRICE,
         }),
       ).toBe(false);
     });

@@ -170,6 +170,22 @@ Feature: Billing a connected self-hosted customer
     When usage is reported for the month
     Then the spend is reported to the hosted usage meter for the billing customer of "ACME"
 
+  # A meter event no subscription line prices is billed at nothing (ADR-174, v20).
+  @unit
+  Scenario: Hosted usage is priced by the quarterly usage line, not the Growth price
+    Given "ACME" was onboarded and its usage subscription has the connected hosted usage price
+    And hosted spend was recorded under "ACME"
+    When usage is reported for the month
+    Then the subscription is asked for the connected hosted usage price, not the Growth one
+    And the spend is reported
+
+  @unit
+  Scenario: Hosted usage is held while the usage subscription has no quarterly line
+    Given "ACME" was onboarded but its usage subscription has no connected hosted usage price
+    And hosted spend was recorded under "ACME"
+    When usage is reported for the month
+    Then no hosted usage is sent and its checkpoint is not advanced
+
   @integration
   Scenario: A connected customer is not skipped for lacking a Cloud plan
     Given "ACME" is a self-hosted customer with no LangWatch Cloud plan

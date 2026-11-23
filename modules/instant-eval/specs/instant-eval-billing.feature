@@ -229,14 +229,6 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       Then no Instant Eval meter event is sent and its checkpoint is not advanced
       And another report is scheduled
 
-    @unit
-    Scenario: A connected customer's hosted usage is priced by its quarterly usage line
-      Given a connected self-hosted customer whose usage subscription has the connected hosted usage price
-      And hosted spend this month
-      When the month is reported
-      Then the subscription is asked for the connected hosted usage price, not the Growth one
-      And the hosted usage is reported
-
     @integration
     Scenario: Only a subscription with the Instant Evals price reaches the Stripe simulator
       Given three usage-billed organizations with Instant Eval spend this month
