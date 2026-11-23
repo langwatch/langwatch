@@ -194,10 +194,13 @@ test_external_endpoint_forces_flags() {
 
 # @scenario "The image, pull secrets and probes come from values and the image's contract"
 test_image_secrets_probes() {
-  local deploy probes
+  local deploy probes release image
+  # The release publishes langwatch/pii-redaction-model:<appVersion>, as for the app.
+  release=$(awk '/^appVersion:/ { gsub(/["'\'']/, "", $2); print $2 }' Chart.yaml)
   deploy=$(only "$(render "$ON")" "pii_redaction_model/deployment")
-  if ! printf '%s\n' "$deploy" | grep -qE 'image: "langwatch/pii-redaction-model:[0-9]+\.[0-9]+\.[0-9]+"'; then
-    fail "default image" "not the public langwatch/pii-redaction-model at a release version"
+  image=$(printf '%s\n' "$deploy" | awk '/^ *image: / { gsub(/"/, "", $2); print $2; exit }')
+  if [ -z "$release" ] || [ "$image" != "langwatch/pii-redaction-model:$release" ]; then
+    fail "default image" "'$image' is not langwatch/pii-redaction-model:$release, the chart's release"
     return
   fi
   if printf '%s\n' "$deploy" | grep -q 'imagePullSecrets:'; then

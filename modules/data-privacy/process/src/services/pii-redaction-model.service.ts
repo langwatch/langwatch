@@ -37,7 +37,7 @@ export type PiiRedactionModelUsage = Readonly<{
   projectId: string;
   texts: number;
   characters: number;
-  spansFound: number;
+  findings: number;
   outcome: "ok" | PiiRedactionModelFallbackReason;
   durationMs: number;
   /** On an error only: the failure's class name. */
@@ -71,8 +71,8 @@ type ModelClearInput = {
   piiRedactionLevel: PIIRedactionLevel;
   entities?: readonly string[] | undefined;
   projectId?: string | undefined;
-  /** The level of the tenant's resolved policy; absent when none was resolved. */
-  resolvedPiiLevel?: PiiLevel | undefined;
+  /** The level in force (policy reconciled with the request); absent when none was resolved. */
+  effectivePiiLevel?: PiiLevel | undefined;
   spareNamesAndPlaces?: readonly boolean[] | undefined;
   /** The record's trace and span, when it has them; its spend request id is derived from it. */
   recordKey?: string | undefined;
@@ -156,8 +156,8 @@ export class PiiRedactionModelService {
   /** The model's clearing of one batch, or null when the batch stays on Presidio. */
   async findClearing(input: ModelClearInput): Promise<(string | null)[] | null> {
     // A custom level, or a policy that could not be resolved, stays on Presidio exactly as
-    // today: the request's own level says STRICT for both, so only the resolved one counts.
-    if (input.resolvedPiiLevel !== "strict") return null;
+    // today: the request's own level says STRICT for both, so only the effective one counts.
+    if (input.effectivePiiLevel !== "strict") return null;
     const projectId = input.projectId;
     if (!projectId) return null;
     const routing = await this.#routingOf({ projectId });
@@ -173,7 +173,7 @@ export class PiiRedactionModelService {
       this.metrics.modelFellBack("not_licensed");
       if (routing.firstInAMinute) {
         this.log.info(
-          { ...call, spansFound: 0, outcome: "not_licensed", durationMs: 0 },
+          { ...call, findings: 0, outcome: "not_licensed", durationMs: 0 },
           USAGE_MESSAGE,
         );
       }
@@ -182,7 +182,7 @@ export class PiiRedactionModelService {
     const { organizationId } = routing;
     if (isBatchTooLongForModel(input.texts)) {
       this.metrics.modelFellBack("too_long");
-      this.log.info({ ...call, spansFound: 0, outcome: "too_long", durationMs: 0 }, USAGE_MESSAGE);
+      this.log.info({ ...call, findings: 0, outcome: "too_long", durationMs: 0 }, USAGE_MESSAGE);
       return null;
     }
 
@@ -190,7 +190,7 @@ export class PiiRedactionModelService {
     if (!admission) {
       this.metrics.modelFellBack("breaker_open");
       this.log.info(
-        { ...call, spansFound: 0, outcome: "breaker_open", durationMs: 0 },
+        { ...call, findings: 0, outcome: "breaker_open", durationMs: 0 },
         USAGE_MESSAGE,
       );
       return null;
@@ -201,7 +201,7 @@ export class PiiRedactionModelService {
       const { cleared, findings } = await this.model.clearCounting(input);
       const durationMs = elapsedSince(startedAt);
       this.#settle({ admission, unavailable: false });
-      this.log.info({ ...call, spansFound: findings, outcome: "ok", durationMs }, USAGE_MESSAGE);
+      this.log.info({ ...call, findings, outcome: "ok", durationMs }, USAGE_MESSAGE);
       await this.spend.record({
         organizationId,
         projectId,
@@ -217,7 +217,7 @@ export class PiiRedactionModelService {
       this.log.warn(
         {
           ...call,
-          spansFound: 0,
+          findings: 0,
           outcome,
           durationMs: elapsedSince(startedAt),
           errorName: failureName(error),
