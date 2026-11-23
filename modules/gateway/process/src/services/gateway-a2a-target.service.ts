@@ -13,7 +13,10 @@ import {
 } from "@langwatch/gateway-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import type { GatewayA2aTargetRepository } from "../repositories/gateway-a2a-target.repository.ts";
+import type {
+  GatewayA2aTargetRepository,
+  GatewayA2aTargetUpdate,
+} from "../repositories/gateway-a2a-target.repository.ts";
 import type {
   GatewayAuditAction,
   GatewayAuditRepository,
@@ -202,7 +205,7 @@ export class GatewayA2aTargetService {
       action,
       actorUserId: parsed.actorUserId,
       before,
-      write: (tx) => this.repository.update(parsed, tx),
+      write: (tx) => this.repository.update(guardedUpdate({ before, edit: parsed }), tx),
     });
   }
 
@@ -275,6 +278,24 @@ export class GatewayA2aTargetService {
       input.blocked ? "gateway.a2a_target.blocked" : "gateway.a2a_target.unblocked",
     );
   }
+}
+
+/** The edit to write: a URL move keeping saved headers lands only on the upstream it checked. */
+function guardedUpdate({
+  before,
+  edit,
+}: {
+  before: GatewayA2aTargetResource;
+  edit: UpdateGatewayA2aTargetInput;
+}): GatewayA2aTargetUpdate {
+  if (edit.upstreamUrl === undefined || edit.upstreamHeaders !== undefined) return edit;
+  return {
+    ...edit,
+    expectedUpstream: {
+      upstreamUrl: before.upstreamUrl,
+      hasUpstreamHeaders: Object.keys(before.upstreamHeaders).length > 0,
+    },
+  };
 }
 
 /**

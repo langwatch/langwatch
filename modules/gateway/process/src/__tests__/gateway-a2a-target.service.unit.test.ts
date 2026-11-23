@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { AppendGatewayAuditInput } from "../repositories/gateway-audit.repository.ts";
+import { MemoryGatewayA2aTargetRepository } from "../repositories/memory/memory.gateway-a2a-target.repository.ts";
 import { MemoryGatewayChangeEventsRepository } from "../repositories/memory/memory.gateway-change-event.repository.ts";
 import {
   FOREIGN_PROJECT_ID,
@@ -165,6 +166,42 @@ describe("GatewayA2aTargetService", () => {
         upstreamHeaders: { "X-Token": "replaced" },
       }),
     ).resolves.toMatchObject({ upstreamUrl: "https://agents.acme.test/a2a" });
+  });
+
+  describe("when headers are saved between an upstream move's read and its write", () => {
+    /** @scenario "the target's saved upstream headers never follow its upstream to a new origin" */
+    it("refuses the move and keeps the headers on their origin", async () => {
+      const repository = MemoryGatewayA2aTargetRepository.create();
+      const targets = service({ repository });
+      const created = await targets.create({ ...base, projectId: null, name: "billing" });
+      const ref = { id: created.id, organizationId: base.organizationId };
+      const findById = repository.findById.bind(repository);
+      let interleaved = false;
+      repository.findById = async (input) => {
+        const snapshot = await findById(input);
+        if (!interleaved) {
+          interleaved = true;
+          await targets.update({
+            ...ref,
+            upstreamHeaders: { "X-Token": "s3cret" },
+            actorUserId: "u2",
+          });
+        }
+        return snapshot;
+      };
+
+      await expect(
+        targets.update({
+          ...ref,
+          upstreamUrl: "https://collector.evil.test/a2a",
+          actorUserId: "u1",
+        }),
+      ).rejects.toMatchObject({ code: "gateway_a2a_target_headers_need_replacing" });
+      expect(await findById(ref)).toMatchObject({
+        upstreamUrl: base.upstreamUrl,
+        upstreamHeaders: { "X-Token": "s3cret" },
+      });
+    });
   });
 
   /** @scenario "every A2A target write is audited without header values" */
