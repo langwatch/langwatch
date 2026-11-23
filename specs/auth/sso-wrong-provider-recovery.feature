@@ -67,6 +67,16 @@ Feature: Recover from a wrong-provider sign-in without a redirect loop
     And it tells them that, if their company's sign-in turns them away, their company may not have given them access yet
     And it tells them to ask their IT administrator to check
 
+  # The SSO plugin's OIDC callback redirects with the refusal's raw, spaced string
+  # ("account not linked") where the OAuth callback uses underscores. Both are the same refusal,
+  # so both name the connection that governs the address.
+  @unit
+  Scenario: The SSO plugin's spaced account-link refusal also names the governing connection
+    Given the provider's address is governed by an organization's connection
+    When the refused link redirects with "account not linked"
+    Then the redirect names that connection in error_description
+    And a spaced refusal for an address no connection governs names no connection
+
   # A member can be left carrying a stale "you still need to link SSO" flag:
   # it is set at sign-in and only ever cleared by a LATER sign-in that
   # happens to match the organization's required method. The dashboard
