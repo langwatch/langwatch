@@ -172,6 +172,17 @@ export interface LwNavigateMessage {
   readonly params: Readonly<Record<string, unknown>>;
 }
 
+/**
+ * The frame's error-panel titles for a crash while drawing or its own libraries failing to load,
+ * as its "lw.error" line starts; a compile error, no default export or failed import is not one.
+ */
+export const CHART_FRAME_CRASH_TITLES = {
+  renderCrash: "Widget crashed while rendering",
+  renderError: "Render error",
+  librariesUnavailable: "Chart libraries failed to load",
+  compilerUnavailable: "Compiler failed to load",
+} as const;
+
 /** Where a forwarded log/error line originated inside the frame. */
 export type ChartFrameLogSource = "console" | "error" | "unhandledrejection" | "lw.error";
 

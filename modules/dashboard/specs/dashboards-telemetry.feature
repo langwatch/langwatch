@@ -192,6 +192,28 @@ Feature: Dashboards telemetry: product events and query telemetry
     Then a "LangWatchQL failed" log line carries the caller, the queryHash and the error code
     And lwql_queries_total counts it with outcome set to that error code
 
+  # Owner asked whether we can see if, how and when customer dashboards fail; which project is enough.
+  @unit
+  Scenario: Telemetry: a failed query is logged at its fault's level with the projects it ran over
+    When a LangWatchQL query is refused or fails
+    Then its "LangWatchQL failed" line is a warning when the customer's query is at fault, such as one over its memory limit
+    And it is an error when the platform is at fault, such as a timeout or an unavailable database, or when no module handled the throw
+    And it stays at info when the caller hung up
+    And it carries projectIds: the project the run came from, then any project it named, each once
+    And it never carries the SQL text or the error's message
+
+  # Owner: a failure in the browser should not happen, so when one does it is reported as a real error.
+  @integration
+  Scenario: Telemetry: a chart or a board header action that crashes while drawing is reported as an exception
+    Given a chart, an action a peer lends the board header, or a widget's sandboxed frame, throws while drawing
+    When its error boundary or the frame's error panel catches the crash
+    Then the crash goes to PostHog once as an exception, not as a product event
+    And it carries the surface "lwql_chart" or "dashboard_widget_frame" with the board's and widget's ids where it has them, or "board_header_action" with the lender and the board
+    And a frame that says the same crash again in one widget mount reports it once
+    And a frame refusing the widget's own source (a compile error, no default export, a failed import) or the widget's own console error reports nothing
+    And it carries no query text and no SQL
+    And a widget query the server refused is not reported here, since its "LangWatchQL failed" line already counts it
+
   @unit
   Scenario: Telemetry: query metrics carry only low-cardinality labels
     When a LangWatchQL query runs

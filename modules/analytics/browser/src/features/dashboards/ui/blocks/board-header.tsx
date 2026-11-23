@@ -5,6 +5,7 @@
  */
 
 import { type BoardHeaderActionProps, BoardHeaderActionToken } from "@langwatch/analytics-client";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
 import { useLentAll } from "@langwatch/browser-host/lent";
 import { Button, Heading, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
@@ -65,11 +66,28 @@ export function BoardHeader({
   );
 }
 
-/** The actions peers lend the header (§10.1); nothing draws without a lender. */
+/**
+ * The actions peers lend the header (§10.1); nothing draws without a lender. One that crashes
+ * is reported as an exception naming its lender and the board.
+ */
 function LentBoardActions(props: BoardHeaderActionProps) {
   const actions = useLentAll(BoardHeaderActionToken);
+  const analytics = useUiAnalytics();
+  const board =
+    props.boardKind === "dashboard"
+      ? { dashboardId: props.boardId }
+      : { templateId: props.boardId };
   return actions.map(({ owner, Component }) => (
-    <IsolatedErrorBoundary key={owner} scope="This action failed to load">
+    <IsolatedErrorBoundary
+      key={owner}
+      scope="This action failed to load"
+      onError={(error) =>
+        analytics.captureException({
+          error,
+          properties: { surface: "board_header_action", owner, ...board },
+        })
+      }
+    >
       <Suspense fallback={null}>
         <Component {...props} />
       </Suspense>

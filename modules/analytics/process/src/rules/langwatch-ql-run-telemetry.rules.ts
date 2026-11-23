@@ -43,23 +43,57 @@ export function langWatchQLFailureOutcome(error: unknown): LangWatchQLRunOutcome
   return "unhandled";
 }
 
+/** The level a failed run is logged at. */
+export type LangWatchQLFailureLevel = "info" | "warn" | "error";
+
+/**
+ * By the error's own fault, as the request logger does: a customer's refusal warns, ours or a
+ * provider's is an error, a cancelled run is no failure, and an unhandled throw is a bug.
+ */
+export function langWatchQLFailureLevel(error: unknown): LangWatchQLFailureLevel {
+  if (error instanceof HandledError) return error.fault === "customer" ? "warn" : "error";
+  return langWatchQLFailureOutcome(error) === "aborted" ? "info" : "error";
+}
+
+/**
+ * The projects a failed run's line names, each once: those it ran from, then any it named. A
+ * value that is no list, such as "all" or a stray one the run scope refuses, names none.
+ */
+export function langWatchQLRunProjectIds({
+  own,
+  named,
+}: {
+  own: readonly (string | undefined)[];
+  named?: unknown;
+}): readonly string[] {
+  const listed = Array.isArray(named) ? named : [];
+  const ids = [...own, ...listed].filter((id): id is string => typeof id === "string" && id !== "");
+  return [...new Set(ids)];
+}
+
 /** The caller a run is counted under. */
 export function langWatchQLTelemetryCaller(telemetry: LangWatchQLRunTelemetry | undefined): string {
   return telemetry?.caller ?? LWQL_UNNAMED_CALLER;
 }
 
-/** The log line's own fields for a run: the caller, the widget's ids when it has them, the hash. */
+/**
+ * The log line's own fields for a run: the caller, the projects (comma-joined, so a log query
+ * can group by them) and the widget's ids when it has them, then the hash.
+ */
 export function langWatchQLTelemetryFields({
   telemetry,
   sql,
   queryHashKey,
+  projectIds = [],
 }: {
   telemetry: LangWatchQLRunTelemetry | undefined;
   sql: string;
   queryHashKey: Uint8Array;
+  projectIds?: readonly string[];
 }): Readonly<Record<string, string>> {
   return {
     caller: langWatchQLTelemetryCaller(telemetry),
+    ...(projectIds.length === 0 ? {} : { projectIds: projectIds.join(",") }),
     ...(telemetry?.dashboardId === undefined ? {} : { dashboardId: telemetry.dashboardId }),
     ...(telemetry?.widgetId === undefined ? {} : { widgetId: telemetry.widgetId }),
     ...(telemetry?.templateId === undefined ? {} : { templateId: telemetry.templateId }),

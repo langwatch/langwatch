@@ -7,6 +7,9 @@
  */
 import type { QueryCompleteness } from "@langwatch/analytics-contract";
 import type { ChartQueryError } from "@langwatch/analytics-contract/chart-frame-protocol";
+import { UiAnalytics, type UiExceptionReport } from "@langwatch/browser-host/analytics";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -79,6 +82,44 @@ const widget = (refreshedAt?: number) => (
   </AnalyticsHostProvider>
 );
 
+/** Keeps the exceptions the widget reports; product events are not this test's subject. */
+class ExceptionRecorder extends UiAnalytics {
+  readonly exceptions: UiExceptionReport[] = [];
+  track(): void {}
+  identify(): void {}
+  group(): void {}
+  reset(): void {}
+  override captureException(report: UiExceptionReport): void {
+    this.exceptions.push(report);
+  }
+}
+
+/** The widget on board_1, under a host whose analytics records what it reports. */
+const reportingWidget = (analytics: UiAnalytics) => (
+  <UiHostServicesContextProvider
+    value={{
+      ...createUiHostServicesFromHost({
+        route: () => ({ params: {}, query: {} }),
+        navigate: () => void 0,
+      }),
+      analytics,
+    }}
+  >
+    <AnalyticsHostProvider value={new StubAnalyticsHost()}>
+      <DesignSystemProvider forcedTheme="light">
+        <DashboardWidgetFrame
+          id="graph_1"
+          graph={GRAPH}
+          projectId="project_1"
+          projectSlug="project"
+          maxHeight={300}
+          dashboardId="board_1"
+        />
+      </DesignSystemProvider>
+    </AnalyticsHostProvider>
+  </UiHostServicesContextProvider>
+);
+
 beforeEach(() => {
   periodMock.mockReturnValue(period({ startMs: 1_000, endMs: 2_000 }));
   executorMock.mockReturnValue({
@@ -148,6 +189,59 @@ describe("given a placed dashboard widget", () => {
 
       expect(screen.getByTestId("frame-diagnostic-badge")).toBeTruthy();
       expect(screen.getByTestId("sandboxed-frame")).toBeTruthy();
+    });
+  });
+});
+
+describe("given a placed dashboard widget whose frame reports an error", () => {
+  describe("when the widget crashes while drawing, and says so twice", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports one exception naming the frame, the board and the widget", () => {
+      const analytics = new ExceptionRecorder();
+      render(reportingWidget(analytics));
+      const crash = {
+        level: "error",
+        source: "lw.error",
+        text: "Render error: x is undefined",
+      } as const;
+
+      act(() => {
+        lastFrameProps().onLog(crash);
+        lastFrameProps().onLog(crash);
+      });
+
+      expect(analytics.exceptions).toHaveLength(1);
+      expect(analytics.exceptions[0]?.error).toEqual(new Error("Render error: x is undefined"));
+      expect(analytics.exceptions[0]?.properties).toEqual({
+        surface: "dashboard_widget_frame",
+        widgetId: "graph_1",
+        dashboardId: "board_1",
+      });
+    });
+  });
+
+  describe("when the frame refuses the widget's own source, or the code logs an error", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports nothing", () => {
+      const analytics = new ExceptionRecorder();
+      render(reportingWidget(analytics));
+
+      act(() => {
+        lastFrameProps().onLog({
+          level: "error",
+          source: "lw.error",
+          text: "Compile error: Unexpected token (1:7)",
+        });
+        lastFrameProps().onLog({
+          level: "error",
+          source: "lw.error",
+          text: "No default export: The widget file must export default a React component.",
+        });
+        lastFrameProps().onLog({ level: "error", source: "console", text: "Render error" });
+      });
+
+      expect(screen.getByTestId("frame-diagnostic-badge")).toBeTruthy();
+      expect(analytics.exceptions).toEqual([]);
     });
   });
 });

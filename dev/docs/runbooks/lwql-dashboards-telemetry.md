@@ -26,7 +26,16 @@ watching. Those runs reach Grafana and the logs only, never PostHog.
 | `lwql_rows_read{caller}`                   | Grafana | same                                                                                               | which callers read the most data             |
 | "LangWatchQL executed" / "failed" log line | logs    | same; carries `caller`, `outcome`, `queryHash`, board, widget and template ids, and the error code | find the run behind a slow or failing number |
 
-The Grafana board is `docs/langwatchql-queries-dashboard.json`.
+The Grafana board is `docs/langwatchql-queries-dashboard.json`. Its "Failed
+widget queries" tables list failed widget runs by project, newest first.
+
+A "failed" line logs at `warn` when the customer's query is at fault (a memory
+or scan limit, a refused statement), at `error` for ours (timeout, database
+down, unhandled), at `info` when aborted. It carries `projectIds`, comma-joined.
+
+A chart, a board header action or a widget's sandboxed frame that crashes while
+drawing goes to PostHog as an exception (`surface`, board and widget ids), not
+as a product event. A frame's compile error or missing export is not reported.
 
 ### What people do (PostHog)
 
@@ -52,8 +61,8 @@ change. Each event also carries `projectId`.
 | `insights.filed/seen/archived/kept.insight`          | sent by nurturing from insight's own events, on the person who acted             | are insights read and acted on                 |
 | `automations.opened.alert_link`                      | a signed-in member opens a link marked `lw_from=alert` (`landedOn`)              | do alerts bring people back to the app         |
 
-No attribute we set carries a raw board or widget id, SQL, a title or question
-text. `dashboardKey` is 16 hex of SHA-256 of the board id.
+No product event attribute we set carries a raw board or widget id, SQL, a
+title or question text; a crash exception names its board and widget by id. `dashboardKey` is 16 hex of SHA-256 of the board id.
 
 ## How a run gets its caller
 

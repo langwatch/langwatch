@@ -224,3 +224,41 @@ describe("who the events are about", () => {
     expect(() => consoleOnly.identify({ id: "user_1", email: null })).not.toThrow();
   });
 });
+
+describe("a crash a screen caught", () => {
+  describe("given a SaaS deployment with PostHog registered", () => {
+    it("goes to PostHog as an exception with its properties, not as an event", () => {
+      const capture = vi.fn();
+      const captureException = vi.fn();
+      const error = new Error("render crash");
+
+      createBrowserUiAnalytics({
+        isSaaS: true,
+        posthogClient: fakePostHog({ capture, captureException } as Partial<PostHog>),
+        isGtagReady: false,
+        isDevelopment: false,
+      }).captureException({ error, properties: { surface: "lwql_chart", widgetId: "w-1" } });
+
+      expect(captureException).toHaveBeenCalledWith(error, {
+        surface: "lwql_chart",
+        widgetId: "w-1",
+      });
+      expect(capture).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a self-hosted deployment", () => {
+    it("reaches no destination and does not throw", () => {
+      const captureException = vi.fn();
+
+      createBrowserUiAnalytics({
+        isSaaS: false,
+        posthogClient: fakePostHog({ captureException } as Partial<PostHog>),
+        isGtagReady: false,
+        isDevelopment: false,
+      }).captureException({ error: new Error("render crash") });
+
+      expect(captureException).not.toHaveBeenCalled();
+    });
+  });
+});

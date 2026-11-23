@@ -11,6 +11,7 @@ import {
   type UiAnalyticsEvent,
   type UiAnalyticsGroup,
   type UiAnalyticsReader,
+  type UiExceptionReport,
 } from "./analytics.ts";
 
 declare global {
@@ -45,6 +46,7 @@ type AnalyticsDestination = {
   reset?: () => void;
   register?: (properties: Readonly<Record<string, unknown>>) => void;
   unregister?: (property: string) => void;
+  captureException?: (report: UiExceptionReport) => void;
 };
 
 const CONSOLE_DESTINATION: AnalyticsDestination = {
@@ -95,6 +97,9 @@ function postHogDestination(client: PostHog): AnalyticsDestination {
     reset: () => client.reset(),
     register: (properties) => client.register({ ...properties }),
     unregister: (property) => client.unregister(property),
+    captureException: ({ error, properties }) => {
+      client.captureException(error, { ...properties });
+    },
   };
 }
 
@@ -151,6 +156,10 @@ class BrowserUiAnalytics extends UiAnalytics {
 
   override unregister(property: string): void {
     this.#each("unregister", (destination) => destination.unregister?.(property));
+  }
+
+  override captureException(report: UiExceptionReport): void {
+    this.#each("captureException", (destination) => destination.captureException?.(report));
   }
 
   #each(what: string, call: (destination: AnalyticsDestination) => void): void {

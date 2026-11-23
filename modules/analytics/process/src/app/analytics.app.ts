@@ -109,9 +109,12 @@ import { readLegacyTimeseriesBody } from "../rules/analytics-legacy-body.rules.t
 import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
-import { keyRunTelemetry } from "../rules/langwatch-ql-key-caller.rules.ts";
+import { keyReachProjectIds, keyRunTelemetry } from "../rules/langwatch-ql-key-caller.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
-import { langWatchQLQueryHashKey } from "../rules/langwatch-ql-run-telemetry.rules.ts";
+import {
+  langWatchQLQueryHashKey,
+  langWatchQLRunProjectIds,
+} from "../rules/langwatch-ql-run-telemetry.rules.ts";
 import { dashboardsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
@@ -857,7 +860,15 @@ export class AnalyticsModule
     try {
       return await this.#runLangWatchQLForKey({ ...input, telemetry });
     } catch (error) {
-      this.#dependencies.runTelemetry.recordFailed({ telemetry, sql: input.sql, error });
+      this.#dependencies.runTelemetry.recordFailed({
+        telemetry,
+        sql: input.sql,
+        error,
+        projectIds: langWatchQLRunProjectIds({
+          own: [...keyReachProjectIds({ reach: input.reach }), input.projectId],
+          named: input.projects,
+        }),
+      });
       throw error;
     }
   }
@@ -984,6 +995,7 @@ export class AnalyticsModule
         telemetry: input.telemetry,
         sql: input.sql,
         error,
+        projectIds: langWatchQLRunProjectIds({ own: [input.project.id], named: input.projects }),
       });
       throw error;
     }
