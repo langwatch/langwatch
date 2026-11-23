@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { pushMock, connection } = vi.hoisted(() => ({
   pushMock: vi.fn(),
-  connection: { configured: true, isLoading: false },
+  connection: { configured: true, isLoading: false, admin: false },
 }));
 vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: pushMock }),
@@ -34,6 +34,14 @@ vi.mock("../../../../../../behavior/langy-api.ts", () => ({
   },
 }));
 
+vi.mock("../../../../../../model/langy-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useLangyHost: () => ({
+    hasOrganizationPermission: (permission: string) =>
+      permission === "organization:manage" && connection.admin,
+  }),
+}));
+
 import { LangyGitHubConnectCard } from "../langy-git-hub-connect-card.tsx";
 
 function renderCard(onShareLocalFolder?: () => void) {
@@ -53,6 +61,7 @@ afterEach(() => {
   cleanup();
   connection.configured = true;
   connection.isLoading = false;
+  connection.admin = false;
   pushMock.mockClear();
   vi.restoreAllMocks();
 });
@@ -89,6 +98,25 @@ describe("given an instance with no GitHub App configured", () => {
       expect(screen.queryByText("Install GitHub App")).toBeNull();
       fireEvent.click(screen.getByText("Share local folder"));
       expect(share).toHaveBeenCalledOnce();
+    });
+
+    /** @scenario "An organization admin is pointed at the GitHub App setup guide" */
+    it("links an organization admin to the GitHub App setup guide", () => {
+      connection.configured = false;
+      connection.admin = true;
+      renderCard(vi.fn());
+
+      const guide = screen.getByText("How to set up the GitHub App").closest("a");
+      expect(guide?.getAttribute("href")).toBe(
+        "https://docs.langwatch.ai/self-hosting/langy/github-app",
+      );
+    });
+
+    it("shows a member no setup guide", () => {
+      connection.configured = false;
+      renderCard(vi.fn());
+
+      expect(screen.queryByText("How to set up the GitHub App")).toBeNull();
     });
   });
 });
