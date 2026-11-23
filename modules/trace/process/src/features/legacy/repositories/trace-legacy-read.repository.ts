@@ -13,6 +13,7 @@ import type {
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
+  SpanAnalyticsFloor,
   TraceSummaryListOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
@@ -84,6 +85,8 @@ export abstract class TraceLegacyReadRepository {
       options: GetAllTracesForProjectOptions;
       /** The own-only proof the span, evaluation and event reads go through. */
       ownRead: Authorization;
+      /** Where span_analytics is complete; absent or null, span types come from stored_spans. */
+      spanAnalyticsFloor?: SpanAnalyticsFloor | null;
     },
   ): Promise<TraceLegacyPage>;
 

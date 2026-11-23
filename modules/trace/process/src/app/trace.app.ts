@@ -971,6 +971,8 @@ type TraceLegacyReadCompositionOptions = {
   blobResolutionDeps?: BlobResolutionDeps | undefined;
   /** The tenant's retention policy; absent, the span read floors at the platform default. */
   retentionResolver?: DataRetentionApi | undefined;
+  /** Where span_analytics is complete; absent, a span-type filter reads stored_spans. */
+  spanAnalyticsFloor?: (() => Promise<SpanAnalyticsFloor>) | undefined;
 };
 
 type TraceTreeCompositionOptions = {
@@ -1208,6 +1210,8 @@ export class TraceModule implements TraceApi, CollectorApp {
         traceCanonicalisation: options.canonicalisation,
         retentionResolver: options.dataRetention,
         blobResolutionDeps,
+        spanAnalyticsFloor: async () =>
+          spanAnalyticsFloorOf(await options.repositories.spanAnalyticsFloor.findReplayStep()),
       }),
       editOverlay,
       logRecordStorage: logRecords,
@@ -2867,6 +2871,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     filters: Readonly<Record<string, unknown>>;
     window?: { startDate?: number; endDate?: number };
     fenced?: boolean;
+    spanAnalyticsFloor?: SpanAnalyticsFloor | null;
   }): GenerateFilterConditionsResult {
     return translateLegacyFilters(input);
   }

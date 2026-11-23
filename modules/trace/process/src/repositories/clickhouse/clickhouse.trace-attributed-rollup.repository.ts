@@ -1,4 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { latestTraceVersionOnly } from "@langwatch/trace-contract";
 import type {
   TraceAttributedRecency,
   TraceAttributedSpendComparison,
@@ -42,12 +43,7 @@ function matchClause(matches: readonly TraceAttributeMatch[]) {
 
 /** The latest version of each trace in the tenant's `OccurredAt` range. */
 function latestVersion(where: string): string {
-  return `(ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
-              FROM trace_summaries
-              WHERE ${where}
-              GROUP BY TenantId, TraceId
-            )`;
+  return latestTraceVersionOnly({ where, alias: "ts" });
 }
 
 const SINGLE_TENANT_RANGE = `TenantId = {tenantId:String}

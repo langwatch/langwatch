@@ -10,7 +10,7 @@ import { ownProof } from "../../../__tests__/support/authorization-proofs.fixtur
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 
 /** The full-window version dedup, identified by its GROUP BY. */
-const DEDUP_AGGREGATE = "GROUP BY TenantId, TraceId";
+const DEDUP_AGGREGATE = "GROUP BY id";
 
 /** Where the outer page stage hands the chosen row identities to the inner one. */
 const IDENTITY_HANDOVER = "(TenantId, TraceId, UpdatedAt) IN (";
@@ -131,7 +131,9 @@ describe("TraceListClickHouseRepository.listAll (unit)", () => {
         const dedupBodies = sql
           .split(DEDUP_AGGREGATE)
           .slice(0, -1)
-          .map((chunk) => chunk.slice(chunk.lastIndexOf("SELECT TenantId")));
+          .map((chunk) =>
+            chunk.slice(chunk.lastIndexOf("SELECT sipHash128(TenantId, TraceId) AS id")),
+          );
         for (const body of dedupBodies) {
           expect(body).not.toContain(USER_FILTER);
         }
