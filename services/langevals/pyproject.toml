@@ -86,10 +86,11 @@ override-dependencies = [
   # server-side file read; patched in 0.8.18.
   "langsmith>=0.8.18",
   # Force a patched strawberry-graphql. The highest fix across its advisories
-  # is 0.327.2 (a HIGH covering <=0.326.0 and a LOW below 0.327.2).
+  # is 0.338.0 (GHSA-xh55-3p42-7v2h, permission classes returning a non-bool;
+  # earlier: a HIGH covering <=0.326.0 and a LOW below 0.327.2).
   # arize-phoenix pins strawberry exactly, so without this the pin decides
   # the version.
-  "strawberry-graphql>=0.327.2",
+  "strawberry-graphql>=0.338.0",
   "pydantic-settings>=2.14.2", # security: pydantic-settings advisory (#1517)
   # security: GHSA circular JSON Schema $ref unbounded-CPU DoS; patched in 0.60.1.
   "json-repair>=0.60.1",
@@ -162,6 +163,8 @@ constraint-dependencies = [
   "pydantic-ai-slim>=2.30.0",
   "certifi>=2026.10.19", # certifi advisory covering <2026.10.19 (GHSA-6q48-6c7w-9gw2, critical)
   "mcp>=1.30.0,!=2.0.*,!=2.1.*", # MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 and 2.2.0 (#2828)
+  "gunicorn>=27.0.0", # CVE-2026-134820/134821: ASGI HTTP parser smuggling and memory exhaustion, 25.2.0 before 27.0.0
+  "graphql-core>=3.3.2", # CVE-2026-134795: parser token-limit bypass DoS, fixed in 3.2.14 and 3.3.2; strawberry>=0.338 needs 3.3
 ]
 
 [tool.uv.workspace]
