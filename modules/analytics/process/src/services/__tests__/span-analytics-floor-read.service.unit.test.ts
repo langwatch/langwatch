@@ -5,6 +5,7 @@
  */
 
 import type { AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
+import { createTestLogger } from "@langwatch/test-harness";
 import { UNKNOWN_SPAN_ANALYTICS_FLOOR } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -24,14 +25,14 @@ describe("SpanAnalyticsFloorReadService", () => {
 
     /** @scenario "A floor that cannot be read keeps stored_spans instead of failing" */
     it("answers the unknown floor when the lookup fails, and warns", async () => {
-      const warn = vi.fn();
+      const { logger, lines } = createTestLogger();
       const service = SpanAnalyticsFloorReadService.create({
         read: () => Promise.reject(new Error("ledger down")),
-        logger: { warn },
+        logger,
       });
 
       await expect(service.floorFor(true)).resolves.toBe(UNKNOWN_SPAN_ANALYTICS_FLOOR);
-      expect(warn).toHaveBeenCalledOnce();
+      expect(lines.findLine("warn", "span_analytics floor unreadable")).toBeDefined();
     });
   });
 

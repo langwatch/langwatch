@@ -107,7 +107,6 @@ export * from "./trace-precondition.schemas.ts";
 export * from "./features/span/trace-span-io.ts";
 export * from "./features/span/trace-span-read-model.ts";
 export * from "./features/list/trace-time-format.ts";
-export * from "./features/list/trace-latest-version.ts";
 export * from "./features/query/trace-ai-query.ts";
 export * from "./features/edit-overlay/trace-edit-overlay.contract.ts";
 export {

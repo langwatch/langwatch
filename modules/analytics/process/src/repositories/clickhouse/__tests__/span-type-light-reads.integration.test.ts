@@ -221,9 +221,9 @@ describe("given spans stored in both stored_spans and span_analytics", () => {
       await releaseMigratedCaches(client);
       const built = timeseries({ floor: null, filters: { "spans.type": ["tool"] } });
 
-      await expect(readRows({ client, ...built, settings: capped })).rejects.toThrow(
-        /MEMORY_LIMIT_EXCEEDED|memory limit exceeded/i,
-      );
+      await expect(readRows({ client, ...built, settings: capped })).rejects.toMatchObject({
+        type: "MEMORY_LIMIT_EXCEEDED",
+      });
     });
 
     /** @scenario "A span type filter over heavy attribute maps stays under a memory cap" */

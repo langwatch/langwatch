@@ -219,6 +219,8 @@ import {
   type TraceAgentSeen,
   type TraceWithholding,
   traceWithholdingOf,
+  filtersReadSpanType,
+  UNKNOWN_SPAN_ANALYTICS_FLOOR,
 } from "@langwatch/trace-contract";
 import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
@@ -301,6 +303,7 @@ import {
 import type {
   ResolveTraceSpansBatchFn,
   ResolveTraceSpansFn,
+  SpanAnalyticsFloorFor,
   TraceLegacyReadRepository,
 } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
 import {
@@ -971,8 +974,8 @@ type TraceLegacyReadCompositionOptions = {
   blobResolutionDeps?: BlobResolutionDeps | undefined;
   /** The tenant's retention policy; absent, the span read floors at the platform default. */
   retentionResolver?: DataRetentionApi | undefined;
-  /** Where span_analytics is complete; absent, a span-type filter reads stored_spans. */
-  spanAnalyticsFloor?: (() => Promise<SpanAnalyticsFloor>) | undefined;
+  /** The floor a span type filter reads by, never throwing; absent, it reads stored_spans. */
+  spanAnalyticsFloor?: SpanAnalyticsFloorFor | undefined;
 };
 
 type TraceTreeCompositionOptions = {
@@ -1210,8 +1213,16 @@ export class TraceModule implements TraceApi, CollectorApp {
         traceCanonicalisation: options.canonicalisation,
         retentionResolver: options.dataRetention,
         blobResolutionDeps,
-        spanAnalyticsFloor: async () =>
-          spanAnalyticsFloorOf(await options.repositories.spanAnalyticsFloor.findReplayStep()),
+        spanAnalyticsFloor: (filters) =>
+          filtersReadSpanType(filters)
+            ? options.repositories.spanAnalyticsFloor
+                .findReplayStep()
+                .then(spanAnalyticsFloorOf)
+                .catch((error: unknown) => {
+                  logger.warn({ error }, "span_analytics floor unreadable; reading stored_spans");
+                  return UNKNOWN_SPAN_ANALYTICS_FLOOR;
+                })
+            : Promise.resolve(UNKNOWN_SPAN_ANALYTICS_FLOOR),
       }),
       editOverlay,
       logRecordStorage: logRecords,

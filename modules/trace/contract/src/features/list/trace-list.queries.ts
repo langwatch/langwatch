@@ -335,3 +335,29 @@ export type TraceListRepository = TraceListRead;
  * but keyset cursor reads pay nothing. Shared so service and pagination UI agree.
  */
 export const TRACE_LIST_MAX_OFFSET_ROWS = 100_000;
+
+/**
+ * Keeps each trace_summaries trace's latest version. Both sets hold only traces with an older
+ * version in the window, so they stay small however many traces or versions there are: a trace
+ * with one version passes, any other keeps its newest. specs/traces-v2/latest-version-dedup.feature
+ */
+export function latestTraceVersionOnly({
+  where,
+  alias,
+}: {
+  where: string;
+  alias?: string;
+}): string {
+  const column = (name: string) => (alias ? `${alias}.${name}` : name);
+  const id = `sipHash128(${column("TenantId")}, ${column("TraceId")})`;
+  const versioned = (select: string) => `SELECT sipHash128(TenantId, TraceId) AS id${select}
+      FROM trace_summaries
+      WHERE ${where}
+      GROUP BY id
+      HAVING min(UpdatedAt) < max(UpdatedAt)`;
+  return `(${id} NOT IN (
+      ${versioned("")}
+    ) OR (${id}, ${column("UpdatedAt")}) IN (
+      ${versioned(", max(UpdatedAt)")}
+    ))`;
+}

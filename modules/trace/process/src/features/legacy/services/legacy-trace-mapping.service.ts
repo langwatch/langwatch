@@ -1,13 +1,10 @@
 import type { Authorization } from "@langwatch/authorization";
 import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
-import { createLogger } from "@langwatch/observability";
-import { filtersReadSpanType, UNKNOWN_SPAN_ANALYTICS_FLOOR } from "@langwatch/trace-contract";
 import type {
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
   ProjectableTrace,
   Protections,
-  SpanAnalyticsFloor,
   Trace,
   TraceCanonicalisationService,
   TraceSummaryData,
@@ -35,13 +32,12 @@ import {
 import type {
   ResolveTraceSpansBatchFn,
   ResolveTraceSpansFn,
+  SpanAnalyticsFloorFor,
   TraceLegacyReadRepository,
   TraceLegacyRow,
 } from "../repositories/trace-legacy-read.repository.ts";
 import { mapNormalizedSpansToSpans } from "../rules/trace-legacy-span-mapping.rules.ts";
 import { mapTraceSummaryToTrace } from "../rules/trace-legacy-summary-mapping.rules.ts";
-
-const logger = createLogger("langwatch:trace:legacy-mapping");
 
 type OccurredAtRange = { from: number; to: number };
 
@@ -53,8 +49,8 @@ type MappingInputs = {
   resolveTraceSpansBatch?: ResolveTraceSpansBatchFn | undefined;
   /** The tenant's retention policy; absent, the span read floors at the platform default. */
   retentionDays?: RetentionDaysProvider | undefined;
-  /** Where span_analytics is complete; absent, a span-type filter reads stored_spans. */
-  spanAnalyticsFloor?: (() => Promise<SpanAnalyticsFloor>) | undefined;
+  /** The floor a span type filter reads by, never throwing; absent, it reads stored_spans. */
+  spanAnalyticsFloor?: SpanAnalyticsFloorFor | undefined;
 };
 
 /** Maps the legacy read's stored rows to legacy traces: canonical IO, offload, protections. */
@@ -64,7 +60,7 @@ export class LegacyTraceMappingService {
   private readonly resolveTraceSpans: ResolveTraceSpansFn | undefined;
   private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
   private readonly retentionDays: RetentionDaysProvider | undefined;
-  private readonly readSpanAnalyticsFloor: (() => Promise<SpanAnalyticsFloor>) | undefined;
+  private readonly readSpanAnalyticsFloor: SpanAnalyticsFloorFor | undefined;
 
   private constructor(inputs: MappingInputs) {
     this.repository = inputs.repository;
@@ -210,21 +206,6 @@ export class LegacyTraceMappingService {
     return LegacyTraceMappingService.chronological(traces);
   }
 
-  /** The floor a span-type filter reads by; the unknown floor when none is asked or readable. */
-  private async spanAnalyticsFloorFor(
-    filters: GetAllTracesForProjectInput["filters"] | undefined,
-  ): Promise<SpanAnalyticsFloor> {
-    if (!this.readSpanAnalyticsFloor || !filtersReadSpanType(filters)) {
-      return UNKNOWN_SPAN_ANALYTICS_FLOOR;
-    }
-    try {
-      return await this.readSpanAnalyticsFloor();
-    } catch (error) {
-      logger.warn({ error }, "span_analytics floor unreadable; span types read from stored_spans");
-      return UNKNOWN_SPAN_ANALYTICS_FLOOR;
-    }
-  }
-
   async listAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
@@ -238,9 +219,8 @@ export class LegacyTraceMappingService {
         options,
         retentionDays: this.retentionDays,
         ownRead,
-        spanAnalyticsFloor: await this.spanAnalyticsFloorFor(input.filters),
+        spanAnalyticsFloor: (await this.readSpanAnalyticsFloor?.(input.filters)) ?? null,
       });
-
     const fetched = summaries.map((summary) =>
       this.mapTrace({ projectId, summary, protections, resolution: unresolved([]) }),
     );
@@ -269,7 +249,6 @@ export class LegacyTraceMappingService {
         trace.projectedAnnotations = annotations.get(trace.trace_id) ?? [];
       }
     }
-
     return { groups, totalHits, traceChecks, scrollId, ...rest };
   }
 

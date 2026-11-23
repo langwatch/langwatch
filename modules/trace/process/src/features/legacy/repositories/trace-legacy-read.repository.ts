@@ -42,6 +42,11 @@ export type ResolveTraceSpansBatchFn = (
   spansPerTrace: NormalizedSpan[][],
 ) => Promise<ResolvedTraceSpans[]>;
 
+/** The span_analytics floor a legacy list's filters read by; the unknown floor when none apply. */
+export type SpanAnalyticsFloorFor = (
+  filters: GetAllTracesForProjectInput["filters"],
+) => Promise<SpanAnalyticsFloor>;
+
 /**
  * Partition-key bound for multi-trace reads: earliest and latest occurrence
  * time (epoch ms) in the requested set. A one-trace caller passes an exact
