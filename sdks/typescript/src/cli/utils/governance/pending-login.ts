@@ -9,6 +9,7 @@ import * as path from "node:path";
 
 import { z } from "zod";
 
+import { writeSecretFile } from "../secret-file";
 import { configPath } from "./config";
 import type { DeviceCode } from "./device-flow";
 
@@ -63,7 +64,7 @@ export function savePendingLogin({
   try {
     const file = pendingLoginPath();
     fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-    fs.writeFileSync(file, JSON.stringify(record, null, 2), { mode: 0o600 });
+    writeSecretFile(file, JSON.stringify(record, null, 2));
   } catch {
     // Only the next run's shortcut is lost; this run still waits on the code.
   }

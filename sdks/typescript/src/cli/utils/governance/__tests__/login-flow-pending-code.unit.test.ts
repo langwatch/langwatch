@@ -159,6 +159,18 @@ describe("a login waiting on a device code", () => {
     });
   });
 
+  describe("when an earlier pending file was readable by others", () => {
+    /** @scenario The pending code is kept beside the config, readable only by its owner */
+    it("narrows it to owner-only before writing the new code", async () => {
+      fs.writeFileSync(pendingLoginPath(), "{}", { mode: 0o644 });
+      startDeviceCode.mockResolvedValueOnce(deviceCode("FRST-CODE"));
+      pollUntilDone.mockImplementationOnce(killedWhileWaiting);
+      await expect(runDeviceFlowLogin()).rejects.toThrow("killed");
+
+      expect(fs.statSync(pendingLoginPath()).mode & 0o777).toBe(0o600);
+    });
+  });
+
   describe("when the rerun comes from another folder", () => {
     let elsewhere: string;
     beforeEach(() => {
