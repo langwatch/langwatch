@@ -394,7 +394,9 @@ describe("given the LangWatchQL view catalog when the map filter is compared wit
       expect(sql, `the filter never names ${key}`).toContain(key.replaceAll(".", "\\\\."));
       expect(isContentAttributeKey(key)).toBe(true);
       expect(isContentAttributeKey(`${key}.0.content`)).toBe(true);
-      const dotSwapped = [key.replaceAll(".", "_"), key.replaceAll(".", "X")];
+      const dotSwapped = key.includes(".")
+        ? [key.replaceAll(".", "_"), key.replaceAll(".", "X")]
+        : [];
       for (const probe of [`${key}x`, `x${key}`, ...dotSwapped]) {
         const isContent = expected.some((k) => probe === k || probe.startsWith(`${k}.`));
         expect(isContentAttributeKey(probe), probe).toBe(isContent);
