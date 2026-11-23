@@ -569,7 +569,13 @@ describe("scopeLangWatchQL over several projects", () => {
         views: [...VIEWS, tampered],
         projectIds: READERS,
       }),
-    ).toThrow(Error);
+    ).toThrow(/column must match/);
+  });
+
+  it("refuses a statement that no longer parses instead of skipping the collapse", () => {
+    const sql = "SELECT count() FROM gateway_budgets WHERE (";
+
+    expect(() => scope({ sql, projectIds: READERS })).toThrow(/no longer parses/);
   });
 
   /** @scenario "A single-project read of a fanned-out view carries no collapse" */

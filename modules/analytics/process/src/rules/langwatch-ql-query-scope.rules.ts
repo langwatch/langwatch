@@ -435,12 +435,13 @@ export function scopeLangWatchQL({
     (memberWindows.some((window) => window.from > 0) ||
       !windowsCoverProjects({ memberWindows, projectIds }));
   const collapsed = collapsedViews({ views, database, projectIds });
-  const parsed = isWindowed || collapsed.size > 0 ? clickHouseSqlParser.parse(sql) : undefined;
-  if (parsed?.ok !== true) {
-    if (isWindowed) throw new Error("LangWatchQL scope: an accepted statement no longer parses");
+  if (!isWindowed && collapsed.size === 0) {
     assertNoUnsupportedTableModifiers({ sql, views, database });
     return sql;
   }
+  // Skipping either rewrite would read rows the run notes say were narrowed: refuse instead.
+  const parsed = clickHouseSqlParser.parse(sql);
+  if (!parsed.ok) throw new Error("LangWatchQL scope: an accepted statement no longer parses");
 
   const windows =
     isWindowed && memberWindows
