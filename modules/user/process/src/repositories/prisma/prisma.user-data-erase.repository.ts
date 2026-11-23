@@ -1,5 +1,4 @@
 import { isFullMember } from "@langwatch/entitlement-contract";
-import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
@@ -314,15 +313,6 @@ export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepos
         await tx.organizationUser.deleteMany({ where: { userId } });
         await tx.account.deleteMany({ where: { userId } });
         await tx.session.deleteMany({ where: { userId } });
-        // Writes gateway's VirtualKey: the delete below nulls each principal, the mark stays.
-        await tx.$executeRaw`
-          UPDATE "VirtualKey" SET "mintedAsPersonal" = true
-          WHERE "principalUserId" = ${userId} AND NOT "mintedAsPersonal"
-          ${skipTenantCheck({
-            // Raw, so each key's last edit time stays; erasure spans every organization.
-            SKIP_TENANT_CHECK: true,
-          })}
-        `;
         const { createdAt } = await tx.user.delete({
           where: { id: userId },
           select: { createdAt: true },
