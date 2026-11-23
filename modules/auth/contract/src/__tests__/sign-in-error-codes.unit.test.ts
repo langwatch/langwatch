@@ -37,13 +37,25 @@ describe("normalizeSignInErrorCode", () => {
     });
   });
 
+  describe("when the provider account being linked already belongs to another user", () => {
+    /** @scenario "A provider account already linked to another user crosses with its own code" */
+    it("maps it to its own screen code, which is stable and may cross", () => {
+      const code = normalizeSignInErrorCode("account_already_linked_to_different_user");
+      expect(code).toBe("ACCOUNT_LINKED_TO_ANOTHER_USER");
+      expect(isStableAuthError(code)).toBe(true);
+      expect(signInErrorMayCross("account_already_linked_to_different_user")).toBe(true);
+    });
+  });
+
   describe("when the code is already a screen code", () => {
-    it.each(["SSO_PROVIDER_NOT_ALLOWED", "DIFFERENT_EMAIL_NOT_ALLOWED", "OAuthAccountNotLinked"])(
-      "returns %s as itself",
-      (code) => {
-        expect(normalizeSignInErrorCode(code)).toBe(code);
-      },
-    );
+    it.each([
+      "SSO_PROVIDER_NOT_ALLOWED",
+      "DIFFERENT_EMAIL_NOT_ALLOWED",
+      "OAuthAccountNotLinked",
+      "ACCOUNT_LINKED_TO_ANOTHER_USER",
+    ])("returns %s as itself", (code) => {
+      expect(normalizeSignInErrorCode(code)).toBe(code);
+    });
   });
 
   describe("when an address carries the earlier library release's spelling", () => {

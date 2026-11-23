@@ -13,8 +13,13 @@ import { describe, expect, it } from "vitest";
 
 const DIFFERENT_EMAIL = "DIFFERENT_EMAIL_NOT_ALLOWED";
 const NOT_LINKED = "OAuthAccountNotLinked";
+const LINKED_TO_ANOTHER = "ACCOUNT_LINKED_TO_ANOTHER_USER";
 const NO_SCREEN = "no specific screen";
-type Screen = typeof DIFFERENT_EMAIL | typeof NOT_LINKED | typeof NO_SCREEN;
+type Screen =
+  | typeof DIFFERENT_EMAIL
+  | typeof NOT_LINKED
+  | typeof LINKED_TO_ANOTHER
+  | typeof NO_SCREEN;
 
 /**
  * The codes of `OAUTH_CALLBACK_ERROR_CODES` and of `link-account.mjs`'s `result.error` strings,
@@ -31,7 +36,7 @@ const CLASSIFIED: Record<string, Screen> = {
   no_callback_url: NO_SCREEN,
   unable_to_link_account: NO_SCREEN,
   email_does_not_match: DIFFERENT_EMAIL,
-  account_already_linked_to_different_user: NOT_LINKED,
+  account_already_linked_to_different_user: LINKED_TO_ANOTHER,
   email_not_found: NO_SCREEN,
   email_not_verified: NO_SCREEN,
   // The sign-in path's refusal for an existing account under another method; the callback

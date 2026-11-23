@@ -167,9 +167,18 @@ Feature: What a failed single sign-on is allowed to say
   Scenario: Every link refusal the installed library redirects with has a specific screen code
     Given the callback error codes and sign-in result codes the installed authentication library defines
     Then email_does_not_match is treated as DIFFERENT_EMAIL_NOT_ALLOWED
-    And account_already_linked_to_different_user is treated as OAuthAccountNotLinked
+    And account_already_linked_to_different_user is treated as ACCOUNT_LINKED_TO_ANOTHER_USER
     And the refusal for an existing account under another method is treated as OAuthAccountNotLinked
     And every other code read is classified as having no specific screen
+
+  # Linking from Settings > Security with a provider account another LangWatch user already holds
+  # is not the wrong-method sign-in: the person is signed in, and signing out or connecting the
+  # method in Settings is exactly what just failed. It needs its own code and its own words.
+  @unit @regression
+  Scenario: A provider account already linked to another user crosses with its own code
+    When the authentication library reports "account_already_linked_to_different_user"
+    Then the error is treated as ACCOUNT_LINKED_TO_ANOTHER_USER, not OAuthAccountNotLinked
+    And it is classified as a stable sign-in error, so it may cross to the screen
 
   @unit @regression
   Scenario: An upgrade that adds or renames a library code fails until the code is classified
