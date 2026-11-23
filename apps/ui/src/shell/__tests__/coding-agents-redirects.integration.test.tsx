@@ -64,6 +64,25 @@ function renderRouterAt(initialEntries: string[]) {
   return router;
 }
 
+/** Every `/:project/` page the application serves, table's and modules' alike, as a stub. */
+const projectPages: RouteObject[] = uiRoutePatterns()
+  .filter((pattern) => pattern.startsWith("/:project/"))
+  .map((path) => ({ path, element: <div>project page</div> }));
+
+/** The redirects ranked against the real project pages, cold-loaded at one address. */
+function renderOverProjectPages(initialEntry: string) {
+  const router = createMemoryRouter(
+    [
+      ...legacyRedirectRoutes,
+      ...projectPages,
+      { path: "/coding-agents/*", element: <div>coding agents</div> },
+    ],
+    { initialEntries: [initialEntry] },
+  );
+  render(<RouterProvider router={router} />);
+  return router;
+}
+
 /** Every `/:project/<segment>` the application serves: the table's own and the modules'. */
 const projectSegments = [
   ...new Set(
@@ -152,18 +171,7 @@ describe("legacy /me redirects", () => {
   describe("when an old address names any page the project routes serve", () => {
     /** @scenario Every old address a project page also matches lands on Coding agents */
     it.each(projectSegments)("moves /me/%s instead of opening a project", async (segment) => {
-      const projectPages: RouteObject[] = uiRoutePatterns()
-        .filter((pattern) => pattern.startsWith("/:project/"))
-        .map((path) => ({ path, element: <div>project page</div> }));
-      const router = createMemoryRouter(
-        [
-          ...legacyRedirectRoutes,
-          ...projectPages,
-          { path: "/coding-agents/*", element: <div>coding agents</div> },
-        ],
-        { initialEntries: [`/me/${segment}`] },
-      );
-      render(<RouterProvider router={router} />);
+      const router = renderOverProjectPages(`/me/${segment}`);
 
       await waitFor(() => {
         expect(addressOf(router)).toBe(
@@ -187,18 +195,7 @@ describe("legacy /me redirects", () => {
     it.each(deepProjectAddresses)(
       "moves %s to the Coding agents home, not a project page",
       async (from) => {
-        const projectPages: RouteObject[] = uiRoutePatterns()
-          .filter((pattern) => pattern.startsWith("/:project/"))
-          .map((path) => ({ path, element: <div>project page</div> }));
-        const router = createMemoryRouter(
-          [
-            ...legacyRedirectRoutes,
-            ...projectPages,
-            { path: "/coding-agents/*", element: <div>coding agents</div> },
-          ],
-          { initialEntries: [from] },
-        );
-        render(<RouterProvider router={router} />);
+        const router = renderOverProjectPages(from);
 
         await waitFor(() => {
           expect(addressOf(router)).toBe("/coding-agents");
@@ -212,18 +209,7 @@ describe("legacy /me redirects", () => {
     it.each([...codingAgentsSegments])(
       "moves /me/%s/abc to that page, without the path below it",
       async (segment) => {
-        const projectPages: RouteObject[] = uiRoutePatterns()
-          .filter((pattern) => pattern.startsWith("/:project/"))
-          .map((path) => ({ path, element: <div>project page</div> }));
-        const router = createMemoryRouter(
-          [
-            ...legacyRedirectRoutes,
-            ...projectPages,
-            { path: "/coding-agents/*", element: <div>coding agents</div> },
-          ],
-          { initialEntries: [`/me/${segment}/abc?range=7d#latest`] },
-        );
-        render(<RouterProvider router={router} />);
+        const router = renderOverProjectPages(`/me/${segment}/abc?range=7d#latest`);
 
         await waitFor(() => {
           expect(addressOf(router)).toBe(`/coding-agents/${segment}?range=7d#latest`);

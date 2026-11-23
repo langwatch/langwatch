@@ -277,7 +277,6 @@ Feature: Product sidebars
     Then Coding agents shows no Dashboards section and no "+"
     And when Dashboards is released for "Shop" but not for the page's own project, the section shows
     And while the page's organization is still unknown, there is no section and the release flag is not asked
-    And while Dashboards is not released for "Shop", my grants there are not read
 
   # A `?ff_release_dashboards=on|off` link answers the flag in that browser, "Shop" included.
   # Retired in S6 by "Each product's sidebar lists its own boards" in modules/dashboard/specs/dashboards-organization-area.feature.

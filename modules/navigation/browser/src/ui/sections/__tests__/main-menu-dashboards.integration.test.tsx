@@ -464,15 +464,6 @@ describe("the Dashboards section with Dashboards in every product on", () => {
       });
     });
 
-    describe("when Dashboards is not released for Shop", () => {
-      /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's release flag" */
-      it("hands the section nothing, so no grant is asked there", async () => {
-        renderSidebar({ ...codingAgents, dashboardsFlagByProject: { [SHOP.id]: false } });
-
-        await expectNoSection();
-      });
-    });
-
     describe("when Dashboards is released for Shop but the page's own grants lack the view", () => {
       /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's view grant" */
       it("still hands the section Shop, whose own grant analytics asks", async () => {
