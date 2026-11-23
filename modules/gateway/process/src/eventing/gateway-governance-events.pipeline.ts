@@ -15,8 +15,10 @@ import {
   GATEWAY_GOVERNANCE_EVENTS_PIPELINE_NAME,
   gatewayBudgetCrossingEventSchema,
   type GatewayGovernanceProcessingEvent,
+  gatewayVkFirstRequestEventSchema,
   gatewayVkLifecycleEventSchema,
   RecordBudgetCrossingCommand,
+  RecordVkFirstRequestCommand,
   RecordVkLifecycleCommand,
 } from "./gateway-governance-events.intent.ts";
 
@@ -28,16 +30,21 @@ export type GatewayGovernanceEventsDefinition = StaticPipelineDefinition<
 
 /**
  * Gateway's governance facts, ordered per governed subject. Gateway only records them;
- * webhook subscribes to them from its own side (record §5, §9).
+ * webhook and nurturing subscribe to them from their own side (record §5, §9).
  */
 export function buildGatewayGovernanceEventsPipeline(): GatewayGovernanceEventsDefinition {
   return definePipeline({
     name: GATEWAY_GOVERNANCE_EVENTS_PIPELINE_NAME,
     aggregate: defineAggregate({ type: GATEWAY_GOVERNANCE_EVENTS_AGGREGATE_TYPE }),
   })
-    .withEvents([gatewayVkLifecycleEventSchema, gatewayBudgetCrossingEventSchema])
+    .withEvents([
+      gatewayVkLifecycleEventSchema,
+      gatewayBudgetCrossingEventSchema,
+      gatewayVkFirstRequestEventSchema,
+    ])
     .withCommand("recordVkLifecycle", RecordVkLifecycleCommand)
     .withCommand("recordBudgetCrossing", RecordBudgetCrossingCommand)
+    .withCommand("recordVkFirstRequest", RecordVkFirstRequestCommand)
     .build();
 }
 

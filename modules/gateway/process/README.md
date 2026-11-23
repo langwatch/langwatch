@@ -1752,12 +1752,13 @@ Declared at `src/eventing/gateway-connect-managed-key.pipeline.ts:63`. Events: `
 
 ### Pipeline `governance_events_processing` (aggregate `governance_subject`)
 
-Declared at `src/eventing/gateway-governance-events.pipeline.ts:34`. Events: `gatewayVkLifecycleEventSchema`, `gatewayBudgetCrossingEventSchema`.
+Declared at `src/eventing/gateway-governance-events.pipeline.ts:36`. Events: `gatewayVkLifecycleEventSchema`, `gatewayBudgetCrossingEventSchema`, `gatewayVkFirstRequestEventSchema`.
 
 | Kind    | Name                   | Handles | Declared at                                             |
 | ------- | ---------------------- | ------- | ------------------------------------------------------- |
-| command | `recordVkLifecycle`    | –       | `src/eventing/gateway-governance-events.pipeline.ts:39` |
-| command | `recordBudgetCrossing` | –       | `src/eventing/gateway-governance-events.pipeline.ts:40` |
+| command | `recordVkLifecycle`    | –       | `src/eventing/gateway-governance-events.pipeline.ts:45` |
+| command | `recordBudgetCrossing` | –       | `src/eventing/gateway-governance-events.pipeline.ts:46` |
+| command | `recordVkFirstRequest` | –       | `src/eventing/gateway-governance-events.pipeline.ts:47` |
 
 ### Pipeline `gateway_instant_eval_judge_spend` (aggregate `global`)
 

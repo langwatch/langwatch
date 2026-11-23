@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+  GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
 } from "@langwatch/gateway-contract";
 import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
@@ -16,6 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { RedisNurturingClaimRepository } from "../../repositories/redis/redis.nurturing-claim.repository.ts";
 import {
   crossingFact,
+  firstRequestFact,
   gatewayEvent,
   gatewayFactsOver,
   lifecycleFact,
@@ -70,6 +72,34 @@ describe.skipIf(!redisUrl)("gateway's key facts over Redis claims", () => {
         ["identify", null],
         ["track", "virtual_key_created"],
         ["track", "key_budget_threshold"],
+      ]);
+    });
+  });
+
+  describe("when a key's first-request fact is delivered twice", () => {
+    /** @scenario "A key's first request delivered twice identifies once over Redis claims" */
+    it("identifies the holder with has_app_request once", async () => {
+      const facts = await gatewayFactsOver({
+        claims: RedisNurturingClaimRepository.create({ redis }),
+      });
+      await facts.joined("user-holder");
+      const firstRequestKeyId = `${virtualKeyId}_first_request`;
+      await facts.deliverFact(
+        gatewayEvent({
+          type: GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
+          data: lifecycleFact({ virtual_key_id: firstRequestKeyId }),
+        }),
+      );
+      const firstRequest = gatewayEvent({
+        type: GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
+        data: firstRequestFact({ virtual_key_id: firstRequestKeyId }),
+      });
+      const beforeFirstRequest = facts.sent.length;
+
+      for (let delivery = 0; delivery < 2; delivery++) await facts.deliverFact(firstRequest);
+
+      expect(facts.sent.slice(beforeFirstRequest)).toEqual([
+        { type: "identify", userId: "user-holder", traits: { has_app_request: true } },
       ]);
     });
   });

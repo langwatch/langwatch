@@ -1286,6 +1286,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       guardrails,
       spend,
       realtimeSessions,
+      firstRequests: governanceEvents,
     });
 
     return new GatewayModule({

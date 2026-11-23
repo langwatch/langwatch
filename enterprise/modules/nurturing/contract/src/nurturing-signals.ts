@@ -451,6 +451,15 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     /** ISO-8601 UTC; null for a window that never rolls; absent when gateway named no end. */
     periodEnd: z.string().nullish(),
   }),
+  z.object({
+    /** A person's key served its first request. `sourceEventId` is the key and `first_request`. */
+    kind: z.literal("key_first_request"),
+    ...signalSource,
+    /** Whoever the key's creation goes to: its holder, else its creator, else the admin. */
+    userId: id,
+    organizationId: id,
+    virtualKeyId: id,
+  }),
 ]);
 export interface NurturingSignalSchema extends Named<typeof nurturingSignalSchemaDefinition> {}
 export const nurturingSignalSchema: NurturingSignalSchema = nurturingSignalSchemaDefinition;

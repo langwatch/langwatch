@@ -11,9 +11,11 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
+  fireGatewayKeySignal,
   fireVirtualKeyCreated,
   isKeyOwnBudget,
   keyBudgetPeriodEndOf,
+  keyFirstRequestSignal,
   type KeyRecipient,
   pickKeyRecipient,
   virtualKeyCreatedSignal,
@@ -264,6 +266,34 @@ describe("isKeyOwnBudget", () => {
 
         expect(isKeyOwnBudget(keyless), scope).toBe(false);
       }
+    });
+  });
+});
+
+describe("fireKeyFirstRequest", () => {
+  const signal = keyFirstRequestSignal({
+    data: {
+      tenantId: "project-1",
+      organization_id: "org-1",
+      virtual_key_id: "vk_1",
+      occurred_at: 3_000,
+    },
+    userId: "user-holder",
+  });
+
+  describe("given a key's first request told to its holder", () => {
+    /** @scenario "A key's first request sets has_app_request on the person told of the key" */
+    it("is one identify setting has_app_request true, and no track", () => {
+      expect(fireGatewayKeySignal(signal)).toEqual([
+        { type: "identify", userId: "user-holder", traits: { has_app_request: true } },
+      ]);
+    });
+
+    it("is claimed once per key", () => {
+      expect(signal).toMatchObject({
+        kind: "key_first_request",
+        sourceEventId: "vk_1:first_request",
+      });
     });
   });
 });

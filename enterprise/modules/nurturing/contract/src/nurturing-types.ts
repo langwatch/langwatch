@@ -116,6 +116,8 @@ export interface CioPersonTraits extends CioOrganizationUsageTraits {
   saw_langy_first_message?: boolean;
   // A gateway key was created for or by the person; only ever set true, so a revoke keeps it
   has_virtual_key?: boolean;
+  // A gateway key told to the person served its first request; only ever set true
+  has_app_request?: boolean;
 
   // Evaluation milestones
   has_evaluations: boolean;

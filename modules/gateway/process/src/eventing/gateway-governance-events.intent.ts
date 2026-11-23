@@ -2,9 +2,12 @@ import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventSchema, EventUtils } from "@langwatch/eventing";
 import {
   GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+  GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
   type RecordBudgetCrossingCommandData,
   recordBudgetCrossingCommandDataSchema,
+  type RecordVkFirstRequestCommandData,
+  recordVkFirstRequestCommandDataSchema,
   type RecordVkLifecycleCommandData,
   recordVkLifecycleCommandDataSchema,
 } from "@langwatch/gateway-contract";
@@ -19,6 +22,7 @@ export const GATEWAY_GOVERNANCE_EVENTS_AGGREGATE_TYPE = "governance_subject" as 
 const GATEWAY_GOVERNANCE_EVENTS_VERSION = "2026-07-31" as const;
 const RECORD_VK_LIFECYCLE_COMMAND_TYPE = "lw.governance.record_vk_lifecycle" as const;
 const RECORD_BUDGET_CROSSING_COMMAND_TYPE = "lw.governance.record_budget_crossing" as const;
+const RECORD_VK_FIRST_REQUEST_COMMAND_TYPE = "lw.governance.record_vk_first_request" as const;
 
 const eventEnvelope = z.object({
   ...EventSchema.shape,
@@ -39,7 +43,17 @@ export const gatewayBudgetCrossingEventSchema = z.object({
 });
 type GatewayBudgetCrossingEvent = z.infer<typeof gatewayBudgetCrossingEventSchema>;
 
-export type GatewayGovernanceProcessingEvent = GatewayVkLifecycleEvent | GatewayBudgetCrossingEvent;
+export const gatewayVkFirstRequestEventSchema = z.object({
+  ...eventEnvelope.shape,
+  type: z.literal(GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE),
+  data: recordVkFirstRequestCommandDataSchema,
+});
+type GatewayVkFirstRequestEvent = z.infer<typeof gatewayVkFirstRequestEventSchema>;
+
+export type GatewayGovernanceProcessingEvent =
+  | GatewayVkLifecycleEvent
+  | GatewayBudgetCrossingEvent
+  | GatewayVkFirstRequestEvent;
 
 /** Keyed on (subject, action, instant), so an admin's double-click records once. */
 export class RecordVkLifecycleCommand implements CommandHandler<
@@ -107,6 +121,44 @@ export class RecordBudgetCrossingCommand implements CommandHandler<
         metadata: {},
         occurredAt: data.occurred_at,
         idempotencyKey: `${command.tenantId}:budget:${data.budget_id}:${data.bucket_scope_id}:${data.kind}:${data.period_started_at_ms}`,
+      }),
+    ];
+  }
+}
+
+/**
+ * Keyed on the key alone, with no instant: that key IS the once-per-key rule, so two drain
+ * batches that both read an empty `lastUsedAt` record the first request once.
+ */
+export class RecordVkFirstRequestCommand implements CommandHandler<
+  Command<RecordVkFirstRequestCommandData>,
+  GatewayVkFirstRequestEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_VK_FIRST_REQUEST_COMMAND_TYPE,
+    recordVkFirstRequestCommandDataSchema,
+    "Record a virtual key's first admitted request",
+  );
+
+  static getAggregateId(payload: RecordVkFirstRequestCommandData): string {
+    return `vk:${payload.virtual_key_id}`;
+  }
+
+  async handle(
+    command: Command<RecordVkFirstRequestCommandData>,
+  ): Promise<GatewayVkFirstRequestEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<GatewayVkFirstRequestEvent>({
+        aggregateType: GATEWAY_GOVERNANCE_EVENTS_AGGREGATE_TYPE,
+        aggregateId: `vk:${data.virtual_key_id}`,
+        tenantId: createTenantId(command.tenantId),
+        type: GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
+        version: GATEWAY_GOVERNANCE_EVENTS_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurred_at,
+        idempotencyKey: `${command.tenantId}:vk_first_request:${data.virtual_key_id}`,
       }),
     ];
   }

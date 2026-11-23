@@ -49,3 +49,22 @@ Feature: Gateway records its governance facts for webhook delivery
     Given a stored lifecycle fact with no actor, principal or purpose, and a stored crossing with no period end
     When each is read through gateway's contract
     Then both parse, the missing fields reading as none
+
+  @unit
+  Scenario: A key's first admitted request records one first-request fact
+    Given a drained batch admitting a request on a key whose lastUsedAt is empty
+    When the spend commands are ingested
+    Then gateway records one first-request fact naming the key and its organization, under the key's trace project
+    And a key that already has a lastUsedAt records none
+
+  @unit
+  Scenario: Two batches that both see an unused key record its first request once
+    Given two drained batches admitting the same key before either advanced its lastUsedAt
+    When both are ingested
+    Then both first-request facts carry one idempotency key, so the key's first request is recorded once
+
+  @unit
+  Scenario: Failing to record a first-request fact never fails the spend batch
+    Given the first-request fact cannot be recorded
+    When a batch admitting an unused key is ingested
+    Then the spend commands are still accepted and the failure is logged

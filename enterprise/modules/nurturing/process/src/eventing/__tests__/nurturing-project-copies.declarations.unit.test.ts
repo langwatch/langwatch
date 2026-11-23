@@ -108,6 +108,7 @@ describe("the five subscriber lanes the personal-project and traced-project maps
       forgetErasedUser: async () => undefined,
       virtualKeyCreated: async () => undefined,
       keyBudgetCrossed: async () => undefined,
+      keyFirstRequested: async () => undefined,
     });
 
     const lanes = (pipeline.globalProjections ?? []).map(({ name }) => name);

@@ -1,4 +1,4 @@
-Feature: Customer.io hears when a person's gateway key is created and when its budget nears or hits its limit
+Feature: Customer.io hears when a person's gateway key is created, first used, and when its budget nears or hits its limit
   Gateway records a key's lifecycle and its budget's crossings as its own facts. Nurturing copies
   each key from the lifecycle facts and reads only its own copies (ADR-001): the key's name, the
   person it acts for, the person who created it, its purpose and its state. The copy is a peer map
@@ -7,6 +7,8 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
   fact: the key's holder if they are a current member of its organization, else its creator if
   they are, else the organization's admin if they are, else no one. Connect and Langy keys send
   nothing. A key no person holds or made goes to the organization's admin.
+  Gateway also records a key's first admitted request; the person told of the key's creation
+  is then identified with has_app_request true.
 
   @unit
   Scenario: A created person's key sets has_virtual_key and sends virtual_key_created
@@ -298,6 +300,57 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
     Given two people's erasures were recorded in Postgres, one of them twice
     When nurturing asks which of 2,500 people, those two among them, are erased
     Then it names only the two erased people, each once, reading at most 1,000 ids at a time
+
+  @unit
+  Scenario: A key's first request sets has_app_request on the person told of the key
+    Given a copied USER key whose holder is a current member
+    When gateway records the key's first request
+    Then Customer.io identifies the holder with has_app_request true
+    And no track is sent
+    And no further request on the key sends anything, gateway recording the first only
+
+  @unit
+  Scenario: A key's first request is told to whoever its creation was told to
+    Given a copied USER key whose holder and creator are each a current member, a disabled member or no member at all
+    When gateway records the key's first request
+    Then has_app_request goes to the holder, else the creator, else the organization's admin, as virtual_key_created did
+    And no one is identified when none of them is a current member
+
+  @unit
+  Scenario: A first request on a key nurturing does not tell of sends nothing
+    Given a CONNECT or LANGY key, a revoked or disabled key, or a key nurturing holds no copy of
+    When gateway records the key's first request
+    Then Customer.io receives no call
+    And the uncopied key logs a warning
+
+  @unit
+  Scenario: A key's first request delivered twice identifies once
+    Given a copied USER key's first-request fact
+    When it is delivered twice
+    Then Customer.io receives one has_app_request identify
+
+  @unit
+  Scenario: A refused has_app_request identify is retried
+    Given Customer.io refuses the first has_app_request identify
+    When the fact is delivered, then retried
+    Then the first delivery fails so its job is retried
+    And the retry sends the identify once
+
+  @integration
+  Scenario: A key's first request delivered twice identifies once over Redis claims
+    Given nurturing's delivery claims in Redis
+    When a key's first-request fact is delivered twice
+    Then Customer.io receives one has_app_request identify
+
+  # --- AC Coverage Map (has_app_request) ---
+  # "one identify, no track"                     -> Scenario: A key's first request sets has_app_request on the person told of the key
+  # "same recipient as virtual_key_created"      -> Scenario: A key's first request is told to whoever its creation was told to
+  # "Connect, Langy, uncopied, revoked, disabled" -> Scenario: A first request on a key nurturing does not tell of sends nothing
+  # "redelivery once, memory and Redis"          -> Scenario: A key's first request delivered twice identifies once
+  #                                               -> Scenario: A key's first request delivered twice identifies once over Redis claims
+  # "refused call retries"                       -> Scenario: A refused has_app_request identify is retried
+  # "first request only, racing batches once"    -> gateway's gateway-governance-events.feature
+  # "replay never sends"                         -> eventing/__tests__/nurturing-replay.no-send.unit.test.ts
 
   # --- AC Coverage Map (langwatch/tasks#1200) ---
   # AC 1: "null purpose counts as USER"          -> unit only: nurturing-virtual-key.rules.unit.test.ts

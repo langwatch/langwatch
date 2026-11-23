@@ -26,7 +26,10 @@ import {
   replayProjectionsOf,
   sealPipelineDefinition,
 } from "@langwatch/eventing";
-import { GATEWAY_VK_LIFECYCLE_EVENT_TYPE } from "@langwatch/gateway-contract";
+import {
+  GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
+  GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
+} from "@langwatch/gateway-contract";
 import {
   USER_ERASED_EVENT_TYPE as IDENTITY_USER_ERASED_EVENT_TYPE,
   USER_IDENTITY_AGGREGATE_TYPE,
@@ -64,7 +67,7 @@ import type { MemoryNurturingTracedProjectRepository } from "../../repositories/
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { utcDayOf } from "../../rules/nurturing-time.rules.ts";
 import { buildNurturingProjectUsagePipeline } from "../nurturing-project-usage.pipeline.ts";
-import { lifecycleFact } from "./nurturing-gateway-facts.test-helpers.ts";
+import { firstRequestFact, lifecycleFact } from "./nurturing-gateway-facts.test-helpers.ts";
 import {
   ADMINS_STEP,
   AUTH_MEMBERS_STEP,
@@ -150,10 +153,12 @@ const projectFact = (type: string, projectId: string, data: Record<string, unkno
 
 /**
  * One owner fact for each of the fifteen lanes the deploy replays: the two erasure marks, the key,
- * the evaluation day, the plan, and the organization, project and trace copies.
+ * the evaluation day, the plan, and the organization, project and trace copies. Gateway's
+ * first-request fact sits in the log too: only a live subscriber reads it, so no step sends it.
  */
 function ownerLogs(): ReplayEvent[] {
   const gateway = lifecycleFact({ occurred_at: AT });
+  const firstRequest = firstRequestFact({ occurred_at: AT });
   return [
     // User marks, identity marks.
     logged({
@@ -184,6 +189,14 @@ function ownerLogs(): ReplayEvent[] {
       tenantId: gateway.tenantId,
       version: "2026-07-31",
       data: gateway,
+    }),
+    logged({
+      type: GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
+      aggregateType: "governance_subject",
+      aggregateId: `vk:${firstRequest.virtual_key_id}`,
+      tenantId: firstRequest.tenantId,
+      version: "2026-07-31",
+      data: firstRequest,
     }),
     // Evaluation days.
     logged({

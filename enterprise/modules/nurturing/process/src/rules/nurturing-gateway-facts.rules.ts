@@ -2,13 +2,14 @@
 /**
  * Who hears gateway's key facts and what Customer.io is told of them. A payload carries the key's
  * name and id and the budget's figures only: never its secret or prefix, a reason, an end user,
- * a bucket, a budget id, a project or any person's id.
+ * a bucket, a budget id, a project or any person's id. A key's first request is a trait only.
  * Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
  */
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
 import {
   CYCLIC_WINDOWS,
   type RecordBudgetCrossingCommandData,
+  type RecordVkFirstRequestCommandData,
   type RecordVkLifecycleCommandData,
 } from "@langwatch/gateway-contract";
 
@@ -22,7 +23,11 @@ import type { NurturingVirtualKey } from "./nurturing-virtual-key.rules.ts";
 
 export type VirtualKeyCreatedSignal = NurturingSignalOf<"virtual_key_created">;
 export type KeyBudgetThresholdSignal = NurturingSignalOf<"key_budget_threshold">;
-export type GatewayKeySignal = VirtualKeyCreatedSignal | KeyBudgetThresholdSignal;
+export type KeyFirstRequestSignal = NurturingSignalOf<"key_first_request">;
+export type GatewayKeySignal =
+  | VirtualKeyCreatedSignal
+  | KeyBudgetThresholdSignal
+  | KeyFirstRequestSignal;
 
 /** Who hears a key fact, and the holders before them whom the member copy holds no row for. */
 export type KeyRecipient = Readonly<{
@@ -140,8 +145,26 @@ export function keyBudgetThresholdSignal({
   };
 }
 
+/** A copied key's first request as its recipient's signal, once per key. */
+export function keyFirstRequestSignal({
+  data,
+  userId,
+}: Readonly<{ data: RecordVkFirstRequestCommandData; userId: string }>): KeyFirstRequestSignal {
+  return {
+    kind: "key_first_request",
+    sourceEventId: `${data.virtual_key_id}:first_request`,
+    tenantId: data.tenantId,
+    occurredAt: data.occurred_at,
+    userId,
+    organizationId: data.organization_id,
+    virtualKeyId: data.virtual_key_id,
+  };
+}
+
 /** The key's name, id and organization: what every key event carries. */
-function keyProperties(signal: GatewayKeySignal): Record<string, unknown> {
+function keyProperties(
+  signal: VirtualKeyCreatedSignal | KeyBudgetThresholdSignal,
+): Record<string, unknown> {
   return {
     key_name: signal.keyName,
     virtual_key_id: signal.virtualKeyId,
@@ -186,9 +209,22 @@ export function fireKeyBudgetThreshold(signal: KeyBudgetThresholdSignal): CioBat
   ];
 }
 
+/**
+ * The person told of the key learns it served a request: a trait only ever set true, so a campaign
+ * waiting on it never sees it unset again. No event: nothing mails on it.
+ */
+export function fireKeyFirstRequest(signal: KeyFirstRequestSignal): CioBatchCall[] {
+  return [{ type: "identify", userId: signal.userId, traits: { has_app_request: true } }];
+}
+
 /** The calls a gateway key signal makes, in the order they are sent. */
 export function fireGatewayKeySignal(signal: GatewayKeySignal): CioBatchCall[] {
-  return signal.kind === "virtual_key_created"
-    ? fireVirtualKeyCreated(signal)
-    : fireKeyBudgetThreshold(signal);
+  switch (signal.kind) {
+    case "virtual_key_created":
+      return fireVirtualKeyCreated(signal);
+    case "key_budget_threshold":
+      return fireKeyBudgetThreshold(signal);
+    case "key_first_request":
+      return fireKeyFirstRequest(signal);
+  }
 }

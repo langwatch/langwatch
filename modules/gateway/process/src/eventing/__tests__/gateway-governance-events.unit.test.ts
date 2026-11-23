@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   RecordBudgetCrossingCommand,
+  RecordVkFirstRequestCommand,
   RecordVkLifecycleCommand,
 } from "../gateway-governance-events.intent.ts";
 
@@ -83,6 +84,35 @@ describe("gateway governance facts", () => {
         type: "lw.governance.vk_lifecycle",
         idempotencyKey: "project-1:vk:key-1:rotated:1000",
       });
+    });
+  });
+
+  describe("when a key's first request is recorded at two instants", () => {
+    /** @scenario "Two batches that both see an unused key record its first request once" */
+    it("keys both appends on the key alone, under the key's governed subject", async () => {
+      const record = (occurredAt: number) =>
+        new RecordVkFirstRequestCommand().handle({
+          type: "lw.governance.record_vk_first_request",
+          tenantId: createTenantId("project-1"),
+          aggregateId: "vk:key-1",
+          data: {
+            tenantId: "project-1",
+            organization_id: "org-1",
+            virtual_key_id: "key-1",
+            occurred_at: occurredAt,
+          },
+        });
+      const [once] = await record(1_000);
+      const [twice] = await record(61_000);
+
+      expect(once).toMatchObject({
+        aggregateType: "governance_subject",
+        aggregateId: "vk:key-1",
+        type: "lw.governance.vk_first_request",
+        version: "2026-07-31",
+        idempotencyKey: "project-1:vk_first_request:key-1",
+      });
+      expect(twice?.idempotencyKey).toBe(once?.idempotencyKey);
     });
   });
 });

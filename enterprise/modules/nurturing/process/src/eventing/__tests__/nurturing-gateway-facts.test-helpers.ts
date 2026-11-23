@@ -7,9 +7,11 @@ import {
   type MapProjectionDefinition,
 } from "@langwatch/eventing";
 import {
-  type GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+  GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+  type GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
   type RecordBudgetCrossingCommandData,
+  type RecordVkFirstRequestCommandData,
   type RecordVkLifecycleCommandData,
 } from "@langwatch/gateway-contract";
 import {
@@ -100,16 +102,38 @@ export function crossingFact(
   };
 }
 
+/** Gateway's fact that vk_1 served its first request. */
+export function firstRequestFact(
+  overrides: Partial<RecordVkFirstRequestCommandData> = {},
+): RecordVkFirstRequestCommandData {
+  return {
+    tenantId: "project-1",
+    organization_id: ORGANIZATION_ID,
+    virtual_key_id: "vk_1",
+    occurred_at: 3_000,
+    ...overrides,
+  };
+}
+
+type GatewayFact =
+  | { type: typeof GATEWAY_VK_LIFECYCLE_EVENT_TYPE; data: RecordVkLifecycleCommandData }
+  | { type: typeof GATEWAY_BUDGET_CROSSING_EVENT_TYPE; data: RecordBudgetCrossingCommandData }
+  | { type: typeof GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE; data: RecordVkFirstRequestCommandData };
+
+/** The fact's subject and what happened to it: one event id per distinct fact. */
+function subjectOf(fact: GatewayFact): string {
+  if (fact.type === GATEWAY_VK_LIFECYCLE_EVENT_TYPE) {
+    return `vk:${fact.data.virtual_key_id}:${fact.data.action}`;
+  }
+  if (fact.type === GATEWAY_BUDGET_CROSSING_EVENT_TYPE) {
+    return `budget:${fact.data.budget_id}:${fact.data.kind}`;
+  }
+  return `vk:${fact.data.virtual_key_id}:first_request`;
+}
+
 /** One of gateway's governance facts as its pipeline appends it. */
-export function gatewayEvent(
-  fact:
-    | { type: typeof GATEWAY_VK_LIFECYCLE_EVENT_TYPE; data: RecordVkLifecycleCommandData }
-    | { type: typeof GATEWAY_BUDGET_CROSSING_EVENT_TYPE; data: RecordBudgetCrossingCommandData },
-): Event {
-  const subject =
-    fact.type === GATEWAY_VK_LIFECYCLE_EVENT_TYPE
-      ? `vk:${fact.data.virtual_key_id}:${fact.data.action}`
-      : `budget:${fact.data.budget_id}:${fact.data.kind}`;
+export function gatewayEvent(fact: GatewayFact): Event {
+  const subject = subjectOf(fact);
   return {
     id: `evt-${subject}-${fact.data.occurred_at}`,
     aggregateId: subject,
@@ -338,6 +362,7 @@ export async function gatewayFactsOver({
     forgetErasedUser: (input) => userErasure.forgetUser(input),
     virtualKeyCreated: (input) => gatewayFacts.virtualKeyCreated(input),
     keyBudgetCrossed: (input) => gatewayFacts.keyBudgetCrossed(input),
+    keyFirstRequested: (input) => gatewayFacts.keyFirstRequested(input),
   });
   const toSubscribers = liveSubscribersOf(pipeline);
   // The key and member copies as the usage pipeline registers them: parse, then store.

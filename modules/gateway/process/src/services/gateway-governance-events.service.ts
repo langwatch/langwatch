@@ -2,6 +2,7 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import type {
   VkLifecycleAction,
   RecordBudgetCrossingCommandData,
+  RecordVkFirstRequestCommandData,
   RecordVkLifecycleCommandData,
   VirtualKeyPurpose,
 } from "@langwatch/gateway-contract";
@@ -17,12 +18,13 @@ type GovernanceSender = Pick<EventingCommandSender<unknown>, "send">;
 type GovernanceSenders = Readonly<{
   recordBudgetCrossing?: GovernanceSender;
   recordVkLifecycle?: GovernanceSender;
+  recordVkFirstRequest?: GovernanceSender;
 }>;
 
 /**
  * Records gateway's governance facts; the senders arrive when the pipeline connects.
- * A crossing that cannot be recorded throws, so its debit is re-driven; a lifecycle
- * fact is best effort, as main's was: a key mutation never fails on it.
+ * A crossing that cannot be recorded throws, so its debit is re-driven; a lifecycle fact
+ * and a first request are best effort: a key mutation or a spend batch never fails on them.
  */
 export class GatewayGovernanceEventsService implements GatewayGovernanceSignals {
   #senders: GovernanceSenders = {};
@@ -46,6 +48,7 @@ export class GatewayGovernanceEventsService implements GatewayGovernanceSignals 
     this.#senders = {
       recordBudgetCrossing: commands.recordBudgetCrossing,
       recordVkLifecycle: commands.recordVkLifecycle,
+      recordVkFirstRequest: commands.recordVkFirstRequest,
     };
   }
 
@@ -84,10 +87,34 @@ export class GatewayGovernanceEventsService implements GatewayGovernanceSignals 
     }
   }
 
+  /**
+   * Records that a key served its first request, under the same tenant as its lifecycle facts.
+   * A lost fact only leaves the person's has_app_request unset, so it is logged, never thrown:
+   * the caller is appending billing records that must not be retried over it.
+   */
+  async recordVkFirstRequest(virtualKey: GatewayFirstRequestKey): Promise<void> {
+    try {
+      const sender = this.#senders.recordVkFirstRequest;
+      if (!sender) return;
+      const tenantId = await this.tenantOf(virtualKey);
+      if (!tenantId) return;
+      const data: RecordVkFirstRequestCommandData = {
+        tenantId,
+        organization_id: virtualKey.organizationId,
+        virtual_key_id: virtualKey.id,
+        occurred_at: this.clock().epochMilliseconds,
+      };
+      await sender.send(data);
+    } catch (error) {
+      logger.warn(
+        { virtualKeyId: virtualKey.id, error },
+        "failed to record a virtual key's first request (best effort)",
+      );
+    }
+  }
+
   /** The key's trace project, else one stable organization project for event tenancy. */
-  private async tenantOf(
-    virtualKey: GatewayVirtualKeyLifecycleSignal["virtualKey"],
-  ): Promise<string | null> {
+  private async tenantOf(virtualKey: GatewayFirstRequestKey): Promise<string | null> {
     if (virtualKey.traceProjectId) return virtualKey.traceProjectId;
     const ids = await this.projects.listIdsByOrganization({
       organizationId: virtualKey.organizationId,
@@ -116,6 +143,13 @@ export type GatewayVirtualKeyLifecycleSignal = {
   actorUserId: string;
   reason?: string | null;
 };
+
+/** The key whose first admitted request is recorded. */
+export type GatewayFirstRequestKey = Readonly<{
+  id: string;
+  organizationId: string;
+  traceProjectId: string | null;
+}>;
 
 export interface GatewayGovernanceSignals {
   emitVirtualKeyLifecycle(signal: GatewayVirtualKeyLifecycleSignal): Promise<void>;

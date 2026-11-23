@@ -1,8 +1,8 @@
 import type { Named } from "@langwatch/module";
 /**
  * Gateway's facts. Governance (a budget crossing, a virtual key lifecycle change) goes to
- * webhook delivery under main's stored type and field names; a licence's managed key
- * provisioned is read by licensing.
+ * webhook delivery under main's stored type and field names; a key's first request is read by
+ * nurturing; a licence's managed key provisioned is read by licensing.
  */
 import { z } from "zod";
 
@@ -78,6 +78,26 @@ export interface RecordBudgetCrossingCommandDataSchema extends Named<
 export const recordBudgetCrossingCommandDataSchema: RecordBudgetCrossingCommandDataSchema =
   recordBudgetCrossingCommandDataSchemaDefinition;
 export type RecordBudgetCrossingCommandData = z.infer<typeof recordBudgetCrossingCommandDataSchema>;
+
+/**
+ * A key served its first request: gateway admitted a request on it while its `lastUsedAt` was
+ * still empty. Nurturing reads it; webhook delivery does not, so it is not in the union below.
+ */
+export const GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE = "lw.governance.vk_first_request" as const;
+
+const recordVkFirstRequestCommandDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  organization_id: z.string().min(1),
+  virtual_key_id: z.string().min(1),
+  /** Unix ms of the ingest that saw the key unused. */
+  occurred_at: z.number().int().positive(),
+});
+export interface RecordVkFirstRequestCommandDataSchema extends Named<
+  typeof recordVkFirstRequestCommandDataSchemaDefinition
+> {}
+export const recordVkFirstRequestCommandDataSchema: RecordVkFirstRequestCommandDataSchema =
+  recordVkFirstRequestCommandDataSchemaDefinition;
+export type RecordVkFirstRequestCommandData = z.infer<typeof recordVkFirstRequestCommandDataSchema>;
 
 /** One governance fact as a delivery module takes it, typed by the event that recorded it. */
 const gatewayGovernanceEventSchemaDefinition = z.discriminatedUnion("type", [

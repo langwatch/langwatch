@@ -31,6 +31,7 @@ function nurturing() {
     forgetErasedUser: async () => undefined,
     virtualKeyCreated: async () => undefined,
     keyBudgetCrossed: async () => undefined,
+    keyFirstRequested: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<

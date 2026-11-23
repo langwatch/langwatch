@@ -8,6 +8,7 @@ import { ZodError } from "zod";
 
 import {
   recordBudgetCrossingCommandDataSchema,
+  recordVkFirstRequestCommandDataSchema,
   recordVkLifecycleCommandDataSchema,
   virtualKeyPurposeSchema,
 } from "../index.ts";
@@ -80,6 +81,23 @@ describe("gateway's governance facts", () => {
     it("refuses it, so a new purpose is a contract change rather than a silent USER", () => {
       expect(() =>
         recordVkLifecycleCommandDataSchema.parse({ ...storedLifecycle, purpose: "ROBOT" }),
+      ).toThrow(ZodError);
+    });
+  });
+
+  describe("when a key's first-request fact is read", () => {
+    /** @scenario "A key's first admitted request records one first-request fact" */
+    it("parses the key and its organization, and refuses one naming no key", () => {
+      const fact = {
+        tenantId: "proj_1",
+        organization_id: "org_1",
+        virtual_key_id: "vk_1",
+        occurred_at: 1_753_800_000_000,
+      };
+
+      expect(recordVkFirstRequestCommandDataSchema.parse(fact)).toEqual(fact);
+      expect(() =>
+        recordVkFirstRequestCommandDataSchema.parse({ ...fact, virtual_key_id: "" }),
       ).toThrow(ZodError);
     });
   });
