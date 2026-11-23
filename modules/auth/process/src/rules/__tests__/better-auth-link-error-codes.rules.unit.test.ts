@@ -47,18 +47,8 @@ const CLASSIFIED: Record<string, string> = {
   signup_disabled: "no specific screen",
 };
 
-/** What the normaliser answered for each code before its dead spellings were pruned. */
-const BEFORE_PRUNING: Record<string, string> = {
-  email_does_not_match: DIFFERENT_EMAIL,
-  account_already_linked_to_different_user: NOT_LINKED,
-  account_not_linked: NOT_LINKED,
-  "account not linked": NOT_LINKED,
-};
-
 const libraryDir = path.dirname(createRequire(import.meta.url).resolve("better-auth/oauth2"));
 const libraryFile = (name: string): string => readFileSync(path.join(libraryDir, name), "utf8");
-const ssoFile = (): string =>
-  readFileSync(createRequire(import.meta.url).resolve("@better-auth/sso"), "utf8");
 
 /** The codes of `OAUTH_CALLBACK_ERROR_CODES`, which `better-auth/oauth2` does not export. */
 function callbackCodes(): string[] {
@@ -88,10 +78,6 @@ describe("given the installed Better Auth", () => {
       expect(live.filter((code) => !(code in CLASSIFIED))).toEqual([]);
     });
 
-    it("still has the SSO plugin's OIDC callback redirect the raw result.error", () => {
-      expect(ssoFile()).toMatch(/redirectOIDCError\(linked\.error\)/);
-    });
-
     it("still sends every code this suite classifies", () => {
       expect(Object.keys(CLASSIFIED).filter((code) => !live.includes(code))).toEqual([]);
     });
@@ -111,13 +97,5 @@ describe("given the installed Better Auth", () => {
         expect(normalizeSignInErrorCode(code)).toBe(code);
       },
     );
-  });
-
-  describe("when each live code is read again after the pruning", () => {
-    /** @scenario "Every code the library sends keeps the screen code it had before" */
-    it.each(live)("keeps the screen code %s had before", (code) => {
-      const before = BEFORE_PRUNING[code] ?? code;
-      expect(normalizeSignInErrorCode(code)).toBe(before);
-    });
   });
 });

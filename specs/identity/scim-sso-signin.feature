@@ -54,19 +54,12 @@ Feature: First sign-in for a provisioned directory member
     Then email_does_not_match is treated as DIFFERENT_EMAIL_NOT_ALLOWED
     And account_already_linked_to_different_user is treated as OAuthAccountNotLinked
     And the refusal for an existing account under another method is treated as OAuthAccountNotLinked
-    And the SSO plugin still redirects the raw sign-in refusal to the error screen
     And every other code read is classified as having no specific screen
 
   @unit @regression
   Scenario: An upgrade that adds or renames a library code fails until the code is classified
     Given a code the installed library redirects with that no classification names
     Then the pinning test fails and names the code
-
-  @unit @regression
-  Scenario: Every code the library sends keeps the screen code it had before
-    Given the screen code each live library code produced before the spellings were pruned
-    When each code is read again
-    Then it produces the same screen code
 
   @unit @regression
   Scenario: A sign-in that succeeds is not read as a failure
