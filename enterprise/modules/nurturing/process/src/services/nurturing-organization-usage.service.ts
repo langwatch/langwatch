@@ -206,41 +206,19 @@ export class NurturingOrganizationUsageService {
       this.dependencies.syncs.inc({ outcome: "send_failed" });
       throw error;
     }
-    // An out-parameter, so a batch that fails midway still reports the identifies already sent.
     const mirrored: MirroredCounts = { identifyCalls: 0 };
-    let userIds: readonly string[] = [];
-    let mirrorFailed = false;
-    try {
-      userIds = await this.membersToMirrorOnto({ organizationId });
-      await this.mirrorOntoMembers({ userIds, traits, counts: mirrored });
-    } catch (error) {
-      mirrorFailed = true;
-      // The group call stands, and the next sync mirrors again, as the other sinks' failures.
-      this.dependencies.logger.warn(
-        { error, organizationId },
-        "an organization's usage could not be mirrored onto its members",
-      );
-    }
-    let trackCalls = 0;
-    try {
-      // Apart from the mirror, so a refused identify skips no event; a failure here fails the job,
-      // whose retry sends the events its released claims let out again.
-      if (traces) {
-        trackCalls = await this.traceActiveDays.send({
-          userIds,
-          days: traceActiveDaysToSend({
-            activeDays: traces.activeDays,
-            now,
-            organizationCreatedAt,
-          }),
-          organizationCreatedAt,
-        });
-      }
-    } catch (error) {
-      state.counted = true;
-      this.dependencies.syncs.inc({ outcome: "events_failed" });
-      throw error;
-    }
+    const { userIds, mirrorFailed } = await this.mirrorOntoOrganization({
+      organizationId,
+      traits,
+      counts: mirrored,
+    });
+    const trackCalls = await this.sendTraceActiveDays({
+      traces,
+      userIds,
+      now,
+      organizationCreatedAt,
+      state,
+    });
     this.dependencies.syncs.inc({ outcome: mirrorFailed ? "mirror_failed" : "synced" });
     // Debug: it fires for every changed project, so the counter carries the volume.
     this.dependencies.logger.debug(
@@ -323,6 +301,66 @@ export class NurturingOrganizationUsageService {
     });
     const erased = new Set(await erasedUsers.findErased({ userIds: latestHere }));
     return latestHere.filter((userId) => !erased.has(userId));
+  }
+
+  /**
+   * Sends each member's trace_active_day events, apart from the mirror so a refused identify skips
+   * no event; a failure here fails the job, whose retry sends the events its released claims let
+   * out again.
+   */
+  private async sendTraceActiveDays({
+    traces,
+    userIds,
+    now,
+    organizationCreatedAt,
+    state,
+  }: Readonly<{
+    traces: ReturnType<typeof traceCountsOf> | null;
+    userIds: readonly string[];
+    now: number;
+    organizationCreatedAt: number;
+    state: AttemptState;
+  }>): Promise<number> {
+    if (!traces) return 0;
+    try {
+      return await this.traceActiveDays.send({
+        userIds,
+        days: traceActiveDaysToSend({ activeDays: traces.activeDays, now, organizationCreatedAt }),
+        organizationCreatedAt,
+      });
+    } catch (error) {
+      state.counted = true;
+      this.dependencies.syncs.inc({ outcome: "events_failed" });
+      throw error;
+    }
+  }
+
+  /**
+   * Mirrors the traits onto the organization's members, swallowing a failure: the group call
+   * stands, and the next sync mirrors again, as the other sinks' failures. `counts` is an
+   * out-parameter, so a batch that fails midway still reports the identifies already sent.
+   */
+  private async mirrorOntoOrganization({
+    organizationId,
+    traits,
+    counts,
+  }: Readonly<{
+    organizationId: string;
+    traits: CioOrganizationUsageTraits;
+    counts: MirroredCounts;
+  }>): Promise<{ userIds: readonly string[]; mirrorFailed: boolean }> {
+    let userIds: readonly string[] = [];
+    try {
+      userIds = await this.membersToMirrorOnto({ organizationId });
+      await this.mirrorOntoMembers({ userIds, traits, counts });
+      return { userIds, mirrorFailed: false };
+    } catch (error) {
+      this.dependencies.logger.warn(
+        { error, organizationId },
+        "an organization's usage could not be mirrored onto its members",
+      );
+      return { userIds, mirrorFailed: true };
+    }
   }
 
   /** Identifies each member with the traits. A refused call throws; its caller decides on retries. */
