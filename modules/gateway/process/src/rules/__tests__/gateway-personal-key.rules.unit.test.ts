@@ -24,7 +24,7 @@ describe("the personal-key rule", () => {
   });
 
   describe("given an unmarked key a person created", () => {
-    /** @scenario "A key with no owner whose creator's account is gone counts as personal on a budget's detail" */
+    /** @scenario "The ledger rows of a key with no owner whose creator's account is gone count as personal on a budget's detail" */
     it("turns on whether its creator's account still exists", () => {
       expect(isMarkedPersonal(unmarked("usr_1"))).toBe(false);
       expect(hangsOnItsCreator(unmarked("usr_1"))).toBe(true);

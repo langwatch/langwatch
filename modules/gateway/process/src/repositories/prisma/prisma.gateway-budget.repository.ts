@@ -703,9 +703,9 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 
   /**
-   * Budget plus resolved scope-target label (human-friendly name for the scope FK) and the
-   * last 20 ledger entries, for the detail page — one round-trip per scope kind so the UI
-   * doesn't chain queries.
+   * Budget plus resolved scope-target label (human-friendly name for the scope FK) and up to
+   * RECENT_LEDGER_READ_LIMIT newest ledger entries, which the caller filters and trims to 20 for
+   * the detail page; one round-trip per scope kind so the UI doesn't chain queries.
    */
   async findDetailById(input: GatewayBudgetReadInput): Promise<BudgetDetail | null> {
     const row = await this.prisma.gatewayBudget.findFirst({

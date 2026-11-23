@@ -23,8 +23,9 @@ export function isMarkedPersonal({
 }
 
 /**
- * Unmarked and made by a person: such a key counts as personal once its creator's account is gone,
- * which catches a key whose owner was erased before the mark existed. A machine never qualifies.
+ * Unmarked and made by a person: such a key's ledger rows count as personal once its creator's
+ * account is gone, which catches a key whose owner was erased before the mark existed. Its budget
+ * stays shared. A machine never qualifies.
  */
 export function hangsOnItsCreator(owner: VirtualKeyOwnership): boolean {
   return !isMarkedPersonal(owner) && !owner.createdById.startsWith(MACHINE_CREATOR_PREFIX);

@@ -10,7 +10,11 @@ import {
   type IdempotentRunner,
 } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { GatewayBudget } from "@langwatch/gateway-contract";
+import type {
+  GatewayBudget,
+  GatewayKeyCaller,
+  GatewayRequestCredential,
+} from "@langwatch/gateway-contract";
 import { MemberNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -47,6 +51,12 @@ const API_KEYS = {
   ak_service_granted: { userId: null, atOrganization: [OTHERS_PERSONAL] },
 } as const;
 type ApiKeyId = keyof typeof API_KEYS;
+
+/** The project's own credential, which acts for no one. */
+const PROJECT_KEY = "project_key";
+
+/** Who sends a request: one of the API keys above, or the project's credential. */
+type CallerId = ApiKeyId | typeof PROJECT_KEY;
 
 const passthroughIdempotency: IdempotentRunner = async ({ handler }) => {
   const response = await handler();
@@ -104,8 +114,8 @@ const KEYS = {
 /** One request to the platform routes, made with the caller's key. */
 type PlatformRequest = { method: string; path: string; body?: unknown };
 
-/** The platform routes over a budget scoped to `usr_owner` and the keys above, for one API key. */
-async function platformAs({ apiKeyId }: { apiKeyId: ApiKeyId }) {
+/** The platform routes over a budget scoped to `usr_owner` and the keys above, for one caller. */
+async function platformAs({ caller }: { caller: CallerId }) {
   const store = MemoryGatewayStore.create();
   store.budgets.set(BUDGET_ID, budgetOf({ ownerId: "usr_owner" }));
   const { repositories } = new MemoryGatewayRepositories(store);
@@ -125,6 +135,7 @@ async function platformAs({ apiKeyId }: { apiKeyId: ApiKeyId }) {
       },
     }),
     projects: createApiFixture<ProjectApi>({
+      findOrganizationId: async () => ORG_ID,
       listIdsByOrganization: async () => [PROJECT_ID],
       listTraceDestinations: async () => [],
     }),
@@ -145,14 +156,19 @@ async function platformAs({ apiKeyId }: { apiKeyId: ApiKeyId }) {
       },
     }),
   });
-  const caller = {
-    kind: "apiKey",
-    apiKeyId,
-    userId: API_KEYS[apiKeyId].userId,
-    organizationId: ORG_ID,
-  } as const;
+  const keyCaller: GatewayKeyCaller =
+    caller === PROJECT_KEY
+      ? { kind: "project", projectId: PROJECT_ID }
+      : {
+          kind: "apiKey",
+          apiKeyId: caller,
+          userId: API_KEYS[caller].userId,
+          organizationId: ORG_ID,
+        };
+  const credential: GatewayRequestCredential =
+    keyCaller.kind === "project" ? { kind: "legacyProjectKey" } : keyCaller;
   const door = () => ({
-    actor: { type: "api_key" as const, id: apiKeyId },
+    actor: { type: "api_key" as const, id: caller },
     scope: { tier: "organization" as const, id: ORG_ID },
   });
   const hono = createRestRuntime({
@@ -165,9 +181,9 @@ async function platformAs({ apiKeyId }: { apiKeyId: ApiKeyId }) {
     app: () => app,
     onError: canonicalErrorResponse,
     middlewareContext: [
-      bindMiddlewareContext(gatewayRestCredential, () => caller),
-      bindMiddlewareContext(gatewayKeyCaller, () => caller),
-      bindMiddlewareContext(gatewayVirtualKeyCaller, () => caller),
+      bindMiddlewareContext(gatewayRestCredential, () => credential),
+      bindMiddlewareContext(gatewayKeyCaller, () => keyCaller),
+      bindMiddlewareContext(gatewayVirtualKeyCaller, () => keyCaller),
     ],
   });
 
@@ -181,9 +197,9 @@ async function platformAs({ apiKeyId }: { apiKeyId: ApiKeyId }) {
   };
 }
 
-/** Reads, or writes with `write`, the budget at `/budgets/:id` as one API key. */
-async function callAs({ apiKeyId }: { apiKeyId: ApiKeyId }) {
-  const send = await platformAs({ apiKeyId });
+/** Reads, or writes with `write`, the budget at `/budgets/:id` as one caller. */
+async function callAs({ caller }: { caller: CallerId }) {
+  const send = await platformAs({ caller });
   return ({ id = BUDGET_ID, write }: { id?: string; write?: BudgetWrite } = {}) =>
     send({
       method: write?.method ?? "GET",
@@ -192,9 +208,9 @@ async function callAs({ apiKeyId }: { apiKeyId: ApiKeyId }) {
     });
 }
 
-/** Creates a budget on `scope` (the wire's snake spelling) as one API key. */
-async function createAs({ apiKeyId, scope }: { apiKeyId: ApiKeyId; scope: object }) {
-  const send = await platformAs({ apiKeyId });
+/** Creates a budget on `scope` (the wire's snake spelling) as one caller. */
+async function createAs({ caller, scope }: { caller: CallerId; scope: object }) {
+  const send = await platformAs({ caller });
   return send({
     method: "POST",
     path: "/budgets",
@@ -205,21 +221,21 @@ async function createAs({ apiKeyId, scope }: { apiKeyId: ApiKeyId; scope: object
 describe("GET /budgets/:id, a budget scoped to one member", () => {
   /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
   it("answers a key acting for its owner", async () => {
-    const read = await callAs({ apiKeyId: "ak_owner" });
+    const read = await callAs({ caller: "ak_owner" });
 
     expect((await read()).status).toBe(200);
   });
 
   /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
   it("answers a key acting for an admin that holds the permission at the organization", async () => {
-    const read = await callAs({ apiKeyId: "ak_admin" });
+    const read = await callAs({ caller: "ak_admin" });
 
     expect((await read()).status).toBe(200);
   });
 
   /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
   it("answers a key acting for a viewer exactly as for a budget that does not exist", async () => {
-    const read = await callAs({ apiKeyId: "ak_viewer" });
+    const read = await callAs({ caller: "ak_viewer" });
 
     const refused = await read();
 
@@ -229,8 +245,8 @@ describe("GET /budgets/:id, a budget scoped to one member", () => {
 
   /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
   it("answers an organization key with no user as not found, unless it holds the permission", async () => {
-    const plain = await callAs({ apiKeyId: "ak_service" });
-    const granted = await callAs({ apiKeyId: "ak_service_granted" });
+    const plain = await callAs({ caller: "ak_service" });
+    const granted = await callAs({ caller: "ak_service_granted" });
 
     const refused = await plain();
 
@@ -238,13 +254,23 @@ describe("GET /budgets/:id, a budget scoped to one member", () => {
     expect(refused).toEqual(await plain({ id: "bdg_unknown" }));
     expect((await granted()).status).toBe(200);
   });
+
+  /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
+  it("answers a project key exactly as for a budget that does not exist", async () => {
+    const read = await callAs({ caller: PROJECT_KEY });
+
+    const refused = await read();
+
+    expect(refused.status).toBe(404);
+    expect(refused).toEqual(await read({ id: "bdg_unknown" }));
+  });
 });
 
 describe("PATCH, DELETE and reset on /budgets/:id, a budget scoped to one member", () => {
   for (const [label, write] of Object.entries(WRITES)) {
     /** @scenario "A budget scoped to one person or to a personal key opens only for that person and those allowed to see other members' personal keys" */
     it(`answers a viewer's key's ${label} exactly as for a budget that does not exist`, async () => {
-      const call = await callAs({ apiKeyId: "ak_viewer" });
+      const call = await callAs({ caller: "ak_viewer" });
 
       const refused = await call({ write });
 
@@ -260,16 +286,16 @@ describe("POST /budgets, on one member or on a personal key", () => {
 
   /** @scenario "A budget on one person or on a personal key is created only by that person and those allowed to see other members' personal keys" */
   it("creates a member's budget for a key acting for that member", async () => {
-    const created = await createAs({ apiKeyId: "ak_owner", scope: member("usr_owner") });
+    const created = await createAs({ caller: "ak_owner", scope: member("usr_owner") });
 
     expect(created.status).toBe(201);
   });
 
   /** @scenario "A budget on one person or on a personal key is created only by that person and those allowed to see other members' personal keys" */
   it("refuses an organization key with no user a member's budget, unless it holds the permission", async () => {
-    const refused = await createAs({ apiKeyId: "ak_service", scope: member("usr_owner") });
-    const granted = await createAs({ apiKeyId: "ak_service_granted", scope: member("usr_owner") });
-    const absent = await createAs({ apiKeyId: "ak_service_granted", scope: member("usr_unknown") });
+    const refused = await createAs({ caller: "ak_service", scope: member("usr_owner") });
+    const granted = await createAs({ caller: "ak_service_granted", scope: member("usr_owner") });
+    const absent = await createAs({ caller: "ak_service_granted", scope: member("usr_unknown") });
 
     expect(refused).toMatchObject({ status: 400, body: { code: "gateway_scope_org_mismatch" } });
     expect(refused).toEqual(absent);
@@ -277,10 +303,19 @@ describe("POST /budgets, on one member or on a personal key", () => {
   });
 
   /** @scenario "A budget on one person or on a personal key is created only by that person and those allowed to see other members' personal keys" */
+  it("refuses a project key a member's budget, as for a member who does not exist", async () => {
+    const refused = await createAs({ caller: PROJECT_KEY, scope: member("usr_owner") });
+    const absent = await createAs({ caller: "ak_service_granted", scope: member("usr_unknown") });
+
+    expect(refused).toMatchObject({ status: 400, body: { code: "gateway_scope_org_mismatch" } });
+    expect(refused).toEqual(absent);
+  });
+
+  /** @scenario "A budget on one person or on a personal key is created only by that person and those allowed to see other members' personal keys" */
   it("refuses a viewer's key a budget on another member's personal key, as for an unknown key", async () => {
-    const refused = await createAs({ apiKeyId: "ak_viewer", scope: key("vk_personal") });
-    const absent = await createAs({ apiKeyId: "ak_admin", scope: key("vk_unknown") });
-    const own = await createAs({ apiKeyId: "ak_owner", scope: key("vk_personal") });
+    const refused = await createAs({ caller: "ak_viewer", scope: key("vk_personal") });
+    const absent = await createAs({ caller: "ak_admin", scope: key("vk_unknown") });
+    const own = await createAs({ caller: "ak_owner", scope: key("vk_personal") });
 
     expect(refused).toMatchObject({ status: 404, body: { code: "virtual_key_not_found" } });
     expect(refused).toEqual(absent);
@@ -289,7 +324,7 @@ describe("POST /budgets, on one member or on a personal key", () => {
 
   /** @scenario "A budget on one person or on a personal key is created only by that person and those allowed to see other members' personal keys" */
   it("refuses a key in another organization as an unknown key, and writes no budget", async () => {
-    const send = await platformAs({ apiKeyId: "ak_viewer" });
+    const send = await platformAs({ caller: "ak_viewer" });
     const create = (virtualKeyId: string) =>
       send({
         method: "POST",
@@ -309,7 +344,7 @@ describe("POST /budgets, on one member or on a personal key", () => {
 
   /** @scenario "A budget on one person or on a personal key is created only by that person and those allowed to see other members' personal keys" */
   it("creates a budget on a shared key for an organization key with no user", async () => {
-    const created = await createAs({ apiKeyId: "ak_service", scope: key("vk_shared") });
+    const created = await createAs({ caller: "ak_service", scope: key("vk_shared") });
 
     expect(created.status).toBe(201);
   });

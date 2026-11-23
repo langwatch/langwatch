@@ -48,8 +48,9 @@ export class GatewayBudgetLedgerVisibilityService {
   private constructor(private readonly dependencies: Dependencies) {}
 
   /**
-   * A budget scoped to one member, or to a personal key, opens only for that person and holders
-   * of `virtualKeys:viewOtherPersonal` at the organization; anyone else is told it does not exist.
+   * A budget scoped to one member, or to a key marked personal, opens only for that person and
+   * holders of `virtualKeys:viewOtherPersonal` at the organization; anyone else is told it does not
+   * exist. An unmarked key's budget stays shared even once its creator's account is gone.
    */
   async assertOpens({
     id,
@@ -63,8 +64,7 @@ export class GatewayBudgetLedgerVisibilityService {
     const scope = await this.dependencies.budgets.getScopeOwnership({ id, organizationId });
     if (!PERSONAL_SCOPE_TYPES.has(scope.scopeType)) return;
     if (await this.seesOthers({ organizationId, reader })) return;
-    const gone = await this.goneCreators({ owners: [scope.scopeKeyOwner] });
-    refuseUnlessOpens({ scope, gone, reader });
+    refuseUnlessOpens({ scope, reader });
   }
 
   /**
@@ -94,16 +94,15 @@ export class GatewayBudgetLedgerVisibilityService {
               organizationId,
             }),
           };
-    const gone = await this.goneCreators({ owners: [ownership.scopeKeyOwner] });
-    if (opensFor({ scope: ownership, gone, reader })) return;
+    if (opensFor({ scope: ownership, reader })) return;
     throw scope.kind === "PRINCIPAL"
       ? new GatewayScopeOrgMismatchError("user")
       : new VirtualKeyNotFoundError();
   }
 
   /**
-   * The detail, opened as {@link assertOpens} does. Its newest rows follow the same rule per key,
-   * and each leaves without its key's owner.
+   * The detail, opened as {@link assertOpens} does. Its newest rows hide another person's key, an
+   * unmarked one too once its creator's account is gone, and each leaves without its key's owner.
    */
   async detailFor({
     organizationId,
@@ -135,19 +134,16 @@ export class GatewayBudgetLedgerVisibilityService {
     reader: GatewayBudgetReader;
     detail: BudgetDetail;
   }): Promise<LedgerRow[]> {
-    const gone = await this.goneCreators({
-      owners: [...detail.recentLedger.map(({ keyOwner }) => keyOwner), detail.scopeKeyOwner],
-    });
     const { scopeType, scopeId } = detail.budget;
-    refuseUnlessOpens({
-      scope: { scopeType, scopeId, scopeKeyOwner: detail.scopeKeyOwner },
-      gone,
-      reader,
-    });
+    const scopeKeyOwner = detail.scopeKeyOwner;
+    refuseUnlessOpens({ scope: { scopeType, scopeId, scopeKeyOwner }, reader });
 
+    const gone = await this.goneCreators({
+      owners: detail.recentLedger.map(({ keyOwner }) => keyOwner),
+    });
     return detail.recentLedger.filter(
       ({ keyOwner }) =>
-        !isPersonal({ owner: keyOwner, gone }) ||
+        !isPersonalRow({ owner: keyOwner, gone }) ||
         isReader({ userId: keyOwner?.principalUserId, reader }),
     );
   }
@@ -204,8 +200,11 @@ export class GatewayBudgetLedgerVisibilityService {
   }
 }
 
-/** Marked personal, hanging on a creator whose account is gone, or unreadable (fails closed). */
-function isPersonal({
+/**
+ * A ledger row's key: marked personal, unreadable (fails closed), or hanging on a creator whose
+ * account is gone. Only rows read the gone creator; a budget's ownership does not.
+ */
+function isPersonalRow({
   owner,
   gone,
 }: {
@@ -237,16 +236,14 @@ type BudgetOwnership =
   | { kind: "owned"; userId: string }
   | { kind: "ownerUnnamed" };
 
-function budgetOwnership({
-  scope,
-  gone,
-}: {
-  scope: BudgetScopeOwnership;
-  gone: ReadonlySet<string>;
-}): BudgetOwnership {
+/**
+ * A key's budget is personal only on the key's own columns, or when the key is unreadable (fails
+ * closed); an unmarked key stays shared once its creator's account is gone.
+ */
+function budgetOwnership({ scope }: { scope: BudgetScopeOwnership }): BudgetOwnership {
   if (scope.scopeType === "PRINCIPAL") return { kind: "owned", userId: scope.scopeId };
   const owner = scope.scopeKeyOwner;
-  if (scope.scopeType !== "VIRTUAL_KEY" || !isPersonal({ owner, gone })) {
+  if (scope.scopeType !== "VIRTUAL_KEY" || (owner !== null && !isMarkedPersonal(owner))) {
     return { kind: "shared" };
   }
   return owner?.principalUserId
@@ -256,13 +253,12 @@ function budgetOwnership({
 
 type ScopeReading = {
   scope: BudgetScopeOwnership;
-  gone: ReadonlySet<string>;
   reader: GatewayBudgetReader;
 };
 
 /** For a reader without `virtualKeys:viewOtherPersonal`: shared, or the reader's own. */
-function opensFor({ scope, gone, reader }: ScopeReading): boolean {
-  const ownership = budgetOwnership({ scope, gone });
+function opensFor({ scope, reader }: ScopeReading): boolean {
+  const ownership = budgetOwnership({ scope });
   if (ownership.kind === "shared") return true;
   return ownership.kind === "owned" && isReader({ userId: ownership.userId, reader });
 }

@@ -102,12 +102,13 @@ Feature: Gateway budget decision service
     And a budget scoped to the shared key is created for anyone allowed to create budgets
 
   @unit
-  Scenario: A key with no owner whose creator's account is gone counts as personal on a budget's detail
+  Scenario: The ledger rows of a key with no owner whose creator's account is gone count as personal on a budget's detail
     Given a budget whose recent ledger holds a row from a key with no principal, never marked personal, whose creator's account is gone
     When a member opens the budget
     Then that row is not shown
     And an organization admin still sees it
     And when the account lookup fails, the read fails rather than counting the account as gone
+    And a budget scoped to that key still opens for the member, who may also create one on it
 
   @unit
   Scenario: A key a machine created never counts as personal on a budget's detail

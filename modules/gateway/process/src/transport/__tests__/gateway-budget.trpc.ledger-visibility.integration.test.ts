@@ -6,7 +6,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BUDGET_ID,
   BUDGET_NOT_FOUND,
+  budgetScopedTo,
   debitsThrough,
   detailFor,
   gatewayFor,
@@ -90,7 +92,7 @@ describe("gatewayBudgets.get, the recent ledger of a budget", () => {
   describe("given a row through a key with no principal whose creator's account is gone", () => {
     const keys = ["vk_shared", "vk_orphaned"] as const;
 
-    /** @scenario "A key with no owner whose creator's account is gone counts as personal on a budget's detail" */
+    /** @scenario "The ledger rows of a key with no owner whose creator's account is gone count as personal on a budget's detail" */
     it("hides it from a member", async () => {
       const { shown, lookedUp } = await detailFor({ caller: "usr_member", keys });
 
@@ -98,16 +100,52 @@ describe("gatewayBudgets.get, the recent ledger of a budget", () => {
       expect(lookedUp).toEqual(["usr_admin", "usr_erased"]);
     });
 
-    /** @scenario "A key with no owner whose creator's account is gone counts as personal on a budget's detail" */
+    /** @scenario "The ledger rows of a key with no owner whose creator's account is gone count as personal on a budget's detail" */
     it("still shows it to an organization admin", async () => {
       const { shown } = await detailFor({ caller: "usr_admin", keys });
 
       expect(shown).toEqual(["vk_orphaned", "vk_shared"]);
     });
+
+    describe("when the budget is scoped to that key", () => {
+      const budget = budgetScopedTo({ scopeType: "VIRTUAL_KEY", scopeId: "vk_orphaned" });
+
+      /** @scenario "The ledger rows of a key with no owner whose creator's account is gone count as personal on a budget's detail" */
+      it("opens the budget for a member, still without the key's rows", async () => {
+        const gateway = await gatewayFor({
+          caller: "usr_member",
+          budget,
+          debits: keys.flatMap((key) => debitsThrough({ key })),
+        });
+
+        const opened = await gateway.open();
+
+        expect(opened.id).toBe(BUDGET_ID);
+        expect(opened.recentLedger.map((row) => row.virtualKeyId)).toEqual(["vk_shared"]);
+      });
+
+      /** @scenario "The ledger rows of a key with no owner whose creator's account is gone count as personal on a budget's detail" */
+      it("lets a member edit, reset and archive the budget", async () => {
+        const gateway = await gatewayFor({ caller: "usr_member", budget });
+
+        expect(await gateway.rename()).toMatchObject({ id: BUDGET_ID, name: "renamed" });
+        expect((await gateway.reset()).lastResetAt).not.toBeNull();
+        expect((await gateway.archive()).archivedAt).not.toBeNull();
+      });
+    });
+
+    /** @scenario "The ledger rows of a key with no owner whose creator's account is gone count as personal on a budget's detail" */
+    it("lets a member create a budget scoped to that key", async () => {
+      const gateway = await gatewayFor({ caller: "usr_member" });
+
+      const created = await gateway.create({ kind: "VIRTUAL_KEY", virtualKeyId: "vk_orphaned" });
+
+      expect(created.scopeId).toBe("vk_orphaned");
+    });
   });
 
   describe("given the account lookup for a key's creator fails", () => {
-    /** @scenario "A key with no owner whose creator's account is gone counts as personal on a budget's detail" */
+    /** @scenario "The ledger rows of a key with no owner whose creator's account is gone count as personal on a budget's detail" */
     it("fails the read rather than counting the account as gone", async () => {
       const outage = new Error("the user module did not answer");
       const gateway = await gatewayFor({
