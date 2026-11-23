@@ -35,6 +35,8 @@ export function LangyGitHubConnectCard({
     { organizationId },
     { enabled: !!organizationId },
   );
+  // Until the status answers, neither card: offering the install first would flash it.
+  if (status.isLoading) return null;
   if (status.data?.configured === false) {
     return <LangyGitHubNotSetUpCard onShareLocalFolder={onShareLocalFolder} />;
   }

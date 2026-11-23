@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { pushMock, connection } = vi.hoisted(() => ({
   pushMock: vi.fn(),
-  connection: { configured: true },
+  connection: { configured: true, isLoading: false },
 }));
 vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: pushMock }),
@@ -24,7 +24,12 @@ vi.mock("../../../../behavior/github-connect-popup.ts", () => ({
 vi.mock("../../../../../../behavior/langy-api.ts", () => ({
   api: {
     github: {
-      getConnectionStatus: { useQuery: () => ({ data: { configured: connection.configured } }) },
+      getConnectionStatus: {
+        useQuery: () =>
+          connection.isLoading
+            ? { data: undefined, isLoading: true }
+            : { data: { configured: connection.configured }, isLoading: false },
+      },
     },
   },
 }));
@@ -47,6 +52,7 @@ function renderCard(onShareLocalFolder?: () => void) {
 afterEach(() => {
   cleanup();
   connection.configured = true;
+  connection.isLoading = false;
   pushMock.mockClear();
   vi.restoreAllMocks();
 });
@@ -84,5 +90,15 @@ describe("given an instance with no GitHub App configured", () => {
       fireEvent.click(screen.getByText("Share local folder"));
       expect(share).toHaveBeenCalledOnce();
     });
+  });
+});
+
+describe("given the connection status has not answered yet", () => {
+  it("shows neither the install nor the not set up card", () => {
+    connection.isLoading = true;
+    renderCard(vi.fn());
+
+    expect(screen.queryByText("Install GitHub App")).toBeNull();
+    expect(screen.queryByText("GitHub is not set up on this instance")).toBeNull();
   });
 });

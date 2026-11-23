@@ -532,6 +532,10 @@ func decodeLLMErrorBody(peeked []byte, resp upstreamResponse) (e herr.E, typed b
 	return decodeProviderErrorBody(peeked, resp.status, resp.contentType), false
 }
 
+// gatewayProviderErrorCode is the gateway's fallback code when it has no
+// parsed provider body to forward (writeUpstreamError in aigateway's router).
+const gatewayProviderErrorCode = "provider_error"
+
 // decodeProviderErrorBody captures a body KNOWN to be provider-native, skipping
 // the gateway-envelope test that decodeLLMErrorBody opens with.
 //
@@ -545,10 +549,6 @@ func decodeLLMErrorBody(peeked []byte, resp upstreamResponse) (e herr.E, typed b
 // shape isGatewayEnvelope reads as ours; routing it through here keeps its
 // prose out of the frame on the strength of where it came from rather than
 // what it looks like.
-// gatewayProviderErrorCode is the gateway's fallback code when it has no
-// parsed provider body to forward (writeUpstreamError in aigateway's router).
-const gatewayProviderErrorCode = "provider_error"
-
 func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr.E {
 	e := herr.E{Code: llmUpstreamErrorCode, Meta: herr.M{
 		"body_kind": providerBodyKind(peeked, contentType),
