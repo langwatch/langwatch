@@ -32,6 +32,7 @@ export class LimitExceededError extends HandledError {
 export class TestSuiteLimitExceededError extends LimitExceededError {
   constructor(current: number, max: number) {
     super("scenarioSets", current, max);
+    this.name = "TestSuiteLimitExceededError";
     this.meta.countedAs = "testSuites";
     this.message = "You have reached the maximum number of suites";
   }

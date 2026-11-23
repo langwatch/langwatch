@@ -7,6 +7,8 @@ import { z } from "zod";
 
 import type {
   GithubAppClient,
+  GithubCheckRunSummary,
+  GithubCheckSuiteSummary,
   GithubInstallationDetails,
   GithubInstallationToken,
   GithubPullRequestSummary,
@@ -46,7 +48,38 @@ const installationSchema = z.object({
     .nullish(),
   repository_selection: z.string().optional(),
   created_at: z.string().optional(),
+  permissions: z.record(z.string(), z.string()).optional(),
 });
+
+const checkSuitesSchema = z.object({
+  check_suites: z.array(
+    z.object({
+      id: z.number(),
+      status: z.string().nullish(),
+      conclusion: z.string().nullish(),
+      app: z.object({ name: z.string().optional(), slug: z.string().optional() }).nullish(),
+      latest_check_runs_count: z.number().optional(),
+    }),
+  ),
+});
+
+const checkRunsSchema = z.object({
+  total_count: z.number().optional(),
+  check_runs: z.array(
+    z.object({
+      name: z.string(),
+      status: z.string().nullish(),
+      conclusion: z.string().nullish(),
+      details_url: z.string().nullish(),
+      html_url: z.string().nullish(),
+    }),
+  ),
+});
+
+/** GitHub's largest page for the check suites and check runs lists. */
+const CHECKS_PAGE_SIZE = 100;
+/** Pages of check runs read per commit; past them the rest count as still running. */
+const MAX_CHECK_RUN_PAGES = 10;
 
 const repositoriesSchema = z.object({
   repositories: z.array(z.object({ id: z.number(), full_name: z.string() })).optional(),
@@ -148,6 +181,7 @@ export class HttpGithubApiAdapter implements GithubAppClient {
       accountId: body.account?.id !== void 0 ? String(body.account.id) : "",
       repositorySelection: body.repository_selection ?? "all",
       createdAt: body.created_at ?? null,
+      permissions: body.permissions ?? {},
     };
   }
 
@@ -254,6 +288,62 @@ export class HttpGithubApiAdapter implements GithubAppClient {
     return toPullRequestSummary(body);
   }
 
+  async listCommitCheckSuites(input: {
+    token: string;
+    owner: string;
+    repo: string;
+    sha: string;
+  }): Promise<GithubCheckSuiteSummary[]> {
+    const body = await this.readPullRequests(
+      input,
+      `/commits/${encodeURIComponent(input.sha)}/check-suites?per_page=${CHECKS_PAGE_SIZE}`,
+      checkSuitesSchema,
+    );
+    return body.check_suites.map((suite) => ({
+      id: suite.id,
+      status: suite.status ?? "queued",
+      conclusion: suite.conclusion ?? null,
+      appName: suite.app?.name ?? suite.app?.slug ?? "",
+      checkRunCount: suite.latest_check_runs_count ?? 0,
+    }));
+  }
+
+  async listCommitCheckRuns(input: {
+    token: string;
+    owner: string;
+    repo: string;
+    sha: string;
+  }): Promise<GithubCheckRunSummary[]> {
+    const runs: GithubCheckRunSummary[] = [];
+    let total = 0;
+    for (let page = 1; page <= MAX_CHECK_RUN_PAGES; page++) {
+      const body = await this.readPullRequests(
+        input,
+        `/commits/${encodeURIComponent(input.sha)}/check-runs?filter=latest&per_page=${CHECKS_PAGE_SIZE}&page=${page}`,
+        checkRunsSchema,
+      );
+      total = body.total_count ?? 0;
+      runs.push(
+        ...body.check_runs.map((run) => ({
+          name: run.name,
+          status: run.status ?? "queued",
+          conclusion: run.conclusion ?? null,
+          detailsUrl: run.html_url ?? run.details_url ?? null,
+        })),
+      );
+      if (body.check_runs.length < CHECKS_PAGE_SIZE || runs.length >= total) break;
+    }
+    if (runs.length < total) {
+      runs.push({
+        name: `${total - runs.length} more check runs`,
+        status: "queued",
+        conclusion: null,
+        detailsUrl: null,
+      });
+    }
+    return runs;
+  }
+
   private async readPullRequests<T>(
     input: { token: string; owner: string; repo: string },
     path: string,
@@ -273,7 +363,7 @@ export class HttpGithubApiAdapter implements GithubAppClient {
           repositoryFullName: `${input.owner}/${input.repo}`,
         });
       }
-      throw new Error(`GitHub pull-request read failed: ${response.status}`);
+      throw new Error(`GitHub repository read failed: ${response.status}`);
     }
 
     return schema.parse(await response.json());

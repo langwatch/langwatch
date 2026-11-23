@@ -19,12 +19,13 @@ catalog:
   '@ai-sdk/anthropic': ^3.0.44
   '@ai-sdk/openai': ^3.0.79
   '@ai-sdk/openai-compatible': ^2.0.55
+  '@aws-sdk/client-bedrock-agent': ^3.1080.0
   '@aws-sdk/client-cloudwatch-logs': ^3.1080.0
   '@aws-sdk/client-lambda': ^3.1080.0
   '@aws-sdk/client-s3': ^3.1080.0
   '@aws-sdk/client-ses': ^3.1080.0
   '@aws-sdk/s3-request-presigner': ^3.826.0
-  '@azure/identity': ^4.13.1
+  '@azure/identity': ^4.14.1
   '@better-auth/passkey': 1.7.11
   '@better-auth/sso': 1.7.11
   '@chakra-ui/react': ^3.36.0
@@ -37,7 +38,7 @@ catalog:
   '@emotion/react': ^11.14.0
   '@hono/node-server': ^2.0.6
   '@hookform/resolvers': ^5.4.0
-  '@langwatch/scenario': 1.7.0-dev.voice10
+  '@langwatch/scenario': 1.8.1
   '@mdx-js/react': ^3.1.0
   '@mdx-js/rollup': ^3.1.0
   '@modelcontextprotocol/sdk': 1.32.0
@@ -187,7 +188,7 @@ catalog:
   tsup: ^8.5.0
   typescript: ^7.0.2
   typescript-eslint: ^8.55.0
-  undici: ^8.10.2
+  undici: ^8.12.2
   unified: ^11.0.5
   use-debounce: ^10.1.1
   usehooks-ts: ^3.1.1
@@ -283,8 +284,8 @@ overrides:
   '@hono/node-server@>=2.0.0 <2.0.10': '>=2.0.10'
   '@langchain/community>fast-xml-parser': ^5.7.0
   '@langchain/core@<0.3.80': '>=0.3.80'
-  '@langwatch/scenario': file:./vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
-  '@langwatch/scenario@1.7.0-dev.voice10>langwatch': workspace:*
+  '@langwatch/scenario': 1.8.1
+  '@langwatch/scenario@1.8.1>langwatch': workspace:*
   '@modelcontextprotocol/client@>=2.0.0 <2.2.0': '>=2.2.0 <3'
   '@modelcontextprotocol/sdk>@hono/node-server': '>=2.0.10'
   '@modelcontextprotocol/sdk@>=1.10.0 <1.32.0': '>=1.32.0 <2'
@@ -299,6 +300,7 @@ overrides:
   ai: ^6.0.161
   axios@>=1.0.0 <1.20.0: '>=1.20.0 <2'
   body-parser@<1.20.6: '>=1.20.6 <2'
+  body-parser@>=2.0.0 <2.4.0: '>=2.4.0 <3'
   brace-expansion@<1.1.21: '>=1.1.21 <2'
   brace-expansion@>=2.0.0 <2.1.7: '>=2.1.7 <3'
   brace-expansion@>=4.0.0 <5.0.12: '>=5.0.12 <6'
@@ -306,6 +308,7 @@ overrides:
   cross-spawn: ^7.0.6
   deepmerge-ts@<8.0.0: 8.0.0
   dompurify@<3.4.16: '>=3.4.16 <4'
+  effect@<3.22.1: '>=3.22.1 <4'
   esbuild@<0.28.1: '>=0.28.1'
   exec-sh: ^0.4.0
   express-rate-limit@>=8.2.0 <8.2.2: '>=8.2.2'
@@ -315,7 +318,7 @@ overrides:
   fast-xml-parser@>=4.1.3 <4.5.4: '>=4.5.4 <5'
   fast-xml-parser@>=5.0.0 <5.3.6: '>=5.3.6 <6'
   file-type@>=13.0.0 <21.3.1: '>=21.3.1 <22'
-  follow-redirects@<1.16.1: '>=1.16.1 <2'
+  follow-redirects@<1.16.2: '>=1.16.2 <2'
   form-data@<4.0.6: '>=4.0.6'
   glob: ^11.1.0
   hono@<4.13.5: '>=4.13.5 <5'
@@ -352,18 +355,20 @@ overrides:
   shell-quote@<1.11.0: '>=1.11.0 <2'
   smol-toml@<1.9.0: '>=1.9.0 <2'
   source-map-js@>=1.0.0 <1.2.2: '>=1.2.2 <2'
-  systeminformation@<5.31.7: '>=5.31.7'
+  systeminformation@<5.33.16: '>=5.33.16 <6'
   thread-stream: ^4.0.0
   tmp: '>=0.2.6'
-  undici@>=6.0.0 <6.28.1: '>=6.28.1 <7'
+  toml@<5.0.1: '>=5.0.1 <6'
+  undici@>=6.0.0 <6.29.1: '>=6.29.1 <7'
   undici@>=7.0.0 <7.29.1: '>=7.29.1 <8'
-  undici@>=8.0.0 <8.10.2: '>=8.10.2 <9'
+  undici@>=8.0.0 <8.12.2: '>=8.12.2 <9'
   uuid@<11.1.1: '>=11.1.1 <12'
   validator@<13.15.22: '>=13.15.22'
   vite@<7.0.0: 8.0.16
   vite@>=7.0.0 <7.3.5: '>=7.3.5 <8'
   vite@>=8.0.0 <8.0.16: '>=8.0.16'
   vitest@<4.1.0: '>=4.1.0'
+  zod@>=4.0.0 <4.6.6: '>=4.6.6 <5'
 
 packageExtensions:
   '@google-cloud/dlp':

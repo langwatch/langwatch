@@ -1,6 +1,6 @@
 # The orange pill under the search bar of a day-zero home in the guided
 # onboarding variant: "Start guided onboarding". One per space (the project
-# home for LLM Ops, the gateway home, the governance home, /me for coding
+# home for LLM Ops, the gateway home, the governance home, /coding-agents for coding
 # agents). Clicking it begins that space's path on the organization, runs the
 # path's tour if it has one, and queues the Langy kickoff that continues the
 # conversation the guided onboarding already attached.

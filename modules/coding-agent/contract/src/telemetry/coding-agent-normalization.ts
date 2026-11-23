@@ -1,3 +1,4 @@
+import { isConversationalQuerySource, readDeclaredSessionKey } from "@langwatch/span-normalisation";
 // One vocabulary for all coding agents; folds registry definitions into
 // shared detection, prefix-stripping and alias tables; downstream code never
 // compares vendor literals.
@@ -61,14 +62,21 @@ export function deriveSpanConversationKey({
   agent,
   name,
   attrs,
+  resourceAttrs = {},
 }: {
   agent: CodingAgent;
   name: string;
   attrs: Record<string, unknown>;
+  resourceAttrs?: Record<string, unknown>;
 }): string | null {
+  const declared = readDeclaredSessionKey({ attributes: attrs, resourceAttributes: resourceAttrs });
+  if (declared !== null) return declared;
   const definition = CODING_AGENT_REGISTRY.find((candidate) => candidate.id === agent);
   return definition?.deriveSessionKeyFromSpan?.({ name, attrs }) ?? deriveConversationKey(attrs);
 }
+
+/** A launcher's own session groups every harness session it runs into one row (any agent). */
+export { readDeclaredSessionKey };
 
 /**
  * The canonical event, from whatever the agent called it. Some agents namespace their event
@@ -372,6 +380,16 @@ const MAX_PROMPT_TITLE_CHARS = 120;
 const USER_QUERY_WRAPPER = /^\s*<user_query>([\s\S]*)<\/user_query>\s*$/;
 
 /** The human's words out of a Grok-wrapped prompt; any other text comes back unchanged. */
+/**
+ * Claude Code's own housekeeping calls (session titles, side queries) are not the agent talking.
+ * A sub-agent's call (`agent:...`) is conversation, and a record with no source is kept.
+ */
+export function isUtilityQuerySource(attrs: Record<string, unknown>): boolean {
+  const querySource = pickString(attrs, "query_source_safe") ?? pickString(attrs, "query_source");
+  if (querySource === null || querySource.startsWith("agent")) return false;
+  return !isConversationalQuerySource(querySource);
+}
+
 export function unwrapUserQuery(text: string): string {
   return USER_QUERY_WRAPPER.exec(text)?.[1]?.trim() ?? text;
 }
@@ -384,11 +402,22 @@ export function unwrapUserQuery(text: string): string {
 export function deriveSessionTitleFromPrompt(text: string): string | null {
   const trimmed = splitLeadingContextBlocks(unwrapUserQuery(text)).body.trim();
   if (trimmed === "" || trimmed === WITHHELD_PROMPT_TEXT) return null;
-  if (trimmed.startsWith("<")) return null;
   const firstLine = trimmed.split(/\r?\n/, 1)[0] ?? "";
   const collapsed = firstLine.replace(/\s+/g, " ").trim();
-  if (collapsed === "") return null;
+  if (!isUsableSessionTitle(collapsed)) return null;
   return collapsed.slice(0, MAX_PROMPT_TITLE_CHARS);
+}
+
+const NON_HUMAN_TITLE_LEAD = /^(?:<|#{1,6}(?:\s|$)|---|```)/;
+
+/**
+ * Whether a line reads as a person's words. A tag (`<task-notification>`), a markdown
+ * heading (`## Your skills`), front matter or a code fence opens a document the harness
+ * injected, so it never names a session, also when a stored name predates this rule.
+ */
+export function isUsableSessionTitle(title: string | null | undefined): title is string {
+  const trimmed = title?.trim() ?? "";
+  return trimmed !== "" && !NON_HUMAN_TITLE_LEAD.test(trimmed);
 }
 
 /** Declared agent name from companion event (only source), null if unknown. */

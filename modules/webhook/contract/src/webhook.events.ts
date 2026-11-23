@@ -126,6 +126,46 @@ export const WEBHOOK_EVENT_TYPES = [
       "An agent seen in the organisation's traffic matches no listed source and is flagged as shadow.",
   },
   {
+    type: "governance.agent.stop_requested",
+    family: "governance",
+    schemaVersion: "1",
+    isEmitting: true,
+    description:
+      "A stop of a registry agent was requested and waits for an approval; carries the stop with its targets.",
+  },
+  {
+    type: "governance.agent.quarantined",
+    family: "governance",
+    schemaVersion: "1",
+    isEmitting: true,
+    description:
+      "Every target of an agent's stop plan was applied, so the agent is quarantined; carries each target's outcome.",
+  },
+  {
+    type: "governance.agent.stop_failed",
+    family: "governance",
+    schemaVersion: "1",
+    isEmitting: true,
+    description:
+      "A stop settled with at least one target the platform refused; carries each target's outcome and error code.",
+  },
+  {
+    type: "governance.agent.restored",
+    family: "governance",
+    schemaVersion: "1",
+    isEmitting: true,
+    description:
+      "Every target the stop changed was reverted; a target that was already stopped before the stop stays stopped.",
+  },
+  {
+    type: "governance.agent.restore_failed",
+    family: "governance",
+    schemaVersion: "1",
+    isEmitting: true,
+    description:
+      "A restore settled with at least one target the platform would not revert; carries each target's outcome.",
+  },
+  {
     type: "ocsf.event",
     family: "ocsf",
     schemaVersion: "1",

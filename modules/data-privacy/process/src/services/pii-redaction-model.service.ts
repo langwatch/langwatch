@@ -1,4 +1,5 @@
 import type { PiiLevel } from "@langwatch/data-privacy-contract";
+import { type EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -45,8 +46,14 @@ export type PiiRedactionModelUsage = Readonly<{
 
 const USAGE_MESSAGE = "PII redaction model call";
 
-/** A project's organization is read once per minute, as its privacy policy is. */
+/** A project's organization, and on self-hosted its licence, is read once per minute. */
 const ORGANIZATION_TTL_MS = 60_000;
+
+/** Where a batch goes: the model, Presidio, or Presidio because self-hosted has no licence. */
+type Routing =
+  | Readonly<{ kind: "model"; organizationId: string }>
+  | Readonly<{ kind: "presidio" }>
+  | Readonly<{ kind: "not_licensed"; organizationId: string; firstInAMinute: boolean }>;
 
 /**
  * Whether this process sends routed batches to the model. Closed: every batch tries it. Open:
@@ -81,6 +88,9 @@ export class PiiRedactionModelService {
     model: PresidioRedactionService;
     featureFlags: FeatureFlagApi;
     scopes: DataPrivacyProjectScopeService;
+    /** Self-hosted, the model comes with the Enterprise license; Cloud prices it. */
+    selfHosted: boolean;
+    entitlements: Pick<EntitlementApi, "getActivePlan">;
     spend: PiiRedactionSpendService;
     metrics: Pick<PiiAnalysisMetricsOtelService, "modelFellBack">;
     log?: UsageLogger;
@@ -95,6 +105,8 @@ export class PiiRedactionModelService {
 
   /** Each project's organization; concurrent batches of one project share one read. */
   readonly #organizations: ProjectLookupCacheService<string>;
+  /** Each organization's Enterprise licence, keyed by organization id; self-hosted only. */
+  readonly #licences: ProjectLookupCacheService<boolean>;
   /**
    * Per process, not per organization: the model is one deployment for every organization, so
    * when it is slow it is slow for all of them, and a per-organization breaker would pay the
@@ -104,6 +116,8 @@ export class PiiRedactionModelService {
   private readonly model: PresidioRedactionService;
   private readonly featureFlags: FeatureFlagApi;
   private readonly scopes: DataPrivacyProjectScopeService;
+  private readonly selfHosted: boolean;
+  private readonly entitlements: Pick<EntitlementApi, "getActivePlan">;
   private readonly spend: PiiRedactionSpendService;
   private readonly metrics: Pick<PiiAnalysisMetricsOtelService, "modelFellBack">;
   private readonly log: UsageLogger;
@@ -113,6 +127,8 @@ export class PiiRedactionModelService {
     model: PresidioRedactionService;
     featureFlags: FeatureFlagApi;
     scopes: DataPrivacyProjectScopeService;
+    selfHosted: boolean;
+    entitlements: Pick<EntitlementApi, "getActivePlan">;
     spend: PiiRedactionSpendService;
     metrics: Pick<PiiAnalysisMetricsOtelService, "modelFellBack">;
     log: UsageLogger;
@@ -121,11 +137,17 @@ export class PiiRedactionModelService {
     this.model = input.model;
     this.featureFlags = input.featureFlags;
     this.scopes = input.scopes;
+    this.selfHosted = input.selfHosted;
+    this.entitlements = input.entitlements;
     this.spend = input.spend;
     this.metrics = input.metrics;
     this.log = input.log;
     this.now = input.now;
     this.#organizations = ProjectLookupCacheService.create<string>({
+      ttlMs: ORGANIZATION_TTL_MS,
+      now: input.now,
+    });
+    this.#licences = ProjectLookupCacheService.create<boolean>({
       ttlMs: ORGANIZATION_TTL_MS,
       now: input.now,
     });
@@ -138,15 +160,26 @@ export class PiiRedactionModelService {
     if (input.resolvedPiiLevel !== "strict") return null;
     const projectId = input.projectId;
     if (!projectId) return null;
-    const organizationId = await this.#routedOrganizationOf({ projectId });
-    if (!organizationId) return null;
+    const routing = await this.#routingOf({ projectId });
+    if (routing.kind === "presidio") return null;
 
     const call = {
-      organizationId,
+      organizationId: routing.organizationId,
       projectId,
       texts: input.texts.length,
       characters: batchCharactersOf(input.texts),
     };
+    if (routing.kind === "not_licensed") {
+      this.metrics.modelFellBack("not_licensed");
+      if (routing.firstInAMinute) {
+        this.log.info(
+          { ...call, spansFound: 0, outcome: "not_licensed", durationMs: 0 },
+          USAGE_MESSAGE,
+        );
+      }
+      return null;
+    }
+    const { organizationId } = routing;
     if (isBatchTooLongForModel(input.texts)) {
       this.metrics.modelFellBack("too_long");
       this.log.info({ ...call, spansFound: 0, outcome: "too_long", durationMs: 0 }, USAGE_MESSAGE);
@@ -219,12 +252,12 @@ export class PiiRedactionModelService {
   }
 
   /**
-   * The project's organization when its batches go to the model, else null. Configured first,
-   * so a deployment naming no model never asks the flag or the database.
+   * Where the project's batches go. Configured first, so a deployment naming no model never asks
+   * the flag or the database; the licence last, so Cloud and an off flag never read the plan.
    */
-  async #routedOrganizationOf({ projectId }: { projectId: string }): Promise<string | null> {
+  async #routingOf({ projectId }: { projectId: string }): Promise<Routing> {
     try {
-      if (!(await this.model.isConfigured())) return null;
+      if (!(await this.model.isConfigured())) return { kind: "presidio" };
 
       const organizationId = await this.#organizationOf({ projectId });
       const routed = await this.featureFlags.isEnabled(PII_REDACTION_MODEL_FLAG, {
@@ -232,15 +265,36 @@ export class PiiRedactionModelService {
         projectId,
         organizationId,
       });
-      return routed ? organizationId : null;
+      if (!routed) return { kind: "presidio" };
+      if (!this.selfHosted) return { kind: "model", organizationId };
+
+      const { licensed, firstInAMinute } = await this.#licenceOf({ organizationId });
+      return licensed
+        ? { kind: "model", organizationId }
+        : { kind: "not_licensed", organizationId, firstInAMinute };
     } catch (error) {
       this.metrics.modelFellBack("routing_error");
       logger.warn(
         { projectId, reason: failureName(error) },
         "PII redaction model routing could not be decided; using Presidio",
       );
-      return null;
+      return { kind: "presidio" };
     }
+  }
+
+  /** Whether the organization holds an Enterprise licence, and whether this read asked for it. */
+  async #licenceOf({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ licensed: boolean; firstInAMinute: boolean }> {
+    let firstInAMinute = false;
+    const licensed = await this.#licences.get(organizationId, async () => {
+      firstInAMinute = true;
+      const plan = await this.entitlements.getActivePlan({ organizationId });
+      return isEnterpriseTier(plan.type);
+    });
+    return { licensed, firstInAMinute };
   }
 
   #organizationOf({ projectId }: { projectId: string }): Promise<string> {

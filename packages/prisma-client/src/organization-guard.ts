@@ -188,6 +188,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   OrganizationAccessNotice: {},
   OrganizationSeatLease: {},
+  // One row per retention scope; read by organizationId, written by row id.
+  RetentionApplyStatus: {},
   // "Which personal teams does this person own" is a READ bounded by the named owner: a personal
   // team has exactly one. Any other Team query, and every write, still names its organization.
   Team: {
@@ -266,6 +268,13 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   AgentRegistryEntry: {},
   AgentRegistryEvent: {},
   AgentRegistryBaseline: {},
+  // The kill switch: stop plans, AWS connections and stops, each read and written per organization.
+  AgentStopPlanTarget: {},
+  AgentStopPlan: {},
+  GovernanceAwsConnection: {},
+  AgentStop: {},
+  AgentStopClaim: {},
+  AgentStopTargetPriorState: {},
   IdentityMatch: {},
   // Candidate matches the suggestion job computed (ADR-128 §12). The job
   // rewrites one organization's rows per pass and the review surface reads one

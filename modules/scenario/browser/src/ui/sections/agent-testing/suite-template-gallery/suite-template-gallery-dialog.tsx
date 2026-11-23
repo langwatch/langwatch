@@ -51,6 +51,7 @@ function BrowseStep({
       onClose={props.onClose}
       title="New suite from a template"
       size="lg"
+      bodyScroll="content"
       error={
         props.loadFailed ? { title: TEMPLATES_LOAD_FAILED, onRetry: props.onRetry } : undefined
       }
@@ -66,6 +67,7 @@ function BrowseStep({
         <ContentTabs
           label="Template kind"
           density="compact"
+          scroll="panel"
           value={wizard.tab}
           onValueChange={({ value }) => wizard.setTab(value)}
           items={tabItems}

@@ -282,6 +282,8 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "tools/docsdeploy",
   "tools/chartheap",
   "tools/charts3region",
+  // The PII model image a release copies (specs/ci/pii-redaction-model-release.feature).
+  "tools/newestimage",
   // How the package-suites weights are measured from main's job logs
   // (specs/ci/package-suites-weights.feature).
   "tools/suiteweights",
@@ -367,6 +369,9 @@ const LEGACY_INERT: string[] = [
   "modules/authz/specs/access-reviews.feature",
   "modules/authz/specs/agent-principals.feature",
   "modules/authz/specs/authz-passports.feature",
+  // PR 9698's organization-wide Dashboards area (ADR-002, amended): specs land first, every
+  // scenario @unimplemented. Remove this entry with the file's first binding.
+  "modules/dashboard/specs/dashboards-organization-area.feature",
   // 2026-09-06 core-logic audit: these five ship ahead of the tests that
   // would bind them (packages/architecture-enforcer's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its
@@ -515,7 +520,6 @@ const LEGACY_INERT: string[] = [
   "specs/features/trigger-cli.feature",
   "specs/features/workflow-cli.feature",
   "specs/home/onboarding-progress-ui.feature",
-  "specs/home/voice-agents-home-banner.feature",
   // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
   // specs ship ahead of the code, and the PR that builds each surface binds its
   // file as it lands. Remove each entry with its first binding.
@@ -552,7 +556,6 @@ const LEGACY_INERT: string[] = [
   "specs/model-config/anthropic-empty-content.feature",
   "specs/model-config/litellm-reasoning-params.feature",
   "specs/model-config/model-parameter-display.feature",
-  "specs/model-config/model-selector-ux.feature",
   "specs/model-config/unified-reasoning-ui.feature",
   "specs/model-providers/custom-model-max-tokens.feature",
   "specs/model-providers/default-provider.feature",

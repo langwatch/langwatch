@@ -152,6 +152,7 @@ describe("the tasks process installation", () => {
         "tiered-free-to-seat-event",
         "stripe-prices-sync",
         "retention-storage-report",
+        "retention-drift-check",
         "dataset-storage-audit",
         "demo-data",
         "trace-destination-report",

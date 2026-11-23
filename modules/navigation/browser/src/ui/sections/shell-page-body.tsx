@@ -7,6 +7,7 @@ import { PageHeaderSizeProvider } from "@langwatch/design-system/page-layout";
 import { Box, type StackProps, VStack } from "@langwatch/design-system/primitives";
 import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
 import type { NavigationTeam } from "@langwatch/navigation-contract";
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 import { useEffect, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
@@ -16,6 +17,7 @@ import { useNavigationHost } from "../../model/navigation-host.ts";
 import { planManagementHref } from "../../model/plan-management-href.ts";
 import { isPathUnder } from "../../model/products.ts";
 import { isResolverAddress } from "../../model/resolve-shell-route.ts";
+import { SETTINGS_MEASURE, settingsColumnCss } from "../../model/settings-column.ts";
 import { cloudAdminGroup, instanceGroup } from "../../model/settings-menu.ts";
 import { AdminViewingAsBanner } from "../blocks/admin-viewing-as-banner.tsx";
 import { SeatLimitBanner } from "../blocks/seat-limit-banner.tsx";
@@ -72,7 +74,7 @@ function readerMayOpenThePage({
   if (isResolverAddress(pathname)) return true;
   // Personal-scope addresses are the reader's by construction, even when
   // membership of the ambient team cannot be confirmed: without this a member
-  // on /me/* hits the refusal and the page never renders.
+  // on /coding-agents/* hits the refusal and the page never renders.
   if (isPersonalScopeRoute || isDemoProject) return true;
   // Administrators created through a role binding alone have no membership row
   // and still have full team access.
@@ -86,10 +88,6 @@ const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items
 
 /** Every page's header and body share this one edge; the design system reads it. */
 const PAGE_INSET = "var(--chakra-spacing-6)";
-/** Settings-style page bodies read in one column this wide, on the header's left edge. */
-const SETTINGS_MEASURE = "1248px";
-/** The space between a page's header rule and its body: `PageLayout.Container`'s top padding. */
-const PAGE_GAP = "var(--chakra-spacing-6)";
 
 /**
  * One plan banner at a time (specs/billing/over-plan-trace-withholding.feature): a failed
@@ -129,19 +127,7 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
       overflowY="auto"
       // Clears the floating assistant launcher, so the last action (Save) is never under it.
       paddingBottom={28}
-      // The header spans the full width like every page; the body below it reads in one
-      // column that starts on the title's edge, so header and body share one axis. The
-      // assistant's floating launcher is a fixed button, so it is skipped.
-      css={{
-        "& [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)": {
-          width: `min(${SETTINGS_MEASURE}, calc(100% - 2 * var(--page-inset)))`,
-          marginInlineStart: "var(--page-inset)",
-          marginInlineEnd: "auto",
-        },
-        "& [data-page-container]": { paddingInline: 0 },
-        // A body that is not a `PageLayout.Container` gets the gap the container draws itself.
-        "& [data-page-header] + :not(button, [data-page-container])": { marginTop: PAGE_GAP },
-      }}
+      css={settingsColumnCss()}
     >
       {children}
     </Box>
@@ -186,7 +172,7 @@ export const ShellPageBody = ({
       ? { label: team.name }
       : null;
   const isPersonalScopeRoute =
-    personalScope || pathname.startsWith("/me") || isOnOwnPersonalProject;
+    personalScope || isPathUnder({ pathname, base: CODING_AGENTS_PATH }) || isOnOwnPersonalProject;
 
   // Audit emission for cross-scope reads. Fires once per project the
   // administrator drills into. Fail-quiet: a refused emission must not stop

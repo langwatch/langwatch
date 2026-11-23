@@ -55,6 +55,11 @@ export interface InstantEvalRunPeers extends InstantEvalRequestStatementPeers {
   isReleased(input: { projectId: string }): Promise<boolean>;
   /** Whether this deployment provisioned a LangWatchQL identity at all. */
   isQueryIdentityAvailable(): boolean;
+  /**
+   * Whether the project's tenant is mapped for the restricted identity, mapping it first when
+   * not. False means a statement would read zero rows, so the run is refused instead.
+   */
+  ensureQueryTenant(input: { projectId: string }): Promise<boolean>;
   /** The restricted tenant identity and protections this asker runs as. */
   resolveCaller(input: {
     projectId: string;
@@ -297,14 +302,16 @@ export class InstantEvalRunService {
   }): Promise<LangWatchQLRunCaller> {
     await this.#assertEnabled(projectId);
     const resolved = await this.peers.resolveCaller({ projectId, actor });
+    const project = getInstantEvalQueryCapability({
+      project: { id: resolved.project.id, lwqlKey: resolved.project.lwqlKey || null },
+      hasDeploymentIdentity: this.peers.isQueryIdentityAvailable(),
+    });
+    // An unmapped tenant reads zero rows with no error, so it is refused, never run empty.
+    if (!(await this.peers.ensureQueryTenant({ projectId: project.id }))) {
+      throw new InstantEvalNotEnabledError();
+    }
 
-    return {
-      project: getInstantEvalQueryCapability({
-        project: { id: resolved.project.id, lwqlKey: resolved.project.lwqlKey || null },
-        hasDeploymentIdentity: this.peers.isQueryIdentityAvailable(),
-      }),
-      protections: resolved.protections,
-    };
+    return { project, protections: resolved.protections };
   }
 
   /** Released but refused means the deployment has no judge, which the operator fixes. */

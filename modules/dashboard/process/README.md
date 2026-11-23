@@ -920,7 +920,7 @@ Permission `analytics:view`. Declared at `src/transport/graph.rest.ts:40`.
 Answers at `/api/graphs`, `/api/v1/graphs`; also, undocumented, `/api/graphs/2026-08-07`, `/api/v1/graphs/2026-08-07`, `/api/graphs/latest`, `/api/v1/graphs/latest`.
 
 ```typescript
-// Query: graphRestListQuerySchema, ../contract/src/graph.ts:83
+// Query: graphRestListQuerySchema, ../contract/src/graph.ts:85
 interface Query {
   dashboardId?: string;
 }
@@ -936,7 +936,7 @@ Permission `analytics:view`. Declared at `src/transport/graph.rest.ts:58`.
 Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/graphs/2026-08-07/:id`, `/api/v1/graphs/2026-08-07/:id`, `/api/graphs/latest/:id`, `/api/v1/graphs/latest/:id`.
 
 ```typescript
-// Params: graphRestParamsSchema, ../contract/src/graph.ts:87
+// Params: graphRestParamsSchema, ../contract/src/graph.ts:89
 interface Params {
   id: string;
 }
@@ -952,7 +952,7 @@ Permission `analytics:create`. Declared at `src/transport/graph.rest.ts:70`.
 Answers at `/api/graphs`, `/api/v1/graphs`; also, undocumented, `/api/graphs/2026-08-07`, `/api/v1/graphs/2026-08-07`, `/api/graphs/latest`, `/api/v1/graphs/latest`.
 
 ```typescript
-// Body: graphRestCreateSchema, ../contract/src/graph.ts:100
+// Body: graphRestCreateSchema, ../contract/src/graph.ts:101
 interface Body {
   name: string;
   graph: Record<string, unknown>;
@@ -975,8 +975,8 @@ Permission `analytics:update`. Declared at `src/transport/graph.rest.ts:97`.
 Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/graphs/2026-08-07/:id`, `/api/v1/graphs/2026-08-07/:id`, `/api/graphs/latest/:id`, `/api/v1/graphs/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof graphRestParamsSchema>; // ../contract/src/graph.ts:87
-// Body: graphRestUpdateSchema, ../contract/src/graph.ts:108
+type Params = z.infer<typeof graphRestParamsSchema>; // ../contract/src/graph.ts:89
+// Body: graphRestUpdateSchema, ../contract/src/graph.ts:109
 interface Body {
   name?: string;
   graph?: Record<string, unknown>;
@@ -994,7 +994,7 @@ Permission `analytics:manage`. Declared at `src/transport/graph.rest.ts:122`.
 Answers at `/api/graphs/:id`, `/api/v1/graphs/:id`; also, undocumented, `/api/graphs/2026-08-07/:id`, `/api/v1/graphs/2026-08-07/:id`, `/api/graphs/latest/:id`, `/api/v1/graphs/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof graphRestParamsSchema>; // ../contract/src/graph.ts:87
+type Params = z.infer<typeof graphRestParamsSchema>; // ../contract/src/graph.ts:89
 // Response: graphDeletedResponseSchema, ../contract/src/dashboard.responses.ts:159
 interface Response {
   id: string;
@@ -1279,7 +1279,7 @@ type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src
 
 ### `dashboardWidgets`
 
-Contract `../contract/src/dashboard-widget.trpc.ts:81`, router `src/transport/dashboard-widget.trpc.ts:34`.
+Contract `../contract/src/dashboard-widget.trpc.ts:77`, router `src/transport/dashboard-widget.trpc.ts:34`.
 
 | Procedure                             | Kind     | Gate                          | Input  | Output                             |
 | ------------------------------------- | -------- | ----------------------------- | ------ | ---------------------------------- |
@@ -1293,26 +1293,26 @@ Contract `../contract/src/dashboard-widget.trpc.ts:81`, router `src/transport/da
 
 ```typescript
 // dashboardWidgets.list
-// Input: inline, ../contract/src/dashboard-widget.trpc.ts:87
+// Input: inline, ../contract/src/dashboard-widget.trpc.ts:83
 interface Input {
   projectId: string;
   dashboardId?: string;
 }
-// Output: dashboardWidgetTrpcRowSchema.array() (inline, ../contract/src/dashboard-widget.trpc.ts:88)
+// Output: dashboardWidgetTrpcRowSchema.array() (inline, ../contract/src/dashboard-widget.trpc.ts:84)
 
 // dashboardWidgets.create
-// Input: z.object({ ...projectScopeSchema.shape, dashboardId: z.string().optional(), name: dashboa… (inline, ../contract/src/dashboard-widget.trpc.ts:92)
-type Output = z.infer<typeof dashboardWidgetTrpcSchema>; // ../contract/src/dashboard-widget.trpc.ts:56
+// Input: z.object({ ...projectScopeSchema.shape, dashboardId: z.string().optional(), name: dashboa… (inline, ../contract/src/dashboard-widget.trpc.ts:88)
+type Output = z.infer<typeof dashboardWidgetTrpcSchema>; // ../contract/src/dashboard-widget.trpc.ts:52
 
 // dashboardWidgets.update
-// Input: z.object({ ...projectScopeSchema.shape, id: z.string(), name: dashboardWidgetNameSchema.o… (inline, ../contract/src/dashboard-widget.trpc.ts:107)
-// Output: dashboardWidgetTrpcSuccessSchema, ../contract/src/dashboard-widget.trpc.ts:79
+// Input: z.object({ ...projectScopeSchema.shape, id: z.string(), name: dashboardWidgetNameSchema.o… (inline, ../contract/src/dashboard-widget.trpc.ts:103)
+// Output: dashboardWidgetTrpcSuccessSchema, ../contract/src/dashboard-widget.trpc.ts:75
 interface Output {
   success: true;
 }
 
 // dashboardWidgets.updateLayout
-// Input: inline, ../contract/src/dashboard-widget.trpc.ts:121
+// Input: inline, ../contract/src/dashboard-widget.trpc.ts:117
 interface Input {
   gridColumn: number;
   gridRow: number;
@@ -1321,10 +1321,10 @@ interface Input {
   projectId: string;
   graphId: string;
 }
-type Output = z.infer<typeof dashboardWidgetTrpcSuccessSchema>; // ../contract/src/dashboard-widget.trpc.ts:79
+type Output = z.infer<typeof dashboardWidgetTrpcSuccessSchema>; // ../contract/src/dashboard-widget.trpc.ts:75
 
 // dashboardWidgets.batchUpdateLayouts
-// Input: inline, ../contract/src/dashboard-widget.trpc.ts:133
+// Input: inline, ../contract/src/dashboard-widget.trpc.ts:129
 interface Input {
   projectId: string;
   layouts: {
@@ -1335,24 +1335,24 @@ interface Input {
     rowSpan: number;
   }[];
 }
-type Output = z.infer<typeof dashboardWidgetTrpcSuccessSchema>; // ../contract/src/dashboard-widget.trpc.ts:79
+type Output = z.infer<typeof dashboardWidgetTrpcSuccessSchema>; // ../contract/src/dashboard-widget.trpc.ts:75
 
 // dashboardWidgets.assignDashboard
-// Input: inline, ../contract/src/dashboard-widget.trpc.ts:141
+// Input: inline, ../contract/src/dashboard-widget.trpc.ts:137
 interface Input {
   projectId: string;
   id: string;
   dashboardId: string;
 }
-type Output = z.infer<typeof dashboardWidgetTrpcSuccessSchema>; // ../contract/src/dashboard-widget.trpc.ts:79
+type Output = z.infer<typeof dashboardWidgetTrpcSuccessSchema>; // ../contract/src/dashboard-widget.trpc.ts:75
 
 // dashboardWidgets.delete
-// Input: inline, ../contract/src/dashboard-widget.trpc.ts:145
+// Input: inline, ../contract/src/dashboard-widget.trpc.ts:141
 interface Input {
   projectId: string;
   id: string;
 }
-type Output = z.infer<typeof dashboardWidgetTrpcSuccessSchema>; // ../contract/src/dashboard-widget.trpc.ts:79
+type Output = z.infer<typeof dashboardWidgetTrpcSuccessSchema>; // ../contract/src/dashboard-widget.trpc.ts:75
 ```
 
 ### `dashboards`
@@ -1446,7 +1446,7 @@ interface Output {
 
 ### `graphs`
 
-Contract `../contract/src/graph.trpc.ts:180`, router `src/transport/graph.trpc.ts:31`.
+Contract `../contract/src/graph.trpc.ts:169`, router `src/transport/graph.trpc.ts:31`.
 
 | Procedure                   | Kind     | Gate                          | Input                                   | Output                      |
 | --------------------------- | -------- | ----------------------------- | --------------------------------------- | --------------------------- |
@@ -1460,7 +1460,7 @@ Contract `../contract/src/graph.trpc.ts:180`, router `src/transport/graph.trpc.t
 
 ```typescript
 // graphs.create
-// Input: graphApiCreateInputSchema, ../contract/src/graph.trpc.ts:49
+// Input: graphApiCreateInputSchema, ../contract/src/graph.trpc.ts:38
 interface Input {
   projectId: string;
   name: string;
@@ -1472,30 +1472,30 @@ interface Input {
   colSpan?: number;
   rowSpan?: number;
 }
-type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:122
+type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:111
 
 // graphs.getAll
-// Input: graphApiListInputSchema, ../contract/src/graph.trpc.ts:57
+// Input: graphApiListInputSchema, ../contract/src/graph.trpc.ts:46
 interface Input {
   projectId: string;
   dashboardId?: string;
 }
-// Output: graphListItemSchema.array() (inline, ../contract/src/graph.trpc.ts:191)
+// Output: graphListItemSchema.array() (inline, ../contract/src/graph.trpc.ts:180)
 
 // graphs.delete
-// Input: graphApiGraphInputSchema, ../contract/src/graph.trpc.ts:68
+// Input: graphApiGraphInputSchema, ../contract/src/graph.trpc.ts:57
 interface Input {
   projectId: string;
   id: string;
 }
-type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:122
+type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:111
 
 // graphs.getById
-type Input = z.infer<typeof graphApiGraphInputSchema>; // ../contract/src/graph.trpc.ts:68
-type Output = z.infer<typeof graphDetailSchema>; // ../contract/src/graph.trpc.ts:171
+type Input = z.infer<typeof graphApiGraphInputSchema>; // ../contract/src/graph.trpc.ts:57
+type Output = z.infer<typeof graphDetailSchema>; // ../contract/src/graph.trpc.ts:160
 
 // graphs.updateById
-// Input: graphApiUpdateInputSchema, ../contract/src/graph.trpc.ts:81
+// Input: graphApiUpdateInputSchema, ../contract/src/graph.trpc.ts:70
 interface Input {
   projectId: string;
   name: string;
@@ -1503,10 +1503,10 @@ interface Input {
   graphId: string;
   filterParams?: unknown;
 }
-type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:122
+type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:111
 
 // graphs.updateLayout
-// Input: graphApiUpdateLayoutInputSchema, ../contract/src/graph.trpc.ts:94
+// Input: graphApiUpdateLayoutInputSchema, ../contract/src/graph.trpc.ts:83
 interface Input {
   projectId: string;
   graphId: string;
@@ -1515,10 +1515,10 @@ interface Input {
   colSpan: number;
   rowSpan: number;
 }
-type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:122
+type Output = z.infer<typeof legacyGraphSchema>; // ../contract/src/graph.trpc.ts:111
 
 // graphs.batchUpdateLayouts
-// Input: graphApiBatchUpdateLayoutsInputSchema, ../contract/src/graph.trpc.ts:108
+// Input: graphApiBatchUpdateLayoutsInputSchema, ../contract/src/graph.trpc.ts:97
 interface Input {
   projectId: string;
   layouts: {
@@ -1529,7 +1529,7 @@ interface Input {
     rowSpan: number;
   }[];
 }
-// Output: graphLayoutsUpdatedSchema, ../contract/src/graph.trpc.ts:178
+// Output: graphLayoutsUpdatedSchema, ../contract/src/graph.trpc.ts:167
 interface Output {
   success: true;
 }
@@ -1616,7 +1616,7 @@ interface Input {
   projectId: string;
   id: string;
 }
-type Output = z.infer<typeof savedWorkbenchChartSchema>; // ../contract/src/saved-workbench-chart.ts:115
+type Output = z.infer<typeof savedWorkbenchChartSchema>; // ../contract/src/saved-workbench-chart.ts:108
 
 // analytics.savedWorkbenchCharts.create
 // Input: inline, ../contract/src/saved-workbench-chart.trpc.ts:43
@@ -1625,7 +1625,7 @@ interface Input {
   name: string;
   definition: unknown;
 }
-type Output = z.infer<typeof savedWorkbenchChartSchema>; // ../contract/src/saved-workbench-chart.ts:115
+type Output = z.infer<typeof savedWorkbenchChartSchema>; // ../contract/src/saved-workbench-chart.ts:108
 
 // analytics.savedWorkbenchCharts.update
 // Input: inline, ../contract/src/saved-workbench-chart.trpc.ts:53
@@ -1635,7 +1635,7 @@ interface Input {
   name?: string;
   definition?: unknown;
 }
-type Output = z.infer<typeof savedWorkbenchChartSchema>; // ../contract/src/saved-workbench-chart.ts:115
+type Output = z.infer<typeof savedWorkbenchChartSchema>; // ../contract/src/saved-workbench-chart.ts:108
 
 // analytics.savedWorkbenchCharts.run
 // Input: inline, ../contract/src/saved-workbench-chart.trpc.ts:68

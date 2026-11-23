@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -34,6 +35,10 @@ func TestResolve_ColdMiss_ConfigFetchFailure_FailsClosedAndCachesNothing(t *test
 	}
 	if !errors.Is(err, domain.ErrAuthUpstream) {
 		t.Fatalf("expected auth_upstream_unavailable (retryable), got %v", err)
+	}
+	var unavailable herr.E
+	if !errors.As(err, &unavailable) || !unavailable.Retryable {
+		t.Fatalf("auth_upstream_unavailable always tells the client to retry: %v", err)
 	}
 	if svc.l1.Len() != 0 {
 		t.Fatalf("a config-less bundle must not be cached; L1 holds %d entries", svc.l1.Len())
@@ -82,7 +87,7 @@ func TestResolve_StaleEntry_ConfigFetchFailure_ServesStaleCredentials(t *testing
 
 	rawKey := "vk-lw-stale"
 	h := hashKey(domain.PresentedKey{Token: rawKey})
-	svc.storeL1(h, bundleWithCreds("vk_stale", time.Now().Add(-30*time.Second), "cred-old"), "")
+	seedL1(svc, h, bundleWithCreds("vk_stale", time.Now().Add(-30*time.Second), "cred-old"), "")
 
 	bundle, err := svc.Resolve(context.Background(), domain.PresentedKey{Token: rawKey})
 	if err != nil {
@@ -144,7 +149,7 @@ func TestRefreshBackground_ConfigFetchFailure_KeepsExistingEntry(t *testing.T) {
 
 	rawKey := "vk-lw-bg"
 	h := hashKey(domain.PresentedKey{Token: rawKey})
-	svc.storeL1(h, bundleWithCreds("vk_bg", time.Now().Add(5*time.Minute), "cred-old"), "")
+	seedL1(svc, h, bundleWithCreds("vk_bg", time.Now().Add(5*time.Minute), "cred-old"), "")
 
 	refreshCurrent(svc, domain.PresentedKey{Token: rawKey}, h)
 
