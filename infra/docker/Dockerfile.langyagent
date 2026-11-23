@@ -188,7 +188,7 @@ COPY packages/redaction/src                           /src/packages/redaction/sr
 COPY services/langevals/ts-integration/evaluators.generated.ts /src/services/langevals/ts-integration/evaluators.generated.ts
 # copy-types.sh also embeds the repo-root feature-map.json (feature-map.generated.ts),
 # and generate-skills-bundle.mjs walks the whole skills/ tree (feature-skills.ts,
-# each published SKILL.mdx, recipes/, version.txt, and the committed _compiled/native
+# each published SKILL.mdx, recipes/, version.txt, and the committed _compiled/cli
 # renders). Bring both in at the ../../ paths those generators expect relative to
 # /src/sdks/typescript, or `pnpm run generate` dies with `Cannot find module
 # '../../feature-map.json'`.

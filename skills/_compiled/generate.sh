@@ -39,3 +39,8 @@ node skills/_compiler/native.ts
 # the two trees equal.
 echo "Syncing native skills into services/langyagent/internal/assets/skills/..."
 rsync -a --delete skills/_compiled/native/ services/langyagent/internal/assets/skills/
+
+# The CLI's `langwatch skills` bundle (sdks/typescript/scripts/generate-skills-bundle.mjs)
+# embeds this variant: the same render with the login steps Langy leaves out kept in.
+echo "Generating CLI bundle skills..."
+node skills/_compiler/native.ts --target cli

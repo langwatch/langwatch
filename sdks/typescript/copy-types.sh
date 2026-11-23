@@ -137,9 +137,9 @@ console.log('Wrote ' + out + ' (' + map.features.length + ' top-level features)'
 # Skills bundle — embed the published agent skills (the curated FEATURE_SKILLS
 # + auto-discovered recipes) so `langwatch skills list/get/install/…` needs no
 # runtime files and works identically in the tsup dist and the bun single
-# binary. Bodies are the COMMITTED skills/_compiled/native/<slug>/SKILL.md
-# renders (same inlineMdx output the public publisher ships — no
-# re-implementation to drift); metadata comes from the canonical sources.
+# binary. Bodies are the COMMITTED skills/_compiled/cli/<slug>/SKILL.md
+# renders (same inlineMdx output the public publisher ships, login steps kept —
+# no re-implementation to drift); metadata comes from the canonical sources.
 # Pure node, no workspace deps — see scripts/generate-skills-bundle.mjs.
 node scripts/generate-skills-bundle.mjs
 

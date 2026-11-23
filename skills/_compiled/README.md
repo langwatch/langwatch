@@ -25,6 +25,13 @@ Go manager's embed dir at image build, so **the checked-in content is exactly
 what the in-product assistant ships with**. `skills/_tests/native-skills.test.ts`
 fails when this tree drifts from the sources.
 
+## `cli/` — the CLI's `langwatch skills` bundle (committed)
+
+The same render for the published set, from `native.ts --target cli`, but it
+keeps the login partials Langy's render leaves out: a CLI user still has to log
+in. `sdks/typescript/scripts/generate-skills-bundle.mjs` embeds these bodies;
+`native-skills.test.ts` and the SDK's `skills-bundle.unit.test.ts` pin them.
+
 ## Regenerating
 
 After modifying any `SKILL.mdx` or `_shared/*.mdx` file:
@@ -33,7 +40,7 @@ After modifying any `SKILL.mdx` or `_shared/*.mdx` file:
 bash skills/_compiled/generate.sh
 ```
 
-Commit the resulting `native/` changes together with the source change.
+Commit the resulting `native/` and `cli/` changes together with the source change.
 
 ## Testing
 
