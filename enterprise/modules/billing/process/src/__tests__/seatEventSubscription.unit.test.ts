@@ -504,12 +504,14 @@ describe("seatEventSubscription", () => {
           organizationId: "org_1",
           newTotalSeats: 8,
         });
+        const previewed = stripeSubscriptions.previews[0]!.change;
+        // The confirmation carries the quote's instant, as the screen sends it.
         await service.updateSeatEventItems({
           organizationId: "org_1",
           totalMembers: 8,
+          quotedAt: previewed.prorationDate!,
         });
 
-        const previewed = stripeSubscriptions.previews[0]!.change;
         const applied = stripeSubscriptions.updates[0]!.change;
 
         expect(previewed).toEqual(applied);
