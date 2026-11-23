@@ -102,7 +102,9 @@ def sync_detailed(
     """Get budget
 
      Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at
-    the organization for a key that names no project.
+    the organization for a key that names no project. A budget scoped to one member (principal), or to a
+    member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the
+    key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):
@@ -141,7 +143,9 @@ def sync(
     """Get budget
 
      Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at
-    the organization for a key that names no project.
+    the organization for a key that names no project. A budget scoped to one member (principal), or to a
+    member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the
+    key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):
@@ -174,7 +178,9 @@ async def asyncio_detailed(
     """Get budget
 
      Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at
-    the organization for a key that names no project.
+    the organization for a key that names no project. A budget scoped to one member (principal), or to a
+    member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the
+    key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):
@@ -211,7 +217,9 @@ async def asyncio(
     """Get budget
 
      Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at
-    the organization for a key that names no project.
+    the organization for a key that names no project. A budget scoped to one member (principal), or to a
+    member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the
+    key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):

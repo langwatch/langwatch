@@ -122,7 +122,9 @@ def sync_detailed(
     """Reset budget period
 
      Moves the budget's period boundary to now; recorded spend is never mutated. Requires
-    gatewayBudgets:update at the organization.
+    gatewayBudgets:update at the organization. A budget scoped to one member (principal), or to a
+    member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the
+    key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):
@@ -167,7 +169,9 @@ def sync(
     """Reset budget period
 
      Moves the budget's period boundary to now; recorded spend is never mutated. Requires
-    gatewayBudgets:update at the organization.
+    gatewayBudgets:update at the organization. A budget scoped to one member (principal), or to a
+    member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the
+    key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):
@@ -206,7 +210,9 @@ async def asyncio_detailed(
     """Reset budget period
 
      Moves the budget's period boundary to now; recorded spend is never mutated. Requires
-    gatewayBudgets:update at the organization.
+    gatewayBudgets:update at the organization. A budget scoped to one member (principal), or to a
+    member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the
+    key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):
@@ -249,7 +255,9 @@ async def asyncio(
     """Reset budget period
 
      Moves the budget's period boundary to now; recorded spend is never mutated. Requires
-    gatewayBudgets:update at the organization.
+    gatewayBudgets:update at the organization. A budget scoped to one member (principal), or to a
+    member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the
+    key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):

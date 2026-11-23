@@ -65606,7 +65606,7 @@
             }
           }
         },
-        "description": "Creates an organization-owned budget across all seven scope types. Spend is counted from the moment the budget is created, so spend earlier in the current window is not included. Requires gatewayBudgets:create at the organization; a project key or an organization key may call it.",
+        "description": "Creates an organization-owned budget across all seven scope types. Spend is counted from the moment the budget is created, so spend earlier in the current window is not included. Requires gatewayBudgets:create at the organization; a project key or an organization key may call it. A principal scope naming another member, or a virtual_key scope naming a personal key that is not the caller's, also requires virtualKeys:viewOtherPersonal at the organization; without it the key answers virtual_key_not_found and the member gateway_scope_org_mismatch, as for one that does not exist.",
         "summary": "Create budget",
         "parameters": [
           {
@@ -66398,7 +66398,7 @@
             }
           }
         },
-        "description": "Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at the organization for a key that names no project.",
+        "description": "Takes a project key or an organization key; requires gatewayBudgets:view at the key's project, or at the organization for a key that names no project. A budget scoped to one member (principal), or to a member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.",
         "summary": "Get budget",
         "security": [
           {
@@ -66963,7 +66963,7 @@
             }
           }
         },
-        "description": "Partial update. Scope, window and cycle_anchor_at are immutable after create. Answers with the budget's live spend, the same figure `GET /budgets` reports. Requires gatewayBudgets:update at the organization.",
+        "description": "Partial update. Scope, window and cycle_anchor_at are immutable after create. Answers with the budget's live spend, the same figure `GET /budgets` reports. Requires gatewayBudgets:update at the organization. A budget scoped to one member (principal), or to a member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.",
         "summary": "Update budget",
         "requestBody": {
           "required": false,
@@ -67600,7 +67600,7 @@
             }
           }
         },
-        "description": "Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires gatewayBudgets:delete at the organization.",
+        "description": "Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires gatewayBudgets:delete at the organization. A budget scoped to one member (principal), or to a member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.",
         "summary": "Archive budget",
         "security": [
           {
@@ -68167,7 +68167,7 @@
             }
           }
         },
-        "description": "Moves the budget's period boundary to now; recorded spend is never mutated. Requires gatewayBudgets:update at the organization.",
+        "description": "Moves the budget's period boundary to now; recorded spend is never mutated. Requires gatewayBudgets:update at the organization. A budget scoped to one member (principal), or to a member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.",
         "summary": "Reset budget period",
         "requestBody": {
           "required": false,

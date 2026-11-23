@@ -114,7 +114,9 @@ def sync_detailed(
 
      Partial update. Scope, window and cycle_anchor_at are immutable after create. Answers with the
     budget's live spend, the same figure `GET /budgets` reports. Requires gatewayBudgets:update at the
-    organization.
+    organization. A budget scoped to one member (principal), or to a member's personal virtual key,
+    answers budget_not_found, as for one that does not exist, unless the key acts for that member or
+    holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):
@@ -157,7 +159,9 @@ def sync(
 
      Partial update. Scope, window and cycle_anchor_at are immutable after create. Answers with the
     budget's live spend, the same figure `GET /budgets` reports. Requires gatewayBudgets:update at the
-    organization.
+    organization. A budget scoped to one member (principal), or to a member's personal virtual key,
+    answers budget_not_found, as for one that does not exist, unless the key acts for that member or
+    holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):
@@ -194,7 +198,9 @@ async def asyncio_detailed(
 
      Partial update. Scope, window and cycle_anchor_at are immutable after create. Answers with the
     budget's live spend, the same figure `GET /budgets` reports. Requires gatewayBudgets:update at the
-    organization.
+    organization. A budget scoped to one member (principal), or to a member's personal virtual key,
+    answers budget_not_found, as for one that does not exist, unless the key acts for that member or
+    holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):
@@ -235,7 +241,9 @@ async def asyncio(
 
      Partial update. Scope, window and cycle_anchor_at are immutable after create. Answers with the
     budget's live spend, the same figure `GET /budgets` reports. Requires gatewayBudgets:update at the
-    organization.
+    organization. A budget scoped to one member (principal), or to a member's personal virtual key,
+    answers budget_not_found, as for one that does not exist, unless the key acts for that member or
+    holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):

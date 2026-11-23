@@ -102,7 +102,9 @@ def sync_detailed(
     """Archive budget
 
      Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires
-    gatewayBudgets:delete at the organization.
+    gatewayBudgets:delete at the organization. A budget scoped to one member (principal), or to a
+    member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the
+    key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):
@@ -141,7 +143,9 @@ def sync(
     """Archive budget
 
      Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires
-    gatewayBudgets:delete at the organization.
+    gatewayBudgets:delete at the organization. A budget scoped to one member (principal), or to a
+    member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the
+    key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):
@@ -174,7 +178,9 @@ async def asyncio_detailed(
     """Archive budget
 
      Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires
-    gatewayBudgets:delete at the organization.
+    gatewayBudgets:delete at the organization. A budget scoped to one member (principal), or to a
+    member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the
+    key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):
@@ -211,7 +217,9 @@ async def asyncio(
     """Archive budget
 
      Soft-delete: the row is marked archived and no longer counted by the budget engine. Requires
-    gatewayBudgets:delete at the organization.
+    gatewayBudgets:delete at the organization. A budget scoped to one member (principal), or to a
+    member's personal virtual key, answers budget_not_found, as for one that does not exist, unless the
+    key acts for that member or holds virtualKeys:viewOtherPersonal at the organization.
 
     Args:
         id (str):
