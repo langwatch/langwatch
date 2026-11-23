@@ -22,7 +22,7 @@ Weekly digest emails: folds the week's usage, picks a template per person and se
 | Postgres table  | `DigestSubscription`            | `process/src/repositories/prisma/prisma.digest-audience.repository.ts:12`     |
 | Postgres table  | `DigestSettings`                | `process/src/repositories/prisma/prisma.digest-audience.repository.ts:12`     |
 | Postgres table  | `DigestProjectWeek`             | `process/src/repositories/prisma/prisma.digest-project-week.repository.ts:24` |
-| Postgres table  | `DigestSend`                    | `process/src/repositories/prisma/prisma.digest-send.repository.ts:19`         |
+| Postgres table  | `DigestSend`                    | `process/src/repositories/prisma/prisma.digest-send.repository.ts:16`         |
 | Postgres table  | `DigestUserWeek`                | `process/src/repositories/prisma/prisma.digest-user-week.repository.ts:24`    |
 | Stores required |                                 | `process/src/channels/http/http.digest.channels.ts:10`                        |
 | Stores required | prisma, redis                   | `process/src/repositories/live/live.digest.repositories.ts:11`                |

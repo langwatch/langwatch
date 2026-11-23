@@ -168,13 +168,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `digest_send` (aggregate `digest_send`)
 
-Declared at `src/eventing/digest-send.pipeline.ts:51`. Events: `DigestSendRequestedEventSchema`.
+Declared at `src/eventing/digest-send.pipeline.ts:56`. Events: `DigestSendRequestedEventSchema`.
 
 | Kind            | Name               | Handles                                                                             | Declared at                               |
 | --------------- | ------------------ | ----------------------------------------------------------------------------------- | ----------------------------------------- |
-| command         | `requestSend`      | –                                                                                   | `src/eventing/digest-send.pipeline.ts:56` |
-| process manager | `digestWeeklyPlan` | every 1 h (`DIGEST_PLAN_INTERVAL_MS = 60 * 60 * 1000`); intents `planWeek` (outbox) | `src/eventing/digest-send.pipeline.ts:57` |
-| process manager | `digestMemberSend` | intents `sendDigest` (outbox)                                                       | `src/eventing/digest-send.pipeline.ts:66` |
+| command         | `requestSend`      | –                                                                                   | `src/eventing/digest-send.pipeline.ts:61` |
+| process manager | `digestWeeklyPlan` | every 1 h (`DIGEST_PLAN_INTERVAL_MS = 60 * 60 * 1000`); intents `planWeek` (outbox) | `src/eventing/digest-send.pipeline.ts:62` |
+| process manager | `digestMemberSend` | intents `sendDigest` (outbox)                                                       | `src/eventing/digest-send.pipeline.ts:74` |
 
 ### Pipeline `digest` (aggregate `digest_week`)
 
