@@ -187,6 +187,7 @@ Feature: The organization picks its PII redaction level on the Data Privacy page
     And it is never read on LangWatch Cloud
     And an Enterprise plan reads as the license, any other plan as none
     And a read in flight is loading, and a refused or failed read is unknown
+    And a failed refresh is unknown, even while an earlier answer is still cached
 
   @unit
   Scenario: The Strict offer on a self-hosted deployment follows the license and the model flag

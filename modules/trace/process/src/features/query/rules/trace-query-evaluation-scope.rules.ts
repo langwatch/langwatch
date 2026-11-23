@@ -131,15 +131,20 @@ function fieldNameOf(tag: TagToken): string {
   return tag.field.type === "ImplicitField" ? "" : tag.field.name;
 }
 
-/** The bound group as `evaluation_runs` subqueries over X's latest rows. */
+/**
+ * The bound group as `evaluation_runs` subqueries over X's latest rows. Negated, its complement:
+ * NOT IN the kept runs, or IN a run an excluded condition names; never a NOT the guard refuses.
+ */
 export function translateEvaluationScope({
   scope,
   ctx,
   fields,
+  negated = false,
 }: {
   scope: EvaluationScope;
   ctx: TranslationContext;
   fields: TraceQueryFieldsService;
+  negated?: boolean;
 }): string {
   const evaluatorId = extractStringValue(scope.anchor);
   validateValueLength(evaluatorId);
@@ -159,13 +164,12 @@ export function translateEvaluationScope({
       .join(anyOf ? " OR " : " AND ");
     return conditions.length > 1 ? `(${joined})` : joined;
   });
-  const excluded = scope.conditions.filter((c) => c.negated);
-  return [
-    runsOfX(keptSql),
-    ...excluded.map((c) =>
-      wrapMembership(runsOfX([conditionSql({ condition: c, ctx, fields })]), true),
-    ),
-  ].join(" AND ");
+  const kept = runsOfX(keptSql);
+  const excluded = scope.conditions
+    .filter((c) => c.negated)
+    .map((c) => runsOfX([conditionSql({ condition: c, ctx, fields })]));
+  if (negated) return `(${[wrapMembership(kept, true), ...excluded].join(" OR ")})`;
+  return [kept, ...excluded.map((membership) => wrapMembership(membership, true))].join(" AND ");
 }
 
 /**

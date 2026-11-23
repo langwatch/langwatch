@@ -1649,11 +1649,13 @@ describe("TerminalView in a Claude Code Code Mode session", () => {
     });
   });
 
-  describe("when no script was recorded", () => {
-    /** @scenario "A Code call with no script recorded says so" */
-    it("says the script was not recorded and keeps the poll as one wait line", () => {
+  describe("when the session was exported without content", () => {
+    /** @scenario "A session exported without content says so once" */
+    it("says once that the agent sends metadata only and keeps each Code row bare", () => {
       const { container } = renderCodeMode([
+        { kind: "user_prompt", atMs: 500, text: null, chars: 0 },
         toolEntry({ name: "REPL", output: outcomeSummary, durationMs: 8, spanId: "repl-span" }),
+        toolEntry({ atMs: 1_500, name: "REPL", output: outcomeSummary, spanId: "repl-span-2" }),
         toolEntry({
           atMs: 2_000,
           name: "Poll",
@@ -1664,10 +1666,27 @@ describe("TerminalView in a Claude Code Code Mode session", () => {
         }),
       ]);
 
-      expect(container.textContent).toContain("Code · script not recorded");
+      const reason =
+        "This agent sends metadata only, so its prompts, scripts and output are not recorded";
+      expect(screen.getAllByText(reason)).toHaveLength(1);
+      expect(container.textContent).not.toContain("script not recorded");
+      expect(screen.getAllByText("Code")).toHaveLength(2);
       expect(screen.queryByRole("button", { name: /Code/ })).not.toBeInTheDocument();
       expect(screen.getByText("Waited for the script · 3ms")).toBeInTheDocument();
       expect(container.textContent).not.toContain('"status"');
+    });
+  });
+
+  describe("when one script of a recorded session was not recorded", () => {
+    /** @scenario "A Code call with no script recorded says so" */
+    it("says on that row that the script was not recorded", () => {
+      const { container } = renderCodeMode([
+        { kind: "user_prompt", atMs: 500, text: "tidy the notes", chars: 14 },
+        toolEntry({ name: "REPL", output: outcomeSummary, durationMs: 8, spanId: "repl-span" }),
+      ]);
+
+      expect(container.textContent).toContain("Code · script not recorded");
+      expect(container.textContent).not.toContain("sends metadata only");
     });
   });
 
