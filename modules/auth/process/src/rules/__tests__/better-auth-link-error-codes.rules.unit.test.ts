@@ -13,38 +13,40 @@ import { describe, expect, it } from "vitest";
 
 const DIFFERENT_EMAIL = "DIFFERENT_EMAIL_NOT_ALLOWED";
 const NOT_LINKED = "OAuthAccountNotLinked";
+const NO_SCREEN = "no specific screen";
+type Screen = typeof DIFFERENT_EMAIL | typeof NOT_LINKED | typeof NO_SCREEN;
 
 /**
  * The codes of `OAUTH_CALLBACK_ERROR_CODES` and of `link-account.mjs`'s `result.error` strings,
  * and the screen code each must reach. Literal redirects (`state_not_found`, ...) are not read.
  */
-const CLASSIFIED: Record<string, string> = {
-  no_code: "no specific screen",
-  oauth_provider_not_found: "no specific screen",
-  issuer_missing: "no specific screen",
-  issuer_mismatch: "no specific screen",
-  invalid_code: "no specific screen",
-  nonce_binding_missing: "no specific screen",
-  unable_to_get_user_info: "no specific screen",
-  no_callback_url: "no specific screen",
-  unable_to_link_account: "no specific screen",
+const CLASSIFIED: Record<string, Screen> = {
+  no_code: NO_SCREEN,
+  oauth_provider_not_found: NO_SCREEN,
+  issuer_missing: NO_SCREEN,
+  issuer_mismatch: NO_SCREEN,
+  invalid_code: NO_SCREEN,
+  nonce_binding_missing: NO_SCREEN,
+  unable_to_get_user_info: NO_SCREEN,
+  no_callback_url: NO_SCREEN,
+  unable_to_link_account: NO_SCREEN,
   email_does_not_match: DIFFERENT_EMAIL,
   account_already_linked_to_different_user: NOT_LINKED,
-  email_not_found: "no specific screen",
-  email_not_verified: "no specific screen",
+  email_not_found: NO_SCREEN,
+  email_not_verified: NO_SCREEN,
   // The sign-in path's refusal for an existing account under another method; the callback
   // swaps the spaces of "account not linked" for underscores before it redirects.
   account_not_linked: NOT_LINKED,
   "account not linked": NOT_LINKED,
-  "unable to link account": "no specific screen",
-  "unable to update account": "no specific screen",
-  "unable to create user": "no specific screen",
-  "unable to create session": "no specific screen",
-  "signup disabled": "no specific screen",
-  unable_to_update_account: "no specific screen",
-  unable_to_create_user: "no specific screen",
-  unable_to_create_session: "no specific screen",
-  signup_disabled: "no specific screen",
+  "unable to link account": NO_SCREEN,
+  "unable to update account": NO_SCREEN,
+  "unable to create user": NO_SCREEN,
+  "unable to create session": NO_SCREEN,
+  "signup disabled": NO_SCREEN,
+  unable_to_update_account: NO_SCREEN,
+  unable_to_create_user: NO_SCREEN,
+  unable_to_create_session: NO_SCREEN,
+  signup_disabled: NO_SCREEN,
 };
 
 const libraryDir = path.dirname(createRequire(import.meta.url).resolve("better-auth/oauth2"));
@@ -83,7 +85,7 @@ describe("given the installed Better Auth", () => {
     });
 
     /** @scenario "Every link refusal the installed library redirects with has a specific screen code" */
-    it.each(Object.entries(CLASSIFIED).filter(([, screen]) => screen !== "no specific screen"))(
+    it.each(Object.entries(CLASSIFIED).filter(([, screen]) => screen !== NO_SCREEN))(
       "maps %s to the specific screen code %s, which is stable",
       (code, screen) => {
         expect(normalizeSignInErrorCode(code)).toBe(screen);
@@ -91,7 +93,7 @@ describe("given the installed Better Auth", () => {
       },
     );
 
-    it.each(Object.entries(CLASSIFIED).filter(([, screen]) => screen === "no specific screen"))(
+    it.each(Object.entries(CLASSIFIED).filter(([, screen]) => screen === NO_SCREEN))(
       "leaves %s as it is, for the generic error screen",
       (code) => {
         expect(normalizeSignInErrorCode(code)).toBe(code);

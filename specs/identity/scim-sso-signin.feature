@@ -58,8 +58,9 @@ Feature: First sign-in for a provisioned directory member
 
   @unit @regression
   Scenario: An upgrade that adds or renames a library code fails until the code is classified
-    Given a code the installed library redirects with that no classification names
-    Then the pinning test fails and names the code
+    Given the sign-in library redirects with a set of error codes
+    When an upgrade adds or renames one of them
+    Then the upgrade cannot merge until that code is classified
 
   @unit @regression
   Scenario: The SSO plugin's spaced account-link spelling still shows the account-link message
