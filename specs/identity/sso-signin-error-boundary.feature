@@ -137,3 +137,9 @@ Feature: What a failed single sign-on is allowed to say
     And the screen says their company sign-in refused it, not LangWatch
     And it tells them their IT team can assign them the LangWatch app, or to try again if they cancelled
     # What the refusal names and when it becomes a seat limit: specs/identity/idp-refused-sign-in.feature
+
+  @unit @regression
+  Scenario: A sign-in that succeeds is not read as a failure
+    Given a person who is signed in, or whose provider account is already linked, signs in
+    When the callback redirects without an error code
+    Then no error code is read and the redirect passes through unchanged

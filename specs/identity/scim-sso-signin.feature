@@ -62,12 +62,6 @@ Feature: First sign-in for a provisioned directory member
     Then the pinning test fails and names the code
 
   @unit @regression
-  Scenario: A sign-in that succeeds is not read as a failure
-    Given a person who is signed in, or whose provider account is already linked, signs in
-    When the callback redirects without an error code
-    Then no error code is read and the redirect passes through unchanged
-
-  @unit @regression
   Scenario: The SSO plugin's spaced account-link spelling still shows the account-link message
     When the SSO plugin's OIDC callback reports "account not linked"
     Then the error is treated as OAuthAccountNotLinked
