@@ -56,7 +56,11 @@ describe("ClickHouseBillableEventsTtlRepository.findTtlMutations", () => {
     it("refuses a row that is not a mutation", async () => {
       const { repository } = repositoryOver([{ mutationId: "mutation_1" }]);
 
-      await expect(repository.findTtlMutations()).rejects.toThrow("isDone");
+      await expect(repository.findTtlMutations()).rejects.toMatchObject({
+        issues: expect.arrayContaining([
+          expect.objectContaining({ code: "invalid_type", path: [0, "isDone"] }),
+        ]),
+      });
     });
   });
 });
