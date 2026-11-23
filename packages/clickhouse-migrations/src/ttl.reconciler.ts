@@ -358,14 +358,14 @@ export function hasRetentionTTL(engineFull: string): boolean {
   return engineFull.includes("_retention_days");
 }
 
-export function buildFixedDeleteTTLExpression(config: TableTTLEntry): string | null {
+function buildFixedDeleteTTLExpression(config: TableTTLEntry): string | null {
   if (config.deleteAfterMonths === undefined) return null;
   const colExpr = config.ttlColumnExpression ?? `toDateTime(${config.ttlColumn})`;
   return `${colExpr} + INTERVAL ${config.deleteAfterMonths} MONTH DELETE`;
 }
 
 /** ClickHouse stores `INTERVAL n MONTH` as `toIntervalMonth(n)` and drops the implicit DELETE. */
-export function hasFixedDeleteTTL({
+function hasFixedDeleteTTL({
   config,
   engineFull,
 }: {
