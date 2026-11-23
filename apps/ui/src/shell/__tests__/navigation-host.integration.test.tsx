@@ -477,8 +477,23 @@ describe("the application chrome", () => {
       }
       const reload = vi.fn();
       // A plain object: jsdom's Location getters refuse a receiver made by Object.create.
-      const { href, origin, pathname, search, hash } = window.location;
-      const location = { href, origin, pathname, search, hash, reload } as unknown as Location;
+      const real = window.location;
+      const location: Location = {
+        ancestorOrigins: real.ancestorOrigins,
+        hash: real.hash,
+        host: real.host,
+        hostname: real.hostname,
+        href: real.href,
+        origin: real.origin,
+        pathname: real.pathname,
+        port: real.port,
+        protocol: real.protocol,
+        search: real.search,
+        assign: vi.fn(),
+        replace: vi.fn(),
+        reload,
+        toString: () => real.href,
+      };
       const spied = vi.spyOn(window, "location", "get").mockReturnValue(location);
       onTestFinished(() => spied.mockRestore());
 
