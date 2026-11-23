@@ -6,26 +6,22 @@
 
 import type { ModelRole } from "./model-feature-registry.ts";
 
-/**
- * The hosted default, the decision model alone. Same id as `INSTANT_EVAL_JUDGE_MODEL_ID`; a
- * contract never imports another module's contract.
- */
+/** The hosted default's current id, the decision model alone; writes store the written id. */
 export const LANGWATCH_DECISION_MODEL_ID = "langwatch/instant-preview";
 
 /** The hosted judge router (ADR-190): an LLM judge picks it where the router flag is on. */
 export const LANGWATCH_EVALS_MODEL_ID = "langwatch/evals-preview";
 
-/** The hosted model's id before the -preview names; where the router flag is on it stays routed. */
-const LEGACY_INSTANT_EVALS_MODEL_ID = "langwatch/instant-evals";
-
 /**
- * Earlier public ids, still accepted wherever a stored or sent id is read: evaluator settings,
- * project default models, API calls. Pickers never list them.
+ * The id every LangWatch hosted pick is written as, in Default models and judge settings: the one
+ * the previous release reads (expand then contract, ADR-182 amendment 2026-11-23). Where the
+ * router flag is on, a judge on it is routed. Writing the -preview ids is a planned follow-up.
  */
+export const LANGWATCH_WRITTEN_MODEL_ID = "langwatch/instant-evals";
+
+/** The earlier public id, read wherever a stored or sent id is read. Pickers never list it. */
 export const LEGACY_LANGWATCH_MODEL_IDS: Readonly<Record<string, string>> = {
-  [LEGACY_INSTANT_EVALS_MODEL_ID]: LANGWATCH_DECISION_MODEL_ID,
-  "langwatch/search-preview": LANGWATCH_DECISION_MODEL_ID,
-  "langwatch/scenario-judge-preview": "langwatch/judge-preview",
+  [LANGWATCH_WRITTEN_MODEL_ID]: LANGWATCH_DECISION_MODEL_ID,
 };
 
 /** The current id of a model: a legacy LangWatch id reads as its new one, any other id as is. */
@@ -33,26 +29,42 @@ export function canonicalModelId(id: string): string {
   return Object.hasOwn(LEGACY_LANGWATCH_MODEL_IDS, id) ? LEGACY_LANGWATCH_MODEL_IDS[id]! : id;
 }
 
-/**
- * Whether an LLM judge naming this id goes through the judge router where its flag is on: Evals
- * Preview, and the legacy id, which was routed before Instant Preview split from it.
- */
-export function isJudgeRoutedModelId(id: string): boolean {
-  return id === LANGWATCH_EVALS_MODEL_ID || id === LEGACY_INSTANT_EVALS_MODEL_ID;
+/** The id a write stores: any LangWatch hosted id as the written one, any other id as is. */
+export function writtenModelId(id: string): string {
+  return isLangWatchDecisionModelId(id) ? LANGWATCH_WRITTEN_MODEL_ID : id;
 }
 
 /**
- * An LLM judge's model as the judge picker reads and saves it: where the router flag is on, the
- * legacy id is routed, so it is Evals Preview. Any other id is kept as it is.
+ * Whether an LLM judge naming this id goes through the judge router where its flag is on: Evals
+ * Preview, and the written id, which was routed before Instant Preview split from it.
  */
-export function judgeModelIdOf({
+export function isJudgeRoutedModelId(id: string): boolean {
+  return id === LANGWATCH_EVALS_MODEL_ID || id === LANGWATCH_WRITTEN_MODEL_ID;
+}
+
+/**
+ * The id an LLM judge's picker shows for a stored one. A hosted id reads as the written id the
+ * picker offers (Evals Preview where the router flag is on, else Instant Preview), except
+ * Instant Preview itself where the flag is on: it is never routed, so it keeps its own name.
+ */
+export function judgeShownModelIdOf({
   id,
   isJudgeRouted,
 }: {
   id: string;
   isJudgeRouted: boolean;
 }): string {
-  return isJudgeRouted && id === LEGACY_INSTANT_EVALS_MODEL_ID ? LANGWATCH_EVALS_MODEL_ID : id;
+  if (!isLangWatchDecisionModelId(id)) return id;
+  if (isJudgeRouted && !isJudgeRoutedModelId(id)) return LANGWATCH_DECISION_MODEL_ID;
+  return LANGWATCH_WRITTEN_MODEL_ID;
+}
+
+/** Whether a LangWatch hosted model may fill this Default models column, from its `fills`. */
+export function isLangWatchModelFillingRole(id: string, role: ModelRole): boolean {
+  const canonical = canonicalModelId(id);
+  return LANGWATCH_DECISION_PREVIEWS.some(
+    (preview) => preview.id === canonical && preview.fills.includes(role),
+  );
 }
 
 const INSTANT_PREVIEW = {

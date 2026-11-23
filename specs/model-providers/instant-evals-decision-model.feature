@@ -484,11 +484,25 @@ Feature: Instant Evals decision model column in Default models
     And it reads the same with the router flag off
 
   @integration
-  Scenario: An LLM judge is offered Evals Preview only where the judge router flag is on
+  Scenario: An LLM judge is offered one LangWatch model, named by the judge router flag
     Given LangWatch's hosted model is released for my project
     When I open an LLM judge's model picker with the judge router flag on
-    Then "Instant Preview" and "Evals Preview" are listed, Evals Preview described as "Optimized for evals"
+    Then only "Evals Preview" is listed of LangWatch's models, described as "Optimized for evals"
     And with the router flag off only "Instant Preview" is listed
+    And either one saves the judge as "langwatch/instant-evals", the id the previous release reads
+
+  @integration
+  Scenario: An evaluator Instant Evals does not answer is offered no decision model
+    Given LangWatch's hosted model is released for my project
+    And my project has an own decision model
+    When I open the model picker of an Off Topic evaluator
+    Then no LangWatch model and no decision model is listed
+
+  @unit
+  Scenario: The Instant Evals column refuses Evals Preview
+    When a Default models config sets the Instant Evals column or its feature to "langwatch/evals-preview"
+    Then it is refused, since no judge router answers for the column
+    And "langwatch/instant-preview", "langwatch/instant-evals" and own decision models are allowed
 
   @integration
   Scenario: The drawer asks about the picked scopes, not the page's project
@@ -505,8 +519,9 @@ Feature: Instant Evals decision model column in Default models
 
   # --- Model ids ---
   # LangWatch's models share a -preview suffix: langwatch/instant-preview (the decision model
-  # alone), langwatch/evals-preview (the judge router) and langwatch/judge-preview. Earlier ids
-  # stay accepted wherever a stored or sent id is read.
+  # alone), langwatch/evals-preview (the judge router) and langwatch/judge-preview. Expand then
+  # contract (ADR-182, 2026-11-23): every id is read, and writes keep langwatch/instant-evals, the
+  # one id the previous release reads, so a rollback never strands a judge or a config.
 
   @unit
   Scenario: Picking Instant Preview by its id finds the hosted model
@@ -521,27 +536,28 @@ Feature: Instant Evals decision model column in Default models
     And it is not an own decision model
 
   @unit
-  Scenario: An earlier LangWatch model id still resolves to the renamed model
-    Given a value stored as "langwatch/instant-evals", "langwatch/search-preview" or "langwatch/scenario-judge-preview"
+  Scenario: The earlier LangWatch model id still resolves to the renamed model
+    Given a value stored as "langwatch/instant-evals"
     When the id is read
-    Then "langwatch/instant-evals" and "langwatch/search-preview" read as "langwatch/instant-preview"
-    And "langwatch/scenario-judge-preview" reads as "langwatch/judge-preview"
-    And the stored "langwatch/instant-evals" still runs on LangWatch's hosted model, never an own key
+    Then it reads as "langwatch/instant-preview"
+    And it still runs on LangWatch's hosted model, never an own key
+    And the coming-soon ids "langwatch/search-preview" and "langwatch/scenario-judge-preview", never stored, are not decision models
 
   @unit
-  Scenario: Saving a config that holds an earlier id stores the new id
-    Given a Default models config that sends "langwatch/instant-evals" for the Instant Evals column
-    When it is saved
-    Then the config stores "langwatch/instant-preview"
+  Scenario: Saving a config stores LangWatch's model under the id the previous release reads
+    Given a Default models config that sends "langwatch/instant-preview" or "langwatch/instant-evals" for the Instant Evals column
+    When it is saved, as a whole config or as one default
+    Then the config stores "langwatch/instant-evals"
+    And an own decision model is stored as it was sent
 
   @unit
-  Scenario: Pickers list only the new LangWatch model ids
+  Scenario: The column picker lists only the new LangWatch model ids
     When the Instant Evals picker lists LangWatch's decision models
-    Then every id it lists is one of "langwatch/instant-preview", "langwatch/evals-preview" or "langwatch/judge-preview"
+    Then every id it lists is "langwatch/instant-preview" or "langwatch/judge-preview"
     And no earlier id is listed
 
   @integration
-  Scenario: A judge stored with an earlier id shows as Instant Preview in the picker
+  Scenario: A judge stored with the earlier id shows as Instant Preview where routing is off
     Given an evaluator whose model is stored as "langwatch/instant-evals"
     And the judge router flag is off for my organization
     When its model picker is shown
@@ -554,4 +570,39 @@ Feature: Instant Evals decision model column in Default models
     And the judge router flag is on for my organization, so the judge is routed
     When its model picker is shown
     Then it reads "Evals Preview", the model that runs
-    And the form holds "langwatch/evals-preview", so the next save stores it
+    And the stored id is left as it is
+
+  @integration
+  Scenario: A judge on Evals Preview's id shows as Instant Preview where routing is off
+    Given an evaluator whose model is stored as "langwatch/evals-preview"
+    And the judge router flag is off for my organization, so the judge is not routed
+    When its model picker is shown
+    Then it reads "Instant Preview", never "Update needed"
+
+  @integration
+  Scenario: A judge on Instant Preview's id keeps its name where routing is on
+    Given an evaluator whose model is stored as "langwatch/instant-preview"
+    And the judge router flag is on for my organization
+    When its model picker is shown
+    Then it reads "Instant Preview", since that judge is never routed
+
+  @integration
+  Scenario: The judge picker waits for the judge router flag before naming a model
+    Given an evaluator whose model is stored as "langwatch/evals-preview"
+    When its model picker is shown while the judge router flag is still loading
+    Then a placeholder is shown, never "Update needed"
+
+  # --- Planned: contract, once no release older than this one runs ---
+
+  @unimplemented
+  Scenario: Writes switch to the -preview ids
+    Given no release older than the one that reads the -preview ids is running
+    When Default models or an LLM judge saves a LangWatch model
+    Then it stores "langwatch/instant-preview" or "langwatch/evals-preview"
+
+  @unimplemented
+  Scenario: An LLM judge may pick Instant Preview beside Evals Preview where routing is on
+    Given writes store the -preview ids
+    When I open an LLM judge's model picker with the judge router flag on
+    Then "Instant Preview" and "Evals Preview" are both listed
+    And a judge on Instant Preview is never routed

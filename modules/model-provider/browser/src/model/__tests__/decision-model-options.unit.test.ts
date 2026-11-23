@@ -23,7 +23,8 @@ describe("decisionModelPickerOptions", () => {
     expect(hostedSubtitle(false)).toBe("Optimized for search and quick classification");
   });
 
-  it("never lists Evals Preview, which only an LLM judge picks", () => {
+  /** @scenario "The column picker lists only the new LangWatch model ids" */
+  it("lists only Instant Preview and Judge Preview of LangWatch's ids, never Evals Preview", () => {
     for (const isJudgeRouted of [true, false]) {
       const values = decisionModelPickerOptions({
         pickable: [],
@@ -31,6 +32,11 @@ describe("decisionModelPickerOptions", () => {
         isOwnModelEnabled: true,
       }).map((option) => option.value);
       expect(values).not.toContain("langwatch/evals-preview");
+      expect(values.filter((value) => value.startsWith("langwatch/"))).toEqual(
+        isJudgeRouted
+          ? ["langwatch/instant-preview", "langwatch/judge-preview"]
+          : ["langwatch/instant-preview"],
+      );
     }
   });
 

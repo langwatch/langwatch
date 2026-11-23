@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The picker offers Instant Evals only when the server releases LangWatch's model, and own
- * decision models either way; the stand-in picker lists exactly the options it is handed.
+ * The judges Instant Evals answers are offered LangWatch's model where the server releases it,
+ * named by the router flag, and own decision models either way. The stand-in lists what it gets.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 
@@ -23,6 +23,7 @@ const HOSTED_DECISION_MODEL = {
 const state = vi.hoisted(() => ({
   flagReleased: false,
   judgeRouted: false,
+  routerLoading: false,
   released: false,
   providers: [] as unknown[],
   decisionModels: [] as { value: string; label: string }[],
@@ -41,7 +42,7 @@ vi.mock("@langwatch/feature-flag-client", () => ({
     enabled:
       (name === INSTANT_EVALS_FLAG && state.flagReleased) ||
       (name === "release_instant_evals_judge_router" && state.judgeRouted),
-    isLoading: false,
+    isLoading: name === "release_instant_evals_judge_router" && state.routerLoading,
   }),
 }));
 
@@ -67,7 +68,17 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => ({
 }));
 
 vi.mock("../../../../behavior/lent-model-provider.tsx", () => ({
-  LLMModelDisplay: ({ model }: { model: string }) => <span data-model={model}>model display</span>,
+  LLMModelDisplay: ({
+    model,
+    builtInModels,
+  }: {
+    model: string;
+    builtInModels?: { value: string; label: string }[];
+  }) => (
+    <span data-testid="model display" data-model={model}>
+      {builtInModels?.find((known) => known.value === model)?.label ?? "Update needed"}
+    </span>
+  ),
 }));
 
 vi.mock("../../../../behavior/lent-peers.tsx", () => ({
@@ -87,13 +98,17 @@ const CONFIGURED_PROVIDER = { provider: "openai", enabled: true, customModels: n
 beforeEach(() => {
   state.flagReleased = false;
   state.judgeRouted = false;
+  state.routerLoading = false;
   state.released = false;
   state.providers = [];
   state.decisionModels = [];
 });
 afterEach(() => cleanup());
 
-function renderField({ model }: { model?: string } = {}) {
+function renderField({
+  model,
+  evaluatorType = "langevals/llm_boolean",
+}: { model?: string; evaluatorType?: string } = {}) {
   const FormModel = () => (
     <output aria-label="form model">{useWatch({ name: "settings.model" })}</output>
   );
@@ -101,7 +116,7 @@ function renderField({ model }: { model?: string } = {}) {
     const methods = useForm({ defaultValues: { settings: model ? { model } : {} } });
     return (
       <FormProvider {...methods}>
-        <EvaluatorLLMConfigField prefix="settings" />
+        <EvaluatorLLMConfigField prefix="settings" evaluatorType={evaluatorType} />
         <FormModel />
       </FormProvider>
     );
@@ -110,11 +125,15 @@ function renderField({ model }: { model?: string } = {}) {
 }
 
 function shownModel(): string | null {
-  return screen.getByText("model display").getAttribute("data-model");
+  return screen.getByTestId("model display").getAttribute("data-model");
+}
+
+function shownName(): string {
+  return screen.getByTestId("model display").textContent ?? "";
 }
 
 function offersInstantEvals(): boolean {
-  return screen.queryByText("Instant Preview") !== null;
+  return offeredLabels().includes("Instant Preview");
 }
 
 function offeredLabels(): string[] {
@@ -187,48 +206,76 @@ describe("EvaluatorLLMConfigField", () => {
       });
     });
 
-    describe("when the server releases Instant Evals and the judge router flag is on", () => {
-      /** @scenario "An LLM judge is offered Evals Preview only where the judge router flag is on" */
-      it("offers Instant Preview, then Evals Preview", () => {
-        state.released = true;
-        state.judgeRouted = true;
-        state.decisionModels = [HOSTED_DECISION_MODEL];
-        renderField();
-
-        expect(offeredLabels()).toEqual(["Instant Preview", "Evals Preview"]);
-      });
-
-      /** @scenario "An LLM judge is offered Evals Preview only where the judge router flag is on" */
-      it("offers Instant Preview alone with the router flag off", () => {
-        state.released = true;
-        state.decisionModels = [HOSTED_DECISION_MODEL];
-        renderField();
-
-        expect(offeredLabels()).toEqual(["Instant Preview"]);
-      });
-    });
-
-    describe("when a judge was saved on the old langwatch/instant-evals id", () => {
+    describe("when the server releases Instant Evals", () => {
       beforeEach(() => {
         state.released = true;
         state.decisionModels = [HOSTED_DECISION_MODEL];
       });
 
+      /** @scenario "An LLM judge is offered one LangWatch model, named by the judge router flag" */
+      it("offers only Evals Preview, saved as langwatch/instant-evals, with the router flag on", () => {
+        state.judgeRouted = true;
+        renderField();
+
+        expect(offeredLabels()).toEqual(["Evals Preview"]);
+      });
+
+      /** @scenario "An LLM judge is offered one LangWatch model, named by the judge router flag" */
+      it("offers only Instant Preview with the router flag off", () => {
+        renderField();
+
+        expect(offeredLabels()).toEqual(["Instant Preview"]);
+      });
+
       /** @scenario "A judge saved on the old id shows Evals Preview where routing is on" */
-      it("shows and holds Evals Preview where the judge router flag is on", async () => {
+      it("shows a judge on langwatch/instant-evals as Evals Preview and leaves it stored", () => {
         state.judgeRouted = true;
         renderField({ model: "langwatch/instant-evals" });
 
-        expect(shownModel()).toBe("langwatch/evals-preview");
-        expect(await screen.findByText("langwatch/evals-preview")).toBeInTheDocument();
+        expect(shownName()).toBe("Evals Preview");
+        expect(screen.getByLabelText("form model")).toHaveTextContent("langwatch/instant-evals");
       });
 
-      /** @scenario "A judge stored with an earlier id shows as Instant Preview in the picker" */
-      it("leaves the stored id as it is with the router flag off", () => {
+      /** @scenario "A judge stored with the earlier id shows as Instant Preview where routing is off" */
+      it("shows a judge on langwatch/instant-evals as Instant Preview and leaves it stored", () => {
         renderField({ model: "langwatch/instant-evals" });
 
-        expect(shownModel()).toBe("langwatch/instant-evals");
+        expect(shownName()).toBe("Instant Preview");
         expect(screen.getByLabelText("form model")).toHaveTextContent("langwatch/instant-evals");
+      });
+
+      /** @scenario "A judge on Evals Preview's id shows as Instant Preview where routing is off" */
+      it("shows a judge on langwatch/evals-preview as Instant Preview, never Update needed", () => {
+        renderField({ model: "langwatch/evals-preview" });
+
+        expect(shownName()).toBe("Instant Preview");
+        expect(screen.getByLabelText("form model")).toHaveTextContent("langwatch/evals-preview");
+      });
+
+      /** @scenario "A judge on Instant Preview's id keeps its name where routing is on" */
+      it("shows a judge on langwatch/instant-preview as Instant Preview with the router flag on", () => {
+        state.judgeRouted = true;
+        renderField({ model: "langwatch/instant-preview" });
+
+        expect(shownModel()).toBe("langwatch/instant-preview");
+        expect(shownName()).toBe("Instant Preview");
+      });
+
+      /** @scenario "The judge picker waits for the judge router flag before naming a model" */
+      it("shows a placeholder while the router flag loads", () => {
+        state.routerLoading = true;
+        renderField({ model: "langwatch/evals-preview" });
+
+        expect(screen.queryByTestId("model display")).toBeNull();
+        expect(screen.queryByText("Update needed")).toBeNull();
+      });
+
+      /** @scenario "An evaluator Instant Evals does not answer is offered no decision model" */
+      it("offers an Off Topic evaluator no LangWatch or own decision model", () => {
+        state.decisionModels = [HOSTED_DECISION_MODEL, OWN_DECISION_MODEL];
+        renderField({ evaluatorType: "langevals/off_topic" });
+
+        expect(offeredLabels()).toEqual([]);
       });
     });
 
@@ -249,7 +296,7 @@ describe("EvaluatorLLMConfigField", () => {
         renderField();
 
         expect(screen.queryByText(/No models configured/i)).not.toBeNull();
-        expect(screen.queryByText("model display")).toBeNull();
+        expect(screen.queryByTestId("model display")).toBeNull();
       });
     });
 

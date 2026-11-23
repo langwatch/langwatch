@@ -2,9 +2,8 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
-import { allModelOptions, judgeModelIdOf } from "@langwatch/model-provider-contract";
+import { allModelOptions, judgeShownModelIdOf } from "@langwatch/model-provider-contract";
 import type { LLMConfig } from "@langwatch/workflow-contract";
-import { useCallback, useEffect, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { useFormContext, useWatch } from "react-hook-form";
 
@@ -38,7 +37,14 @@ export const LLM_CONFIG_KEYS = [
  * object-based API: reads params from form context, builds an LLMConfig
  * object, writes changed params back on change.
  */
-export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
+export const EvaluatorLLMConfigField = ({
+  prefix,
+  evaluatorType,
+}: {
+  prefix: string;
+  /** Only the evaluators Instant Evals answers are offered LangWatch's and own decision models. */
+  evaluatorType: string | undefined;
+}) => {
   const { setValue, control } = useFormContext();
 
   // Watch all LLM config fields for changes
@@ -48,34 +54,29 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
   }) as (string | number | undefined)[];
 
   // Construct LLMConfig object from watched values
-  const llmConfig: LLMConfig = useMemo(() => {
-    const config: Partial<Record<(typeof LLM_CONFIG_KEYS)[number], string | number>> = {};
-    LLM_CONFIG_KEYS.forEach((key, index) => {
-      const val = watchedValues[index];
-      if (val !== undefined) {
-        config[key] = val;
-      }
-    });
-    config.model = (config.model as string) ?? "";
-    return config as LLMConfig;
-  }, [watchedValues]);
+  const config: Partial<Record<(typeof LLM_CONFIG_KEYS)[number], string | number>> = {};
+  LLM_CONFIG_KEYS.forEach((key, index) => {
+    const val = watchedValues[index];
+    if (val !== undefined) {
+      config[key] = val;
+    }
+  });
+  config.model = (config.model as string) ?? "";
+  const llmConfig = config as LLMConfig;
 
   // Handle changes from LLMConfigPopover — write all keys back to form.
   // We iterate over LLM_CONFIG_KEYS (not just newConfig entries) so that
   // cleared fields (e.g. reasoning removed on model switch) are set to
   // undefined, preventing stale values from persisting.
-  const handleChange = useCallback(
-    (newConfig: LLMConfig) => {
-      const incoming = new Map<string, string | number | undefined>();
-      for (const [key, value] of Object.entries(newConfig)) {
-        incoming.set(toInternalKey(key), value as string | number | undefined);
-      }
-      for (const key of LLM_CONFIG_KEYS) {
-        setValue(`${prefix}.${key}`, incoming.get(key), { shouldDirty: true });
-      }
-    },
-    [prefix, setValue],
-  );
+  const handleChange = (newConfig: LLMConfig) => {
+    const incoming = new Map<string, string | number | undefined>();
+    for (const [key, value] of Object.entries(newConfig)) {
+      incoming.set(toInternalKey(key), value as string | number | undefined);
+    }
+    for (const key of LLM_CONFIG_KEYS) {
+      setValue(`${prefix}.${key}`, incoming.get(key), { shouldDirty: true });
+    }
+  };
 
   // Zero enabled providers shows the empty state shared with the prompt playground and
   // workflow pickers; a skeleton renders while either query is in flight. An unanswered
@@ -85,14 +86,12 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
   const instantEvals = useInstantEvalJudgeModels({
     projectId: project?.id,
     organizationId: organization?.id,
+    evaluatorType,
   });
-  const { builtInModels, isJudgeRouted } = instantEvals;
-  // A judge saved on the legacy id runs the router where it is on: it reads and saves as such.
-  const judgeModel = judgeModelIdOf({ id: llmConfig.model, isJudgeRouted });
+  const { builtInModels, shownModels, isJudgeRouted } = instantEvals;
+  // Any hosted id shows as the one the picker offers; the stored value changes only on a pick.
+  const judgeModel = judgeShownModelIdOf({ id: llmConfig.model, isJudgeRouted });
   const shownConfig: LLMConfig = { ...llmConfig, model: judgeModel };
-  useEffect(() => {
-    if (judgeModel !== llmConfig.model) setValue(`${prefix}.model`, judgeModel);
-  }, [judgeModel, llmConfig.model, prefix, setValue]);
   const { isEmpty, isLoading } = useModelSelection({
     options: allModelOptions,
     model: judgeModel,
@@ -121,7 +120,7 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
           transition="background 0.15s"
           justify="space-between"
         >
-          <LLMModelDisplay model={judgeModel} builtInModels={builtInModels} />
+          <LLMModelDisplay model={judgeModel} builtInModels={shownModels} />
           <Box color="fg.muted">
             <ChevronDown size={16} />
           </Box>

@@ -266,13 +266,14 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Given a self-hosted install, where IS_SAAS is unset
     When the router flag is read with no operator row and no override
     Then it is off, so the LLM-judge caller sends no route
-    And no picker offers LangWatch Evals Preview
+    And the judge picker names LangWatch's hosted model Instant Preview, never Evals Preview
     And an operator can still switch it on for the install
 
   # --- The LLM-judge caller (ADR-190 open question 2: one caller behind the flag) ---
 
-  # Evals Preview (langwatch/evals-preview) is the router; Instant Preview
-  # (langwatch/instant-preview) is the hosted decision model alone, never routed.
+  # Evals Preview is the router: the picker saves it as langwatch/instant-evals, the id the
+  # previous release reads, and langwatch/evals-preview reads the same. Instant Preview's own id,
+  # langwatch/instant-preview, is the hosted decision model alone, never routed (ADR-182).
 
   @unit
   Scenario: An LLM judge on LangWatch Evals Preview is routed when the flag is on
@@ -291,7 +292,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And the router flag is not read
 
   @unit
-  Scenario: A judge saved on the earlier langwatch/instant-evals id keeps its routing
+  Scenario: A judge saved on langwatch/instant-evals, the id the picker writes, is routed
     Given the router flag is on for the project's organization
     And an LLM judge evaluation whose model is stored as "langwatch/instant-evals"
     When it runs on Instant Evals

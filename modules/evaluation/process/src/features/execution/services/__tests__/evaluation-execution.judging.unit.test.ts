@@ -506,7 +506,7 @@ describe("EvaluationExecutionService with the judge router", () => {
     it("sends no route and never reads the flag", async () => {
       const { service, calls, isRouted } = buildService({ isRouted: true });
 
-      await runBooleanJudge(service, INSTANT_EVAL_JUDGE_MODEL_ID);
+      await runBooleanJudge(service, "langwatch/instant-preview");
 
       expect(isRouted).not.toHaveBeenCalled();
       expect(calls[0]).not.toHaveProperty("route");
@@ -514,8 +514,8 @@ describe("EvaluationExecutionService with the judge router", () => {
   });
 
   describe("given the router flag is on and the judge was saved as langwatch/instant-evals", () => {
-    /** @scenario "A judge saved on the earlier langwatch/instant-evals id keeps its routing" */
-    it("sends the llm_judge route, as before the split", async () => {
+    /** @scenario "A judge saved on langwatch/instant-evals, the id the picker writes, is routed" */
+    it("sends the llm_judge route", async () => {
       const { service, calls } = buildService({ isRouted: true });
 
       await runBooleanJudge(service, "langwatch/instant-evals");

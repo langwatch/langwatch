@@ -227,7 +227,6 @@ describe("<LLMModelDisplay/>", () => {
   });
 
   describe("given a judge stored with an earlier LangWatch model id", () => {
-    /** @scenario "A judge stored with an earlier id shows as Instant Preview in the picker" */
     it("shows the renamed model's label and asks for no update", async () => {
       renderWithDesignSystem(
         <LLMModelDisplay model="langwatch/instant-evals" builtInModels={[BUILT_IN]} />,

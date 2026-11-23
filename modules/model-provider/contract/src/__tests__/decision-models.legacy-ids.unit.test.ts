@@ -1,19 +1,26 @@
 /**
- * LangWatch's model ids share a -preview suffix; earlier ids stay accepted on read.
+ * LangWatch's model ids share a -preview suffix: every id is read, writes keep the earlier one.
  * @see specs/model-providers/instant-evals-decision-model.feature
  */
 import { describe, expect, it } from "vitest";
 
 import {
+  isModelAllowedAsRoleDefault,
+  isModelAllowedForFeature,
+} from "../catalog/codex-restrictions.ts";
+import {
   canonicalModelId,
   findDecisionModel,
+  INSTANT_EVAL_DECISION_FEATURE_KEY,
   isDecisionModelId,
   isOwnDecisionModelId,
-  judgeModelIdOf,
+  judgeShownModelIdOf,
   LANGWATCH_DECISION_MODEL_ID,
   LANGWATCH_DECISION_PREVIEWS,
   LANGWATCH_EVALS_MODEL_ID,
+  LANGWATCH_WRITTEN_MODEL_ID,
   LEGACY_LANGWATCH_MODEL_IDS,
+  writtenModelId,
 } from "../catalog/decision-models.ts";
 
 describe("LangWatch model ids", () => {
@@ -40,33 +47,89 @@ describe("LangWatch model ids", () => {
     expect(isOwnDecisionModelId("langwatch/evals-preview")).toBe(false);
   });
 
-  /** @scenario "An earlier LangWatch model id still resolves to the renamed model" */
-  it.each([
-    ["langwatch/instant-evals", "langwatch/instant-preview"],
-    ["langwatch/search-preview", "langwatch/instant-preview"],
-    ["langwatch/scenario-judge-preview", "langwatch/judge-preview"],
-  ])("reads %s as %s", (legacy, current) => {
-    expect(canonicalModelId(legacy)).toBe(current);
+  /** @scenario "The earlier LangWatch model id still resolves to the renamed model" */
+  it("reads langwatch/instant-evals as langwatch/instant-preview", () => {
+    expect(canonicalModelId("langwatch/instant-evals")).toBe("langwatch/instant-preview");
   });
 
-  /** @scenario "An earlier LangWatch model id still resolves to the renamed model" */
+  /** @scenario "The earlier LangWatch model id still resolves to the renamed model" */
   it("runs a stored langwatch/instant-evals on the hosted model, never as an own key", () => {
     expect(findDecisionModel("langwatch/instant-evals")?.id).toBe(LANGWATCH_DECISION_MODEL_ID);
     expect(isDecisionModelId("langwatch/instant-evals")).toBe(true);
     expect(isOwnDecisionModelId("langwatch/instant-evals")).toBe(false);
   });
 
-  /** @scenario "A judge saved on the old id shows Evals Preview where routing is on" */
-  it("reads a judge on langwatch/instant-evals as Evals Preview only where it is routed", () => {
-    expect(judgeModelIdOf({ id: "langwatch/instant-evals", isJudgeRouted: true })).toBe(
+  /** @scenario "The earlier LangWatch model id still resolves to the renamed model" */
+  it.each(["langwatch/search-preview", "langwatch/scenario-judge-preview"])(
+    "drops the never-stored coming-soon id %s",
+    (id) => {
+      expect(canonicalModelId(id)).toBe(id);
+      expect(isDecisionModelId(id)).toBe(false);
+    },
+  );
+
+  /** @scenario "Saving a config stores LangWatch's model under the id the previous release reads" */
+  it("writes every LangWatch hosted id as langwatch/instant-evals, any other id as it is", () => {
+    expect(LANGWATCH_WRITTEN_MODEL_ID).toBe("langwatch/instant-evals");
+    for (const id of [
+      "langwatch/instant-preview",
       "langwatch/evals-preview",
-    );
-    expect(judgeModelIdOf({ id: "langwatch/instant-evals", isJudgeRouted: false })).toBe(
       "langwatch/instant-evals",
-    );
-    expect(judgeModelIdOf({ id: "langwatch/instant-preview", isJudgeRouted: true })).toBe(
+    ]) {
+      expect(writtenModelId(id)).toBe("langwatch/instant-evals");
+    }
+    expect(writtenModelId("openai/decisions:gpt-6-luna")).toBe("openai/decisions:gpt-6-luna");
+    expect(writtenModelId("openai/gpt-5.4-mini")).toBe("openai/gpt-5.4-mini");
+  });
+
+  /** @scenario "A judge saved on the old id shows Evals Preview where routing is on" */
+  it("shows a routed judge on either routed id as the written id the picker names Evals Preview", () => {
+    for (const id of ["langwatch/instant-evals", "langwatch/evals-preview"]) {
+      expect(judgeShownModelIdOf({ id, isJudgeRouted: true })).toBe("langwatch/instant-evals");
+    }
+  });
+
+  /** @scenario "A judge on Evals Preview's id shows as Instant Preview where routing is off" */
+  it("shows every hosted id as the written id where routing is off", () => {
+    for (const id of [
+      "langwatch/instant-evals",
+      "langwatch/evals-preview",
+      "langwatch/instant-preview",
+    ]) {
+      expect(judgeShownModelIdOf({ id, isJudgeRouted: false })).toBe("langwatch/instant-evals");
+    }
+  });
+
+  /** @scenario "A judge on Instant Preview's id keeps its name where routing is on" */
+  it("keeps Instant Preview's own id where routing is on, and leaves own models as they are", () => {
+    expect(judgeShownModelIdOf({ id: "langwatch/instant-preview", isJudgeRouted: true })).toBe(
       "langwatch/instant-preview",
     );
+    expect(judgeShownModelIdOf({ id: "openai/decisions:gpt-6-luna", isJudgeRouted: true })).toBe(
+      "openai/decisions:gpt-6-luna",
+    );
+  });
+
+  /** @scenario "The Instant Evals column refuses Evals Preview" */
+  it("refuses Evals Preview for the column and its feature, allows the rest", () => {
+    expect(isModelAllowedAsRoleDefault("langwatch/evals-preview", "INSTANT_EVALS")).toBe(false);
+    expect(
+      isModelAllowedForFeature({
+        modelId: "langwatch/evals-preview",
+        featureKey: INSTANT_EVAL_DECISION_FEATURE_KEY,
+      }),
+    ).toBe(false);
+    for (const id of [
+      "langwatch/instant-preview",
+      "langwatch/instant-evals",
+      "openai/decisions:gpt-6-luna",
+    ]) {
+      expect(isModelAllowedAsRoleDefault(id, "INSTANT_EVALS")).toBe(true);
+      expect(
+        isModelAllowedForFeature({ modelId: id, featureKey: INSTANT_EVAL_DECISION_FEATURE_KEY }),
+      ).toBe(true);
+    }
+    expect(isModelAllowedAsRoleDefault("langwatch/judge-preview", "INSTANT_EVALS")).toBe(false);
   });
 
   it("leaves every other id as it is", () => {
@@ -75,7 +138,6 @@ describe("LangWatch model ids", () => {
     }
   });
 
-  /** @scenario "Pickers list only the new LangWatch model ids" */
   it("lists only the new ids among LangWatch's decision models", () => {
     const ids = LANGWATCH_DECISION_PREVIEWS.map((preview) => preview.id);
     expect(ids).toEqual([

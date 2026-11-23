@@ -106,7 +106,8 @@ Anthropic and OpenAI (`http.instant-eval-llm-judge.channel.ts`). The module owns
 The leaf now has four upstreams. It still calls no peer Api.
 
 Pricing has two rules. An unrouted judgement is priced from its input tokens at the classifier's
-rate, under the model `langwatch-evals-preview` (older rows carry `jev`). A routed judgement is
+rate, under the model `langwatch-instant-preview` (older rows carry `langwatch-evals-preview` or
+`jev`). A routed judgement is
 priced from the summed cost of its calls at the same markup, under the model `langwatch-judge`
 and the rate version
 `instant_eval_judge_router@<version>x<markup>`. A judgement that carries a cost, including 0, is a

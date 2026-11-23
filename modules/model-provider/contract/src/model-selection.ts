@@ -14,8 +14,11 @@ export type ModelOptionGroup = {
   models: ModelOption[];
 };
 
-/** A model LangWatch serves itself, so a project needs no provider of its own to pick it. */
-export type BuiltInModel = { value: string; label: string };
+/**
+ * A model LangWatch serves itself, so a project needs no provider of its own to pick it. Its line
+ * is the catalogue's, unless it sets its own: one id may be offered under two names.
+ */
+export type BuiltInModel = { value: string; label: string; description?: string };
 
 /**
  * The heading built-in models are listed under. Not "LangWatch": an own decision model in it
@@ -299,9 +302,9 @@ export function modelSelectionFrom({
     isCustom: customModelIdSet.has(modelValue),
   }));
   // A decision model's line, and a shorter row title where it has one, come from the catalogue.
-  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label }) => {
+  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label, description }) => {
     const entry = findDecisionModel(value);
-    const subtitle = entry?.description;
+    const subtitle = description ?? entry?.description;
     return {
       label: entry?.pickerLabel ?? label,
       value,

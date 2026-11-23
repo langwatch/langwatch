@@ -12,7 +12,7 @@ import {
   isLatestAlias,
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
-  canonicalModelId,
+  writtenModelId,
   isDecisionModelId,
   isModelRole,
   MODEL_ROLES,
@@ -158,7 +158,7 @@ export abstract class ModelProviderCatalog {
       }
       if (!allowed) refuseDefault({ key, value });
 
-      clean[key] = canonicalModelId(value);
+      clean[key] = writtenModelId(value);
     }
 
     return { config: clean, droppedRestricted };

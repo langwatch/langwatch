@@ -1,68 +1,95 @@
 /**
- * The built-in judge models a project may pick: Instant Preview, when the server releases it, then
- * Evals Preview where the judge router flag is on, and the project's own decision models whether or
- * not Instant Evals are released. The server weighs the opt-in, a license and the provider keys.
+ * The built-in judge models a project may pick: LangWatch's hosted model, when the server releases
+ * it, then the project's own decision models, only for the evaluators Instant Evals answers. The
+ * hosted pick is saved as the written id and named by the router flag (ADR-182, ADR-190).
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
 import { useFeatureFlag } from "@langwatch/feature-flag-client";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
-import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
-import { LANGWATCH_EVALS_MODEL_ID, type BuiltInModel } from "@langwatch/model-provider-contract";
+import {
+  INSTANT_EVAL_JUDGE_MODEL_ID,
+  isInstantEvalJudgeEvaluatorType,
+} from "@langwatch/instant-eval-judge-contract";
+import {
+  findDecisionModel,
+  isLangWatchDecisionModelId,
+  LANGWATCH_DECISION_MODEL_ID,
+  LANGWATCH_EVALS_MODEL_ID,
+  type BuiltInModel,
+} from "@langwatch/model-provider-contract";
 
 import { evaluatorApi } from "./evaluator-api.ts";
 
-/** How the picker names LangWatch's hosted judge. */
+/** LangWatch's hosted judge where the router flag is off: the decision model alone. */
 export const INSTANT_EVALS_BUILT_IN_MODEL: BuiltInModel = {
   value: INSTANT_EVAL_JUDGE_MODEL_ID,
   label: "Instant Preview",
 };
 
-/** The judge router (ADR-190), offered to an LLM judge where its flag is on. */
+/** The same saved id where the router flag is on: the judge router answers it (ADR-190). */
 export const EVALS_PREVIEW_BUILT_IN_MODEL: BuiltInModel = {
-  value: LANGWATCH_EVALS_MODEL_ID,
+  value: INSTANT_EVAL_JUDGE_MODEL_ID,
   label: "Evals Preview",
+  description: findDecisionModel(LANGWATCH_EVALS_MODEL_ID)?.description ?? "",
 };
 
-const RELEASED: readonly BuiltInModel[] = [INSTANT_EVALS_BUILT_IN_MODEL];
-const RELEASED_ROUTED: readonly BuiltInModel[] = [
-  INSTANT_EVALS_BUILT_IN_MODEL,
-  EVALS_PREVIEW_BUILT_IN_MODEL,
-];
+/** A judge saved on Instant Preview's own id where the flag is on is never routed; named only. */
+const INSTANT_PREVIEW_SHOWN: BuiltInModel = {
+  value: LANGWATCH_DECISION_MODEL_ID,
+  label: "Instant Preview",
+};
+
 const NONE: readonly BuiltInModel[] = [];
-const HOSTED_IDS: ReadonlySet<string> = new Set(RELEASED_ROUTED.map((model) => model.value));
 
 export function useInstantEvalJudgeModels({
   projectId,
   organizationId,
+  evaluatorType,
 }: {
   projectId: string | undefined;
   organizationId: string | undefined;
+  evaluatorType: string | undefined;
 }): {
   builtInModels: readonly BuiltInModel[];
+  /** The picker's models plus any name a stored hosted id shows as. */
+  shownModels: readonly BuiltInModel[];
   isJudgeRouted: boolean;
   isLoading: boolean;
 } {
+  const isAnswered = !!projectId && isInstantEvalJudgeEvaluatorType(evaluatorType);
   const access = evaluatorApi.instantEval.access.useQuery(
     { projectId: projectId ?? "" },
-    { enabled: !!projectId, staleTime: 5 * 60 * 1000 },
+    { enabled: isAnswered, staleTime: 5 * 60 * 1000 },
   );
   // Own models answer to their own flag on the server, never to the Instant Evals release.
   const decisionModels = evaluatorApi.modelProvider.listDecisionModelsForProject.useQuery(
     { projectId: projectId ?? "" },
-    { enabled: !!projectId },
+    { enabled: isAnswered },
   );
-  const { enabled: isJudgeRouted } = useFeatureFlag(
-    FrontendFlags.release_instant_evals_judge_router,
-    { projectId, organizationId, enabled: !!projectId && !!organizationId },
+  const router = useFeatureFlag(FrontendFlags.release_instant_evals_judge_router, {
+    projectId,
+    organizationId,
+    enabled: isAnswered && !!organizationId,
+  });
+  if (!isAnswered) {
+    return { builtInModels: NONE, shownModels: NONE, isJudgeRouted: false, isLoading: false };
+  }
+  const isJudgeRouted = router.enabled;
+  // LangWatch's model keeps its name and place first; the server's hosted entries are twins.
+  const own = (decisionModels.data ?? []).filter(
+    (model) => !isLangWatchDecisionModelId(model.value),
   );
-  // LangWatch's models keep their names and place first; the server's hosted entries are twins.
-  const own = (decisionModels.data ?? []).filter((model) => !HOSTED_IDS.has(model.value));
-  const released = isJudgeRouted ? RELEASED_ROUTED : RELEASED;
-  const hosted = access.data?.hostedReleased ? released : NONE;
+  const offered = isJudgeRouted ? EVALS_PREVIEW_BUILT_IN_MODEL : INSTANT_EVALS_BUILT_IN_MODEL;
+  const hosted = access.data?.hostedReleased ? [offered] : NONE;
+  const builtInModels = own.length === 0 ? hosted : [...hosted, ...own];
 
   return {
-    builtInModels: own.length === 0 ? hosted : [...hosted, ...own],
+    builtInModels,
+    shownModels:
+      isJudgeRouted && hosted.length > 0
+        ? [...builtInModels, INSTANT_PREVIEW_SHOWN]
+        : builtInModels,
     isJudgeRouted,
-    isLoading: access.isLoading || decisionModels.isLoading,
+    isLoading: access.isLoading || decisionModels.isLoading || router.isLoading,
   };
 }

@@ -36,6 +36,29 @@ describe("modelSelectionFrom", () => {
     });
   });
 
+  describe("given a built-in model that sets its own line", () => {
+    /** @scenario "An LLM judge is offered one LangWatch model, named by the judge router flag" */
+    it("shows its own line over the catalogue's for the same id", () => {
+      const line = (description?: string) =>
+        modelSelectionFrom({
+          providers: [],
+          options: [],
+          mode: "chat",
+          featureKey: undefined,
+          builtInModels: [
+            {
+              value: "langwatch/instant-evals",
+              label: "Evals Preview",
+              ...(description ? { description } : {}),
+            },
+          ],
+        }).selectOptions[0]?.subtitle;
+
+      expect(line("Optimized for evals")).toBe("Optimized for evals");
+      expect(line()).toBe("Optimized for search and quick classification");
+    });
+  });
+
   describe("given a built-in model and a configured provider", () => {
     it("lists the built-in model first, before the provider's models", () => {
       const { groupedByProvider } = modelSelectionFrom({
