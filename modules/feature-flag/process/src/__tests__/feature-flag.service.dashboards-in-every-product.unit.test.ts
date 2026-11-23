@@ -1,7 +1,7 @@
 /**
  * `release_dashboards_in_every_product` is on by default (2026-11-23): the browser's flag map
  * carries it on with no operator row, environment override or force-enable.
- * Spec: modules/navigation/specs/product-sidebars.feature.
+ * Spec: modules/feature-flag/specs/feature-flag.feature.
  */
 import { describe, expect, it } from "vitest";
 
@@ -29,7 +29,7 @@ describe("the release_dashboards_in_every_product default", () => {
     { deployment: "a self-hosted install", isSaas: false },
   ])("given $deployment with nothing setting the flag", ({ isSaas }) => {
     describe("when the browser reads its flags for a project", () => {
-      /** @scenario "With no setting for the flag, Gateway and Coding agents show the Dashboards section" */
+      /** @scenario "Dashboards in every product is on by default" */
       it("carries the flag on", async () => {
         const flags = await buildService({ isSaas }).resolveFrontendFlags(PROJECT);
 

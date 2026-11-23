@@ -216,11 +216,12 @@ Feature: Product sidebars
     And a member who cannot reach Dashboards sees no such section
     And with no project for LLM Ops to open there is no such section
 
-  # Binds the registry default: no env override, no force-enable, no operator-store row.
+  # Binds the registry default; its resolution is "Dashboards in every product is on by default"
+  # in modules/feature-flag/specs/feature-flag.feature.
   # Retired in S6 with the flag, by "Each product's sidebar lists its own boards" in modules/dashboard/specs/dashboards-organization-area.feature.
   @integration
   Scenario: With no setting for the flag, Gateway and Coding agents show the Dashboards section
-    Given nothing sets Dashboards in every product, on LangWatch Cloud or a self-hosted install
+    Given nothing sets Dashboards in every product, so it holds its registry default
     And I can reach Dashboards in "Shop", the project LLM Ops would open
     When I am in Gateway or Coding agents
     Then the sidebar shows a "Dashboards · Shop" section under the product's own pages

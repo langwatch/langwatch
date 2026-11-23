@@ -400,7 +400,10 @@ describe("the Dashboards section with Dashboards in every product on", () => {
   ] as const;
 
   describe("given a member who can reach Dashboards, in Gateway or Coding agents", () => {
-    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    /**
+     * @scenario "Gateway and Coding agents show the Dashboards section, naming its project"
+     * @scenario "With no setting for the flag, Gateway and Coding agents show the Dashboards section"
+     */
     it.each(outsideLlmOps)(
       "hands the section the project LLM Ops would open, in $surface",
       async ({ surface, pathname, project }) => {
@@ -418,30 +421,11 @@ describe("the Dashboards section with Dashboards in every product on", () => {
         );
       },
     );
-  });
-
-  describe("given nothing sets the flag, so it holds the registry's default", () => {
-    const registryDefault =
-      pickFlagDefinition("release_dashboards_in_every_product")?.defaultValue ?? false;
 
     /** @scenario "With no setting for the flag, Gateway and Coding agents show the Dashboards section" */
-    it.each(outsideLlmOps)(
-      "draws the section for the project LLM Ops would open, in $surface",
-      async ({ surface, pathname, project }) => {
-        renderSidebar({
-          surface,
-          pathname,
-          project,
-          everyProductFlag: registryDefault,
-          openableTeams: [PERSONAL_TEAM, SHOP_TEAM],
-          rememberedProjectSlug: "shop",
-        });
-
-        expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
-          "Pinned dashboards in Shop (project-shop)",
-        );
-      },
-    );
+    it("holds the flag on in the registry, so the section shows with nothing setting it", () => {
+      expect(pickFlagDefinition("release_dashboards_in_every_product")?.defaultValue).toBe(true);
+    });
   });
 
   describe("given the same member, in Governance", () => {

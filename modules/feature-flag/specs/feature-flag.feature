@@ -90,6 +90,12 @@ Feature: Resolve a feature flag, roll it out, and let people opt into experiment
       When a caller resolves it
       Then resolution raises an unknown-flag error rather than inventing an answer
 
+    @unit
+    Scenario: Dashboards in every product is on by default
+      Given no environment override, force-enable entry or operator row sets release_dashboards_in_every_product
+      When the browser reads its flags for a project, on LangWatch Cloud or a self-hosted install
+      Then release_dashboards_in_every_product is on
+
   Rule: Targeting rules override the row for the targets they name, and nobody else
 
     @unit
