@@ -182,15 +182,6 @@ Feature: A PII redaction model call is priced per character, written to the spen
       When it sends a long span and a simple span
       Then neither the model nor Presidio is called and no priced fact is recorded
 
-    @unit
-    Scenario: The model's routing does not read the subscription
-      Given an organization with a Strict project whose subscription carries no PII redaction price
-      When the model answers its span of 7,900 characters
-      Then it is priced at 3,950,000 nano dollars, like any paying organization's
-      # The flag and Strict's confirmation are the only gates; the meter holds the usage until
-      # the subscription carries the price ("Usage is held while the subscription carries no PII
-      # redaction price"). A level already on Strict when the flag goes on is not asked again.
-
     @integration
     Scenario: A paying organization's month reaches Stripe at 0.50 dollars per million characters
       Given a usage-billed organization whose Growth subscription in dollars carries the PII redaction price

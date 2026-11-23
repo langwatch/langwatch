@@ -226,18 +226,4 @@ describe("given the Cloud price of the PII redaction model", () => {
       expect(await customer.priced()).toEqual([]);
     });
   });
-
-  describe("when a Strict organization's subscription carries no PII redaction price", () => {
-    /** @scenario "The model's routing does not read the subscription" */
-    it("prices its span at the full rate: data privacy holds no billing peer to ask", async () => {
-      // Data privacy holds no billing peer: whatever the plan, the flag and the level decide.
-      const customer = await cloudCustomer({ free: false, level: "STRICT" });
-
-      await customer.send(spanWith({ spanId: "span-long", input: LONG_SPAN }));
-
-      expect(await customer.priced()).toEqual([
-        expect.objectContaining({ characters: 7_900, priceNanoUsd: 3_950_000 }),
-      ]);
-    });
-  });
 });

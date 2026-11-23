@@ -91,7 +91,8 @@ one), and the free list stays with no end date (decisions 12 to 14).
 12. **No free monthly amount.** Every character the model is sent is priced from the first one
     of the month; the meter reports the month's whole total, nothing taken off. The characters
     are counted as sent, after the in-process standard detection has masked what it finds (a
-    phone number becomes a shorter placeholder), so the customer pays for the text the model read.
+    phone number is counted as its marker), so the customer pays for the text the model read. The
+    length cap (8,000 characters) is measured on that masked text too.
 13. **No minimum per call.** A batch is priced at its characters times the rate and never raised
     to a floor: a 50-character span is 25,000 nano-USD. This is assumed, not yet decided for good;
     a minimum would be a code change in data-privacy and a new rate version.

@@ -491,7 +491,7 @@ describe.skipIf(!goPresent)(
     /** @scenario "A paying organization's month reaches Stripe at 0.50 dollars per million characters" */
     it("sends a paying organization's whole month at the published rate, nothing taken off", async () => {
       // 250 long spans of 7,900 characters and 1,000 simple ones of 120, all answered by the model.
-      const characters = 250 * 7_900 + 1_000 * 120;
+      const characters = 2_095_000;
       const customer = await piiRedactionCustomer({
         organizationId: "org-pii-paying",
         withPiiRedactionLine: true,
@@ -500,7 +500,6 @@ describe.skipIf(!goPresent)(
 
       await customer.reportMonth();
 
-      expect(characters).toBe(2_095_000);
       expect(customer.errors).toEqual([]);
       expect(await customer.piiUsage()).toEqual([
         expect.objectContaining({ value: 1.0475, events: 1 }),
