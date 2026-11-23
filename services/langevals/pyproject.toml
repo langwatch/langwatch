@@ -14,7 +14,7 @@ dependencies = [
   "pandas>=2.2.2",
   "markdown>=3.6",
   "uvicorn>=0.29.0",
-  "gunicorn>=25.1.0",
+  "gunicorn>=27.0.0", # CVE-2026-134820/134821 (ASGI HTTP parser), fixed in 27.0.0
   "httpx>=0.27.0",
   "nest-asyncio>=1.6.0",
   "pip-licenses>=5.5.0",
@@ -163,7 +163,6 @@ constraint-dependencies = [
   "pydantic-ai-slim>=2.30.0",
   "certifi>=2026.10.19", # certifi advisory covering <2026.10.19 (GHSA-6q48-6c7w-9gw2, critical)
   "mcp>=1.30.0,!=2.0.*,!=2.1.*", # MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 and 2.2.0 (#2828)
-  "gunicorn>=27.0.0", # CVE-2026-134820/134821: ASGI HTTP parser smuggling and memory exhaustion, 25.2.0 before 27.0.0
   "graphql-core>=3.3.2", # CVE-2026-134795: parser token-limit bypass DoS, fixed in 3.2.14 and 3.3.2; strawberry>=0.338 needs 3.3
 ]
 

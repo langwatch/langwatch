@@ -35,7 +35,6 @@ constraints = [
     { name = "datasets", specifier = ">=5.0.1" },
     { name = "fsspec", specifier = ">=2026.6.0" },
     { name = "graphql-core", specifier = ">=3.3.2" },
-    { name = "gunicorn", specifier = ">=27.0.0" },
     { name = "joserfc", specifier = ">=1.7.6" },
     { name = "langgraph-sdk", specifier = ">=0.4.4" },
     { name = "mako", specifier = ">=1.4.2" },
@@ -2475,7 +2474,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115.11" },
-    { name = "gunicorn", specifier = ">=25.1.0" },
+    { name = "gunicorn", specifier = ">=27.0.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "langevals-azure", marker = "extra == 'all'", editable = "evaluators/azure" },
     { name = "langevals-azure", marker = "extra == 'azure'", editable = "evaluators/azure" },
