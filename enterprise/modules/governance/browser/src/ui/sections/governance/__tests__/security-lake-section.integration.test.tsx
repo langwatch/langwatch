@@ -16,10 +16,11 @@ import { SecurityLakeSection } from "../security-lake/security-lake-section.tsx"
 const calls = vi.hoisted(() => ({
   callers: [] as { input: unknown; options: { enabled?: boolean } | undefined }[],
   tested: [] as unknown[],
+  testFailure: null as Error | null,
 }));
 
 /** A connection-test mutation that keeps its last answer until reset, as the real hook does. */
-function useStatefulTestConnection() {
+function useStatefulTestConnection(options?: { onError?: (error: Error) => void }) {
   const [state, setState] = useState<{ variables: unknown; data: unknown } | null>(null);
   return {
     isPending: false,
@@ -27,6 +28,7 @@ function useStatefulTestConnection() {
     variables: state?.variables ?? null,
     mutate: (input: unknown) => {
       calls.tested.push(input);
+      if (calls.testFailure !== null) return options?.onError?.(calls.testFailure);
       setState({ variables: input, data: { ok: true, waiting: 3, inFlight: 0 } });
     },
     reset: () => setState(null),
@@ -40,7 +42,10 @@ vi.mock("../../../../behavior/governance-api.ts", () => {
       ingestionSources: {
         securityLakeCreate: { useMutation: mutation },
         securityLakeUpdate: { useMutation: mutation },
-        securityLakeTestConnection: { useMutation: () => useStatefulTestConnection() },
+        securityLakeTestConnection: {
+          useMutation: (options?: { onError?: (error: Error) => void }) =>
+            useStatefulTestConnection(options),
+        },
         securityLakeGet: {
           useQuery: () => ({ data: { externalId: "lw-0123456789abcdef0123456789abcdef" } }),
         },
@@ -70,14 +75,22 @@ const lake = {
 const renderSection = (props: {
   organizationId: string;
   sources: { id: string; name: string; sourceType: string }[] | undefined;
+  host?: ReturnType<typeof fakeGovernanceHost>;
 }) =>
-  renderWithGovernanceHost(<SecurityLakeSection canManage onChanged={vi.fn()} {...props} />, {
-    host: fakeGovernanceHost(),
-  });
+  renderWithGovernanceHost(
+    <SecurityLakeSection
+      canManage
+      onChanged={vi.fn()}
+      organizationId={props.organizationId}
+      sources={props.sources}
+    />,
+    { host: props.host ?? fakeGovernanceHost() },
+  );
 
 beforeEach(() => {
   calls.callers.length = 0;
   calls.tested.length = 0;
+  calls.testFailure = null;
 });
 afterEach(cleanup);
 
@@ -133,5 +146,31 @@ describe("SecurityLakeSection", () => {
     await userEvent.click(screen.getByRole("button", { name: "Edit" }));
 
     expect(screen.queryByText(/Queue reachable/)).not.toBeInTheDocument();
+  });
+
+  it("names the blank field instead of testing a form the input schema would refuse", async () => {
+    renderSection({ organizationId: "org_1", sources: [lake] });
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await userEvent.clear(screen.getByLabelText("Region"));
+    await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
+
+    expect(calls.tested).toEqual([]);
+    expect(screen.getByLabelText("Region")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("raises an error toast when the connection test itself fails", async () => {
+    const host = fakeGovernanceHost();
+    calls.testFailure = new Error("network down");
+    renderSection({ organizationId: "org_1", sources: [lake], host });
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
+
+    expect(calls.tested).toHaveLength(1);
+    expect(host.recording.failures).toEqual([
+      expect.objectContaining({
+        error: calls.testFailure,
+        fallbackTitle: "Couldn't test the connection",
+      }),
+    ]);
   });
 });

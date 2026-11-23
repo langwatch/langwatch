@@ -151,13 +151,17 @@ export class SecurityLakePullerService implements GovernancePuller<SecurityLakeP
       run,
       nowMs,
     });
+    // Messages left on the queue mean the source is not read through to now; the last stamp stays.
+    const truncated = run.stoppedEarly || run.messages >= config.maxMessagesPerRun;
     return {
       events: [],
       writtenCount: run.written,
       cursor: JSON.stringify(health),
       errorCount: run.poison.length,
-      completeness: run.messages >= config.maxMessagesPerRun ? "truncated" : "complete",
-      readThroughAt: Temporal.Instant.fromEpochMilliseconds(nowMs).toString(),
+      completeness: truncated ? "truncated" : "complete",
+      ...(truncated
+        ? {}
+        : { readThroughAt: Temporal.Instant.fromEpochMilliseconds(nowMs).toString() }),
     };
   }
 }

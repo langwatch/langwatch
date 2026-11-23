@@ -149,9 +149,19 @@ describe("SecurityLakeSourceForm", () => {
   /** @scenario Test connection shows the queue backlog in the settings form */
   it("tests a saved source and shows the queue backlog", async () => {
     const onTestConnection = vi.fn();
+    const initialValues = securityLakeFormFromSource({
+      name: "ACME Security Lake",
+      parserConfig: {
+        region: "eu-west-1",
+        subscriberRoleArn: "arn:aws:iam::123456789012:role/acme-lake-subscriber",
+        queueUrl: "https://sqs.eu-west-1.amazonaws.com/123456789012/acme-lake",
+        sources: ["CLOUD_TRAIL_MGMT"],
+      },
+    });
     render(
       <SecurityLakeSourceForm
         {...formProps}
+        initialValues={initialValues}
         isNew={false}
         onSubmit={vi.fn()}
         onTestConnection={onTestConnection}
@@ -159,7 +169,7 @@ describe("SecurityLakeSourceForm", () => {
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Test connection" }));
-    expect(onTestConnection).toHaveBeenCalledExactlyOnceWith(formProps.initialValues);
+    expect(onTestConnection).toHaveBeenCalledExactlyOnceWith(initialValues);
     expect(screen.getByText("Queue reachable: 2 waiting, 0 in flight")).toBeInTheDocument();
   });
 

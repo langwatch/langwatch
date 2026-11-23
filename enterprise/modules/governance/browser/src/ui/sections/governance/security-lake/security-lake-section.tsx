@@ -48,7 +48,9 @@ export function SecurityLakeSection({
   const lakes = (sources ?? []).filter((source) => source.sourceType === SECURITY_LAKE_SOURCE_TYPE);
   const toaster = useGovernanceToaster();
   const showErrorToast = useShowErrorToast();
-  const test = api.ingestionSources.securityLakeTestConnection.useMutation();
+  const test = api.ingestionSources.securityLakeTestConnection.useMutation({
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't test the connection" }),
+  });
   const edit = (id: string | null) => {
     test.reset();
     setEditing(id);

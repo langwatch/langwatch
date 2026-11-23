@@ -166,4 +166,44 @@ describe("SecurityLakePullerService", () => {
       });
     });
   });
+
+  describe("when the run's budget ends it with messages still on the queue", () => {
+    it("reports the run truncated and does not claim it read through to now", async () => {
+      const queue = MemorySecurityLakeQueueChannel.create();
+      queue.send({ body: "{}" });
+      const reader = SecurityLakeReaderService.create({
+        queue,
+        objects: MemoryObjectStoreChannel.create(),
+        events: MemoryOcsfEventsRepository.create(),
+        runBudget: { maxMs: 0, maxBytes: 1 },
+      });
+      const puller = SecurityLakePullerService.create({
+        reader,
+        projects: createApiFixture<InternalTenants>({
+          ensureInternal: async () => ({ id: "project_governance" }),
+        }),
+        now: () => 1_763_300_000_000,
+      });
+      const config = securityLakePullConfigSchema.parse({
+        adapter: "aws_security_lake",
+        region: "eu-west-1",
+        subscriberRoleArn: ROLE,
+        queueUrl: "https://sqs.eu-west-1.amazonaws.com/123456789012/acme-subscriber",
+        sqsEndpoint: "http://localhost:4566",
+      });
+
+      const result = await puller.runOnce(
+        {
+          context: { organizationId: "org_acme", ingestionSourceId: "src_1" },
+          credentials: { aws_access_key_id: "AKIAACME", aws_secret_access_key: "secret" },
+          cursor: null,
+        } as never,
+        config,
+      );
+
+      expect(result.completeness).toBe("truncated");
+      expect(result.readThroughAt).toBeUndefined();
+      expect(queue.pending()).toHaveLength(1);
+    });
+  });
 });

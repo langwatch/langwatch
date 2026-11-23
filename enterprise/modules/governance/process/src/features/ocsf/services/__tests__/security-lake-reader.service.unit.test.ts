@@ -154,7 +154,14 @@ describe("SecurityLakeReaderService", () => {
 
       const result = await read();
 
-      expect(result).toMatchObject({ messages: 1, objects: 1, rows: 3, written: 2, dropped: 1 });
+      expect(result).toMatchObject({
+        messages: 1,
+        objects: 1,
+        rows: 3,
+        written: 2,
+        dropped: 1,
+        stoppedEarly: false,
+      });
       const rows = await stored();
       expect(rows.map((row) => row.eventId).toSorted()).toEqual([
         `security_lake:${SOURCE}:ct-1`,
@@ -553,6 +560,44 @@ describe("SecurityLakeReaderService", () => {
       expect(queue.pending()).toEqual([]);
     });
 
+    it("hands back a notification cut short by messages read before it, without spending its tries", async () => {
+      const big = MIXED_CALLS.flatMap((call) =>
+        Array.from({ length: 60 }, (_, n) => ({ ...call, uid: `${call.uid}-big-${n}` })),
+      );
+      const bigBytes = cloudTrailParquet(big);
+      const [first, second] = ["d", "e"].map((name) =>
+        MGMT_KEY.replace("a.parquet", `${name}.parquet`),
+      ) as [string, string];
+      const { queue, objects, read, stored } = setup({
+        config: { maxReceives: 1 },
+        runBudget: { maxMs: 60_000, maxBytes: bigBytes.byteLength + 1 },
+      });
+      objects.seedBytes({ bucket: BUCKET, key: MGMT_KEY, bytes: bigBytes });
+      for (const [n, key] of [first, second].entries()) {
+        const calls = [{ ...MIXED_CALLS[0]!, uid: `ct-small-${n}` }];
+        objects.seedBytes({ bucket: BUCKET, key, bytes: cloudTrailParquet(calls) });
+      }
+      const record = (key: string) => ({
+        eventName: "ObjectCreated:Put",
+        s3: { bucket: { name: BUCKET }, object: { key } },
+      });
+      queue.send({ body: notification(MGMT_KEY) });
+      queue.send({ body: JSON.stringify({ Records: [first, second].map(record) }) });
+
+      const cut = await read();
+      expect(cut).toMatchObject({ deleted: 1, retried: 1, poison: [], stoppedEarly: true });
+      expect(queue.pending()).toHaveLength(1);
+
+      const rest = await read();
+      expect(rest).toMatchObject({ deleted: 1, poison: [], stoppedEarly: false });
+      expect((await stored()).map((row) => row.eventId)).toEqual(
+        expect.arrayContaining([
+          `security_lake:${SOURCE}:ct-small-0`,
+          `security_lake:${SOURCE}:ct-small-1`,
+        ]),
+      );
+    });
+
     it("stops starting messages once the run's time budget is spent", async () => {
       const holder: { clock?: { ms: number } } = {};
       const { queue, objects, read, clock } = setup({
@@ -570,7 +615,7 @@ describe("SecurityLakeReaderService", () => {
 
       const result = await read();
 
-      expect(result).toMatchObject({ messages: 1, deleted: 1 });
+      expect(result).toMatchObject({ messages: 1, deleted: 1, stoppedEarly: true });
       const [left] = await queue.receive({ maxMessages: 10 });
       expect(left?.receiveCount).toBe(2);
     });

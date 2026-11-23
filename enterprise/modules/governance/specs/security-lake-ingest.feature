@@ -261,7 +261,7 @@ Scenario: Editing one Security Lake setting keeps the other stored settings
     Scenario: The source health shows the last read, lag, counts and poison objects
       Given a source that has read files and recorded one poison object
       When the admin opens the source
-      Then it shows the last read time, the lag behind the newest event, the written and dropped counts and the poison object
+      Then it shows the last read time, the lag behind the oldest event written in the last run, the written and dropped counts and the poison object
 
     @integration
     Scenario: The written count counts each event once when a file is read again

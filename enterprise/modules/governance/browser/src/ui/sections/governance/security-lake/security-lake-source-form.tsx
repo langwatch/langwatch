@@ -96,14 +96,20 @@ export function SecurityLakeSourceForm({
   const toggleSource = (source: SecurityLakeCloudTrailSource, checked: boolean) =>
     setValues((current) => withSource({ values: current, source, checked }));
   const sendOnce = useSendOnce(isSaving);
-  const submit = () => {
-    if (!sendOnce.canSend()) return;
+  /** Shows the form's errors and says whether the values may be sent. */
+  const validate = () => {
     const found = securityLakeFormErrors({ values, isNew });
     setErrors(found);
     if (found.s3Endpoint || found.sqsEndpoint) setShowAdvanced(true);
-    if (Object.keys(found).length > 0) return;
+    return Object.keys(found).length === 0;
+  };
+  const submit = () => {
+    if (!sendOnce.canSend() || !validate()) return;
     sendOnce.sent();
     onSubmit(values);
+  };
+  const testConnection = () => {
+    if (onTestConnection && validate()) onTestConnection(values);
   };
 
   return (
@@ -184,7 +190,7 @@ export function SecurityLakeSourceForm({
           Cancel
         </Button>
         {!isNew && onTestConnection && (
-          <Button variant="outline" loading={isTesting} onClick={() => onTestConnection(values)}>
+          <Button variant="outline" loading={isTesting} onClick={testConnection}>
             Test connection
           </Button>
         )}

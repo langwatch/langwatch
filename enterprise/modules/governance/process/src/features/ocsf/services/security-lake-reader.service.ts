@@ -77,6 +77,8 @@ export type SecurityLakeReadResult = {
   poison: SecurityLakePoison[];
   /** Read time of the oldest event written, for the source's lag. */
   oldestEventTimeMs: number | undefined;
+  /** The run stopped on its budget or deadline, so messages may still wait on the queue. */
+  stoppedEarly: boolean;
 };
 
 type ReaderScope = { tenantId: string; sourceId: string };
@@ -93,11 +95,13 @@ type MessageOutcome =
       invalid: number;
     }
   | { kind: "retry"; key: string; reason: string; partial: DoneOutcome }
+  /** Cut by a budget messages before it spent: handed back without spending a try. */
+  | { kind: "deferred"; key: string; reason: string }
   | { kind: "poison"; key: string; reason: string; partial?: DoneOutcome };
 type DoneOutcome = Extract<MessageOutcome, { kind: "done" }>;
 
 /** The decoded rows a message outcome writes: all of a done message, those read before a failure. */
-function findWrittenParts(outcome: MessageOutcome): DoneOutcome[] {
+function findWrittenParts(outcome: Exclude<MessageOutcome, { kind: "deferred" }>): DoneOutcome[] {
   if (outcome.kind === "done") return [outcome];
   return outcome.partial === undefined ? [] : [outcome.partial];
 }
@@ -180,6 +184,7 @@ export class SecurityLakeReaderService {
       retried: 0,
       poison: [],
       oldestEventTimeMs: undefined,
+      stoppedEarly: false,
     };
     const target: SecurityLakeQueueTarget = {
       queueUrl: config.queueUrl,
@@ -203,8 +208,11 @@ export class SecurityLakeReaderService {
         credentials,
         signal,
       });
-    while (result.messages < config.maxMessagesPerRun && !signal?.aborted) {
-      if (this.isPastBudget(run)) break;
+    while (result.messages < config.maxMessagesPerRun) {
+      if (this.isPastBudget(run) || signal?.aborted) {
+        result.stoppedEarly = true;
+        break;
+      }
       const batch = await this.deps.queue.receive({
         ...target,
         maxMessages: Math.min(SQS_RECEIVE_MAX, config.maxMessagesPerRun - result.messages),
@@ -213,7 +221,10 @@ export class SecurityLakeReaderService {
       if (fresh.length === 0) break;
       for (const message of fresh) seen.add(message.messageId);
       const finished = await this.settleBatch({ fresh, run, target, signal, settle });
-      if (!finished) break;
+      if (!finished) {
+        result.stoppedEarly = true;
+        break;
+      }
     }
     return result;
   }
@@ -320,6 +331,12 @@ export class SecurityLakeReaderService {
       credentials,
       signal,
     });
+    if (outcome.kind === "deferred") {
+      result.retried += 1;
+      result.stoppedEarly = true;
+      await this.release({ target, message });
+      return;
+    }
     if (outcome.kind === "retry" && message.receiveCount < config.maxReceives) {
       result.retried += 1;
       // Back for the next run rather than hidden for the whole hold.
@@ -376,12 +393,15 @@ export class SecurityLakeReaderService {
       dropped: 0,
       invalid: 0,
     };
+    // A notification cut on a budget it did not start spends no try; alone over it, it can never fit.
+    const startedFresh = run.bytes === 0;
     // A failed object does not stop the rest: their rows are kept even if the notification goes.
     let failure: { key: string; reason: string } | undefined;
     let refused: { key: string; reason: string } | undefined;
     for (const object of selected) {
       // One notification may name many objects: past the budget the rest wait for another run.
       if (this.isPastBudget(run)) {
+        if (!startedFresh) return { kind: "deferred", key: object.key, reason: RUN_BUDGET_SPENT };
         failure ??= { key: object.key, reason: RUN_BUDGET_SPENT };
         break;
       }
