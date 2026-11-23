@@ -116,7 +116,7 @@ export class NurturingGatewayFactsService {
    * A live USER key's first request, told to whoever its creation was told to: the person a
    * campaign waiting on the key's first use reads. Gateway records a key's first request once,
    * so a key not copied yet fails the delivery to be retried, up to
-   * {@link KEY_FIRST_REQUEST_COPY_ATTEMPTS}; a key never copied (a Connect key) then ends unsent.
+   * {@link KEY_FIRST_REQUEST_COPY_ATTEMPTS}; a key whose copy never reached nurturing (a lost or failed copy) then ends unsent.
    */
   async keyFirstRequested({
     data,

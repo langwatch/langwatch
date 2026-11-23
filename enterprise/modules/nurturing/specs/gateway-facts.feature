@@ -332,7 +332,7 @@ Feature: Customer.io hears when a person's gateway key is created, first used, a
 
   @unit
   Scenario: A first request on a key nurturing never copies ends unsent after its retries
-    Given a key nurturing never copies, such as a Connect key
+    Given a key whose lifecycle copy never reached nurturing, such as a lost or failed copy
     When its first-request fact is delivered and retried
     Then each delivery before the last of its bounded attempts fails so its job is retried
     And the last attempt sends nothing and logs a warning, so the job ends instead of looping

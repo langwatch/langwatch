@@ -173,7 +173,7 @@ describe("a gateway key's first request in nurturing", () => {
     it("fails each delivery before the last attempt, then ends unsent with a warning", async () => {
       const facts = await gatewayFactsOver();
       await facts.joined("user-holder");
-      const uncopied = firstRequest({ virtual_key_id: "vk_connect_uncopied" });
+      const uncopied = firstRequest({ virtual_key_id: "vk_never_copied" });
 
       for (let attempt = 1; attempt < KEY_FIRST_REQUEST_COPY_ATTEMPTS; attempt++) {
         await expect(facts.deliverFact(uncopied, { deliveryAttempt: attempt })).rejects.toThrow(
