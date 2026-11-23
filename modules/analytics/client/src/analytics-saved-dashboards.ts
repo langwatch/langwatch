@@ -1,6 +1,6 @@
 /**
- * The saved-dashboards list analytics lends navigation's sidebar on dashboards pages, each
- * product's Dashboards section, and the member's starred dashboards (§10.1).
+ * The saved-dashboards list analytics lends navigation's sidebar on dashboards pages, the pinned
+ * section with the organization's area off, and each product's Dashboards section (§10.1).
  */
 
 import { uiTokens } from "@langwatch/module";
@@ -36,17 +36,6 @@ export const StarredDashboardsToken =
  */
 export const DASHBOARD_HOME_PRODUCTS = ["llm-ops", "me", "gateway", "governance"] as const;
 export type DashboardHomeProduct = (typeof DASHBOARD_HOME_PRODUCTS)[number];
-
-/**
- * What a sidebar hands the group: its own product, whose boards its Dashboards section lists
- * and the group leaves out; none in the library, which lists every star.
- */
-export type OrganizationStarredDashboardsProps = { product?: DashboardHomeProduct };
-
-/** The "Starred dashboards" sidebar group: the member's stars as plain links. */
-export const OrganizationStarredDashboardsToken = uiTokens(
-  "analytics",
-).component<OrganizationStarredDashboardsProps>("organizationStarredDashboards");
 
 /** What a product's sidebar hands its Dashboards section: the product it lists and creates in. */
 export type ProductDashboardsProps = { product: DashboardHomeProduct };

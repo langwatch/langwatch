@@ -1,7 +1,7 @@
 /**
- * One row of the `/dashboards` library: a star toggle, the board's name linking to it, who sees
- * it, its owner and a "⋮" menu with what this member may do. A From LangWatch row reads
- * "Read-only" and "LangWatch", and offers Star, "Duplicate to edit" and a Move it cannot do.
+ * One row of the `/dashboards` library: the board's name linking to it, who sees it, its owner
+ * and a "⋮" menu with what this member may do. A From LangWatch row reads "Read-only" and
+ * "LangWatch", and offers "Duplicate to edit" and a Move it cannot do.
  */
 
 import { Menu } from "@langwatch/design-system/menu";
@@ -13,45 +13,21 @@ import {
   Link as ChakraLink,
   Text,
 } from "@langwatch/design-system/primitives";
-import {
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  FolderInput,
-  Lock,
-  MoreVertical,
-  Pencil,
-  Sparkles,
-  Star,
-  StarOff,
-  Trash2,
-} from "lucide-react";
+import { Copy, FolderInput, Lock, MoreVertical, Pencil, Sparkles, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
 import { InlineTextField } from "../elements/inline-text-field.tsx";
 
-/** Star, name, who sees it, owner, menu: the columns every row lines up on. */
-const ROW_COLUMNS = "24px minmax(0, 1fr) 150px 96px 28px";
-
-/** The member's star on a row, offered as Star or Unstar. */
-export type LibraryRowStar = { isStarred: boolean; onToggle: () => void };
-
-/** A starred row's place in the star order; a side left unset shows disabled, at that end. */
-export type LibraryRowStarMoves = {
-  onUp: (() => void) | undefined;
-  onDown: (() => void) | undefined;
-};
+/** Name, who sees it, owner, menu: the columns every row lines up on. */
+const ROW_COLUMNS = "minmax(0, 1fr) 150px 96px 28px";
 
 /** "Move to product…": `onMove` where the member may move it, else why not, shown disabled. */
 export type LibraryRowMove = { onMove: () => void } | { refusal: string };
 
 /** What the menu offers; an entry left out is not shown. */
 export type LibraryRowActions = {
-  star?: LibraryRowStar;
-  /** Offered while the row is starred. */
-  starMoves?: LibraryRowStarMoves;
   onRename?: () => void;
   move?: LibraryRowMove;
   onDuplicate?: () => void;
@@ -82,26 +58,15 @@ export function LibraryRow({
   actions: LibraryRowActions;
   renaming?: LibraryRowRenaming | undefined;
 }) {
-  const {
-    star,
-    starMoves,
-    onRename,
-    move,
-    onDuplicate,
-    duplicateLabel = "Duplicate",
-    remove,
-  } = actions;
+  const { onRename, move, onDuplicate, duplicateLabel = "Duplicate", remove } = actions;
   // While renaming the menu is gone, so closing it cannot hand focus back and end the edit.
   const hasMenu =
-    renaming === void 0 &&
-    [star, onRename, move, onDuplicate, remove].some((entry) => entry !== void 0);
-  const frame = { name, href, whoSees, isPrivate, owner, renaming, star };
+    renaming === void 0 && [onRename, move, onDuplicate, remove].some((entry) => entry !== void 0);
+  const frame = { name, href, whoSees, isPrivate, owner, renaming };
   return (
     <RowFrame {...frame}>
       {hasMenu && (
         <RowMenu name={name}>
-          {star && <StarItem star={star} />}
-          {star?.isStarred && starMoves && <StarMoveItems moves={starMoves} />}
           {onRename && (
             <Menu.Item value="rename" onClick={onRename}>
               <MenuRow icon={<Pencil size={13} />}>Rename</MenuRow>
@@ -132,20 +97,17 @@ export function LibraryRow({
 export function CuratedLibraryRow({
   name,
   href,
-  star,
   onDuplicate,
   moveRefusal,
 }: {
   name: string;
   href: string | undefined;
-  star?: LibraryRowStar;
   onDuplicate?: () => void;
   moveRefusal: string;
 }) {
   return (
-    <RowFrame name={name} href={href} whoSees="Read-only" owner="LangWatch" star={star}>
+    <RowFrame name={name} href={href} whoSees="Read-only" owner="LangWatch">
       <RowMenu name={name}>
-        {star && <StarItem star={star} />}
         <MoveItem move={{ refusal: moveRefusal }} />
         {onDuplicate && (
           <Menu.Item value="duplicate" onClick={onDuplicate}>
@@ -154,29 +116,6 @@ export function CuratedLibraryRow({
         )}
       </RowMenu>
     </RowFrame>
-  );
-}
-
-function StarItem({ star }: { star: LibraryRowStar }) {
-  return (
-    <Menu.Item value="star" onClick={star.onToggle}>
-      <MenuRow icon={star.isStarred ? <StarOff size={13} /> : <Star size={13} />}>
-        {star.isStarred ? "Unstar" : "Star"}
-      </MenuRow>
-    </Menu.Item>
-  );
-}
-
-function StarMoveItems({ moves }: { moves: LibraryRowStarMoves }) {
-  return (
-    <>
-      <Menu.Item value="star-up" disabled={!moves.onUp} onClick={moves.onUp}>
-        <MenuRow icon={<ChevronUp size={13} />}>Move up</MenuRow>
-      </Menu.Item>
-      <Menu.Item value="star-down" disabled={!moves.onDown} onClick={moves.onDown}>
-        <MenuRow icon={<ChevronDown size={13} />}>Move down</MenuRow>
-      </Menu.Item>
-    </>
   );
 }
 
@@ -191,25 +130,6 @@ function MoveItem({ move }: { move: LibraryRowMove }) {
     >
       <MenuRow icon={<FolderInput size={13} />}>Move to product…</MenuRow>
     </Menu.Item>
-  );
-}
-
-/** The row's own star: outline, filled once starred; the same write as the menu's Star. */
-function StarToggle({ name, star }: { name: string; star: LibraryRowStar | undefined }) {
-  // A board that opens nowhere cannot be starred; its column stays, so rows line up.
-  if (!star) return <Box />;
-  return (
-    <IconButton
-      size="2xs"
-      variant="ghost"
-      color={star.isStarred ? "orange.solid" : "fg.subtle"}
-      _hover={{ color: star.isStarred ? "orange.solid" : "fg" }}
-      aria-label={star.isStarred ? `Unstar ${name}` : `Star ${name}`}
-      aria-pressed={star.isStarred}
-      onClick={star.onToggle}
-    >
-      <Star size={14} fill={star.isStarred ? "currentColor" : "none"} aria-hidden />
-    </IconButton>
   );
 }
 
@@ -234,7 +154,6 @@ function RowFrame({
   isPrivate = false,
   owner,
   renaming,
-  star,
   children,
 }: {
   name: string;
@@ -243,7 +162,6 @@ function RowFrame({
   isPrivate?: boolean;
   owner: string | undefined;
   renaming?: LibraryRowRenaming | undefined;
-  star: LibraryRowStar | undefined;
   children: ReactNode;
 }) {
   return (
@@ -259,7 +177,6 @@ function RowFrame({
       _hover={{ "& .row-menu": { opacity: 1 } }}
       _focusWithin={{ "& .row-menu": { opacity: 1 } }}
     >
-      <StarToggle name={name} star={star} />
       {renaming ? (
         <InlineTextField
           value={name}

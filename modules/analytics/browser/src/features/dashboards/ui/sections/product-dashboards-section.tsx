@@ -1,7 +1,6 @@
 /**
- * A product sidebar's "Dashboards" section, lent through `ProductDashboardsToken` (§10.1): the
- * member's My dashboard and boards not starred, 8 then "Show N more", the product's starred ones,
- * its From LangWatch boards, and in LLM Ops "Browse templates". Hidden with nothing to list.
+ * Product sidebar "Dashboards" section, lent via `ProductDashboardsToken` (§10.1): My dashboard,
+ * boards, From LangWatch, "Browse templates"; "No dashboards yet" when empty, in every product.
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
@@ -24,11 +23,7 @@ import {
   libraryBoardPath,
   namesInProduct,
 } from "../../model/organization-library.ts";
-import {
-  hasProductBoards,
-  PRODUCT_BOARDS_SHOWN_MAX,
-  sharingTitle,
-} from "../../model/product-dashboards.ts";
+import { PRODUCT_BOARDS_SHOWN_MAX, sharingTitle } from "../../model/product-dashboards.ts";
 import { SidebarLinkRow } from "../blocks/sidebar-link-row.tsx";
 import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 import { NewDashboardDialog } from "./new-dashboard-dialog.tsx";
@@ -45,12 +40,12 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
   const fold = useCuratedFold();
   const [isShowingAll, setIsShowingAll] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  if (!isLoaded || !hasProductBoards(boards)) return null;
+  if (!isLoaded) return null;
   const projectSlug = host.project()?.slug;
   const openId = host.route().params.dashboardId;
   const hiddenCount = boards.rows.length - PRODUCT_BOARDS_SHOWN_MAX;
   const shownRows = isShowingAll ? boards.rows : boards.rows.slice(0, PRODUCT_BOARDS_SHOWN_MAX);
-  const starredCount = boards.starred.length + boards.starredCurated.length;
+  const isEmpty = boards.rows.length + boards.fromLangWatch.length === 0;
   const boardRow = (board: LibraryBoard) => (
     <BoardRow key={board.id} board={board} isOpen={board.id === openId} />
   );
@@ -72,6 +67,11 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           <NewDashboardButton isCreating={false} onCreate={() => setIsCreating(true)} />
         )}
       </HStack>
+      {isEmpty && (
+        <Text textStyle="bodySm" color="fg.subtle" paddingX={2} paddingY="4px">
+          No dashboards yet
+        </Text>
+      )}
       {boards.rows.length > 0 && (
         <RowList label={LABEL}>
           {shownRows.map(boardRow)}
@@ -84,17 +84,6 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           )}
         </RowList>
       )}
-      {starredCount > 0 && (
-        <>
-          <Text {...GROUP_LABEL_STYLE} paddingX={2} marginTop={1} marginBottom={0.5}>
-            Starred
-          </Text>
-          <RowList label="Starred">
-            {boards.starred.map(boardRow)}
-            {boards.starredCurated.map(curatedRow)}
-          </RowList>
-        </>
-      )}
       {boards.fromLangWatch.length > 0 && (
         <>
           <ToggleRow isLabel isExpanded={!fold.folded} onClick={fold.toggle}>
@@ -105,7 +94,7 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           )}
         </>
       )}
-      {product === "llm-ops" && projectSlug && (
+      {projectSlug && (
         <RowList label="Templates">
           <SidebarLinkRow
             name="Browse templates"

@@ -8,10 +8,9 @@ import {
   type DashboardHomeProduct,
   type DashboardProject,
   type DashboardScope,
-  type DashboardStar,
 } from "@langwatch/dashboard-contract";
 
-import { MY_DASHBOARD_NAME, organizationBoardPath, organizationCuratedPath } from "./boards.ts";
+import { MY_DASHBOARD_NAME, organizationBoardPath } from "./boards.ts";
 import type { CuratedBoard } from "./curated-boards.ts";
 
 /** What the library's header says it is. */
@@ -35,8 +34,6 @@ export type LibraryBoard = {
   readonly project: DashboardProject | null;
   /** Where the board opens; null when no project the member reads can show it. */
   readonly openProject: DashboardProject | null;
-  /** Its place in the member's star order; null when not starred. */
-  readonly starPosition: number | null;
 };
 
 /** The fields a row reads off the list's answer, which carries more. */
@@ -50,7 +47,6 @@ export function libraryBoardOf({
   homeProduct,
   project,
   openProject,
-  starPosition,
 }: LibraryBoard): LibraryBoard {
   return {
     id,
@@ -62,7 +58,6 @@ export function libraryBoardOf({
     homeProduct,
     project,
     openProject,
-    starPosition,
   };
 }
 
@@ -134,37 +129,6 @@ export const DEFAULT_SCOPE_BY_PRODUCT: Readonly<Record<DashboardHomeProduct, Das
   governance: "ORGANIZATION",
 };
 
-/**
- * The member's board stars with `board` swapped one place up or down, in star order, for
- * `boards.reorderStars`; undefined when it already sits at the end it faces.
- */
-export function starOrderAfterMove({
-  boards,
-  board,
-  direction,
-}: {
-  boards: readonly LibraryBoard[];
-  board: Pick<LibraryBoard, "id">;
-  direction: "up" | "down";
-}): DashboardStar[] | undefined {
-  const starred = starredInOrder(boards);
-  const from = starred.findIndex((candidate) => candidate.id === board.id);
-  const to = direction === "up" ? from - 1 : from + 1;
-  if (from === -1 || to < 0 || to >= starred.length) return void 0;
-  const swapped = starred.map((candidate, index) => {
-    if (index === from) return starred[to] ?? candidate;
-    return index === to ? (starred[from] ?? candidate) : candidate;
-  });
-  return swapped.map(({ id }) => ({ kind: "board", dashboardId: id }));
-}
-
-/** The member's starred boards in their star order. */
-export function starredInOrder(boards: readonly LibraryBoard[]): LibraryBoard[] {
-  return boards
-    .filter((board) => board.starPosition !== null)
-    .toSorted((a, b) => (a.starPosition ?? 0) - (b.starPosition ?? 0));
-}
-
 /** A group's heading: the product and how many boards it lists, From LangWatch ones included. */
 export function groupHeading(group: LibraryGroup): string {
   return `${group.label} · ${group.curated.length + group.boards.length}`;
@@ -217,44 +181,4 @@ export function firstUntitledName(taken: readonly string[]): string {
     (_, index) => `Untitled dashboard ${index + 1}`,
   );
   return candidates.find((name) => !names.has(name)) ?? `Untitled dashboard ${names.size + 1}`;
-}
-
-/** Stars the organization's sidebar shows before the rest sit behind "All starred (N)". */
-export const STARRED_SHOWN_MAX = 7;
-
-/** One row of the organization sidebar's "Starred dashboards" group: a plain link. */
-export type StarredLibraryLink = {
-  readonly key: string;
-  readonly name: string;
-  readonly href: string;
-};
-
-/**
- * The member's stars at the organization level: starred boards in their star order, then the
- * From LangWatch boards starred in the project in view. A board that opens nowhere is left out.
- */
-export function organizationStarLinks({
-  boards,
-  templateIds,
-  curated,
-  hasProject,
-}: {
-  boards: readonly LibraryBoard[];
-  templateIds: readonly string[];
-  curated: readonly CuratedBoard[];
-  /** A From LangWatch board reads the project in view, so with none it opens nowhere. */
-  hasProject: boolean;
-}): StarredLibraryLink[] {
-  const starredBoards = starredInOrder(boards).flatMap((board): StarredLibraryLink[] => {
-    const href = libraryBoardPath(board);
-    return href ? [{ key: `board:${board.id}`, name: board.name, href }] : [];
-  });
-  if (!hasProject) return starredBoards;
-  const starredCurated = templateIds.flatMap((templateId): StarredLibraryLink[] => {
-    const board = curated.find((candidate) => candidate.templateId === templateId);
-    if (!board) return [];
-    const href = organizationCuratedPath({ templateId });
-    return [{ key: `template:${templateId}`, name: board.name, href }];
-  });
-  return [...starredBoards, ...starredCurated];
 }

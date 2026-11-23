@@ -7,14 +7,10 @@ import { describe, expect, it } from "vitest";
 
 import { CURATED_BOARDS } from "../model/curated-boards.ts";
 import type { LibraryBoard } from "../model/organization-library.ts";
-import {
-  boardsHomedOutside,
-  hasProductBoards,
-  productSidebarBoards,
-  sharingTitle,
-} from "../model/product-dashboards.ts";
+import { productSidebarBoards, sharingTitle } from "../model/product-dashboards.ts";
 
 const SHOP = { id: "proj-shop", slug: "shop", name: "Shop" };
+const OPS = { id: "proj-ops", slug: "ops", name: "Ops" };
 const ME = "user-me";
 
 const board = (overrides: Partial<LibraryBoard> & Pick<LibraryBoard, "id">): LibraryBoard => ({
@@ -26,21 +22,19 @@ const board = (overrides: Partial<LibraryBoard> & Pick<LibraryBoard, "id">): Lib
   homeProduct: "gateway",
   project: SHOP,
   openProject: SHOP,
-  starPosition: null,
   ...overrides,
 });
 
 const groupsOf = (
   boards: readonly LibraryBoard[],
-  extra: { product?: LibraryBoard["homeProduct"]; templateIds?: string[] } = {},
+  extra: { product?: LibraryBoard["homeProduct"]; projectId?: string | undefined } = {},
 ) =>
   productSidebarBoards({
     boards,
     product: extra.product ?? "gateway",
     userId: ME,
     curated: CURATED_BOARDS,
-    starredTemplateIds: extra.templateIds ?? [],
-    hasProject: true,
+    projectId: "projectId" in extra ? extra.projectId : SHOP.id,
   });
 
 describe("productSidebarBoards", () => {
@@ -57,50 +51,38 @@ describe("productSidebarBoards", () => {
       expect(groups.rows.map(({ id }) => id)).toEqual(["mine", "alpha", "zeta"]);
     });
 
-    it("puts the product's starred boards in their own group, in star order", () => {
-      const groups = groupsOf([
-        board({ id: "late", starPosition: 4 }),
-        board({ id: "plain" }),
-        board({ id: "early", starPosition: 1 }),
-      ]);
-
-      expect(groups.rows.map(({ id }) => id)).toEqual(["plain"]);
-      expect(groups.starred.map(({ id }) => id)).toEqual(["early", "late"]);
-    });
-
     it("leaves out a board that opens nowhere", () => {
       expect(groupsOf([board({ id: "hidden", openProject: null })]).rows).toEqual([]);
     });
   });
 
-  describe("given the From LangWatch boards", () => {
-    it("lists them only in LLM Ops, a starred one in the starred group", () => {
-      const [first, ...rest] = CURATED_BOARDS;
-      const llmOps = groupsOf([], { product: "llm-ops", templateIds: [first?.templateId ?? ""] });
+  describe("given LLM Ops boards at every scope, with Shop in view", () => {
+    /** @scenario "The LLM Ops section in a project lists the same boards, filtered" */
+    it("lists Shop's Project boards, Organization and Only me boards, and no other project's", () => {
+      const groups = groupsOf(
+        [
+          board({ id: "shop-project", homeProduct: "llm-ops", scope: "PROJECT" }),
+          board({ id: "ops-project", homeProduct: "llm-ops", scope: "PROJECT", project: OPS }),
+          board({ id: "ops-organization", homeProduct: "llm-ops", project: OPS }),
+          board({ id: "only-me", homeProduct: "llm-ops", scope: "PRIVATE", project: OPS }),
+        ],
+        { product: "llm-ops" },
+      );
 
-      expect(llmOps.starredCurated).toEqual([first]);
-      expect(llmOps.fromLangWatch).toEqual(rest);
+      expect(groups.rows.map(({ id }) => id)).toEqual([
+        "only-me",
+        "ops-organization",
+        "shop-project",
+      ]);
+    });
+  });
+
+  describe("given the From LangWatch boards", () => {
+    it("lists them all in LLM Ops with a project in view, and nowhere else", () => {
+      expect(groupsOf([], { product: "llm-ops" }).fromLangWatch).toEqual(CURATED_BOARDS);
+      expect(groupsOf([], { product: "llm-ops", projectId: void 0 }).fromLangWatch).toEqual([]);
       expect(groupsOf([], { product: "gateway" }).fromLangWatch).toEqual([]);
     });
-  });
-
-  describe("given nothing homed in the product and no From LangWatch board", () => {
-    /** @scenario "Each product's sidebar lists its own boards" */
-    it("has nothing to list, so the section hides", () => {
-      expect(hasProductBoards(groupsOf([board({ id: "llm", homeProduct: "llm-ops" })]))).toBe(
-        false,
-      );
-    });
-  });
-});
-
-describe("boardsHomedOutside", () => {
-  /** @scenario "Every sidebar lists my stars from other products" */
-  it("leaves out the sidebar's own product, and keeps every board in the library", () => {
-    const boards = [board({ id: "gw" }), board({ id: "llm", homeProduct: "llm-ops" })];
-
-    expect(boardsHomedOutside({ boards, product: "gateway" }).map(({ id }) => id)).toEqual(["llm"]);
-    expect(boardsHomedOutside({ boards, product: void 0 })).toHaveLength(2);
   });
 });
 

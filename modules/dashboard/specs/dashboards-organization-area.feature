@@ -9,7 +9,9 @@ Feature: Organization-wide Dashboards area
   # "The organization's Dashboards area" is the flag release_dashboards_organization_area (ADR-002,
   # decision 6); "Dashboards in every product" is release_dashboards_in_every_product, which
   # governs only the other products' sidebar sections. Both need release_dashboards.
-  # A "# Next PR" line marks a scenario this PR (S0: the library, the starred group and the
+  # Owner, 2026-11-23: "we can drop starred... If it's in the project + product, it goes on the
+  # sidebar." Stars stay stored (column, repository, API); no screen in the area reads or writes them.
+  # A "# Next PR" line marks a scenario this PR (S0: the library, the sidebars and the
   # org-level routes) leaves to the next: home products (decision 8, with their chrome, product
   # templates and moves) and every @q1-all-projects scenario. Each keeps @unimplemented.
   # Every scenario names its evidence: a haven browser screenshot for UI, the quoted tRPC answer
@@ -133,7 +135,7 @@ Feature: Organization-wide Dashboards area
   @integration
   Scenario: The Dashboards sidebar at org level
     When I open "/dashboards"
-    Then the Dashboards sidebar lists "All dashboards" (current), "Templates" and my "Starred dashboards", and nothing else besides Quick Search
+    Then the Dashboards sidebar lists "All dashboards" (current) and "Templates", and nothing else besides Quick Search
     And "Templates" opens "/dashboards/templates"
     # Evidence: haven browser screenshot of the sidebar, and the address after the click
 
@@ -185,18 +187,17 @@ Feature: Organization-wide Dashboards area
     # Evidence: the quoted boards.create and boards.createAtScope answers, and the refusal
 
   @integration
-  Scenario: Delete, rename, star and duplicate from the library
+  Scenario: Delete, rename and duplicate from the library
     When I delete a board I may delete and confirm
     Then it is deleted in its own project and a toast says ""<name>" deleted"
     And an Organization board of a project I cannot read offers no Delete
-    When I star a row
-    Then it is starred in the project it opens in, and Unstar removes the star
+    And no row offers Star, Unstar or a star toggle, a board I starred before included
     When I rename a board I may edit
     Then Enter saves the name in place in its own project and says "Dashboard renamed", and Escape saves nothing
     And a board of a project where I may not edit offers no Rename
     When I duplicate a board
     Then the copy, "<name> copy", is stored in my store project at the board's scope and opens
-    # Evidence: the quoted delete, update, star and create answers, and screenshots of the toasts
+    # Evidence: the quoted delete, update and create answers, and screenshots of the toasts
 
   @integration
   Scenario: The library lists every board I may see, grouped by product
@@ -244,15 +245,13 @@ Feature: Organization-wide Dashboards area
   @integration @unimplemented
   Scenario: A library row's menu offers what I may do
     Given my Organization board homed in Gateway, owned by "Shop", where I hold analytics:update and analytics:delete
-    Then its menu offers Star, Rename, Move to product…, Duplicate and Delete
+    Then its menu offers Rename, Move to product…, Duplicate and Delete
     And Rename edits the name in place: Enter or leaving the field saves it and says "Dashboard renamed", Escape cancels
-    And a From LangWatch row offers Star (or Unstar) and "Duplicate to edit", and shows "Move to product…" disabled, saying "Built for LLM Ops. Duplicate it, then move the copy."
-    And a starred row's menu offers Unstar, "Move up" and "Move down", which change my star order everywhere
+    And a From LangWatch row offers "Duplicate to edit", and shows "Move to product…" disabled, saying "Built for LLM Ops. Duplicate it, then move the copy."
     And My dashboard offers "Move to product…", and shows "Delete" disabled, saying "Your default dashboard can't be deleted"
     And the server refuses a delete of My dashboard with "dashboard_default_not_deletable"
     # The hover on My dashboard's Delete is an addition: the approved design disables it with no hover
-    And starring a row from the library lists it in the Gateway sidebar's starred group without a page reload, in the same tab
-    # Evidence: haven browser screenshots of each menu and hover, and of the sidebar after the star
+    # Evidence: haven browser screenshots of each menu and hover
 
   # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
@@ -380,13 +379,12 @@ Feature: Organization-wide Dashboards area
     And the Coding agents board is listed only in the library and the Coding agents sidebar
     # Evidence: haven browser screenshot of /shop/dashboards sidebar, and the run's params
 
-  # Next PR: home products (ADR-002, decision 8).
-  @integration @unimplemented
+  @integration
   Scenario: The LLM Ops section in a project lists the same boards, filtered
-    Given LLM Ops-homed boards owned by "Shop" and by "Ops", some Project, some Organization, one starred
+    Given LLM Ops-homed boards owned by "Shop" and by "Ops", some Project, some Organization, some Only me, one starred
     When I am in LLM Ops in "Shop"
-    Then its Dashboards section shows My dashboard, then the "Shop" boards I may see and every Organization board homed in LLM Ops, not starred, by name
-    And then my starred LLM Ops boards in my order, then the From LangWatch boards I have not starred
+    Then its Dashboards section shows My dashboard, then the "Shop" Project boards, every Organization board and my Only me boards homed in LLM Ops, by name, a starred one among them
+    And then the From LangWatch boards
     And it lists no Project board of "Ops" and no board homed in another product
     And every board it lists is also in the library
     # Evidence: haven browser screenshot of the section next to the library's LLM Ops group
@@ -684,50 +682,40 @@ Feature: Organization-wide Dashboards area
     # Evidence: screenshots of the menu, the toast and both boards, and the quoted answers
 
   # ---- Product sidebars (B11; G13 title rule; E7, E8, E10) ----
-  # The approved design's starred group in the other products; home products split it later.
+  # Owner, 2026-11-23, replacing the approved design's starred group: a board is in the sidebar
+  # of its product when I can see it for the project in view, starred or not.
   @integration
-  Scenario: Gateway, Coding agents and Governance list my starred dashboards
-    Given "Dashboards in every product" and "the organization's Dashboards area" are on
-    When I am in Gateway, Coding agents or Governance
-    Then the sidebar has a "Starred dashboards" group, 7 of my stars then "All starred (N)", which opens the library
-    And no project's Dashboards section
-    And with either off there is no such group
-    # Evidence: screenshots of the three sidebars
+  Scenario: No sidebar has a Starred dashboards group
+    Given "Dashboards in every product" and "the organization's Dashboards area" are on, and I starred boards before
+    When I am in LLM Ops, Gateway, Coding agents, Governance or the Dashboards sidebar
+    Then there is no "Starred dashboards" group, and no project's pinned Dashboards section
+    And a starred board is listed in its own product's Dashboards section like any other
+    And with "Dashboards in every product" off, Gateway, Coding agents and Governance show no Dashboards section
+    # Evidence: screenshots of the five sidebars
 
   @integration
   Scenario: Each product's sidebar lists its own boards
     Given boards homed in each product
     When I am in Coding agents, Gateway or Governance
-    Then the sidebar has a "Dashboards" section with that product's boards I may see, not starred, by name, 8 then "Show N more" and "Show less"
-    And then my starred boards of that product, in my order
+    Then the sidebar has a "Dashboards" section with that product's boards I may see, by name, 8 then "Show N more" and "Show less"
     And its "+" opens the create dialog with that product fixed
     And a board is listed only when its owning project has Dashboards on and I may read it, or it is my personal board
     And a member who can reach Dashboards in no project of "Acme" sees no section
     And the "+" shows when I hold analytics:create in at least one project, an organization admin's own grants included
     And after "?ff_release_dashboards=off" in this browser there is no section
     And each row shows a lock on Only me boards and a hover title: "Only you can see this", "Shared with <project>" or "Shared with the organization"
-    And with no board I can see homed there and no From LangWatch board, there is no section, and the library's "New dashboard" makes the product's first board
+    And with no board I can see homed there and no From LangWatch board, the section still shows its heading and "+" with "No dashboards yet", so every product reads alike
     # Evidence: screenshots of the three sidebars, and one per access case
 
   @integration
-  Scenario: Every sidebar lists my stars from other products
-    Given I starred 9 boards homed in LLM Ops and one homed in Gateway
-    When I am in Gateway
-    Then a "Starred dashboards" group lists 7 of the LLM Ops ones in my order, then "All starred (9)", which opens the library
-    And the Gateway one is in the Dashboards section, not in this group
-    And the rows are plain links with no menu and no unstar
-    And the group folds and unfolds, and the Settings sidebar has no such group
-    # Evidence: screenshots of the Gateway and Settings sidebars, folded and unfolded
-
-  @integration
   Scenario: The LLM Ops section ends with Browse templates
-    When I am in LLM Ops in "Shop"
+    When I am in a product in "Shop"
     Then the last row of its Dashboards section is "Browse templates", which opens "/shop/dashboards/templates"
     # Evidence: screenshot of the section and the address after the click
 
   @integration @unimplemented
   Scenario: A long sidebar scrolls with a fade, and its footer stays put
-    Given more boards and stars than the window can show
+    Given more boards than the window can show
     Then the sidebar's list scrolls, its bottom fades while there is more below, and the footer stays at the bottom
     And the page I am on is scrolled into view
     # Evidence: screenshots at the top and the bottom of the scroll, light and dark

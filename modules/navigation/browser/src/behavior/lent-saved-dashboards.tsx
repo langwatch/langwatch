@@ -1,8 +1,6 @@
 /** Analytics' saved dashboards and its Dashboards section, placed by navigation (§10.1). */
 
 import {
-  OrganizationStarredDashboardsToken,
-  type OrganizationStarredDashboardsProps,
   ProductDashboardsToken,
   type ProductDashboardsProps,
   SavedDashboardsToken,
@@ -19,11 +17,6 @@ export function SavedDashboards(props: SavedDashboardsProps) {
 /** The Dashboards section: the member's pinned dashboards and the "+" that adds one. */
 export function StarredDashboards(props: StarredDashboardsProps) {
   return <Lent of={StarredDashboardsToken} props={props} />;
-}
-
-/** The "Starred dashboards" group: the member's stars, less the sidebar's own product's. */
-export function OrganizationStarredDashboards(props: OrganizationStarredDashboardsProps) {
-  return <Lent of={OrganizationStarredDashboardsToken} props={props} />;
 }
 
 /** A product's "Dashboards" section with the organization's area on: its boards and "+". */

@@ -1,7 +1,7 @@
 /**
  * One product's boards for its sidebar's Dashboards section, off `boards.listInOrganization`
- * (the library's own read, which a create or a move refreshes) and the member's stars in the
- * project in view. ADR-002, decision 8.
+ * (the library's own read, which a create or a move refreshes), for the project in view.
+ * ADR-002, decision 8.
  */
 
 import type { DashboardHomeProduct } from "@langwatch/dashboard-contract";
@@ -11,7 +11,6 @@ import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { CURATED_BOARDS } from "../model/curated-boards.ts";
 import { type LibraryBoard, libraryBoardOf } from "../model/organization-library.ts";
 import { type ProductSidebarBoards, productSidebarBoards } from "../model/product-dashboards.ts";
-import { useFavourites } from "./use-favourites.ts";
 
 export function useProductDashboards({ product }: { product: DashboardHomeProduct }): {
   boards: ProductSidebarBoards;
@@ -26,18 +25,13 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
     { organizationId },
     { enabled: organizationId !== "" },
   );
-  const favourites = useFavourites();
-  const starredTemplateIds = favourites.stars.flatMap((star) =>
-    star.kind === "template" ? [star.templateId] : [],
-  );
   const allBoards = (list.data ?? []).map(libraryBoardOf);
   const boards = productSidebarBoards({
     boards: allBoards,
     product,
     userId: host.userId(),
     curated: CURATED_BOARDS,
-    starredTemplateIds,
-    hasProject: host.project() !== void 0,
+    projectId: host.project()?.id,
   });
   return { boards, allBoards, isLoaded: list.data !== void 0 };
 }

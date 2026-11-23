@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- * A product sidebar's Dashboards section and its Starred dashboards group with the organization's
- * area on, over the real tRPC hooks and a transport the test answers.
+ * A product sidebar's Dashboards section with the organization's area on, over the real tRPC
+ * hooks and a transport the test answers.
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
@@ -12,19 +12,24 @@ import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
-import { OrganizationStarredSection } from "../ui/sections/organization-starred-section.tsx";
 import { ProductDashboardsSection } from "../ui/sections/product-dashboards-section.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
 const SHOP = { id: "proj-shop", slug: "shop-abc123", name: "Shop" };
+/** The project the stub host has in view. */
+const IN_VIEW = { id: "proj-1", slug: "test-project", name: "Test Project" };
 
 const board = ({
   id,
   homeProduct = "gateway",
+  scope = "ORGANIZATION",
+  project = SHOP,
   starPosition = null,
 }: {
   id: string;
   homeProduct?: string;
+  scope?: string;
+  project?: typeof SHOP;
   starPosition?: number | null;
 }) => ({
   id,
@@ -32,11 +37,11 @@ const board = ({
   description: null,
   createdById: "someone",
   ownerName: null,
-  scope: "ORGANIZATION",
+  scope,
   homeProduct,
   updatedAt: new Date("2026-11-01"),
-  project: SHOP,
-  openProject: SHOP,
+  project,
+  openProject: project,
   starPosition,
 });
 
@@ -44,7 +49,7 @@ function render({ element, listed }: { element: ReactElement; listed: unknown[] 
   const answer = (call: UiProcedureCall): Promise<unknown> => {
     if (call.path === "boards.listInOrganization") return Promise.resolve(listed);
     if (call.path === "boards.listStarred") return Promise.resolve([]);
-    if (call.path === "boards.storeProjects") return Promise.resolve([]);
+    if (call.path === "boards.storeProjects") return Promise.resolve([SHOP]);
     return NO_PROCEDURES(call);
   };
   renderDashboards({ element, host: new StubAnalyticsHost(), answer });
@@ -76,6 +81,30 @@ describe("a product's Dashboards section", () => {
     });
   });
 
+  describe("given LLM Ops boards at every scope, some starred, with a project in view", () => {
+    /** @scenario "The LLM Ops section in a project lists the same boards, filtered" */
+    it("lists each in the section by name, a star changing nothing, and no other project's", async () => {
+      render({
+        element: <ProductDashboardsSection product="llm-ops" />,
+        listed: [
+          board({ id: "Organization board", homeProduct: "llm-ops", starPosition: 0 }),
+          board({ id: "Only me board", homeProduct: "llm-ops", scope: "PRIVATE" }),
+          board({
+            id: "Project board",
+            homeProduct: "llm-ops",
+            scope: "PROJECT",
+            project: IN_VIEW,
+          }),
+          board({ id: "Shop's Project board", homeProduct: "llm-ops", scope: "PROJECT" }),
+        ],
+      });
+
+      const list = await screen.findByRole("list", { name: "Dashboards" });
+      expect(linkNames(list)).toEqual(["Only me board", "Organization board", "Project board"]);
+      expect(screen.queryByRole("list", { name: "Starred" })).toBeNull();
+    });
+  });
+
   describe("given LLM Ops in a project", () => {
     /** @scenario "The LLM Ops section ends with Browse templates" */
     it("ends with Browse templates, which opens the project's templates", async () => {
@@ -90,37 +119,17 @@ describe("a product's Dashboards section", () => {
 
   describe("given no board homed in the product and no From LangWatch board", () => {
     /** @scenario "Each product's sidebar lists its own boards" */
-    it("draws no section once the list has loaded", async () => {
+    it("still draws the heading, New dashboard and the quiet line, and no other product's", async () => {
       render({
-        // The starred group reads the same list, so its row says the list has answered.
-        element: (
-          <>
-            <ProductDashboardsSection product="governance" />
-            <OrganizationStarredSection product="governance" />
-          </>
-        ),
-        listed: [board({ id: "Elsewhere", starPosition: 0 })],
+        element: <ProductDashboardsSection product="gateway" />,
+        listed: [board({ id: "Elsewhere", homeProduct: "llm-ops", starPosition: 0 })],
       });
 
-      expect(await screen.findByRole("link", { name: "Elsewhere" })).toBeInTheDocument();
-      expect(screen.queryByRole("region", { name: "Dashboards" })).toBeNull();
-      expect(screen.queryByText("Dashboards")).toBeNull();
+      const section = await screen.findByRole("region", { name: "Dashboards" });
+      expect(within(section).getByText("No dashboards yet")).toBeInTheDocument();
+      expect(within(section).getByText("Dashboards")).toBeInTheDocument();
+      expect(await within(section).findByRole("button", { name: "New dashboard" })).toBeVisible();
+      expect(within(section).queryByRole("link", { name: "Elsewhere" })).toBeNull();
     });
-  });
-});
-
-describe("a product sidebar's Starred dashboards group", () => {
-  /** @scenario "Every sidebar lists my stars from other products" */
-  it("leaves out the stars homed in the sidebar's own product", async () => {
-    render({
-      element: <OrganizationStarredSection product="gateway" />,
-      listed: [
-        board({ id: "Gateway star", starPosition: 0 }),
-        board({ id: "LLM Ops star", homeProduct: "llm-ops", starPosition: 1 }),
-      ],
-    });
-
-    const list = await screen.findByRole("list", { name: "Starred dashboards" });
-    expect(linkNames(list)).toEqual(["LLM Ops star"]);
   });
 });

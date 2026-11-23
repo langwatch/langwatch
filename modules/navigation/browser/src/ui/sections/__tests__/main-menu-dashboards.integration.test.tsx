@@ -6,8 +6,6 @@
  */
 
 import {
-  OrganizationStarredDashboardsToken,
-  type OrganizationStarredDashboardsProps,
   ProductDashboardsToken,
   type ProductDashboardsProps,
   SavedDashboardsToken,
@@ -147,15 +145,6 @@ function LentStarred({ project }: StarredDashboardsProps) {
   );
 }
 
-/** Stands in for analytics' lent "Starred dashboards" group, echoing the product it leaves out. */
-function LentOrganizationStarred({ product }: OrganizationStarredDashboardsProps) {
-  return (
-    <div data-testid="organization-starred">
-      Starred dashboards{product ? ` outside ${product}` : ""}
-    </div>
-  );
-}
-
 /** Stands in for analytics' lent product Dashboards section, echoing its product. */
 function LentProductDashboards({ product }: ProductDashboardsProps) {
   return <div data-testid="product-dashboards">Dashboards of {product}</div>;
@@ -169,10 +158,6 @@ const analyticsLends = uiDeclarations([
       lends: [
         { token: SavedDashboardsToken, load: async () => ({ default: LentList }) },
         { token: StarredDashboardsToken, load: async () => ({ default: LentStarred }) },
-        {
-          token: OrganizationStarredDashboardsToken,
-          load: async () => ({ default: LentOrganizationStarred }),
-        },
         { token: ProductDashboardsToken, load: async () => ({ default: LentProductDashboards }) },
       ],
     },
@@ -288,8 +273,11 @@ describe("the Dashboards product sidebar", () => {
 
 describe("the Dashboards sidebar in the organization's library", () => {
   describe("given the library is open", () => {
-    /** @scenario "The Dashboards sidebar at org level" */
-    it("lists All dashboards as current, Templates and the member's stars", async () => {
+    /**
+     * @scenario "The Dashboards sidebar at org level"
+     * @scenario "No sidebar has a Starred dashboards group"
+     */
+    it("lists All dashboards as current and Templates, and no starred group", async () => {
       renderSidebar({ surface: "dashboards", pathname: "/dashboards", everyProductFlag: true });
 
       expect(screen.getByRole("button", { name: "Quick Search" })).toBeInTheDocument();
@@ -301,9 +289,9 @@ describe("the Dashboards sidebar in the organization's library", () => {
         "href",
         "/dashboards/templates",
       );
-      expect(await screen.findByTestId("organization-starred")).toBeInTheDocument();
+      expect(screen.queryByText(/Starred/)).toBeNull();
       expect(screen.queryByTestId("saved-dashboards")).toBeNull();
-      expect(screen.queryByTestId("starred-dashboards")).toBeNull();
+      await expectNoSection();
     });
   });
 });
@@ -410,7 +398,7 @@ describe("the other products' sidebars once the organization's Dashboards area i
 
   describe("given the area is off, in Gateway", () => {
     /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
-    it("keeps the project's Dashboards section and draws no starred group", async () => {
+    it("keeps the project's Dashboards section", async () => {
       renderSidebar({
         surface: "gateway",
         pathname: "/gateway/virtual-keys",
@@ -422,13 +410,12 @@ describe("the other products' sidebars once the organization's Dashboards area i
       expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
         "Pinned dashboards in Shop (project-shop)",
       );
-      expect(screen.queryByTestId("organization-starred")).toBeNull();
     });
   });
 
   describe("given the area is off, in Governance", () => {
     /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
-    it("draws no Dashboards section and no starred group", async () => {
+    it("draws no Dashboards section", async () => {
       renderSidebar({
         surface: "governance",
         pathname: "/governance",
@@ -438,31 +425,16 @@ describe("the other products' sidebars once the organization's Dashboards area i
       });
 
       await expectNoSection();
-      expect(screen.queryByTestId("organization-starred")).toBeNull();
     });
-  });
-
-  describe("given the area is on", () => {
-    /** @scenario "Gateway, Coding agents and Governance list my starred dashboards" */
-    it.each(otherProducts)(
-      "lists the starred group and no project's section in $surface",
-      async ({ surface, pathname, project }) => {
-        organizationLibrary.open = true;
-        renderSidebar({ surface, pathname, project, everyProductFlag: true, ...shopRemembered });
-
-        expect(await screen.findByTestId("organization-starred")).toBeInTheDocument();
-        await expectNoSection();
-      },
-    );
   });
 
   describe("given the area is on, in each product", () => {
     /**
      * @scenario "Each product's sidebar lists its own boards"
-     * @scenario "Every sidebar lists my stars from other products"
+     * @scenario "No sidebar has a Starred dashboards group"
      */
     it.each(otherProducts)(
-      "lists $surface's own boards and the stars homed elsewhere",
+      "lists $surface's own boards, with no starred group and no project's section",
       async ({ surface, pathname, project }) => {
         organizationLibrary.open = true;
         renderSidebar({ surface, pathname, project, everyProductFlag: true, ...shopRemembered });
@@ -470,13 +442,15 @@ describe("the other products' sidebars once the organization's Dashboards area i
         expect(await screen.findByTestId("product-dashboards")).toHaveTextContent(
           `Dashboards of ${surface}`,
         );
-        expect(screen.getByTestId("organization-starred")).toHaveTextContent(
-          `Starred dashboards outside ${surface}`,
-        );
+        expect(screen.queryByText(/Starred/)).toBeNull();
+        await expectNoSection();
       },
     );
 
-    /** @scenario "Each product's sidebar lists its own boards" */
+    /**
+     * @scenario "The LLM Ops section in a project lists the same boards, filtered"
+     * @scenario "No sidebar has a Starred dashboards group"
+     */
     it("lists LLM Ops's own boards in place of the project's pinned section", async () => {
       organizationLibrary.open = true;
       renderSidebar({ surface: "llm-ops", pathname: "/demo" });
@@ -484,23 +458,23 @@ describe("the other products' sidebars once the organization's Dashboards area i
       expect(await screen.findByTestId("product-dashboards")).toHaveTextContent(
         "Dashboards of llm-ops",
       );
-      expect(screen.getByTestId("organization-starred")).toHaveTextContent(
-        "Starred dashboards outside llm-ops",
-      );
+      expect(screen.queryByText(/Starred/)).toBeNull();
       await expectNoSection();
     });
   });
 
   describe("given the area is on but every product's flag is off", () => {
-    /** @scenario "Gateway, Coding agents and Governance list my starred dashboards" */
+    /** @scenario "No sidebar has a Starred dashboards group" */
     it.each(otherProducts)(
-      "lists no starred group in $surface",
+      "draws no Dashboards section in $surface",
       async ({ surface, pathname, project }) => {
         organizationLibrary.open = true;
         renderSidebar({ surface, pathname, project, ...shopRemembered });
 
+        await expect(
+          screen.findByTestId("product-dashboards", {}, { timeout: 300 }),
+        ).rejects.toThrow("Unable to find an element");
         await expectNoSection();
-        expect(screen.queryByTestId("organization-starred")).toBeNull();
       },
     );
   });

@@ -9,7 +9,6 @@ import {
   DashboardPointerToken,
   FilterSidebarToken,
   LwqlReplayChartToken,
-  OrganizationStarredDashboardsToken,
   ProductDashboardsToken,
   SavedDashboardsToken,
   StarredDashboardsToken,
@@ -137,13 +136,6 @@ export const analyticsWeb = defineBrowserModule("analytics")
     load: async () => ({
       default: (await import("./features/dashboards/ui/sections/product-dashboards-section.tsx"))
         .ProductDashboardsSection,
-    }),
-  })
-  /** The "Starred dashboards" group, lent to the library's and every product's sidebar. */
-  .lends(OrganizationStarredDashboardsToken, {
-    load: async () => ({
-      default: (await import("./features/dashboards/ui/sections/organization-starred-section.tsx"))
-        .OrganizationStarredSection,
     }),
   })
   /** A kept pointer to a board and a widget, lent to the insight row that names its origin. */

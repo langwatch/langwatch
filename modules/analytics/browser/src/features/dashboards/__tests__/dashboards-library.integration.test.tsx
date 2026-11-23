@@ -92,7 +92,6 @@ function libraryServer({
       };
       return Promise.resolve(row({ id: dashboardId, name: "Moved", homeProduct }));
     }
-    if (call.path === "boards.reorderStars") return Promise.resolve({ success: true });
     if (call.path === "boards.create" || call.path === "boards.createAtScope") {
       const { name } = call.input as { name: string };
       return Promise.resolve({ ...row({ id: "board-new", name }), projectId: IN_VIEW.id });
@@ -103,9 +102,6 @@ function libraryServer({
     if (call.path === "boards.update") return Promise.resolve(row({ id: "x", name: "x" }));
     if (call.path === "boards.setScope") return Promise.resolve(row({ id: "x", name: "x" }));
     if (call.path === "boards.listStarred") return Promise.resolve([]);
-    if (call.path === "boards.star" || call.path === "boards.unstar") {
-      return Promise.resolve({ success: true });
-    }
     return NO_PROCEDURES(call);
   };
   return { calls, answer };
@@ -577,7 +573,7 @@ describe("the Dashboards library", () => {
   });
 
   describe("when the member deletes a board of a project they may delete in", () => {
-    /** @scenario "Delete, rename, star and duplicate from the library" */
+    /** @scenario "Delete, rename and duplicate from the library" */
     it("asks first, deletes it from its own project, and says so", async () => {
       const { host, calls, user } = renderLibrary();
 
@@ -596,7 +592,7 @@ describe("the Dashboards library", () => {
       );
     });
 
-    /** @scenario "Delete, rename, star and duplicate from the library" */
+    /** @scenario "Delete, rename and duplicate from the library" */
     it("offers no delete on an Organization board of a project they cannot read", async () => {
       const { user } = renderLibrary();
 
@@ -608,103 +604,24 @@ describe("the Dashboards library", () => {
     });
   });
 
-  describe("when the member stars a board from its row", () => {
-    /** @scenario "Delete, rename, star and duplicate from the library" */
-    it("stars it in the project it opens in", async () => {
-      const { calls, user } = renderLibrary();
-
-      await user.click(await screen.findByRole("button", { name: "Actions for Everyone's board" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Star" }));
-
-      await waitFor(() =>
-        expect(inputsTo(calls, "boards.star")).toEqual([
-          { projectId: IN_VIEW.id, star: { kind: "board", dashboardId: "board-org" } },
-        ]),
-      );
-    });
-
-    /** @scenario "Delete, rename, star and duplicate from the library" */
-    it("offers Unstar on a starred board, which removes the star", async () => {
-      const { calls, user } = renderLibrary({
+  describe("when the member has starred a board", () => {
+    /** @scenario "Delete, rename and duplicate from the library" */
+    it("offers no Star, Unstar or star toggle on any row, a starred one included", async () => {
+      const { user } = renderLibrary({
         listed: [row({ id: "board-shop", name: "Shop board", starPosition: 0 })],
       });
 
       await user.click(await screen.findByRole("button", { name: "Actions for Shop board" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Unstar" }));
 
-      await waitFor(() =>
-        expect(inputsTo(calls, "boards.unstar")).toEqual([
-          { projectId: SHOP.id, star: { kind: "board", dashboardId: "board-shop" } },
-        ]),
-      );
-    });
-
-    /** @scenario "Delete, rename, star and duplicate from the library" */
-    it("stars and unstars from the row's own toggle, filled once starred", async () => {
-      const { calls, user } = renderLibrary({
-        listed: [
-          row({ id: "board-shop", name: "Shop board", starPosition: 0 }),
-          row({ id: "board-org", name: "Everyone's board", scope: "ORGANIZATION", project: null }),
-        ],
-      });
-
-      const starred = await screen.findByRole("button", { name: "Unstar Shop board" });
-      expect(starred).toHaveAttribute("aria-pressed", "true");
-      await user.click(starred);
-      await user.click(screen.getByRole("button", { name: "Star Everyone's board" }));
-
-      await waitFor(() =>
-        expect([...inputsTo(calls, "boards.unstar"), ...inputsTo(calls, "boards.star")]).toEqual([
-          { projectId: SHOP.id, star: { kind: "board", dashboardId: "board-shop" } },
-          { projectId: IN_VIEW.id, star: { kind: "board", dashboardId: "board-org" } },
-        ]),
-      );
-    });
-  });
-
-  describe("when the member reorders their starred boards from the library", () => {
-    const STARRED = [
-      row({ id: "board-first", name: "First board", starPosition: 0 }),
-      row({ id: "board-second", name: "Second board", starPosition: 1 }),
-    ];
-
-    /** @scenario "A library row's menu offers what I may do" */
-    it("moves a star up, saving my whole star order where it opens", async () => {
-      const { calls, user } = renderLibrary({ listed: STARRED });
-
-      await user.click(await screen.findByRole("button", { name: "Actions for Second board" }));
-      expect(await screen.findByRole("menuitem", { name: "Move down" })).toHaveAttribute(
-        "aria-disabled",
-        "true",
-      );
-      await user.click(screen.getByRole("menuitem", { name: "Move up" }));
-
-      await waitFor(() =>
-        expect(inputsTo(calls, "boards.reorderStars")).toEqual([
-          {
-            projectId: SHOP.id,
-            stars: [
-              { kind: "board", dashboardId: "board-second" },
-              { kind: "board", dashboardId: "board-first" },
-            ],
-          },
-        ]),
-      );
-    });
-
-    /** @scenario "A library row's menu offers what I may do" */
-    it("offers no Move up or Move down on a board not starred", async () => {
-      const { user } = renderLibrary();
-
-      await user.click(await screen.findByRole("button", { name: "Actions for Shop board" }));
-
-      expect(await screen.findByRole("menuitem", { name: "Star" })).toBeVisible();
+      expect(await screen.findByRole("menuitem", { name: "Rename" })).toBeVisible();
+      expect(screen.queryByRole("menuitem", { name: "Unstar" })).toBeNull();
       expect(screen.queryByRole("menuitem", { name: "Move up" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Unstar Shop board" })).toBeNull();
     });
   });
 
   describe("when the member renames a board they may edit", () => {
-    /** @scenario "Delete, rename, star and duplicate from the library" */
+    /** @scenario "Delete, rename and duplicate from the library" */
     it("saves the name in place in its own project on Enter, and says so", async () => {
       const { host, calls, user } = renderLibrary();
 
@@ -724,7 +641,7 @@ describe("the Dashboards library", () => {
       );
     });
 
-    /** @scenario "Delete, rename, star and duplicate from the library" */
+    /** @scenario "Delete, rename and duplicate from the library" */
     it("saves nothing on Escape", async () => {
       const { calls, user } = renderLibrary();
 
@@ -736,19 +653,19 @@ describe("the Dashboards library", () => {
       expect(inputsTo(calls, "boards.update")).toEqual([]);
     });
 
-    /** @scenario "Delete, rename, star and duplicate from the library" */
+    /** @scenario "Delete, rename and duplicate from the library" */
     it("offers no Rename on a board of a project they cannot edit in", async () => {
       const { user } = renderLibrary();
 
       await user.click(await screen.findByRole("button", { name: "Actions for Everyone's board" }));
 
-      expect(await screen.findByRole("menuitem", { name: "Star" })).toBeVisible();
+      expect(await screen.findByRole("menuitem", { name: "Move to product…" })).toBeVisible();
       expect(screen.queryByRole("menuitem", { name: "Rename" })).toBeNull();
     });
   });
 
   describe("when the member duplicates a board", () => {
-    /** @scenario "Delete, rename, star and duplicate from the library" */
+    /** @scenario "Delete, rename and duplicate from the library" */
     it("copies it into the store project at its scope, opens it, and names the copy", async () => {
       const { host, calls, user } = renderLibrary();
 
@@ -770,7 +687,7 @@ describe("the Dashboards library", () => {
       expect(host.navigations).toEqual(["/dashboards/board-new"]);
     });
 
-    /** @scenario "Delete, rename, star and duplicate from the library" */
+    /** @scenario "Delete, rename and duplicate from the library" */
     it("keeps an Only me board Only me, opened by id", async () => {
       const { host, calls, user } = renderLibrary({
         listed: [row({ id: "board-mine", name: "My notes", scope: "PRIVATE" })],
