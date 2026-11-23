@@ -67,6 +67,10 @@ function listPublishedSkills() {
 // --- Frontmatter -------------------------------------------------------------
 // Same minimal reader as skills/_lib/frontmatter.ts: top-level single-line
 // `key: value` pairs between the `---` fences.
+/**
+ * @param {string} raw full SKILL.mdx source
+ * @returns {{ frontmatter: Record<string, string>, body: string }}
+ */
 function splitFrontmatter(raw) {
   const m = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!m) return { frontmatter: {}, body: raw };
