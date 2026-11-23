@@ -547,7 +547,7 @@ func decodeLLMErrorBody(peeked []byte, resp upstreamResponse) (e herr.E, typed b
 // what it looks like.
 // gatewayProviderErrorCode is the gateway's fallback code when it has no
 // parsed provider body to forward (writeUpstreamError in aigateway's router).
-const gatewayProviderErrorCode herr.Code = "provider_error"
+const gatewayProviderErrorCode = "provider_error"
 
 func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr.E {
 	e := herr.E{Code: llmUpstreamErrorCode, Meta: herr.M{
