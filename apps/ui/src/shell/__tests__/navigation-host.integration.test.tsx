@@ -27,7 +27,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import UiAppChrome from "../ui-app-chrome";
 import { loadUiRootHostServices } from "../ui-root-host-services";
@@ -476,9 +476,11 @@ describe("the application chrome", () => {
         }
       }
       const reload = vi.fn();
-      vi.spyOn(window, "location", "get").mockReturnValue(
-        Object.create(window.location, { reload: { value: reload } }),
-      );
+      // A plain object: jsdom's Location getters refuse a receiver made by Object.create.
+      const { href, origin, pathname, search, hash } = window.location;
+      const location = { href, origin, pathname, search, hash, reload } as unknown as Location;
+      const spied = vi.spyOn(window, "location", "get").mockReturnValue(location);
+      onTestFinished(() => spied.mockRestore());
 
       render(
         <MemoryRouter initialEntries={["/my-project/traces"]}>
