@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.28.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.27.0...langwatch@v3.28.0) (2026-11-23)
+
+
+### Features
+
+* **aigateway:** a2a proxy with per-target policy, scanning and tracing ([#9643](https://github.com/langwatch/langwatch/issues/9643)) ([9802015](https://github.com/langwatch/langwatch/commit/9802015b69cb229c3be97180cddf53cc246aed8f))
+* **governance:** ingest OCSF AI events from AWS Security Lake ([#9638](https://github.com/langwatch/langwatch/issues/9638)) ([0db90c2](https://github.com/langwatch/langwatch/commit/0db90c242a639ef1adaf89148e816950a430a5c8))
+
+
+### Bug Fixes
+
+* **analytics:** filter content keys from LWQL map columns with one regex, not a lambda per prefix ([#9809](https://github.com/langwatch/langwatch/issues/9809)) ([6e53832](https://github.com/langwatch/langwatch/commit/6e53832e9633de80a17888e85345ff224fe18077))
+* **auth:** prune dead link-error spellings and pin the library's codes ([#9753](https://github.com/langwatch/langwatch/issues/9753)) ([f11fcc0](https://github.com/langwatch/langwatch/commit/f11fcc0db4c68d43561a51d017e192e10ff985c6))
+* **langy:** never show sign-in steps for Langy's own key and refuse a blank sandbox key ([#9495](https://github.com/langwatch/langwatch/issues/9495)) ([71c0cca](https://github.com/langwatch/langwatch/commit/71c0cca7a155c46140eed3b5917918e6eaab611b))
+* **model-provider:** send the NLP secret on translate calls ([#9799](https://github.com/langwatch/langwatch/issues/9799)) ([a9f3742](https://github.com/langwatch/langwatch/commit/a9f374250041f0ca32728ac612ee4e9c0d496405))
+* **model-provider:** translate trace text that reads like instructions, and name a provider content filter refusal ([#9804](https://github.com/langwatch/langwatch/issues/9804)) ([efacb2e](https://github.com/langwatch/langwatch/commit/efacb2ede2c90343ecfaa8cb8306e388656bbc1c))
+* self-hosted install fixes for plain HTTP, live streams, GitHub-less Langy and missing models ([#9818](https://github.com/langwatch/langwatch/issues/9818)) ([392b56a](https://github.com/langwatch/langwatch/commit/392b56a0b52dedcc0021bcce876b2e69916a91de))
+* **trace:** negate the whole group under a NOT in trace search ([#9807](https://github.com/langwatch/langwatch/issues/9807)) ([711539f](https://github.com/langwatch/langwatch/commit/711539f587b3ba19606ffbe0425710842c181603))
+
 ## [3.27.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.26.0...langwatch@v3.27.0) (2026-11-23)
 
 
