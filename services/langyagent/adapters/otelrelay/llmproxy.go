@@ -545,6 +545,10 @@ func decodeLLMErrorBody(peeked []byte, resp upstreamResponse) (e herr.E, typed b
 // shape isGatewayEnvelope reads as ours; routing it through here keeps its
 // prose out of the frame on the strength of where it came from rather than
 // what it looks like.
+// gatewayProviderErrorCode is the gateway's fallback code when it has no
+// parsed provider body to forward (writeUpstreamError in aigateway's router).
+const gatewayProviderErrorCode herr.Code = "provider_error"
+
 func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr.E {
 	e := herr.E{Code: llmUpstreamErrorCode, Meta: herr.M{
 		"body_kind": providerBodyKind(peeked, contentType),
@@ -565,6 +569,10 @@ func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr
 	}
 	if refusal, ok := credentialRefusalReason(status); ok && refusal != code {
 		e.Reasons = append(e.Reasons, herr.E{Code: refusal})
+	} else if code == gatewayProviderErrorCode && status > 0 {
+		// The gateway's generic envelope names no cause, so the status (a 404 is
+		// a missing model) still has to reach the panel.
+		e.Reasons = append(e.Reasons, herr.E{Code: upstreamHTTPReasonCode(status)})
 	}
 	if cause, ok := accountCauseReason(status, peeked); ok {
 		e.Reasons = append(e.Reasons, herr.E{Code: cause})
