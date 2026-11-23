@@ -86,6 +86,3 @@ CREATE INDEX IF NOT EXISTS "DigestUserWeek_organizationId_isoWeek_idx" ON "Diges
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "DigestUserWeek_isoWeek_idx" ON "DigestUserWeek"("isoWeek");
-
--- CreateIndex
-CREATE INDEX IF NOT EXISTS "DigestSend_isoWeek_templateId_idx" ON "DigestSend"("isoWeek", "templateId");

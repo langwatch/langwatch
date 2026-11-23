@@ -213,11 +213,9 @@ export class DigestSendService {
   }
 
   /**
-   * One member's week, sent at most once: only the caller that claims the week sends it. Skipped
-   * if disarmed, unenrolled or opted out since the plan, when the person left or was disabled
-   * since, has no address, or when the picked template has nothing to show. Their role and the
-   * projects they may view are read now, not taken from the plan. The email is rendered before
-   * the week is claimed: an email that cannot be rendered throws, claims nothing, and is retried.
+   * One member's week, sent at most once: only the claimer sends. Role and visible projects are
+   * read now, not from the plan; the email is rendered before the claim, so one that cannot be
+   * rendered claims nothing and is retried.
    */
   async sendDigest({
     userId,
@@ -282,10 +280,9 @@ export class DigestSendService {
   }
 
   /**
-   * A member's last week, mailed to the operator alone; no send is recorded. Its unsubscribe
-   * link names the operator, the person it reached, never the member. The test send respects
-   * enrolment and opt-out as the weekly send does: it is refused for an organization not
-   * enrolled and for a member who opted out. Arming is not required, so a test can come first.
+   * A member's last week, mailed to the operator alone, its unsubscribe link naming the operator;
+   * no send is recorded. It respects enrolment and opt-out like the weekly send, but not arming,
+   * so a test can come first.
    */
   async sendTest({
     organizationId,

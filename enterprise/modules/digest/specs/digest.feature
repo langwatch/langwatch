@@ -415,6 +415,20 @@ Feature: Weekly digest emails
     When they enrol an organization, arm the send or send a test
     Then each call is refused with not_found and nothing is enrolled, armed or sent
 
+  @unit
+  Scenario: An operator enrols and unenrols organizations
+    Given an operator ops admits to manage the digest
+    When they enrol two organizations and then unenrol one
+    Then each call answers the settings with the enrolled organizations sorted
+    And only the organization still enrolled is enrolled
+
+  @unit
+  Scenario: An operator arms and disarms the weekly send
+    Given an operator ops admits to manage the digest, and an enrolled organization
+    When they arm the send and then disarm it
+    Then each call answers the settings with the switch as set
+    And the stored switch matches it, with the enrolment unchanged
+
   @integration @unimplemented
   Scenario: The gallery previews a person's email for every eligible template
     Given an organization's folds for last week

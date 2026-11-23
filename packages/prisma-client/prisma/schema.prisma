@@ -8112,8 +8112,6 @@ model DigestSend {
   templateId     String
   sentAt         DateTime
   createdAt      DateTime @default(now())
-
-  @@index([isoWeek, templateId])
 }
 
 /// The digest's one settings row. `armed` is the weekly send's master switch; it starts off.

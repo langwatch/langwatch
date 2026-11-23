@@ -139,9 +139,9 @@ export const userWeekStateSchema = z.object({
   repositories: z.record(z.string(), z.number()),
   /**
    * The repository each session was counted for, so a session counts once however its facts
-   * arrive; capped at MAX_SESSIONS. Absent on weeks folded before it existed.
+   * arrive; capped at MAX_SESSIONS.
    */
-  sessionRepositories: z.record(z.string(), z.string()).default({}),
+  sessionRepositories: z.record(z.string(), z.string()),
 });
 export type UserWeekState = z.infer<typeof userWeekStateSchema>;
 

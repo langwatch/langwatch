@@ -4,5 +4,5 @@
 export interface DigestCallCounterRepository {
   count(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
-  ): Promise<Readonly<{ allowed: boolean; resetAt: number }>>;
+  ): Promise<Readonly<{ allowed: boolean }>>;
 }

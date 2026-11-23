@@ -59,12 +59,12 @@ Until the "what's new" editor exists no card is published, so a person whose pic
 
 ## Tables (Postgres, owned by digest)
 
-- `DigestCohortOrganization` — organizations enrolled in the send (default: none, so nothing sends).
+- `DigestCohortOrganization`: organizations enrolled in the send (default: none, so nothing sends).
   Only their projects fold.
-- `DigestSubscription` — per user; `unsubscribedAt`, `unsubscribedFromSendId`. No row = subscribed.
-- `DigestProjectWeek`, `DigestUserWeek` — the fold projections above; the send reads them.
-- `DigestSend` — one per user per week, id `userId:isoWeek`: template, ISO week, sentAt.
-- `DigestSettings` — singleton: `armed` (the weekly send's master switch, default false) and the
+- `DigestSubscription`: per user; `unsubscribedAt`, `unsubscribedFromSendId`. No row = subscribed.
+- `DigestProjectWeek`, `DigestUserWeek`: the fold projections above; the send reads them.
+- `DigestSend`: one per user per week (id `userId:isoWeek`), holding template, ISO week, sentAt.
+- `DigestSettings`: a singleton holding `armed` (the weekly send's master switch, default false) and the
   last planned week.
 - Not built: `DigestClick` (send id, link key, at), `DigestUpdate` (the "what's new" card), and
   `links` on `DigestSend`.

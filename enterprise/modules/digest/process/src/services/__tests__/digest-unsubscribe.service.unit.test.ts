@@ -5,13 +5,37 @@
  * @see enterprise/modules/digest/specs/digest.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { UserApi } from "@langwatch/user-contract";
+import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryDigestAudienceRepository } from "../../repositories/memory/memory.digest-audience.repository.ts";
+import { MemoryDigestCallCounterRepository } from "../../repositories/memory/memory.digest-call-counter.repository.ts";
 import { DigestUnsubscribeService } from "../digest-unsubscribe.service.ts";
 
 const CALLER = "203.0.113.7";
+const AT = new Date("2026-01-01T00:00:00Z");
+
+/** The attempt counter as it answers while its store is down. */
+class UnavailableCallCounterRepository extends MemoryDigestCallCounterRepository {
+  override count(): Promise<never> {
+    return Promise.reject(new Error("redis is down"));
+  }
+}
+
+function profileOf(id: string): UserProfile {
+  return {
+    id,
+    name: null,
+    email: `${id}@example.test`,
+    emailVerified: true,
+    image: null,
+    pendingSsoSetup: false,
+    createdAt: AT,
+    updatedAt: AT,
+    lastLoginAt: null,
+    deactivatedAt: null,
+  };
+}
 
 describe("the digest's unsubscribe service", () => {
   describe("when the attempt counter fails", () => {
@@ -20,14 +44,10 @@ describe("the digest's unsubscribe service", () => {
       const audience = MemoryDigestAudienceRepository.create();
       const service = DigestUnsubscribeService.create({
         secret: "secret",
-        limits: {
-          count: async () => {
-            throw new Error("redis is down");
-          },
-        },
+        limits: new UnavailableCallCounterRepository(),
         audience,
         users: createApiFixture<Pick<UserApi, "findById">>(
-          { findById: async ({ id }) => ({ id }) as never },
+          { findById: async ({ id }) => profileOf(id) },
           "UserApi",
         ),
         now: () => Date.now(),

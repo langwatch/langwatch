@@ -36,22 +36,27 @@ export const digestCodingAgentWeekProps = z.object({
 export type DigestCodingAgentWeekProps = z.infer<typeof digestCodingAgentWeekProps>;
 
 /** A total missing the series the week dropped reads as a floor. */
-const floorOf = (totalsAtLeast: boolean | undefined, text: string): string =>
-  totalsAtLeast ? `at least ${text}` : text;
+const floorOf = ({
+  totalsAtLeast,
+  text,
+}: {
+  totalsAtLeast: boolean | undefined;
+  text: string;
+}): string => (totalsAtLeast ? `at least ${text}` : text);
 
 export const digestCodingAgentWeekSubject = ({
   sessions,
   costUsd,
   totalsAtLeast,
 }: DigestCodingAgentWeekProps): string => {
-  const cost = floorOf(totalsAtLeast, formatUsd(costUsd));
+  const cost = floorOf({ totalsAtLeast, text: formatUsd(costUsd) });
   return `Your coding agents this week: ${formatCount(sessions)} sessions, ${cost}`;
 };
 
 export const DigestCodingAgentWeek = (props: DigestCodingAgentWeekProps) => {
   const { sessions, tokens, costUsd, activeMinutes, linesChanged, commits, pullRequests, topRepo } =
     props;
-  const floor = (text: string) => floorOf(props.totalsAtLeast, text);
+  const floor = (text: string) => floorOf({ totalsAtLeast: props.totalsAtLeast, text });
   const tokensText = floor(formatCompact(tokens));
   const costText = floor(formatUsd(costUsd));
 

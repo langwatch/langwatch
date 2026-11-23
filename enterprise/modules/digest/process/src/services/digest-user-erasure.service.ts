@@ -10,10 +10,8 @@ type Deps = Readonly<{
 }>;
 
 /**
- * Clears digest rows on user erasure: the person's subscription, their sends and their folded
- * weeks, in every organization. It sends nothing and reads no other module's table; a
- * redelivery finds nothing left and changes nothing.
- * Spec: enterprise/modules/digest/specs/digest.feature
+ * On user erasure, clears the person's subscription, sends and folded weeks everywhere, reading
+ * no other module's table; a redelivery finds nothing and changes nothing. Spec: digest.feature.
  */
 export class DigestUserErasureService {
   static create(deps: Deps): DigestUserErasureService {

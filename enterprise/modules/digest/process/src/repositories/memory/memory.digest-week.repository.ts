@@ -51,14 +51,10 @@ export class MemoryDigestWeekRepository<State extends WeekState> {
     return Promise.resolve();
   }
 
-  deleteBefore({ isoWeek }: { isoWeek: string }): Promise<number> {
-    let dropped = 0;
+  deleteBefore({ isoWeek }: { isoWeek: string }): Promise<void> {
     for (const [key, row] of this.#rows) {
-      if (row.state.isoWeek < isoWeek) {
-        this.#rows.delete(key);
-        dropped += 1;
-      }
+      if (row.state.isoWeek < isoWeek) this.#rows.delete(key);
     }
-    return Promise.resolve(dropped);
+    return Promise.resolve();
   }
 }

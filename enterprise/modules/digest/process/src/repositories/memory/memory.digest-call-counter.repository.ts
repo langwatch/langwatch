@@ -13,7 +13,7 @@ export class MemoryDigestCallCounterRepository implements DigestCallCounterRepos
 
   async count(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
-  ): Promise<Readonly<{ allowed: boolean; resetAt: number }>> {
+  ): Promise<Readonly<{ allowed: boolean }>> {
     const now = nowInstant().epochMilliseconds;
     const open = this.#windows.get(input.key);
     const window =
@@ -22,6 +22,6 @@ export class MemoryDigestCallCounterRepository implements DigestCallCounterRepos
         : { count: 0, expiresAt: now + input.windowSeconds * 1000 };
     window.count += 1;
     this.#windows.set(input.key, window);
-    return { allowed: window.count <= input.max, resetAt: window.expiresAt };
+    return { allowed: window.count <= input.max };
   }
 }

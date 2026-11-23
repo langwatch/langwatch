@@ -4,6 +4,7 @@ import type {
   SpanFactsContribution,
 } from "@langwatch/coding-agent-contract";
 import type { EvaluationLifecycleCompletedEventData } from "@langwatch/evaluation-contract";
+import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SimulationRunFinishedEventData } from "@langwatch/scenario-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
@@ -22,6 +23,8 @@ import {
   spanFact,
 } from "../rules/digest-activity.rules.ts";
 import { isoWeekOf } from "../rules/digest-week.rules.ts";
+
+const logger = createLogger("langwatch:digest");
 
 /** How stale this process's view of the enrolled cohort may be before it is read again. */
 const COHORT_REFRESH_MS = 60 * 1000;
@@ -62,7 +65,9 @@ export class DigestSourceService {
   mayFold(projectId: string): boolean {
     const cohort = this.#cohort;
     if (cohort && !this.#isStale(cohort)) return cohort.organizationOf.has(projectId);
-    void this.#refresh().catch(() => undefined);
+    void this.#refresh().catch((error: unknown) => {
+      logger.warn({ error }, "the digest could not read its cohort; letting the project through");
+    });
     return true;
   }
 

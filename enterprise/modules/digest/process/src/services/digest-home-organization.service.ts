@@ -24,8 +24,8 @@ const homeRanking = (organizationId: string | undefined): HomeRanking =>
   organizationId === undefined ? { kind: "no-home" } : { kind: "home", organizationId };
 
 /**
- * Which of a person's organizations is their home, the one that sends their weekly email. Used
- * only by DigestSendService; split out so that service stays under its size ceiling.
+ * Which of a person's organizations is their home, the one that sends their weekly email: ranks
+ * their organizations by the week's activity they may view, and checks a stored home still holds.
  */
 export class DigestHomeOrganizationService {
   static create(deps: Deps): DigestHomeOrganizationService {
@@ -35,10 +35,9 @@ export class DigestHomeOrganizationService {
   private constructor(private readonly deps: Deps) {}
 
   /**
-   * A person in several enrolled organizations is sent one email a week, from the home the plan
-   * stored on the request. With none stored (a request asked before it was), or a stored home
-   * that can no longer send (unenrolled, or the person left it), the send ranks the
-   * organizations they are still in now.
+   * A person in several enrolled organizations gets one email a week, from the home the plan
+   * stored; with none, or one that can no longer send (unenrolled, or they left), the send ranks
+   * the organizations they are still in.
    */
   async isHomeOrganization({
     organizationId,

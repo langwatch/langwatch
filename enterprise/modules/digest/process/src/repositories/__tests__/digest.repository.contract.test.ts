@@ -265,10 +265,8 @@ function weekCases<State extends { organizationId: string; isoWeek: string }>(
           await storeFold(weeks, folded(kind.fold({ organizationId, isoWeek, count: 0 })));
         }
 
-        const dropped = await weeks.deleteBefore({ isoWeek: CUTOFF });
+        await weeks.deleteBefore({ isoWeek: CUTOFF });
 
-        // At least ours: a run killed before its cleanup may have left older rows behind.
-        expect(dropped).toBeGreaterThanOrEqual(1);
         const left = await weeks.findWeeks({ isoWeeks: [BEFORE, CUTOFF, AFTER], organizationId });
         expect(byWeek(left).map(({ isoWeek }) => isoWeek)).toEqual([CUTOFF, AFTER]);
       });

@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { nowInstant } from "@langwatch/time";
-
 import type { DigestCallCounterRepository } from "../digest-call-counter.repository.ts";
 
 /** Only the commands this repository calls. */
@@ -28,20 +26,14 @@ export class RedisDigestCallCounterRepository implements DigestCallCounterReposi
 
   async count(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
-  ): Promise<Readonly<{ allowed: boolean; resetAt: number }>> {
+  ): Promise<Readonly<{ allowed: boolean }>> {
     const redisKey = `${KEY_PREFIX}${input.key}`;
     const count = await this.#redis.incr(redisKey);
-    let ttl = await this.#redis.ttl(redisKey);
+    const ttl = await this.#redis.ttl(redisKey);
     // Only the first call opens the window, so later calls cannot push its end out. A TTL of -1
     // is a key orphaned by a crash between incr and expire: without re-arming it the caller
     // would stay rate-limited forever, and unsubscribe must always work.
-    if (count === 1 || ttl === -1) {
-      await this.#redis.expire(redisKey, input.windowSeconds);
-      ttl = input.windowSeconds;
-    }
-    return {
-      allowed: count <= input.max,
-      resetAt: nowInstant().epochMilliseconds + (ttl > 0 ? ttl : input.windowSeconds) * 1000,
-    };
+    if (count === 1 || ttl === -1) await this.#redis.expire(redisKey, input.windowSeconds);
+    return { allowed: count <= input.max };
   }
 }

@@ -1,14 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The weekly digest's unsubscribe address, `/api/digest/unsubscribe?token=`. The email's footer
- * link opens it (GET, a page that changes nothing, so a link scanner's prefetch unsubscribes
- * no one); the RFC 8058 header and the page's button POST to it. The signed token is the whole
- * authorization, so no session is resolved. A bad or expired token answers 400; with no signing
- * secret configured, 503. Each call counts one attempt per caller before anything is read, and a
- * caller past the limit answers 429. Every page refuses to be framed, since its button changes a
- * subscription in one click, and is neither stored nor passed on by Referer, since its address
- * holds the token.
- * Spec: enterprise/modules/digest/specs/digest.feature
+ * `/api/digest/unsubscribe`: GET only shows a page, so a link scanner's prefetch unsubscribes no
+ * one; RFC 8058 and the page's button POST. The token is the whole authorization; pages refuse
+ * framing and caching since the address holds it. Spec: digest.feature.
  */
 import { publicRoute } from "@langwatch/api/access";
 import {

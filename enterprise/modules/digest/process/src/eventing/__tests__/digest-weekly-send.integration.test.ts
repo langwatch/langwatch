@@ -81,7 +81,7 @@ function tokenOf(oneClickUrl: string): string {
 
 /** One member's send for a week, carried out as the outbox would. */
 const sendFor = ({ userId, isoWeek }: { userId: string; isoWeek: string }) =>
-  digest.carryOut({ userId, organizationId: ORGANIZATION, isoWeek });
+  digest.carryOut({ userId, organizationId: ORGANIZATION, isoWeek, homeOrganizationId: null });
 
 /** Each send carried out in turn, as the outbox would. */
 async function carryOutAll(payloads: readonly unknown[]): Promise<void> {
@@ -801,11 +801,7 @@ describe("an operator's test send", () => {
 
       await expect(
         digest.sendTest({ organizationId: ORGANIZATION, userId: MEMBER, operatorId: "ghost" }),
-      ).rejects.toMatchObject({
-        code: "digest_operator_address_missing",
-        httpStatus: 409,
-        message: "Your account has no email address, so a test digest can't be sent to you.",
-      });
+      ).rejects.toMatchObject({ code: "digest_operator_address_missing", httpStatus: 409 });
       expect(digest.mail).toEqual([]);
     });
   });

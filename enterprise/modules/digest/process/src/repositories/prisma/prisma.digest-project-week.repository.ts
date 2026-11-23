@@ -80,8 +80,8 @@ export class PrismaDigestProjectWeekRepository
     return rows.map((row) => projectWeekStateSchema.parse(row.state));
   }
 
-  deleteBefore({ isoWeek }: { isoWeek: string }): Promise<number> {
-    return this.database.$executeRaw`
+  async deleteBefore({ isoWeek }: { isoWeek: string }): Promise<void> {
+    await this.database.$executeRaw`
       ${skipTenantCheck({
         // Retention sweeps every organization's weeks older than any send still reads.
         SKIP_TENANT_CHECK: true,

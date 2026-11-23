@@ -20,12 +20,9 @@ export type DigestMailRender = Pick<
 >;
 
 /**
- * Renders a composed digest email through the injected `MailRender` and parses the command
- * notification will take. Everything that can refuse the email short of the mailer refuses it
- * here, so a send can do this before it claims the week and a refusal leaves the week unclaimed.
- *
- * @throws when the template's own schema refuses the props, or notification's command schema
- *   refuses the envelope (an unsubscribe address that is not a URL, say).
+ * Renders a composed digest email and parses notification's command: everything short of the
+ * mailer that can refuse it refuses here, so a send renders before claiming the week.
+ * @throws when the template's or notification's schema refuses the props or the envelope.
  */
 export async function renderDigestMail({
   mail,

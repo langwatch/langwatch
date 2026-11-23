@@ -52,14 +52,9 @@ type Deps = Readonly<{
 }>;
 
 /**
- * The digest's one-click unsubscribe (RFC 8058) and the page behind its link. Tokens use
- * ADR-031's format, `base64url(JSON).hex(HMAC-SHA256)` with an `exp`, the HMAC taken over
- * `digest.v1:` and the JSON, compared in constant time; the token is the whole authorization,
- * so it names one person and nothing else can be done with it. A link naming a person who no
- * longer exists is refused as `digest_link_invalid`, so no subscription row is written for them.
- * Without a secret every call refuses with `digest_links_unavailable`. Each public call counts one
- * attempt per caller first, and past the limit refuses with `digest_unsubscribe_rate_limited`
- * having read and written nothing.
+ * The one-click unsubscribe (RFC 8058) and its page. The token (ADR-031's HMAC format) is the
+ * whole authorization, so it names one person and does nothing else; each call counts an attempt
+ * before reading anything, and a link naming a person who no longer exists writes no row.
  */
 export class DigestUnsubscribeService {
   static create(deps: Deps): DigestUnsubscribeService {
