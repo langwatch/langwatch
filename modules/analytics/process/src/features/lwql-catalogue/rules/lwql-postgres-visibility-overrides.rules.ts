@@ -74,22 +74,27 @@ const isPersonalKey = (keyColumn: string) =>
   `    )\n` +
   `)`;
 
-/**
- * One member's budget. An ATTRIBUTED_USER budget caps each end user of a key or project, people
- * who are not members (specs/ai-gateway/end-user-attribution.feature), so it stays shared.
- */
+/** One member's budget. */
 const MEMBER_SCOPES = `('PRINCIPAL')`;
 
-const NOT_A_PERSONAL_BUDGET =
-  `"m"."scopeType" NOT IN ${MEMBER_SCOPES} AND ` +
-  `("m"."scopeType" <> 'VIRTUAL_KEY' OR NOT ${isPersonalKey(`"m"."scopeId"`)})`;
+/**
+ * A key's budget, or one capping each end user of a key or project (its scope id is the anchor).
+ * End users are not members, so a per-end-user budget goes only with a personal key it caps
+ * (specs/ai-gateway/end-user-attribution.feature); a project anchor names no key.
+ */
+const KEY_SCOPES = `('VIRTUAL_KEY', 'ATTRIBUTED_USER')`;
 
-/** The row's budget (`budgetId`) is not one of `scopes`. */
-const notOnBudgetScopedTo = (scopes: string) =>
+/** The budget `budget` (a table alias) is scoped to one member, or to or over a personal key. */
+const isPersonalBudget = (budget: string) =>
+  `${budget}."scopeType" IN ${MEMBER_SCOPES} OR ` +
+  `(${budget}."scopeType" IN ${KEY_SCOPES} AND ${isPersonalKey(`${budget}."scopeId"`)})`;
+
+/** The row's budget (`budgetId`) is not one `budgetPredicate` holds for (alias "b"). */
+const notOnBudgetWhere = (budgetPredicate: string) =>
   `NOT EXISTS (\n` +
   `  SELECT 1 FROM {{schema}}."GatewayBudget" AS "b"\n` +
   `  WHERE "b"."id" = "m"."budgetId"\n` +
-  `    AND "b"."scopeType" IN ${scopes}\n` +
+  `    AND ${budgetPredicate}\n` +
   `)`;
 
 /**
@@ -98,13 +103,19 @@ const notOnBudgetScopedTo = (scopes: string) =>
  */
 export const VISIBILITY_POSTGRES_OVERRIDES: Record<string, PostgresDatasetOverride> = {
   GatewayBudget: {
-    rowFilter: NOT_A_PERSONAL_BUDGET,
-    rowFilterNote: " Budgets scoped to one member or to a personal key are not queryable.",
+    rowFilter: `NOT (${isPersonalBudget(`"m"`)})`,
+    rowFilterNote:
+      " Budgets scoped to one member or to a personal key, or capping each end user of a personal key, are not queryable.",
+  },
+  GatewayBudgetBucketBoundary: {
+    rowFilter: notOnBudgetWhere(`(${isPersonalBudget(`"b"`)})`),
+    rowFilterNote:
+      " Boundaries of a budget that gateway_budgets leaves out are not queryable either.",
   },
   GatewayBudgetLedger: {
     rowFilter: allOf(
       `NOT ${isPersonalKey(`"m"."virtualKeyId"`)}`,
-      notOnBudgetScopedTo(MEMBER_SCOPES),
+      notOnBudgetWhere(`"b"."scopeType" IN ${MEMBER_SCOPES}`),
     ),
     rowFilterNote:
       " Spend through a personal key, or against a budget scoped to one member, is not queryable.",

@@ -173,6 +173,11 @@ export const gatewayBudgetTrpcTransport: TrpcRouterDeclaration<
   .procedure("create")
   .withPermission("gatewayBudgets:create")
   .handle(async ({ app, input, actor }) => {
+    await app.assertBudgetScopeOpensFor({
+      scope: input.scope,
+      organizationId: input.organizationId,
+      reader: { kind: "member", userId: actor.id },
+    });
     const row = await app.createBudget({
       organizationId: input.organizationId,
       scope: input.scope,

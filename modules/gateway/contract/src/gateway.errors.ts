@@ -168,7 +168,7 @@ export class GatewayVoiceKeyMissingError extends HandledError {
 
 /**
  * Scope does not belong to the request's organization; cross-tenant guard,
- * never a typo.
+ * never a typo. A member the caller may not budget is answered the same way.
  */
 export class GatewayScopeOrgMismatchError extends HandledError {
   declare readonly code: "gateway_scope_org_mismatch";

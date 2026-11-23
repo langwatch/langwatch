@@ -1,12 +1,15 @@
 /**
  * Who may open a budget, and what of its detail they see (gateway-budget-service.feature). The
  * doors ask the budget permission; this rule depends on the stored budget and each row's key, so
- * the service asks the rest, for the detail screen, edits, archives and the REST read alike.
+ * the service asks the rest, for the detail screen, creates, edits, archives and REST alike.
  */
 import {
   GatewayBudgetNotFoundError,
+  GatewayScopeOrgMismatchError,
+  VirtualKeyNotFoundError,
   type GatewayBudgetDetail,
   type GatewayBudgetReader,
+  type GatewayBudgetScope,
 } from "@langwatch/gateway-contract";
 
 import type { GatewayUserDirectoryChannel } from "../../../channels/gateway-user-directory.channel.ts";
@@ -34,7 +37,7 @@ const PERSONAL_SCOPE_TYPES = new Set(["PRINCIPAL", "VIRTUAL_KEY"]);
 type Dependencies = Readonly<{
   permissions: Pick<GatewayScopePermissions, "sessionHolds" | "apiKeyHolds">;
   users: GatewayUserDirectoryChannel;
-  budgets: Pick<GatewayBudgetRepository, "getScopeOwnership">;
+  budgets: Pick<GatewayBudgetRepository, "getScopeOwnership" | "findScopeKeyOwnership">;
 }>;
 
 export class GatewayBudgetLedgerVisibilityService {
@@ -62,6 +65,40 @@ export class GatewayBudgetLedgerVisibilityService {
     if (await this.seesOthers({ organizationId, reader })) return;
     const gone = await this.goneCreators({ owners: [scope.scopeKeyOwner] });
     refuseUnlessOpens({ scope, gone, reader });
+  }
+
+  /**
+   * A budget is created only on a scope {@link assertOpens} would open for its creator afterwards.
+   * Another person's scope is refused as an absent target is: a key as not found, a member as
+   * outside the organization, so neither answer confirms the person or the key.
+   */
+  async assertScopeOpens({
+    scope,
+    organizationId,
+    reader,
+  }: {
+    scope: GatewayBudgetScope;
+    organizationId: string;
+    reader: GatewayBudgetReader;
+  }): Promise<void> {
+    if (scope.kind !== "PRINCIPAL" && scope.kind !== "VIRTUAL_KEY") return;
+    if (await this.seesOthers({ organizationId, reader })) return;
+    const ownership: BudgetScopeOwnership =
+      scope.kind === "PRINCIPAL"
+        ? { scopeType: "PRINCIPAL", scopeId: scope.principalUserId, scopeKeyOwner: null }
+        : {
+            scopeType: "VIRTUAL_KEY",
+            scopeId: scope.virtualKeyId,
+            scopeKeyOwner: await this.dependencies.budgets.findScopeKeyOwnership({
+              virtualKeyId: scope.virtualKeyId,
+              organizationId,
+            }),
+          };
+    const gone = await this.goneCreators({ owners: [ownership.scopeKeyOwner] });
+    if (opensFor({ scope: ownership, gone, reader })) return;
+    throw scope.kind === "PRINCIPAL"
+      ? new GatewayScopeOrgMismatchError("user")
+      : new VirtualKeyNotFoundError();
   }
 
   /**
@@ -217,20 +254,22 @@ function budgetOwnership({
     : { kind: "ownerUnnamed" };
 }
 
-/** For a reader without `virtualKeys:viewOtherPersonal`: another person's budget is not found. */
-function refuseUnlessOpens({
-  scope,
-  gone,
-  reader,
-}: {
+type ScopeReading = {
   scope: BudgetScopeOwnership;
   gone: ReadonlySet<string>;
   reader: GatewayBudgetReader;
-}): void {
+};
+
+/** For a reader without `virtualKeys:viewOtherPersonal`: shared, or the reader's own. */
+function opensFor({ scope, gone, reader }: ScopeReading): boolean {
   const ownership = budgetOwnership({ scope, gone });
-  if (ownership.kind === "shared") return;
-  if (ownership.kind === "owned" && isReader({ userId: ownership.userId, reader })) return;
-  throw new GatewayBudgetNotFoundError();
+  if (ownership.kind === "shared") return true;
+  return ownership.kind === "owned" && isReader({ userId: ownership.userId, reader });
+}
+
+/** For a reader without `virtualKeys:viewOtherPersonal`: another person's budget is not found. */
+function refuseUnlessOpens(reading: ScopeReading): void {
+  if (!opensFor(reading)) throw new GatewayBudgetNotFoundError();
 }
 
 function withoutOwner({

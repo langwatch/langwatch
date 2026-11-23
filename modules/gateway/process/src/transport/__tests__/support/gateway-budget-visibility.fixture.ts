@@ -8,8 +8,12 @@ import {
   trpcFailureTraceIds,
 } from "@langwatch/api/trpc";
 import { type AuthzApi, permissionsConferred } from "@langwatch/authz-contract";
-import type { GatewayBudget, GatewayBudgetDebitRow } from "@langwatch/gateway-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import type {
+  GatewayBudget,
+  GatewayBudgetDebitRow,
+  GatewayBudgetScope,
+} from "@langwatch/gateway-contract";
+import { MemberNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
@@ -52,6 +56,9 @@ const KEYS = {
   vk_machine: { principalUserId: null, createdById: `svc_${TENANT_PROJECT_ID}` },
 } as const;
 export type KeyId = keyof typeof KEYS | "vk_deleted";
+
+/** A scope a budget can be one person's through: a member, or a key. */
+export type PersonalScope = Extract<GatewayBudgetScope, { kind: "PRINCIPAL" | "VIRTUAL_KEY" }>;
 
 export function budgetScopedTo(scope: Pick<GatewayBudget, "scopeType" | "scopeId">): GatewayBudget {
   const now = nowInstant();
@@ -180,6 +187,19 @@ async function seededGateway({
         slug: "organization",
         createdAt: nowInstant(),
       }),
+      getMember: async ({ organizationId, userId }) => {
+        if (!(userId in ROLES)) throw new MemberNotFoundError(userId);
+        return {
+          userId,
+          organizationId,
+          role: ROLES[userId as Caller],
+          disabledAt: null,
+          createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+          updatedAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+          user: { id: userId, name: userId, email: `${userId}@example.test` },
+          teams: [],
+        };
+      },
     }),
   });
   return { app, channels };
@@ -212,6 +232,15 @@ export async function gatewayFor({
     rename: (id = BUDGET_ID) => procedures.update({ id, organizationId: ORG_ID, name: "renamed" }),
     archive: (id = BUDGET_ID) => procedures.archive({ id, organizationId: ORG_ID }),
     reset: (id = BUDGET_ID) => procedures.reset({ id, organizationId: ORG_ID }),
+    create: (scope: PersonalScope) =>
+      procedures.create({
+        organizationId: ORG_ID,
+        scope,
+        name: "created",
+        window: "MONTH",
+        limitUsd: 10,
+        allowUnreachable: false,
+      }),
     asked,
     lookedUp: () => sorted(channels.users.asked),
   };

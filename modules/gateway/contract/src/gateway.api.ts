@@ -17,6 +17,7 @@ import type {
   GatewayBudgetDebitRow,
   GatewayBudgetDetail,
   GatewayBudgetReader,
+  GatewayBudgetScope,
   GatewayBudgetListWithHealth,
   GatewayBudgetPageWithHealth,
   GatewayBudgetResolutionTarget,
@@ -651,6 +652,15 @@ export interface GatewayApi extends GatewayInternalProtocol {
    */
   assertBudgetOpensFor(input: {
     id: string;
+    organizationId: string;
+    reader: GatewayBudgetReader;
+  }): Promise<void>;
+  /**
+   * Refuses to create a budget on a member or a personal key the reader could not open afterwards
+   * (see `assertBudgetOpensFor`): a key as `virtual_key_not_found`, a member as outside the org.
+   */
+  assertBudgetScopeOpensFor(input: {
+    scope: GatewayBudgetScope;
     organizationId: string;
     reader: GatewayBudgetReader;
   }): Promise<void>;

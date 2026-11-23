@@ -118,6 +118,7 @@ function mount(
       projectId: PROJECT_ID,
     }),
     assertBudgetOpensFor: async () => undefined,
+    assertBudgetScopeOpensFor: async () => undefined,
     ...overrides,
   });
   const door = ({ request }: { request: Request }) => {

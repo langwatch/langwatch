@@ -327,6 +327,14 @@ export class MemoryGatewayBudgetRepository extends GatewayBudgetRepository {
     };
   }
 
+  async findScopeKeyOwnership(input: {
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<VirtualKeyOwnership | null> {
+    const key = this.store.virtualKeys.get(input.virtualKeyId);
+    return key?.organizationId === input.organizationId ? this.#ownerOf(key.id) : null;
+  }
+
   async findDetailById(input: GatewayBudgetReadInput): Promise<BudgetDetail | null> {
     const stored = this.#stored(input);
     if (!stored) return null;

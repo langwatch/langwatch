@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * Who may open, edit, reset and archive a budget scoped to one member, off the real control plane.
+ * Who may create, open, edit, reset and archive a member's budget, off the real control plane.
  * @see modules/gateway/specs/gateway-budget-service.feature
  */
 import { describe, expect, it } from "vitest";
@@ -10,6 +10,7 @@ import {
   BUDGET_NOT_FOUND,
   budgetScopedTo,
   gatewayFor,
+  type PersonalScope,
   refusalOf,
 } from "./support/gateway-budget-visibility.fixture.ts";
 
@@ -105,6 +106,65 @@ describe("gatewayBudgets get, update, archive and reset, a budget scoped to one 
       const opened = await (await gatewayFor({ caller: "usr_viewer", budget })).open();
 
       expect(opened.id).toBe(BUDGET_ID);
+    });
+  });
+});
+
+describe("gatewayBudgets create, on one member or on a personal key", () => {
+  const personalScopes: readonly (readonly [string, PersonalScope, PersonalScope, string])[] = [
+    [
+      "one member",
+      { kind: "PRINCIPAL", principalUserId: "usr_owner" },
+      { kind: "PRINCIPAL", principalUserId: "usr_unknown" },
+      "gateway_scope_org_mismatch",
+    ],
+    [
+      "a personal key",
+      { kind: "VIRTUAL_KEY", virtualKeyId: "vk_personal" },
+      { kind: "VIRTUAL_KEY", virtualKeyId: "vk_unknown" },
+      "virtual_key_not_found",
+    ],
+  ];
+
+  for (const [label, scope, absent, code] of personalScopes) {
+    describe(`given a budget scoped to ${label}`, () => {
+      /** @scenario "A budget on one person or on a personal key is created only by that person and those allowed to see other members' personal keys" */
+      it("creates it for its owner", async () => {
+        const created = await (await gatewayFor({ caller: "usr_owner" })).create(scope);
+
+        expect(created.scopeType).toBe(scope.kind);
+      });
+
+      /** @scenario "A budget on one person or on a personal key is created only by that person and those allowed to see other members' personal keys" */
+      it("creates it for an organization admin", async () => {
+        const created = await (await gatewayFor({ caller: "usr_admin" })).create(scope);
+
+        expect(created.scopeType).toBe(scope.kind);
+      });
+
+      /** @scenario "A budget on one person or on a personal key is created only by that person and those allowed to see other members' personal keys" */
+      it("refuses another member exactly as an admin is refused a target that does not exist", async () => {
+        const refused = await refusalOf(
+          (await gatewayFor({ caller: "usr_member" })).create(scope),
+        );
+        const absentForAdmin = await refusalOf(
+          (await gatewayFor({ caller: "usr_admin" })).create(absent),
+        );
+
+        expect(refused).toMatchObject({ data: { error: { code } } });
+        expect(refused).toEqual(absentForAdmin);
+      });
+    });
+  }
+
+  describe("given a budget scoped to a shared key", () => {
+    /** @scenario "A budget on one person or on a personal key is created only by that person and those allowed to see other members' personal keys" */
+    it("creates it for any member allowed to create budgets", async () => {
+      const gateway = await gatewayFor({ caller: "usr_member" });
+
+      const created = await gateway.create({ kind: "VIRTUAL_KEY", virtualKeyId: "vk_shared" });
+
+      expect(created.scopeId).toBe("vk_shared");
     });
   });
 });

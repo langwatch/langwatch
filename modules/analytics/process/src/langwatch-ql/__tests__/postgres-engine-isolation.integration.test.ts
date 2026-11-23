@@ -95,6 +95,9 @@ function personalUsageSeed({ tenant }: { tenant: string }): string[] {
     `'MONTH', 10, now(), '${user}')`;
   const debit = (suffix: string, budgetId: string, keyId: string) =>
     `('${tenant}-led-${suffix}', '${budgetId}', '${keyId}', 'req-${suffix}', 1, 'gpt-5')`;
+  const boundary = (suffix: string, anchorId: string) =>
+    `('${tenant}-bnd-${suffix}', '${org}', '${tenant}-bdg-${suffix}', ` +
+    `'${anchorId}:end-user-1', now())`;
   return [
     `INSERT INTO "VirtualKey" ("id", "organizationId", "name", "hashedSecret", ` +
       `"displayPrefix", "principalUserId", "mintedAsPersonal", "createdById") VALUES ` +
@@ -109,6 +112,7 @@ function personalUsageSeed({ tenant }: { tenant: string }): string[] {
       [
         budget("principal", "PRINCIPAL", user),
         budget("attributed", "ATTRIBUTED_USER", `${tenant}-vk`),
+        budget("attributed-personal", "ATTRIBUTED_USER", personal),
         budget("shared-key", "VIRTUAL_KEY", `${tenant}-vk`),
         budget("personal-key", "VIRTUAL_KEY", personal),
         budget("orphaned-key", "VIRTUAL_KEY", orphaned),
@@ -125,8 +129,11 @@ function personalUsageSeed({ tenant }: { tenant: string }): string[] {
         debit("on-attributed", `${tenant}-bdg-attributed`, `${tenant}-vk`),
       ].join(", "),
     `INSERT INTO "GatewayBudgetBucketBoundary" ("id", "organizationId", "budgetId", ` +
-      `"bucketScopeId", "periodStartedAt") VALUES ('${tenant}-bnd-attributed', '${org}', ` +
-      `'${tenant}-bdg-attributed', '${tenant}-vk:end-user-1', now())`,
+      `"bucketScopeId", "periodStartedAt") VALUES ` +
+      [
+        boundary("attributed", `${tenant}-vk`),
+        boundary("attributed-personal", personal),
+      ].join(", "),
   ];
 }
 
@@ -134,7 +141,7 @@ function personalUsageCleanup({ tenant }: { tenant: string }): string[] {
   const keyIds = Object.values(personalUsageKeys({ tenant })).map((id) => `'${id}'`);
   return [
     `DELETE FROM "GatewayBudgetLedger" WHERE "id" LIKE '${tenant}-led-%'`,
-    `DELETE FROM "GatewayBudgetBucketBoundary" WHERE "id" = '${tenant}-bnd-attributed'`,
+    `DELETE FROM "GatewayBudgetBucketBoundary" WHERE "id" LIKE '${tenant}-bnd-%'`,
     `DELETE FROM "GatewayBudget" WHERE "id" LIKE '${tenant}-bdg-%'`,
     `DELETE FROM "VirtualKey" WHERE "id" IN (${keyIds.join(", ")})`,
   ];
@@ -1100,11 +1107,11 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
     });
 
     /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
-    it("keeps shared and per-end-user usage, and drops personal-key spend and member budgets", async () => {
+    it("keeps shared and per-end-user usage, and drops personal-key usage and member budgets", async () => {
       const ledger = await idsIn("gateway_budget_ledgers", "GatewayBudgetLedgerId");
       const budgets = await idsIn("gateway_budgets", "GatewayBudgetId");
       const droppedLedger = seeded("led", ["personal", "minted", "on-principal"]);
-      const droppedBudgets = seeded("bdg", ["principal", "personal-key"]);
+      const droppedBudgets = seeded("bdg", ["principal", "personal-key", "attributed-personal"]);
 
       expect(ledger).toContain(`${tenant()}-GatewayBudgetLedger-1`);
       expect(ledger).toContain(`${tenant()}-led-on-attributed`);

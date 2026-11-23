@@ -121,6 +121,7 @@ import {
   type GatewayBudgetResource,
   type GatewayBudgetDetail,
   type GatewayBudgetReader,
+  type GatewayBudgetScope,
   type GatewayBudgetScopeTarget,
   type GatewayCacheRuleResource,
   type GatewayBudgetScopeReachResult,
@@ -2032,6 +2033,14 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     reader: GatewayBudgetReader;
   }): Promise<void> {
     return this.#dependencies.budgetLedgerVisibility.assertOpens(input);
+  }
+
+  assertBudgetScopeOpensFor(input: {
+    scope: GatewayBudgetScope;
+    organizationId: string;
+    reader: GatewayBudgetReader;
+  }): Promise<void> {
+    return this.#dependencies.budgetLedgerVisibility.assertScopeOpens(input);
   }
 
   createBudget(input: CreateGatewayBudgetInput): Promise<GatewayBudgetResource> {

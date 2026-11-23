@@ -224,7 +224,7 @@ async function mountedBudgets() {
 }
 
 describe("the platform family's budget routes", () => {
-  describe("given a virtual-key and a principal budget created over REST", () => {
+  describe("given a virtual-key and an organization budget created over REST", () => {
     /** @scenario A VK-scoped budget created over REST is visible in the REST list */
     it("lists both with spend available, and filters them by scope type", async () => {
       const { call } = await mountedBudgets();
@@ -236,8 +236,8 @@ describe("the platform family's budget routes", () => {
           limit_usd: "10",
         }),
         await call("POST", "/budgets", {
-          name: "person cap",
-          scope: { kind: "principal", principal_user_id: USER_ID },
+          name: "organization cap",
+          scope: { kind: "organization", organization_id: ORGANIZATION_ID },
           window: "month",
           limit_usd: "20",
         }),
@@ -245,16 +245,16 @@ describe("the platform family's budget routes", () => {
 
       const all = await call("GET", "/budgets");
       const keyOnly = await call("GET", "/budgets?scope_type=virtual_key");
-      const orgAndTeam = await call("GET", "/budgets?scope_type=organization,team");
+      const principalAndTeam = await call("GET", "/budgets?scope_type=principal,team");
 
       expect(created.map((answer) => answer.status)).toEqual([201, 201]);
       expect(all.body.spend_available).toBe(true);
       expect(all.body.data?.map((row) => row.scope_type).toSorted()).toEqual([
-        "principal",
+        "organization",
         "virtual_key",
       ]);
       expect(keyOnly.body.data?.map((row) => row.scope_type)).toEqual(["virtual_key"]);
-      expect(orgAndTeam.body.data).toEqual([]);
+      expect(principalAndTeam.body.data).toEqual([]);
     });
   });
 

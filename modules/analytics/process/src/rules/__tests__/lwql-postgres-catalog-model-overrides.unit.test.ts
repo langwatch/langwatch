@@ -285,27 +285,31 @@ describe("given the derived Postgres catalog's overrides", () => {
       );
     });
 
+    /** The budget `alias` names is one member's or a personal key's, or caps its end users. */
+    const personalBudgetOf = (alias: string) =>
+      `${alias}."scopeType" IN ('PRINCIPAL') OR ` +
+      `(${alias}."scopeType" IN ('VIRTUAL_KEY', 'ATTRIBUTED_USER') AND ` +
+      `${personalKeyOf(`${alias}."scopeId"`)})`;
+
     /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
-    it("leaves budgets scoped to one member or to a personal key out, for every caller", () => {
-      expect(statementOf("GatewayBudget")).toContain(
-        `\nWHERE ("m"."scopeType" NOT IN ('PRINCIPAL') AND ` +
-          `("m"."scopeType" <> 'VIRTUAL_KEY' OR NOT ${personalKeyOf(`"m"."scopeId"`)}))`,
+    it("leaves budgets scoped to one member or to a personal key, or over a personal key's end users, out for every caller", () => {
+      expect(statementOf("GatewayBudget")).toContain(`\nWHERE (NOT (${personalBudgetOf(`"m"`)}))`);
+    });
+
+    /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
+    it("keeps the spend of per-end-user budgets through shared keys, whose end users are not members", () => {
+      expect(statementOf("GatewayBudgetLedger")).not.toContain("'ATTRIBUTED_USER'");
+    });
+
+    /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
+    it("leaves out the bucket boundaries of every budget gateway_budgets leaves out", () => {
+      expect(statementOf("GatewayBudgetBucketBoundary")).toContain(
+        `\nWHERE (NOT EXISTS (\n` +
+          `  SELECT 1 FROM "public"."GatewayBudget" AS "b"\n` +
+          `  WHERE "b"."id" = "m"."budgetId"\n` +
+          `    AND (${personalBudgetOf(`"b"`)})\n` +
+          `))`,
       );
-    });
-
-    /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
-    it("keeps per-end-user budgets and their spend, whose end users are not members", () => {
-      for (const baseRelation of ["GatewayBudget", "GatewayBudgetLedger"]) {
-        expect(statementOf(baseRelation), baseRelation).not.toContain("'ATTRIBUTED_USER'");
-      }
-    });
-
-    /** @scenario "The budget views return no rows for personal keys or person-scoped budgets, for any reader" */
-    it("shows the bucket boundaries of every budget, per-end-user ones included", () => {
-      const statement = statementOf("GatewayBudgetBucketBoundary");
-
-      expect(statement).not.toContain(`"GatewayBudget" AS "b"`);
-      expect(statement).not.toContain("'ATTRIBUTED_USER'");
     });
 
     /** @scenario "A key with no owner whose creator's account is gone counts as personal, unless a machine created it" */
@@ -325,7 +329,10 @@ describe("given the derived Postgres catalog's overrides", () => {
         "Spend through a personal key, or against a budget scoped to one member, is not queryable.",
       );
       expect(byName.get("gateway_budgets")?.description).toContain(
-        "Budgets scoped to one member or to a personal key are not queryable.",
+        "Budgets scoped to one member or to a personal key, or capping each end user of a personal key, are not queryable.",
+      );
+      expect(byName.get("gateway_budget_bucket_boundaries")?.description).toContain(
+        "Boundaries of a budget that gateway_budgets leaves out are not queryable either.",
       );
     });
   });

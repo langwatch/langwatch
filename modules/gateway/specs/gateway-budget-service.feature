@@ -92,6 +92,15 @@ Feature: Gateway budget decision service
     And any other key is answered exactly as for a budget that does not exist
     And a budget scoped to a shared key, or capping each end user of a key, opens for the viewer
 
+  @integration
+  Scenario: A budget on one person or on a personal key is created only by that person and those allowed to see other members' personal keys
+    Given a member, that member's personal key, and a shared key
+    When the member, an organization admin and another member each create a budget scoped to the member or to the personal key
+    Then the member and the admin create it
+    And the other member is refused exactly as for a target that does not exist: the key as virtual_key_not_found, the member as gateway_scope_org_mismatch
+    And over the REST API, a key acting for the member or holding that permission at the organization creates it, and any other key is refused the same way
+    And a budget scoped to the shared key is created for anyone allowed to create budgets
+
   @unit
   Scenario: A key with no owner whose creator's account is gone counts as personal on a budget's detail
     Given a budget whose recent ledger holds a row from a key with no principal, never marked personal, whose creator's account is gone

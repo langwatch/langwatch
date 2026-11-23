@@ -438,6 +438,7 @@ describe("the gateway platform family's idempotent creates", () => {
         actorUserId: "user_1",
       }),
       createBudget,
+      assertBudgetScopeOpensFor: async () => undefined,
       groupMemberCounts: async () => new Map<string, number>(),
       budgetScopeReach: async () => ({
         reachable: true,
@@ -572,6 +573,7 @@ describe("the gateway platform family's caller", () => {
         app: createApiFixture<GatewayApi>({
           getKeyCaller,
           createBudget,
+          assertBudgetScopeOpensFor: async () => undefined,
           groupMemberCounts: async () => new Map<string, number>(),
           budgetScopeReach: async () => ({
             reachable: true,

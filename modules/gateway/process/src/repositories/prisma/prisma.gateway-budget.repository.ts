@@ -798,12 +798,22 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     if (!budget) throw new GatewayBudgetNotFoundError();
     const scopeKeyOwner =
       budget.scopeType === "VIRTUAL_KEY"
-        ? await this.prisma.virtualKey.findFirst({
-            where: { id: budget.scopeId, organizationId },
-            select: { principalUserId: true, mintedAsPersonal: true, createdById: true },
-          })
+        ? await this.findScopeKeyOwnership({ virtualKeyId: budget.scopeId, organizationId })
         : null;
     return { scopeType: budget.scopeType, scopeId: budget.scopeId, scopeKeyOwner };
+  }
+
+  findScopeKeyOwnership({
+    virtualKeyId,
+    organizationId,
+  }: {
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<VirtualKeyOwnership | null> {
+    return this.prisma.virtualKey.findFirst({
+      where: { id: virtualKeyId, organizationId },
+      select: { principalUserId: true, mintedAsPersonal: true, createdById: true },
+    });
   }
 
   /**

@@ -167,6 +167,11 @@ export abstract class GatewayBudgetRepository {
     id: string;
     organizationId: string;
   }): Promise<BudgetScopeOwnership>;
+  /** Whose key a VIRTUAL_KEY budget would be scoped to; null when the organization lacks it. */
+  abstract findScopeKeyOwnership(input: {
+    virtualKeyId: string;
+    organizationId: string;
+  }): Promise<VirtualKeyOwnership | null>;
   abstract findScopeReachCandidates(organizationId: string): Promise<GatewayKeyReachRow[]>;
   /** Refuses a request-supplied scope id naming anything outside the budget's organization. */
   abstract assertScopeWithinOrganization(input: CreateBudgetInput): Promise<void>;
