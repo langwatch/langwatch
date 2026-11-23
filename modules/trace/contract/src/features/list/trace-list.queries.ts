@@ -337,9 +337,9 @@ export type TraceListRepository = TraceListRead;
 export const TRACE_LIST_MAX_OFFSET_ROWS = 100_000;
 
 /**
- * Keeps each trace_summaries trace's latest version. Both sets hold only traces with an older
- * version in the window, so they stay small however many traces or versions there are: a trace
- * with one version passes, any other keeps its newest. specs/traces-v2/latest-version-dedup.feature
+ * Keeps each trace_summaries trace's latest version in `where`, a filter on one unjoined table.
+ * Both sets hold one entry per trace with an older version there, so they stay small; the row
+ * must match `where` too. specs/traces-v2/latest-version-dedup.feature
  */
 export function latestTraceVersionOnly({
   where,
@@ -355,9 +355,9 @@ export function latestTraceVersionOnly({
       WHERE ${where}
       GROUP BY id
       HAVING min(UpdatedAt) < max(UpdatedAt)`;
-  return `(${id} NOT IN (
+  return `((${where}) AND (${id} NOT IN (
       ${versioned("")}
     ) OR (${id}, ${column("UpdatedAt")}) IN (
       ${versioned(", max(UpdatedAt)")}
-    ))`;
+    )))`;
 }

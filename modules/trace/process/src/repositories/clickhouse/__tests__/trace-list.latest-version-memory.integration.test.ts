@@ -7,7 +7,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { latestTraceVersionOnly } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   startMigratedTraceClickHouse,
@@ -100,6 +100,35 @@ async function countLatest({
 describe.skipIf(!clickHouseConfigured)("given trace_summaries with superseded versions", () => {
   beforeAll(async () => {
     ch = await startMigratedTraceClickHouse();
+    // Unmerged parts keep every seeded version until the reads finish.
+    await ch.command({ query: "SYSTEM STOP MERGES trace_summaries" });
+  });
+
+  afterAll(async () => {
+    await ch?.command({ query: "SYSTEM START MERGES trace_summaries" });
+  });
+
+  describe("when a trace has one version inside the window and a newer one after it", () => {
+    const tenant = freshTenant();
+
+    beforeAll(async () => {
+      await seedVersions({ tenant, first: 0, count: 10, version: 0 });
+      await seedVersions({ tenant, first: 0, count: 10, version: 30 });
+    });
+
+    /** @scenario "A version outside the dedup window never passes" */
+    it("keeps only the version inside the window", async () => {
+      const outer = windowOf(tenant);
+      const inner = `${outer} AND UpdatedAt <= ${BASE} + INTERVAL 10 SECOND`;
+      const result = await ch.query({
+        query: `SELECT count() AS rows FROM trace_summaries
+          WHERE ${outer} AND ${latestTraceVersionOnly({ where: inner })}`,
+        format: "JSONEachRow",
+      });
+      const [row] = await result.json<{ rows: string }>();
+
+      expect(Number(row?.rows)).toBe(10);
+    });
   });
 
   describe("when 100,000 of 600,000 traces have an older and a newer version", () => {

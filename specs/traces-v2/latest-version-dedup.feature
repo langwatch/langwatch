@@ -20,3 +20,9 @@ Feature: Trace reads keep each trace's latest version without a set of every tra
     When a read keeps only each trace's latest version
     Then it counts every trace once, on its newest version
     And it needs at most twice the memory of a set of every latest version
+
+  @integration @regression
+  Scenario: A version outside the dedup window never passes
+    Given traces with one version inside the dedup window and a newer version after it
+    When a read over a wider window keeps only each trace's latest version
+    Then it returns each trace once, on the version inside the dedup window
