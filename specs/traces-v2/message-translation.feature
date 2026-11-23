@@ -108,3 +108,11 @@ Feature: Message translation in the trace details drawer
       When the user clicks any Translate action in the drawer
       Then a toast tells them to double-check their Fast model configuration in Model Providers
       And the view returns to the untranslated state
+
+  Rule: Translate reaches the NLP engine the way every other model call does
+
+    @unit @regression
+    Scenario: Translate built through the app sends the NLP engine its internal secret
+      Given a deployment whose NLP engine requires its internal secret
+      When a trace message is translated through the model provider app
+      Then the engine call carries the X-LangWatch-NLP-Secret header
