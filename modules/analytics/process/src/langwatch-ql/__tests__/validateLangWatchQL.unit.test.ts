@@ -10,6 +10,7 @@ import {
  */
 import { describe, expect, it } from "vitest";
 
+import { LWQL_ALLOWED_FUNCTION_NAMES } from "../../features/app-functions/rules/langwatch-ql-functions.rules.ts";
 import type { LangWatchQLValidation } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
@@ -429,6 +430,7 @@ describe("validateLangWatchQL given a set membership test", () => {
       "SELECT count() FROM spans " +
         "WHERE TraceId IN (SELECT TraceId FROM traces) AND TraceId IN gateway_request_spend",
     ],
+    ["an array column", "SELECT count() FROM traces WHERE 'gpt-4' IN Models"],
     ["a name wrapped in a function", "SELECT count() FROM spans WHERE TraceId IN tuple(traces)"],
     [
       "a name beside literals in a nested function",
@@ -444,6 +446,19 @@ describe("validateLangWatchQL given a set membership test", () => {
   });
 
   /** @scenario "A set membership test names its set with a subquery" */
+  it("refuses a plain-name set for every allowed set test function", () => {
+    const setTests = LWQL_ALLOWED_FUNCTION_NAMES.filter((name) =>
+      /^(global)?(not)?(null)?in(ignoreset)?$/i.test(name),
+    );
+
+    expect(setTests).toEqual(expect.arrayContaining(["in", "notIn", "globalIn", "globalNotIn"]));
+    for (const name of setTests) {
+      const sql = `SELECT count() FROM spans WHERE ${name}(TraceId, traces)`;
+      expect(codesOf(validate(sql)), name).toContain("IN_TABLE_OPERAND");
+    }
+  });
+
+  /** @scenario "A set membership test names its set with a subquery" */
   it("tells the caller to write the set as a subquery or as values", () => {
     const result = validate("SELECT count() FROM spans WHERE TraceId IN traces");
 
@@ -454,6 +469,7 @@ describe("validateLangWatchQL given a set membership test", () => {
       "x IN (SELECT ... FROM view)",
       "x IN ('a', 'b')",
       "x IN {ids:Array(String)}",
+      "has(column, x)",
     ]) {
       expect(violation?.message).toContain(remedy);
       expect(violation?.hint).toContain(remedy);
@@ -498,6 +514,10 @@ describe("validateLangWatchQL given a set membership test", () => {
       "SELECT count() FROM spans WHERE TraceId IN tuple('a', tuple('b', 'c'))",
     ],
     ["a query parameter", "SELECT count() FROM spans WHERE TraceId NOT IN {ids:Array(String)}"],
+    [
+      "an array column test written with has",
+      "SELECT count() FROM traces WHERE has(Models, 'gpt-4')",
+    ],
     [
       "an allowed function over a lambda and literals",
       "SELECT count() FROM spans WHERE 1 IN arrayFilter(y -> y > 0, [1, 2, 3])",

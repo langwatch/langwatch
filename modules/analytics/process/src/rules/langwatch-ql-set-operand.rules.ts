@@ -4,10 +4,10 @@
  * @see specs/lwql/api.feature, scenario: A set membership test names its set with a subquery
  */
 import { isNode, type SqlAstNode } from "./langwatch-ql-parser.rules.ts";
+import { DEFAULT_VIOLATION_HINTS } from "./langwatch-ql-violations.rules.ts";
 
 /** What an `IN_TABLE_OPERAND` refusal tells the caller, from the validator and the scope step. */
-export const IN_TABLE_OPERAND_MESSAGE =
-  "The set of an IN test cannot be a plain name. Write rows of a view as a subquery, x IN (SELECT ... FROM view), and a list of values inline, x IN ('a', 'b'), or as a bound parameter, x IN {ids:Array(String)}.";
+export const IN_TABLE_OPERAND_MESSAGE = `The set of an IN test cannot be a plain name. ${DEFAULT_VIOLATION_HINTS.IN_TABLE_OPERAND}`;
 
 /** The set membership tests, by the names `IN` and its variants parse to, lower-cased. */
 const SET_MEMBERSHIP_FUNCTIONS: ReadonlySet<string> = new Set([
