@@ -1,8 +1,8 @@
 diff --git a/dist/db/internal-adapter.mjs b/dist/db/internal-adapter.mjs
-index f1da35d..19def98 100644
+index f1da35d..c1bb2c2 100644
 --- a/dist/db/internal-adapter.mjs
 +++ b/dist/db/internal-adapter.mjs
-@@ -606,8 +606,8 @@ const createInternalAdapter = (adapter, ctx) => {
+@@ -606,8 +606,9 @@ const createInternalAdapter = (adapter, ctx) => {
  				join: { ...options?.includeAccounts ? { account: true } : {} }
  			});
  			if (!result) return null;
@@ -10,6 +10,7 @@ index f1da35d..19def98 100644
 -			if (normalize(result.email) !== normalize(email)) return null;
 +			// LangWatch: the identity storage adapter resolves a verified secondary address to its user
 +			// (ADR-116), whose User.email is the primary, so the returned address is not compared here.
++			// Owned by identity; tested by modules/identity/process/src/__tests__/identity-storage-adapter-identity.unit.test.ts.
  			const { account: accounts, ...user } = result;
  			return {
  				user,

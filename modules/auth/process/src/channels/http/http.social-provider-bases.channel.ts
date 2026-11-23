@@ -16,6 +16,9 @@ const GITHUB_WEB = "https://github.com";
 const FETCH_TIMEOUT_MS = 10_000;
 
 /** The fields of GitHub's `/user` answer read here; the rest passes through as profile data. */
+/** One entry of GitHub's `/user/emails` answer. */
+type GitHubEmail = { email: string; primary?: boolean; verified?: boolean };
+
 type GitHubUser = Record<string, unknown> & {
   email?: string | null;
   name?: string | null;
@@ -105,14 +108,7 @@ function githubAt({ provider, base }: { provider: SocialProvider; base: string }
         headers,
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
-      const emails: { email: string; primary?: boolean; verified?: boolean }[] | null =
-        emailsResponse.ok
-          ? ((await emailsResponse.json()) as {
-              email: string;
-              primary?: boolean;
-              verified?: boolean;
-            }[])
-          : null;
+      const emails = emailsResponse.ok ? ((await emailsResponse.json()) as GitHubEmail[]) : null;
       if (!profile.email && emails) {
         profile.email = (emails.find((entry) => entry.primary) ?? emails[0])?.email;
       }
