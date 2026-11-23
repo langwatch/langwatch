@@ -163,6 +163,7 @@ function setup({
   presidioChannel,
   selfHosted = false,
   planType = "ENTERPRISE",
+  planSource = "license",
   planFails = false,
 }: {
   modelConfigured?: boolean;
@@ -173,6 +174,7 @@ function setup({
   presidioChannel?: PresidioChannel;
   selfHosted?: boolean;
   planType?: string;
+  planSource?: string;
   planFails?: boolean;
 } = {}) {
   const presidio = MemoryPresidioChannel.create({ endpoint: "http://langevals:5562" });
@@ -195,7 +197,7 @@ function setup({
     getActivePlan: async ({ organizationId }) => {
       planReads.push(organizationId);
       if (planFails) throw new Error("licence store unreachable");
-      return { planSource: "license", type: planType, name: planType, free: false } as never;
+      return { planSource, type: planType, name: planType, free: planSource === "free" } as never;
     },
   });
 
@@ -371,6 +373,27 @@ describe("PiiRedactionModelService", () => {
         } finally {
           vi.useRealTimers();
         }
+      });
+    });
+
+    describe("when the organization's Enterprise licence has expired", () => {
+      /** @scenario "A self-hosted organization whose Enterprise licence expired keeps the Presidio path" */
+      it("sends the batch to Presidio and counts it not_licensed", async () => {
+        // Entitlement answers a lapsed licence with the free baseline plan (its
+        // "An expired license resolves the baseline plan" scenario).
+        const { analysis, presidio, memoryModel, sent, fallbacks } = setup({
+          selfHosted: true,
+          planSource: "free",
+          planType: "OPEN_SOURCE",
+        });
+        presidio.answerWith(anonymized("call <PERSON>"));
+
+        const cleared = await analysis.clearPresidio(strictBatch());
+
+        expect(cleared).toEqual(["call [PERSON]"]);
+        expect(sent(memoryModel)).toHaveLength(0);
+        expect(sent(presidio)).toHaveLength(1);
+        expect(fallbacks).toEqual(["not_licensed"]);
       });
     });
 
