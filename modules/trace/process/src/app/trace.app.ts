@@ -3752,6 +3752,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     matches: readonly TraceAttributeMatch[];
     valueKey: string;
     values: readonly string[];
+    valuePrefixes?: readonly string[];
     sinceMs: number;
   }): Promise<{ value: string; count: number }[]> {
     const { projectId, ...query } = input;

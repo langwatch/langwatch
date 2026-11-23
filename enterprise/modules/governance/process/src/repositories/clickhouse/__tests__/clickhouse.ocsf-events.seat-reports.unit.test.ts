@@ -96,6 +96,7 @@ describe("ClickHouseOcsfEventsRepository.findLatestSeatReports", () => {
         tenantId: "gov-1",
         actionName: "seat_report",
         pushedSourceType: "ocsf_push",
+        securityLakeSourceType: "security_lake",
       });
       // TenantId leads the predicate — nothing else here is unique across
       // tenants — and neither value is spliced into the SQL text.

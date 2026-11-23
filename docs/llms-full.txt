@@ -7947,6 +7947,28 @@ The tRPC query `governance.ocsfExport` still returns the governance events in th
 
 **Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for how a fired alert reaches you, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.
 
+## Read AI events from AWS Security Lake
+
+LangWatch can subscribe to your AWS Security Lake and read the CloudTrail management and data events for Bedrock and SageMaker calls. Add a Security Lake source under Governance, Ingestion sources, with the subscriber role ARN, Region and queue URL that Security Lake gave you when you created the subscriber.
+
+LangWatch generates the source's external id when you add it. You can't choose it. Copy it from the source's edit form, or read it from the API, and set it as the `sts:ExternalId` condition in the subscriber role's trust policy. The trust policy must require it, or any LangWatch customer that knows the role ARN could ask LangWatch to assume your role.
+
+LangWatch reads each Parquet object the queue announces, keeps the model, agent and endpoint calls, and deletes the message only after the events are written. A message that keeps failing is recorded as poison once it passes its receive limit.
+
+### Minimal IAM for the subscriber role
+
+The access keys you store on the source are the base identity. That identity needs `sts:AssumeRole` on the subscriber role, and the role's trust policy must allow it only with the external id LangWatch generated as the `sts:ExternalId` condition. Before each read, LangWatch assumes the subscriber role with that external id and reads the queue and the bucket with the role's temporary credentials.
+
+The subscriber role needs only these permissions:
+
+- `s3:GetObject` on the Security Lake bucket prefix of the selected sources.
+- `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:ChangeMessageVisibility` and `sqs:GetQueueAttributes` on the subscriber queue. LangWatch extends a message's visibility while it reads the file. The connection test uses `sqs:GetQueueAttributes`.
+- `kms:Decrypt` on the lake key, only when the lake uses a customer managed KMS key.
+
+### Callers without traces
+
+The source page lists the principals that called a model in the last 30 days and sent no traces. A principal counts as traced when a trace in any project of the organisation carries its ARN in the `aws.principal.arn` attribute.
+
 ---
 
 # FILE: ./ai-gateway/governance/overview.mdx
@@ -66055,6 +66077,7 @@ The table lists each limit's current value; the **Kind** column marks which ones
 | GitHub pull requests per day           | 20                             | Hardcoded       | `LANGY_GITHUB_PRS_PER_DAY` (a code constant, not an env var)     |
 | Max concurrent workers                 | 20 (default)                   | Configurable    | `LANGY_MAX_WORKERS`                                              |
 | Idle worker reap                       | 10 minutes (600000 ms default) | Configurable    | `LANGY_WORKER_IDLE_MS`                                           |
+| Max worker age                         | 5 hours (18000000 ms default)  | Configurable    | `LANGY_WORKER_MAX_AGE_MS`                                        |
 | Per-session LangWatch API key lifetime | Short-lived, auto-expiring     | Fixed by design | Minted per chat, owned by the requesting user                    |
 | GitHub installation token lifetime     | 1 hour                         | Fixed by GitHub | Minted per turn, cached in Redis just under 1 hour, self-expires |
 
@@ -66070,7 +66093,7 @@ Langy runs one isolated worker per conversation. `LANGY_MAX_WORKERS` caps how ma
 
 ### Idle worker reap
 
-A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so no sensitive data stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. See [Sandbox](/langy/security/sandbox).
+A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so no sensitive data stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. A worker older than `LANGY_WORKER_MAX_AGE_MS` (default 5 hours) is replaced between turns, never during one, so its session key never expires mid-conversation; the next turn gets a fresh worker and key and resumes the session. See [Sandbox](/langy/security/sandbox).
 
 ### Per-session LangWatch API key
 
@@ -69752,7 +69775,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.26.0 # x-release-please-version
+    targetRevision: 3.27.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -69807,7 +69830,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.26.0 # x-release-please-version
+      targetRevision: 3.27.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -70216,7 +70239,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.26.0 # x-release-please-version
+VERSION=3.27.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -70232,13 +70255,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.26.0" # x-release-please-version
+    tag: "3.27.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.26.0" # x-release-please-version
+    tag: "3.27.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.26.0" # x-release-please-version
+    tag: "3.27.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -71643,6 +71666,7 @@ The agent-side variables (`LANGY_*` apart from the one below) are set on the `la
 |---|---|---|---|
 | `LANGY_MAX_WORKERS` | Max concurrent worker subprocesses before the pod returns 503. | No | `20` |
 | `LANGY_WORKER_IDLE_MS` | Idle-worker reap timeout. | No | `600000` (10 min) |
+| `LANGY_WORKER_MAX_AGE_MS` | Max worker age. A worker older than this is replaced between turns, so its session key (6 hours) never expires mid-conversation. | No | `18000000` (5 hours) |
 | `LANGY_READINESS_TIMEOUT_MS` | How long to wait for a freshly spawned worker to report ready. The Go default is 15000; the chart raises it to 60000 for gVisor cold boot. | No | `60000` (chart) |
 | `LANGY_WORKSPACE_ROOT` | Writable workspace root (an `emptyDir` mount). | No | `/workspace` |
 
@@ -75244,7 +75268,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.26.0 \
+  --version 3.27.0 \
   -f values-production.yaml
 # x-release-please-end
 ```
@@ -78054,6 +78078,64 @@ Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activ
 ---
 title: "Push OCSF events in from another source"
 openapi: "POST /api/v1/governance/ocsf/ingest"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/add-an-aws-security-lake-source.mdx
+
+---
+title: "Add an AWS Security Lake source"
+openapi: "POST /api/v1/governance/security-lake/sources"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/edit-an-aws-security-lake-source.mdx
+
+---
+title: "Edit an AWS Security Lake source"
+openapi: "PATCH /api/v1/governance/security-lake/sources/{sourceId}"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/overview.mdx
+
+---
+title: "Overview"
+description: "Add an AWS Security Lake subscriber as a source, test its queue and read its health. LangWatch reads the subscriber queue on the source's schedule and stores the AI activity it finds as OCSF events."
+---
+
+## Intro
+
+Add an AWS Security Lake subscriber as a source, test its queue and read its health. LangWatch reads the subscriber queue on the source's schedule and stores the AI activity it finds as OCSF events.
+
+---
+
+# FILE: ./api-reference/governance-security-lake/read-a-security-lake-source-s-health.mdx
+
+---
+title: "Read a Security Lake source's health"
+openapi: "GET /api/v1/governance/security-lake/sources/{sourceId}/health"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/read-a-security-lake-source.mdx
+
+---
+title: "Read a Security Lake source"
+openapi: "GET /api/v1/governance/security-lake/sources/{sourceId}"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/test-a-security-lake-source-s-connection.mdx
+
+---
+title: "Test a Security Lake source's connection"
+openapi: "POST /api/v1/governance/security-lake/sources/{sourceId}/test"
 ---
 
 ---

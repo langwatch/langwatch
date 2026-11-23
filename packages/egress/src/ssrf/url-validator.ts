@@ -29,6 +29,12 @@ export interface SsrfPolicy {
    * the `.local` / `.localhost` block for that exact host. Never metadata or a cloud domain.
    */
   allowedHosts: string[];
+  /**
+   * When true, a host under `.amazonaws.com` (a regional or VPC endpoint the caller signs to)
+   * skips the cloud-domain block. It is still resolved and judged: metadata always refused,
+   * private and loopback addresses refused under `blockLocal`.
+   */
+  allowAwsServiceHosts?: boolean;
 }
 
 /**
@@ -122,6 +128,29 @@ export function isBlockedCloudDomain(hostname: string): boolean {
   return BLOCKED_CLOUD_DOMAINS.some(
     (domain) => lowerHostname === domain.slice(1) || lowerHostname.endsWith(domain),
   );
+}
+
+/**
+ * Any name under amazonaws.com: service, regional and VPC (`vpce-*`) endpoints, but EC2 public
+ * names too. Not a filter on its own: the resolved address is still judged and pinned.
+ */
+function isAwsServiceHost(hostname: string): boolean {
+  const lower = withoutTrailingDot(hostname.toLowerCase());
+  return lower.endsWith(".amazonaws.com") && isIP(lower) === 0;
+}
+
+/** Whether the cloud-domain block applies: not to an allowlisted on-premise or named AWS host. */
+function isCloudDomainJudged({
+  hostname,
+  allowlisted,
+  policy,
+}: {
+  hostname: string;
+  allowlisted: boolean;
+  policy: SsrfPolicy;
+}): boolean {
+  if (allowlisted && isOnPremiseDomain(hostname)) return false;
+  return !(policy.allowAwsServiceHosts === true && isAwsServiceHost(hostname));
 }
 
 const onPremiseLabels = new Set<string>(ON_PREMISE_SUFFIXES.map((suffix) => suffix.slice(1)));
@@ -378,7 +407,7 @@ export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
     // an on-premise host the operator named exactly.
     validateNotMetadataEndpoint(ctx);
     const allowlisted = isAllowlisted(ctx, policy);
-    if (!(allowlisted && isOnPremiseDomain(hostname))) validateNotBlockedCloudDomain(ctx);
+    if (isCloudDomainJudged({ hostname, allowlisted, policy })) validateNotBlockedCloudDomain(ctx);
 
     if (allowlisted) return resolveAllowlisted(ctx);
 

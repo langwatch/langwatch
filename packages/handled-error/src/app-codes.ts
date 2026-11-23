@@ -78,6 +78,7 @@ export const APP_ERROR_CODES = [
   "aggregate_project_is_read_only",
   "aggregate_rule_outside_organization",
   "ai_call_failed",
+  "ai_content_filtered",
   "ai_query_provider_error",
   "already_organization_member",
   "analytics_aggregate_unattended_read",
