@@ -13,6 +13,7 @@ import { moduleApi } from "@langwatch/module";
 import type {
   BoardSummary,
   Dashboard,
+  DashboardProject,
   DashboardScope,
   DashboardScopeImpact,
   DashboardScopeProjects,
@@ -20,6 +21,7 @@ import type {
   DashboardStar,
   DashboardSummary,
   DashboardViewer,
+  OrganizationBoard,
   StarredDashboard,
 } from "./dashboard.ts";
 import type { Graph, GraphLayout } from "./graph.ts";
@@ -94,6 +96,29 @@ export interface DashboardApi {
     viewer?: DashboardViewer;
     includeOrganization?: boolean;
   }): Promise<BoardSummary[]>;
+  /**
+   * Every board the member may see across the organization, for the `/dashboards` library
+   * (ADR-002). Boards of a project with Dashboards off are left out; `dashboards_not_enabled`
+   * when no project of the organization has it on.
+   */
+  findBoardsInOrganization(input: {
+    organizationId: string;
+    viewer: DashboardViewer;
+  }): Promise<OrganizationBoard[]>;
+  /**
+   * One board of the organization, by the same rule as `findBoardsInOrganization`, for the
+   * org-level board pages (ADR-002); `dashboard_not_found` for any board that list leaves out.
+   */
+  getBoardInOrganization(input: {
+    organizationId: string;
+    viewer: DashboardViewer;
+    dashboardId: string;
+  }): Promise<OrganizationBoard>;
+  /** The projects with Dashboards on where the member may create a board, by name (ADR-002). */
+  findStoreProjects(input: {
+    organizationId: string;
+    viewer: DashboardViewer;
+  }): Promise<DashboardProject[]>;
   /** Where a reader opens each of these Dashboards boards, keyed by board id. */
   getBoardLinks(input: {
     projectId: string;

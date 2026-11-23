@@ -32,6 +32,8 @@ import {
   SHELL_SIDEBAR_WIDTH_EXPANDED,
 } from "../model/shell-layout.ts";
 import { useIsMobileViewport } from "./use-is-mobile-viewport.ts";
+import { useOrganizationDashboardsArea } from "./use-organization-dashboards-area.ts";
+import { useProjectAddressDestination } from "./use-project-address-redirect.ts";
 import { useReachableProducts } from "./use-reachable-products.ts";
 
 export interface NavigationShellReadyState {
@@ -83,6 +85,8 @@ export function useNavigationShellState({
     () => null,
   );
   const sidebarHint = honourDashboardsSidebarHint({ hint: storedHint, reachableProducts });
+  const organizationLibrary = useOrganizationDashboardsArea();
+  const projectAddressDestination = useProjectAddressDestination();
 
   const user = host.currentUser();
   const project = host.project();
@@ -97,8 +101,18 @@ export function useNavigationShellState({
     const reading = host.featureFlag(FrontendFlags[flag]);
     return !reading.isLoading && !reading.enabled;
   };
-  if (isSwitchedOffProductAt({ pathname, isFlagOff })) {
+  // The organization's library is about no project, so its flags are the organization's.
+  const isClosed =
+    organizationLibrary === "elsewhere"
+      ? isSwitchedOffProductAt({ pathname, isFlagOff })
+      : organizationLibrary === "closed";
+  if (isClosed) {
     return { status: "not-found" };
+  }
+  // With the library's flag off the address reads as before: a project it forwards to, if any.
+  if (organizationLibrary === "legacy") {
+    const isForwarding = projectAddressDestination !== null || host.isLoading();
+    return isForwarding ? { status: "loading" } : { status: "not-found" };
   }
 
   const route = resolveShellRoute({
@@ -114,7 +128,7 @@ export function useNavigationShellState({
     return { status: "chromeless" };
   }
 
-  if (!user || isShellDataPending({ host, route })) {
+  if (!user || organizationLibrary === "loading" || isShellDataPending({ host, route })) {
     return { status: "loading" };
   }
 

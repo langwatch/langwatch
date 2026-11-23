@@ -53,6 +53,25 @@ function contractCases(backend: DashboardBackend): void {
     });
   });
 
+  describe("when boards are read across projects", () => {
+    /** @scenario "The memory and Postgres dashboard repositories answer alike" */
+    it("answers every board the named projects own and none of another project", async () => {
+      const boards = backend.boards();
+      const own = await board("Own");
+      const theirs = await board("Theirs", backend.otherProjectId());
+
+      const both = await boards.findBoardsInProjects({
+        projectIds: [backend.projectId(), backend.otherProjectId()],
+      });
+      const onlyOwn = await boards.findBoardsInProjects({ projectIds: [backend.projectId()] });
+
+      expect(both.map((found) => found.id)).toEqual(expect.arrayContaining([own.id, theirs.id]));
+      expect(onlyOwn.map((found) => found.id)).toContain(own.id);
+      expect(onlyOwn.map((found) => found.id)).not.toContain(theirs.id);
+      await expect(boards.findBoardsInProjects({ projectIds: [] })).resolves.toEqual([]);
+    });
+  });
+
   describe("when a widget is placed on a board the project does not own", () => {
     /** @scenario "The memory and Postgres dashboard repositories answer alike" */
     it("refuses it as a missing board", async () => {

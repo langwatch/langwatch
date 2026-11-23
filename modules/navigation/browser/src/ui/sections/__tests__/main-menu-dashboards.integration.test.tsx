@@ -2,9 +2,11 @@
  * @vitest-environment jsdom
  * @see modules/dashboard/specs/dashboards-v1.feature
  * @see modules/navigation/specs/product-sidebars.feature
+ * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
 import {
+  OrganizationStarredDashboardsToken,
   SavedDashboardsToken,
   type SavedDashboardsProps,
   StarredDashboardsToken,
@@ -24,6 +26,9 @@ const dashboardsRelease: {
   byProject: Readonly<Record<string, boolean>>;
   fallback: boolean;
 } = vi.hoisted(() => ({ byProject: {}, fallback: false }));
+
+/** Whether the organization's flags open its Dashboards area. */
+const organizationLibrary: { open: boolean } = vi.hoisted(() => ({ open: false }));
 
 /**
  * The reader's own permissions as each project resolves them; `fallback` for a project not named.
@@ -73,7 +78,14 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
     personalWorkspaceFeatures: { get: { useQuery: () => ({}) } },
     limits: { getUsage: { useQuery: () => ({}) } },
     ops: { getBadgeCounts: { useQuery: () => ({}) } },
-    featureFlag: { isEnabledForEachOrganization: { useQuery: () => ({}) } },
+    featureFlag: {
+      isEnabledForEachOrganization: {
+        useQuery: () => ({
+          data: { enabledByOrganizationId: { "organization-1": organizationLibrary.open } },
+          isLoading: false,
+        }),
+      },
+    },
     authz: {
       effectivePermissions: {
         useQuery: ({ projectId }: { projectId: string }) => ({
@@ -132,6 +144,11 @@ function LentStarred({ project }: StarredDashboardsProps) {
   );
 }
 
+/** Stands in for analytics' lent "Starred dashboards" group of the library's sidebar. */
+function LentOrganizationStarred() {
+  return <div data-testid="organization-starred">Starred dashboards</div>;
+}
+
 const analyticsLends = uiDeclarations([
   {
     name: "analytics",
@@ -140,6 +157,10 @@ const analyticsLends = uiDeclarations([
       lends: [
         { token: SavedDashboardsToken, load: async () => ({ default: LentList }) },
         { token: StarredDashboardsToken, load: async () => ({ default: LentStarred }) },
+        {
+          token: OrganizationStarredDashboardsToken,
+          load: async () => ({ default: LentOrganizationStarred }),
+        },
       ],
     },
   },
@@ -213,6 +234,7 @@ afterEach(() => {
   cleanup();
   clearAllFeatureFlagOverrides();
   declarations.current = undefined;
+  organizationLibrary.open = false;
 });
 
 describe("the Dashboards product sidebar", () => {
@@ -247,6 +269,28 @@ describe("the Dashboards product sidebar", () => {
       renderSidebar({ surface: "dashboards", pathname: "/demo/dashboards" });
 
       expect(await screen.findByTestId("saved-dashboards")).toHaveTextContent("open:none");
+    });
+  });
+});
+
+describe("the Dashboards sidebar in the organization's library", () => {
+  describe("given the library is open", () => {
+    /** @scenario "The Dashboards sidebar at org level" */
+    it("lists All dashboards as current, Templates and the member's stars", async () => {
+      renderSidebar({ surface: "dashboards", pathname: "/dashboards", everyProductFlag: true });
+
+      expect(screen.getByRole("button", { name: "Quick Search" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "All dashboards" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      expect(screen.getByRole("link", { name: "Templates" })).toHaveAttribute(
+        "href",
+        "/dashboards/templates",
+      );
+      expect(await screen.findByTestId("organization-starred")).toBeInTheDocument();
+      expect(screen.queryByTestId("saved-dashboards")).toBeNull();
+      expect(screen.queryByTestId("starred-dashboards")).toBeNull();
     });
   });
 });
@@ -337,6 +381,80 @@ describe("the LLM Ops sidebar", () => {
       expect(link).toHaveAttribute("href", "/demo/analytics");
       expect(within(link).queryByText("Legacy")).toBeNull();
     });
+  });
+});
+
+describe("the other products' sidebars once the organization's Dashboards area is on", () => {
+  const otherProducts = [
+    { surface: "gateway", pathname: "/gateway/virtual-keys", project: SHOP },
+    { surface: "me", pathname: "/coding-agents", project: PERSONAL },
+    { surface: "governance", pathname: "/governance", project: SHOP },
+  ] as const;
+  const shopRemembered = {
+    openableTeams: [PERSONAL_TEAM, SHOP_TEAM],
+    rememberedProjectSlug: "shop",
+  } as const;
+
+  describe("given the area is off, in Gateway", () => {
+    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    it("keeps the project's Dashboards section and draws no starred group", async () => {
+      renderSidebar({
+        surface: "gateway",
+        pathname: "/gateway/virtual-keys",
+        project: SHOP,
+        everyProductFlag: true,
+        ...shopRemembered,
+      });
+
+      expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
+        "Pinned dashboards in Shop (project-shop)",
+      );
+      expect(screen.queryByTestId("organization-starred")).toBeNull();
+    });
+  });
+
+  describe("given the area is off, in Governance", () => {
+    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    it("draws no Dashboards section and no starred group", async () => {
+      renderSidebar({
+        surface: "governance",
+        pathname: "/governance",
+        project: SHOP,
+        everyProductFlag: true,
+        ...shopRemembered,
+      });
+
+      await expectNoSection();
+      expect(screen.queryByTestId("organization-starred")).toBeNull();
+    });
+  });
+
+  describe("given the area is on", () => {
+    /** @scenario "Gateway, Coding agents and Governance list my starred dashboards" */
+    it.each(otherProducts)(
+      "lists the starred group and no project's section in $surface",
+      async ({ surface, pathname, project }) => {
+        organizationLibrary.open = true;
+        renderSidebar({ surface, pathname, project, everyProductFlag: true, ...shopRemembered });
+
+        expect(await screen.findByTestId("organization-starred")).toBeInTheDocument();
+        await expectNoSection();
+      },
+    );
+  });
+
+  describe("given the area is on but every product's flag is off", () => {
+    /** @scenario "Gateway, Coding agents and Governance list my starred dashboards" */
+    it.each(otherProducts)(
+      "lists no starred group in $surface",
+      async ({ surface, pathname, project }) => {
+        organizationLibrary.open = true;
+        renderSidebar({ surface, pathname, project, ...shopRemembered });
+
+        await expectNoSection();
+        expect(screen.queryByTestId("organization-starred")).toBeNull();
+      },
+    );
   });
 });
 

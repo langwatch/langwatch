@@ -5,7 +5,7 @@
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { CreateProjectDrawerToken, CreateTeamDrawerToken } from "@langwatch/organization-client";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -143,9 +143,11 @@ const BASE_READINGS: StubNavigationReadings = {
 function renderShell({
   readings,
   personalScope = false,
+  mode,
 }: {
   readings?: Partial<StubNavigationReadings>;
   personalScope?: boolean;
+  mode?: "product-switcher" | "icon-rail";
 } = {}) {
   return renderWithDesignSystem(
     <WithStubNavigationHost
@@ -158,7 +160,7 @@ function renderShell({
         openDrawerByToken: openDrawerByTokenMock,
       }}
     >
-      <NavigationShell personalScope={personalScope}>
+      <NavigationShell personalScope={personalScope} {...(mode ? { mode } : {})}>
         <div data-testid="page-body" />
       </NavigationShell>
     </WithStubNavigationHost>,
@@ -267,6 +269,10 @@ describe("an address naming a project the reader does not have", () => {
 function productMenuItem(label: string) {
   return screen.getByText(label).closest("[role='menuitem']");
 }
+
+/** A product's tile in the icon rail, or null when the rail has none. */
+const railTile = (name: string) =>
+  within(screen.getByRole("navigation", { name: "Products" })).queryByRole("button", { name });
 
 async function openProductSwitcher() {
   const user = userEvent.setup();
@@ -1245,5 +1251,129 @@ describe("search entries in the shell", () => {
     });
     expect(screen.getAllByRole("button", { name: "Quick Search" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Top bar search" })).toHaveLength(1);
+  });
+});
+
+describe("the organization's Dashboards library at /dashboards", () => {
+  const libraryReadings: Partial<StubNavigationReadings> = {
+    pathname: "/dashboards",
+    permissions: [...(BASE_READINGS.permissions ?? []), "analytics:view"],
+    flags: {
+      ...BASE_READINGS.flags,
+      release_dashboards: { enabled: true, isLoading: false },
+      release_dashboards_organization_area: { enabled: true, isLoading: false },
+    },
+    notFound: <div data-testid="not-found" />,
+  };
+  const releasedTo = (organizations: Record<string, boolean>) => {
+    orgFlags = {
+      ...orgFlags,
+      release_dashboards: organizations,
+      release_dashboards_organization_area: organizations,
+    };
+  };
+
+  describe("when both flags are on for the organization", () => {
+    /** @scenario "The library shows only the organization in the top bar" */
+    it("draws the page with the organization and no project chip, Dashboards current", () => {
+      releasedTo({ org_1: true });
+      renderShell({ readings: libraryReadings });
+
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+      expect(screen.getByText("ACME")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Switch product" })).toHaveTextContent(
+        "Dashboards",
+      );
+      expect(screen.getByRole("link", { name: "All dashboards" })).toBeInTheDocument();
+    });
+
+    /** @scenario "The library shows only the organization in the top bar" */
+    it("highlights Dashboards in the icon rail", () => {
+      releasedTo({ org_1: true });
+      renderShell({ readings: libraryReadings, mode: "icon-rail" });
+
+      expect(railTile("Dashboards")).toHaveAttribute("aria-current", "page");
+      expect(railTile("LLM Ops")).not.toHaveAttribute("aria-current");
+    });
+
+    it("draws the page before any project resolves", () => {
+      releasedTo({ org_1: true });
+      renderShell({ readings: { ...libraryReadings, project: void 0, team: void 0 } });
+
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the organization has the new flag off", () => {
+    /** @scenario "With the flag off, /dashboards forwards to my project as before" */
+    it("forwards to the reader's project, as the address did before, drawing no page", async () => {
+      replaceMock.mockReset();
+      orgFlags = {
+        ...orgFlags,
+        release_dashboards: { org_1: true },
+        release_dashboards_organization_area: { org_1: false },
+      };
+      renderShell({ readings: libraryReadings });
+
+      await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/demo"));
+      expect(screen.queryByTestId("not-found")).toBeNull();
+      expect(screen.queryByTestId("page-body")).toBeNull();
+    });
+  });
+
+  describe("when Dashboards is off for the organization", () => {
+    /** @scenario "Dashboards off in every project" */
+    it("answers not-found from the organization's flags, whatever the project in view says", () => {
+      orgFlags = {
+        ...orgFlags,
+        release_dashboards: { org_1: false },
+        release_dashboards_organization_area: { org_1: true },
+      };
+      renderShell({ readings: libraryReadings });
+
+      expect(screen.getByTestId("not-found")).toBeInTheDocument();
+      expect(screen.queryByTestId("page-body")).toBeNull();
+    });
+
+    const offEverywhere: Partial<StubNavigationReadings> = {
+      ...libraryReadings,
+      pathname: "/demo",
+      flags: { ...libraryReadings.flags, release_dashboards: { enabled: false, isLoading: false } },
+    };
+
+    /** @scenario "Dashboards off in every project" */
+    it("draws no Dashboards tile in the icon rail", () => {
+      releasedTo({ org_1: false });
+      renderShell({ readings: offEverywhere, mode: "icon-rail" });
+
+      expect(railTile("LLM Ops")).toBeInTheDocument();
+      expect(railTile("Dashboards")).toBeNull();
+    });
+
+    /** @scenario "Dashboards off in every project" */
+    it("lists no Dashboards in the product switcher", async () => {
+      releasedTo({ org_1: false });
+      renderShell({ readings: offEverywhere });
+
+      await openProductSwitcher();
+
+      expect(screen.getByRole("menuitem", { name: /LLM Ops/ })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: /Dashboards/ })).toBeNull();
+    });
+  });
+
+  describe("when the product switcher opens with the library released", () => {
+    it("opens Dashboards on the library", async () => {
+      releasedTo({ org_1: true });
+      renderShell({ readings: { ...libraryReadings, pathname: "/demo" } });
+      const user = await openProductSwitcher();
+
+      await user.click(screen.getByText("Dashboards"));
+
+      await waitFor(() => {
+        expect(navigateMock).toHaveBeenCalledWith("/dashboards");
+      });
+    });
   });
 });

@@ -7,15 +7,23 @@ import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
 import { useFeatureFlag } from "@langwatch/feature-flag-client";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
-import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, LayoutDashboard, LayoutTemplate, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
+import {
+  OrganizationStarredDashboards,
+  SavedDashboards,
+  StarredDashboards,
+} from "../../behavior/lent-saved-dashboards.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
 import { useLlmOpsProject, useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
 import { useOpsAttentionCount } from "../../behavior/use-ops-attention-count.ts";
+import {
+  useHasOrganizationLibrary,
+  useOrganizationLibrary,
+} from "../../behavior/use-product-home.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
 import { useSettingsEntryHref } from "../../behavior/use-settings-entry-href.ts";
 import { useSettingsMenu } from "../../behavior/use-settings-menu.ts";
@@ -26,8 +34,11 @@ import { useNavigationHost } from "../../model/navigation-host.ts";
 import { readLastVisitedProduct } from "../../model/product-memory.ts";
 import {
   isAdminShellRoute,
+  isOrganizationDashboardsPath,
+  isOrganizationLibraryPath,
   isPathUnder,
   OPERATIONS_CONSOLE,
+  ORGANIZATION_DASHBOARDS_PATH,
   type ProductId,
 } from "../../model/products.ts";
 import { dashboardsAreaAt, toProjectRoutePattern } from "../../model/project-nav-items.ts";
@@ -164,6 +175,7 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
   const organization = host.organization();
   const { reachableProducts } = useReachableProducts();
   const projectSlug = useLlmOpsProjectSlug();
+  const hasOrganizationLibrary = useHasOrganizationLibrary();
   // Refused /ops view: the remembered product is not where the viewer came from.
   const isRefusedOps = isPathUnder({ pathname: host.pathname(), base: "/ops" });
   if (isRefusedOps && !host.opsAccess().hasAccess) return null;
@@ -174,6 +186,7 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
       : null,
     reachableProducts,
     projectSlug,
+    hasOrganizationLibrary,
   });
 
   return (
@@ -327,12 +340,47 @@ function SectionItemsNav({
  */
 function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
   const host = useNavigationHost();
+  if (isOrganizationDashboardsPath(host.pathname())) {
+    return <OrganizationDashboardsSidebarBody showExpanded={showExpanded} />;
+  }
   const pattern = toProjectRoutePattern({
     pathname: host.pathname(),
     projectSlug: host.project()?.slug,
   });
   if (!showExpanded) return null;
   return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
+}
+
+/**
+ * The Dashboards sidebar in the organization's area: the library, its templates, offered only
+ * with a project LLM Ops would open, where a board made from one is stored (ADR-002), and the
+ * member's starred dashboards.
+ */
+function OrganizationDashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
+  const host = useNavigationHost();
+  const projectSlug = useLlmOpsProjectSlug();
+  const templatesPath = `${ORGANIZATION_DASHBOARDS_PATH}/templates`;
+  return (
+    <>
+      <SideMenuLink
+        icon={LayoutDashboard}
+        label="All dashboards"
+        href={ORGANIZATION_DASHBOARDS_PATH}
+        isActive={isOrganizationLibraryPath(host.pathname())}
+        showLabel={showExpanded}
+      />
+      {projectSlug && (
+        <SideMenuLink
+          icon={LayoutTemplate}
+          label="Templates"
+          href={templatesPath}
+          isActive={host.pathname() === templatesPath}
+          showLabel={showExpanded}
+        />
+      )}
+      {showExpanded && <OrganizationStarredDashboards />}
+    </>
+  );
 }
 
 /** The sidebars that may show the Dashboards section only with every product's flag on. */
@@ -343,7 +391,8 @@ const GRANTS_STALE_TIME_MS = 30_000;
 
 /**
  * The Dashboards section analytics lends, for a member who can reach Dashboards: in LLM Ops,
- * and with `release_dashboards_in_every_product` in Gateway and Coding agents too.
+ * and with `release_dashboards_in_every_product` in Gateway and Coding agents too, or the
+ * organization's starred group there and in Governance once its area is on.
  */
 function StarredDashboardsGroup({
   surface,
@@ -354,13 +403,35 @@ function StarredDashboardsGroup({
 }) {
   const host = useNavigationHost();
   const { reachableProducts } = useReachableProducts();
-  const llmOpsProject = useLlmOpsProject();
   const everyProduct = host.featureFlag(FrontendFlags.release_dashboards_in_every_product);
   if (!showExpanded) return null;
   if (surface === "llm-ops") {
     return reachableProducts.includes("dashboards") ? <StarredDashboards /> : null;
   }
-  if (!everyProduct.enabled || !DASHBOARDS_SECTION_FLAGGED_SURFACES.has(surface)) return null;
+  if (!everyProduct.enabled || !ORGANIZATION_STARS_SURFACES.has(surface)) return null;
+  return <OutsideLlmOps surface={surface} />;
+}
+
+/** With the organization's area on, its starred group, Governance included (ADR-002). */
+const ORGANIZATION_STARS_SURFACES: ReadonlySet<SidebarSurface> = new Set([
+  "gateway",
+  "me",
+  "governance",
+]);
+
+/**
+ * Gateway, Coding agents and Governance with every product's flag on: the organization's
+ * starred group where its area is on, else the project's Dashboards section. Nothing while
+ * the area's flags load.
+ */
+function OutsideLlmOps({ surface }: { surface: SidebarSurface }) {
+  const llmOpsProject = useLlmOpsProject();
+  const hasOrganizationArea = useOrganizationLibrary();
+  if (hasOrganizationArea === void 0) return null;
+  if (hasOrganizationArea) {
+    return <OrganizationStarredDashboards />;
+  }
+  if (!DASHBOARDS_SECTION_FLAGGED_SURFACES.has(surface)) return null;
   // These pages are about no project: the section works in the one LLM Ops would open.
   if (!llmOpsProject) return null;
   const { id, slug, name } = llmOpsProject;

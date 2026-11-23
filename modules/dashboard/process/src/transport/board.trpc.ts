@@ -23,6 +23,36 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
       }));
     })
 
+    // Asked of the organization, which every seat holds, Developer included (ADR-002); the
+    // service then reads each project only where the member holds `analytics:view`.
+    .procedure("listInOrganization")
+    .withPermission("organization:view")
+    .handle(async ({ app, input, actor }) =>
+      app.findBoardsInOrganization({
+        organizationId: input.organizationId,
+        viewer: { userId: actor.id },
+      }),
+    )
+
+    // The same door and loaded-row rule as the library, so an id answers only what it lists.
+    .procedure("resolve")
+    .withPermission("organization:view")
+    .handle(async ({ app, input, actor }) =>
+      app.getBoardInOrganization({
+        organizationId: input.organizationId,
+        viewer: { userId: actor.id },
+        dashboardId: input.dashboardId,
+      }),
+    )
+
+    // Asked of the organization like the library; the service keeps the projects the member
+    // may create in, with Dashboards on.
+    .procedure("storeProjects")
+    .withPermission("organization:view")
+    .handle(async ({ app, input, actor }) =>
+      app.findStoreProjects({ organizationId: input.organizationId, viewer: { userId: actor.id } }),
+    )
+
     .procedure("getById")
     .withPermission("analytics:view")
     .handle(async ({ app, input, actor }) =>
@@ -37,6 +67,18 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
     .withPermission("analytics:create")
     .handle(async ({ app, input, actor }) =>
       app.createBoard({ projectId: input.projectId, name: input.name, createdById: actor.id }),
+    )
+
+    // Making it and setting its scope, in one write: both grants, asked at the door.
+    .procedure("createAtScope")
+    .withPermission(["analytics:create", "analytics:update"])
+    .handle(async ({ app, input, actor }) =>
+      app.createBoard({
+        projectId: input.projectId,
+        name: input.name,
+        createdById: actor.id,
+        scope: input.scope,
+      }),
     )
 
     .procedure("update")

@@ -1,10 +1,16 @@
 Feature: Organization-wide Dashboards area
-  # Sources: tasks#1211 comment 2026-11-19; the design prototype; ADR-002 (amended);
+  # Sources: tasks#1211 comment 2026-11-19; the approved design; ADR-002 (amended);
   # product decisions D1-D5 of 2026-11-21.
   #
   # Spec first (ADR-002, amended): every scenario is @unimplemented until the slice that builds
   # it binds a test and drops the tag. The other tags name the level it binds at.
   # @q1-all-projects rests on product decision D1, @q3-author-only on D3.
+  # "The organization's Dashboards area" is the flag release_dashboards_organization_area (ADR-002,
+  # decision 6); "Dashboards in every product" is release_dashboards_in_every_product, which
+  # governs only the other products' sidebar sections. Both need release_dashboards.
+  # A "# Next PR" line marks a scenario this PR (S0: the library, the starred group and the
+  # org-level routes) leaves to the next: home products (decision 8, with their chrome, product
+  # templates and moves) and every @q1-all-projects scenario. Each keeps @unimplemented.
   # Every scenario names its evidence: a haven browser screenshot for UI, the quoted tRPC answer
   # or run params for server rules. "Test passes" is never evidence. Every UI scenario's
   # screenshots are taken in light and dark.
@@ -12,16 +18,23 @@ Feature: Organization-wide Dashboards area
   Background:
     Given an organization "Acme" with projects "Shop" and "Ops", where release_dashboards is on
     And I read both projects unless a scenario says otherwise
-    And "Dashboards in every product" is on unless a scenario says otherwise
+    And "the organization's Dashboards area" is on unless a scenario says otherwise
     And the expanded sidebar is 212px wide
 
   # ---- Flag off: nothing new beyond PR 9698's rename and /me redirects (B8) ----
+  @integration
+  Scenario: With the flag off, /dashboards forwards to my project as before
+    Given "the organization's Dashboards area" is off for "Acme"
+    When I open "/dashboards"
+    Then I land on my last-used project's address, as the base commit of PR 9698 does, and no library page is drawn
+    # Evidence: the address after the forward
+
   @integration @unimplemented
   Scenario: With the flag off, the Dashboards area is as it was
-    Given "Dashboards in every product" is off
+    Given "the organization's Dashboards area" is off
     When I open "/dashboards", "/dashboards/<a board id>", "/dashboards/templates" or "/dashboards/curated/<id>"
     Then I see the same page the base commit of PR 9698 shows for that address
-    And the Gateway, Governance and Coding agents sidebars show no Dashboards section and no "Starred dashboards" group
+    And the Gateway, Governance and Coding agents sidebars are as the base commit draws them: the project's Dashboards section only where "Dashboards in every product" is on, and no "Starred dashboards" group
     And the LLM Ops sidebar's Dashboards section lists my pins, at most 7, its "+" makes a board at once, and it has no "Browse templates"
     And the Dashboards sidebar at "/shop/dashboards" is the one dashboards-v1 AC3 describes
     And "/shop/dashboards" lands on my My dashboard of "Shop", as today
@@ -37,7 +50,7 @@ Feature: Organization-wide Dashboards area
   # ---- The Coding agents rename: page titles (draft AC4; S0) ----
   @integration @unimplemented
   Scenario: Every Coding agents page title says Coding agents
-    Given "Dashboards in every product" is on, and also when it is off
+    Given "the organization's Dashboards area" is on, and also when it is off
     When I open each page under "/coding-agents", and each old "/me" address that redirects there
     Then the browser tab's title names "Coding agents", never "Me"
     And the page header names "Coding agents", never "Me"
@@ -45,13 +58,14 @@ Feature: Organization-wide Dashboards area
     # asserts on document.title and the page header text of each, with one screenshot per page
 
   # ---- Org level: chrome and top bar (B1, B5, S5, S6) ----
-  @integration @unimplemented
+  @integration
   Scenario: The library shows only the organization in the top bar
     When I open "/dashboards"
     Then the top bar shows the organization control and no project chip
     And "Dashboards" is highlighted in the product switcher and the icon rail
     # Evidence: haven browser screenshot of /dashboards, top bar and rail in frame
 
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: An org-level board draws its home product's chrome, with no project chip
     Given an Organization board homed in Gateway
@@ -62,6 +76,7 @@ Feature: Organization-wide Dashboards area
     Then it opens in the Dashboards chrome, with no project chip
     # Evidence: haven browser screenshots of /dashboards/<id> as both members
 
+  # Next PR: "All projects" at the organization level (ADR-002, decision 9; D1).
   @integration @q1-all-projects @unimplemented
   Scenario: An LLM Ops board or a From LangWatch board at org level
     Given an Organization board homed in LLM Ops, and my last-used project "Shop"
@@ -74,17 +89,17 @@ Feature: Organization-wide Dashboards area
     When I open a Gateway-homed Organization board at "/shop/dashboards/<id>"
     Then the Gateway sidebar shows with no project chip, and the board's chip reads "Shop"
     # Evidence: haven screenshots of each case, sidebar link targets hovered, and the run's params
-    # Chrome as the design prototype (`shellFor`: last-used project). Data "All projects" by D1 (21 Nov,
-    # newer than the prototype's "reads its project's scope"). Top bar: the 1211 comment.
+    # Chrome as the approved design (the last-used project). Data "All projects" by D1 (21 Nov,
+    # newer than the approved design's "reads its project's scope"). Top bar: the 1211 comment.
 
-  @integration @unimplemented
+  @integration
   Scenario: The Dashboards sidebar at org level
     When I open "/dashboards"
     Then the Dashboards sidebar lists "All dashboards" (current), "Templates" and my "Starred dashboards", and nothing else besides Quick Search
     And "Templates" opens "/dashboards/templates"
     # Evidence: haven browser screenshot of the sidebar, and the address after the click
 
-  @integration @unimplemented
+  @integration
   Scenario: The Templates page at org level
     When I open "/dashboards/templates"
     Then the template gallery shows, with no project chip
@@ -95,24 +110,57 @@ Feature: Organization-wide Dashboards area
     Then the new board's name has a number added, so no two share a name
     # Evidence: screenshots of the gallery and the toast, and the quoted create answers
 
-  @integration @unimplemented
+  @unit
   Scenario: Switching organization on an org-level page
     Given I belong to "Acme" and to a second organization "Beta"
     When I switch organization to "Beta" on "/dashboards/<id>"
     Then I land on "/dashboards" of "Beta"
     # Evidence: haven browser screenshot after the switch, address bar in frame
 
-  @integration @unimplemented
+  @integration
   Scenario: A Developer seat can open the library
     Given my seat in "Acme" is Developer, so I read only my own personal project (ADR-171)
     When I open "/dashboards"
-    Then the library request is answered, not refused for organization:view
+    Then the library request is answered, not refused: a Developer seat holds organization:view through the organization floor
     And it lists my personal project's Project boards, my personal boards and the Organization boards, those with no project named, and no Project board of "Shop" or "Ops"
-    And it shows no Gateway or Governance group
-    And an Organization board I open reads only my personal project
+    And an Organization board of "Shop" opens in my personal project
     # Evidence: the quoted boards.listInOrganization answer and the run's params, and a screenshot of the library
 
   # ---- Library (B10, S4, S10; E12, E13, E15, E16) ----
+  # What this PR ships of the library; the scenarios marked "# Next PR" below add the rest.
+  @integration
+  Scenario: The library lists the boards I may see, with who sees each and its owner
+    When I open "/dashboards"
+    Then the header reads "Dashboards" with "Every dashboard you can see, by product."
+    And one group, "LLM Ops · <count>", lists the From LangWatch boards first, each marked "Read-only", then boards with no project, then the rest by project
+    And each row names who sees it: the project's name, "Organization", or "Only me"
+    And each row names its owner, "You" for mine, else its author's name
+    And an Organization board opens at "/dashboards/<id>", a Project board at its project's address
+    # Evidence: haven browser screenshots of the library, light and dark
+
+  @integration
+  Scenario: A board made in the library is made at its scope in one write
+    When I press "New dashboard" in the library and create a board with a name and who can see it
+    Then it is stored in my store project at that scope, in one write
+    And a Project board opens at its project's address, an Only me or Organization one at "/dashboards/<id>"
+    And a seat that may create dashboards there but not update them is refused an Only me or Organization board, and nothing is written
+    # Evidence: the quoted boards.create and boards.createAtScope answers, and the refusal
+
+  @integration
+  Scenario: Delete, rename, star and duplicate from the library
+    When I delete a board I may delete and confirm
+    Then it is deleted in its own project and a toast says ""<name>" deleted"
+    And an Organization board of a project I cannot read offers no Delete
+    When I star a row
+    Then it is starred in the project it opens in, and Unstar removes the star
+    When I rename a board I may edit
+    Then Enter saves the name in place in its own project and says "Dashboard renamed", and Escape saves nothing
+    And a board of a project where I may not edit offers no Rename
+    When I duplicate a board
+    Then the copy, "<name> copy", is stored in my store project at the board's scope and opens
+    # Evidence: the quoted delete, update, star and create answers, and screenshots of the toasts
+
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: The library lists every board I may see, grouped by product
     Given boards homed in LLM Ops, Coding agents, Gateway and Governance
@@ -128,7 +176,7 @@ Feature: Organization-wide Dashboards area
     And a project name too long for its column, such as "Checkout conversion and refunds EU", ends with "…" and shows in full on hover
     # Evidence: haven browser screenshots of the library, light and dark, plus one hover
 
-  @unit @integration @unimplemented
+  @integration
   Scenario: The library leaves out what I may not see
     Given another member's Only me board, a Project board of a project I cannot read,
       and boards of a project where Dashboards is off
@@ -138,6 +186,7 @@ Feature: Organization-wide Dashboards area
     And an Organization board of an archived project is not listed
     # Evidence: the quoted boards.listInOrganization answer for that member
 
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: A long group shows 8 boards, then "Show N more" and "Show less"
     Given 11 boards homed in Gateway
@@ -146,6 +195,7 @@ Feature: Organization-wide Dashboards area
     And the group stays open or folded after a reload
     # Evidence: haven browser screenshots before and after each click
 
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: A library row's menu offers what I may do
     Given my Organization board homed in Gateway, owned by "Shop", where I hold analytics:update and analytics:delete
@@ -155,10 +205,11 @@ Feature: Organization-wide Dashboards area
     And a starred row's menu offers Unstar, "Move up" and "Move down", which change my star order everywhere
     And My dashboard offers "Move to product…", and shows "Delete" disabled, saying "Your default dashboard can't be deleted"
     And the server refuses a delete of My dashboard with "dashboard_default_not_deletable"
-    # The hover on My dashboard's Delete is an addition: the prototype disables it with no hover
+    # The hover on My dashboard's Delete is an addition: the approved design disables it with no hover
     And starring a row from the library lists it in the Gateway sidebar's starred group without a page reload, in the same tab
     # Evidence: haven browser screenshots of each menu and hover, and of the sidebar after the star
 
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: Duplicate and Delete from the library
     When I duplicate my Organization board homed in Gateway, owned by "Shop" where I may create
@@ -175,6 +226,7 @@ Feature: Organization-wide Dashboards area
     And the same delete sent to the server is refused with "dashboard_last_in_product"
     # Evidence: the quoted create and delete answers and the refusals, and screenshots of the toasts and pages
 
+  # Next PR: From LangWatch boards always list today, so the library is never empty yet.
   @integration @unimplemented
   Scenario: An empty library
     Given I may see no board and no From LangWatch board
@@ -183,6 +235,7 @@ Feature: Organization-wide Dashboards area
     # Evidence: haven browser screenshot
 
   # ---- Data at org level vs project view (1211; D1) ----
+  # Next PR: "All projects" at the organization level (ADR-002, decision 9; D1).
   @unit @integration @q1-all-projects @unimplemented
   Scenario: An org-level board reads every project I may read
     Given an Organization board whose widget stores no projects
@@ -192,6 +245,7 @@ Feature: Organization-wide Dashboards area
     And the chip reads "All projects", and the card line reads "Projects: All projects"
     # Evidence: the run's params, and a screenshot of the chip and the card line
 
+  # Next PR: "All projects" at the organization level (ADR-002, decision 9; D1).
   @unit @integration @q1-all-projects @unimplemented
   Scenario: "All projects" leaves out what I may not read
     Given "Acme" also has an archived project "Old", a project "Secret" I cannot read,
@@ -238,7 +292,7 @@ Feature: Organization-wide Dashboards area
     Then its past traffic still counts, as on its Gateway Usage page
     When the key list cannot be read
     Then the chart shows "Couldn't load" with Retry and no figures
-    And with release_dashboards_in_every_product off, no run reads the governance project
+    And with release_dashboards_organization_area off, no run reads the governance project
     And the same board in the project view of "Shop" reads no governance trace
     And a LangWatchQL REST run with projects "all" binds no governance project, as before
     # Evidence: screenshots, signed in as each member, of the board's chart for K1 next to K1's Gateway Usage page (same period, same figure); of the hostile "count() FROM traces" chart; of the keyless member's chart; of my chart with M1 and without P1; and of the admin's chart without P1 and M1. The run response for each, showing params.dashboard_context_projects without the governance id.
@@ -251,6 +305,7 @@ Feature: Organization-wide Dashboards area
     And a widget that stores its own projects reads those projects in both views
     # Evidence: the run's params in both views, and two screenshots
 
+  # Next PR: "All projects" at the organization level (ADR-002, decision 9; D1).
   @integration @q1-all-projects @unimplemented
   Scenario: Reading more than 100 projects says so on the card
     Given I read 101 projects of "Acme"
@@ -259,6 +314,7 @@ Feature: Organization-wide Dashboards area
     And a widget that stores its own projects on the same board still draws
     # Evidence: a screenshot of both cards; message from langwatch-ql-readable-projects.service.ts:73-76
 
+  # Next PR: "All projects" at the organization level (ADR-002, decision 9; D1).
   @integration @q1-all-projects @unimplemented
   Scenario: A From LangWatch board opens at the organization level
     When I open a From LangWatch board from the library
@@ -268,6 +324,7 @@ Feature: Organization-wide Dashboards area
     # Evidence: the address, the run's params, and a screenshot of the read-only board
 
   # ---- What a project view lists (1211: "the same org-level dashboards, scoped to that project") (B2, B3) ----
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: Dashboards inside a project lists the organization's boards, read for that project
     Given an Organization board homed in Gateway, owned by "Ops"
@@ -278,6 +335,7 @@ Feature: Organization-wide Dashboards area
     And the Coding agents board is listed only in the library and the Coding agents sidebar
     # Evidence: haven browser screenshot of /shop/dashboards sidebar, and the run's params
 
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: The LLM Ops section in a project lists the same boards, filtered
     Given LLM Ops-homed boards owned by "Shop" and by "Ops", some Project, some Organization, one starred
@@ -346,6 +404,7 @@ Feature: Organization-wide Dashboards area
     # Evidence: the projection's rows before and after the lw.user.erased event
 
   # ---- Opening by id, addresses, missing boards (B6, B7, S8; E4, E6) ----
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: A board's address is where it was made, and never changes
     Given boards made in the library, from each product's "+", and as Project boards of "Shop" in LLM Ops
@@ -355,14 +414,14 @@ Feature: Organization-wide Dashboards area
     And any of those addresses with the id of a board I may see opens that board
     # Evidence: the address bar and chrome before and after each move
 
-  @integration @unimplemented
+  @integration
   Scenario: A Project board's org-level address redirects to its project
     Given a Project board owned by "Shop", and a member who reads "Shop"
     When they open "/dashboards/<id>"
     Then they land on "/shop/dashboards/<id>" with the project chip showing "Shop"
     # Evidence: the address after the redirect, and a screenshot
 
-  @integration @unimplemented
+  @integration
   Scenario: A Project board of a project I cannot read is not available at org level
     Given a Project board owned by "Ops" and a member who cannot read "Ops"
     When they open "/dashboards/<id>" or "/shop/dashboards/<id>"
@@ -370,6 +429,7 @@ Feature: Organization-wide Dashboards area
     And no response, address or page text names "Ops"
     # Evidence: screenshot plus the network panel of the resolve call
 
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: A board's old project address keeps working after a move
     Given an Organization board at "/shop/dashboards/<id>" that was moved to Gateway
@@ -386,6 +446,7 @@ Feature: Organization-wide Dashboards area
     And nothing of the board's name, description or widgets shows
     # Evidence: one screenshot per case
 
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: Archiving a project hides the organization boards stored in it
     Given Organization boards homed in Gateway and in LLM Ops, stored in "Ops"
@@ -396,13 +457,31 @@ Feature: Organization-wide Dashboards area
     Then both boards are back where they were, with their widgets
     # Evidence: screenshots of the library and the Gateway sidebar before, during and after, and the quoted list answers
 
-  @unit @integration @unimplemented
+  @integration
   Scenario: A board of another organization is not found by id
     Given a board of another organization
     When I open "/dashboards/<id>" or "/shop/dashboards/<id>" in "Acme", or resolve its id
     Then the answer and the page are the same as for a board that does not exist
     # Evidence: the quoted resolve answer, and a screenshot
 
+  # The board runs in the project it opens in (`InProject`): that project's grants and events.
+  @integration
+  Scenario: An org-level board opened in another project answers from that project's grants
+    Given the organization's Dashboards area is on and an Organization board opens in "Shop"
+    When the page names no project
+    Then what I may do on it is what my own grants in "Shop" let me do
+    And when "Shop" is the page's own project, the page's grants answer, with no read of them
+    # Evidence: the quoted grant reads
+
+  @integration
+  Scenario: Events from an org-level board are about the project it opens in
+    Given the organization's Dashboards area is on and an Organization board opens in "Shop"
+    When something I do on it is tracked
+    Then that event is about "Shop"
+    And the events after it are about the page's own project again, or about no project
+    # Evidence: the captured event properties
+
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: Editing an org-level board follows its owning project
     Given an Organization board homed in Gateway, owned by "Shop"
@@ -414,6 +493,7 @@ Feature: Organization-wide Dashboards area
     # Evidence: screenshots as both members, and the quoted refusal
 
   # ---- Create (B4, B15; E14, E15) ----
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: Create from the library with a name, product and who can see it
     When I press "New dashboard" in the library
@@ -429,12 +509,14 @@ Feature: Organization-wide Dashboards area
     Then a toast says "Dashboard created", it opens at "/dashboards/<id>" (an LLM Ops Project board at its project's address), it is listed in that product's sidebar and in the library, and its scope is the one I picked
     # Evidence: screenshots of the dialog per product and of the toast, the quoted create answer, and a screenshot as a member who never opened a project
 
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: A product's "+" fixes the product and says where the board lives
     When I press "+" in the Gateway sidebar's Dashboards section
     Then the dialog has no product choice and reads "Lives in Gateway. Move it from Dashboards."
     # Evidence: screenshot of the dialog
 
+  # Next PR: today an empty name marks the field and makes nothing; "Create" is not disabled.
   @integration @unimplemented
   Scenario: The create dialog refuses an empty name, and Cancel makes nothing
     When the name is empty or only spaces
@@ -443,12 +525,14 @@ Feature: Organization-wide Dashboards area
     Then no board is made and the library is unchanged
     # Evidence: screenshot of the disabled button, and the library before and after
 
+  # Next PR: home products (ADR-002, decision 8).
   @unit @unimplemented
   Scenario: A board outside LLM Ops cannot be Project
     When a create names home Gateway and scope Project
     Then it is refused with "dashboard_home_needs_org_scope" and no board is made
     # Evidence: the quoted tRPC refusal
 
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: A board homed outside LLM Ops offers no Project scope
     Given my Organization board homed in Gateway
@@ -464,6 +548,7 @@ Feature: Organization-wide Dashboards area
     # Evidence: screenshots of the library and the four sections
 
   # ---- Move (D3; B12, S3; E16) ----
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: Move an Organization board to Gateway
     Given an Organization board homed in LLM Ops that I may edit
@@ -475,6 +560,7 @@ Feature: Organization-wide Dashboards area
     And its id, its address and its scope are unchanged
     # Evidence: screenshots of the toast and both sidebars, and the quoted board before and after
 
+  # Next PR: home products (ADR-002, decision 8).
   @unit @integration @q3-author-only @unimplemented
   Scenario: Only the author can move a Project board out of LLM Ops
     Given a Project board in "Shop"
@@ -486,6 +572,7 @@ Feature: Organization-wide Dashboards area
     And the server refuses such a move from them with "dashboard_scope_author_only", and the board is unchanged
     # Evidence: screenshots of both dialogs and the hover, and the quoted refusal
 
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: Move edge cases
     Given boards I may edit
@@ -500,6 +587,7 @@ Feature: Organization-wide Dashboards area
     And moving "Agent spend" to LLM Ops keeps it personal and Only me: it lists in the LLM Ops section in every project and in the library's LLM Ops group, and still follows me to "Beta"
     # Evidence: a screenshot per case, and the quoted board after each move
 
+  # Next PR: home products (ADR-002, decision 8).
   @unit @integration @unimplemented
   Scenario: Move needs edit rights in the owning project
     Given I may only view dashboards in "Shop"
@@ -507,6 +595,7 @@ Feature: Organization-wide Dashboards area
     And a move request is refused and the home product is unchanged
     # Evidence: the quoted refusal, a screenshot of the hover, and the board before and after
 
+  # Next PR: home products (ADR-002, decision 8).
   @unit @unimplemented
   Scenario: A moved board's home survives a rebuild of its events
     When a board is moved to Governance and the home projection is rebuilt from its events
@@ -515,6 +604,7 @@ Feature: Organization-wide Dashboards area
     # Evidence: the list answer before and after the rebuild
 
   # ---- Chart menu (E9) ----
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: A widget moves to another board of the same product, or to a new one
     Given a widget on a Gateway board, and two other Gateway boards and one LLM Ops board I may edit
@@ -528,6 +618,17 @@ Feature: Organization-wide Dashboards area
     # Evidence: screenshots of the menu, the toast and both boards, and the quoted answers
 
   # ---- Product sidebars (B11; G13 title rule; E7, E8, E10) ----
+  # The approved design's starred group in the other products; home products split it later.
+  @integration
+  Scenario: Gateway, Coding agents and Governance list my starred dashboards
+    Given "Dashboards in every product" and "the organization's Dashboards area" are on
+    When I am in Gateway, Coding agents or Governance
+    Then the sidebar has a "Starred dashboards" group, 7 of my stars then "All starred (N)", which opens the library
+    And no project's Dashboards section
+    And with either off there is no such group
+    # Evidence: screenshots of the three sidebars
+
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: Each product's sidebar lists its own boards
     Given boards homed in each product
@@ -543,6 +644,7 @@ Feature: Organization-wide Dashboards area
     And with no board I can see homed there and no From LangWatch board, there is no section, and the library's "New dashboard" makes the product's first board
     # Evidence: screenshots of the three sidebars, and one per access case
 
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: Every sidebar lists my stars from other products
     Given I starred 9 boards homed in LLM Ops and one homed in Gateway
@@ -553,6 +655,7 @@ Feature: Organization-wide Dashboards area
     And the group folds and unfolds, and the Settings sidebar has no such group
     # Evidence: screenshots of the Gateway and Settings sidebars, folded and unfolded
 
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: The LLM Ops section ends with Browse templates
     When I am in LLM Ops in "Shop"
@@ -567,6 +670,7 @@ Feature: Organization-wide Dashboards area
     # Evidence: screenshots at the top and the bottom of the scroll, light and dark
 
   # G13: one title rule. PR 9698 at 4bdb2e57 showed "Dashboards · Demo projec" clipped.
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: Every product's Dashboards section has the same title, never clipped
     Given my current project is named "Demo project"
@@ -579,6 +683,7 @@ Feature: Organization-wide Dashboards area
     # Evidence: four screenshots (LLM Ops, Coding agents, Gateway, Governance) at 212px, light and dark, plus one hover
 
   # ---- Empty board, failures, gates, public surfaces (S1; N7, N8, N9) ----
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: An empty board offers only its product's templates
     Given an empty LLM Ops board in "Shop", an empty LLM Ops board at org level, and an empty Gateway board
@@ -596,7 +701,7 @@ Feature: Organization-wide Dashboards area
     Then the dialog or menu shows the error, and nothing changes
     # Evidence: haven screenshots with the call failed (network blocked), light and dark
 
-  @integration @unimplemented
+  @integration
   Scenario: Dashboards off in every project
     Given release_dashboards is off for every project of "Acme"
     When I open "/dashboards", "/dashboards/<id>" or "/dashboards/templates"
@@ -604,6 +709,7 @@ Feature: Organization-wide Dashboards area
     And on a page with no project the flags are evaluated for the organization
     # Evidence: screenshots and the flag evaluation's target in the network panel
 
+  # Next PR: home products (ADR-002, decision 8).
   @integration @unimplemented
   Scenario: The public dashboards API is unchanged
     Given a Gateway-homed Organization board of "Shop" and my personal board
@@ -624,16 +730,18 @@ Feature: Organization-wide Dashboards area
     # Evidence: the address after each switch, and screenshots
 
   # ---- Release gate per project ----
-  @unit @unimplemented
+  @integration
   Scenario: Boards of a project with Dashboards off are not in the organization's area
     Given "Ops" has release_dashboards off
     Then no board owned by "Ops" is listed or resolved by id at org level
     # Evidence: the quoted list and resolve answers
 
   # ---- Reserved slug (B14) ----
-  @unit @unimplemented
+  @unit
   Scenario: "dashboards" is a reserved project slug
-    When a project slug would be minted as "dashboards"
-    Then minting refuses it, as it refuses "gateway"
-    # Evidence: the unit's quoted refusal
-    # Release item R-slug (below) covers projects made before this change.
+    Given "dashboards" is reserved beside "gateway", so minting never gives it to a project
+    And a project made while slugs carried no id suffix (October and November 2023) holds "dashboards"
+    When the upgrade runs its background step "project:reslug-reserved-dashboards"
+    Then that project's slug becomes its name and id token, as minting gives a project today
+    And a second run changes nothing, every other project keeps its slug, and with no such project the step does nothing
+    # Evidence: the step's report on the first and the second run

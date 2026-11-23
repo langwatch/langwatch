@@ -92,7 +92,15 @@ describe("productFromPathname", () => {
     expect(productFromPathname("/my-project")).toBe("llm-ops");
     expect(productFromPathname("/my-project/analytics/dashboards")).toBe("llm-ops");
     expect(productFromPathname("/my-project/dashboards-old")).toBe("llm-ops");
-    expect(productFromPathname("/dashboards")).toBe("llm-ops");
+  });
+
+  it("maps the organization's Dashboards area to the Dashboards product", () => {
+    expect(productFromPathname("/dashboards")).toBe("dashboards");
+    expect(productFromPathname("/dashboards/")).toBe("dashboards");
+    expect(productFromPathname("/dashboards/board_1")).toBe("dashboards");
+    expect(productFromPathname("/dashboards/templates")).toBe("dashboards");
+    expect(productFromPathname("/dashboards/curated/agent-flight-deck")).toBe("dashboards");
+    expect(productFromPathname("/dashboards-old")).toBe("llm-ops");
   });
 
   /** @scenario An ops page is never remembered as the last product */

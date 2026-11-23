@@ -7,6 +7,7 @@ import {
   MY_DASHBOARD_NAME,
   newDashboardScope,
   projectIdSchema,
+  type DashboardScope,
   type Dashboard,
   type BoardSummary,
   type DashboardViewer,
@@ -73,7 +74,7 @@ export class BoardService {
   async getBoard(input: BoardRef): Promise<Dashboard> {
     const ref = boardRef(input);
     const found = await this.#access.findReadable({ ...ref, viewer: input.viewer });
-    if (!found) throw new DashboardNotFoundError(ref.projectId);
+    if (!found) throw new DashboardNotFoundError({ projectId: ref.projectId });
     return found.board;
   }
 
@@ -85,16 +86,25 @@ export class BoardService {
     projectId: string;
     name: string;
     createdById?: string;
+    scope?: DashboardScope;
   }): Promise<Dashboard> {
-    const { createdById, ...fields } = input;
+    const { createdById, scope: asked, ...fields } = input;
     const parsed = dashboardCreateInputSchema.parse(fields);
+    const fallback = newDashboardScope({ name: parsed.name, createdById });
+    const scope = asked ?? fallback;
+    // Checked before the write, so a refused scope leaves no board behind.
+    const organizationId =
+      scope === fallback
+        ? null
+        : await this.#access.requireScopeWrite({ projectId: parsed.projectId, createdById, scope });
 
     const board = await this.#repository.createBoard({
       id: generate(DASHBOARD_KSUID_RESOURCE).toString(),
       projectId: parsed.projectId,
       name: parsed.name,
       createdById: createdById ?? null,
-      scope: newDashboardScope({ name: parsed.name, createdById }),
+      scope,
+      organizationId,
     });
     // Stored as an ordinary star, so unstarring it later removes it for good.
     if (createdById !== undefined && parsed.name === MY_DASHBOARD_NAME) {

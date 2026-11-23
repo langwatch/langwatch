@@ -106,6 +106,30 @@ export interface BoardSummarySchema extends Named<typeof boardSummarySchemaDefin
 export const boardSummarySchema: BoardSummarySchema = boardSummarySchemaDefinition;
 export type BoardSummary = z.infer<typeof boardSummarySchema>;
 
+/**
+ * A board in the organization's Dashboards library (ADR-002). `project` is the owner, named only
+ * where the reader may read it; `openProject` is where the board opens, null when nowhere.
+ */
+const organizationBoardSchemaDefinition = z
+  .object({
+    id: dashboardIdSchema,
+    name: dashboardNameSchema,
+    description: z.string().nullable(),
+    createdById: z.string().nullable(),
+    scope: dashboardScopeSchema,
+    updatedAt: z.date(),
+    project: dashboardProjectSchema.nullable(),
+    openProject: dashboardProjectSchema.nullable(),
+    /** Where the board sits in the reader's star order, 0 first; null when not starred. */
+    starPosition: z.number().int().nonnegative().nullable(),
+    /** The author's display name; null when the board has no author or the author no name. */
+    ownerName: z.string().nullable(),
+  })
+  .strict();
+export interface OrganizationBoardSchema extends Named<typeof organizationBoardSchemaDefinition> {}
+export const organizationBoardSchema: OrganizationBoardSchema = organizationBoardSchemaDefinition;
+export type OrganizationBoard = z.infer<typeof organizationBoardSchema>;
+
 /** What a narrower scope takes from other members, for the confirmation that asks first. */
 const dashboardScopeImpactSchemaDefinition = z
   .object({ otherStars: z.number().int().nonnegative() })

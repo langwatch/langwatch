@@ -49,6 +49,7 @@ export type CodeStepId =
   | "organization:record-seat-peak-opening-snapshots"
   | "project:record-created-facts"
   | "project:list-personal-owner-and-first-message-facts"
+  | "project:reslug-reserved-dashboards"
   | "prompt:seed-tags-for-untagged-organizations"
   | "scenario:close-stalled-runs"
   | "scenario:fill-id-indexes"

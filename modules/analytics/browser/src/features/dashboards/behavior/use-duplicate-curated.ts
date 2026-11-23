@@ -1,7 +1,7 @@
 /**
  * "Duplicate to edit" on a From LangWatch board, from its page or its sidebar row: makes the
  * member's own "<name> (copy)", opens it and drafts the template's report in Langy, unsent,
- * as adding a template does.
+ * as adding a template does. From the library, the copy goes to the store project.
  */
 
 import { useLangyAsk } from "../langy/behavior/use-board-langy.ts";
@@ -10,17 +10,22 @@ import type { CuratedBoard } from "../model/curated-boards.ts";
 import { useBoardFromTemplate } from "./use-board-from-template.ts";
 import { useBoardPeriod } from "./use-board-period.ts";
 import { useSavedDashboards } from "./use-saved-dashboards.ts";
+import type { StoreProject } from "./use-store-project.ts";
 
-export function useDuplicateCurated() {
+/** `store`: copying at the organization level, into the store project and past its names. */
+export function useDuplicateCurated({ store }: { store?: StoreProject } = {}) {
   const saved = useSavedDashboards();
-  const fromTemplate = useBoardFromTemplate();
+  const fromTemplate = useBoardFromTemplate({
+    atOrganization: store !== void 0,
+    storeProject: store?.storeProject,
+  });
   const langy = useLangyAsk();
   const { period } = useBoardPeriod();
 
   const duplicate = async (board: CuratedBoard) => {
     const created = await fromTemplate.duplicateCurated({
       board,
-      existingNames: saved.boards.map(({ name }) => name),
+      existingNames: store?.namesInStore ?? saved.boards.map(({ name }) => name),
     });
     if (!created || !langy.enabled) return;
     const copy = boardSubject({ board: created, widgets: created.widgets });

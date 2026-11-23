@@ -1,3 +1,4 @@
+import { ORGANIZATION_DASHBOARDS_PATH } from "@langwatch/analytics-client";
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import { CODING_AGENTS_PATH, RETIRED_PERSONAL_PATH } from "@langwatch/user-contract";
@@ -115,6 +116,39 @@ export function productById(id: ProductId): ProductDefinition {
   return product;
 }
 
+export { ORGANIZATION_DASHBOARDS_PATH };
+
+/**
+ * Whether the address is in the organization's Dashboards area: the library and the org-level
+ * board, template and From LangWatch pages under it. "dashboards" is a reserved project slug.
+ */
+export function isOrganizationDashboardsPath(pathname: string): boolean {
+  const trimmed = pathname.replace(/\/+$/, "");
+  return isPathUnder({ pathname: trimmed, base: ORGANIZATION_DASHBOARDS_PATH });
+}
+
+/** Whether the address is the organization's library itself, not a page under it. */
+export function isOrganizationLibraryPath(pathname: string): boolean {
+  return pathname.replace(/\/+$/, "") === ORGANIZATION_DASHBOARDS_PATH;
+}
+
+/**
+ * Where a product opens. With the organization's library released, Dashboards opens on it
+ * rather than on a project's Dashboards area.
+ */
+export function productHomeHref({
+  product,
+  projectSlug,
+  hasOrganizationLibrary,
+}: {
+  product: ProductDefinition;
+  projectSlug?: string | null;
+  hasOrganizationLibrary: boolean;
+}): string | null {
+  if (product.id === "dashboards" && hasOrganizationLibrary) return ORGANIZATION_DASHBOARDS_PATH;
+  return product.homeHref({ projectSlug });
+}
+
 /** Whether a product works inside one project, so the top bar offers the project picker. */
 export function isProjectScopedProduct(id: ProductId | null): boolean {
   if (!id) return false;
@@ -151,6 +185,7 @@ export function productFromPathname(pathname: string): ProductId | null {
     return "me";
   }
   if (isPathUnder({ pathname, base: "/gateway" })) return "gateway";
+  if (isOrganizationDashboardsPath(pathname)) return "dashboards";
   if (isPathUnder({ pathname, base: "/governance" })) return "governance";
   const nonProductPrefixes = [
     "/settings",

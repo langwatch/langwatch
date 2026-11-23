@@ -383,6 +383,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "project:reslug-reserved-dashboards",
+    "kind": "data",
+    "mode": "background",
+    "owner": "project",
+    "description": "Gives a project whose address is exactly /dashboards the usual name-and-id address instead.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "prompt:seed-tags-for-untagged-organizations",
     "kind": "tenant",
     "mode": "background",

@@ -1,6 +1,6 @@
 /**
  * The saved-dashboards list analytics lends navigation's sidebar on dashboards pages, and the
- * member's starred dashboards it lends the other products' sidebars (§10.1).
+ * member's starred dashboards it lends the other products' sidebars and the library's (§10.1).
  */
 
 import { uiTokens } from "@langwatch/module";
@@ -29,3 +29,11 @@ export type StarredDashboardsProps = { project?: StarredDashboardsProject };
  */
 export const StarredDashboardsToken =
   uiTokens("analytics").component<StarredDashboardsProps>("starredDashboards");
+
+/** The library's sidebar group hands analytics nothing: it reads the organization in scope. */
+type OrganizationStarredDashboardsProps = Record<string, never>;
+
+/** The "Starred dashboards" sidebar group, in the library and Governance: stars as plain links. */
+export const OrganizationStarredDashboardsToken = uiTokens(
+  "analytics",
+).component<OrganizationStarredDashboardsProps>("organizationStarredDashboards");

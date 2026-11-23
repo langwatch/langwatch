@@ -42,7 +42,7 @@ import {
   widgetSetupDraft,
 } from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
-import { curatedBoardPath, dashboardTemplatesPath, myDashboardId } from "../../model/boards.ts";
+import { myDashboardId, templateLinks } from "../../model/boards.ts";
 import { CURATED_BOARDS } from "../../model/curated-boards.ts";
 import { AddBlockCard, EmptyBoard } from "../blocks/blank-board.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
@@ -50,7 +50,6 @@ import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { BoardProjectChip } from "../blocks/board-project-chip.tsx";
 import { BoardScopeControl } from "../blocks/board-scope-control.tsx";
-import { BoardUnavailable } from "../blocks/board-unavailable.tsx";
 import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
 import { LimitFailedWidgetsBanner } from "../blocks/limit-failed-widgets-banner.tsx";
 import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
@@ -59,6 +58,7 @@ import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { BoardWidgetEditor } from "./board-widget-editor.tsx";
 import { BoardWidgetsGrid } from "./board-widgets-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
+import { ProjectBoardUnavailable } from "./project-board-unavailable.tsx";
 
 /** The header's one action on a board the reader may edit. */
 function AddWidgetButton({ onClick }: { onClick: () => void }) {
@@ -95,7 +95,7 @@ function sharedProjectChip(projects: ReturnType<typeof useBoardProjects>) {
   };
 }
 
-function OpenBoard({ board }: { board: SavedBoard }) {
+function OpenBoard({ board, atOrganization }: { board: SavedBoard; atOrganization: boolean }) {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
   const saved = useSavedDashboards();
@@ -149,6 +149,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   };
   const isEmpty = boardWidgets.status === "success" && widgets.length === 0;
   const isMyDashboard = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
+  const templates = templateLinks({ projectSlug: saved.projectSlug, atOrganization });
 
   return (
     <BoardPage
@@ -207,10 +208,8 @@ function OpenBoard({ board }: { board: SavedBoard }) {
       {isEmpty && canEdit && (
         <EmptyBoard
           boards={CURATED_BOARDS}
-          boardHref={({ templateId }) =>
-            curatedBoardPath({ projectSlug: saved.projectSlug, templateId })
-          }
-          templatesHref={dashboardTemplatesPath({ projectSlug: saved.projectSlug })}
+          boardHref={({ templateId }) => templates.curatedHref(templateId)}
+          templatesHref={templates.templatesHref}
         />
       )}
       {boardWidgets.status === "success" && widgets.length > 0 && (
@@ -304,7 +303,8 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   );
 }
 
-function Board() {
+/** The board the address names, in the project in view; the org-level page runs it too. */
+export function Board({ atOrganization = false }: { atOrganization?: boolean }) {
   const dashboardId = useAnalyticsHost().route().params.dashboardId;
   const { boards, organizationBoards, isLoading, loadError } = useSavedDashboards();
   if (isLoading) return <UiPageLoading />;
@@ -312,12 +312,12 @@ function Board() {
   if (loadError) return <UiPageNotFound />;
   const board = [...boards, ...organizationBoards].find(({ id }) => id === dashboardId);
   // A deleted board and one set to Only me read the same: the server tells neither apart.
-  if (!board) return <BoardUnavailable />;
+  if (!board) return <ProjectBoardUnavailable />;
   // Keyed so a board's in-flight edits never leak into the next board.
   return (
     <>
       <OldAnalyticsBanner />
-      <OpenBoard key={board.id} board={board} />
+      <OpenBoard key={board.id} board={board} atOrganization={atOrganization} />
     </>
   );
 }

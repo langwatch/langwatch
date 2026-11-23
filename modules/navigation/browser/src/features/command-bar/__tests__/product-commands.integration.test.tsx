@@ -18,6 +18,8 @@ let personalFeatures: Record<string, boolean> | undefined;
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     personalWorkspaceFeatures: { get: { useQuery: () => ({ data: personalFeatures }) } },
+    // The organization's Dashboards flags never answer here, so no home moves to the library.
+    featureFlag: { isEnabledForEachOrganization: { useQuery: () => ({ isLoading: true }) } },
   },
 }));
 

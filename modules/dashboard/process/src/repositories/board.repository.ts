@@ -47,6 +47,8 @@ export type MemberStars = Readonly<{
 export interface BoardRepository {
   /** The project's boards, oldest first, then the organization's from other projects. */
   findBoards(input: BoardReach): Promise<BoardSummaryRecord[]>;
+  /** Every board these projects own, whatever its scope; the caller decides who sees which. */
+  findBoardsInProjects(input: { projectIds: readonly string[] }): Promise<BoardRecord[]>;
   /** The boards among these ids the read reaches; an id it does not reach is left out. */
   findBoardsByIds(input: BoardReach & { dashboardIds: readonly string[] }): Promise<BoardRecord[]>;
   /** No description; `createdById` null and scope Project when absent. */
@@ -56,6 +58,8 @@ export interface BoardRepository {
     name: string;
     createdById?: string | null;
     scope?: DashboardScope;
+    /** Stamped on an Organization board, as setting that scope stamps it. */
+    organizationId?: string | null;
   }): Promise<BoardRecord>;
   updateBoard(input: {
     projectId: string;

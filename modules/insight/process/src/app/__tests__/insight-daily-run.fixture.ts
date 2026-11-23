@@ -371,7 +371,7 @@ function boardReader(world: RunWorld) {
     open: ({ dashboardId, ...read }: BoardRead & { dashboardId: string }) => {
       const found = stored().find(({ id }) => id === dashboardId);
       if (!found || standingOf({ ...read, board: found }) === "none") {
-        throw new DashboardNotFoundError(read.projectId);
+        throw new DashboardNotFoundError({ projectId: read.projectId });
       }
       return found;
     },

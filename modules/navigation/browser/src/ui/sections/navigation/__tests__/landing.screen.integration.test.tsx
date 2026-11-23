@@ -32,6 +32,12 @@ vi.mock("../../../../behavior/navigation-api.ts", () => ({
     identity: {
       myTestArrival: { useQuery: () => mockTestArrival },
     },
+    // The organization's Dashboards area is off here, so Dashboards lands on the project's.
+    featureFlag: {
+      isEnabledForEachOrganization: {
+        useQuery: () => ({ data: { enabledByOrganizationId: {} }, isLoading: false }),
+      },
+    },
   },
 }));
 

@@ -77,6 +77,9 @@ describe("the dashboard tRPC declarations", () => {
     it("keeps the boards wire names, kinds and permissions", () => {
       expect(tableOf(boardTrpc, mounted(boardTrpcTransport))).toEqual([
         ["getAll", "query", "analytics:view"],
+        ["listInOrganization", "query", "organization:view"],
+        ["resolve", "query", "organization:view"],
+        ["storeProjects", "query", "organization:view"],
         ["getById", "query", "analytics:view"],
         ["create", "mutation", "analytics:create"],
         ["update", "mutation", "analytics:update"],

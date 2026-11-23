@@ -9,6 +9,7 @@ import {
   DashboardPointerToken,
   FilterSidebarToken,
   LwqlReplayChartToken,
+  OrganizationStarredDashboardsToken,
   SavedDashboardsToken,
   StarredDashboardsToken,
 } from "@langwatch/analytics-client";
@@ -85,6 +86,20 @@ export const analyticsWeb = defineBrowserModule("analytics")
     "pages/[project]/dashboards/[dashboardId]": {
       load: () => import("./features/dashboards/ui/sections/dashboard-board.screen.tsx"),
     },
+    // The organization's area; the navigation shell opens it only while its flags are on.
+    // Templates and From LangWatch boards read the project in view, else the store project.
+    "pages/dashboards/index": {
+      load: () => import("./features/dashboards/ui/sections/dashboards-library.screen.tsx"),
+    },
+    "pages/dashboards/templates": {
+      load: () => import("./features/dashboards/ui/sections/organization-templates.screen.tsx"),
+    },
+    "pages/dashboards/curated/[templateId]": {
+      load: () => import("./features/dashboards/ui/sections/organization-curated.screen.tsx"),
+    },
+    "pages/dashboards/[dashboardId]": {
+      load: () => import("./features/dashboards/ui/sections/organization-board.screen.tsx"),
+    },
   })
   .withDrawers({
     dashboardName: {
@@ -114,6 +129,13 @@ export const analyticsWeb = defineBrowserModule("analytics")
     load: async () => ({
       default: (await import("./features/dashboards/ui/sections/starred-dashboards-section.tsx"))
         .StarredDashboardsSection,
+    }),
+  })
+  /** The "Starred dashboards" group, lent to the library's and Governance's sidebars. */
+  .lends(OrganizationStarredDashboardsToken, {
+    load: async () => ({
+      default: (await import("./features/dashboards/ui/sections/organization-starred-section.tsx"))
+        .OrganizationStarredSection,
     }),
   })
   /** A kept pointer to a board and a widget, lent to the insight row that names its origin. */

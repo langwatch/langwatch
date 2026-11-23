@@ -10,6 +10,7 @@ import { type ReactNode, useId } from "react";
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
 import { useBoardPeriod } from "../../behavior/use-board-period.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
+import { useStoreProject } from "../../behavior/use-store-project.ts";
 import { useTemplateLibraryFilters } from "../../behavior/use-template-library-filters.ts";
 import { TRUNK_PITCHES, TRUNK_QUESTIONS, type Trunk } from "../../catalogue/index.ts";
 import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
@@ -112,10 +113,17 @@ function TrunkSection({
   );
 }
 
-function TemplatesLibrary() {
+/**
+ * The finder. At the organization level (`/dashboards/templates`) a template is always added
+ * anew to the store project, Only me and numbered, so no card reads "Added" (ADR-002).
+ */
+export function TemplatesLibrary({ atOrganization = false }: { atOrganization?: boolean }) {
   const { filters, setFilters, clearFilters } = useTemplateLibraryFilters();
   const saved = useSavedDashboards();
-  const fromTemplate = useBoardFromTemplate();
+  const store = useStoreProject({ enabled: atOrganization });
+  const fromTemplate = useBoardFromTemplate({ atOrganization, storeProject: store.storeProject });
+  // At the organization level, with no project to store it in, nothing makes a board (ADR-002).
+  const offersAdd = !atOrganization || store.storeProject !== void 0;
   const langy = useLangyAsk();
   // The library's address carries no period, so this is the one a new board opens on.
   const { period } = useBoardPeriod();
@@ -127,13 +135,14 @@ function TemplatesLibrary() {
   const create = async ({ board: template }: LibraryTemplate) => {
     const created = await fromTemplate.createFromTemplate({
       template,
-      existingNames: saved.boards.map(({ name }) => name),
+      existingNames: atOrganization ? store.namesInStore : saved.boards.map(({ name }) => name),
     });
     if (!created || !langy.enabled || !template.reportPrompt) return;
     const board = boardSubject({ board: created, widgets: created.widgets });
     langy.ask(boardPromptDraft({ prompt: template.reportPrompt, board, period }));
   };
   const addedHref = ({ board }: LibraryTemplate) => {
+    if (atOrganization) return void 0;
     const dashboardId = boardFromTemplateId({ templateName: board.name, boards: saved.boards });
     return dashboardId && dashboardsPath({ projectSlug: saved.projectSlug, dashboardId });
   };
@@ -142,12 +151,15 @@ function TemplatesLibrary() {
       key={template.board.id}
       template={template}
       actions={
-        <AddTemplateButton
-          name={template.board.name}
-          isCreating={fromTemplate.creatingId === template.board.id}
-          addedHref={addedHref(template)}
-          onCreate={() => void create(template)}
-        />
+        offersAdd ? (
+          <AddTemplateButton
+            name={template.board.name}
+            isCreating={fromTemplate.creatingId === template.board.id}
+            addedHref={addedHref(template)}
+            inProject={!atOrganization}
+            onCreate={() => void create(template)}
+          />
+        ) : null
       }
     />
   );

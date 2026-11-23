@@ -3,6 +3,7 @@ import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 
 import type { DashboardsSidebarHint } from "./dashboards-sidebar-hint.ts";
 import {
+  isOrganizationDashboardsPath,
   isOrganizationScopedProduct,
   isPathUnder,
   isSettingsShellRoute,
@@ -69,24 +70,27 @@ function seatRefusalAt({
 }
 
 /**
- * The product the chrome draws. Dashboards wins over the personal plane: its
- * sidebar is the saved-dashboards list, which the Coding agents sidebar does not carry.
- * A reader who clicked in from LLM Ops stays in that sidebar (the hint); no hint, no change.
+ * The product the chrome draws. Dashboards wins over the personal plane: the Coding agents
+ * sidebar has no saved-dashboards list. A reader who clicked in from LLM Ops stays there (the
+ * hint), except in the organization's library, which is about no project; no hint, no change.
  */
 function activeProductFor({
   isSettingsRoute,
   isPersonalScopeRoute,
+  isOrganizationLibrary,
   addressedProductId,
   sidebarHint,
 }: {
   isSettingsRoute: boolean;
   isPersonalScopeRoute: boolean;
+  isOrganizationLibrary: boolean;
   addressedProductId: ProductId | null;
   sidebarHint: DashboardsSidebarHint | null;
 }): ProductId | null {
   if (isSettingsRoute) return null;
-  if (addressedProductId === "dashboards")
-    return sidebarHint === "llm-ops" ? "llm-ops" : "dashboards";
+  if (addressedProductId === "dashboards") {
+    return sidebarHint === "llm-ops" && !isOrganizationLibrary ? "llm-ops" : "dashboards";
+  }
   if (isPersonalScopeRoute) return "me";
   return addressedProductId ?? "llm-ops";
 }
@@ -132,20 +136,27 @@ export function resolveShellRoute({
   const addressedProductId = productFromPathname(pathname);
   /** Org-scoped products: exclude personal scope to avoid wrong shell at /gateway */
   const isOrgScopedProduct = isOrganizationScopedProduct(addressedProductId);
+  // The organization's Dashboards library needs no project, and draws no project chip.
+  const isOrganizationLibrary = isOrganizationDashboardsPath(pathname);
   const isPersonalScopeRoute =
     !isSettingsRoute &&
     !isOrgScopedProduct &&
+    !isOrganizationLibrary &&
     (isPersonalScope ||
       isPathUnder({ pathname, base: CODING_AGENTS_PATH }) ||
       isOnOwnPersonalProject);
   const activeProductId = activeProductFor({
     isSettingsRoute,
     isPersonalScopeRoute,
+    isOrganizationLibrary,
     addressedProductId,
     sidebarHint,
   });
   const isOrgScopeRoute =
-    isOrgScope || isSettingsRoute || isOrganizationScopedProduct(activeProductId);
+    isOrgScope ||
+    isSettingsRoute ||
+    isOrganizationLibrary ||
+    isOrganizationScopedProduct(activeProductId);
 
   return {
     isSettingsRoute,

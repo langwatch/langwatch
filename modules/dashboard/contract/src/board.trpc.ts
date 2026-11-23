@@ -14,14 +14,17 @@ import {
 import {
   dashboardDescriptionSchema,
   dashboardNameSchema,
+  dashboardProjectSchema,
   dashboardScopeImpactSchema,
   dashboardScopeProjectsSchema,
   dashboardScopeSchema,
   dashboardStarSchema,
+  organizationBoardSchema,
   starredDashboardSchema,
 } from "./dashboard.ts";
 
 const projectScopeSchema = z.object({ projectId: z.string() });
+const organizationScopeSchema = z.object({ organizationId: z.string() });
 const boardRefSchema = z.object({ ...projectScopeSchema.shape, dashboardId: z.string() });
 
 export const boardTrpc = defineTrpcContract("boards")
@@ -36,12 +39,46 @@ export const boardTrpc = defineTrpcContract("boards")
   )
   .withOutput(boardTrpcSummarySchema.array())
 
+  /**
+   * Every board the member may see across the organization, the `/dashboards` library (ADR-002);
+   * `dashboards_not_enabled` when no project of the organization has Dashboards on.
+   */
+  .query("listInOrganization")
+  .withInput(organizationScopeSchema)
+  .withOutput(organizationBoardSchema.array())
+
+  /**
+   * One board of the organization by id, by the library's rule (ADR-002, decision 3); any board
+   * the member may not see, another organization's included, answers `dashboard_not_found`.
+   */
+  .query("resolve")
+  .withInput(z.object({ ...organizationScopeSchema.shape, dashboardId: z.string() }))
+  .withOutput(organizationBoardSchema)
+
+  /**
+   * The projects a board made outside a project view may be stored in: Dashboards on and
+   * `analytics:create` held, by name. The browser picks the last-used one (ADR-002, decision 3).
+   */
+  .query("storeProjects")
+  .withInput(organizationScopeSchema)
+  .withOutput(dashboardProjectSchema.array())
+
   .query("getById")
   .withInput(boardRefSchema)
   .withOutput(dashboardTrpcRowSchema)
 
   .mutation("create")
   .withInput(z.object({ ...projectScopeSchema.shape, name: z.string() }))
+  .withOutput(dashboardTrpcRowSchema)
+
+  /**
+   * A new board made at `scope` in one write. It asks what `create` and `setScope` ask
+   * together, so a seat refused the scope is refused at the door and nothing is written.
+   */
+  .mutation("createAtScope")
+  .withInput(
+    z.object({ ...projectScopeSchema.shape, name: z.string(), scope: dashboardScopeSchema }),
+  )
   .withOutput(dashboardTrpcRowSchema)
 
   /** The board's inline name and description; refused while `release_dashboards` is off. */

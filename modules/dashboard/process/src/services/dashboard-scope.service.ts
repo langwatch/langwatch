@@ -88,7 +88,7 @@ export class DashboardScopeService {
     const found = await this.#access.findReadable(input);
     const organizationId = found?.board.organizationId ?? null;
     if (!found || found.board.scope !== "ORGANIZATION" || organizationId === null) {
-      throw new DashboardNotFoundError(input.projectId);
+      throw new DashboardNotFoundError({ projectId: input.projectId });
     }
 
     const projectIds = await this.#projects.findLiveNonGovernanceIdsByOrganization({
@@ -106,7 +106,7 @@ export class DashboardScopeService {
     });
 
     const owner = candidates.find(({ id }) => id === found.board.projectId);
-    if (!owner) throw new DashboardNotFoundError(input.projectId);
+    if (!owner) throw new DashboardNotFoundError({ projectId: input.projectId });
     return {
       ownerProject: projectOf(owner),
       projects: candidates

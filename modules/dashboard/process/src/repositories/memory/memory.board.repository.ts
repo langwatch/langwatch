@@ -40,6 +40,10 @@ export class MemoryBoardRepository implements BoardRepository {
     }));
   }
 
+  async findBoardsInProjects(input: { projectIds: readonly string[] }): Promise<BoardRecord[]> {
+    return this.#database.boards.filter((board) => input.projectIds.includes(board.projectId));
+  }
+
   async findBoardsByIds(
     input: BoardReach & { dashboardIds: readonly string[] },
   ): Promise<BoardRecord[]> {
@@ -54,6 +58,7 @@ export class MemoryBoardRepository implements BoardRepository {
     name: string;
     createdById?: string | null;
     scope?: DashboardScope;
+    organizationId?: string | null;
   }): Promise<BoardRecord> {
     const board = dashboardSchema.parse({
       ...input,
@@ -61,7 +66,7 @@ export class MemoryBoardRepository implements BoardRepository {
       description: null,
       createdById: input.createdById ?? null,
       scope: input.scope ?? "PROJECT",
-      organizationId: null,
+      organizationId: input.organizationId ?? null,
       createdAt: this.#database.now(),
       updatedAt: this.#database.now(),
     });
@@ -86,7 +91,7 @@ export class MemoryBoardRepository implements BoardRepository {
 
   async deleteBoard(input: { projectId: string; dashboardId: string }): Promise<BoardRecord> {
     const board = this.#findBoard(input);
-    if (!board) throw new DashboardNotFoundError(input.projectId);
+    if (!board) throw new DashboardNotFoundError({ projectId: input.projectId });
     const database = this.#database;
     const onBoard = (row: { projectId: string; dashboardId: string | null }) =>
       row.projectId === board.projectId && row.dashboardId === board.id;

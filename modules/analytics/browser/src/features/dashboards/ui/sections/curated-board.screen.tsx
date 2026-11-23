@@ -1,7 +1,7 @@
 /**
- * `/[project]/dashboards/curated/[templateId]`: a From LangWatch board, a template live and
- * read-only. Nothing is stored until "Duplicate to edit" in the sidebar menu
- * (dashboards-v2.feature).
+ * `/<project>/dashboards/curated/<templateId>`: a From LangWatch board, a template live and
+ * read-only, stored nowhere until "Duplicate to edit" or a widget picked for a new board
+ * (dashboards-v2.feature). `organization-curated.screen.tsx` opens it at the organization level.
  */
 
 import { UiPageNotFound } from "@langwatch/browser/page-fallbacks";
@@ -21,6 +21,7 @@ import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
+import { useStoreProject } from "../../behavior/use-store-project.ts";
 import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import { boardSetupDraft, boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
@@ -36,7 +37,13 @@ import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { CuratedWidgetsGrid } from "./curated-widgets-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 
-function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
+function OpenCuratedBoard({
+  board,
+  atOrganization,
+}: {
+  board: CuratedBoard;
+  atOrganization: boolean;
+}) {
   const host = useAnalyticsHost();
   const projectId = host.project()?.id ?? "";
   const saved = useSavedDashboards();
@@ -66,8 +73,14 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
   const emptyWidgetNames = empty.emptyNames({ widgets: board.widgets, keyOf: ({ key }) => key });
   const limitFailedWidgets = useLimitFailedWidgets();
   // Whoever may create dashboards picks a widget for a new one; the rest ask Langy.
-  const { mayCreate } = useBoardReader();
-  const { createWithWidget } = useBoardFromTemplate();
+  const reader = useBoardReader();
+  const store = useStoreProject({ enabled: atOrganization });
+  const mayCreate = atOrganization ? store.storeProject !== void 0 : reader.mayCreate;
+  const { createWithWidget } = useBoardFromTemplate({
+    atOrganization,
+    storeProject: store.storeProject,
+  });
+  const existingNames = atOrganization ? store.namesInStore : saved.boards.map(({ name }) => name);
   const picker = useBlockPickerAddress();
   const openPicker = () => {
     if (!picker.isOpen) picker.open();
@@ -153,7 +166,7 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
             createWithWidget({
               question,
               templateId: board.templateId,
-              existingNames: saved.boards.map(({ name }) => name),
+              existingNames,
             })
           }
           onSkip={picker.close}
@@ -164,14 +177,15 @@ function OpenCuratedBoard({ board }: { board: CuratedBoard }) {
   );
 }
 
-function Curated() {
+/** The From LangWatch board the address names; `atOrganization`, a new board goes to the store. */
+export function CuratedBoardPage({ atOrganization = false }: { atOrganization?: boolean }) {
   const templateId = useAnalyticsHost().route().params.templateId ?? "";
   const board = curatedBoardById(templateId);
   if (!board) return <UiPageNotFound />;
   return (
     <>
       <OldAnalyticsBanner />
-      <OpenCuratedBoard key={board.templateId} board={board} />
+      <OpenCuratedBoard key={board.templateId} board={board} atOrganization={atOrganization} />
     </>
   );
 }
@@ -179,7 +193,7 @@ function Curated() {
 export default function CuratedBoardScreen() {
   return (
     <DashboardsGate>
-      <Curated />
+      <CuratedBoardPage />
     </DashboardsGate>
   );
 }

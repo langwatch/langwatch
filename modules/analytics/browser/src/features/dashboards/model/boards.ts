@@ -3,6 +3,7 @@
  * boards get and the addresses in the area. Addresses are built and read here only.
  */
 
+import { ORGANIZATION_DASHBOARDS_PATH } from "@langwatch/analytics-client";
 import { MY_DASHBOARD_NAME } from "@langwatch/dashboard-contract";
 
 export { MY_DASHBOARD_NAME };
@@ -56,6 +57,43 @@ export function curatedBoardPath({
   templateId: string;
 }): string {
   return `${dashboardsPath({ projectSlug })}/${CURATED_SEGMENT}/${encodeURIComponent(templateId)}`;
+}
+
+export { ORGANIZATION_DASHBOARDS_PATH };
+
+/** The address of a board in the organization's area, opened by id under no project. */
+export function organizationBoardPath({ dashboardId }: { dashboardId: string }): string {
+  return `${ORGANIZATION_DASHBOARDS_PATH}/${encodeURIComponent(dashboardId)}`;
+}
+
+/** The address of the organization's templates library. */
+export function organizationTemplatesPath(): string {
+  return `${ORGANIZATION_DASHBOARDS_PATH}/${TEMPLATES_SEGMENT}`;
+}
+
+/** The address of one From LangWatch board at the organization level. */
+export function organizationCuratedPath({ templateId }: { templateId: string }): string {
+  return `${ORGANIZATION_DASHBOARDS_PATH}/${CURATED_SEGMENT}/${encodeURIComponent(templateId)}`;
+}
+
+/** Where an empty board's templates lead: its project's, or the organization's at org level. */
+export function templateLinks({
+  projectSlug,
+  atOrganization,
+}: {
+  projectSlug: string;
+  atOrganization: boolean;
+}): { curatedHref: (templateId: string) => string; templatesHref: string } {
+  if (atOrganization) {
+    return {
+      curatedHref: (templateId) => organizationCuratedPath({ templateId }),
+      templatesHref: organizationTemplatesPath(),
+    };
+  }
+  return {
+    curatedHref: (templateId) => curatedBoardPath({ projectSlug, templateId }),
+    templatesHref: dashboardTemplatesPath({ projectSlug }),
+  };
 }
 
 /** What the area has open, read from the address under `/dashboards/`. */

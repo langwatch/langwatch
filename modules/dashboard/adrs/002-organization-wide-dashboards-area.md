@@ -3,7 +3,7 @@
 **Date:** 2026-11-20
 
 **Amended:** 2026-11-21, after the acceptance-criteria review of langwatch/tasks#1211 and
-the design prototype. Decisions 1 to 4, 6 and 7 changed; decisions 8 to 13 are new.
+the approved design. Decisions 1 to 4, 6 and 7 changed; decisions 8 to 13 are new.
 
 **Status:** Accepted (2026-11-21; product decisions D1, D3 and D5, team decisions D2 and D4)
 
@@ -21,7 +21,7 @@ The product requirement on langwatch/tasks#1211 (19 Nov) sharpens this: a projec
 view is the organization-level space filtered to one project. Opening Dashboards
 or Analytics inside a project shows the same organization boards, scoped to that
 project, not a separate set. At the organization level the scope picker shows
-only the organization. The design prototype adds the layout and
+only the organization. The approved design adds the layout and
 the flows: each product's sidebar lists that product's own boards, a library
 lists every board by product, boards are made in a dialog and moved between
 products, addresses keep working after a move, and My dashboard and Coding
@@ -94,7 +94,7 @@ folded into projections owned by the dashboard module.
    redirect sends a `PROJECT` board opened at `/dashboards/<id>` to its own
    project's address, and only when the member reads that project. Otherwise
    the page is not available and nothing names the project. There are no
-   product-prefixed board routes. This differs on purpose from the prototype,
+   product-prefixed board routes. This differs on purpose from the approved design,
    which gives project boards the library address: here a project shows only at
    a project address, and every existing board link is a project address.
 5. **Per-route "no picker" flag.** Hide the picker on the `/dashboards` routes
@@ -102,14 +102,15 @@ folded into projections owned by the dashboard module.
    `scopeKind` `"organization"`. This is smaller and leaves
    `seatReachesProduct` untouched, so developer seats still get in. They see
    only boards from projects they can read, the same rule as today.
-6. **One flag (amended; D4).** Everything ships behind the existing frontend
-   flag `release_dashboards_in_every_product`, default off, which needs
-   `release_dashboards`. On a page with no project both are evaluated for the
-   organization, and the area exists only when at least one of its projects has
-   Dashboards on. While the flag is off the `/dashboards` addresses answer as
-   before, only LLM Ops shows a Dashboards section, no dialog opens, home
-   products are ignored so every board lists in LLM Ops, and personal boards
-   are hidden but kept.
+6. **One flag for the area (amended; D4, 2026-11-23).** The organization-wide
+   area ships behind its own frontend flag `release_dashboards_organization_area`,
+   default off, which needs `release_dashboards`. On a page with no project both
+   are evaluated for the organization, and the area exists only when at least one
+   of its projects has Dashboards on. `release_dashboards_in_every_product` stays
+   the flag of the other products' sidebar sections only, so turning those on
+   never opens the area. While the area's flag is off the `/dashboards` addresses
+   answer as before, no dialog opens, home products are ignored so every board
+   lists in LLM Ops, and personal boards are hidden but kept.
 7. **Release gate.** Hide boards whose owning project has `release_dashboards`
    off. This matches what that project shows today. The gate covers the area,
    not the data: "All projects" (decision 9) still reads a readable project
