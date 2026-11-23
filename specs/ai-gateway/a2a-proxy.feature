@@ -359,7 +359,7 @@ Feature: A2A proxy on the gateway
     Then the error behind it is recorded on the hop span and in a gateway log line
     And the caller's reply does not carry it
 
-  @unit
+  @integration
   Scenario: the config version token reads the same A2A targets as the bundle
     Given a virtual key whose trace project no longer resolves
     When the gateway asks for the key's config version token
