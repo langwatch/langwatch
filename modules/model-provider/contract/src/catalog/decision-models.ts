@@ -41,6 +41,20 @@ export function isJudgeRoutedModelId(id: string): boolean {
   return id === LANGWATCH_EVALS_MODEL_ID || id === LEGACY_INSTANT_EVALS_MODEL_ID;
 }
 
+/**
+ * An LLM judge's model as the judge picker reads and saves it: where the router flag is on, the
+ * legacy id is routed, so it is Evals Preview. Any other id is kept as it is.
+ */
+export function judgeModelIdOf({
+  id,
+  isJudgeRouted,
+}: {
+  id: string;
+  isJudgeRouted: boolean;
+}): string {
+  return isJudgeRouted && id === LEGACY_INSTANT_EVALS_MODEL_ID ? LANGWATCH_EVALS_MODEL_ID : id;
+}
+
 const INSTANT_PREVIEW = {
   label: "Instant Preview",
   description: "Optimized for search and quick classification",

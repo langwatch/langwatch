@@ -39,6 +39,7 @@ export function useInstantEvalJudgeModels({
   organizationId: string | undefined;
 }): {
   builtInModels: readonly BuiltInModel[];
+  isJudgeRouted: boolean;
   isLoading: boolean;
 } {
   const access = evaluatorApi.instantEval.access.useQuery(
@@ -61,6 +62,7 @@ export function useInstantEvalJudgeModels({
 
   return {
     builtInModels: own.length === 0 ? hosted : [...hosted, ...own],
+    isJudgeRouted,
     isLoading: access.isLoading || decisionModels.isLoading,
   };
 }

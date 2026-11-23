@@ -543,5 +543,15 @@ Feature: Instant Evals decision model column in Default models
   @integration
   Scenario: A judge stored with an earlier id shows as Instant Preview in the picker
     Given an evaluator whose model is stored as "langwatch/instant-evals"
+    And the judge router flag is off for my organization
     When its model picker is shown
     Then it reads "Instant Preview", not an unknown model
+    And the stored id is left as it is
+
+  @integration
+  Scenario: A judge saved on the old id shows Evals Preview where routing is on
+    Given an evaluator whose model is stored as "langwatch/instant-evals"
+    And the judge router flag is on for my organization, so the judge is routed
+    When its model picker is shown
+    Then it reads "Evals Preview", the model that runs
+    And the form holds "langwatch/evals-preview", so the next save stores it

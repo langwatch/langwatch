@@ -2,9 +2,9 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
-import { allModelOptions } from "@langwatch/model-provider-contract";
+import { allModelOptions, judgeModelIdOf } from "@langwatch/model-provider-contract";
 import type { LLMConfig } from "@langwatch/workflow-contract";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { useFormContext, useWatch } from "react-hook-form";
 
@@ -86,10 +86,16 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
     projectId: project?.id,
     organizationId: organization?.id,
   });
-  const { builtInModels } = instantEvals;
+  const { builtInModels, isJudgeRouted } = instantEvals;
+  // A judge saved on the legacy id runs the router where it is on: it reads and saves as such.
+  const judgeModel = judgeModelIdOf({ id: llmConfig.model, isJudgeRouted });
+  const shownConfig: LLMConfig = { ...llmConfig, model: judgeModel };
+  useEffect(() => {
+    if (judgeModel !== llmConfig.model) setValue(`${prefix}.model`, judgeModel);
+  }, [judgeModel, llmConfig.model, prefix, setValue]);
   const { isEmpty, isLoading } = useModelSelection({
     options: allModelOptions,
-    model: llmConfig.model,
+    model: judgeModel,
     mode: "chat",
     builtInModels,
   });
@@ -115,13 +121,17 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
           transition="background 0.15s"
           justify="space-between"
         >
-          <LLMModelDisplay model={llmConfig.model} builtInModels={builtInModels} />
+          <LLMModelDisplay model={judgeModel} builtInModels={builtInModels} />
           <Box color="fg.muted">
             <ChevronDown size={16} />
           </Box>
         </HStack>
       </Popover.Trigger>
-      <LLMConfigPopover values={llmConfig} onChange={handleChange} builtInModels={builtInModels} />
+      <LLMConfigPopover
+        values={shownConfig}
+        onChange={handleChange}
+        builtInModels={builtInModels}
+      />
     </Popover.Root>
   );
 };

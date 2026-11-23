@@ -45513,7 +45513,7 @@ The picker is one list: LangWatch's **Instant Preview** first, then the models o
     <Frame>
       <img
         src="/images/instant-evals/own-model-picker.png"
-        alt="Edit default models drawer for the ACME organization, with the Instant Evals picker open: Instant Preview first, then Decisions API on OpenAI ticked, then models whose provider has no key yet"
+        alt="Edit default models drawer for an organization, with the Instant Evals picker open: Instant Preview first, then Decisions API on Azure OpenAI ticked, then models whose provider has no key yet"
       />
     </Frame>
   </Step>

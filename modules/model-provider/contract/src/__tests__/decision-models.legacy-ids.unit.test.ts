@@ -9,6 +9,7 @@ import {
   findDecisionModel,
   isDecisionModelId,
   isOwnDecisionModelId,
+  judgeModelIdOf,
   LANGWATCH_DECISION_MODEL_ID,
   LANGWATCH_DECISION_PREVIEWS,
   LANGWATCH_EVALS_MODEL_ID,
@@ -53,6 +54,19 @@ describe("LangWatch model ids", () => {
     expect(findDecisionModel("langwatch/instant-evals")?.id).toBe(LANGWATCH_DECISION_MODEL_ID);
     expect(isDecisionModelId("langwatch/instant-evals")).toBe(true);
     expect(isOwnDecisionModelId("langwatch/instant-evals")).toBe(false);
+  });
+
+  /** @scenario "A judge saved on the old id shows Evals Preview where routing is on" */
+  it("reads a judge on langwatch/instant-evals as Evals Preview only where it is routed", () => {
+    expect(judgeModelIdOf({ id: "langwatch/instant-evals", isJudgeRouted: true })).toBe(
+      "langwatch/evals-preview",
+    );
+    expect(judgeModelIdOf({ id: "langwatch/instant-evals", isJudgeRouted: false })).toBe(
+      "langwatch/instant-evals",
+    );
+    expect(judgeModelIdOf({ id: "langwatch/instant-preview", isJudgeRouted: true })).toBe(
+      "langwatch/instant-preview",
+    );
   });
 
   it("leaves every other id as it is", () => {

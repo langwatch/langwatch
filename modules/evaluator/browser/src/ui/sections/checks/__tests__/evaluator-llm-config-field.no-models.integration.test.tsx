@@ -8,7 +8,7 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { INSTANT_EVALS_FLAG } from "@langwatch/instant-eval-contract";
 import { cleanup, screen } from "@testing-library/react";
-import { FormProvider, useForm } from "react-hook-form";
+import { FormProvider, useForm, useWatch } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const OWN_DECISION_MODEL = {
@@ -67,7 +67,7 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => ({
 }));
 
 vi.mock("../../../../behavior/lent-model-provider.tsx", () => ({
-  LLMModelDisplay: () => <span>model display</span>,
+  LLMModelDisplay: ({ model }: { model: string }) => <span data-model={model}>model display</span>,
 }));
 
 vi.mock("../../../../behavior/lent-peers.tsx", () => ({
@@ -93,16 +93,24 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
-function renderField() {
+function renderField({ model }: { model?: string } = {}) {
+  const FormModel = () => (
+    <output aria-label="form model">{useWatch({ name: "settings.model" })}</output>
+  );
   const Harness = () => {
-    const methods = useForm({ defaultValues: { settings: {} } });
+    const methods = useForm({ defaultValues: { settings: model ? { model } : {} } });
     return (
       <FormProvider {...methods}>
         <EvaluatorLLMConfigField prefix="settings" />
+        <FormModel />
       </FormProvider>
     );
   };
   renderWithDesignSystem(<Harness />);
+}
+
+function shownModel(): string | null {
+  return screen.getByText("model display").getAttribute("data-model");
 }
 
 function offersInstantEvals(): boolean {
@@ -197,6 +205,30 @@ describe("EvaluatorLLMConfigField", () => {
         renderField();
 
         expect(offeredLabels()).toEqual(["Instant Preview"]);
+      });
+    });
+
+    describe("when a judge was saved on the old langwatch/instant-evals id", () => {
+      beforeEach(() => {
+        state.released = true;
+        state.decisionModels = [HOSTED_DECISION_MODEL];
+      });
+
+      /** @scenario "A judge saved on the old id shows Evals Preview where routing is on" */
+      it("shows and holds Evals Preview where the judge router flag is on", async () => {
+        state.judgeRouted = true;
+        renderField({ model: "langwatch/instant-evals" });
+
+        expect(shownModel()).toBe("langwatch/evals-preview");
+        expect(await screen.findByText("langwatch/evals-preview")).toBeInTheDocument();
+      });
+
+      /** @scenario "A judge stored with an earlier id shows as Instant Preview in the picker" */
+      it("leaves the stored id as it is with the router flag off", () => {
+        renderField({ model: "langwatch/instant-evals" });
+
+        expect(shownModel()).toBe("langwatch/instant-evals");
+        expect(screen.getByLabelText("form model")).toHaveTextContent("langwatch/instant-evals");
       });
     });
 
