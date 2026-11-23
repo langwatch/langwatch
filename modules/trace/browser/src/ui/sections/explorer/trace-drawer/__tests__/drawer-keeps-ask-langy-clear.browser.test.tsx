@@ -75,6 +75,7 @@ describe("given a trace drawer the reader dragged wider than the space beside As
   });
 
   describe("when the window gets narrower", () => {
+    /** @scenario "Narrowing the window keeps the drawer clear of Ask Langy" */
     it("narrows the drawer so the button stays uncovered", async () => {
       renderWithDesignSystem(<WideTraceDrawer />);
       await resting(await screen.findByTestId("trace-drawer"));

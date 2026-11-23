@@ -51,6 +51,7 @@ describe("fitDrawerWidth", () => {
   });
 
   describe("given less room beside the button than the minimum width", () => {
+    /** @scenario "With less room than the minimum width the drawer still leaves Ask Langy clear" */
     it("keeps the button clear and takes only the room there is", () => {
       const width = fitDrawerWidth({
         ...base,

@@ -141,6 +141,18 @@ Rule: The drawer never covers Ask Langy
     Then the drawer's left edge stops a gap to the right of the Ask Langy button
     And the button can still be clicked
 
+  @integration
+  Scenario: Narrowing the window keeps the drawer clear of Ask Langy
+    Given a wide trace drawer is open on Trace Explorer
+    When the reader makes the window narrower
+    Then the drawer narrows with it and the Ask Langy button stays uncovered
+
+  @unit
+  Scenario: With less room than the minimum width the drawer still leaves Ask Langy clear
+    Given the room right of Ask Langy is narrower than the drawer's minimum width
+    When the trace drawer is open
+    Then the drawer takes only the room there is and the button stays uncovered
+
   @unit @integration @regression
   Scenario: Opening Langy beside a wide trace drawer narrows the drawer
     Given a wide trace drawer is open on Trace Explorer and the Langy panel is closed
