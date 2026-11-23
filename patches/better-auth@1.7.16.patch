@@ -1,0 +1,15 @@
+diff --git a/dist/db/internal-adapter.mjs b/dist/db/internal-adapter.mjs
+index f1da35d..19def98 100644
+--- a/dist/db/internal-adapter.mjs
++++ b/dist/db/internal-adapter.mjs
+@@ -606,8 +606,8 @@ const createInternalAdapter = (adapter, ctx) => {
+ 				join: { ...options?.includeAccounts ? { account: true } : {} }
+ 			});
+ 			if (!result) return null;
+-			const normalize = (value) => value.normalize("NFC").toLowerCase();
+-			if (normalize(result.email) !== normalize(email)) return null;
++			// LangWatch: the identity storage adapter resolves a verified secondary address to its user
++			// (ADR-116), whose User.email is the primary, so the returned address is not compared here.
+ 			const { account: accounts, ...user } = result;
+ 			return {
+ 				user,

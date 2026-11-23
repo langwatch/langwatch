@@ -29,7 +29,7 @@ export const samlOwnOriginRepost = {
     before: [
       {
         matcher: (context) => context.path === "/sso/saml2/sp/acs/:providerId",
-        handler: createAuthMiddleware(async (ctx) => {
+        handler: createAuthMiddleware(async (ctx): Promise<Response | undefined> => {
           if (ctx.headers?.get("sec-fetch-site") !== "cross-site") return;
           const post = assertionPostSchema.safeParse(ctx.body);
           if (!post.success || !answersNoRequest(post.data.SAMLResponse)) return;

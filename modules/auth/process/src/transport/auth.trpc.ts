@@ -32,7 +32,7 @@ export const authRequestHeadersContext = defineMiddlewareContext(
   z
     .record(z.string(), z.union([z.string(), z.array(z.string())]).optional())
     .nullable()
-    .transform((record) => {
+    .transform((record): Headers => {
       const headers = new Headers();
       for (const [name, value] of Object.entries(record ?? {})) {
         for (const one of typeof value === "string" ? [value] : (value ?? [])) {
