@@ -580,9 +580,8 @@ function translateEventTypeFilter({
 }
 
 /**
- * Translate event metric key filter. Uses paired arrayExists to correlate
- * Events.Name with Events.Attributes at the same index — this prevents false
- * positives where event type matches at one index but key matches at another.
+ * Event metric key filter: paired arrayExists keeps name and attributes at one index. Keys
+ * match by `hasAny(mapKeys(...))`; a lambda over them copies each event's map once per key.
  */
 function translateEventMetricKeyFilter({
   values,
@@ -603,14 +602,14 @@ function translateEventMetricKeyFilter({
     // Correlate event name and attributes at the same array index
     metricKeyCondition = `arrayExists(
       (name, attrs) -> name = {${eventTypeParam}:String}
-        AND arrayExists(k -> mapContains(attrs, k), {${keysParam}:Array(String)}),
+        AND hasAny(mapKeys(attrs), {${keysParam}:Array(String)}),
       "Events.Name",
       "Events.Attributes"
     )`;
   } else {
     // No event type filter, just check attributes
     metricKeyCondition = `arrayExists(
-      x -> arrayExists(k -> mapContains(x, k), {${keysParam}:Array(String)}),
+      x -> hasAny(mapKeys(x), {${keysParam}:Array(String)}),
       "Events.Attributes"
     )`;
   }

@@ -1219,6 +1219,8 @@ export class TraceModule implements TraceApi, CollectorApp {
       topicNames: options.repositories.topicNames,
       facets: CLICKHOUSE_FACET_CATALOG,
       discoverUpdates: options.tenantBroadcast,
+      lightFloor: async () =>
+        spanAnalyticsFloorOf(await options.repositories.spanAnalyticsFloor.findReplayStep()),
     });
     const protections = TraceViewerProtectionService.create(options.protections);
     // Own-only: the records and viewer reads carry no door proof (ruling TRACE-PROOF-SHARE).

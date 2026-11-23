@@ -11,6 +11,7 @@ import type {
   DiscoverResult,
   FacetDescriptor,
   FacetValuesResult,
+  SpanAnalyticsFloor,
   TraceListCursor,
   TraceListItem,
   TraceListPage,
@@ -111,6 +112,7 @@ export class TraceListService {
     topicNames,
     facets,
     discoverUpdates,
+    lightFloor,
   }: {
     repository: TraceListRead;
     /** Evaluation's shared runs, read for each page's evaluation summaries (R40). */
@@ -120,6 +122,8 @@ export class TraceListService {
     facets: FacetCatalog;
     /** Where a finished background discover refresh tells the tenant's tabs to refetch. */
     discoverUpdates: Pick<PresenceApi, "publishProjectEvent">;
+    /** Where span_analytics starts; batched span facets read it inside that window. */
+    lightFloor?: () => Promise<SpanAnalyticsFloor>;
   }): TraceListService {
     const topicNaming = TraceTopicNamingService.create({ topicNames });
 
@@ -131,6 +135,7 @@ export class TraceListService {
         topicNaming,
         facets,
         updates: discoverUpdates,
+        ...(lightFloor ? { lightFloor } : {}),
       }),
       facetValues: TraceFacetValuesService.create({ repository, topicNaming, facets }),
     });
