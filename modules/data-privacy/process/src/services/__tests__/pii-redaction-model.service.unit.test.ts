@@ -283,7 +283,7 @@ const strictBatch = (
 ) => ({
   texts: ["call Ana"],
   piiRedactionLevel: "STRICT" as const,
-  resolvedPiiLevel: "strict" as const,
+  effectivePiiLevel: "strict" as const,
   projectId,
 });
 
@@ -358,7 +358,7 @@ describe("PiiRedactionModelService", () => {
           expect(outcomes()).toEqual([["info", "not_licensed"]]);
           expect(usage[0]?.fields).toMatchObject({
             organizationId: ORGANIZATION_ID,
-            spansFound: 0,
+            findings: 0,
           });
 
           await vi.advanceTimersByTimeAsync(1);
@@ -555,7 +555,7 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio({
         texts: ["call Ana at +3161234567", "nothing here"],
         piiRedactionLevel: "STRICT",
-        resolvedPiiLevel: "strict",
+        effectivePiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
@@ -568,7 +568,7 @@ describe("PiiRedactionModelService", () => {
         projectId: PROJECT_ID,
         texts: 2,
         characters: 35,
-        spansFound: 2,
+        findings: 2,
         outcome: "ok",
         durationMs: expect.any(Number),
       });
@@ -581,7 +581,9 @@ describe("PiiRedactionModelService", () => {
 
     /** @scenario "Each PII redaction model call leaves one usage log line" */
     it("logs a refusal as an error with its class name only, and counts it", async () => {
-      const { analysis, presidio, fallbacks, usage } = setup();
+      const { analysis, presidio, fallbacks, usage } = setup({
+        model: scriptedModel([{ kind: "refuse" }]).channel,
+      });
       presidio.answerWith(anonymized("call <PERSON>"));
 
       await analysis.clearPresidio(strictBatch());
@@ -591,8 +593,8 @@ describe("PiiRedactionModelService", () => {
       expect(usage[0]!.level).toBe("warn");
       expect(usage[0]!.fields).toMatchObject({
         outcome: "error",
-        errorName: "Error",
-        spansFound: 0,
+        errorName: "LangevalsPiiDetectionError",
+        findings: 0,
         texts: 1,
         characters: 8,
       });
@@ -672,7 +674,7 @@ describe("PiiRedactionModelService", () => {
       return span.attributes[0]?.value.stringValue;
     }
 
-    /** @scenario "Only a resolved strict policy reaches the PII redaction model" */
+    /** @scenario "Only a batch whose effective PII level is strict reaches the PII redaction model" */
     it("sends a strict policy's batch to the model", async () => {
       const { analysis, presidio, memoryModel, sent } = setup();
       memoryModel.answerWith(anonymized("call <PERSON>"));
@@ -687,7 +689,22 @@ describe("PiiRedactionModelService", () => {
       expect(sent(presidio)).toHaveLength(0);
     });
 
-    /** @scenario "Only a resolved strict policy reaches the PII redaction model" */
+    /** @scenario "Only a batch whose effective PII level is strict reaches the PII redaction model" */
+    it("sends an essential policy's batch to the model when the request says STRICT", async () => {
+      const { analysis, presidio, memoryModel, sent } = setup();
+      memoryModel.answerWith(anonymized("call <PERSON>"));
+
+      const redacted = await redactSpanUnder({
+        analysis,
+        resolve: async () => policyAt({ level: "essential" }),
+      });
+
+      expect(redacted).toBe("call [PERSON]");
+      expect(sent(memoryModel)).toHaveLength(1);
+      expect(sent(presidio)).toHaveLength(0);
+    });
+
+    /** @scenario "Only a batch whose effective PII level is strict reaches the PII redaction model" */
     it("sends a custom policy's batch to Presidio, though the request says STRICT", async () => {
       const { analysis, presidio, memoryModel, flagReads, sent } = setup();
       presidio.answerWith(anonymized("call <PERSON>"));
@@ -704,7 +721,7 @@ describe("PiiRedactionModelService", () => {
       expect(flagReads).toHaveLength(0);
     });
 
-    /** @scenario "Only a resolved strict policy reaches the PII redaction model" */
+    /** @scenario "Only a batch whose effective PII level is strict reaches the PII redaction model" */
     it("sends the batch to Presidio when the policy cannot be loaded", async () => {
       const { analysis, presidio, memoryModel, flagReads, sent } = setup();
       presidio.answerWith(anonymized("call <PERSON>"));
@@ -739,7 +756,7 @@ describe("PiiRedactionModelService", () => {
       const { analysis, presidio, memoryModel, flagReads, sent } = setup();
       presidio.answerWith(anonymized("call <PERSON>"));
 
-      await analysis.clearPresidio({ ...strictBatch(), resolvedPiiLevel: undefined });
+      await analysis.clearPresidio({ ...strictBatch(), effectivePiiLevel: undefined });
 
       expect(sent(memoryModel)).toHaveLength(0);
       expect(flagReads).toHaveLength(0);
@@ -967,7 +984,7 @@ describe("PiiRedactionModelService", () => {
 
         const cleared = policy.clearBatch([{ text: "call Ana", isNameExempt: false }], {
           piiRedactionLevel: "STRICT",
-          resolvedPiiLevel: "strict",
+          effectivePiiLevel: "strict",
           mainMethod: "presidio",
           projectId: PROJECT_ID,
         });
@@ -1010,7 +1027,7 @@ describe("PiiRedactionModelService", () => {
 
       const cleared = await policy.clearBatch([{ text: "call Ana", isNameExempt: false }], {
         piiRedactionLevel: "STRICT",
-        resolvedPiiLevel: "strict",
+        effectivePiiLevel: "strict",
         mainMethod: "presidio",
         projectId: PROJECT_ID,
       });
@@ -1052,7 +1069,7 @@ describe("PiiRedactionModelService", () => {
       const cleared = await analysis.clearPresidio({
         texts: ["a".repeat(5_000), "b".repeat(3_001)],
         piiRedactionLevel: "STRICT",
-        resolvedPiiLevel: "strict",
+        effectivePiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
@@ -1068,7 +1085,7 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio({
         texts: ["a".repeat(8_000)],
         piiRedactionLevel: "STRICT",
-        resolvedPiiLevel: "strict",
+        effectivePiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
@@ -1084,7 +1101,7 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio({
         texts: ["a".repeat(8_001)],
         piiRedactionLevel: "STRICT",
-        resolvedPiiLevel: "strict",
+        effectivePiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
@@ -1095,7 +1112,7 @@ describe("PiiRedactionModelService", () => {
           projectId: PROJECT_ID,
           texts: 1,
           characters: 8_001,
-          spansFound: 0,
+          findings: 0,
           outcome: "too_long",
           durationMs: 0,
         },
@@ -1151,7 +1168,7 @@ describe("PiiRedactionModelService", () => {
           projectId: PROJECT_ID,
           texts: 1,
           characters: 8,
-          spansFound: 0,
+          findings: 0,
           outcome: "breaker_open",
           durationMs: 0,
         },
@@ -1311,7 +1328,7 @@ describe("PiiRedactionModelService", () => {
       await analysis.clearPresidio({
         texts: ["a".repeat(8_001)],
         piiRedactionLevel: "STRICT",
-        resolvedPiiLevel: "strict",
+        effectivePiiLevel: "strict",
         projectId: PROJECT_ID,
       });
 
