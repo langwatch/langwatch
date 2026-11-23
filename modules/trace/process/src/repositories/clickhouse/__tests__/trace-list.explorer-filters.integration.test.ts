@@ -251,6 +251,7 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
   const passedB = "evalchip-passed-b";
   const failed = "evalchip-failed";
   const unjudged = "evalchip-unjudged";
+  const skipped = "evalchip-skipped";
   let writtenAt = 0;
 
   const runOf = (id: string): ResolvedInstantEvalRun => ({
@@ -273,8 +274,11 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
     tenant: string;
     run: string;
     traceId: string;
-    passed: boolean;
+    /** null is a skipped or failed judgement, with no verdict. */
+    passed: boolean | null;
   }) {
+    let probability: number | null = null;
+    if (passed !== null) probability = passed ? 0.9 : 0.1;
     return {
       TenantId: tenant,
       RunId: run,
@@ -283,11 +287,11 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
       ThreadId: "",
       SpanId: "",
       Kind: "boolean",
-      Status: "judged",
-      Passed: passed ? 1 : 0,
+      Status: passed === null ? "skipped" : "judged",
+      Passed: passed === null ? null : Number(passed),
       Score: null,
       Label: "",
-      Probability: passed ? 0.9 : 0.1,
+      Probability: probability,
       Probabilities: "",
       Error: "",
       OccurredAt: new Date(base),
@@ -298,7 +302,7 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
 
   beforeAll(async () => {
     await insertTraces(
-      [passedA, passedB, failed, unjudged].map((traceId, offset) =>
+      [passedA, passedB, failed, unjudged, skipped].map((traceId, offset) =>
         traceRow({
           tenantId,
           traceId,
@@ -315,6 +319,7 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
         judgment({ tenant: tenantId, run: runId, traceId: passedA, passed: true }),
         judgment({ tenant: tenantId, run: runId, traceId: passedB, passed: true }),
         judgment({ tenant: tenantId, run: runId, traceId: failed, passed: false }),
+        judgment({ tenant: tenantId, run: runId, traceId: skipped, passed: null }),
         judgment({ tenant: otherTenantId, run: foreignRunId, traceId: passedA, passed: true }),
       ],
       format: "JSONEachRow",
@@ -355,6 +360,17 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
       });
 
       expect(page.totalHits).toBe(0);
+    });
+
+    /** @scenario "A negated eval chip keeps the traces the judge did not match" */
+    it("under NOT lists only the judged no, not a passed, skipped or unjudged trace", async () => {
+      const page = await listWith({
+        tenantId,
+        filterWhere: chipFilter({ query: `NOT eval:"${question}"`, run: runId }),
+      });
+
+      expect(page.rows.map((row) => row.traceId)).toEqual([failed]);
+      expect(page.totalHits).toBe(1);
     });
   });
 

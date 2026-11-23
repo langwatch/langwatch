@@ -12,6 +12,7 @@ import {
   type TagToken,
   type UnaryOperatorToken,
   type TranslationContext,
+  unjudgeableInstantEvalTags,
 } from "@langwatch/trace-contract";
 
 import {
@@ -471,6 +472,8 @@ export function translateFilterAst({
   }
 
   if (ast.type === "EmptyExpression") return null;
+  // Read off the tree compiled below, so each eval chip occurrence is checked on its own.
+  if (ctx.evalRuns) ctx.unjudgeableEvalTags = unjudgeableInstantEvalTags(ast);
 
   const sql = translateNode({ node: ast, negated: false, ctx, translateTag, translateScope });
 
