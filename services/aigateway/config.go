@@ -17,21 +17,24 @@ import (
 type Config struct {
 	Environment string `env:"ENVIRONMENT"`
 	// MetricsAPIKey is METRICS_API_KEY, the pull door's scrape bearer (ADR-175).
-	MetricsAPIKey                 string                    `env:"METRICS_API_KEY"`
-	BlockLocalHTTPCalls           bool                      `env:"BLOCK_LOCAL_HTTP_CALLS"`
-	RequireHTTPSCustomerEndpoints bool                      `env:"REQUIRE_HTTPS_CUSTOM_ENDPOINTS"`
-	AllowedProxyHosts             string                    `env:"ALLOWED_PROXY_HOSTS"`
-	Server                        config.Server             `env:"SERVER"`
-	Log                           clog.Config               `env:"LOG"`
-	ControlPlane                  ControlPlaneConfig        `env:"LW_GATEWAY"`
-	AuthCache                     AuthCacheConfig           `env:"LW_GATEWAY_AUTH_CACHE"`
-	Circuit                       CircuitConfig             `env:"LW_GATEWAY_CIRCUIT"`
-	CustomerTraceBridge           CustomerTraceBridgeConfig `env:"CUSTOMER_TRACE_BRIDGE"`
-	LangyMirror                   LangyMirrorConfig         `env:"LANGY_MIRROR"`
-	SpendEmitter                  SpendEmitterConfig        `env:"LW_GATEWAY_SPEND"`
-	OTel                          config.OTel               `env:"OTEL"`
-	Voice                         VoiceConfig               `env:"LW_GATEWAY_VOICE"`
-	CORS                          CORSConfig                `env:"LW_GATEWAY_CORS"`
+	MetricsAPIKey                 string `env:"METRICS_API_KEY"`
+	BlockLocalHTTPCalls           bool   `env:"BLOCK_LOCAL_HTTP_CALLS"`
+	RequireHTTPSCustomerEndpoints bool   `env:"REQUIRE_HTTPS_CUSTOM_ENDPOINTS"`
+	AllowedProxyHosts             string `env:"ALLOWED_PROXY_HOSTS"`
+	// A2APublicBaseURL is the gateway's public origin, used in the URLs of
+	// proxied Agent Cards. Empty uses the request's scheme and Host.
+	A2APublicBaseURL    string                    `env:"A2A_PUBLIC_BASE_URL"`
+	Server              config.Server             `env:"SERVER"`
+	Log                 clog.Config               `env:"LOG"`
+	ControlPlane        ControlPlaneConfig        `env:"LW_GATEWAY"`
+	AuthCache           AuthCacheConfig           `env:"LW_GATEWAY_AUTH_CACHE"`
+	Circuit             CircuitConfig             `env:"LW_GATEWAY_CIRCUIT"`
+	CustomerTraceBridge CustomerTraceBridgeConfig `env:"CUSTOMER_TRACE_BRIDGE"`
+	LangyMirror         LangyMirrorConfig         `env:"LANGY_MIRROR"`
+	SpendEmitter        SpendEmitterConfig        `env:"LW_GATEWAY_SPEND"`
+	OTel                config.OTel               `env:"OTEL"`
+	Voice               VoiceConfig               `env:"LW_GATEWAY_VOICE"`
+	CORS                CORSConfig                `env:"LW_GATEWAY_CORS"`
 	// CodexAPIBase is where codex model calls go (CODEX_API_BASE, the root
 	// that `/responses` hangs off); unset is OpenAI's own codex backend.
 	// haven's +outbound names outboundsim.
