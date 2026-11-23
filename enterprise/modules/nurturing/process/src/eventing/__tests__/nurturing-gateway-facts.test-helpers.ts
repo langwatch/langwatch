@@ -215,20 +215,29 @@ function registeredCopyLanes({
   };
 }
 
+/** The queue's delivery of a job: its 1-based attempt, absent outside the queue. */
+type Delivery = Readonly<{ deliveryAttempt?: number }>;
+
 /**
  * The nurturing pipeline's peer subscribers as a worker registers them, and the live router's
  * hand-off: an owner's event goes to every subscriber declaring its type, in registration order.
  */
-export function liveSubscribersOf(pipeline: NurturingPipeline): (event: Event) => Promise<void> {
+export function liveSubscribersOf(
+  pipeline: NurturingPipeline,
+): (event: Event, delivery?: Delivery) => Promise<void> {
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<
     Parameters<NonNullable<NurturingPipeline["globalProjections"]>[number]["register"]>[0]
   >({ registerEventSubscriber: (subscriber) => void subscribers.push(subscriber) });
   for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
-  return async (event) => {
+  return async (event, delivery = {}) => {
     const lanes = subscribers.filter(({ eventTypes }) => eventTypes.includes(event.type));
     for (const lane of lanes) {
-      await lane.handle(event, { tenantId: event.tenantId, aggregateId: event.aggregateId });
+      await lane.handle(event, {
+        tenantId: event.tenantId,
+        aggregateId: event.aggregateId,
+        ...delivery,
+      });
     }
   };
 }
@@ -368,10 +377,13 @@ export async function gatewayFactsOver({
   // The key and member copies as the usage pipeline registers them: parse, then store.
   const copyLanes = registeredCopyLanes({ virtualKeys, members });
 
-  /** Copies a lifecycle or join fact, then hands the event to every nurturing peer lane on it. */
-  const deliverFact = async (event: Event) => {
+  /**
+   * Copies a lifecycle or join fact, then hands the event to every nurturing peer lane on it, as
+   * the queue's `deliveryAttempt` when given.
+   */
+  const deliverFact = async (event: Event, delivery?: Delivery) => {
     await copyLanes(event);
-    await toSubscribers(event);
+    await toSubscribers(event, delivery);
   };
   /** A current member of the organization since `at`, as an owner's join fact records one. */
   async function joined(userId: string, at = 1): Promise<void> {

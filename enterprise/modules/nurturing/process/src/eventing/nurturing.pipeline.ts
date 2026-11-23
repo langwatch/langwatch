@@ -278,6 +278,7 @@ export function buildNurturingPipeline(deps: {
   keyFirstRequested: (input: {
     data: RecordVkFirstRequestCommandData;
     deliver: (signal: NurturingSignal) => Promise<void>;
+    deliveryAttempt?: number;
   }) => Promise<void>;
 }): NurturingPipeline {
   const deliverSignal = (signal: NurturingSignal) =>
@@ -570,7 +571,8 @@ export function buildNurturingPipeline(deps: {
       .withPeerSubscriber("keyFirstRequest", {
         eventType: GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
         data: recordVkFirstRequestCommandDataSchema,
-        handle: (data) => deps.keyFirstRequested({ data, deliver: deliverSignal }),
+        handle: (data, { deliveryAttempt }) =>
+          deps.keyFirstRequested({ data, deliveryAttempt, deliver: deliverSignal }),
       })
       .withPeerSubscriber("langyFirstMessageSeen", {
         eventType: LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE,
