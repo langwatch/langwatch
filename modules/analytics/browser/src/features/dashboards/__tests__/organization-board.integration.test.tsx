@@ -13,7 +13,11 @@ import { type ReactNode, useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { type AnalyticsHostProject, AnalyticsHostProvider } from "../../../model/analytics-host.ts";
-import { StubAnalyticsHost } from "../../../testing.tsx";
+import {
+  ANALYTICS_MEMBER_PERMISSIONS,
+  StubAnalyticsHost,
+  type StubAnalyticsHostOptions,
+} from "../../../testing.tsx";
 import { libraryBoardPath } from "../model/organization-library.ts";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import OrganizationBoardScreen from "../ui/sections/organization-board.screen.tsx";
@@ -70,8 +74,21 @@ const LISTED_IN_SHOP = {
   updatedAt: new Date("2026-11-01"),
 };
 
-const hostIn = (project: AnalyticsHostProject | undefined) =>
-  new StubAnalyticsHost({ project, route: { params: { dashboardId: "board-org" }, query: {} } });
+/** A member who may edit the board and ask Langy, so an empty board shows all it offers. */
+const LANGY_EDITOR: StubAnalyticsHostOptions = {
+  flags: { release_dashboards: true, release_langy_enabled: true },
+  permissions: [...ANALYTICS_MEMBER_PERMISSIONS, "langy:create"],
+};
+
+const hostIn = (
+  project: AnalyticsHostProject | undefined,
+  options: StubAnalyticsHostOptions = {},
+) =>
+  new StubAnalyticsHost({
+    ...options,
+    project,
+    route: { params: { dashboardId: "board-org" }, query: {} },
+  });
 
 /** The LLM Ops top bar as a board sees it: the project in view, switched in place. */
 function TopBarProjectSwitch({
@@ -99,6 +116,7 @@ function renderBoard({
   homeProduct = "llm-ops",
   projectInView = inView(TEST_PROJECT),
   switchTo = [],
+  asLangyEditor = false,
 }: {
   answer: unknown;
   /** The home the project's list answers for the board. */
@@ -107,10 +125,11 @@ function renderBoard({
   projectInView?: AnalyticsHostProject | null;
   /** The projects the top bar can switch to, in place. */
   switchTo?: readonly AnalyticsHostProject[];
+  asLangyEditor?: boolean;
 }) {
   const calls: UiProcedureCall[] = [];
-  const host = hostIn(projectInView ?? undefined);
-  const hosts = [host, ...switchTo.map(hostIn)];
+  const host = hostIn(projectInView ?? undefined, asLangyEditor ? LANGY_EDITOR : {});
+  const hosts = [host, ...switchTo.map((project) => hostIn(project))];
   const respond = (call: UiProcedureCall): Promise<unknown> => {
     calls.push(call);
     if (call.path === "boards.resolve") {
@@ -153,6 +172,25 @@ describe("a board opened at /dashboards/<id>", () => {
       expect(screen.getByLabelText(`Data from ${SHOP.name}`)).toBeVisible();
       expect(host.replacements).toEqual([]);
       expect(host.navigations).toEqual([]);
+    });
+  });
+
+  describe("when it is an empty board the member may edit", () => {
+    /** @scenario "Only an empty LLM Ops board offers templates" */
+    it("offers no template, and keeps the ask bar, its questions and Add a widget", async () => {
+      renderBoard({
+        answer: resolved({ id: "board-org", scope: "PROJECT", project: SHOP }),
+        projectInView: inView(SHOP),
+        asLangyEditor: true,
+      });
+
+      expect(
+        await screen.findByRole("button", { name: "Where does my money go?" }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "What do you want to know?" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
+      expect(screen.queryByText("Or start from a template")).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "View all templates" })).not.toBeInTheDocument();
     });
   });
 

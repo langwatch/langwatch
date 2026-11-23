@@ -307,7 +307,10 @@ afterEach(cleanup);
 
 describe("a member's board", () => {
   describe("given a member opens a board with nothing on it", () => {
-    /** @scenario "Boards: every empty board shows one view" */
+    /**
+     * @scenario "Boards: every empty board shows one view"
+     * @scenario "Only an empty LLM Ops board offers templates"
+     */
     it("shows the ask bar, the suggested questions and the From LangWatch boards to start from", async () => {
       openBoard({
         server: inMemoryServer({ boards: OWN_BOARDS }),
@@ -329,6 +332,29 @@ describe("a member's board", () => {
       ]);
       expect(start.getByRole("link", { name: "View all templates" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /^Add a widget Start/ })).toBeNull();
+    });
+
+    describe("when the board is homed in Gateway", () => {
+      /** @scenario "Only an empty LLM Ops board offers templates" */
+      it("offers no template, and keeps the ask bar, its questions and Add a widget", async () => {
+        openBoard({
+          server: inMemoryServer({
+            boards: OWN_BOARDS.map((each) => ({ ...each, homeProduct: "gateway" as const })),
+          }),
+          flags: LANGY_ON,
+          permissions: LANGY_MEMBER,
+        });
+
+        expect(
+          await screen.findByRole("button", { name: "Where does my money go?" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "What do you want to know?" }),
+        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
+        expect(screen.queryByText("Or start from a template")).toBeNull();
+        expect(screen.queryByRole("link", { name: "View all templates" })).toBeNull();
+      });
     });
 
     describe("when the member opens a From LangWatch card", () => {

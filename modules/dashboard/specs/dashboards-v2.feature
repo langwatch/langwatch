@@ -1360,9 +1360,12 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then "What do you want to know?" sits under the header
     And without Langy a stored board keeps it to find a widget, and a From LangWatch board has none unless the member may create dashboards
 
+  # Owner, 2026-11-23: "templates should only be llm ops, not also on the dashboards page".
+  # A board homed elsewhere, or opened at "/dashboards/<id>", shows no templates
+  # (dashboards-organization-area.feature, "Only an empty LLM Ops board offers templates").
   @integration
   Scenario: Boards: every empty board shows one view
-    Given a board with no widgets
+    Given an LLM Ops board with no widgets, opened in its project
     Then it shows the ask bar, the suggested questions,
       "Or start from a template" with the three From LangWatch boards and "View all templates"
     And each card opens its live board

@@ -4,7 +4,11 @@
  */
 
 import { ORGANIZATION_DASHBOARDS_PATH } from "@langwatch/analytics-client";
-import { MY_DASHBOARD_NAME } from "@langwatch/dashboard-contract";
+import {
+  DEFAULT_DASHBOARD_HOME_PRODUCT,
+  type DashboardHomeProduct,
+  MY_DASHBOARD_NAME,
+} from "@langwatch/dashboard-contract";
 
 export { MY_DASHBOARD_NAME };
 
@@ -66,30 +70,20 @@ export function organizationBoardPath({ dashboardId }: { dashboardId: string }):
   return `${ORGANIZATION_DASHBOARDS_PATH}/${encodeURIComponent(dashboardId)}`;
 }
 
-/** The address of the organization's templates library. */
-export function organizationTemplatesPath(): string {
-  return `${ORGANIZATION_DASHBOARDS_PATH}/${TEMPLATES_SEGMENT}`;
-}
-
-/** The address of one From LangWatch board at the organization level. */
-export function organizationCuratedPath({ templateId }: { templateId: string }): string {
-  return `${ORGANIZATION_DASHBOARDS_PATH}/${CURATED_SEGMENT}/${encodeURIComponent(templateId)}`;
-}
-
-/** Where an empty board's templates lead: its project's, or the organization's at org level. */
+/**
+ * Where an empty board's templates lead, or undefined where none is offered: templates read LLM
+ * Ops data, so only an LLM Ops board in its project offers them (owner, 2026-11-23).
+ */
 export function templateLinks({
   projectSlug,
+  homeProduct,
   atOrganization,
 }: {
   projectSlug: string;
+  homeProduct: DashboardHomeProduct;
   atOrganization: boolean;
-}): { curatedHref: (templateId: string) => string; templatesHref: string } {
-  if (atOrganization) {
-    return {
-      curatedHref: (templateId) => organizationCuratedPath({ templateId }),
-      templatesHref: organizationTemplatesPath(),
-    };
-  }
+}): { curatedHref: (templateId: string) => string; templatesHref: string } | undefined {
+  if (atOrganization || homeProduct !== DEFAULT_DASHBOARD_HOME_PRODUCT) return void 0;
   return {
     curatedHref: (templateId) => curatedBoardPath({ projectSlug, templateId }),
     templatesHref: dashboardTemplatesPath({ projectSlug }),

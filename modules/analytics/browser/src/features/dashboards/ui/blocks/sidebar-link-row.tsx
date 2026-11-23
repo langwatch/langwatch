@@ -1,7 +1,7 @@
 /**
  * A link row in a sidebar list: a board or "Browse templates". A board's row may carry its "⋮"
- * menu, drawn over the row's right end only while the row is hovered, focused or the menu open,
- * so the row looks the same otherwise; and while renamed, the name is a field in its place.
+ * menu, drawn over the row's right end only while the row is hovered, keyboard-focused or its menu
+ * open, so the row looks the same otherwise; and while renamed, the name is a field in its place.
  */
 
 import { Box, Link as ChakraLink, Text } from "@langwatch/design-system/primitives";
@@ -14,9 +14,11 @@ import { revealsBoardMenu } from "./board-menu.tsx";
 
 /** A row with a menu: it shows the menu, and the name gives up the menu's room while it shows. */
 const MENU_ROW = {
-  ...revealsBoardMenu,
   css: {
-    "&:hover > a, &:focus-within > a, &:has([aria-expanded=true]) > a": { paddingRight: "28px" },
+    ...revealsBoardMenu.css,
+    "&:hover > a, &:has(:focus-visible) > a, &:has([aria-expanded=true]) > a": {
+      paddingRight: "28px",
+    },
   },
 };
 

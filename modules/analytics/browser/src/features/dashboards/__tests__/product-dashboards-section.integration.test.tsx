@@ -116,6 +116,32 @@ describe("a product's Dashboards section", () => {
     });
   });
 
+  describe("given my own My dashboard in the project in view and another in Shop", () => {
+    const myDashboard = ({ id, project }: { id: string; project: typeof SHOP }) => ({
+      ...board({ id, homeProduct: "llm-ops", scope: "PRIVATE", project }),
+      name: "My dashboard",
+      createdById: "user-1",
+    });
+
+    /** @scenario "The sidebar lists only my My dashboard for the project I am in" */
+    it("lists mine of the project in view alone, and another member's My dashboard as before", async () => {
+      render({
+        element: <ProductDashboardsSection product="llm-ops" />,
+        listed: [
+          myDashboard({ id: "mine-in-shop", project: SHOP }),
+          myDashboard({ id: "mine-here", project: IN_VIEW }),
+          { ...board({ id: "theirs", homeProduct: "llm-ops" }), name: "My dashboard" },
+        ],
+      });
+
+      const list = await screen.findByRole("list", { name: "Dashboards" });
+      const hrefs = within(list)
+        .getAllByRole("link", { name: "My dashboard" })
+        .map((link) => link.getAttribute("href"));
+      expect(hrefs).toEqual(["/dashboards/mine-here", "/dashboards/theirs"]);
+    });
+  });
+
   describe("given LLM Ops with no saved board", () => {
     /** @scenario "From LangWatch boards are not listed for now" */
     it("says No dashboards yet and lists no From LangWatch group", async () => {

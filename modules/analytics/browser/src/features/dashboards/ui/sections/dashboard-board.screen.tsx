@@ -171,7 +171,11 @@ function OpenBoard({ board, atOrganization }: { board: SavedBoard; atOrganizatio
   const isEmpty = boardWidgets.status === "success" && widgets.length === 0;
   const isMyDashboard = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
   const renameBoard = useBoardTitleRename(board);
-  const templates = templateLinks({ projectSlug: saved.projectSlug, atOrganization });
+  const templates = templateLinks({
+    projectSlug: saved.projectSlug,
+    homeProduct: board.homeProduct,
+    atOrganization,
+  });
 
   return (
     <WidgetReadsEveryProjectContext.Provider value={readsOrganization}>
@@ -229,7 +233,7 @@ function OpenBoard({ board, atOrganization }: { board: SavedBoard; atOrganizatio
             This dashboard has no widgets yet.
           </Text>
         )}
-        {isEmpty && canEdit && (
+        {isEmpty && canEdit && templates && (
           <EmptyBoard
             boards={CURATED_BOARDS}
             boardHref={({ templateId }) => templates.curatedHref(templateId)}

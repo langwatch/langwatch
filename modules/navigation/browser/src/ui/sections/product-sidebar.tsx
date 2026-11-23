@@ -7,7 +7,7 @@ import { Box, VStack } from "@langwatch/design-system/primitives";
 import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
 import { useFeatureFlag } from "@langwatch/feature-flag-client";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
-import { ArrowLeft, ArrowUpRight, LayoutDashboard, LayoutTemplate, Search } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, LayoutDashboard, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
 import {
@@ -355,32 +355,19 @@ function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
 }
 
 /**
- * The Dashboards sidebar in the organization's area: the library, and its templates, offered only
- * with a project LLM Ops would open, where a board made from one is stored (ADR-002).
+ * The Dashboards sidebar in the organization's area: the library alone. Templates read LLM Ops
+ * data, so they are offered only in LLM Ops (owner, 2026-11-23).
  */
 function OrganizationDashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
   const host = useNavigationHost();
-  const projectSlug = useLlmOpsProjectSlug();
-  const templatesPath = `${ORGANIZATION_DASHBOARDS_PATH}/templates`;
   return (
-    <>
-      <SideMenuLink
-        icon={LayoutDashboard}
-        label="All dashboards"
-        href={ORGANIZATION_DASHBOARDS_PATH}
-        isActive={isOrganizationLibraryPath(host.pathname())}
-        showLabel={showExpanded}
-      />
-      {projectSlug && (
-        <SideMenuLink
-          icon={LayoutTemplate}
-          label="Templates"
-          href={templatesPath}
-          isActive={host.pathname() === templatesPath}
-          showLabel={showExpanded}
-        />
-      )}
-    </>
+    <SideMenuLink
+      icon={LayoutDashboard}
+      label="All dashboards"
+      href={ORGANIZATION_DASHBOARDS_PATH}
+      isActive={isOrganizationLibraryPath(host.pathname())}
+      showLabel={showExpanded}
+    />
   );
 }
 

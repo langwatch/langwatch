@@ -277,7 +277,7 @@ describe("the Dashboards sidebar in the organization's library", () => {
      * @scenario "The Dashboards sidebar at org level"
      * @scenario "No sidebar has a Starred dashboards group"
      */
-    it("lists All dashboards as current and Templates, and no starred group", async () => {
+    it("lists All dashboards as current, with no Templates and no starred group", async () => {
       renderSidebar({ surface: "dashboards", pathname: "/dashboards", everyProductFlag: true });
 
       expect(screen.getByRole("button", { name: "Quick Search" })).toBeInTheDocument();
@@ -285,10 +285,7 @@ describe("the Dashboards sidebar in the organization's library", () => {
         "aria-current",
         "page",
       );
-      expect(screen.getByRole("link", { name: "Templates" })).toHaveAttribute(
-        "href",
-        "/dashboards/templates",
-      );
+      expect(screen.queryByRole("link", { name: "Templates" })).toBeNull();
       expect(screen.queryByText(/Starred/)).toBeNull();
       expect(screen.queryByTestId("saved-dashboards")).toBeNull();
       await expectNoSection();

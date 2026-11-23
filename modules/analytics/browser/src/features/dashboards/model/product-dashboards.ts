@@ -12,9 +12,9 @@ import { isOwnMyDashboard, type LibraryBoard, libraryBoardPath } from "./organiz
 export const PRODUCT_BOARDS_SHOWN_MAX = 8;
 
 /**
- * The section's rows for one product: every board homed there the member can see for the
- * project in view, whatever its scope. A Project board of another project is not in view.
- * The member's own My dashboard comes first, then the rest by name.
+ * The section's rows for one product: every board homed there the member can see for the project
+ * in view, whatever its scope, but no Project board or own My dashboard of another project, so
+ * the member's own lists once. It comes first, then the rest by name.
  */
 export function productSidebarBoards({
   boards,
@@ -29,13 +29,15 @@ export function productSidebarBoards({
   /** The project in view, whose Project boards are the ones listed. */
   projectId: string | undefined;
 }): readonly LibraryBoard[] {
+  const isDefault = (board: LibraryBoard) => isOwnMyDashboard({ board, userId });
+  const listsOnlyInItsProject = (board: LibraryBoard) =>
+    board.scope === "PROJECT" || isDefault(board);
   const listed = boards.filter(
     (board) =>
       board.homeProduct === product &&
       libraryBoardPath(board) !== void 0 &&
-      (board.scope !== "PROJECT" || board.project?.id === projectId),
+      (!listsOnlyInItsProject(board) || board.project?.id === projectId),
   );
-  const isDefault = (board: LibraryBoard) => isOwnMyDashboard({ board, userId });
   const others = listed
     .filter((board) => !isDefault(board))
     .toSorted((a, b) => a.name.localeCompare(b.name));

@@ -1,7 +1,7 @@
 /**
  * A board's "⋮" menu with what this member may do: Rename, Move to product…, Duplicate and
  * Delete. The library's rows and the product sidebars' rows draw the same one. It stays hidden
- * until its row is hovered or holds focus (`revealsBoardMenu`), and while it is open.
+ * until its row is hovered or holds keyboard focus (`revealsBoardMenu`), and while it is open.
  */
 
 import { Menu } from "@langwatch/design-system/menu";
@@ -23,10 +23,12 @@ export type BoardMenuActions = {
   remove?: { onDelete?: () => void };
 };
 
-/** Spread on the row that holds the menu, so hovering or focusing the row shows it. */
+/**
+ * Spread on the row that holds the menu, so hovering or keyboard focus in the row shows it.
+ * Not `:focus-within`: a clicked link keeps focus after navigating, so the open row kept its "⋮".
+ */
 export const revealsBoardMenu = {
-  _hover: { "& .board-menu": { opacity: 1 } },
-  _focusWithin: { "& .board-menu": { opacity: 1 } },
+  css: { "&:hover .board-menu, &:has(:focus-visible) .board-menu": { opacity: 1 } },
 };
 
 /** Whether the menu would offer anything at all. */

@@ -132,12 +132,13 @@ Feature: Organization-wide Dashboards area
     Then its header names no project, and the project in view does not change what it reads
     # Evidence: haven browser screenshots of both boards' headers, and the run's params
 
+  # Owner, 2026-11-23: "templates should only be llm ops, not also on the dashboards page".
   @integration
   Scenario: The Dashboards sidebar at org level
     When I open "/dashboards"
-    Then the Dashboards sidebar lists "All dashboards" (current) and "Templates", and nothing else besides Quick Search
-    And "Templates" opens "/dashboards/templates"
-    # Evidence: haven browser screenshot of the sidebar, and the address after the click
+    Then the Dashboards sidebar lists "All dashboards" (current), and nothing else besides Quick Search
+    And it has no "Templates" entry: templates are offered only in LLM Ops
+    # Evidence: haven browser screenshot of the sidebar
 
   @integration
   Scenario: The Templates page at org level
@@ -403,6 +404,16 @@ Feature: Organization-wide Dashboards area
     And every board it lists is also in the library
     # Evidence: haven browser screenshot of the section next to the library's LLM Ops group
 
+  # Default call, 2026-11-23, pending the owner's answer: the owner saw "My dashboard" twice in
+  # the LLM Ops sidebar, one from each project the member reads. The library still lists both.
+  @integration
+  Scenario: The sidebar lists only my My dashboard for the project I am in
+    Given my own My dashboard of "Shop", another of "Ops", and another member's My dashboard shared with the organization
+    When I am in LLM Ops in "Shop"
+    Then its Dashboards section lists my My dashboard of "Shop" and not the one of "Ops"
+    And the other member's My dashboard is listed as before
+    # Evidence: haven browser screenshot of the section
+
   # ---- Personal boards (E1, E2) ----
   @integration @unimplemented
   Scenario: My dashboard is mine in every project
@@ -418,7 +429,7 @@ Feature: Organization-wide Dashboards area
     Given I had a My dashboard in "Shop" and in "Ops" before this change
     When I open Dashboards in "Shop" for the first time with the flag on
     Then my personal My dashboard starts with the widgets of my "Shop" one
-    And both earlier ones still exist, listed in LLM Ops as "My dashboard · Shop" and "My dashboard · Ops", Only me
+    And both earlier ones still exist, listed in the library's LLM Ops group as "My dashboard · Shop" and "My dashboard · Ops", Only me
     # Evidence: the list answer, and screenshots of the section
 
   @unit @integration @unimplemented
@@ -724,11 +735,13 @@ Feature: Organization-wide Dashboards area
     Given a board listed in a product's Dashboards section
     When I hover its row, or move keyboard focus into it
     Then a "⋮" button shows at the row's right end, and it stays while its menu is open
-    And otherwise the row looks as it did, with no "⋮"
+    And otherwise the row looks as it did, with no "⋮", the row of the board I have open included
+    And clicking a row to open its board leaves no "⋮" once the mouse moves away
     And its menu is the library row's, by the same rules: Rename, Move to product…, Duplicate and Delete where I hold analytics:update and analytics:delete in the owning project; no Rename, no Delete and a greyed-out Move where I may only view
     And opening the menu does not open the board
     And Rename edits the name in place in the row, and Enter saves it in the project that owns the board
-    # Evidence: haven browser screenshots of a row at rest, hovered and with its menu open, light and dark
+    # Evidence: haven browser screenshots of a row at rest, hovered and with its menu open, and of
+    # the open board's row at rest after a click, light and dark
 
   @integration
   Scenario: The LLM Ops section ends with Browse templates
@@ -758,13 +771,13 @@ Feature: Organization-wide Dashboards area
     # Evidence: four screenshots (LLM Ops, Coding agents, Gateway, Governance) at 212px, light and dark, plus one hover
 
   # ---- Empty board, failures, gates, public surfaces (S1; N7, N8, N9) ----
-  # Next PR: home products (ADR-002, decision 8).
-  @integration @unimplemented
-  Scenario: An empty board offers only its product's templates
-    Given an empty LLM Ops board in "Shop", an empty LLM Ops board at org level, and an empty Gateway board
-    Then the "Shop" board's "Or start from a template" lists the From LangWatch boards of LLM Ops and links to "/shop/dashboards/templates"
-    And the org-level one links to "/dashboards/templates"
-    And the Gateway board offers no template
+  # Owner, 2026-11-23: "templates should only be llm ops, not also on the dashboards page".
+  @integration
+  Scenario: Only an empty LLM Ops board offers templates
+    Given an empty LLM Ops board in "Shop", the same board opened at org level, and an empty Gateway board
+    Then the "Shop" board's "Or start from a template" lists the From LangWatch boards and "View all templates" opens "/shop/dashboards/templates"
+    And the org-level board and the Gateway board show no "Or start from a template" and no "View all templates", as no Coding agents or Governance board does
+    And each still shows its ask bar, its suggested questions and its header's "Add a widget"
     # Evidence: a screenshot of each empty board
 
   @integration @unimplemented
