@@ -215,6 +215,29 @@ Rule: Query syntax
     When the user searches for "NOT @status:error"
     Then traces with status "error" are excluded from results
 
+  @unit
+  Scenario: NOT over a bracketed group negates the whole group
+    Given traces that are errors on "gpt-4o-mini", errors on another model, and not errors on "gpt-4o-mini"
+    When the user searches for "NOT (@status:error AND @model:gpt-4o-mini)"
+    Then only the errors on "gpt-4o-mini" are excluded
+    And "NOT (@status:error OR @model:gpt-4o-mini)" excludes every error and every "gpt-4o-mini" trace
+    And a NOT inside the group cancels the outer one, as in "NOT (NOT @status:error AND @model:gpt-4o-mini)"
+    And the trace list and an automation's match on a single trace give the same answer
+
+  @unit
+  Scenario: NOT over an evaluator group keeps the evaluator's own results together
+    Given a trace where evaluator "x" scored 0.3 and evaluator "y" scored 0.9
+    When the user searches for "NOT (@evaluator:x AND @evaluatorScore:>0.5)"
+    Then the trace is shown, because x did not score above 0.5
+    And the compiled query passes the tenant guard instead of erroring
+
+  @integration
+  Scenario: The table lists exactly the complement of a group under NOT
+    Given stored traces that are errors on a model, errors on another model, and not errors on that model
+    When the trace list reads "NOT (@status:error AND @model:<model>)" and "NOT (@status:error OR @model:<model>)"
+    Then each lists the traces its group leaves out, no more and no fewer
+    And the table total and the sidebar's counts agree with that list
+
   Scenario: CSV shorthand for OR within a field
     When the user searches for "@status:error,warning"
     Then traces with status "error" or "warning" are shown
