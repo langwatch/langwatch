@@ -5,7 +5,6 @@
 
 import { describe, expect, it } from "vitest";
 
-import { CURATED_BOARDS } from "../model/curated-boards.ts";
 import type { LibraryBoard } from "../model/organization-library.ts";
 import { productSidebarBoards, sharingTitle } from "../model/product-dashboards.ts";
 
@@ -33,7 +32,6 @@ const groupsOf = (
     boards,
     product: extra.product ?? "gateway",
     userId: ME,
-    curated: CURATED_BOARDS,
     projectId: "projectId" in extra ? extra.projectId : SHOP.id,
   });
 
@@ -48,11 +46,11 @@ describe("productSidebarBoards", () => {
         board({ id: "mine", name: "My dashboard", createdById: ME }),
       ]);
 
-      expect(groups.rows.map(({ id }) => id)).toEqual(["mine", "alpha", "zeta"]);
+      expect(groups.map(({ id }) => id)).toEqual(["mine", "alpha", "zeta"]);
     });
 
     it("leaves out a board that opens nowhere", () => {
-      expect(groupsOf([board({ id: "hidden", openProject: null })]).rows).toEqual([]);
+      expect(groupsOf([board({ id: "hidden", openProject: null })])).toEqual([]);
     });
   });
 
@@ -69,19 +67,7 @@ describe("productSidebarBoards", () => {
         { product: "llm-ops" },
       );
 
-      expect(groups.rows.map(({ id }) => id)).toEqual([
-        "only-me",
-        "ops-organization",
-        "shop-project",
-      ]);
-    });
-  });
-
-  describe("given the From LangWatch boards", () => {
-    it("lists them all in LLM Ops with a project in view, and nowhere else", () => {
-      expect(groupsOf([], { product: "llm-ops" }).fromLangWatch).toEqual(CURATED_BOARDS);
-      expect(groupsOf([], { product: "llm-ops", projectId: void 0 }).fromLangWatch).toEqual([]);
-      expect(groupsOf([], { product: "gateway" }).fromLangWatch).toEqual([]);
+      expect(groups.map(({ id }) => id)).toEqual(["only-me", "ops-organization", "shop-project"]);
     });
   });
 });

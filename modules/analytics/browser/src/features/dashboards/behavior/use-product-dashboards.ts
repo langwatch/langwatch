@@ -8,12 +8,11 @@ import type { DashboardHomeProduct } from "@langwatch/dashboard-contract";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import { CURATED_BOARDS } from "../model/curated-boards.ts";
 import { type LibraryBoard, libraryBoardOf } from "../model/organization-library.ts";
-import { type ProductSidebarBoards, productSidebarBoards } from "../model/product-dashboards.ts";
+import { productSidebarBoards } from "../model/product-dashboards.ts";
 
 export function useProductDashboards({ product }: { product: DashboardHomeProduct }): {
-  boards: ProductSidebarBoards;
+  boards: readonly LibraryBoard[];
   /** Every board the library lists, for numbering a new one in any product. */
   allBoards: readonly LibraryBoard[];
   /** False while the list loads or after it failed, so the section draws nothing. */
@@ -30,7 +29,6 @@ export function useProductDashboards({ product }: { product: DashboardHomeProduc
     boards: allBoards,
     product,
     userId: host.userId(),
-    curated: CURATED_BOARDS,
     projectId: host.project()?.id,
   });
   return { boards, allBoards, isLoaded: list.data !== void 0 };

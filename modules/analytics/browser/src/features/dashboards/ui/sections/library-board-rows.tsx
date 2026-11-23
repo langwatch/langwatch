@@ -8,46 +8,17 @@ import { useState } from "react";
 
 import { type AnalyticsHostApi, useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
-import { organizationCuratedPath } from "../../model/boards.ts";
-import { type CuratedBoard, CURATED_BOARDS } from "../../model/curated-boards.ts";
 import {
-  HOME_PRODUCT_LABELS,
   isOwnMyDashboard,
   libraryBoardPath,
   type LibraryBoard,
   ownerLabel,
   whoSees,
 } from "../../model/organization-library.ts";
-import { CuratedLibraryRow, LibraryRow, type LibraryRowActions } from "../blocks/library-row.tsx";
-
-/** Every From LangWatch board ships homed in LLM Ops (ADR-002, decision 8). */
-const CURATED_MOVE_REFUSAL = `Built for ${HOME_PRODUCT_LABELS["llm-ops"]}. Duplicate it, then move the copy.`;
+import { LibraryRow, type LibraryRowActions } from "../blocks/library-row.tsx";
 
 /** Why a board the member may only view offers no move. */
 const VIEW_ONLY_MOVE_REFUSAL = "You can view this dashboard but not change it.";
-
-export function LibraryCuratedRow({
-  templateId,
-  onDuplicate,
-}: {
-  templateId: string;
-  onDuplicate?: (curated: CuratedBoard) => void;
-}) {
-  const host = useAnalyticsHost();
-  const curated = CURATED_BOARDS.find((board) => board.templateId === templateId);
-  // Its page reads the project in view or the store project (`onDuplicate` is set while there
-  // is one), so with neither it opens nowhere.
-  const opens = host.project() !== void 0 || onDuplicate !== void 0;
-  if (!curated) return null;
-  return (
-    <CuratedLibraryRow
-      name={curated.name}
-      href={opens ? organizationCuratedPath({ templateId }) : void 0}
-      {...(onDuplicate ? { onDuplicate: () => onDuplicate(curated) } : {})}
-      moveRefusal={CURATED_MOVE_REFUSAL}
-    />
-  );
-}
 
 export function LibraryBoardRow({
   board,

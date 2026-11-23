@@ -13,7 +13,6 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost, type StubAnalyticsHostOptions } from "../../../testing.tsx";
-import { CURATED_BOARDS } from "../model/curated-boards.ts";
 import DashboardsLibraryScreen from "../ui/sections/dashboards-library.screen.tsx";
 import { NewDashboardDialog } from "../ui/sections/new-dashboard-dialog.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
@@ -67,8 +66,7 @@ const LISTED = [
 ];
 
 /**
- * Answers the library, the store projects, the project list the From LangWatch rows read, and
- * every write.
+ * Answers the library, the store projects and every write.
  */
 function libraryServer({
   listed = LISTED,
@@ -149,7 +147,8 @@ const inputsTo = (calls: readonly UiProcedureCall[], path: string) =>
 describe("the Dashboards library", () => {
   describe("when the member can see boards in the organization", () => {
     /** @scenario "The library lists the boards I may see, with who sees each and its owner" */
-    it("lists From LangWatch first, then boards with no project, then by project", async () => {
+    /** @scenario "From LangWatch boards are not listed for now" */
+    it("lists boards with no project first, then by project, and no From LangWatch row", async () => {
       renderLibrary();
       const group = await screen.findByRole("region", { name: "LLM Ops" });
       const names = within(group)
@@ -158,10 +157,9 @@ describe("the Dashboards library", () => {
 
       expect(screen.getByRole("heading", { name: "Dashboards" })).toBeInTheDocument();
       expect(screen.getByText("Every dashboard you can see, by product.")).toBeInTheDocument();
-      expect(within(group).getByText(`LLM Ops · ${CURATED_BOARDS.length + 2}`)).toBeVisible();
-      const curatedNames = names.slice(0, CURATED_BOARDS.length);
-      expect(curatedNames.filter((name) => name.includes("Read-only"))).toEqual(curatedNames);
-      expect(names.slice(CURATED_BOARDS.length)).toEqual([
+      expect(within(group).getByText("LLM Ops · 2")).toBeVisible();
+      expect(screen.queryByText("From LangWatch")).toBeNull();
+      expect(names).toEqual([
         expect.stringContaining("Everyone's board"),
         expect.stringContaining("Shop board"),
       ]);
@@ -219,12 +217,12 @@ describe("the Dashboards library", () => {
     });
 
     /** @scenario "The library lists every board I may see, grouped by product" */
-    it("lists each board in its own product's group, From LangWatch boards in LLM Ops alone", async () => {
+    it("lists each board in its own product's group", async () => {
       renderLibrary({ listed: HOMED });
       const llmOps = await screen.findByRole("region", { name: "LLM Ops" });
       const gateway = screen.getByRole("region", { name: "Gateway" });
 
-      expect(within(llmOps).getByText(`LLM Ops · ${CURATED_BOARDS.length + 1}`)).toBeVisible();
+      expect(within(llmOps).getByText("LLM Ops · 1")).toBeVisible();
       expect(within(gateway).getByText("Gateway · 1")).toBeVisible();
       expect(within(gateway).getAllByRole("listitem")).toEqual([
         within(gateway).getByText("Key spend").closest("li"),
@@ -232,6 +230,19 @@ describe("the Dashboards library", () => {
       expect(
         within(screen.getByRole("region", { name: "Coding agents" })).getByText("Agent spend"),
       ).toBeVisible();
+    });
+  });
+
+  describe("when the member can see no board", () => {
+    /** @scenario "An empty library" */
+    it("says No dashboards yet and lists no From LangWatch group", async () => {
+      renderLibrary({ listed: [] });
+
+      expect(await screen.findByText("No dashboards yet")).toBeVisible();
+      expect(
+        screen.getByText("Make one for any product. It shows in that product's sidebar."),
+      ).toBeVisible();
+      expect(screen.queryByText("From LangWatch")).toBeNull();
     });
   });
 
@@ -252,7 +263,7 @@ describe("the Dashboards library", () => {
       const firstEight = ELEVEN.slice(0, 8).map((board) => board.name);
 
       expect(boardLinks(group)).toEqual(firstEight);
-      expect(within(group).getByText(`LLM Ops · ${CURATED_BOARDS.length + 11}`)).toBeVisible();
+      expect(within(group).getByText("LLM Ops · 11")).toBeVisible();
 
       await user.click(within(group).getByRole("button", { name: "Show 3 more" }));
 
@@ -546,18 +557,6 @@ describe("the Dashboards library", () => {
 
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
       expect(inputsTo(calls, "boards.move")).toEqual([]);
-    });
-
-    /** @scenario "A library row's menu offers what I may do" */
-    it("greys out Move on a From LangWatch board, saying to move a copy", async () => {
-      const [curated] = CURATED_BOARDS;
-      const { user } = renderLibrary();
-
-      await user.click(await screen.findByRole("button", { name: `Actions for ${curated?.name}` }));
-      const move = await screen.findByRole("menuitem", { name: "Move to product…" });
-
-      expect(move).toHaveAttribute("aria-disabled", "true");
-      expect(move).toHaveAttribute("title", "Built for LLM Ops. Duplicate it, then move the copy.");
     });
 
     /** @scenario "Move needs edit rights in the owning project" */

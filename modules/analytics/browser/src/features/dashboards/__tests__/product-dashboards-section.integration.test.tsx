@@ -105,6 +105,18 @@ describe("a product's Dashboards section", () => {
     });
   });
 
+  describe("given LLM Ops with no saved board", () => {
+    /** @scenario "From LangWatch boards are not listed for now" */
+    it("says No dashboards yet and lists no From LangWatch group", async () => {
+      render({ element: <ProductDashboardsSection product="llm-ops" />, listed: [] });
+
+      const section = await screen.findByRole("region", { name: "Dashboards" });
+      expect(within(section).getByText("No dashboards yet")).toBeInTheDocument();
+      expect(within(section).queryByText("From LangWatch")).toBeNull();
+      expect(screen.queryByRole("list", { name: "From LangWatch" })).toBeNull();
+    });
+  });
+
   describe("given LLM Ops in a project", () => {
     /** @scenario "The LLM Ops section ends with Browse templates" */
     it("ends with Browse templates, which opens the project's templates", async () => {
@@ -125,7 +137,7 @@ describe("a product's Dashboards section", () => {
     });
   });
 
-  describe("given no board homed in the product and no From LangWatch board", () => {
+  describe("given no board homed in the product", () => {
     /** @scenario "Each product's sidebar lists its own boards" */
     it("still draws the heading, New dashboard and the quiet line, and no other product's", async () => {
       render({

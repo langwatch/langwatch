@@ -11,7 +11,6 @@ import {
 } from "@langwatch/dashboard-contract";
 
 import { MY_DASHBOARD_NAME, organizationBoardPath } from "./boards.ts";
-import type { CuratedBoard } from "./curated-boards.ts";
 
 /** What the library's header says it is. */
 export const LIBRARY_HEADER = {
@@ -69,11 +68,10 @@ export const HOME_PRODUCT_LABELS: Readonly<Record<DashboardHomeProduct, string>>
   governance: "Governance",
 };
 
-/** One product's group: its From LangWatch boards first, then its boards. */
+/** One product's group of boards. */
 export type LibraryGroup = {
   readonly product: DashboardHomeProduct;
   readonly label: string;
-  readonly curated: readonly CuratedBoard[];
   readonly boards: readonly LibraryBoard[];
 };
 
@@ -91,23 +89,13 @@ export const LIBRARY_PRODUCT_ORDER: readonly DashboardHomeProduct[] = [
   "governance",
 ];
 
-/**
- * The library's groups in rail order, each product with at least one board. Every From
- * LangWatch board is homed in LLM Ops (ADR-002, decision 8).
- */
-export function libraryGroups({
-  boards,
-  curated,
-}: {
-  boards: readonly LibraryBoard[];
-  curated: readonly CuratedBoard[];
-}): LibraryGroup[] {
+/** The library's groups in rail order, each product with at least one board. */
+export function libraryGroups({ boards }: { boards: readonly LibraryBoard[] }): LibraryGroup[] {
   return LIBRARY_PRODUCT_ORDER.map((product) => ({
     product,
     label: HOME_PRODUCT_LABELS[product],
-    curated: product === "llm-ops" ? curated : [],
     boards: boards.filter((board) => board.homeProduct === product).toSorted(byPlace),
-  })).filter((group) => group.curated.length + group.boards.length > 0);
+  })).filter((group) => group.boards.length > 0);
 }
 
 /** The names boards homed in `product` already have, so a new one is numbered past them. */
@@ -129,9 +117,9 @@ export const DEFAULT_SCOPE_BY_PRODUCT: Readonly<Record<DashboardHomeProduct, Das
   governance: "ORGANIZATION",
 };
 
-/** A group's heading: the product and how many boards it lists, From LangWatch ones included. */
+/** A group's heading: the product and how many boards it lists. */
 export function groupHeading(group: LibraryGroup): string {
-  return `${group.label} · ${group.curated.length + group.boards.length}`;
+  return `${group.label} · ${group.boards.length}`;
 }
 
 /** Who sees a board, as its row says it: the project, "Organization" or "Only me". */

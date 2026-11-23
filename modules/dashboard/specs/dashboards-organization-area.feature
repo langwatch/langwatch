@@ -172,7 +172,7 @@ Feature: Organization-wide Dashboards area
   Scenario: The library lists the boards I may see, with who sees each and its owner
     When I open "/dashboards"
     Then the header reads "Dashboards" with "Every dashboard you can see, by product."
-    And one group, "LLM Ops · <count>", lists the From LangWatch boards first, each marked "Read-only", then boards with no project, then the rest by project
+    And one group, "LLM Ops · <count>", lists boards with no project first, then the rest by project
     And each row names who sees it: the project's name, "Organization", or "Only me"
     And each row names its owner, "You" for mine, else its author's name
     And every board opens at "/dashboards/<id>", a Project board included (owner, 2026-11-23)
@@ -204,13 +204,11 @@ Feature: Organization-wide Dashboards area
     Given boards homed in LLM Ops, Coding agents, Gateway and Governance
     When I open "/dashboards"
     Then the header reads "Dashboards" with "Every dashboard you can see, by product."
-    And each product that has at least one board or From LangWatch board I may see has a group headed "<Product> · <count>", counting both, in the rail's order: Coding agents, LLM Ops, Gateway, Governance
-    And a product with neither has no group
-    And LLM Ops lists its From LangWatch boards first, each marked "Read-only"
+    And each product that has at least one board I may see has a group headed "<Product> · <count>", in the rail's order: Coding agents, LLM Ops, Gateway, Governance
+    And a product with none has no group
     And within a group, boards with no project come first, then by project name, then by board name
     And each row names who sees it: the project's name, "Organization", or "Only me" with a lock
     And each row names its owner, "You" for mine
-    And a From LangWatch row shows "Read-only" as who sees it and "LangWatch" as owner
     And a project name too long for its column, such as "Checkout conversion and refunds EU", ends with "…" and shows in full on hover
     # Evidence: haven browser screenshots of the library, light and dark, plus one hover
 
@@ -227,7 +225,7 @@ Feature: Organization-wide Dashboards area
   @integration
   Scenario: A long group shows 8 boards, then "Show N more" and "Show less"
     Given 11 boards homed in LLM Ops
-    Then the LLM Ops group shows its From LangWatch boards and 8 boards, and a "Show 3 more" that opens the rest in place
+    Then the LLM Ops group shows 8 boards, and a "Show 3 more" that opens the rest in place
     And then it reads "Show less", which folds the group back to 8
     And a group of 8 boards or fewer offers neither
     # Evidence: haven browser screenshots before and after each click
@@ -246,7 +244,6 @@ Feature: Organization-wide Dashboards area
     Given my Organization board homed in Gateway, owned by "Shop", where I hold analytics:update and analytics:delete
     Then its menu offers Rename, Move to product…, Duplicate and Delete
     And Rename edits the name in place: Enter or leaving the field saves it and says "Dashboard renamed", Escape cancels
-    And a From LangWatch row offers "Duplicate to edit", and shows "Move to product…" disabled, saying "Built for LLM Ops. Duplicate it, then move the copy."
     And My dashboard offers "Move to product…", and shows "Delete" disabled, saying "Your default dashboard can't be deleted"
     And the server refuses a delete of My dashboard with "dashboard_default_not_deletable"
     # The hover on My dashboard's Delete is an addition: the approved design disables it with no hover
@@ -263,15 +260,24 @@ Feature: Organization-wide Dashboards area
     And on a Project board of a project where I may not create, Duplicate is disabled, saying "You can't make dashboards in <project>."
     When I delete a board and confirm
     Then a toast says ""<name>" deleted", it leaves the library and its sidebar, and its id reads "This dashboard was deleted or isn't shared with you."
-    When I try to delete the last board I can see in a product in this organization, counting Project, Organization, Only me and personal boards and not From LangWatch ones
+    When I try to delete the last board I can see in a product in this organization, counting Project, Organization, Only me and personal boards
     Then nothing is deleted and a toast says "You can't delete your last dashboard"
     And the same delete sent to the server is refused with "dashboard_last_in_product"
     # Evidence: the quoted create and delete answers and the refusals, and screenshots of the toasts and pages
 
-  # Next PR: From LangWatch boards always list today, so the library is never empty yet.
-  @integration @unimplemented
+  # Owner, 2026-11-23: "I think we can also remove 'From LangWatch' for now as well. It's a bit
+  # confusing." Removed for now from the library and every sidebar; the boards still open by address.
+  @integration
+  Scenario: From LangWatch boards are not listed for now
+    Given the organization's Dashboards area is on
+    When I open "/dashboards", or any product's Dashboards section
+    Then no "From LangWatch" group or row is listed, in the library or in any sidebar
+    And "/dashboards/curated/<template id>", "/shop/dashboards/curated/<template id>" and the templates page still open, so old links work
+    # Evidence: haven browser screenshots of the library and the LLM Ops sidebar
+
+  @integration
   Scenario: An empty library
-    Given I may see no board and no From LangWatch board
+    Given I may see no board
     Then "/dashboards" reads "No dashboards yet" and "Make one for any product. It shows in that product's sidebar."
     And it offers "New dashboard" when I may create
     # Evidence: haven browser screenshot
@@ -356,10 +362,12 @@ Feature: Organization-wide Dashboards area
     And a widget that stores its own projects on the same board still draws
     # Evidence: a screenshot of both cards; message from langwatch-ql-readable-projects.service.ts:73-76
 
+  # Removed for now (owner, 2026-11-23): "I think we can also remove 'From LangWatch' for now as
+  # well. It's a bit confusing." No library row or sidebar group opens one; the address still does.
   # Next PR: "All projects" at the organization level (ADR-002, decision 9; D1).
   @integration @q1-all-projects @unimplemented
-  Scenario: A From LangWatch board opens at the organization level
-    When I open a From LangWatch board from the library
+  Scenario: A From LangWatch board's address opens at the organization level
+    When I open "/dashboards/curated/<template id>" from an old link
     Then it opens at "/dashboards/curated/<template id>", read-only, in the LLM Ops sidebar, with no project chip
     And its widgets read every project I may read
     And "Duplicate to edit" makes an Only me copy homed in LLM Ops, named "<name> (copy)", stored in my store project
@@ -382,7 +390,7 @@ Feature: Organization-wide Dashboards area
     Given LLM Ops-homed boards owned by "Shop" and by "Ops", some Project, some Organization, some Only me, one starred
     When I am in LLM Ops in "Shop"
     Then its Dashboards section shows My dashboard, then the "Shop" Project boards, every Organization board and my Only me boards homed in LLM Ops, by name, a starred one among them
-    And then the From LangWatch boards
+    And it has no From LangWatch group
     And it lists no Project board of "Ops" and no board homed in another product
     And every board it lists is also in the library
     # Evidence: haven browser screenshot of the section next to the library's LLM Ops group
@@ -699,7 +707,7 @@ Feature: Organization-wide Dashboards area
     And the "+" shows when I hold analytics:create in at least one project, an organization admin's own grants included
     And after "?ff_release_dashboards=off" in this browser there is no section
     And each row shows a lock on Only me boards and a hover title: "Only you can see this", "Shared with <project>" or "Shared with the organization"
-    And with no board I can see homed there and no From LangWatch board, the section still shows its heading and "+" with "No dashboards yet", so every product reads alike
+    And with no board I can see homed there, the section still shows its heading and "+" with "No dashboards yet", so every product reads alike
     # Evidence: screenshots of the three sidebars, and one per access case
 
   @integration

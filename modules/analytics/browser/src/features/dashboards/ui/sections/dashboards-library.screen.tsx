@@ -1,6 +1,6 @@
 /**
  * `/dashboards`, the organization's Dashboards library (ADR-002): every board the member can
- * see, by home product, From LangWatch boards first; the one place a board moves between
+ * see, by home product; the one place a board moves between
  * products. Every board opens at `/dashboards/<id>`. dashboards-organization-area.feature
  */
 
@@ -17,7 +17,6 @@ import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardReader } from "../../behavior/use-board-access.ts";
 import { useLibraryShowMore } from "../../behavior/use-library-show-more.ts";
 import { useOrganizationLibrary } from "../../behavior/use-organization-library.ts";
-import { type CuratedBoard, CURATED_BOARDS } from "../../model/curated-boards.ts";
 import {
   groupHeading,
   LIBRARY_HEADER,
@@ -26,7 +25,7 @@ import {
   libraryGroups,
   namesInProduct,
 } from "../../model/organization-library.ts";
-import { LibraryBoardRow, LibraryCuratedRow } from "./library-board-rows.tsx";
+import { LibraryBoardRow } from "./library-board-rows.tsx";
 import { MoveBoardDialog } from "./move-board-dialog.tsx";
 import { NewDashboardDialog } from "./new-dashboard-dialog.tsx";
 
@@ -51,10 +50,8 @@ export default function DashboardsLibraryScreen() {
   if (library.isLoading) return <UiPageLoading />;
 
   // A copy goes to the store project too, so with none nothing is copied.
-  const duplicates = mayCreate
-    ? { onDuplicate: library.duplicateBoard, onDuplicateCurated: library.duplicateCurated }
-    : {};
-  const groups = libraryGroups({ boards: library.boards, curated: CURATED_BOARDS });
+  const duplicates = mayCreate ? { onDuplicate: library.duplicateBoard } : {};
+  const groups = libraryGroups({ boards: library.boards });
   const newButton = mayCreate ? (
     <Button size="sm" colorPalette="teal" onClick={() => setIsNewDialogOpen(true)}>
       <Plus size={14} aria-hidden />
@@ -216,7 +213,6 @@ function LibraryDialogs({
 /** The duplicates are unset where there is no store project to copy into. */
 type BoardHandlers = {
   onDuplicate?: (board: LibraryBoard) => void;
-  onDuplicateCurated?: (curated: CuratedBoard) => void;
   onMove: (board: LibraryBoard) => void;
   onDelete: (board: LibraryBoard) => void;
 };
@@ -224,7 +220,6 @@ type BoardHandlers = {
 function ProductGroup({
   group,
   onDuplicate,
-  onDuplicateCurated,
   onMove,
   onDelete,
 }: BoardHandlers & { group: LibraryGroup }) {
@@ -247,13 +242,6 @@ function ProductGroup({
         background="bg"
         css={{ "& > li + li": { borderTopWidth: "1px", borderColor: "border" } }}
       >
-        {group.curated.map((curated) => (
-          <LibraryCuratedRow
-            key={curated.templateId}
-            templateId={curated.templateId}
-            {...(onDuplicateCurated ? { onDuplicate: onDuplicateCurated } : {})}
-          />
-        ))}
         {shown.map((board) => (
           <LibraryBoardRow
             key={board.id}

@@ -8,7 +8,6 @@ import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { type LibraryBoard, libraryBoardOf } from "../model/organization-library.ts";
 import { useBoardFromTemplate } from "./use-board-from-template.ts";
-import { useDuplicateCurated } from "./use-duplicate-curated.ts";
 import { useLibraryCreate, useLibraryDelete, useLibraryMove } from "./use-library-writes.ts";
 import { useStoreProject } from "./use-store-project.ts";
 
@@ -17,7 +16,6 @@ export function useOrganizationLibrary() {
   const store = useStoreProject();
   const { storeProject, namesInStore } = store;
   const fromTemplate = useBoardFromTemplate({ atOrganization: true, storeProject });
-  const curatedCopy = useDuplicateCurated({ store });
   const creating = useLibraryCreate();
   const deleting = useLibraryDelete();
   const moving = useLibraryMove();
@@ -54,6 +52,5 @@ export function useOrganizationLibrary() {
     ...deleting,
     ...moving,
     duplicateBoard,
-    duplicateCurated: curatedCopy.duplicate,
   };
 }

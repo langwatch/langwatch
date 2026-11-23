@@ -13,7 +13,7 @@ import {
   Link as ChakraLink,
   Text,
 } from "@langwatch/design-system/primitives";
-import { Copy, FolderInput, Lock, MoreVertical, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { Copy, FolderInput, Lock, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
@@ -86,35 +86,6 @@ export function LibraryRow({
           )}
         </RowMenu>
       )}
-    </RowFrame>
-  );
-}
-
-/**
- * A From LangWatch board: live and read-only, so a copy is the one thing to make of it. Its
- * Move shows disabled, saying why (`moveRefusal`), so the member learns to move a copy.
- */
-export function CuratedLibraryRow({
-  name,
-  href,
-  onDuplicate,
-  moveRefusal,
-}: {
-  name: string;
-  href: string | undefined;
-  onDuplicate?: () => void;
-  moveRefusal: string;
-}) {
-  return (
-    <RowFrame name={name} href={href} whoSees="Read-only" owner="LangWatch">
-      <RowMenu name={name}>
-        <MoveItem move={{ refusal: moveRefusal }} />
-        {onDuplicate && (
-          <Menu.Item value="duplicate" onClick={onDuplicate}>
-            <MenuRow icon={<Sparkles size={13} />}>Duplicate to edit</MenuRow>
-          </Menu.Item>
-        )}
-      </RowMenu>
     </RowFrame>
   );
 }

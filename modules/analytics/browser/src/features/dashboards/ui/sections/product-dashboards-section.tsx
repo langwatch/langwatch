@@ -1,23 +1,21 @@
 /**
- * Product sidebar "Dashboards" section: My dashboard, boards, From LangWatch. "No dashboards yet"
- * when empty, in every product. "Browse templates" only in LLM Ops: templates read its data.
+ * Product sidebar "Dashboards" section: My dashboard, then the product's boards. "No dashboards
+ * yet" when empty, in every product. "Browse templates" only in LLM Ops: templates read its data.
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
 import type { ProductDashboardsProps } from "@langwatch/analytics-client";
 import { SidebarSectionLabel } from "@langwatch/design-system/app-shell";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { ChevronRight, LayoutDashboard, LayoutTemplate, Lock } from "lucide-react";
+import { LayoutDashboard, LayoutTemplate, Lock } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardReader } from "../../behavior/use-board-access.ts";
-import { useCuratedFold } from "../../behavior/use-curated-fold.ts";
 import { useLibraryCreate } from "../../behavior/use-library-writes.ts";
 import { useProductDashboards } from "../../behavior/use-product-dashboards.ts";
 import { type StoreProject, useStoreProject } from "../../behavior/use-store-project.ts";
-import { curatedBoardPath, dashboardTemplatesPath } from "../../model/boards.ts";
-import type { CuratedBoard } from "../../model/curated-boards.ts";
+import { dashboardTemplatesPath } from "../../model/boards.ts";
 import {
   type LibraryBoard,
   libraryBoardPath,
@@ -31,33 +29,20 @@ import { NewDashboardDialog } from "./new-dashboard-dialog.tsx";
 /** One title in every product, never with a project name (the G13 title rule). */
 const LABEL = "Dashboards";
 
-const GROUP_LABEL_STYLE = { textStyle: "eyebrow", color: "fg.subtle" } as const;
-
 export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
   const host = useAnalyticsHost();
   const { boards, allBoards, isLoaded } = useProductDashboards({ product });
   const store = useStoreProject();
-  const fold = useCuratedFold();
   const [isShowingAll, setIsShowingAll] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   if (!isLoaded) return null;
   const projectSlug = host.project()?.slug;
   const openId = host.route().params.dashboardId;
-  const hiddenCount = boards.rows.length - PRODUCT_BOARDS_SHOWN_MAX;
-  const shownRows = isShowingAll ? boards.rows : boards.rows.slice(0, PRODUCT_BOARDS_SHOWN_MAX);
-  const isEmpty = boards.rows.length + boards.fromLangWatch.length === 0;
+  const hiddenCount = boards.length - PRODUCT_BOARDS_SHOWN_MAX;
+  const shownRows = isShowingAll ? boards : boards.slice(0, PRODUCT_BOARDS_SHOWN_MAX);
   const boardRow = (board: LibraryBoard) => (
     <BoardRow key={board.id} board={board} isOpen={board.id === openId} />
   );
-  const curatedRow = (curated: CuratedBoard) =>
-    projectSlug ? (
-      <SidebarLinkRow
-        key={curated.templateId}
-        name={curated.name}
-        href={curatedBoardPath({ projectSlug, templateId: curated.templateId })}
-        icon={<LayoutDashboard size={14} />}
-      />
-    ) : null;
 
   return (
     <VStack as="section" aria-label={LABEL} align="stretch" gap={0.5} width="full">
@@ -67,12 +52,12 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           <NewDashboardButton isCreating={false} onCreate={() => setIsCreating(true)} />
         )}
       </HStack>
-      {isEmpty && (
+      {boards.length === 0 && (
         <Text textStyle="bodySm" color="fg.subtle" paddingX={2} paddingY="4px">
           No dashboards yet
         </Text>
       )}
-      {boards.rows.length > 0 && (
+      {boards.length > 0 && (
         <RowList label={LABEL}>
           {shownRows.map(boardRow)}
           {hiddenCount > 0 && (
@@ -83,16 +68,6 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
             </Box>
           )}
         </RowList>
-      )}
-      {boards.fromLangWatch.length > 0 && (
-        <>
-          <ToggleRow isLabel isExpanded={!fold.folded} onClick={fold.toggle}>
-            From LangWatch
-          </ToggleRow>
-          {!fold.folded && (
-            <RowList label="From LangWatch">{boards.fromLangWatch.map(curatedRow)}</RowList>
-          )}
-        </>
       )}
       {projectSlug && product === "llm-ops" && (
         <RowList label="Templates">
@@ -131,18 +106,8 @@ function BoardRow({ board, isOpen }: { board: LibraryBoard; isOpen: boolean }) {
   );
 }
 
-/** "Show N more" / "Show less", or a foldable group heading with its chevron. */
-function ToggleRow({
-  isLabel = false,
-  isExpanded,
-  onClick,
-  children,
-}: {
-  isLabel?: boolean;
-  isExpanded?: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
+/** "Show N more" / "Show less". */
+function ToggleRow({ onClick, children }: { onClick: () => void; children: ReactNode }) {
   return (
     <Button
       variant="plain"
@@ -150,25 +115,14 @@ function ToggleRow({
       justifyContent="flex-start"
       gap={1}
       paddingX={2}
-      paddingY={isLabel ? 0 : "4px"}
-      marginTop={isLabel ? 1 : 0}
-      width={isLabel ? "auto" : "full"}
-      {...(isLabel ? GROUP_LABEL_STYLE : { textStyle: "bodySm", color: "fg.subtle" })}
+      paddingY="4px"
+      width="full"
+      textStyle="bodySm"
+      color="fg.subtle"
       _hover={{ color: "fg.muted" }}
-      aria-expanded={isExpanded}
       onClick={onClick}
     >
       {children}
-      {isExpanded !== void 0 && (
-        <Box
-          as="span"
-          display="flex"
-          transition="transform 0.15s"
-          transform={isExpanded ? "rotate(90deg)" : void 0}
-        >
-          <ChevronRight size={9} aria-hidden />
-        </Box>
-      )}
     </Button>
   );
 }
