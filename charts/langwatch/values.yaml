@@ -178,7 +178,7 @@ images:
   ## @param images.pii_redaction_model.pullPolicy [string] PII redaction model image pull policy.
   pii_redaction_model:
     repository: langwatch/pii-redaction-model
-    tag: 3.23.0 # x-release-please-version
+    tag: 3.26.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
