@@ -11,7 +11,7 @@ Dashboards and the graphs and saved workbench charts on them.
 | Classification | core (`modules/catalogue.json`)                                                                                |
 | Subjects       | dashboard, graph, saved-workbench-chart                                                                        |
 | Halves         | [contract](contract) · [process](process/README.md)                                                            |
-| Api token      | `DashboardApi` = `moduleApi<DashboardApi>()("dashboard")`, `contract/src/dashboard.api.ts:412` (58 operations) |
+| Api token      | `DashboardApi` = `moduleApi<DashboardApi>()("dashboard")`, `contract/src/dashboard.api.ts:437` (61 operations) |
 | Installed by   | api, worker, tasks (process)                                                                                   |
 
 ## What dashboard owns
@@ -43,6 +43,7 @@ Anything else dashboard needs belongs to another module and is reached through i
 | `authz`      | `AuthzApi`      | [authz](../authz/README.md)           |
 | `automation` | `AutomationApi` | [automation](../automation/README.md) |
 | `projects`   | `ProjectApi`    | [project](../project/README.md)       |
+| `users`      | `UserApi`       | [user](../user/README.md)             |
 
 ## Who depends on dashboard
 

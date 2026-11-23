@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Flat operations a door or a peer calls once the dashboard app is composed.
 
-Peers call these through the token, declared at `../contract/src/dashboard.api.ts:48`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/dashboard.api.ts:50`; nothing else in this package is public.
 
 #### `getAll`
 
@@ -78,6 +78,30 @@ The Dashboards area's boards the viewer may see, with `isStarred`; no Only me bo
 
 ```typescript
 findBoards(input: { projectId: string; viewer?: DashboardViewer; includeOrganization?: boolean; }): Promise<BoardSummary[]>;
+```
+
+#### `findBoardsInOrganization`
+
+Every board the member may see across the organization, for the `/dashboards` library (ADR-002). Boards of a project with Dashboards off are left out; `dashboards_not_enabled` when no project of the organization has it on.
+
+```typescript
+findBoardsInOrganization(input: { organizationId: string; viewer: DashboardViewer; }): Promise<OrganizationBoard[]>;
+```
+
+#### `getBoardInOrganization`
+
+One board of the organization, by the same rule as `findBoardsInOrganization`, for the org-level board pages (ADR-002); `dashboard_not_found` for any board that list leaves out.
+
+```typescript
+getBoardInOrganization(input: { organizationId: string; viewer: DashboardViewer; dashboardId: string; }): Promise<OrganizationBoard>;
+```
+
+#### `findStoreProjects`
+
+The projects with Dashboards on where the member may create a board, by name (ADR-002).
+
+```typescript
+findStoreProjects(input: { organizationId: string; viewer: DashboardViewer; }): Promise<DashboardProject[]>;
 ```
 
 #### `getBoardLinks`
@@ -824,7 +848,7 @@ Permission `analytics:create`. Declared at `src/transport/dashboard.rest.ts:157`
 Answers at `/api/v1/analytics/reports`.
 
 ```typescript
-// Body: dashboardRestNameSchema, ../contract/src/dashboard.ts:215
+// Body: dashboardRestNameSchema, ../contract/src/dashboard.ts:239
 interface Body {
   name: string;
 }
@@ -848,7 +872,7 @@ Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:172`
 Answers at `/api/v1/analytics/reports/reorder`.
 
 ```typescript
-// Body: dashboardRestReorderSchema, ../contract/src/dashboard.ts:224
+// Body: dashboardRestReorderSchema, ../contract/src/dashboard.ts:248
 interface Body {
   dashboardIds: string[];
 }
@@ -867,7 +891,7 @@ Permission `analytics:view`. Declared at `src/transport/dashboard.rest.ts:192`.
 Answers at `/api/v1/analytics/reports/:reportId`.
 
 ```typescript
-// Params: reportRestParamsSchema, ../contract/src/dashboard.ts:236
+// Params: reportRestParamsSchema, ../contract/src/dashboard.ts:260
 interface Params {
   reportId: string;
 }
@@ -883,8 +907,8 @@ Permission `analytics:update`. Declared at `src/transport/dashboard.rest.ts:210`
 Answers at `/api/v1/analytics/reports/:reportId`.
 
 ```typescript
-type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:236
-type Body = z.infer<typeof dashboardRestNameSchema>; // ../contract/src/dashboard.ts:215
+type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:260
+type Body = z.infer<typeof dashboardRestNameSchema>; // ../contract/src/dashboard.ts:239
 type Response = z.infer<typeof dashboardResponseSchema>; // ../contract/src/dashboard.responses.ts:93
 ```
 
@@ -897,7 +921,7 @@ Permission `analytics:manage`. Declared at `src/transport/dashboard.rest.ts:230`
 Answers at `/api/v1/analytics/reports/:reportId`.
 
 ```typescript
-type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:236
+type Params = z.infer<typeof reportRestParamsSchema>; // ../contract/src/dashboard.ts:260
 type Response = z.infer<typeof dashboardDeletedResponseSchema>; // ../contract/src/dashboard.responses.ts:115
 ```
 
@@ -1133,34 +1157,62 @@ type Response = unknown;
 
 ### `boards`
 
-Contract `../contract/src/board.trpc.ts:27`, router `src/transport/board.trpc.ts:10`.
+Contract `../contract/src/board.trpc.ts:30`, router `src/transport/board.trpc.ts:10`.
 
-| Procedure              | Kind     | Gate                          | Input                | Output                           |
-| ---------------------- | -------- | ----------------------------- | -------------------- | -------------------------------- |
-| `boards.getAll`        | query    | Permission `analytics:view`   | inline               | inline                           |
-| `boards.getById`       | query    | Permission `analytics:view`   | `boardRefSchema`     | `dashboardTrpcRowSchema`         |
-| `boards.create`        | mutation | Permission `analytics:create` | inline               | `dashboardTrpcRowSchema`         |
-| `boards.update`        | mutation | Permission `analytics:update` | inline               | `dashboardTrpcRowSchema`         |
-| `boards.delete`        | mutation | Permission `analytics:delete` | `boardRefSchema`     | `dashboardTrpcRowSchema`         |
-| `boards.setScope`      | mutation | Permission `analytics:update` | inline               | `dashboardTrpcRowSchema`         |
-| `boards.scopeImpact`   | query    | Permission `analytics:view`   | `boardRefSchema`     | `dashboardScopeImpactSchema`     |
-| `boards.scopeProjects` | query    | Permission `analytics:view`   | `boardRefSchema`     | `dashboardScopeProjectsSchema`   |
-| `boards.listStarred`   | query    | Permission `analytics:view`   | `projectScopeSchema` | inline                           |
-| `boards.star`          | mutation | Permission `analytics:view`   | inline               | `dashboardReorderResponseSchema` |
-| `boards.unstar`        | mutation | Permission `analytics:view`   | inline               | `dashboardReorderResponseSchema` |
-| `boards.reorderStars`  | mutation | Permission `analytics:view`   | inline               | `dashboardReorderResponseSchema` |
+| Procedure                   | Kind     | Gate                                              | Input                     | Output                           |
+| --------------------------- | -------- | ------------------------------------------------- | ------------------------- | -------------------------------- |
+| `boards.getAll`             | query    | Permission `analytics:view`                       | inline                    | inline                           |
+| `boards.listInOrganization` | query    | Permission `organization:view`                    | `organizationScopeSchema` | inline                           |
+| `boards.resolve`            | query    | Permission `organization:view`                    | inline                    | `organizationBoardSchema`        |
+| `boards.storeProjects`      | query    | Permission `organization:view`                    | `organizationScopeSchema` | inline                           |
+| `boards.getById`            | query    | Permission `analytics:view`                       | `boardRefSchema`          | `dashboardTrpcRowSchema`         |
+| `boards.create`             | mutation | Permission `analytics:create`                     | inline                    | `dashboardTrpcRowSchema`         |
+| `boards.createAtScope`      | mutation | Permission `analytics:create or analytics:update` | inline                    | `dashboardTrpcRowSchema`         |
+| `boards.update`             | mutation | Permission `analytics:update`                     | inline                    | `dashboardTrpcRowSchema`         |
+| `boards.delete`             | mutation | Permission `analytics:delete`                     | `boardRefSchema`          | `dashboardTrpcRowSchema`         |
+| `boards.setScope`           | mutation | Permission `analytics:update`                     | inline                    | `dashboardTrpcRowSchema`         |
+| `boards.scopeImpact`        | query    | Permission `analytics:view`                       | `boardRefSchema`          | `dashboardScopeImpactSchema`     |
+| `boards.scopeProjects`      | query    | Permission `analytics:view`                       | `boardRefSchema`          | `dashboardScopeProjectsSchema`   |
+| `boards.listStarred`        | query    | Permission `analytics:view`                       | `projectScopeSchema`      | inline                           |
+| `boards.star`               | mutation | Permission `analytics:view`                       | inline                    | `dashboardReorderResponseSchema` |
+| `boards.unstar`             | mutation | Permission `analytics:view`                       | inline                    | `dashboardReorderResponseSchema` |
+| `boards.reorderStars`       | mutation | Permission `analytics:view`                       | inline                    | `dashboardReorderResponseSchema` |
 
 ```typescript
 // boards.getAll
-// Input: inline, ../contract/src/board.trpc.ts:31
+// Input: inline, ../contract/src/board.trpc.ts:34
 interface Input {
   projectId: string;
   includeOrganization?: boolean;
 }
-// Output: boardTrpcSummarySchema.array() (inline, ../contract/src/board.trpc.ts:37)
+// Output: boardTrpcSummarySchema.array() (inline, ../contract/src/board.trpc.ts:40)
+
+// boards.listInOrganization
+// Input: organizationScopeSchema, ../contract/src/board.trpc.ts:27
+interface Input {
+  organizationId: string;
+}
+// Output: organizationBoardSchema.array() (inline, ../contract/src/board.trpc.ts:48)
+
+// boards.resolve
+// Input: inline, ../contract/src/board.trpc.ts:55
+interface Input {
+  organizationId: string;
+  dashboardId: string;
+}
+type Output = z.infer<typeof organizationBoardSchema>; // ../contract/src/dashboard.ts:130
+
+// boards.storeProjects
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/board.trpc.ts:27
+// Output: inline, ../contract/src/board.trpc.ts:64
+type Output = {
+  id: string;
+  name: string;
+  slug: string;
+}[];
 
 // boards.getById
-// Input: boardRefSchema, ../contract/src/board.trpc.ts:25
+// Input: boardRefSchema, ../contract/src/board.trpc.ts:28
 interface Input {
   projectId: string;
   dashboardId: string;
@@ -1180,15 +1232,24 @@ interface Output {
 }
 
 // boards.create
-// Input: inline, ../contract/src/board.trpc.ts:44
+// Input: inline, ../contract/src/board.trpc.ts:71
 interface Input {
   projectId: string;
   name: string;
 }
 type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:58
 
+// boards.createAtScope
+// Input: inline, ../contract/src/board.trpc.ts:80
+interface Input {
+  projectId: string;
+  name: string;
+  scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+}
+type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:58
+
 // boards.update
-// Input: inline, ../contract/src/board.trpc.ts:50
+// Input: inline, ../contract/src/board.trpc.ts:87
 interface Input {
   projectId: string;
   dashboardId: string;
@@ -1198,11 +1259,11 @@ interface Input {
 type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:58
 
 // boards.delete
-type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:25
+type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:28
 type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:58
 
 // boards.setScope
-// Input: inline, ../contract/src/board.trpc.ts:65
+// Input: inline, ../contract/src/board.trpc.ts:102
 interface Input {
   projectId: string;
   dashboardId: string;
@@ -1211,15 +1272,15 @@ interface Input {
 type Output = z.infer<typeof dashboardTrpcRowSchema>; // ../contract/src/dashboard.responses.ts:58
 
 // boards.scopeImpact
-type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:25
-// Output: dashboardScopeImpactSchema, ../contract/src/dashboard.ts:117
+type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:28
+// Output: dashboardScopeImpactSchema, ../contract/src/dashboard.ts:141
 interface Output {
   otherStars: number;
 }
 
 // boards.scopeProjects
-type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:25
-// Output: dashboardScopeProjectsSchema, ../contract/src/dashboard.ts:128
+type Input = z.infer<typeof boardRefSchema>; // ../contract/src/board.trpc.ts:28
+// Output: dashboardScopeProjectsSchema, ../contract/src/dashboard.ts:152
 interface Output {
   ownerProject: {
     id: string;
@@ -1234,14 +1295,14 @@ interface Output {
 }
 
 // boards.listStarred
-// Input: projectScopeSchema, ../contract/src/board.trpc.ts:24
+// Input: projectScopeSchema, ../contract/src/board.trpc.ts:26
 interface Input {
   projectId: string;
 }
-// Output: starredDashboardSchema.array() (inline, ../contract/src/board.trpc.ts:81)
+// Output: starredDashboardSchema.array() (inline, ../contract/src/board.trpc.ts:118)
 
 // boards.star
-// Input: inline, ../contract/src/board.trpc.ts:85
+// Input: inline, ../contract/src/board.trpc.ts:122
 interface Input {
   projectId: string;
   star:
@@ -1257,7 +1318,7 @@ interface Input {
 type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:122
 
 // boards.unstar
-// Input: inline, ../contract/src/board.trpc.ts:89
+// Input: inline, ../contract/src/board.trpc.ts:126
 interface Input {
   projectId: string;
   star:
@@ -1273,7 +1334,7 @@ interface Input {
 type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:122
 
 // boards.reorderStars
-// Input: z.object({ ...projectScopeSchema.shape, stars: z.array(dashboardStarSchema) }) (inline, ../contract/src/board.trpc.ts:94)
+// Input: z.object({ ...projectScopeSchema.shape, stars: z.array(dashboardStarSchema) }) (inline, ../contract/src/board.trpc.ts:131)
 type Output = z.infer<typeof dashboardReorderResponseSchema>; // ../contract/src/dashboard.responses.ts:122
 ```
 
@@ -1433,7 +1494,7 @@ type Output = {
 
 // dashboards.sourcePresence
 type Input = z.infer<typeof projectScopeSchema>; // ../contract/src/dashboard.trpc.ts:17
-// Output: dashboardSourcePresenceSchema, ../contract/src/dashboard.ts:206
+// Output: dashboardSourcePresenceSchema, ../contract/src/dashboard.ts:230
 interface Output {
   traces: "present" | "absent" | "failed";
   scenarios: "present" | "absent" | "failed";
