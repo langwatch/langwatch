@@ -88,6 +88,7 @@ import {
   applyFeatureFlagOverridesFromSearch,
   clearAllFeatureFlagOverrides,
 } from "@langwatch/feature-flag-client";
+import { pickFlagDefinition } from "@langwatch/feature-flag-contract";
 import type {
   NavigationOrganization,
   NavigationProject,
@@ -408,6 +409,30 @@ describe("the Dashboards section with Dashboards in every product on", () => {
           pathname,
           project,
           everyProductFlag: true,
+          openableTeams: [PERSONAL_TEAM, SHOP_TEAM],
+          rememberedProjectSlug: "shop",
+        });
+
+        expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
+          "Pinned dashboards in Shop (project-shop)",
+        );
+      },
+    );
+  });
+
+  describe("given nothing sets the flag, so it holds the registry's default", () => {
+    const registryDefault =
+      pickFlagDefinition("release_dashboards_in_every_product")?.defaultValue ?? false;
+
+    /** @scenario "With no setting for the flag, Gateway and Coding agents show the Dashboards section" */
+    it.each(outsideLlmOps)(
+      "draws the section for the project LLM Ops would open, in $surface",
+      async ({ surface, pathname, project }) => {
+        renderSidebar({
+          surface,
+          pathname,
+          project,
+          everyProductFlag: registryDefault,
           openableTeams: [PERSONAL_TEAM, SHOP_TEAM],
           rememberedProjectSlug: "shop",
         });
