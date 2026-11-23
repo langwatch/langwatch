@@ -16,6 +16,7 @@ export {
 export {
   enforcesHttps,
   SecurityHeaders,
+  servesPlainHttp,
   type TransportSecurityOptions,
 } from "./security-headers.ts";
 export {

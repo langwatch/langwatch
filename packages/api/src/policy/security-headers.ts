@@ -13,10 +13,16 @@ export type TransportSecurityOptions = Readonly<{
  * without TLS), where forcing HTTPS leaves the page blank.
  */
 export function enforcesHttps({ production, publicBaseUrl }: TransportSecurityOptions): boolean {
-  if (production !== true) return false;
-  if (publicBaseUrl === undefined || !URL.canParse(publicBaseUrl)) return true;
+  return production === true && !servesPlainHttp(publicBaseUrl);
+}
 
-  return new URL(publicBaseUrl).protocol !== "http:";
+/** Whether the deployment's public address is a plain `http:` URL. */
+export function servesPlainHttp(publicBaseUrl: string | undefined): boolean {
+  return (
+    publicBaseUrl !== undefined &&
+    URL.canParse(publicBaseUrl) &&
+    new URL(publicBaseUrl).protocol === "http:"
+  );
 }
 
 /** Immutable security policy; overlays leave the shared defaults intact. */
