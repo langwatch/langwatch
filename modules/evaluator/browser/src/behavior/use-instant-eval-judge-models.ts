@@ -30,7 +30,7 @@ export const INSTANT_EVALS_BUILT_IN_MODEL: BuiltInModel = {
 export const EVALS_PREVIEW_BUILT_IN_MODEL: BuiltInModel = {
   value: INSTANT_EVAL_JUDGE_MODEL_ID,
   label: "Evals Preview",
-  description: findDecisionModel(LANGWATCH_EVALS_MODEL_ID)?.description ?? "",
+  description: findDecisionModel(LANGWATCH_EVALS_MODEL_ID)?.description,
 };
 
 /** A judge saved on Instant Preview's own id where the flag is on is never routed; named only. */
