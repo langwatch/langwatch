@@ -11,6 +11,7 @@ import {
   type GatewayA2aTargetWire,
   type UpdateGatewayA2aTargetInput,
 } from "@langwatch/gateway-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { GatewayA2aTargetRepository } from "../repositories/gateway-a2a-target.repository.ts";
 import type {
@@ -30,11 +31,14 @@ import {
   a2aTargetToDto,
   a2aTargetsForProject,
 } from "../rules/gateway-a2a-target.rules.ts";
+import { assertProjectInOrganization } from "../rules/gateway-project-scope.rules.ts";
 
 type GatewayA2aTargetServiceDependencies = {
   repository: GatewayA2aTargetRepository;
   changeEvents: GatewayChangeEventsRepository;
   auditLog: GatewayAuditRepository;
+  /** Where a project-scoped target's project is checked against the target's organization. */
+  projects: Pick<ProjectApi, "findWithTeam">;
   transactions: GatewayTransactionRepository;
 };
 
@@ -47,12 +51,14 @@ export class GatewayA2aTargetService {
   private readonly repository: GatewayA2aTargetRepository;
   private readonly changeEvents: GatewayChangeEventsRepository;
   private readonly auditLog: GatewayAuditRepository;
+  private readonly projects: Pick<ProjectApi, "findWithTeam">;
   private readonly transactions: GatewayTransactionRepository;
 
   private constructor(input: GatewayA2aTargetServiceDependencies) {
     this.repository = input.repository;
     this.changeEvents = input.changeEvents;
     this.auditLog = input.auditLog;
+    this.projects = input.projects;
     this.transactions = input.transactions;
   }
 
@@ -153,6 +159,10 @@ export class GatewayA2aTargetService {
 
   async create(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetResource> {
     const parsed = createGatewayA2aTargetInputSchema.parse(input);
+    if (parsed.projectId !== null) {
+      const project = await this.projects.findWithTeam(parsed.projectId);
+      assertProjectInOrganization({ project, organizationId: parsed.organizationId });
+    }
     const existing = await this.repository.findAll(parsed.organizationId, { headers: false });
     if (existing.some((t) => t.name === parsed.name && t.projectId === parsed.projectId)) {
       throw new GatewayA2aTargetNameTakenError(parsed.name);

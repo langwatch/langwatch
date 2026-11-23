@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { AppendGatewayAuditInput } from "../repositories/gateway-audit.repository.ts";
 import { MemoryGatewayChangeEventsRepository } from "../repositories/memory/memory.gateway-change-event.repository.ts";
 import {
+  FOREIGN_PROJECT_ID,
   a2aTargetBase as base,
   a2aTargetService as service,
   sealedA2aTargetRepository,
@@ -66,6 +67,28 @@ describe("GatewayA2aTargetService", () => {
     await expect(
       targets.create({ ...base, projectId: null, name: "billing" }),
     ).resolves.toMatchObject({ projectId: null });
+  });
+
+  describe("when the target names a project of another organization", () => {
+    it("refuses with the scope mismatch code and stores, announces and audits nothing", async () => {
+      const changeEvents = MemoryGatewayChangeEventsRepository.create();
+      const rows: AppendGatewayAuditInput[] = [];
+      const targets = service({
+        changeEvents,
+        auditLog: {
+          append: async (row) => {
+            rows.push(row);
+          },
+        },
+      });
+
+      await expect(
+        targets.create({ ...base, projectId: FOREIGN_PROJECT_ID, name: "billing" }),
+      ).rejects.toMatchObject({ code: "gateway_scope_org_mismatch" });
+      expect(await targets.list(base.organizationId)).toEqual([]);
+      expect((await changeEvents.since(base.organizationId, 0n)).events).toEqual([]);
+      expect(rows).toEqual([]);
+    });
   });
 
   it("checks a new name without unsealing any target's headers", async () => {
