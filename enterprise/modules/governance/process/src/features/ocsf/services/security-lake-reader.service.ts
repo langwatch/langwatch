@@ -209,23 +209,19 @@ export class SecurityLakeReaderService {
         signal,
       });
     while (result.messages < config.maxMessagesPerRun) {
-      if (this.isPastBudget(run) || signal?.aborted) {
-        result.stoppedEarly = true;
-        break;
-      }
+      if (this.isPastBudget(run) || signal?.aborted) break;
       const batch = await this.deps.queue.receive({
         ...target,
         maxMessages: Math.min(SQS_RECEIVE_MAX, config.maxMessagesPerRun - result.messages),
       });
       const fresh = batch.filter((message) => !seen.has(message.messageId));
-      if (fresh.length === 0) break;
+      if (fresh.length === 0) return result;
       for (const message of fresh) seen.add(message.messageId);
       const finished = await this.settleBatch({ fresh, run, target, signal, settle });
-      if (!finished) {
-        result.stoppedEarly = true;
-        break;
-      }
+      if (!finished) break;
     }
+    // Any way out but an empty receive may leave messages on the queue.
+    result.stoppedEarly = true;
     return result;
   }
 
@@ -246,13 +242,14 @@ export class SecurityLakeReaderService {
     signal: AbortSignal | undefined;
     settle: (message: SecurityLakeQueueMessage) => Promise<void>;
   }): Promise<boolean> {
-    for (const message of fresh) await this.hold({ target, message });
+    for (const message of fresh) await this.setVisibility({ target, message });
     for (const [index, message] of fresh.entries()) {
       if (this.isPastBudget(run) || signal?.aborted) {
-        for (const left of fresh.slice(index)) await this.release({ target, message: left });
+        for (const left of fresh.slice(index))
+          await this.setVisibility({ target, message: left, seconds: 0 });
         return false;
       }
-      if (index > 0) await this.hold({ target, message });
+      if (index > 0) await this.setVisibility({ target, message });
       await settle(message);
     }
     return true;
@@ -265,38 +262,21 @@ export class SecurityLakeReaderService {
     );
   }
 
-  /** Best effort: a refused extension leaves the message on its old hold, still read this run. */
-  private async hold({
+  /** Hides a message for `seconds`, the read hold unless handed back; a refusal keeps the old hold. */
+  private async setVisibility({
     target,
     message,
+    seconds = SECURITY_LAKE_VISIBILITY_HOLD_SECONDS,
   }: {
     target: SecurityLakeQueueTarget;
     message: SecurityLakeQueueMessage;
+    seconds?: number;
   }): Promise<void> {
     await this.deps.queue
       .changeVisibility({
         ...target,
         receiptHandle: message.receiptHandle,
-        visibilityTimeoutSeconds: SECURITY_LAKE_VISIBILITY_HOLD_SECONDS,
-      })
-      .catch(() => undefined);
-  }
-
-  /** Hands a message back to the queue, at once or after `delaySeconds`. */
-  private async release({
-    target,
-    message,
-    delaySeconds = 0,
-  }: {
-    target: SecurityLakeQueueTarget;
-    message: SecurityLakeQueueMessage;
-    delaySeconds?: number;
-  }): Promise<void> {
-    await this.deps.queue
-      .changeVisibility({
-        ...target,
-        receiptHandle: message.receiptHandle,
-        visibilityTimeoutSeconds: delaySeconds,
+        visibilityTimeoutSeconds: seconds,
       })
       .catch(() => undefined);
   }
@@ -334,13 +314,13 @@ export class SecurityLakeReaderService {
     if (outcome.kind === "deferred") {
       result.retried += 1;
       result.stoppedEarly = true;
-      await this.release({ target, message });
+      await this.setVisibility({ target, message, seconds: 0 });
       return;
     }
     if (outcome.kind === "retry" && message.receiveCount < config.maxReceives) {
       result.retried += 1;
       // Back for the next run rather than hidden for the whole hold.
-      await this.release({ target, message, delaySeconds: SECURITY_LAKE_RETRY_DELAY_SECONDS });
+      await this.setVisibility({ target, message, seconds: SECURITY_LAKE_RETRY_DELAY_SECONDS });
       return;
     }
     // Rows decoded before a failed object are written too; a rewrite on redelivery is idempotent.
