@@ -450,6 +450,10 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     scopeType: id,
     /** ISO-8601 UTC; null for a window that never rolls; absent when gateway named no end. */
     periodEnd: z.string().nullish(),
+    /** The model the key spent most on this period; absent when gateway named none. */
+    topModel: z.string().nullish(),
+    /** That model's share of the key's spend as a whole percent, 0 to 100; absent with it. */
+    topModelShare: z.number().nullish(),
   }),
   z.object({
     /** A person's key served its first request. `sourceEventId` is the key and `first_request`. */

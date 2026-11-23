@@ -71,6 +71,13 @@ const recordBudgetCrossingCommandDataSchemaDefinition = z.object({
   spent_usd: z.string(),
   on_breach: z.enum(["block", "warn"]),
   occurred_at: z.number().int().positive(),
+  /**
+   * The model the bucket spent most on this period, ties to the first by name. Only a key's own
+   * budget carries it; absent when the read failed or on a fact stored before it was recorded.
+   */
+  top_model: z.string().min(1).nullish(),
+  /** That model's share of the bucket's spend this period, 0 to 1; present with `top_model`. */
+  top_model_spend_share: z.number().min(0).max(1).nullish(),
 });
 export interface RecordBudgetCrossingCommandDataSchema extends Named<
   typeof recordBudgetCrossingCommandDataSchemaDefinition

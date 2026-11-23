@@ -13,7 +13,7 @@ import {
   type RecordVkLifecycleCommandData,
 } from "@langwatch/gateway-contract";
 import { Temporal } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
@@ -157,6 +157,99 @@ describe("gateway's key facts in nurturing", () => {
         ["track", "user-holder", "key_budget_threshold"],
         ["track", "user-holder", "key_budget_threshold"],
       ]);
+    });
+  });
+
+  describe("when a copied key's budget crosses, 62% of its spend on gpt-5-mini, then breaches", () => {
+    let facts: Awaited<ReturnType<typeof gatewayFactsOver>>;
+
+    beforeEach(async () => {
+      facts = await gatewayFactsOver();
+      await facts.joined("user-holder");
+      await facts.deliverFact(created());
+    });
+
+    /** @scenario "A threshold crossing names the model the key spent most on" */
+    it("tracks key_top_model and key_top_model_share with every attribute sent today, on both", async () => {
+      const topModel = { top_model: "gpt-5-mini", top_model_spend_share: 0.62 };
+
+      await facts.deliverFact(crossed(topModel));
+      await facts.deliverFact(crossed({ ...topModel, kind: "breached", spent_usd: "120.000000" }));
+
+      expect(thresholdProperties(facts.sent)).toEqual([
+        {
+          ...KEY_PROPERTIES,
+          key_budget: 100,
+          key_spend: 84.5,
+          budget_reached: false,
+          on_breach: "warn",
+          window: "month",
+          scope_type: "virtual_key",
+          budget_period_end: "1970-01-01T00:33:20.000Z",
+          key_top_model: "gpt-5-mini",
+          key_top_model_share: 62,
+        },
+        expect.objectContaining({
+          budget_reached: true,
+          key_top_model: "gpt-5-mini",
+          key_top_model_share: 62,
+        }),
+      ]);
+      expect(callsOf(facts.sent).slice(-2)).toEqual([
+        ["track", "user-holder", "key_budget_threshold"],
+        ["track", "user-holder", "key_budget_threshold"],
+      ]);
+    });
+
+    /** @scenario "A threshold crossing names the model the key spent most on" */
+    it("tracks the crossing once when the same fact is delivered twice", async () => {
+      const named = crossed({ top_model: "gpt-5-mini", top_model_spend_share: 0.62 });
+
+      for (let delivery = 0; delivery < 2; delivery++) await facts.deliverFact(named);
+
+      expect(thresholdProperties(facts.sent)).toEqual([
+        expect.objectContaining({ key_top_model: "gpt-5-mini", key_top_model_share: 62 }),
+      ]);
+    });
+
+    /** @scenario "A threshold crossing names the model the key spent most on" */
+    it("sends gateway's model at 50 when the spend was split evenly", async () => {
+      await facts.deliverFact(crossed({ top_model: "claude-sonnet", top_model_spend_share: 0.5 }));
+
+      expect(thresholdProperties(facts.sent)).toEqual([
+        expect.objectContaining({ key_top_model: "claude-sonnet", key_top_model_share: 50 }),
+      ]);
+    });
+  });
+
+  describe("when a crossing names no top model, its read having failed or the fact predating it", () => {
+    /** @scenario "A crossing that names no top model sends no top-model properties" */
+    it("tracks every property sent today and neither top-model property, never null", async () => {
+      const facts = await gatewayFactsOver();
+      await facts.joined("user-holder");
+      await facts.deliverFact(created());
+
+      await facts.deliverFact(crossed());
+      await facts.deliverFact(
+        crossed({ kind: "breached", top_model: null, top_model_spend_share: null }),
+      );
+
+      const sent = thresholdProperties(facts.sent);
+      expect(sent).toHaveLength(2);
+      expect(sent[0]).toEqual({
+        ...KEY_PROPERTIES,
+        key_budget: 100,
+        key_spend: 84.5,
+        budget_reached: false,
+        on_breach: "warn",
+        window: "month",
+        scope_type: "virtual_key",
+        budget_period_end: "1970-01-01T00:33:20.000Z",
+      });
+      for (const properties of sent) {
+        expect(properties).not.toHaveProperty("key_top_model");
+        expect(properties).not.toHaveProperty("key_top_model_share");
+      }
     });
   });
 

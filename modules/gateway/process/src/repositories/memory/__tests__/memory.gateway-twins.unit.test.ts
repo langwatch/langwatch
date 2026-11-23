@@ -334,7 +334,13 @@ describe("memory gateway twins", () => {
   });
 
   describe("given debits in the budget ledger twin", () => {
-    const debit = (overrides: { gatewayRequestId: string; amountNanoUsd: number; at: string }) => ({
+    const debit = (overrides: {
+      gatewayRequestId: string;
+      amountNanoUsd: number;
+      at: string;
+      model?: string;
+      status?: "SUCCESS" | "PROVIDER_ERROR";
+    }) => ({
       tenantId: PROJECT,
       budgetId: "budget_1",
       scope: "PROJECT" as const,
@@ -345,8 +351,8 @@ describe("memory gateway twins", () => {
       tokensOutput: 1,
       tokensCacheRead: 0,
       tokensCacheWrite: 0,
-      model: "gpt-5",
-      status: "SUCCESS" as const,
+      model: overrides.model ?? "gpt-5",
+      status: overrides.status ?? ("SUCCESS" as const),
       gatewayRequestId: overrides.gatewayRequestId,
       amountNanoUsd: overrides.amountNanoUsd,
       occurredAt: Temporal.Instant.from(overrides.at),
@@ -403,6 +409,36 @@ describe("memory gateway twins", () => {
       );
 
       expect(spend?.spentNanoUsd).toBe(2_000);
+    });
+
+    it("sums successful spend per model from the floor, a replayed request once", async () => {
+      const ledger = MemoryGatewayBudgetSpendRepository.create();
+      const at = "2026-10-10T00:00:00Z";
+      await ledger.insertDebit([debit({ gatewayRequestId: "r1", amountNanoUsd: 400, at })]);
+      await ledger.insertDebit([debit({ gatewayRequestId: "r1", amountNanoUsd: 9_999, at })]);
+      await ledger.insertDebit([debit({ gatewayRequestId: "r2", amountNanoUsd: 220, at })]);
+      await ledger.insertDebit([
+        debit({ gatewayRequestId: "r3", amountNanoUsd: 380, at, model: "claude" }),
+      ]);
+      await ledger.insertDebit([
+        debit({ gatewayRequestId: "r4", amountNanoUsd: 5_000, at, status: "PROVIDER_ERROR" }),
+      ]);
+      await ledger.insertDebit([
+        debit({ gatewayRequestId: "r5", amountNanoUsd: 5_000, at: "2026-10-02T00:00:00Z" }),
+      ]);
+
+      const spend = await ledger.findModelSpendForTarget({
+        tenantIds: [PROJECT],
+        target: {
+          ...target,
+          periodFloorMs: Temporal.Instant.from("2026-10-05T00:00:00Z").epochMilliseconds,
+        },
+      });
+
+      expect(spend.toSorted((a, b) => (a.model < b.model ? -1 : 1))).toEqual([
+        { model: "claude", spentNanoUsd: 380n },
+        { model: "gpt-5", spentNanoUsd: 620n },
+      ]);
     });
   });
 

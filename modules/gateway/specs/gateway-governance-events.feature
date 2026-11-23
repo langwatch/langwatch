@@ -68,3 +68,26 @@ Feature: Gateway records its governance facts for webhook delivery
     Given the first-request fact cannot be recorded
     When a batch admitting an unused key is ingested
     Then the spend commands are still accepted and the failure is logged
+
+  @unit
+  Scenario: A key budget's crossing names the model it spent most on
+    Given a key's own budget past its warn line, 62% of its successful spend this period on gpt-5-mini
+    When crossing detection runs
+    Then the crossing names gpt-5-mini with a 0.62 share of the spend
+    And a tie names the first model by name
+    And the by-model spend is read once per crossing in a process, however many debits follow
+    And a project, team, organization, principal or attributed-user crossing names no model and reads none
+
+  @unit
+  Scenario: A failed top-model read still records the crossing
+    Given the by-model spend read fails
+    When crossing detection runs
+    Then the crossing is recorded without a top model or share
+    And the debit is not re-driven
+
+  @integration
+  Scenario: A key budget's spend by model counts each request once in ClickHouse
+    Given requests on a key over two models, one replayed, one failed, one before the period, each also debiting the project's budget
+    When the key budget's spend by model is read since its period start
+    Then each successful request in the period counts once, for the key's budget only
+    And gpt-5-mini is named at a 0.62 share

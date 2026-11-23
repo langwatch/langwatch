@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Who hears gateway's key facts and what Customer.io is told of them. A payload carries the key's
- * name and id and the budget's figures only: never its secret or prefix, a reason, an end user,
- * a bucket, a budget id, a project or any person's id. A key's first request is a trait only.
+ * name and id, the budget's figures and the model the key spent most on only: never its secret or
+ * prefix, a reason, an end user, a bucket, a budget id, a project or any person's id. A model name
+ * is no person's data. A key's first request is a trait only.
  * Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
  */
 import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
@@ -142,7 +143,20 @@ export function keyBudgetThresholdSignal({
     window: data.window.toLowerCase(),
     scopeType: data.scope_type.toLowerCase(),
     ...(periodEnd.outcome === "known" ? { periodEnd: periodEnd.periodEnd } : {}),
+    ...keyTopModelOf(data),
   };
+}
+
+/**
+ * Gateway's top model and its share of spend as a whole percent, e.g. 62. Both or neither: the
+ * mail names the model with its share, so one alone is left out like a fact that carries none.
+ */
+export function keyTopModelOf(
+  data: Pick<RecordBudgetCrossingCommandData, "top_model" | "top_model_spend_share">,
+): Pick<KeyBudgetThresholdSignal, "topModel" | "topModelShare"> {
+  const { top_model: topModel, top_model_spend_share: share } = data;
+  if (!topModel || share === null || share === undefined) return {};
+  return { topModel, topModelShare: Math.min(100, Math.max(0, Math.round(share * 100))) };
 }
 
 /** A copied key's first request as its recipient's signal, once per key. */
@@ -188,7 +202,10 @@ export function fireVirtualKeyCreated(signal: VirtualKeyCreatedSignal): CioBatch
   return [{ type: "identify", userId, traits: { has_virtual_key: true } }, track];
 }
 
-/** One event per crossing; `budget_period_end` is left out when gateway named no end. */
+/**
+ * One event per crossing. `budget_period_end` is left out when gateway named no end, and the top
+ * model's two properties when it named no model: never sent as null.
+ */
 export function fireKeyBudgetThreshold(signal: KeyBudgetThresholdSignal): CioBatchCall[] {
   return [
     {
@@ -204,6 +221,9 @@ export function fireKeyBudgetThreshold(signal: KeyBudgetThresholdSignal): CioBat
         window: signal.window,
         scope_type: signal.scopeType,
         ...(signal.periodEnd === undefined ? {} : { budget_period_end: signal.periodEnd }),
+        ...(signal.topModel && typeof signal.topModelShare === "number"
+          ? { key_top_model: signal.topModel, key_top_model_share: signal.topModelShare }
+          : {}),
       },
     },
   ];

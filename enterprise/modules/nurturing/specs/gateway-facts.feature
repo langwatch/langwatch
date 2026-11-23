@@ -67,6 +67,22 @@ Feature: Customer.io hears when a person's gateway key is created, first used, a
     And a TOTAL budget's crossing sends budget_period_end null
 
   @unit
+  Scenario: A threshold crossing names the model the key spent most on
+    Given a copied USER key whose holder is a current member
+    And gateway's crossing names gpt-5-mini with 0.62 of the key's spend this period
+    When the crossing is delivered, then its breach, and the crossing again
+    Then each sends key_budget_threshold with key_top_model gpt-5-mini and key_top_model_share 62, a whole percent, beside every attribute sent before
+    And the redelivered crossing sends nothing more
+    And an even split sends gateway's model at 50
+
+  @unit
+  Scenario: A crossing that names no top model sends no top-model properties
+    Given a crossing whose top-model read failed in gateway, or one stored before gateway named a top model
+    When it is delivered
+    Then key_budget_threshold carries every attribute sent before
+    And neither key_top_model nor key_top_model_share is sent, not even as null
+
+  @unit
   Scenario: A crossing of an organization, project or team budget sends nothing
     Given a budget crossing that names no key
     When it is delivered
@@ -341,6 +357,18 @@ Feature: Customer.io hears when a person's gateway key is created, first used, a
     Given nurturing's delivery claims in Redis
     When a key's first-request fact is delivered twice
     Then Customer.io receives one has_app_request identify
+
+  # --- AC Coverage Map (key_top_model) ---
+  # AC 1: "62% on gpt-5-mini, every property"        -> Scenario: A threshold crossing names the model the key spent most on
+  # AC 2: "breach carries the figures"           -> Scenario: A threshold crossing names the model the key spent most on
+  # AC 3: "delivered twice, one track"           -> Scenario: A threshold crossing names the model the key spent most on
+  # AC 4: "50/50: first by name, 50"             -> Scenario: A threshold crossing names the model the key spent most on
+  #                                               -> gateway's gateway-governance-events.feature (the tie)
+  # AC 5: "model read fails: no properties"      -> Scenario: A crossing that names no top model sends no top-model properties
+  #                                               -> gateway's gateway-governance-events.feature (the failed read)
+  # AC 6: "stored before: as today"              -> Scenario: A crossing that names no top model sends no top-model properties
+  # AC 7: "keyless crossings send nothing"       -> Scenario: A crossing of an organization, project or team budget sends nothing
+  # AC 8: "one by-model read per crossing"       -> gateway's gateway-governance-events.feature
 
   # --- AC Coverage Map (has_app_request) ---
   # "one identify, no track"                     -> Scenario: A key's first request sets has_app_request on the person told of the key

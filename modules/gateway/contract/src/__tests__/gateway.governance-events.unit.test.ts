@@ -64,6 +64,20 @@ describe("gateway's governance facts", () => {
 
       expect(parsed).toMatchObject(storedCrossing);
       expect(parsed.period_ends_at_ms ?? null).toBeNull();
+      expect(parsed).not.toHaveProperty("top_model");
+      expect(parsed).not.toHaveProperty("top_model_spend_share");
+    });
+  });
+
+  describe("when a key budget's crossing names its top model", () => {
+    /** @scenario "A key budget's crossing names the model it spent most on" */
+    it("parses the model and its share, and refuses a share outside 0 to 1", () => {
+      const named = { ...storedCrossing, top_model: "gpt-5-mini", top_model_spend_share: 0.62 };
+
+      expect(recordBudgetCrossingCommandDataSchema.parse(named)).toMatchObject(named);
+      expect(() =>
+        recordBudgetCrossingCommandDataSchema.parse({ ...named, top_model_spend_share: 62 }),
+      ).toThrow(ZodError);
     });
   });
 
