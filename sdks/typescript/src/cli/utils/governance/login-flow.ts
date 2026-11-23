@@ -42,10 +42,9 @@ import {
   startDeviceCode,
 } from "./device-flow";
 import { printIngestionKeyNotice } from "./ingestion-key-notice";
-import { formatLoginCeremony, type LoginCeremonyBudgetLine } from "./login-ceremony";
+import { expiryPhrase, formatLoginCeremony, type LoginCeremonyBudgetLine } from "./login-ceremony";
 import {
   clearPendingLogin,
-  expiryPhrase,
   type PendingLoginRequest,
   resumablePendingLogin,
   savePendingLogin,

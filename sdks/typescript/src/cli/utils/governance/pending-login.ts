@@ -87,7 +87,8 @@ export function resumablePendingLogin({
     pending.control_plane_url === request.control_plane_url &&
     pending.kind === request.kind &&
     pending.management === request.management &&
-    pending.cwd === request.cwd;
+    // Only a project key login writes into its folder (.env); a device session is machine-wide.
+    (request.kind !== "project_api_key" || pending.cwd === request.cwd);
   if (!sameRequest) return undefined;
 
   // A code in its last seconds may already carry an approval: resume it and let the poll say.
@@ -128,12 +129,4 @@ function readPendingLogin(): PendingLogin | undefined {
   } catch {
     return undefined;
   }
-}
-
-/** How long the person has to approve, said the way they would read it. */
-export function expiryPhrase(expiresInSeconds: number): string {
-  const minutes = Math.floor(expiresInSeconds / 60);
-  if (minutes >= 2) return `${minutes} minutes`;
-  if (minutes === 1) return "1 minute";
-  return `${Math.max(0, expiresInSeconds)} seconds`;
 }

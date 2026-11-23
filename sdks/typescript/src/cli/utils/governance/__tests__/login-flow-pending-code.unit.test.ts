@@ -147,6 +147,55 @@ describe("a login waiting on a device code", () => {
     });
   });
 
+  describe("when the login saves the code it waits on", () => {
+    /** @scenario The pending code is kept beside the config, readable only by its owner */
+    it("writes it next to the config file with owner-only permissions", async () => {
+      startDeviceCode.mockResolvedValueOnce(deviceCode("FRST-CODE"));
+      pollUntilDone.mockImplementationOnce(killedWhileWaiting);
+      await expect(runDeviceFlowLogin()).rejects.toThrow("killed");
+
+      expect(pendingLoginPath()).toBe(path.join(dir, "config.pending-login.json"));
+      expect(fs.statSync(pendingLoginPath()).mode & 0o777).toBe(0o600);
+    });
+  });
+
+  describe("when the rerun comes from another folder", () => {
+    let elsewhere: string;
+    beforeEach(() => {
+      elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), "lw-pending-elsewhere-"));
+    });
+    afterEach(() => {
+      fs.rmSync(elsewhere, { recursive: true, force: true });
+    });
+
+    /** @scenario A device session login is picked up from any folder */
+    it("waits on the earlier code for a device session login", async () => {
+      startDeviceCode.mockResolvedValueOnce(deviceCode("FRST-CODE"));
+      pollUntilDone.mockImplementationOnce(killedWhileWaiting);
+      await expect(runDeviceFlowLogin()).rejects.toThrow("killed");
+
+      vi.spyOn(process, "cwd").mockReturnValue(elsewhere);
+      pollUntilDone.mockResolvedValueOnce(signedIn);
+      await runDeviceFlowLogin();
+
+      expect(startDeviceCode).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario A login for something else starts its own code */
+    it("starts a new code for a project key login, which writes into its folder", async () => {
+      startDeviceCode
+        .mockResolvedValueOnce(deviceCode("FRST-CODE"))
+        .mockResolvedValueOnce(deviceCode("SCND-CODE"));
+      pollUntilDone.mockImplementation(killedWhileWaiting);
+      await expect(runUnifiedLoginFlow({ kind: "project_api_key" })).rejects.toThrow("killed");
+
+      vi.spyOn(process, "cwd").mockReturnValue(elsewhere);
+      await expect(runUnifiedLoginFlow({ kind: "project_api_key" })).rejects.toThrow("killed");
+
+      expect(startDeviceCode).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe("when the rerun comes in the code's last seconds", () => {
     /** @scenario A code in its last seconds is still picked up */
     it("waits on the earlier code rather than starting a new one", async () => {

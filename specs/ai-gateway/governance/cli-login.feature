@@ -96,8 +96,21 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
   @unit
   Scenario: A login for something else starts its own code
     Given a login left a pending device code for one control plane
-    When a login runs against another control plane or another credential type
+    When a login runs against another control plane, another credential type,
+      or, for a project key login, from another folder
     Then it asks the server for a new code
+
+  @unit
+  Scenario: A device session login is picked up from any folder
+    Given a device session login left a pending device code
+    When the same login runs again from another folder
+    Then it waits on the earlier code
+
+  @unit
+  Scenario: The pending code is kept beside the config, readable only by its owner
+    When a login saves the device code it waits on
+    Then the file sits next to the CLI config file
+    And only its owner can read or write it
 
   @unit
   Scenario: A picked up code that lapsed starts a fresh one
