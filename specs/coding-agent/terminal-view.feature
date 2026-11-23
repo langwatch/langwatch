@@ -548,11 +548,19 @@ Rule: A Code Mode session reads like the real CLI, not like REPL and Poll
     And a faint note says Claude Code recorded only the start of the script and its full length
 
   @integration
-  Scenario: A Code call with no script recorded says so
-    Given a Claude Code session in Code Mode exported without content
+  Scenario: A session exported without content says so once
+    Given a Claude Code session in Code Mode exported without content, two scripts and a poll
     When the Terminal tab renders the session
-    Then the Code row says the script was not recorded
+    Then one faint line at the top says "This agent sends metadata only, so its prompts, scripts and output are not recorded"
+    And each Code row reads "Code" with no note of its own
     And the poll is still one wait line with its duration
+
+  @integration
+  Scenario: A Code call with no script recorded says so
+    Given a Claude Code session in Code Mode that recorded its prompt, with one script exported without its source
+    When the Terminal tab renders the session
+    Then that Code row says the script was not recorded
+    And no line says the agent sends metadata only
 
   @unit
   Scenario: A model reply that only names its tool calls adds no line of its own
