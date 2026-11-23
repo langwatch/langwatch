@@ -19,6 +19,20 @@ const FILTER_KEYS = ["zz1", "zz2", "zz3", "zz4", "zz5", "event.metrics.k3_4"];
 /** A lambda over the keys peaked near 99 MiB here; one hasAny per event near 50 MiB. */
 const MEMORY_CAP_BYTES = "70000000";
 
+/** Retries a seed step the server killed for its total memory, which other suites share. */
+async function seedStep(run: () => Promise<unknown>): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await run();
+      return;
+    } catch (error) {
+      const killed = (error as { type?: string }).type === "MEMORY_LIMIT_EXCEEDED";
+      if (!killed || attempt === 5) throw error;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 2_000));
+    }
+  }
+}
+
 /** The span-side condition of the translated filter, with the table's own column names. */
 function eventCondition(): { sql: string; params: Record<string, unknown> } {
   resetParamCounter();
@@ -45,20 +59,22 @@ describe("given spans whose events carry attribute maps", () => {
     });
     // Seeded in slices: one 70k-row insert of generated maps passes the 1 GiB a CI server allows.
     for (let start = 0; start < SPAN_COUNT; start += SEED_SLICE) {
-      await ch.command({
-        query: `INSERT INTO ${TABLE} SELECT number,
+      await seedStep(() =>
+        ch.command({
+          query: `INSERT INTO ${TABLE} SELECT number,
           arrayMap(e -> concat('evt', toString((number + e) % 3)), range(${EVENTS_PER_SPAN})),
           arrayMap(e -> CAST(mapFromArrays(
             arrayMap(i -> concat('event.metrics.k', toString(i), '_', toString(number % 11)), range(${KEYS_PER_EVENT})),
             arrayMap(i -> concat(repeat('v', 40), toString(number)), range(${KEYS_PER_EVENT}))
           ) AS Map(String, String)), range(${EVENTS_PER_SPAN}))
           FROM numbers(${start}, ${SEED_SLICE})`,
-        clickhouse_settings: { max_threads: 1, max_insert_threads: "1", max_block_size: "4096" },
-      });
+          clickhouse_settings: { max_threads: 1, max_insert_threads: "1", max_block_size: "4096" },
+        }),
+      );
     }
     // One part again, so the filter reads blocks as large as one insert gave.
-    await ch.command({ query: `OPTIMIZE TABLE ${TABLE} FINAL` });
-  }, 120_000);
+    await seedStep(() => ch.command({ query: `OPTIMIZE TABLE ${TABLE} FINAL` }));
+  }, 180_000);
 
   afterAll(async () => {
     await ch?.command({ query: `DROP TABLE IF EXISTS ${TABLE}` });
