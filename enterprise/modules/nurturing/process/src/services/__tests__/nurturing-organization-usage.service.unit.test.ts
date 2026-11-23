@@ -542,7 +542,9 @@ describe("NurturingOrganizationUsageService", () => {
       await service.tracesChanged({ projectId: "project-1" });
 
       const tracked = sent.flat().filter((call) => call.type === "track");
-      expect(tracked.map((call) => call.messageId)).toEqual(["trace_active_day:admin-1:2026-11-20"]);
+      expect(tracked.map((call) => call.messageId)).toEqual([
+        "trace_active_day:admin-1:2026-11-20",
+      ]);
     });
   });
 
