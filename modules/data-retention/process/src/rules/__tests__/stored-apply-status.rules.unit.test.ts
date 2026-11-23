@@ -30,7 +30,7 @@ const TEN = Date.UTC(2026, 10, 22, 10);
 const ELEVEN = Date.UTC(2026, 10, 22, 11);
 const teamOfProject = new Map([["project-1", "team-1"]]);
 
-const changed = (at: number, { lengthens = false } = {}): RetentionPolicyChangedEvent =>
+const changed = (at: number, { shortens = false } = {}): RetentionPolicyChangedEvent =>
   EventUtils.createEvent<RetentionPolicyChangedEvent>({
     aggregateType: RETENTION_EXTENSION_AGGREGATE_TYPE,
     aggregateId: organizationId,
@@ -43,7 +43,7 @@ const changed = (at: number, { lengthens = false } = {}): RetentionPolicyChanged
       scope: organization,
       category: "traces",
       retentionDays: 30,
-      lengthens,
+      shortens,
       changedAt: at,
     },
     metadata: {},
@@ -88,7 +88,7 @@ describe("the apply status fold", () => {
         changedAt: TEN,
         appliedAt: ELEVEN,
         raisedAt: null,
-        shortenedAt: TEN,
+        shortenedAt: null,
       };
       expect(fold([changed(TEN), applied(ELEVEN)])).toEqual(expected);
       expect(fold([applied(ELEVEN), changed(TEN)])).toEqual(expected);
@@ -97,7 +97,7 @@ describe("the apply status fold", () => {
 
     /** @scenario "The status keeps raises apart from exact applies" */
     it("holds a raise apart from exact applies and a lengthening save apart from shorter ones", () => {
-      expect(fold([changed(TEN, { lengthens: true }), applied(ELEVEN, "raise")])).toEqual({
+      expect(fold([changed(TEN), applied(ELEVEN, "raise")])).toEqual({
         ...organization,
         organizationId,
         changedAt: TEN,
@@ -105,6 +105,12 @@ describe("the apply status fold", () => {
         raisedAt: ELEVEN,
         shortenedAt: null,
       });
+    });
+
+    /** @scenario "Only a save that keeps fewer days blocks a later raise" */
+    it("stamps a shorter save and leaves an unchanged or longer one out", () => {
+      expect(fold([changed(TEN, { shortens: true }), changed(ELEVEN)]).shortenedAt).toBe(TEN);
+      expect(fold([changed(TEN), changed(ELEVEN)]).shortenedAt).toBeNull();
     });
 
     it("keys both facts to the scope they name", () => {

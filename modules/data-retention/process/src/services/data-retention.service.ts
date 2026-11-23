@@ -56,6 +56,12 @@ function lengthensRetention({ from, to }: { from: number | undefined; to: number
   return to === 0 || to > from;
 }
 
+/** Whether a save keeps fewer days than the rule it replaced; an unchanged period does not. */
+function shortensRetention({ from, to }: { from: number | undefined; to: number }): boolean {
+  if (from === undefined || from === to) return false;
+  return !lengthensRetention({ from, to });
+}
+
 /** Projects whose placements one retention lookup reads at once. */
 const RETENTION_LOOKUP_CHUNK = 1_000;
 
@@ -178,7 +184,7 @@ export class DataRetentionService {
     scope: ScopeAssignment;
     category: RetentionCategory;
     retentionDays: number;
-  }): Promise<{ policy: RetentionPolicy; lengthens: boolean }> {
+  }): Promise<{ policy: RetentionPolicy; lengthens: boolean; shortens: boolean }> {
     const retentionDays = retentionDaysInputSchema.parse(input.retentionDays);
     await this.assertScopeInOrganization(input);
     const previous = (
@@ -201,6 +207,7 @@ export class DataRetentionService {
     return {
       policy,
       lengthens: lengthensRetention({ from: previous?.retentionDays, to: retentionDays }),
+      shortens: shortensRetention({ from: previous?.retentionDays, to: retentionDays }),
     };
   }
 

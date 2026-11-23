@@ -60,6 +60,13 @@ Feature: Each retention change and each apply to stored data is recorded
     Then the scope's status holds the raise at 11:00 and no exact apply
 
   @unit
+  Scenario: Only a save that keeps fewer days blocks a later raise
+    Given a save at 10:00 that kept fewer days and an unchanged save at 11:00
+    When the facts are folded
+    Then the scope's status holds the shorter save at 10:00
+    And an unchanged or longer save is never held as shorter
+
+  @unit
   Scenario: A raise after a lengthening save marks the scope applied
     Given a scope lengthened at 10:00 and raised at 11:00
     Then the scope reads as applied at 11:00

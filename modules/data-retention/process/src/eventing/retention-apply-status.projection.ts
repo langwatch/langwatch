@@ -1,5 +1,5 @@
 /**
- * Per scope, the latest change, exact apply, raise and non-lengthening change, keyed
+ * Per scope, the latest change, exact apply, raise and shortening change, keyed
  * `organizationId:scopeType:scopeId`. Each keeps its maximum, so the fold is order-free.
  * Spec: modules/data-retention/specs/retention-apply-record.feature
  */
@@ -26,7 +26,7 @@ export interface RetentionApplyStatusState {
   readonly appliedAt: number | null;
   /** A rewrite that only raised stamps after a lengthening save. */
   readonly raisedAt: number | null;
-  /** A change that did not lengthen the period, so a raise cannot cover it. */
+  /** A change that kept fewer days than before, so a raise cannot cover it. */
   readonly shortenedAt: number | null;
 }
 
@@ -60,9 +60,9 @@ export function applyRetentionApplyStatusEvent(
       return {
         ...base,
         changedAt: latest(state.changedAt, event.data.changedAt),
-        shortenedAt: event.data.lengthens
-          ? state.shortenedAt
-          : latest(state.shortenedAt, event.data.changedAt),
+        shortenedAt: event.data.shortens
+          ? latest(state.shortenedAt, event.data.changedAt)
+          : state.shortenedAt,
       };
     case RETENTION_APPLIED_EVENT_TYPE:
       return event.data.mode === "apply"

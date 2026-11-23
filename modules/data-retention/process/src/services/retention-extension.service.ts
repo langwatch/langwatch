@@ -101,7 +101,7 @@ export class RetentionExtensionService {
     scope,
     category,
     retentionDays,
-    lengthens,
+    shortens,
     changeId,
     at,
   }: {
@@ -109,7 +109,7 @@ export class RetentionExtensionService {
     scope: ScopeAssignment;
     category: RetentionCategory;
     retentionDays: number;
-    lengthens: boolean;
+    shortens: boolean;
     changeId: string;
     at: number;
   }): Promise<void> {
@@ -120,7 +120,7 @@ export class RetentionExtensionService {
       scope,
       category,
       retentionDays,
-      lengthens,
+      shortens,
       changedAt: at,
     });
   }
