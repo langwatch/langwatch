@@ -102,16 +102,14 @@ folded into projections owned by the dashboard module.
    `scopeKind` `"organization"`. This is smaller and leaves
    `seatReachesProduct` untouched, so developer seats still get in. They see
    only boards from projects they can read, the same rule as today.
-6. **One flag for the area (amended; D4, 2026-11-23).** The organization-wide
-   area ships behind its own frontend flag `release_dashboards_organization_area` (added in #9789),
-   default off, which needs `release_dashboards`. On a page with no project both
-   are evaluated for the organization, and the area exists only when at least one
-   of its projects has Dashboards on. `release_dashboards_in_every_product` stays
-   the flag of the other products' sidebar sections only, default on since
-   2026-11-23, so turning it on never opens the area. While the area's flag is off
-   the `/dashboards` addresses answer as before, no dialog opens, home products
-   are ignored so every board lists in LLM Ops, and personal boards are hidden but
-   kept.
+6. **One flag (amended; D4, 2026-11-23).** Everything ships behind the existing
+   frontend flag `release_dashboards_in_every_product`, which needs
+   `release_dashboards` and now defaults on. On a page with no project both are
+   evaluated for the organization, and the area exists only when at least one of
+   its projects has Dashboards on. While the flag is off the `/dashboards`
+   addresses answer as before, only LLM Ops shows a Dashboards section, no dialog
+   opens, home products are ignored so every board lists in LLM Ops, and
+   personal boards are hidden but kept.
 7. **Release gate.** Hide boards whose owning project has `release_dashboards`
    off. This matches what that project shows today. The gate covers the area,
    not the data: "All projects" (decision 9) still reads a readable project
