@@ -282,6 +282,8 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "tools/docsdeploy",
   "tools/chartheap",
   "tools/charts3region",
+  // The PII model image a release copies (specs/ci/pii-redaction-model-release.feature).
+  "tools/newestimage",
   // How the package-suites weights are measured from main's job logs
   // (specs/ci/package-suites-weights.feature).
   "tools/suiteweights",

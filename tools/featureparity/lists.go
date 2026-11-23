@@ -70,6 +70,7 @@ var (
 		"tools/docsdeploy",
 		"tools/chartheap",
 		"tools/charts3region",
+		"tools/newestimage",
 		"tools/suiteweights",
 		"tools/matrixseed",
 		"cmd/matrixseed",

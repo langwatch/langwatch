@@ -180,6 +180,15 @@ images:
     repository: langwatch/pii-redaction-model
     tag: 3.23.0 # x-release-please-version
     pullPolicy: IfNotPresent
+  # The PII redaction model's public image (piiRedactionModel below), used
+  # only when piiRedactionModel.enabled.
+  ## @param images.pii_redaction_model.repository [string] PII redaction model image repository.
+  ## @param images.pii_redaction_model.tag [string] PII redaction model image tag.
+  ## @param images.pii_redaction_model.pullPolicy [string] PII redaction model image pull policy.
+  pii_redaction_model:
+    repository: langwatch/pii-redaction-model
+    tag: 3.23.0 # x-release-please-version
+    pullPolicy: IfNotPresent
 
 # =============================================================================
 # LangWatch Main Application Configuration
