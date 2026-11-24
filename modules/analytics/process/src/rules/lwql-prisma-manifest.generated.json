@@ -22095,7 +22095,7 @@
     {
       "name": "NurturingProjectUsageView",
       "tableName": "NurturingProjectUsageView",
-      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per\norganization for the per-email traits. Traces are counted in NurturingProjectTraceDay.",
+      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per\norganization for the per-email traits. Traces are counted in NurturingProjectTraceDayCount.",
       "primaryKey": [
         "projectId",
         "owner"

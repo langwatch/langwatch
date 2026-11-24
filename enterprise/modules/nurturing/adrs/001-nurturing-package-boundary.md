@@ -61,10 +61,14 @@ keyed by project, UTC day and source, so a replay rebuilds each day exactly
 instead of adding to it; two deploy steps replay trace's log one counting window
 back. This reverses the decision of issue 9378 that kept them a batch
 subscriber. A span stored under two event ids still counts twice, as before.
+During rollout, an old-pod batch that counted and then failed before its ack is
+retried on a new pod through the lane alias, and counts twice until the replay
+rebuilds that day.
 `NurturingUncopiedProject` and its retry clock are retired: a fold counts a
 trace whether or not its project's placement copy has landed. It and
-`NurturingProjectTraceDay` are read and written by no code, and stay until an
-operator step drops them.
+`NurturingProjectTraceDay` are read and written by no code of this release (the
+migration reads `NurturingProjectTraceDay` once to seed the new table), and stay
+until an operator step drops them.
 
 ## Known exceptions on main, tracked
 

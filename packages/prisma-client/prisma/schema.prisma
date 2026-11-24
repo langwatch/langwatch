@@ -5400,7 +5400,7 @@ model NurturingOrganization {
 
 /// Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario
 /// and simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per
-/// organization for the per-email traits. Traces are counted in NurturingProjectTraceDay.
+/// organization for the per-email traits. Traces are counted in NurturingProjectTraceDayCount.
 model NurturingProjectUsageView {
   projectId         String
   /// The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation).
