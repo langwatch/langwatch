@@ -20,6 +20,11 @@ import {
   SUBSCRIPTION_STARTED_EVENT_TYPE,
   subscriptionStartedEventDataSchema,
 } from "@langwatch/enterprise-billing-contract";
+import {
+  INGESTION_SOURCE_CREATED_EVENT_TYPE,
+  INGESTION_SOURCE_WENT_LIVE_EVENT_TYPE,
+  ingestionSourceFactDataSchema,
+} from "@langwatch/enterprise-governance-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import {
   USAGE_REPORT_RECEIVED_EVENT_TYPE,
@@ -132,6 +137,10 @@ import {
   appOpenedSignals,
   langyFirstMessageSeenSignal,
 } from "../rules/nurturing-app-opened.rules.ts";
+import {
+  governanceSourceConnectedSignals,
+  governanceSourceLiveSignals,
+} from "../rules/nurturing-governance-facts.rules.ts";
 import {
   insightFiledSignal,
   insightReaderSignal,
@@ -606,6 +615,17 @@ export function buildNurturingPipeline(deps: {
         eventType: GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
         data: recordUnbudgetedSpendCommandDataSchema,
         handle: (data) => deps.unbudgetedSpendRecorded({ data, deliver: deliverSignal }),
+      })
+      // Governance's source facts name the person to tell, so no copy is read for a recipient.
+      .withPeerSubscriber("governanceSourceConnected", {
+        eventType: INGESTION_SOURCE_CREATED_EVENT_TYPE,
+        data: ingestionSourceFactDataSchema,
+        handle: (data) => deliverEach(governanceSourceConnectedSignals({ data })),
+      })
+      .withPeerSubscriber("governanceSourceLive", {
+        eventType: INGESTION_SOURCE_WENT_LIVE_EVENT_TYPE,
+        data: ingestionSourceFactDataSchema,
+        handle: (data) => deliverEach(governanceSourceLiveSignals({ data })),
       })
       .withPeerSubscriber("langyFirstMessageSeen", {
         eventType: LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE,

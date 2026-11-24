@@ -178,6 +178,10 @@ export interface CioOrgTraits extends CioOrganizationUsageTraits {
   has_evaluation_results?: boolean;
   evaluation_count?: number;
   first_evaluation_at?: number;
+  /** A governance ingestion source was created; only ever set true. */
+  has_governance_source?: boolean;
+  /** A governance source took its first data; only ever set true. */
+  has_governance_data?: boolean;
   onboarding_variant?: string;
   onboarding_paths?: string;
   onboarding_primary_path?: string;
@@ -239,7 +243,11 @@ export type CioEventName =
   /** A key's budget crossed its warn line or its limit; `budget_reached` tells them apart. */
   | "key_budget_threshold"
   /** An organization's person keys spent without a budget this week; to its admin, weekly. */
-  | "gateway_spend_without_budget";
+  | "gateway_spend_without_budget"
+  /** A person created a governance ingestion source. */
+  | "governance_source_connected"
+  /** A governance source the person created took its first data; once per source. */
+  | "governance_source_live";
 
 // ---------------------------------------------------------------------------
 // Batch call discriminated union

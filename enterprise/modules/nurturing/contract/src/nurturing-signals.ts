@@ -501,6 +501,26 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     keyCount: z.number().int().positive(),
     totalSpendUsd: z.number(),
   }),
+  z.object({
+    /** An organization connected a governance source. `sourceEventId` is `<source>:connected`. */
+    kind: z.literal("governance_source_connected"),
+    ...signalSource,
+    /** The person who created the source. */
+    userId: id,
+    organizationId: id,
+    sourceId: id,
+    sourceType: id,
+  }),
+  z.object({
+    /** A governance source took its first data. `sourceEventId` is `<source>:live`, once. */
+    kind: z.literal("governance_source_live"),
+    ...signalSource,
+    /** The person who created the source. */
+    userId: id,
+    organizationId: id,
+    sourceId: id,
+    sourceType: id,
+  }),
 ]);
 export interface NurturingSignalSchema extends Named<typeof nurturingSignalSchemaDefinition> {}
 export const nurturingSignalSchema: NurturingSignalSchema = nurturingSignalSchemaDefinition;

@@ -38,6 +38,7 @@ export * from "./features/ingestion/ingestion-templates.trpc.ts";
 export * from "./features/ingestion/ingestion-pull.commands.ts";
 export * from "./features/ingestion/ingestion-pull.events.ts";
 export * from "./features/ingestion/ingestion-source-key.commands.ts";
+export * from "./features/ingestion/ingestion-source-lifecycle.events.ts";
 export * from "./features/cost/coding-assistant-billing.commands.ts";
 export * from "./features/cost/coding-assistant-billing.events.ts";
 export * from "./features/ingestion/ottl.ts";

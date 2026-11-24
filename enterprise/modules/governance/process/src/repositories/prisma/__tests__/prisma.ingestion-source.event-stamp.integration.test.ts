@@ -64,6 +64,24 @@ describe.skipIf(!databaseUrl)("PrismaIngestionSourceRepository.recordEventReceiv
       expect(stored.status).toBe("active");
       expect(stored.lastEventAt?.toISOString()).toBe("2026-11-13T10:00:00.000Z");
     });
+
+    /** @scenario "A source's first data records that it went live, once" */
+    it("says exactly one of racing stamps moved it live, and stamps every later one", async () => {
+      const id = await sourceWith("awaiting_first_event");
+      const later = Temporal.Instant.fromEpochMilliseconds(Date.parse("2026-11-13T11:00:00.000Z"));
+
+      const racing = await Promise.all([
+        repository.recordEventReceived(id, STAMPED_AT),
+        repository.recordEventReceived(id, STAMPED_AT),
+        repository.recordEventReceived(id, STAMPED_AT),
+      ]);
+      const after = await repository.recordEventReceived(id, later);
+
+      expect(racing.filter(({ wentLive }) => wentLive)).toHaveLength(1);
+      expect(after).toEqual({ wentLive: false });
+      const stored = await prisma.ingestionSource.findUniqueOrThrow({ where: { id } });
+      expect(stored.lastEventAt?.toISOString()).toBe("2026-11-13T11:00:00.000Z");
+    });
   });
 
   describe("given the admin disabled the source after its batch was let in", () => {
@@ -71,8 +89,9 @@ describe.skipIf(!databaseUrl)("PrismaIngestionSourceRepository.recordEventReceiv
     it("leaves the source disabled and its last event time alone", async () => {
       const id = await sourceWith("disabled");
 
-      await repository.recordEventReceived(id, STAMPED_AT);
+      const stamp = await repository.recordEventReceived(id, STAMPED_AT);
 
+      expect(stamp).toEqual({ wentLive: false });
       const stored = await prisma.ingestionSource.findUniqueOrThrow({ where: { id } });
       expect(stored.status).toBe("disabled");
       expect(stored.lastEventAt).toBeNull();

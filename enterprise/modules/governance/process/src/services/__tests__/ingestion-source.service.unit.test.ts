@@ -15,6 +15,7 @@ import {
   findPullCredentialComplaints,
 } from "../../features/ingestion-pull/rules/pull-config-shape.rules.ts";
 import { PullDestinationService } from "../../features/ingestion-pull/services/pull-destination.service.ts";
+import { IngestionSourceFactsService } from "../../features/ingestion-source/services/ingestion-source-facts.service.ts";
 import { IngestionSourceReadService } from "../../features/ingestion-source/services/ingestion-source-read.service.ts";
 import {
   IngestionSecretConfiguration,
@@ -91,7 +92,7 @@ class FakeSourceRepository extends IngestionSourceRepository {
     this.row = source({ ...this.row, ...rowPatchOf(input) });
     return this.row;
   });
-  recordEventReceived = vi.fn(async () => undefined);
+  recordEventReceived = vi.fn(async () => ({ wentLive: false }));
   getUnpricedUsageWindow = vi.fn(async () => ({ since: null, through: null }));
   updateUnpricedUsageWindow = vi.fn(async () => undefined);
   findUnpricedUsageWindows = vi.fn(async () => []);
@@ -158,6 +159,7 @@ function harness({ ottl = MemoryOttlTransformChannel.create() } = {}) {
     diagnostics: new FakeDiagnostics(),
     ottl,
     now: () => NOW,
+    facts: IngestionSourceFactsService.create({ reportError: () => {} }),
   });
   return { service, repository, projects, findWithTeam, entitlements, lifecycle };
 }

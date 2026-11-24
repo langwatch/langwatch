@@ -25,6 +25,7 @@ import {
   fireWorkflowCreated,
 } from "../rules/nurturing-feature-adoption-service.rules.ts";
 import { isGatewayKeySignal } from "../rules/nurturing-gateway-facts.rules.ts";
+import { isGovernanceSourceSignal } from "../rules/nurturing-governance-facts.rules.ts";
 import {
   fireGuidedOnboardingPaths,
   fireGuidedOnboardingProgress,
@@ -340,7 +341,7 @@ export class NurturingDeliveryService {
     if (!this.deps.customerIo) return;
     if (isCodingOrAppSignal(signal)) return this.sendCustomerIoCalls(fireCodingOrApp(signal));
     // Each call is claimed on its own; a refused one fails the delivery, so its job retries.
-    if (isGatewayKeySignal(signal)) {
+    if (isGatewayKeySignal(signal) || isGovernanceSourceSignal(signal)) {
       return this.parts.gatewayKeys?.deliver({ signal, deliveredClaim });
     }
     switch (signal.kind) {

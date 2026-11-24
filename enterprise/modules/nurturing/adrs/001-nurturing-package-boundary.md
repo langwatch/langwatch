@@ -104,7 +104,11 @@ created a key, who it acts for, its purpose and a crossing's period end, its
 `lw.governance.vk_first_request` fact says a key served its first request, and its
 `lw.governance.unbudgeted_spend` fact names an organization's top unbudgeted keys
 by name and spend, so nurturing never reads gateway's tables
-(https://github.com/langwatch/tasks/issues/1200). No feature module depends on
+(https://github.com/langwatch/tasks/issues/1200). Governance's contract
+(`@langwatch/enterprise-governance-contract`) is another: its
+`lw.governance.ingestion_source_created` and `lw.governance.ingestion_source_went_live`
+facts name an ingestion source's organization, id, type and creator, so nurturing
+never reads governance's tables. No feature module depends on
 nurturing's process, so no peer cycle can pass through it.
 
 ## Persistence

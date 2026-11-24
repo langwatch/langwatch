@@ -81,10 +81,11 @@ export abstract class IngestionSourceRepository {
     input: UpdateIngestionSourceRecord,
   ): Promise<GovernanceIngestionSource>;
   /**
-   * Stamp a received batch: last event time, and active. One conditional write that never
-   * touches a source that is off, so a disable landing while a batch is in flight holds.
+   * Stamp a received batch: last event time, and active. Never touches a source that is off, so
+   * a disable landing while a batch is in flight holds. `wentLive` is true for the one stamp that
+   * moved the source off awaiting its first event, however many batches race for it.
    */
-  abstract recordEventReceived(id: string, at: Instant): Promise<void>;
+  abstract recordEventReceived(id: string, at: Instant): Promise<{ wentLive: boolean }>;
   abstract getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow>;
   abstract updateUnpricedUsageWindow(id: string, window: UnpricedUsageWindow): Promise<void>;
   /** The organisation's unarchived sources that read a window they could not price. */

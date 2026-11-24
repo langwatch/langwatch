@@ -4017,6 +4017,9 @@ importers:
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../billing/contract
+      '@langwatch/enterprise-governance-contract':
+        specifier: workspace:*
+        version: link:../../governance/contract
       '@langwatch/enterprise-nurturing-contract':
         specifier: workspace:*
         version: link:../contract

@@ -8,6 +8,11 @@ import {
   fireGatewayKeySignal,
   type GatewayKeySignal,
 } from "../rules/nurturing-gateway-facts.rules.ts";
+import {
+  fireGovernanceSourceSignal,
+  type GovernanceSourceSignal,
+  isGovernanceSourceSignal,
+} from "../rules/nurturing-governance-facts.rules.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
@@ -25,9 +30,10 @@ function recipientDigestOf(userId: string): string {
 }
 
 /**
- * Sends a gateway key signal's calls in order, each claimed by type and recipient inside the
- * signal's claim: a retry after the identify went sends the track alone, or both to a new person.
- * A refused call gives back its claim and the signal's, then fails the delivery so its job retries.
+ * Sends a gateway key or governance source signal's calls in order, each claimed by type and
+ * recipient inside the signal's claim: a retry after the first call went sends the rest alone, or
+ * all of them to a new person. A refused call gives back its claim and the signal's, then fails
+ * the delivery so its job retries.
  */
 export class NurturingGatewayKeyDeliveryService {
   static create(dependencies: GatewayKeyDeliveryDependencies): NurturingGatewayKeyDeliveryService {
@@ -39,8 +45,14 @@ export class NurturingGatewayKeyDeliveryService {
   async deliver({
     signal,
     deliveredClaim,
-  }: Readonly<{ signal: GatewayKeySignal; deliveredClaim: string }>): Promise<void> {
-    for (const call of fireGatewayKeySignal(signal)) {
+  }: Readonly<{
+    signal: GatewayKeySignal | GovernanceSourceSignal;
+    deliveredClaim: string;
+  }>): Promise<void> {
+    const calls = isGovernanceSourceSignal(signal)
+      ? fireGovernanceSourceSignal(signal)
+      : fireGatewayKeySignal(signal);
+    for (const call of calls) {
       await this.sendOnce({ call, deliveredClaim });
     }
   }

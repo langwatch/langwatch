@@ -99,6 +99,9 @@
       "path": "../../billing/contract/tsconfig.build.json"
     },
     {
+      "path": "../../governance/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/coding-agent/contract/tsconfig.build.json"
     },
     {

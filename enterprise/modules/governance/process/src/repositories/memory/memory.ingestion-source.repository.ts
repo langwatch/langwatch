@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
+  ingestionSourceAwaitsFirstEvent,
   ingestionSourceStatusIsOff,
   type GovernanceIngestionSource,
 } from "@langwatch/enterprise-governance-contract";
@@ -123,11 +124,13 @@ export class MemoryIngestionSourceRepository extends IngestionSourceRepository {
     return toSource(next);
   }
 
-  async recordEventReceived(id: string, at: Instant): Promise<void> {
+  async recordEventReceived(id: string, at: Instant): Promise<{ wentLive: boolean }> {
     const row = this.rows.find((candidate) => candidate.id === id);
-    if (row === undefined || ingestionSourceStatusIsOff(row.status)) return;
+    if (row === undefined || ingestionSourceStatusIsOff(row.status)) return { wentLive: false };
 
+    const wentLive = ingestionSourceAwaitsFirstEvent(row.status);
     await this.update(id, { lastEventAt: at, status: "active" });
+    return { wentLive };
   }
 
   async getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow> {
