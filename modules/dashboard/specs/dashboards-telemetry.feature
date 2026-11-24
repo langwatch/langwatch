@@ -199,7 +199,7 @@ Feature: Dashboards telemetry: product events and query telemetry
     Then its "LangWatchQL failed" line is a warning when the customer's query is at fault, such as one over its memory limit
     And it is an error when the platform is at fault, such as a timeout or an unavailable database, or when no module handled the throw
     And it stays at info when the caller hung up
-    And it carries projectIds: the project the run came from, then any project it named, each once
+    And it carries projectIds: the projects its scope resolved to, or, for a run refused before its scope resolved, the project it came from, then any project it named, each once
     And it never carries the SQL text or the error's message
 
   # Owner: a failure in the browser should not happen, so when one does it is reported as a real error.
