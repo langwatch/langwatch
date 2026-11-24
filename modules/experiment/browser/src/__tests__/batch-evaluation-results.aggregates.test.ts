@@ -48,6 +48,71 @@ describe("computeBatchTargetAggregates", () => {
     });
   });
 
+  describe("given a stopped run's plan", () => {
+    const stoppedRun = ({
+      answered,
+      total,
+      expectedCells,
+    }: {
+      answered: Record<string, number[]>;
+      total: number | null;
+      expectedCells: number | null;
+    }) => {
+      const cells = Object.entries(answered).flatMap(([targetId, rows]) =>
+        rows.map((index) => ({ targetId, index })),
+      );
+      return transformBatchEvaluationData({
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "project-1",
+        total,
+        targets: Object.keys(answered).map((id) => ({ id, name: id, type: "prompt" })),
+        completeness: {
+          complete: true,
+          dataset: { received: cells.length, expected: expectedCells },
+          evaluations: { received: 0, expected: null },
+        },
+        dataset: cells.map(({ targetId, index }) => ({
+          index,
+          targetId,
+          entry: { question: `Q${index}` },
+          predicted: { output: `A${index}` },
+        })),
+        evaluations: [],
+        timestamps: { createdAt: 0, updatedAt: 0, stoppedAt: 1 },
+      });
+    };
+
+    it("counts each of two targets against its share of the planned cells", () => {
+      const data = stoppedRun({
+        answered: { a: [0, 1, 2, 3, 4], b: [0, 1, 2, 3, 4] },
+        total: 20,
+        expectedCells: null,
+      });
+
+      const aggregates = computeAllBatchAggregates(data);
+
+      expect(aggregates.get("a")).toMatchObject({ completedRows: 5, totalRows: 10 });
+      expect(aggregates.get("b")).toMatchObject({ completedRows: 5, totalRows: 10 });
+    });
+
+    it("takes the reported cell count when the run recorded no total", () => {
+      const data = stoppedRun({ answered: { a: [0, 1, 2, 4, 6] }, total: null, expectedCells: 10 });
+
+      const [aggregate] = [...computeAllBatchAggregates(data).values()];
+
+      expect(aggregate).toMatchObject({ completedRows: 5, totalRows: 10 });
+    });
+
+    it("never counts fewer rows than the run holds", () => {
+      const data = stoppedRun({ answered: { a: [0, 1, 2, 3] }, total: 2, expectedCells: null });
+
+      const [aggregate] = [...computeAllBatchAggregates(data).values()];
+
+      expect(aggregate).toMatchObject({ completedRows: 4, totalRows: 4 });
+    });
+  });
+
   describe("when counting completedRows", () => {
     it("counts rows with output as completed", () => {
       const targetCol = createTargetColumn("gpt-4");
