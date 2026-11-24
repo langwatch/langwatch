@@ -112,9 +112,8 @@ export class SeatHoldService {
     if (input.standing.role !== "EXTERNAL")
       return classifyMemberType(input.standing.role, undefined);
     const teamIds = await memberships.findSharedTeamIds({ organizationId: input.organizationId });
-    const customRoleIds = customRoleIdsOf({
-      bindings: await memberships.findTeamGrants({ ...input, teamIds }),
-    });
+    const teamBindings = await memberships.findTeamGrants({ ...input, teamIds });
+    const customRoleIds = customRoleIdsOf({ bindings: teamBindings });
     const permissions =
       customRoleIds.length === 0
         ? []
@@ -127,7 +126,7 @@ export class SeatHoldService {
     return classifyMemberType(
       input.standing.role,
       permissions.length > 0 ? permissions : undefined,
-      { billingOnly: input.standing.billingOnly === true },
+      { billingOnly: input.standing.billingOnly === true && teamBindings.length === 0 },
     );
   }
 

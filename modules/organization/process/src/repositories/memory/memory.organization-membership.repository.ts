@@ -811,6 +811,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     const row = this.membershipRow(input);
     if (!row || row.disabledAt === null || row.seatPendingSince == null) return false;
     row.role = OrganizationUserRole.MEMBER;
+    row.billingOnly = false;
     row.disabledAt = null;
     row.seatPendingSince = null;
     row.pendingSsoGrantId = input.pendingAdmissionId;

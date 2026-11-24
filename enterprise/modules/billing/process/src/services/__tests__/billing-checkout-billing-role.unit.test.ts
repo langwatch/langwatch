@@ -50,7 +50,6 @@ describe("BillingStarterRoleService", () => {
     ]);
   });
 
-  /** @scenario "A Billing-only member pays the upgrade on Free" */
   it("keeps Billing with a Billing-only member who completes the checkout", async () => {
     const { service, writes } = starterRole();
 

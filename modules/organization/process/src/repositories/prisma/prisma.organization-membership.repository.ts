@@ -318,6 +318,49 @@ async function landedInTime(write: () => Promise<unknown>): Promise<boolean> {
   }
 }
 
+/** Puts the row and seat hold back as the role change found them, unless a later write moved on. */
+async function restoreMembershipRow({
+  tx,
+  organizationId,
+  userId,
+  role,
+  previous,
+  seatMoved,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+  role: OrganizationUserRole;
+  previous: {
+    role: OrganizationUserRole;
+    billingOnly: boolean;
+    writtenAt: Date | null;
+    fullSeatSince: Date | null;
+    hold: Prisma.SeatHoldGetPayload<object> | null;
+    seatColumns: { fullSeatSince?: Date | null };
+  };
+  seatMoved: boolean;
+}): Promise<void> {
+  const restored = await tx.organizationUser.updateMany({
+    where: {
+      organizationId,
+      userId,
+      role,
+      billingOnly: false,
+      ...(previous.writtenAt ? { updatedAt: previous.writtenAt } : {}),
+      ...(seatMoved ? { fullSeatSince: previous.seatColumns.fullSeatSince ?? null } : {}),
+    },
+    data: {
+      role: previous.role,
+      billingOnly: previous.billingOnly,
+      ...(seatMoved ? { fullSeatSince: previous.fullSeatSince } : {}),
+    },
+  });
+  if (restored.count === 0 || !seatMoved) return;
+  await tx.seatHold.deleteMany({ where: { organizationId, userId } });
+  if (previous.hold) await tx.seatHold.create({ data: previous.hold });
+}
+
 async function emitScopeBindingPlans({
   writer,
   organizationId,
@@ -2183,6 +2226,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
             },
             data: {
               role: OrganizationUserRole.MEMBER,
+              billingOnly: false,
               disabledAt: null,
               seatPendingSince: null,
               pendingSsoGrantId: pendingAdmissionId,
@@ -2266,6 +2310,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       });
 
       const seatMoves = input.seat !== undefined && input.seat.kind !== "unchanged";
+      let writtenAt: Date | null = null;
       const previousHold = seatMoves
         ? await tx.seatHold.findUnique({
             where: { organizationId_userId: { organizationId, userId } },
@@ -2284,11 +2329,13 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
             userId,
             seat: input.seat,
           });
-          await tx.organizationUser.update({
+          const written = await tx.organizationUser.update({
             where: { userId_organizationId: { userId, organizationId } },
             // Any role change ends Billing only; the new role is metered (ADR-205).
             data: { role, billingOnly: false, ...columns },
+            select: { updatedAt: true },
           });
+          writtenAt = written.updatedAt;
           return columns;
         },
       });
@@ -2368,6 +2415,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       return {
         role: currentMember.role,
         billingOnly: currentMember.billingOnly,
+        writtenAt,
         fullSeatSince: currentMember.fullSeatSince,
         hold: previousHold,
         seatColumns,
@@ -2423,6 +2471,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     previous: {
       role: OrganizationUserRole;
       billingOnly: boolean;
+      /** When the change being reverted wrote the row; a later write moves it on. */
+      writtenAt: Date | null;
       fullSeatSince: Date | null;
       hold: Prisma.SeatHoldGetPayload<object> | null;
       seatColumns: { fullSeatSince?: Date | null };
@@ -2438,25 +2488,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         userId,
         cause: "role_changed",
         actorUserId,
-        write: async () => {
-          const restored = await tx.organizationUser.updateMany({
-            where: {
-              organizationId,
-              userId,
-              role,
-              billingOnly: false,
-              ...(seatMoved ? { fullSeatSince: previous.seatColumns.fullSeatSince ?? null } : {}),
-            },
-            data: {
-              role: previous.role,
-              billingOnly: previous.billingOnly,
-              ...(seatMoved ? { fullSeatSince: previous.fullSeatSince } : {}),
-            },
-          });
-          if (restored.count === 0 || !seatMoved) return;
-          await tx.seatHold.deleteMany({ where: { organizationId, userId } });
-          if (previous.hold) await tx.seatHold.create({ data: previous.hold });
-        },
+        write: () =>
+          restoreMembershipRow({ tx, organizationId, userId, role, previous, seatMoved }),
       });
     });
   }

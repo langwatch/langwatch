@@ -256,6 +256,8 @@ const organizationMemberRecordSchemaDefinition = z.object({
   updatedAt: z.date(),
   departmentId: z.string().nullable(),
   disabledAt: z.date().nullable(),
+  /** Billing only (ADR-205): the Billing grant, no team and no seat. */
+  billingOnly: z.boolean().optional(),
   user: z.object({
     id: z.string().min(1),
     name: z.string().nullable(),

@@ -61,12 +61,13 @@ const writer = createApiFixture<AuthzGrantsService>({
 });
 
 let repository: PrismaOrganizationMembershipRepository;
+const ROLE_WRITTEN_AT = new Date("2026-11-24T10:00:00.000Z");
 
 beforeEach(() => {
   vi.clearAllMocks();
   memberCount.mockResolvedValue(2);
   memberDelete.mockResolvedValue(undefined);
-  memberUpdate.mockResolvedValue(undefined);
+  memberUpdate.mockResolvedValue({ updatedAt: ROLE_WRITTEN_AT });
   memberUpdateMany.mockResolvedValue({ count: 1 });
   teamFindMany.mockResolvedValue([]);
   teamUpdateMany.mockResolvedValue({ count: 0 });
@@ -258,6 +259,7 @@ describe("given an admin being demoted to member", () => {
           userId: "user_a",
           role: OrganizationUserRole.MEMBER,
           billingOnly: false,
+          updatedAt: ROLE_WRITTEN_AT,
         },
         data: { role: OrganizationUserRole.ADMIN, billingOnly: false },
       });

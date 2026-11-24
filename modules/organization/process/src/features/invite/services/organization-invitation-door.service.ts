@@ -285,14 +285,8 @@ export class OrganizationInvitationDoorService {
     // An invitation targets an address, so a session carrying none cannot be
     // matched to one at all.
     if (!by.email) throw new SignedInAddressRequiredError();
-    if (invite.status === "ACCEPTED") {
-      // The acceptor retrying after a failed grant tail repairs it; the grant command ids
-      // make the repair idempotent.
-      if (invite.acceptedByUserId === by.id) {
-        await this.deps.invitations.apply({ userId: by.id, invite });
-      }
-      throw new InviteAlreadyAcceptedError();
-    }
+    // A spent invitation writes nothing again: its grants may since have been changed (ADR-205).
+    if (invite.status === "ACCEPTED") throw new InviteAlreadyAcceptedError();
     if (this.deps.invitations.displayStatus(invite) === "EXPIRED") throw new InviteExpiredError();
     if (invite.status !== "PENDING") throw new InviteNotReadyForAcceptanceError();
 
@@ -317,7 +311,10 @@ export class OrganizationInvitationDoorService {
     // invitation is marked ACCEPTED only once everything before it has landed.
     await this.deps.invitations.apply({ userId: by.id, invite, viaIdentifierId });
 
-    await this.#provisionPersonalWorkspace({ organizationId: invite.organizationId, by });
+    // Billing only reaches no team or project, its own workspace included (ADR-205).
+    if (!invite.billingOnly) {
+      await this.#provisionPersonalWorkspace({ organizationId: invite.organizationId, by });
+    }
 
     void this.deps.signals
       .announceJoin({

@@ -25,10 +25,33 @@ Feature: Billing-only invite
     Then each is refused with permission_denied
     And subscription:manage, seatRequests:manage and members:view are allowed
 
+  Scenario: A Billing-only member is given no team, project or personal workspace
+    Given a Billing-only member
+    When their invite is accepted, an admin grants them a team or project, or a system write does
+    Then no personal workspace or project is created for them
+    And the grant is refused with billing_only_no_team_access
+
+  Scenario: A Billing-only invite that names a team is refused
+    Given an admin inviting someone as Billing only
+    When the invite names a team
+    Then it is refused with billing_only_no_team_access
+
+  Scenario: A role change clears Billing only and the new role is metered
+    Given a Billing-only member
+    When an admin moves them to the Member role
+    Then they are no longer Billing only
+    And they count in the member seats
+
+  Scenario: Using a spent invitation link again writes nothing
+    Given a Billing-only invite already accepted, whose Billing an admin turned off
+    When the person uses the link again
+    Then it is refused with invite_already_accepted
+    And Billing stays off
+
   Scenario: Billing only is not granted through a group or an API key
-    Given a Billing-only invite
-    Then it names a user and the organization scope
-    And a group or an API key cannot be invited as Billing only
+    Given the Billing grant held through a group or on an API key
+    When it asks for subscription:manage or seatRequests:manage
+    Then each is refused
 
   Scenario: Accepting a Billing-only invite takes no seat
     Given an organization with every seat used

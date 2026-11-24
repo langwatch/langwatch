@@ -366,6 +366,12 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
       caller,
       bindings: args.bindings,
     });
+    await this.bindingWriter.assertNoBillingOnlyPrincipal({
+      organizationId: args.organizationId,
+      userIds: args.bindings.flatMap(({ principal }) =>
+        "userId" in principal ? [principal.userId] : [],
+      ),
+    });
     return this.options.ledger.attachBindings(args);
   }
 

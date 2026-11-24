@@ -1033,8 +1033,25 @@ describe("AuthzGrantsService central caller ceiling", () => {
       newBindingId: () => "rb_test_ksuid",
       bindings,
     });
-    return { service, ledger, findPermissionsBeyondCaller };
+    return { service, ledger, findPermissionsBeyondCaller, bindings };
   }
+
+  /** @scenario "A Billing-only member is given no team, project or personal workspace" */
+  it("refuses any binding for a Billing-only member, even from a system write", async () => {
+    const { service, ledger, bindings } = ceilingService([]);
+    bindings.isBillingOnlyMember.mockResolvedValue(true);
+
+    await expect(
+      service.attachBindings({
+        organizationId: ORG,
+        bindings: [{ ...TEAM_ADMIN, role: "VIEWER" }],
+        caller: { type: "system" },
+        actor: WRITE_ACTOR,
+        onDuplicate: "attach",
+      }),
+    ).rejects.toMatchObject({ code: "billing_only_no_team_access" });
+    expect(ledger.attachBindings).not.toHaveBeenCalled();
+  });
 
   /** @scenario "Adding a team member with a role above the caller is refused" */
   it("refuses an attach beyond what the caller holds and writes nothing", async () => {

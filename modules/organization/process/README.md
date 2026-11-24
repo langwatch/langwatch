@@ -2128,13 +2128,13 @@ interface Output {
 }
 
 // organization.deleteMember
-// Input: organizationApiRemoveMemberInputSchema, ../contract/src/organization.responses.ts:454
+// Input: organizationApiRemoveMemberInputSchema, ../contract/src/organization.responses.ts:456
 interface Input {
   organizationId: string;
   userId: string;
   giveSeatToUserId?: string | null;
 }
-// Output: organizationMemberRemovedSchema, ../contract/src/organization.responses.ts:471
+// Output: organizationMemberRemovedSchema, ../contract/src/organization.responses.ts:473
 interface Output {
   success: true;
   seatGivenToUserId: string | null;
@@ -2147,7 +2147,7 @@ interface Input {
   userId: string;
   organizationId: string;
 }
-// Output: organizationSeatRemovalPreviewSchema, ../contract/src/organization.responses.ts:494
+// Output: organizationSeatRemovalPreviewSchema, ../contract/src/organization.responses.ts:496
 interface Output {
   holdsFullSeat: boolean;
   seatFreesAt: unknown | null;
@@ -2160,7 +2160,7 @@ interface Output {
 
 // organization.listHeldSeats
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: organizationHeldSeatsSchema, ../contract/src/organization.responses.ts:517
+// Output: organizationHeldSeatsSchema, ../contract/src/organization.responses.ts:519
 interface Output {
   heldSeats: {
     userId: string;
@@ -2219,11 +2219,11 @@ interface Input {
   organizationId: string;
   includeDeactivated?: boolean;
 }
-type Output = z.infer<typeof organizationMemberDirectorySchema>; // ../contract/src/organization.responses.ts:309
+type Output = z.infer<typeof organizationMemberDirectorySchema>; // ../contract/src/organization.responses.ts:311
 
 // organization.getDirectoryCounts
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: organizationDirectoryCountsSchema, ../contract/src/organization.responses.ts:326
+// Output: organizationDirectoryCountsSchema, ../contract/src/organization.responses.ts:328
 interface Output {
   members: number;
   openInvites: number;
@@ -2234,11 +2234,11 @@ interface Output {
 
 // organization.getMemberById
 type Input = z.infer<typeof organizationApiMemberScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:37
-type Output = z.infer<typeof organizationMemberRecordSchema>; // ../contract/src/organization.responses.ts:272
+type Output = z.infer<typeof organizationMemberRecordSchema>; // ../contract/src/organization.responses.ts:274
 
 // organization.getInvitedMemberIds
 type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:15
-// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:429
+// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:431
 interface Output {
   memberUserIds: string[];
   invitedUserIds: string[];
@@ -2277,7 +2277,7 @@ interface Input {
     customRoleId?: string;
   }[];
 }
-// Output: organizationMemberRoleChangedSchema, ../contract/src/organization.responses.ts:340
+// Output: organizationMemberRoleChangedSchema, ../contract/src/organization.responses.ts:342
 interface Output {
   success: true;
   teamsLeftWithoutAdmin: {
@@ -2316,7 +2316,7 @@ interface Input {
   targetKind?: string;
   targetId?: string;
 }
-type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:392
+type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:394
 ```
 
 ### `personalWorkspaceFeatures`

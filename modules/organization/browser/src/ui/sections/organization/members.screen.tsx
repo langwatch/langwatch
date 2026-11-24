@@ -469,7 +469,7 @@ function MemberListRow({
       onOpen={onOpen}
       badges={
         <>
-          {member.role === "EXTERNAL" && (
+          {member.role === "EXTERNAL" && !member.billingOnly && (
             <Badge colorPalette="gray" size="sm">
               Lite Member
             </Badge>

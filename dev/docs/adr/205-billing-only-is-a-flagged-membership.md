@@ -37,12 +37,15 @@ We will:
 2. Classify an `EXTERNAL` holder with `billingOnly` as `BillingOnly`, a member type no pool
    counts or caps. The invite cap check skips it on every plan, Free included.
 3. On acceptance, copy the flag to the membership and grant Billing through `AuthzApi.setBillingRole`
-   (source `invite`), idempotent on the invite id. If the grant fails after the membership
-   commits, the person who accepted clicks Join again on the same link: the invitation door
-   re-applies the grants for its acceptor before it answers `invite_already_accepted`.
+   (source `invite`), idempotent on the invite id. A spent invitation never writes again, since
+   an admin may have changed its grants since: if the Billing grant fails after the membership
+   commits, an admin turns Billing on in the member's drawer.
 4. Refuse a team for a Billing-only invite. Any role change clears the flag, so the new role is
    metered as usual.
-5. Offer Billing only on the invite procedure, as `billingOnly: true` on one invite. The invite always names a person by address; there is no group or key form.
+5. Refuse every new binding for a Billing-only member in the authz grant writer, system writes
+   included (`billing_only_no_team_access`), and create no personal workspace or project for them.
+   To give one access, an admin first moves them to a seat role.
+6. Offer Billing only on the invite procedure, as `billingOnly: true` on one invite. The invite always names a person by address; there is no group or key form.
 
 ## Rationale / Trade-offs
 
@@ -52,6 +55,11 @@ rollback would crash the previous release on the first `BILLING` row it reads. T
 enum, so the previous release reads a Billing-only member as a Lite member with no team: it may
 count one Lite seat too many during a rollback, and it grants nothing extra, because the member
 has no team binding and Billing confers only its own bag.
+
+During a rolling deploy a pod on the previous release may accept a Billing-only invite. It does not
+know the flag, so it creates a plain Lite membership with no team and no Billing grant: the person
+holds a Lite seat and cannot pay. An admin fixes it by turning Billing on in the member's drawer
+and, if wanted, inviting them again as Billing only after removing them.
 
 The cost of the flag is that every counter must pass it to the classifier. A counter that forgets
 it counts the person as Lite, which refuses a seat rather than granting access. The counters are

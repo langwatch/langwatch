@@ -11,14 +11,24 @@ import { withSeatHolds } from "./support/seat-holds.ts";
 
 const MEMBER = { organizationId: "org-1", userId: "user-2" };
 
-function seatHoldsWhere({ customRolePermissions }: { customRolePermissions: unknown[] }) {
+function seatHoldsWhere({
+  customRolePermissions,
+  builtInTeamRole = false,
+}: {
+  customRolePermissions: unknown[];
+  builtInTeamRole?: boolean;
+}) {
   return withSeatHolds({
     repository: createApiFixture<OrganizationMembershipRepository>({
       findSharedTeamIds: async () => ["team-1"],
-      findTeamGrants: async () =>
-        customRolePermissions.length > 0
+      findTeamGrants: async () => [
+        ...(customRolePermissions.length > 0
           ? [{ scopeId: "team-1", role: TeamUserRole.CUSTOM, customRoleId: "role-1" }]
-          : [],
+          : []),
+        ...(builtInTeamRole
+          ? [{ scopeId: "team-1", role: TeamUserRole.VIEWER, customRoleId: null }]
+          : []),
+      ],
       findCustomRolePermissions: async () => customRolePermissions,
     }),
   }).seatHolds;
@@ -44,6 +54,17 @@ describe("SeatHoldService.memberTypeOf", () => {
       }).memberTypeOf({ ...MEMBER, standing: { role: "EXTERNAL", billingOnly: true } });
 
       expect(type).toBe("FullMember");
+    });
+  });
+
+  describe("given a Billing-only member that holds a built-in team role", () => {
+    it("meters the member as a Lite seat", async () => {
+      const type = await seatHoldsWhere({
+        customRolePermissions: [],
+        builtInTeamRole: true,
+      }).memberTypeOf({ ...MEMBER, standing: { role: "EXTERNAL", billingOnly: true } });
+
+      expect(type).toBe("LiteMember");
     });
   });
 });

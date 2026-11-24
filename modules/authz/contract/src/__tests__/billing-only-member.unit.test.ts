@@ -56,14 +56,12 @@ function allowed({
 describe("given a Billing-only member", () => {
   const grants = billingOnlyMember();
 
-  /** @scenario "A Billing-only member reaches billing and nothing else" */
   it("refuses traces, projects and organization management", () => {
     expect(allowed({ grants, permission: "traces:view", scope: projectScope })).toBe(false);
     expect(allowed({ grants, permission: "project:view", scope: projectScope })).toBe(false);
     expect(allowed({ grants, permission: "organization:manage" })).toBe(false);
   });
 
-  /** @scenario "A Billing-only member reaches billing and nothing else" */
   it("allows the subscription, seat requests and the member list", () => {
     expect(allowed({ grants, permission: "subscription:manage" })).toBe(true);
     expect(allowed({ grants, permission: "seatRequests:manage" })).toBe(true);

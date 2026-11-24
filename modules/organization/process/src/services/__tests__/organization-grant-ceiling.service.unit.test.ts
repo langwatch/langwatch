@@ -96,7 +96,6 @@ describe("given a Billing-only invite's grant", () => {
     billing: true,
   } as const;
 
-  /** @scenario "Billing only is not granted through a group or an API key" */
   it("asks for the Billing bag at the organization, for the person sending it", async () => {
     const { service, findPermissionsBeyondCaller } = ceiling();
 
