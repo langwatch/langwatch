@@ -152,6 +152,35 @@ const ROWS: LangWatchQLDataset = [
 
 const withChakra = (element: ReactElement) => renderWithDesignSystem(element);
 
+/** A chart that reports its failures to `analytics`, as a placed widget does. */
+const reportingChart = ({
+  analytics,
+  spec = barOverQueryResult,
+}: {
+  analytics: RecordingUiAnalytics;
+  spec?: unknown;
+}) => (
+  <UiHostServicesContextProvider
+    value={{
+      ...createUiHostServicesFromHost({
+        route: () => ({ params: {}, query: {} }),
+        navigate: () => void 0,
+      }),
+      analytics,
+    }}
+  >
+    <LangWatchQLVegaLiteChart
+      spec={spec}
+      datasets={{ query_result: ROWS }}
+      columnsByDataset={{ query_result: COLUMNS }}
+      themeConfig={THEME_CONFIGS.light}
+      pinnedConfig={PINNED_CONFIG}
+      colorMode="light"
+      crashContext={{ dashboardId: "board-1", widgetId: "widget-1" }}
+    />
+  </UiHostServicesContextProvider>
+);
+
 const chart = ({
   spec = barOverQueryResult as unknown,
   rows = ROWS,
@@ -578,27 +607,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       const failure = new Error("Unrecognized signal name: bogus");
       vega.state.failWith = failure;
       const analytics = new RecordingUiAnalytics();
-      withChakra(
-        <UiHostServicesContextProvider
-          value={{
-            ...createUiHostServicesFromHost({
-              route: () => ({ params: {}, query: {} }),
-              navigate: () => void 0,
-            }),
-            analytics,
-          }}
-        >
-          <LangWatchQLVegaLiteChart
-            spec={barOverQueryResult}
-            datasets={{ query_result: ROWS }}
-            columnsByDataset={{ query_result: COLUMNS }}
-            themeConfig={THEME_CONFIGS.light}
-            pinnedConfig={PINNED_CONFIG}
-            colorMode="light"
-            crashContext={{ dashboardId: "board-1", widgetId: "widget-1" }}
-          />
-        </UiHostServicesContextProvider>,
-      );
+      withChakra(reportingChart({ analytics }));
 
       await screen.findByTestId("lwql-chart-failure");
       expect(analytics.exceptions).toEqual([
@@ -607,6 +616,39 @@ describe("the LangWatchQL Vega-Lite chart", () => {
           properties: { surface: "lwql_chart_embed", dashboardId: "board-1", widgetId: "widget-1" },
         },
       ]);
+    });
+
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports the same failure once even when the chart embeds and fails again", async () => {
+      vega.state.failWith = new Error("Unrecognized signal name: bogus");
+      const analytics = new RecordingUiAnalytics();
+      const { rerender } = withChakra(reportingChart({ analytics }));
+      await screen.findByTestId("lwql-chart-failure");
+
+      rerender(
+        reportingChart({
+          analytics,
+          spec: { ...(barOverQueryResult as object), height: 240 },
+        }),
+      );
+
+      await waitFor(() => expect(vega.state.calls).toHaveLength(2));
+      await screen.findByTestId("lwql-chart-failure");
+      expect(analytics.exceptions).toHaveLength(1);
+    });
+
+    /** @scenario "No renderer path performs network or file loading" */
+    it("does not report a refused resource load as an exception", async () => {
+      vega.state.failWith = new LangWatchQLVegaLoadBlockedError({
+        reference: "https://example.test/rows.json",
+        method: "http",
+      });
+      const analytics = new RecordingUiAnalytics();
+      withChakra(reportingChart({ analytics }));
+
+      await screen.findByTestId("lwql-chart-failure");
+      expect(failureCode()).toBe("loader-blocked");
+      expect(analytics.exceptions).toEqual([]);
     });
 
     /** @scenario "Chart failures are explicit and do not discard the table" */

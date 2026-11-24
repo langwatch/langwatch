@@ -201,7 +201,8 @@ describe("given a placed dashboard widget whose frame reports an error", () => {
       });
 
       expect(analytics.exceptions).toHaveLength(1);
-      expect(analytics.exceptions[0]?.error).toEqual(new Error("Render error: x is undefined"));
+      // Text only: an Error built here would carry this host's stack, not the widget's.
+      expect(analytics.exceptions[0]?.error).toBe("Render error: x is undefined");
       expect(analytics.exceptions[0]?.properties).toEqual({
         surface: "dashboard_widget_frame",
         widgetId: "graph_1",

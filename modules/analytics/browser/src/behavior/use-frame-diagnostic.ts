@@ -71,8 +71,9 @@ export function useFrameDiagnostic({
     const surface = reportedSurface(entry);
     if (surface === undefined || reported.current.has(entry.text)) return;
     reported.current.add(entry.text);
+    // A string, not an Error: the host's stack would point at this file, not the widget.
     reporting.current.analytics.captureException({
-      error: new Error(entry.text),
+      error: entry.text,
       properties: { surface, ...reporting.current.crashContext },
     });
   }, []);
