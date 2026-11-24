@@ -141,7 +141,7 @@ export class DatasetChunkMaintenanceService {
       assertColumnEditAllowed({ current, oldColumnTypes });
 
       const { ids, entries } = await this.readAllRows({
-        dataset,
+        dataset: current,
         projectId,
         chunkCount: current.chunkCount ?? 0,
         storage: datasetStorage,

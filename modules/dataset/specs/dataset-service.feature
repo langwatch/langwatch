@@ -273,6 +273,12 @@ Feature: Shared Dataset service
     Then no more than one chunk is fetched ahead of the one being read
 
   @unit
+  Scenario: A column edit sizes its read ahead from the dataset as it stands under the lock
+    Given a column edit started from a dataset record whose chunks have since grown to the size limit
+    When the edit reads every row under the dataset lock
+    Then it reads ahead by the sizes recorded under the lock, one full-size chunk at a time
+
+  @unit
   Scenario: A read that stops early or meets a failed chunk leaves no unhandled failure
     Given a ready dataset whose later chunk fails to read
     When a reader stops before that chunk, or reads up to it
