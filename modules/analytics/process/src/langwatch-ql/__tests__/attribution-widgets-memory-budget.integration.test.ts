@@ -68,18 +68,28 @@ const MEMORY_LIMIT_EXCEEDED = 241;
 
 const SHIPPED = DEFAULT_LWQL_RESOURCE_LIMITS;
 /** A shipped byte budget, kept in its shipped proportion to the memory cap. */
-const scaledToCap = (bytes: number) =>
-  Math.floor((bytes * ATTRIBUTION_MEMORY_CAP_BYTES) / SHIPPED.maxMemoryUsageBytes);
+const scaledToCap = (bytes: number, cap = ATTRIBUTION_MEMORY_CAP_BYTES) =>
+  Math.floor((bytes * cap) / SHIPPED.maxMemoryUsageBytes);
 
-/** Production's ceilings at C on four threads, its spill and join budgets scaled with it. */
-const LIMITS: LangWatchQLResourceLimits = {
+/** Production's ceilings at `cap` on four threads, its spill and join budgets scaled with it. */
+const limitsAt = (cap: number): LangWatchQLResourceLimits => ({
   ...SHIPPED,
-  maxMemoryUsageBytes: ATTRIBUTION_MEMORY_CAP_BYTES,
+  maxMemoryUsageBytes: cap,
   maxThreads: 4,
-  maxBytesBeforeExternalGroupBy: scaledToCap(SHIPPED.maxBytesBeforeExternalGroupBy),
-  maxBytesBeforeExternalSort: scaledToCap(SHIPPED.maxBytesBeforeExternalSort),
-  maxBytesInJoin: scaledToCap(SHIPPED.maxBytesInJoin),
-};
+  maxBytesBeforeExternalGroupBy: scaledToCap(SHIPPED.maxBytesBeforeExternalGroupBy, cap),
+  maxBytesBeforeExternalSort: scaledToCap(SHIPPED.maxBytesBeforeExternalSort, cap),
+  maxBytesInJoin: scaledToCap(SHIPPED.maxBytesInJoin, cap),
+});
+
+/** Production's ceilings at C, the cap every describe but units runs under. */
+const LIMITS = limitsAt(ATTRIBUTION_MEMORY_CAP_BYTES);
+/**
+ * A raised test cap for units alone. Its evaluations read sets the floor, so units stays over the
+ * 192 MiB cap in both forms on this seed; at this cap its runs finish and their peaks are real.
+ * Production's cap is unchanged.
+ */
+const UNITS_MEASURE_CAP_BYTES = 1024 * 2 ** 20;
+const UNITS_LIMITS = limitsAt(UNITS_MEASURE_CAP_BYTES);
 
 type SweepCase = { label: QueryLabel; form: Form; tenant: TenantSeed };
 type SweepRow = SweepCase & { runs: readonly Run[] };
@@ -120,6 +130,8 @@ describe("given three tenants' attribution traces, read over a 60-day period and
   let seedSeconds = Number.NaN;
   const measurer = createMeasurer({ harness: () => harness, executor: () => executor });
   const { measurements } = measurer;
+  /** A separate cache, so units' raised-cap runs never mix with the 192 MiB ones. */
+  const unitsMeasurer = createMeasurer({ harness: () => harness, executor: () => executor });
 
   const measured = ({
     form,
@@ -154,19 +166,33 @@ describe("given three tenants' attribution traces, read over a 60-day period and
 
   afterAll(async () => {
     const rows: Record<string, unknown>[] = [];
-    for (const [key, pending] of measurements) {
-      const { form, label, tenant } = JSON.parse(key) as {
-        form: Form;
-        label: QueryLabel;
-        tenant: TenantName;
-      };
-      const runs = await pending.catch(() => []);
-      const sql = sqlOf({ form, label });
-      const database = harness.names.database;
-      const floored = floorLangWatchQLDedup({ sql, database, views: VIEWS }) !== sql;
-      for (const [n, run] of runs.entries()) {
-        const peakMiB = mib(run.peakBytes);
-        rows.push({ form, label, tenant, run: n + 1, floored, peakMiB, ...run });
+    for (const [capBytes, cached] of [
+      [ATTRIBUTION_MEMORY_CAP_BYTES, measurements],
+      [UNITS_MEASURE_CAP_BYTES, unitsMeasurer.measurements],
+    ] as const) {
+      for (const [key, pending] of cached) {
+        const { form, label, tenant } = JSON.parse(key) as {
+          form: Form;
+          label: QueryLabel;
+          tenant: TenantName;
+        };
+        const runs = await pending.catch(() => []);
+        const sql = sqlOf({ form, label });
+        const database = harness.names.database;
+        const floored = floorLangWatchQLDedup({ sql, database, views: VIEWS }) !== sql;
+        for (const [n, run] of runs.entries()) {
+          const peakMiB = mib(run.peakBytes);
+          rows.push({
+            capMiB: mib(capBytes),
+            form,
+            label,
+            tenant,
+            run: n + 1,
+            floored,
+            peakMiB,
+            ...run,
+          });
+        }
       }
     }
     console.table(rows);
@@ -243,23 +269,52 @@ describe("given three tenants' attribution traces, read over a 60-day period and
   });
 
   /**
-   * units stays over the memory cap in both forms on this seed because the evaluations read sets
-   * the floor (shared with att-table/passRates), so these cases pin history growth by rows read,
-   * not peak memory.
+   * units runs under UNITS_LIMITS, a raised test cap, so its runs finish; production's cap is
+   * unchanged. Tests run in order, so beforeAll's cap holds for all; afterAll restores LIMITS.
+   * On LARGE the catalogue reads fewer rows than main, peaking at most a tenth above it.
    */
-  describe("when the catalogue's att-change/units is measured by rows read on each tenant", () => {
+  describe("when the catalogue's att-change/units is measured under the raised test cap", () => {
     const label = "att-change/units";
+    const unitsMeasured = ({ form, tenant }: { form: Form; tenant: TenantSeed }) =>
+      unitsMeasurer.measured({ form, label, tenant, runs: RUNS });
+
+    /** The restricted identity's own cap, read as it: the raised one, or the test fails. */
+    const expectRaisedCap = async () => {
+      const result = await executor.execute({
+        sql: "SELECT toString(getSetting('max_memory_usage')) AS cap",
+        tenantCapability: TENANTS.LARGE.keyHash,
+        projectIds: [TENANTS.LARGE.tenantId],
+      });
+      expect(result.rows).toEqual([{ cap: String(UNITS_MEASURE_CAP_BYTES) }]);
+    };
+
+    beforeAll(async () => {
+      await harness.applyAccessModel({
+        views: VIEWS,
+        sourceDatabase: harness.factDatabase,
+        limits: UNITS_LIMITS,
+      });
+    }, 120_000);
+
+    afterAll(async () => {
+      await harness.applyAccessModel({
+        views: VIEWS,
+        sourceDatabase: harness.factDatabase,
+        limits: LIMITS,
+      });
+    }, 120_000);
 
     /** @scenario "att-change/units's memory no longer grows with the project's older history" */
     it(
-      "reads within a tenth of the rows of the tenant with no older history",
+      "peaks no more than a tenth above the tenant with no older history, median of three",
       async () => {
-        const large = await measured({ form: "catalogue", label, tenant: TENANTS.LARGE });
-        const bare = await measured({ form: "catalogue", label, tenant: TENANTS.BARE });
-        const largeMax = Math.max(...large.map((run) => run.rowsRead));
-        const bareMin = Math.min(...bare.map((run) => run.rowsRead));
-        const drift = (largeMax - bareMin) / bareMin;
-        expect(drift, `${described(large)} against ${described(bare)}`).toBeLessThanOrEqual(
+        await expectRaisedCap();
+        const large = await unitsMeasured({ form: "catalogue", tenant: TENANTS.LARGE });
+        const bare = await unitsMeasured({ form: "catalogue", tenant: TENANTS.BARE });
+        expectAnswered({ runs: large, context: `${label} on LARGE` });
+        expectAnswered({ runs: bare, context: `${label} on BARE` });
+        const growth = (median(large) - median(bare)) / median(bare);
+        expect(growth, `${described(large)} against ${described(bare)}`).toBeLessThanOrEqual(
           HISTORY_TOLERANCE,
         );
       },
@@ -267,16 +322,21 @@ describe("given three tenants' attribution traces, read over a 60-day period and
     );
 
     it(
-      "reads fewer rows than main's att-change/units on the tenant with older history",
+      "reads fewer rows than main's att-change/units and peaks no more than a tenth above it, on the tenant with older history",
       async () => {
-        const catalogue = await measured({ form: "catalogue", label, tenant: TENANTS.LARGE });
-        const main = await measured({ form: "main", label, tenant: TENANTS.LARGE });
-        const catalogueMax = Math.max(...catalogue.map((run) => run.rowsRead));
-        const mainMin = Math.min(...main.map((run) => run.rowsRead));
-        expect(
-          catalogueMax,
-          `${described(catalogue)} against main ${described(main)}`,
-        ).toBeLessThan(mainMin);
+        await expectRaisedCap();
+        const catalogue = await unitsMeasured({ form: "catalogue", tenant: TENANTS.LARGE });
+        const main = await unitsMeasured({ form: "main", tenant: TENANTS.LARGE });
+        expectAnswered({ runs: catalogue, context: `${label} on LARGE` });
+        expectAnswered({ runs: main, context: `main's ${label} on LARGE` });
+        console.log(`catalogue: ${described(catalogue)}`);
+        console.log(`main: ${described(main)}`);
+        const context = `${described(catalogue)} against main ${described(main)}`;
+        const catalogueMaxRows = Math.max(...catalogue.map((run) => run.rowsRead));
+        const mainMinRows = Math.min(...main.map((run) => run.rowsRead));
+        expect(catalogueMaxRows, context).toBeLessThan(mainMinRows);
+        const growth = (median(catalogue) - median(main)) / median(main);
+        expect(growth, context).toBeLessThanOrEqual(HISTORY_TOLERANCE);
       },
       CASE_TIMEOUT_MS,
     );

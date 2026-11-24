@@ -148,9 +148,11 @@ Feature: Stock trace widgets read the light trace table
     Scenario: att-change/units's memory no longer grows with the project's older history
       Given a large project with 300 days of older history and a large project with none
       And every trace judged twice, a tenth of them with an unmerged retraction pair
-      When att-change/units reads a 60-day period and the window before it, under the widget cap at compatibility 25.10
-      Then it reads within a tenth of the rows on the project with history as on the project without, measured by rows read
-      And it stays over the cap on both, because the evaluations read sets the floor (shared with att-table/passRates), so peak memory cannot show history growth
+      When att-change/units reads a 60-day period and the window before it, under a raised test cap at compatibility 25.10
+      Then it answers on both projects
+      And its median peak over three runs on the project with history is no more than 10% above the project without
+      And on the project with history it reads fewer rows than main and peaks no more than 10% above main's median
+      And its runs are measured with the raised test cap so they can finish, because the evaluations read sets the floor (shared with att-table/passRates) and keep it over the widget cap; production's cap is unchanged
 
     @integration
     Scenario: A trace folded before the column existed reads its version after the replay
