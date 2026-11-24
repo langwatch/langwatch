@@ -86,6 +86,22 @@ export class StoragePermissionDeniedError extends HandledError {
   }
 }
 
+/** Storage answered a server fault or asked to slow down: nothing was saved; a retry may work. */
+export class StorageUnavailableError extends HandledError {
+  declare readonly code: "storage_unavailable";
+
+  constructor({ operation, status, cause }: { operation: string; status: string; cause?: Error }) {
+    super("storage_unavailable", `Storage could not answer right now (${operation}: ${status})`, {
+      httpStatus: 503,
+      fault: "platform",
+      retryable: true,
+      ...remediation("storage_unavailable"),
+      ...(cause === undefined ? {} : { reasons: [cause] }),
+    });
+    this.name = "StorageUnavailableError";
+  }
+}
+
 /** A project whose organization this deployment cannot name. */
 export class UnknownStorageProjectError extends Error {
   constructor(readonly projectId: string) {

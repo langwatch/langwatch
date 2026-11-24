@@ -33,6 +33,7 @@ import {
   measureBody,
   secondsUntil,
   StoredObjectNotFoundError,
+  StorageUnavailableError,
   type ObjectBackend,
   uploadRouteOf,
 } from "./object-storage-backend.ts";
@@ -141,6 +142,24 @@ export async function bucketRegionOf({
   }
 }
 
+/**
+ * A server fault (5xx but 501, which no retry changes) or a throttle (429, SlowDown, the SDK's
+ * own throttling mark) is retryable; every other error is passed on as it was.
+ */
+function unavailable(error: unknown, operation: string): unknown {
+  if (!(error instanceof S3ServiceException)) return error;
+  const status = error.$metadata.httpStatusCode;
+  if (status === 501) return error;
+  const serverFault = (status !== undefined && status >= 500) || error.$fault === "server";
+  const throttled = status === 429 || error.name === "SlowDown" || !!error.$retryable?.throttling;
+  if (!serverFault && !throttled) return error;
+  return new StorageUnavailableError({
+    operation,
+    status: `${status ?? "no status"} ${error.name}`,
+    cause: error,
+  });
+}
+
 function isMissing(error: unknown): boolean {
   if (!(error instanceof S3ServiceException)) return false;
   const missingName = error.name === "NoSuchKey" || error.name === "NotFound";
@@ -169,7 +188,7 @@ async function writeObject(options: {
       { requestTimeout: 0 },
     );
   } catch (error) {
-    throw measured.failure() ?? error;
+    throw measured.failure() ?? unavailable(error, "write");
   }
   return measured.digest();
 }
@@ -202,7 +221,7 @@ async function readObject(place: S3Place, at: StoredObjectAddress): Promise<Read
     throw new Error(`S3 answered "${at.key}" without a readable body.`);
   } catch (error) {
     if (isMissing(error)) throw new StoredObjectNotFoundError(at.projectId, at.key);
-    throw error;
+    throw unavailable(error, "read");
   }
 }
 
@@ -212,7 +231,7 @@ async function objectExists(place: S3Place, at: StoredObjectAddress): Promise<bo
     return true;
   } catch (error) {
     if (isMissing(error)) return false;
-    throw error;
+    throw unavailable(error, "existence check");
   }
 }
 
@@ -232,7 +251,7 @@ async function heldDigest(
     return { byteLength, sha256: Buffer.from(checksum, "base64").toString("hex") };
   } catch (error) {
     if (isMissing(error)) throw new StoredObjectNotFoundError(at.projectId, at.key);
-    throw error;
+    throw unavailable(error, "digest");
   }
 }
 
@@ -287,7 +306,11 @@ export function s3Backend(options: {
     exists: (at) => objectExists(place, at),
     digest: async (at) => (await heldDigest(place, at)) ?? digestOf(await readObject(place, at)),
     async remove(at) {
-      await place.client.send(new DeleteObjectCommand({ Bucket: place.bucket, Key: at.key }));
+      await place.client
+        .send(new DeleteObjectCommand({ Bucket: place.bucket, Key: at.key }))
+        .catch((error: unknown) => {
+          throw unavailable(error, "delete");
+        });
     },
     signUpload: async (at, facts) =>
       uploadRoute === "through-process"
@@ -296,7 +319,9 @@ export function s3Backend(options: {
     uploadRoute,
     signDownload: (at, facts) => signObjectDownload({ ...place, clock: options.clock }, at, facts),
     async probe() {
-      await place.client.send(new HeadBucketCommand({ Bucket: place.bucket }));
+      await place.client.send(new HeadBucketCommand({ Bucket: place.bucket })).catch((error) => {
+        throw unavailable(error, "bucket probe");
+      });
     },
   };
 }

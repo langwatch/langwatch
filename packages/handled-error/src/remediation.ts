@@ -99,6 +99,13 @@ const registry = {
     docsPath: "/self-hosting/configuration/environment-variables",
   },
 
+  storage_unavailable: {
+    tips: [
+      "This is a temporary fault or throttle at the object store; retry in a few seconds",
+      "If it persists, check the health and request limits of the S3 bucket or Azure storage account",
+    ],
+  },
+
   dataset_invalid_column: {
     tips: [
       "Add the column to the dataset, or remove it from the row, and send it again; retrying unchanged will fail identically",

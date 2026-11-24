@@ -859,6 +859,7 @@ export const APP_ERROR_CODES = [
   "storage_credentials_refused",
   "storage_not_writable",
   "storage_permission_denied",
+  "storage_unavailable",
   "stored_object_files_rate_limited",
   "stored_object_write_conflict",
   "subscription_already_active",

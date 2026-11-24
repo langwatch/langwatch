@@ -173,3 +173,11 @@ Feature: The object-storage member
     When a module reads or checks an object
     Then the refusal carries the code "storage_permission_denied", a platform fault
     And its remediation names the "Storage Blob Data Contributor" role to grant
+
+  @unit @regression
+  Scenario: A store that answers 5xx is a retryable storage_unavailable refusal
+    Given object storage on S3 or Azure Blob that answers a server fault, 503 SlowDown or ServerBusy, or 429
+    When a module writes, reads, checks, digests, removes or probes an object
+    Then the refusal carries the code "storage_unavailable", a platform fault
+    And it is retryable, answered with status 503
+    And a 404 still reads as absent and a 401 or 403 keeps its own refusal

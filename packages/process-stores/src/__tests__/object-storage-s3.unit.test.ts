@@ -343,3 +343,58 @@ describe("given object storage on S3", () => {
     });
   });
 });
+
+describe("given object storage on S3 that answers a server fault or a throttle", () => {
+  function failing(answer: { name: string; status: number; fault: "client" | "server" }) {
+    const { client } = scriptedClient(() =>
+      Promise.reject(
+        new S3ServiceException({
+          name: answer.name,
+          $fault: answer.fault,
+          $metadata: { httpStatusCode: answer.status },
+          message: answer.name,
+        }),
+      ),
+    );
+    return s3Backend({ client, bucket: "objects", clock });
+  }
+  const operations = (backend: ReturnType<typeof s3Backend>) => ({
+    write: () => backend.write(at, text("hello"), { byteLength: 5, contentType: "text/plain" }),
+    read: () => backend.read(at),
+    exists: () => backend.exists(at),
+    digest: () => backend.digest(at),
+    remove: () => backend.remove(at),
+  });
+  const answers = [
+    { name: "InternalError", status: 500, fault: "server" },
+    { name: "SlowDown", status: 503, fault: "server" },
+    { name: "TooManyRequests", status: 429, fault: "client" },
+  ] as const;
+
+  /** @scenario "A store that answers 5xx is a retryable storage_unavailable refusal" */
+  it("refuses every operation as storage_unavailable, retryable with status 503", async () => {
+    for (const answer of answers) {
+      for (const [name, operation] of Object.entries(operations(failing(answer)))) {
+        const refusal = await operation().then(
+          () => `${name} resolved`,
+          (error: unknown) => error,
+        );
+        expect(refusal, `${name} on ${answer.status}`).toMatchObject({
+          code: "storage_unavailable",
+          retryable: true,
+          httpStatus: 503,
+          fault: "platform",
+        });
+      }
+    }
+  });
+
+  it("keeps a client refusal as it was, not retryable", async () => {
+    const backend = failing({ name: "AccessDenied", status: 403, fault: "client" });
+
+    const refusal = await backend.read(at).catch((error: unknown) => error);
+
+    expect(refusal).toBeInstanceOf(S3ServiceException);
+    expect(refusal).not.toMatchObject({ code: "storage_unavailable" });
+  });
+});
