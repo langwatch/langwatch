@@ -12,6 +12,10 @@ import { useEffect, useMemo, useRef } from "react";
 
 import { api } from "../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import {
+  instantEvalCatchUpDelayMs,
+  isAwaitingInstantEvalEnd,
+} from "../../../model/instant-eval-end-catch-up.ts";
 import { dueInstantEvalRefetches } from "../../../model/instant-eval-refetch-pacing.ts";
 import { useInstantEvalRunStore } from "./instant-eval-run.store.ts";
 import { useInstantEvalRuns } from "./use-instant-eval-runs.ts";
@@ -58,7 +62,48 @@ export function useInstantEvalRunWatch(): void {
   useMarkRegisteredChipsTyped();
   useRefetchOnRunProgress(runs);
   useConfirmEndedRuns({ projectId, runs });
+  useCatchUpEndingRuns({ projectId, runs });
   useSettleQuietRuns();
+}
+
+/**
+ * A run with nothing left to judge, or one the reader stopped, is read again on a short backoff
+ * until it says it ended: its end's hint can land before its row says so, and nothing hints again.
+ */
+function useCatchUpEndingRuns({
+  projectId,
+  runs,
+}: {
+  projectId: string;
+  runs: Record<string, ExplorerInstantEvalProgress>;
+}): void {
+  const trpcUtils = api.useUtils();
+  const stoppedByUser = useInstantEvalRunStore((s) => s.stoppedByUser);
+  const awaiting = Object.values(runs)
+    .filter((run) => isAwaitingInstantEvalEnd({ run, isStopRequested: !!stoppedByUser[run.id] }))
+    .map((run) => run.id)
+    .toSorted()
+    .join(",");
+  useEffect(() => {
+    if (!projectId || !awaiting) return;
+    const startedAt = nowInstant().epochMilliseconds;
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = () => {
+      const waitedMs = nowInstant().epochMilliseconds - startedAt;
+      const delay = instantEvalCatchUpDelayMs({ attempt, waitedMs });
+      if (delay === null) return;
+      timer = setTimeout(() => {
+        attempt += 1;
+        for (const runId of awaiting.split(",")) {
+          void trpcUtils.instantEval.get.invalidate({ projectId, runId });
+        }
+        schedule();
+      }, delay);
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, [projectId, awaiting, trpcUtils]);
 }
 
 /**
