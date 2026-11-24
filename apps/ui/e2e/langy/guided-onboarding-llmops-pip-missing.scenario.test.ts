@@ -111,7 +111,7 @@ describe("Langy installs the package when pip is not on PATH", () => {
           config: {
             name: "guided onboarding: the llmops path when pip is not on PATH",
             description:
-              'A developer of the ACME notes application (one OpenAI call behind a FastAPI endpoint, a requirements.txt manifest, no lock file, no virtual environment, no tracing and no tests) just signed up and picked Evals & LLM Ops. The folder is shared through the command line. The terminal\'s PATH has no `pip`: that spelling answers "pip: command not found" and exits 127, while `pip3` and `python3 -m pip` work. Langy must install the LangWatch package anyway, through the next spelling on the ladder.',
+              'A developer of the ACME notes application (one OpenAI call behind a FastAPI endpoint, a requirements.txt manifest, no lock file, no virtual environment, no tracing and no tests) just signed up and picked Evals & LLM Ops. The folder is shared through the command line. The terminal\'s PATH has no `pip`: `pip` and `pip3` answer "command not found" and exit 127, while `python3 -m pip` works. Langy must install the LangWatch package anyway, through the next spelling on the ladder.',
             agents: [
               langy,
               scenario.userSimulatorAgent({ model }),
@@ -120,7 +120,7 @@ describe("Langy installs the package when pip is not on PATH", () => {
                 criteria: [
                   "After a command answers that it is not found, Langy tries a different spelling of the same tool before it reports anything to the developer. Retrying the spelling that was not found, or stopping at it, fails this criterion.",
                   "Langy installs the LangWatch package into the project and says so. A reply that leaves the package uninstalled fails this criterion.",
-                  "Langy never tells the developer that the folder has no package manager, that Python is missing, or that they need to install a package manager themselves. Only the spelling `pip` was absent.",
+                  "Langy never tells the developer that the folder has no package manager, that Python is missing, or that they need to install a package manager themselves. Only the bare `pip` and `pip3` spellings were absent.",
                   "Langy does not ask the developer to run the install by hand while the folder is connected; it does the work itself.",
                   ...LANGY_GUIDED_PATH_CRITERIA,
                 ],
@@ -146,7 +146,7 @@ describe("Langy installs the package when pip is not on PATH", () => {
                   repo: folder,
                   label: "guided-pip-missing",
                   clearOpenRequests: false,
-                  shims: { pip: PIP_NOT_FOUND },
+                  shims: { pip: PIP_NOT_FOUND, pip3: PIP_NOT_FOUND },
                   pathDirs: [python.binDir],
                 });
                 await terminal.approve();
@@ -190,9 +190,7 @@ describe("Langy installs the package when pip is not on PATH", () => {
         console.log("[layer2] pip attempts:", pipAttempts.join(" | "));
         expect(pipAttempts.length).toBeLessThanOrEqual(1);
         expect(
-          commands.some((command) =>
-            /(pip3\s+install|python3?\s+-m\s+pip\s+install|uv\s+add)/.test(command),
-          ),
+          commands.some((command) => /(python3?\s+-m\s+pip\s+install|uv\s+add)/.test(command)),
         ).toBe(true);
 
         // Item 1 is done: the manifest names the package and the interpreter

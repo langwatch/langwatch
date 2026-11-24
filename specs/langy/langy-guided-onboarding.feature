@@ -716,7 +716,7 @@ Feature: Langy guides the first setup after sign-up
       And a folder where git could not be run keeps the unknown lines
 
     # A run ended on "this folder does not have the pip package manager
-    # available" after one `pip install` answered 127: pip3, python -m pip and
+    # available" after one `pip install` answered 127: python3 -m pip, python -m pip and
     # uv were never tried.
     # A film ran python3 -m pip first in a folder whose venv uv had made,
     # where pip is not installed, and reached uv add only on the second try.
@@ -731,7 +731,7 @@ Feature: Langy guides the first setup after sign-up
     @unit
     Scenario: A missing pip climbs the install ladder before it asks
       When the compiled guided-onboarding skill is read
-      Then the Python install is a ladder from uv to the folder's interpreter to pip, pip3, python3 -m pip and python -m pip
+      Then the Python install is a ladder from uv to .venv/bin/python -m pip, python3 -m pip and python -m pip
       And a command not found moves to the next rung without a retry
       And only when every rung is missing does the question offer "Install uv for me" or "I'll set up Python myself"
 
@@ -746,6 +746,7 @@ Feature: Langy guides the first setup after sign-up
       And a JavaScript install is checked with a require
       And uv run is the runner only in a uv project, and elsewhere Python runs through the interpreter the ladder worked with
       And pip install --upgrade never runs against an interpreter the SDK does not support
+      And the Python check of the install runs through the interpreter of the rung of the install ladder that worked
       And the tracing skill says the same
 
     @unit
@@ -926,7 +927,7 @@ Feature: Langy guides the first setup after sign-up
     @e2e
     Scenario: A command not found moves the install ladder to the next rung
       Given a shared folder whose manifest is requirements.txt, with no lock file and no virtual environment
-      And a terminal whose PATH has no pip, while pip3 and python3 -m pip work
+      And a terminal whose PATH has no pip and no pip3, while python3 -m pip works
       When Langy runs the llmops path
       Then Langy tries pip at most once and installs through the next spelling on the ladder
       And the manifest names langwatch and the interpreter can import it

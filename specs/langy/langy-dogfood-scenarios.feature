@@ -206,7 +206,6 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And the key is checked visible to the process the way the project reads it, without printing it
     And the given command is the first and only check, copied as written for the project's runner, with no probe before it
     And the one change the check takes is the project's own loader, or none when the environment comes from the shell
-    And the Python check of the install runs through the interpreter of the rung of the install ladder that worked
 
   # A filmed run put the LangChain callback on the model call inside one graph
   # node. The trace then held llm spans only: the tool nodes and the plain

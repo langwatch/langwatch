@@ -65,16 +65,6 @@ describe("given the tracing skill", () => {
       );
     });
 
-    /** @scenario "LangWatch initialises after the project's environment is loaded" */
-    it("runs the install check through the interpreter of the rung that worked", () => {
-      const rendered = tracingSkill();
-      expect(rendered).toContain("through the interpreter of the rung that worked");
-      expect(rendered).toContain("`.venv/bin/python -c` after `.venv/bin/python -m pip`");
-      expect(rendered).toContain("`python3 -c` after `python3 -m pip`");
-      expect(rendered).toContain("`<interpreter> -m pip show langwatch`");
-      expect(rendered).not.toContain("`uv pip show langwatch` after `uv add`");
-    });
-
     /** @scenario "A LangGraph callback is attached at the graph, not inside a node" */
     it("puts the LangChain callback in the config of the graph invocation", () => {
       const rendered = tracingSkill();
