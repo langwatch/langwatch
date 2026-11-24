@@ -130,6 +130,24 @@ describe("<SignInError/>", () => {
   });
 });
 
+describe("given a link from Settings refused because another user holds the provider account", () => {
+  /** @scenario "Linking a provider account that belongs to another LangWatch account says so and sends me back to Security" */
+  it("says to disconnect it from the other account and goes back to Security", () => {
+    renderError("account_already_linked_to_different_user");
+
+    expect(screen.getByText("Already connected to another account")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "The account you picked is already connected to a different LangWatch account. Sign in to that LangWatch account and disconnect it in Settings > Security, or connect a different account here.",
+      ),
+    ).toBeTruthy();
+    const back = screen.getByRole("link", { name: "Back to Settings" });
+    expect(back.getAttribute("href")).toBe("/settings/security");
+    expect(screen.queryByText("Account already exists")).toBeNull();
+    expect(screen.queryByRole("link", { name: /sign out/i })).toBeNull();
+  });
+});
+
 describe("given the user is on the 'account already exists' sign-in error page", () => {
   /** @scenario "The error page does not auto-redirect back to the identity provider" */
   /** @scenario A blocked returning user is not trapped bouncing between the app and the IdP */
