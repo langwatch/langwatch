@@ -44,6 +44,10 @@ Organizations without a paid plan have a **$1 free budget** for Instant Evals in
 
 Every judged query and run is one spend event on the [billing events](/ai-gateway/billing-events) ledger, so a [gateway budget](/ai-gateway/budgets) set on a project or an organization caps Instant Evals the same way it caps gateway traffic.
 
+## PII redaction model
+
+Strict PII redaction with the LangWatch PII Redaction Model is priced separately from events, at **$0.50 per 1M characters** sent to the model, excluding VAT. Spans, log records and metric points are all billed this way. There is no free monthly amount and no minimum per record, and a record the model does not answer is not charged. See [Strict with the LangWatch PII Redaction Model](/platform/data-privacy#strict-with-the-langwatch-pii-redaction-model) for what is billed and how to turn it on.
+
 ## Custom data retention
 
 Retention controls how long your events are kept before they're automatically removed. Every plan keeps events for 49 days by default. Paid plans change the window in **Settings → Data Retention**, per organization, team or project:

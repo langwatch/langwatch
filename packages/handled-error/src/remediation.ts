@@ -957,6 +957,15 @@ const registry = {
     docsPath: "/platform/model-providers",
   },
 
+  ai_content_filtered: {
+    tips: [
+      "The provider's own content filter refused the input; on Azure OpenAI the answer is 400 content_filter, often a jailbreak (Prompt Shields) match on instruction-like text",
+      "Relax or adjust the content filter on the deployment the feature's model points at, or try other text",
+      "Retrying the same text fails the same way",
+    ],
+    docsPath: "/platform/model-providers",
+  },
+
   model_provider_unavailable: {
     tips: [
       "meta.reason is not_configured when the project has no row for the provider, disabled when the row is switched off",

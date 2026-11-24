@@ -505,6 +505,34 @@ func TestApplyChange_CacheRuleMutationEvictsOrganization(t *testing.T) {
 	}
 }
 
+// Spec: specs/ai-gateway/a2a-proxy.feature
+//
+// @scenario "a change to an A2A target reaches the gateway on the change feed"
+func TestApplyChange_A2ATargetChangeEvictsOrganization(t *testing.T) {
+	resolver := &fakeResolver{}
+	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
+
+	for _, kind := range []string{
+		ChangeKindA2ATargetCreated,
+		ChangeKindA2ATargetUpdated,
+		ChangeKindA2ATargetDeleted,
+	} {
+		t.Run(kind, func(t *testing.T) {
+			matchingKey := hashKey(domain.PresentedKey{Token: "vk-lw-a2a-matching-" + kind})
+			otherKey := hashKey(domain.PresentedKey{Token: "vk-lw-a2a-other-" + kind})
+			seedL1(svc, matchingKey, &domain.Bundle{OrganizationID: "org-1"}, "")
+			seedL1(svc, otherKey, &domain.Bundle{OrganizationID: "org-2"}, "")
+
+			svc.applyChange("org-1", CacheChange{Kind: kind})
+
+			_, isMatchingPresent := svc.l1.Get(matchingKey)
+			_, isOtherPresent := svc.l1.Get(otherKey)
+			assert.False(t, isMatchingPresent, "an A2A target change must evict the polled organization")
+			assert.True(t, isOtherPresent, "other organizations must remain cached")
+		})
+	}
+}
+
 // --- Grace-window classification ---------------------------------------------
 
 /** @scenario "the grace window moves the hard cap, not the bundle's own expiry" */

@@ -77,6 +77,7 @@ export const reads = {
     "specs/webhooks/**/*",
     "plugins/langwatch/**/*",
     "modules/agent/contract/src/connected-agent.protocol.ts",
+    "infra/docker/Dockerfile.langyagent",
   ],
   "@langwatch/evaluation-process": ["charts/langwatch/**/*", "docs/self-hosting/**/*"],
   "@langwatch/auth-process": ["charts/langwatch/**/*", "docs/self-hosting/**/*"],
