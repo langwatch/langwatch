@@ -33,10 +33,6 @@ const email: TransactionalEmail = {
   subject: "You reached your plan's usage limit",
   body: "<p>Upgrade to keep tracing</p>",
   replyTo: "LangWatch Triggers <no-reply+tag@langwatch.test>",
-  headers: {
-    "List-Unsubscribe": "<https://app.langwatch.test/api/unsubscribe?token=t>",
-    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-  },
 };
 
 type Posted = { url: string; init: RequestInit };
@@ -95,10 +91,6 @@ describe("given the client on the default region", () => {
         subject: "You reached your plan's usage limit",
         body: "<p>Upgrade to keep tracing</p>",
         reply_to: "LangWatch Triggers <no-reply+tag@langwatch.test>",
-        headers: {
-          "List-Unsubscribe": "<https://app.langwatch.test/api/unsubscribe?token=t>",
-          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        },
         send_to_unsubscribed: true,
         tracked: false,
       });

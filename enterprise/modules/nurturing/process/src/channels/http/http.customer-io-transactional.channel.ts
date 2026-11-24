@@ -104,7 +104,6 @@ function payloadOf(email: CustomerIoTransactionalRequest) {
     subject: literalUnderLiquid(email.subject),
     body: literalUnderLiquid(email.body),
     ...(email.replyTo && { reply_to: email.replyTo }),
-    ...(email.headers && { headers: email.headers }),
     send_to_unsubscribed: true,
     tracked: false,
   };

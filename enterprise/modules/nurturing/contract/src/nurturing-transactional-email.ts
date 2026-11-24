@@ -20,7 +20,6 @@ const transactionalEmailSchemaDefinition = z
     /** The rendered HTML; it replaces whatever body the message holds in Customer.io. */
     body: z.string(),
     replyTo: z.string().min(1).optional(),
-    headers: z.record(z.string(), z.string()).optional(),
   })
   .strict();
 export interface TransactionalEmailSchema extends Named<
