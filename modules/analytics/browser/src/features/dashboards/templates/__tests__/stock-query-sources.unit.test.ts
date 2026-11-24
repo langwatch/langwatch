@@ -154,6 +154,15 @@ describe("given a query over a view that keeps an origin", () => {
     );
   });
 
+  it("refuses a direct join of a trace view in a select that reads the parameter itself", () => {
+    expect(() =>
+      readSources(
+        "SELECT t FROM trace_metrics JOIN spans ON a = b " +
+          `GROUP BY t HAVING countIf(Source NOT IN ${SOURCES}) = 0`,
+      ),
+    ).toThrow("joins spans directly");
+  });
+
   it("keeps a select to the sources when only a select nested in it reads the parameter", () => {
     const sql = readSources(
       `SELECT n FROM trace_metrics WHERE a IN (SELECT a FROM numbers WHERE has(${SOURCES}, a))`,

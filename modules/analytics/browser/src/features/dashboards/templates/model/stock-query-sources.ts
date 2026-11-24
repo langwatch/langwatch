@@ -236,9 +236,11 @@ export function readSources(sql: string): string {
 
   code.forEach((token, position) => {
     const view = token.toUpperCase() === "FROM" ? referenceAt({ code, position, ctes }) : undefined;
-    if (!view || keepsSourcesItself({ code, from: position + 1 })) return;
-    const predicate = sourcesPredicate({ ...view, bound });
+    if (!view) return;
+    // The region is read first so a direct join is refused even in a select that keeps itself.
     const { where, end } = regionOf({ code, from: position + 2 });
+    if (keepsSourcesItself({ code, from: position + 1 })) return;
+    const predicate = sourcesPredicate({ ...view, bound });
     const last = at[end - 1] ?? at[position] ?? 0;
 
     if (where === undefined) insertions.push({ after: last, text: ` WHERE ${predicate}` });

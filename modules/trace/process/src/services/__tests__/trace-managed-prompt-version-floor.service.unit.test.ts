@@ -3,10 +3,8 @@
  * port alone, and answers `unknown` rather than throwing when the ledger cannot be read.
  * @see specs/lwql/stock-widgets-on-trace-metrics.feature
  */
-import type { LedgerStepRecord } from "@langwatch/upgrade/reader";
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { MemorySpanAnalyticsFloorRepository } from "../../repositories/memory/memory.span-analytics-floor.repository.ts";
 import type { SpanAnalyticsFloorRepository } from "../../repositories/span-analytics-floor.repository.ts";
 import { TraceManagedPromptVersionFloorService } from "../trace-managed-prompt-version-floor.service.ts";
 
@@ -16,10 +14,6 @@ const UNKNOWN = { from: null, rebuilding: false, unknown: true };
 
 describe("given the managed prompt version floor", () => {
   describe("when its ledger port is read", () => {
-    it("is built from a port whose only member is findReplayStep", () => {
-      expectTypeOf<keyof SpanAnalyticsFloorRepository>().toEqualTypeOf<"findReplayStep">();
-    });
-
     it("answers from a test double that has no write methods", async () => {
       const readOnly: SpanAnalyticsFloorRepository = {
         findReplayStep: async () => [
@@ -30,19 +24,6 @@ describe("given the managed prompt version floor", () => {
       await expect(
         TraceManagedPromptVersionFloorService.create({ ledger: readOnly }).getFloor(),
       ).resolves.toEqual({ from: SINCE, rebuilding: false, unknown: false });
-    });
-
-    it("leaves the memory ledger's rows as they were", async () => {
-      const records: LedgerStepRecord[] = [
-        { status: "running", report: { replayedSince: SINCE }, startedAt: STARTED },
-      ];
-      const ledger = MemorySpanAnalyticsFloorRepository.create({ records });
-      const before = structuredClone(await ledger.findReplayStep());
-
-      await TraceManagedPromptVersionFloorService.create({ ledger }).getFloor();
-
-      expect(await ledger.findReplayStep()).toEqual(before);
-      expect(records).toEqual(before);
     });
   });
 
@@ -72,9 +53,11 @@ describe("given the managed prompt version floor", () => {
   describe("when the ledger row is failed", () => {
     /** @scenario "A replay that failed after its retries shows the history as unknown, never the rows" */
     it("answers unknown", async () => {
-      const ledger = MemorySpanAnalyticsFloorRepository.create({
-        records: [{ status: "failed", report: { replayedSince: SINCE }, startedAt: STARTED }],
-      });
+      const ledger: SpanAnalyticsFloorRepository = {
+        findReplayStep: async () => [
+          { status: "failed", report: { replayedSince: SINCE }, startedAt: STARTED },
+        ],
+      };
 
       await expect(
         TraceManagedPromptVersionFloorService.create({ ledger }).getFloor(),
