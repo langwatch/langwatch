@@ -247,9 +247,10 @@ export function modeForSourceType({ sourceType }: { sourceType: SourceType }): S
   return SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType)?.mode ?? "pull";
 }
 
-export function needsIngestSecret({ sourceType }: { sourceType: SourceType }): boolean {
+/** A type outside the catalogue (Security Lake reads its own queue) has no ingest secret. */
+export function needsIngestSecret({ sourceType }: { sourceType: string }): boolean {
   const opt = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType);
-  if (!opt) return true;
+  if (!opt) return false;
   return opt.mode === "push" || sourceType === "s3_custom";
 }
 

@@ -9,14 +9,18 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/egress"
@@ -66,11 +70,6 @@ const CallerAgentHeader = "X-LangWatch-Agent-Name"
 // caller's Authorization (its virtual key) is never one of them.
 var forwardedHeaders = []string{"Content-Type", "Accept", "A2A-Version", "A2A-Extensions", "X-A2A-Extensions"}
 
-// Registry finds the target a caller asked for within the caller's project.
-type Registry interface {
-	Lookup(ctx context.Context, bundle *domain.Bundle, name string) (domain.A2ATarget, error)
-}
-
 // Config wires a Handler.
 type Config struct {
 	Registry Registry
@@ -89,11 +88,18 @@ type Config struct {
 	// card fetch, is not https.
 	RequireHTTPS bool
 	// PublicBaseURL is the gateway's public origin for Agent Card URLs.
-	// Empty uses the request's own scheme and Host.
+	// Empty refuses Agent Card calls: the request's Host is the caller's to set.
 	PublicBaseURL string
 	// Tracer records the hop: the customer trace bridge's tracer, so the span
 	// lands in the caller's project. Nil uses the global tracer provider.
 	Tracer trace.Tracer
+	// Logger records why a refusal caused by an error happened. Nil logs nothing.
+	Logger *zap.Logger
+	// RequestBodyTimeout bounds reading the caller's body. Zero is one minute.
+	RequestBodyTimeout time.Duration
+	// ReplyBodyTimeout bounds reading a reply that is not a stream, from its
+	// headers on. Zero is two minutes; a stream has no such bound.
+	ReplyBodyTimeout time.Duration
 }
 
 // Handler serves /a2a/{target}/...
@@ -113,6 +119,15 @@ func New(cfg Config) *Handler {
 	if cfg.Tracer == nil {
 		cfg.Tracer = otel.Tracer("github.com/langwatch/langwatch/services/aigateway/adapters/a2aproxy")
 	}
+	if cfg.Logger == nil {
+		cfg.Logger = zap.NewNop()
+	}
+	if cfg.RequestBodyTimeout <= 0 {
+		cfg.RequestBodyTimeout = time.Minute
+	}
+	if cfg.ReplyBodyTimeout <= 0 {
+		cfg.ReplyBodyTimeout = 2 * time.Minute
+	}
 	return &Handler{cfg: cfg}
 }
 
@@ -129,18 +144,27 @@ type call struct {
 	binding string
 	method  string
 	isCard  bool
-	id      json.RawMessage
-	body    []byte
+	// cardPath is the discovery path a card request named, v1.0 or v0.2.
+	cardPath string
+	id       json.RawMessage
+	body     []byte
 	// refusedReason is set once the call has been refused.
 	refusedReason string
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := &call{w: w, r: r, ctx: r.Context(), binding: bindingHTTPJSON, span: trace.SpanFromContext(context.Background())}
+	// The deadline stays when the body is not read whole, so the server's own
+	// read of what is left cannot wait on a stalled caller either.
+	rc := http.NewResponseController(w)
+	_ = rc.SetReadDeadline(time.Now().Add(h.cfg.RequestBodyTimeout))
 	bad := parseRoute(c)
 	c.bundle = h.cfg.Bundle(c.ctx)
 	if c.bundle != nil {
 		if !h.inflight.acquire(c.bundle.VirtualKeyID) {
+			if c.binding == bindingJSONRPC {
+				c.id = peekRequestID(c.r.Body)
+			}
 			c.refuse(refuseBusy)
 			return
 		}
@@ -148,6 +172,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if bad == nil {
 		bad = parseBody(c)
+	}
+	if bad == nil {
+		_ = rc.SetReadDeadline(time.Time{})
 	}
 	if c.bundle == nil {
 		c.refuse(refuseUnauthenticated)
@@ -162,7 +189,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	target, ok := h.admit(c)
-	if !ok || !h.withinLimits(c) {
+	if !ok {
+		return
+	}
+	if servesCard(c) && h.cfg.PublicBaseURL == "" {
+		c.refuse(refusePublicURLUnset)
+		return
+	}
+	if !h.withinLimits(c) {
 		return
 	}
 	if c.isCard {
@@ -179,6 +213,9 @@ func parseBody(c *call) *refusal {
 	c.body = body
 	if tooLarge {
 		return &refuseTooLarge
+	}
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		return &refuseBodyTimeout
 	}
 	if err != nil {
 		return &refuseInvalidRequest
@@ -200,7 +237,10 @@ func parseRoute(c *call) *refusal {
 		return &refuseInvalidPath
 	}
 	c.isCard = (decoded == cardPath || decoded == legacyCardPath) && r.Method == http.MethodGet
-	method, known := restMethod(r.Method, decoded)
+	if c.isCard {
+		c.cardPath = decoded
+	}
+	method, known := restMethod(r.Method, decoded, rest)
 	c.method = method
 	if (decoded == "" || decoded == "/") && r.Method == http.MethodPost {
 		c.binding, known = bindingJSONRPC, true
@@ -291,6 +331,44 @@ func foldsToEnvelopeMember(name string) bool {
 		}
 	}
 	return false
+}
+
+// maxPeekIDBytes bounds how much of a refused body is read for its id, so a
+// key over its in-flight limit cannot hold memory with the refusals.
+const maxPeekIDBytes = 64 << 10
+
+// peekRequestID reads the JSON-RPC id from the start of a body, by the
+// envelope's own member rules, or nothing when the id does not come within
+// maxPeekIDBytes.
+func peekRequestID(r io.Reader) json.RawMessage {
+	if r == nil {
+		return nil
+	}
+	dec := json.NewDecoder(io.LimitReader(r, maxPeekIDBytes))
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return nil
+	}
+	members := map[string]json.RawMessage{}
+	for dec.More() && readMember(dec, members) {
+		if id, ok := members["id"]; ok {
+			return id
+		}
+	}
+	return nil
+}
+
+// errReplyStalled is a reply body that did not arrive within ReplyBodyTimeout.
+var errReplyStalled = errors.New("the A2A agent reply body did not arrive within the reply body timeout")
+
+// readReply reads a reply that is not a stream with readLimited. When the body
+// takes longer than ReplyBodyTimeout it calls cancel, which ends the upstream call.
+func (h *Handler) readReply(body io.Reader, cancel context.CancelFunc) ([]byte, bool, error) {
+	timer := time.AfterFunc(h.cfg.ReplyBodyTimeout, cancel)
+	raw, tooLarge, err := readLimited(body)
+	if !timer.Stop() && err != nil {
+		err = fmt.Errorf("%w: %w", errReplyStalled, err)
+	}
+	return raw, tooLarge, err
 }
 
 // readLimited reads at most maxBodyBytes. A body over the limit is reported,
@@ -399,14 +477,16 @@ func (h *Handler) forward(c *call, target domain.A2ATarget) {
 	if !h.scan(c, DirectionRequest, c.body) {
 		return
 	}
-	req, err := newUpstreamRequest(c, target)
+	ctx, cancel := context.WithCancel(c.ctx)
+	defer cancel()
+	req, err := newUpstreamRequest(ctx, c, target)
 	if err != nil {
 		c.refuse(refuseUpstream.withMessage("the A2A agent URL is invalid"))
 		return
 	}
 	resp, err := h.cfg.Client.Do(req)
 	if err != nil {
-		c.refuse(upstreamRefusal(err))
+		h.refuseUpstreamFailure(c, err)
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -415,47 +495,60 @@ func (h *Handler) forward(c *call, target domain.A2ATarget) {
 		h.stream(c, resp)
 		return
 	}
-	respBody, tooLarge, err := readLimited(resp.Body)
+	respBody, tooLarge, err := h.readReply(resp.Body, cancel)
 	if tooLarge {
 		c.refuse(refuseReplyTooLarge)
 		return
 	}
 	if err != nil {
-		c.refuse(refuseUpstream.withMessage("the A2A agent reply was cut off"))
+		h.refuseWithCause(c, refuseUpstream.withMessage("the A2A agent reply was cut off"), err)
 		return
 	}
 	setResultAttrs(c.span, respBody)
 	if !h.scan(c, DirectionResponse, respBody) {
 		return
 	}
-	if c.method == "GetExtendedAgentCard" || c.method == "agent/getAuthenticatedExtendedCard" {
-		respBody = rewriteReplyCard(respBody, target.UpstreamURL, proxyBase(h.cfg.PublicBaseURL, c.r, target.Name))
+	// Only a successful reply carries a card; any other is relayed as it came.
+	if isExtendedCardMethod(c.method) && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		respBody = rewriteReplyCard(respBody, target.UpstreamURL, proxyBase(h.cfg.PublicBaseURL, target.Name))
 	}
 	copyHeader(c.w.Header(), resp.Header)
 	c.w.WriteHeader(resp.StatusCode)
 	_, _ = c.w.Write(respBody)
 }
 
-// upstreamRefusal names why the upstream call failed when the cause is the
-// proxy's own egress policy.
-func upstreamRefusal(err error) refusal {
-	switch {
-	case errors.Is(err, errRedirectRefused):
-		return refuseUpstream.withMessage(errRedirectRefused.Error())
-	case errors.Is(err, egress.ErrBlocked):
-		return refuseUpstream.withMessage(errAddressBlocked.Error())
-	}
-	return refuseUpstream
+// isExtendedCardMethod reports whether a method asks for the extended Agent Card.
+func isExtendedCardMethod(method string) bool {
+	return method == "GetExtendedAgentCard" || method == "agent/getAuthenticatedExtendedCard"
 }
 
-func newUpstreamRequest(c *call, target domain.A2ATarget) (*http.Request, error) {
+// servesCard reports whether the call answers with an Agent Card.
+func servesCard(c *call) bool {
+	return c.isCard || isExtendedCardMethod(c.method)
+}
+
+// refuseUpstreamFailure refuses a call whose upstream request failed, naming the
+// cause to the caller only when it is the proxy's own egress policy.
+func (h *Handler) refuseUpstreamFailure(c *call, err error) {
+	r := refuseUpstream
+	switch {
+	case errors.Is(err, errRedirectRefused):
+		r = r.withMessage(errRedirectRefused.Error())
+	case errors.Is(err, egress.ErrBlocked):
+		r = r.withMessage(errAddressBlocked.Error())
+	}
+	h.refuseWithCause(c, r, err)
+}
+
+func newUpstreamRequest(ctx context.Context, c *call, target domain.A2ATarget) (*http.Request, error) {
 	upstreamURL := upstreamEndpoint(target.UpstreamURL, c.rest, c.r.URL.RawQuery)
-	req, err := http.NewRequestWithContext(c.ctx, c.r.Method, upstreamURL, bytes.NewReader(c.body))
+	req, err := http.NewRequestWithContext(ctx, c.r.Method, upstreamURL, bytes.NewReader(c.body))
 	if err != nil {
 		return nil, err
 	}
+	hopByHop := connectionFields(c.r.Header)
 	for _, name := range forwardedHeaders {
-		if v := c.r.Header.Get(name); v != "" {
+		if v := c.r.Header.Get(name); v != "" && !hopByHop[http.CanonicalHeaderKey(name)] {
 			req.Header.Set(name, v)
 		}
 	}
@@ -490,7 +583,7 @@ func (h *Handler) checkTexts(c *call, dir Direction, texts []string) *refusal {
 	}
 	verdict, err := h.cfg.Scanner.Scan(c.ctx, ScanInput{Bundle: c.bundle, Direction: dir, Texts: texts})
 	if err != nil {
-		return h.scanFailed(c, dir)
+		return h.scanFailed(c, dir, err)
 	}
 	if verdict.Action != domain.GuardrailBlock {
 		return nil
@@ -502,16 +595,30 @@ func (h *Handler) checkTexts(c *call, dir Direction, texts []string) *refusal {
 	return &r
 }
 
-// scanFailed applies the key's fail-open setting for that direction.
-func (h *Handler) scanFailed(c *call, dir Direction) *refusal {
-	failOpen := c.bundle.Config.Guardrails.RequestFailOpen
-	if dir == DirectionResponse {
+// scanFailed applies the key's fail-open setting for that direction. Stream
+// chunks always fail open, as on the LLM routes. The cause goes to the hop
+// span and the log either way, never to the caller.
+func (h *Handler) scanFailed(c *call, dir Direction, cause error) *refusal {
+	var failOpen bool
+	switch dir {
+	case DirectionRequest:
+		failOpen = c.bundle.Config.Guardrails.RequestFailOpen
+	case DirectionResponse:
 		failOpen = c.bundle.Config.Guardrails.ResponseFailOpen
+	case DirectionStreamChunk:
+		failOpen = true
 	}
 	if !failOpen {
+		h.recordCause(c, refuseScanUnavailable.reason, cause)
 		return &refuseScanUnavailable
 	}
+	h.cfg.Logger.Warn("a2a_scan_fail_open", zap.String("direction", string(dir)),
+		zap.String("a2a.target", c.name), zap.Error(cause))
 	c.span.SetAttributes(attribute.Bool("langwatch.a2a.scan.failed_open", true))
+	c.span.AddEvent("a2a_scan_fail_open", trace.WithAttributes(
+		attribute.String("langwatch.guardrail.direction", string(dir)),
+		attribute.String("langwatch.guardrail.cause", cause.Error()),
+	))
 	return nil
 }
 

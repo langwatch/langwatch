@@ -664,6 +664,18 @@ Rule: Categorical facet selection logic
     When the user checks "Error" and "Warning" under Status and "gpt-4o" under Model
     Then the query is "(@status:error OR @status:warning) AND @model:gpt-4o"
 
+  @unit
+  Scenario: A value a group in the search bar makes optional is marked as in group
+    When the user searches for "NOT (@status:error AND @model:gpt-5-mini)" or "@status:error OR @model:gpt-5-mini"
+    Then the "Error" row under Status and the "gpt-5-mini" row under Model are neither included nor excluded
+    And each says "in group", titled "Part of a group in the search bar"
+    And clicking such a row does what it did before
+
+  @unit
+  Scenario: Values every result must match keep their include or exclude mark
+    When the user searches for "@status:error AND @model:gpt-5-mini", "NOT (@status:error OR @model:gpt-5-mini)" or "@status:error OR @status:warning"
+    Then each named row shows include or exclude as before, with no "in group" label
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RANGE FACETS

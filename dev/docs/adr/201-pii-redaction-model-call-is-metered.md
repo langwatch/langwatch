@@ -81,9 +81,10 @@ one), and the free list stays with no end date (decisions 12 to 14).
     subscription line prices and bills it at nothing, so a report would advance the checkpoint
     and lose the charge. The PII meter first lists the customer's subscriptions at Stripe and
     reports only when an active, past-due or trialing one has a line on
-    `GROWTH_PII_REDACTION_USD`. Otherwise nothing is read or written and the first report after
-    the line is added carries the month from zero. A failed read holds the month too and
-    schedules another report. The other meters do not wait on it.
+    `GROWTH_PII_REDACTION_USD`, by price id, lookup key or `langwatch_key` metadata. The check
+    is shared with Instant Evals and behaves as ADR-174 decision 18 says: a held month sends
+    nothing, writes no total and warns with the amount held; a failed read counts toward the
+    circuit breaker; a pending total is replayed. The other meters do not wait on it.
 11. **Checkout adds the price.** A Growth checkout in dollars carries the metered
     `GROWTH_PII_REDACTION_USD` line, like Instant Evals, wherever the mode maps it. Euros carry
     none: the meter counts dollars. The price is $1.00 per meter unit (one dollar redacted),

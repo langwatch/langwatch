@@ -103,7 +103,7 @@ func allocatedBy(fn func()) uint64 {
 	return after.TotalAlloc - before.TotalAlloc
 }
 
-// @scenario "a payload is read without building a tree, and only when a guardrail applies"
+// @scenario "a payload is served with bounded allocations with and without a guardrail"
 func TestSmallPartsBodyStaysCheap(t *testing.T) {
 	body := manySmallParts()
 	require.Less(t, len(body), maxBodyBytes)
@@ -150,9 +150,10 @@ func TestBusyKeyIsRefused(t *testing.T) {
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "http://gw.acme.test/a2a/billing", strings.NewReader(sendMessage("SendMessage", "hi"))))
 	assert.Equal(t, http.StatusOK, rec.Code, "a JSON-RPC caller gets the JSON-RPC error shape")
-	code, reason, _ := rpcError(t, rec)
+	code, reason, id := rpcError(t, rec)
 	assert.Equal(t, -32020, code)
 	assert.Equal(t, "a2a_too_many_requests", reason)
+	assert.Equal(t, "7", id, "the refusal echoes the request id")
 	assert.Empty(t, f.upstreamCalls())
 
 	h.inflight.release(f.bundle.VirtualKeyID)
@@ -235,6 +236,55 @@ func TestDataPartStringsAreScannedAsWritten(t *testing.T) {
 func TestFilePartBytesAreScannedDecoded(t *testing.T) {
 	p := collectTexts([]byte(`{"message":{"parts":[{"raw":"dG9rZW4x","mediaType":"text/plain"}]}}`))
 	assert.Contains(t, p.texts, "token1")
+}
+
+// @scenario "content outside text parts is scanned before the upstream"
+func TestUnpaddedAndURLSafeFileBytesAreScannedDecoded(t *testing.T) {
+	for name, encoded := range map[string]string{
+		"unpadded":          "d2lyZSB0aGUgbW9uZXk",
+		"URL-safe":          "d2lyZSB0aGUgbW9uZXk_Pz4=",
+		"URL-safe unpadded": "d2lyZSB0aGUgbW9uZXkgfn5-",
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFixture(t)
+			f.bundle.Config.Guardrails.Pre = []domain.GuardrailEntry{{ID: "g1"}}
+			f.scanner = GuardrailScanner{Evaluator: fakeEvaluator{deny: "wire the money"}}
+			body := `{"jsonrpc":"2.0","id":7,"method":"SendMessage","params":{"message":{"messageId":"m1","role":"ROLE_USER",` +
+				`"parts":[{"raw":"` + encoded + `","mediaType":"text/plain"}]}}}`
+			rec := f.do(http.MethodPost, "/a2a/billing", body)
+
+			_, reason, _ := rpcError(t, rec)
+			assert.Equal(t, "a2a_content_blocked", reason)
+			assert.Empty(t, f.upstreamCalls())
+		})
+	}
+}
+
+// @scenario "the trace continues through the hop"
+func TestJSONRPCReplyWithoutResultNamesNoTask(t *testing.T) {
+	for name, body := range map[string]string{
+		"error reply": `{"jsonrpc":"2.0","id":"req-7","error":{"code":-32001,"message":"no such task"}}`,
+		"null result": `{"jsonrpc":"2.0","id":"req-7","result":null}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.NotContains(t, resultAttrs(body), attrTaskID)
+		})
+	}
+	assert.Equal(t, "t1", resultAttrs(`{"id":"t1","status":{"state":"TASK_STATE_WORKING"}}`)[attrTaskID],
+		"a bare HTTP+JSON task still names itself")
+}
+
+// resultAttrs records setResultAttrs on a fresh span and returns its attributes.
+func resultAttrs(body string) map[string]string {
+	rec := tracetest.NewSpanRecorder()
+	_, span := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec)).Tracer("t").Start(context.Background(), "hop")
+	setResultAttrs(span, []byte(body))
+	span.End()
+	out := map[string]string{}
+	for _, kv := range rec.Ended()[0].Attributes() {
+		out[string(kv.Key)] = kv.Value.String()
+	}
+	return out
 }
 
 // @scenario "a virtual key with too many calls in flight is refused"

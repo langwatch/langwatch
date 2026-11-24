@@ -87,7 +87,7 @@ workers:
     - { name: ADMIN_EMAILS, value: "you@yourcompany.com" }
 ```
 
-Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. Dashboard widgets need both `release_dashboards` and `release_lwql_workbench`. The Query API (`POST /api/v1/query`) works without either.
+Shipped features are on by default on a self-hosted install, including LangWatchQL (`release_lwql_workbench`) and Instant Evals (`release_instant_evals`). Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. The same page switches a feature off. Dashboard widgets need both `release_dashboards` and `release_lwql_workbench`. The Query API (`POST /api/v1/query`) works without either.
 
 ### License
 

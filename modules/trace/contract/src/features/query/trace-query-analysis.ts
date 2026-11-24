@@ -7,7 +7,7 @@
 import type { LiqeQuery } from "liqe";
 
 import { filterAST, walkAST } from "./trace-query-ast.ts";
-import type { FacetState } from "./trace-query-metadata.ts";
+import type { FacetDisplayState, FacetState } from "./trace-query-metadata.ts";
 import { isEmptyAST, parse, serialize } from "./trace-query-parser.ts";
 
 /**
@@ -135,6 +135,13 @@ export function getFacetValueState(ast: LiqeQuery, fieldName: string, value: str
   return "neutral";
 }
 
+/** The sidebar row a tag names, `${field}|${value}`: none for free text, ranges and non-tags. */
+function rowKeysNamedBy(node: LiqeQuery): string[] {
+  if (node.type !== "Tag" || node.field.type === "ImplicitField") return [];
+  if (node.expression.type !== "LiteralExpression") return [];
+  return [`${node.field.name}|${String(node.expression.value)}`];
+}
+
 /**
  * Single AST walk that captures every facet value's state, keyed by
  * `${field}|${value}`. Replaces dozens of per-row `getFacetValueState` calls
@@ -143,21 +150,131 @@ export function getFacetValueState(ast: LiqeQuery, fieldName: string, value: str
 export function buildFacetStateLookup(ast: LiqeQuery): ReadonlyMap<string, FacetState> {
   const map = new Map<string, FacetState>();
   walkAST(ast, (node, negated) => {
-    if (node.type !== "Tag") {
-      return;
-    }
-    if (node.field.type === "ImplicitField") {
-      return;
-    }
-    if (node.expression.type !== "LiteralExpression") {
-      return;
-    }
-    const key = `${node.field.name}|${String(node.expression.value)}`;
     // Last write wins, matching `getFacetValueState`'s array-includes
     // semantics (it returns the first match, but for canonical queries
     // values appear once per field).
-    map.set(key, negated ? "exclude" : "include");
+    for (const key of rowKeysNamedBy(node)) map.set(key, negated ? "exclude" : "include");
   });
+  return map;
+}
+
+function isNegation(operator: string): boolean {
+  return operator === "NOT" || operator === "-";
+}
+
+/** Whether a subtree is a positive "any of" on one field: tags of that field joined only by OR. */
+function isAnyOfGroup({ node, negated }: { node: LiqeQuery; negated: boolean }): boolean {
+  const fields = new Set<string>();
+  const visit = (n: LiqeQuery, neg: boolean): boolean => {
+    switch (n.type) {
+      case "Tag":
+        if (neg || n.field.type === "ImplicitField") return false;
+        fields.add(n.field.name);
+        return true;
+      case "UnaryOperator":
+        return visit(n.operand, neg !== isNegation(n.operator));
+      case "ParenthesizedExpression":
+        return visit(n.expression, neg);
+      case "LogicalExpression":
+        return (n.operator.operator === "OR") !== neg && visit(n.left, neg) && visit(n.right, neg);
+      default:
+        return false;
+    }
+  };
+  return visit(node, negated) && fields.size === 1;
+}
+
+function displayStateOf({
+  negated,
+  grouped,
+}: {
+  negated: boolean;
+  grouped: boolean;
+}): FacetDisplayState {
+  if (grouped) return "grouped";
+  return negated ? "exclude" : "include";
+}
+
+function markDisplayStates({
+  node,
+  negated,
+  grouped,
+  map,
+}: {
+  node: LiqeQuery;
+  negated: boolean;
+  grouped: boolean;
+  map: Map<string, FacetDisplayState>;
+}): void {
+  switch (node.type) {
+    case "Tag": {
+      // A term every result must match keeps its mark even where it also sits in a group.
+      for (const key of rowKeysNamedBy(node)) {
+        if (!(grouped && map.has(key))) map.set(key, displayStateOf({ negated, grouped }));
+      }
+      return;
+    }
+    case "UnaryOperator":
+      markDisplayStates({
+        node: node.operand,
+        negated: negated !== isNegation(node.operator),
+        grouped,
+        map,
+      });
+      return;
+    case "ParenthesizedExpression":
+      markDisplayStates({ node: node.expression, negated, grouped, map });
+      return;
+    case "LogicalExpression": {
+      // Under a NOT, AND acts as OR (De Morgan), as in `facetReach`.
+      const actsAsOr = (node.operator.operator === "OR") !== negated;
+      const inGroup = grouped || (actsAsOr && !isAnyOfGroup({ node, negated }));
+      markDisplayStates({ node: node.left, negated, grouped: inGroup, map });
+      markDisplayStates({ node: node.right, negated, grouped: inGroup, map });
+      return;
+    }
+    default:
+      return;
+  }
+}
+
+/**
+ * The signed keys (`+field|value`, `-field|value`) every result of a subtree must match: both
+ * sides of an AND, only what both sides of an OR share (NOT swaps them, as in `markDisplayStates`).
+ */
+function requiredSignedKeys({ node, negated }: { node: LiqeQuery; negated: boolean }): Set<string> {
+  switch (node.type) {
+    case "Tag":
+      return new Set(rowKeysNamedBy(node).map((key) => `${negated ? "-" : "+"}${key}`));
+    case "UnaryOperator":
+      return requiredSignedKeys({
+        node: node.operand,
+        negated: negated !== isNegation(node.operator),
+      });
+    case "ParenthesizedExpression":
+      return requiredSignedKeys({ node: node.expression, negated });
+    case "LogicalExpression": {
+      const left = requiredSignedKeys({ node: node.left, negated });
+      const right = requiredSignedKeys({ node: node.right, negated });
+      if ((node.operator.operator === "OR") === negated) return new Set([...left, ...right]);
+      return new Set([...left].filter((key) => right.has(key)));
+    }
+    default:
+      return new Set();
+  }
+}
+
+/**
+ * What each sidebar row shows, keyed by `${field}|${value}`. A term keeps include or exclude only
+ * when every result must match it; one a group makes optional is "grouped" (#9810). Display only:
+ * clicks still read `getFacetValueState`.
+ */
+export function buildFacetDisplayLookup(ast: LiqeQuery): ReadonlyMap<string, FacetDisplayState> {
+  const map = new Map<string, FacetDisplayState>();
+  markDisplayStates({ node: ast, negated: false, grouped: false, map });
+  for (const signed of requiredSignedKeys({ node: ast, negated: false })) {
+    map.set(signed.slice(1), signed.startsWith("-") ? "exclude" : "include");
+  }
   return map;
 }
 
