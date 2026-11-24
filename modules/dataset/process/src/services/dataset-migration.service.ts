@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import type { MigrationStepReport, MigrationStepRun } from "@langwatch/upgrade/step";
+import { z } from "zod";
 
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type {
@@ -10,6 +11,12 @@ import type {
   DatasetMigrationSummary,
   DatasetMoveNotes,
 } from "../repositories/dataset-migration.repository.ts";
+import {
+  carriedCount,
+  carriedList,
+  resumedStepProgress,
+  stepProgressReport,
+} from "../rules/dataset-step-progress.rules.ts";
 import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
 
 const logger = createLogger("langwatch:dataset:migration");
@@ -18,14 +25,31 @@ const RECORD_PAGE_SIZE = 1000;
 
 type MigrationProjects = Pick<ProjectApi, "listAllIds">;
 
-/** Where a resumed run starts, and what it hears after each project it finished. */
+/** The totals of moved datasets a retried step carries; failures count the last attempt only. */
+const carriedMoveSchema = z.object({
+  migrated: carriedCount,
+  alreadyMigrated: carriedCount,
+  archived: carriedCount,
+  empty: carriedCount,
+  rowsUnderOtherProject: carriedList(
+    z.object({ datasetId: z.string(), projectId: z.string(), rows: z.number() }),
+  ),
+});
+type CarriedMove = z.infer<typeof carriedMoveSchema>;
+
+/** Where a resumed run starts, the totals it carries, and what it hears after each project. */
 type MigrationRunInput = {
   dryRun?: boolean;
   /** Projects up to and including this id are skipped: the last finished one. */
   afterProjectId?: string | undefined;
+  carried?: CarriedMove | undefined;
   /** Stops between datasets; a project cut short is not reported finished. */
   signal?: AbortSignal;
-  onProjectDone?: (progress: { afterProjectId: string }) => Promise<void>;
+  /** After every project, finished or not; the cursor names the last one finished. */
+  onProgress?: (progress: {
+    afterProjectId: string | undefined;
+    summary: DatasetMigrationSummary;
+  }) => Promise<void>;
 };
 
 /**
@@ -68,13 +92,24 @@ export class DatasetMigrationService {
     dryRun,
     signal,
   }: Parameters<MigrationStepRun>[0]): Promise<MigrationStepReport> {
-    const resumed = checkpoint.resumeFrom?.afterProjectId;
+    const resumed = resumedStepProgress({
+      resumeFrom: checkpoint.resumeFrom,
+      totals: carriedMoveSchema,
+    });
     const result = await this.run({
       dryRun,
       signal,
-      afterProjectId: typeof resumed === "string" ? resumed : undefined,
-      onProjectDone: (progress) =>
-        dryRun ? Promise.resolve() : checkpoint.save({ report: progress }),
+      afterProjectId: resumed.afterProjectId,
+      carried: dryRun ? undefined : resumed.totals,
+      onProgress: ({ afterProjectId, summary }) =>
+        dryRun
+          ? Promise.resolve()
+          : checkpoint.save({
+              report: stepProgressReport({
+                afterProjectId,
+                totals: carriedMoveSchema.parse(summary),
+              }),
+            }),
     });
     if (result.status === "schema-pending") {
       throw new Error("Dataset chunk-layout columns are not applied yet; the step retries");
@@ -133,26 +168,26 @@ export class DatasetMigrationService {
   }
 
   private async migrateAll(input: MigrationRunInput): Promise<DatasetMigrationSummary> {
+    const carried = carriedMoveSchema.parse(input.carried ?? {});
     const summary: DatasetMigrationSummary = {
-      migrated: 0,
+      ...carried,
+      rowsUnderOtherProject: [...carried.rowsUnderOtherProject],
       wouldMigrate: 0,
-      alreadyMigrated: 0,
       skippedConcurrentWrite: 0,
       failed: 0,
-      archived: 0,
-      empty: 0,
-      rowsUnderOtherProject: [],
     };
 
     let after = input.afterProjectId;
+    let finished = input.afterProjectId;
     do {
       const projects = await this.projects.listAllIds({ after, limit: PROJECT_ID_PAGE_LIMIT });
       for (const projectId of projects.ids) {
         if (input.signal?.aborted) return summary;
         await this.migrateProject({ projectId, input, summary });
-        if (input.signal?.aborted) return summary;
         // Once any dataset is left behind, the cursor stays before it for the retry.
-        if (remaining(summary) === 0) await input.onProjectDone?.({ afterProjectId: projectId });
+        if (!input.signal?.aborted && remaining(summary) === 0) finished = projectId;
+        await input.onProgress?.({ afterProjectId: finished, summary });
+        if (input.signal?.aborted) return summary;
       }
       after = projects.next ?? undefined;
     } while (after !== undefined);

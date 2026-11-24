@@ -112,3 +112,13 @@ Feature: Single-file datasets keep working where the previous release kept them
       Given a dataset in today's layout and a file at the old key for its id
       When a caller reads the dataset
       Then the records come from the dataset's own storage, not the file
+
+  Rule: The conversion step reports across its attempts
+
+    @unit
+    Scenario: A conversion that retried reports every dataset it converted across its attempts
+      Given the conversion converted some datasets and failed on one, so it retried
+      When the retry converts the dataset left behind and is recorded done
+      Then its report counts every dataset converted and every old file left across both attempts
+      And the datasets it names as failed, missing or unreadable are the last attempt's only
+      And a checkpoint an older release saved with only its cursor still resumes, counting from zero

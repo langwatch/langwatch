@@ -1,12 +1,19 @@
 import { createLogger } from "@langwatch/observability";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import type { MigrationStepReport, MigrationStepRun } from "@langwatch/upgrade/step";
+import { z } from "zod";
 
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { DatasetSingleFileConversionRepository } from "../repositories/dataset-single-file-conversion.repository.ts";
 import type { DatasetSingleFileRepository } from "../repositories/dataset-single-file.repository.ts";
 import { isSingleFileDataset, parseSingleFileRecords } from "../rules/dataset-single-file.rules.ts";
+import {
+  carriedCount,
+  carriedList,
+  resumedStepProgress,
+  stepProgressReport,
+} from "../rules/dataset-step-progress.rules.ts";
 import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
 
 const logger = createLogger("langwatch:dataset:single-file-conversion");
@@ -32,12 +39,25 @@ export type DatasetSingleFileConversionReport = {
   failed: string[];
 };
 
+/** The totals of converted datasets a retried step carries; its problems are the last attempt's. */
+const carriedConversionSchema = z.object({
+  converted: carriedCount,
+  oldFilesLeft: carriedCount,
+  wrongRecordedCount: carriedList(z.string()),
+});
+type CarriedConversion = z.infer<typeof carriedConversionSchema>;
+
 type ConversionRunInput = {
   dryRun?: boolean;
   /** Projects up to and including this id are skipped: the last finished one. */
   afterProjectId?: string | undefined;
+  carried?: CarriedConversion | undefined;
   signal?: AbortSignal;
-  onProjectDone?: (progress: { afterProjectId: string }) => Promise<void>;
+  /** After every project, finished or not; the cursor names the last one finished. */
+  onProgress?: (progress: {
+    afterProjectId: string | undefined;
+    report: DatasetSingleFileConversionReport;
+  }) => Promise<void>;
 };
 
 type ConversionOutcome =
@@ -89,13 +109,24 @@ export class DatasetSingleFileConversionService {
     dryRun,
     signal,
   }: Parameters<MigrationStepRun>[0]): Promise<MigrationStepReport> {
-    const resumed = checkpoint.resumeFrom?.afterProjectId;
+    const resumed = resumedStepProgress({
+      resumeFrom: checkpoint.resumeFrom,
+      totals: carriedConversionSchema,
+    });
     const { report } = await this.run({
       dryRun,
       signal,
-      afterProjectId: typeof resumed === "string" ? resumed : undefined,
-      onProjectDone: (progress) =>
-        dryRun ? Promise.resolve() : checkpoint.save({ report: progress }),
+      afterProjectId: resumed.afterProjectId,
+      carried: dryRun ? undefined : resumed.totals,
+      onProgress: ({ afterProjectId, report: progress }) =>
+        dryRun
+          ? Promise.resolve()
+          : checkpoint.save({
+              report: stepProgressReport({
+                afterProjectId,
+                totals: carriedConversionSchema.parse(progress),
+              }),
+            }),
     });
     const problems = [
       ...problemLines(
@@ -112,24 +143,26 @@ export class DatasetSingleFileConversionService {
   }
 
   private async convertAll(input: ConversionRunInput): Promise<DatasetSingleFileConversionReport> {
+    const carried = carriedConversionSchema.parse(input.carried ?? {});
     const report: DatasetSingleFileConversionReport = {
-      converted: 0,
+      ...carried,
+      wrongRecordedCount: [...carried.wrongRecordedCount],
       wouldConvert: 0,
       wouldConvertRecords: 0,
-      oldFilesLeft: 0,
-      wrongRecordedCount: [],
       missingFile: [],
       unreadable: [],
       failed: [],
     };
     let after = input.afterProjectId;
+    let finished = input.afterProjectId;
     do {
       const page = await this.options.projects.listAllIds({ after, limit: PROJECT_ID_PAGE_LIMIT });
       for (const projectId of page.ids) {
         if (input.signal?.aborted) return report;
         await this.convertProject({ projectId, input, report });
+        if (!input.signal?.aborted && leftBehind(report) === 0) finished = projectId;
+        await input.onProgress?.({ afterProjectId: finished, report });
         if (input.signal?.aborted) return report;
-        if (leftBehind(report) === 0) await input.onProjectDone?.({ afterProjectId: projectId });
       }
       after = page.next ?? undefined;
     } while (after !== undefined);
