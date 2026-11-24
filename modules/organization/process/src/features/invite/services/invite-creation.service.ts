@@ -8,10 +8,9 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   AlreadyOrganizationMemberError,
-  BillingOnlyNoTeamAccessError,
   DuplicateInviteError,
   MemberSeatLimitReachedError,
-  OrganizationUserRole,
+  type OrganizationUserRole,
   PersonalWorkspaceNotManagedHereError,
   type Organization,
   type OrganizationInvite,
@@ -34,6 +33,7 @@ import { buildInviteAcceptUrl } from "../../../rules/invite-link.rules.ts";
 import {
   assertAssignmentsWithinInvitedSeat,
   classifyInvitesByMemberType,
+  prepareBillingOnlyInvite,
 } from "../../../rules/invite-memberships.rules.ts";
 import { assertAdditionsNotHeldForPayment } from "../../../rules/payment-hold.rules.ts";
 import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
@@ -464,7 +464,7 @@ export class InviteCreationService {
     invite: CreateInvitesInviteInput;
     isStrict: boolean;
   }): Promise<CreateAdminInviteInput | null> {
-    if (invite.billingOnly) return this.prepareBillingOnlyInvite({ organizationId, invite });
+    if (invite.billingOnly) return prepareBillingOnlyInvite({ organizationId, invite });
     const resolvedTeams = await this.teams.resolveInviteTeams({
       organizationId,
       invite,
@@ -490,28 +490,6 @@ export class InviteCreationService {
       teamIds: resolvedTeams.teamIdsString,
       teamAssignments:
         resolvedTeams.teamAssignments.length > 0 ? resolvedTeams.teamAssignments : undefined,
-    };
-  }
-
-  /** Billing only: role EXTERNAL, no team, no seat (ADR-205). A team asked for is refused. */
-  private prepareBillingOnlyInvite({
-    organizationId,
-    invite,
-  }: {
-    organizationId: string;
-    invite: CreateInvitesInviteInput;
-  }): CreateAdminInviteInput | null {
-    if ((invite.teams?.length ?? 0) > 0 || invite.teamIds?.trim()) {
-      throw new BillingOnlyNoTeamAccessError();
-    }
-    const email = invite.email.trim();
-    if (!email) return null;
-    return {
-      email,
-      role: OrganizationUserRole.EXTERNAL,
-      organizationId,
-      teamIds: "",
-      billingOnly: true,
     };
   }
 }

@@ -316,9 +316,8 @@ export class OrganizationMemberRoleService {
   }
 
   /**
-   * Updates a member's organization role and cascades effective team role
-   * changes. Computes effective team role updates from the requested updates and
-   * current memberships.
+   * Updates a member's organization role and cascades the effective team role changes,
+   * computed from the requested updates and the current memberships.
    */
   async updateMemberRole(params: {
     organizationId: string;
