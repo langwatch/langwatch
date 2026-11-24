@@ -650,7 +650,8 @@
               "ai-gateway/overview",
               "ai-gateway/quickstart",
               "ai-gateway/cap-spend-per-team",
-              "ai-gateway/concepts"
+              "ai-gateway/concepts",
+              "ai-gateway/a2a-proxy"
             ]
           },
           {

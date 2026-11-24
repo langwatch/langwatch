@@ -14,8 +14,28 @@ export const DEFAULT_DECODE_LIMITS: SecurityLakeDecodeLimits = {
   maxRows: 250_000,
 };
 
-/** A file past a decode cap: reading it again gives the same answer, so it goes straight to poison. */
-export class DecodeLimitError extends Error {}
+/** The error name of a file past a decode cap: a second read gives the same answer, so poison. */
+const DECODE_LIMIT_ERROR = "DecodeLimitError";
+
+function decodeLimitError(message: string): Error {
+  const error = new Error(message);
+  error.name = DECODE_LIMIT_ERROR;
+  return error;
+}
+
+export function isDecodeLimitError(error: unknown): error is Error {
+  return error instanceof Error && error.name === DECODE_LIMIT_ERROR;
+}
+
+const DECODER_MESSAGE_MAX = 200;
+
+/** What a tenant reads about an object the decoder could not read: the file, not AWS, is at fault. */
+export function describeParquetFailure(error: unknown): string {
+  const detail = error instanceof Error ? error.message.trim().slice(0, DECODER_MESSAGE_MAX) : "";
+  return detail
+    ? `The object is not a readable Parquet file: ${detail}`
+    : "The object is not a readable Parquet file.";
+}
 
 /** The decompressors, each refusing a page before it takes the object past the byte cap. */
 function cappedCompressors(maxDecompressedBytes: number): Compressors {
@@ -34,7 +54,7 @@ function cappedCompressors(maxDecompressedBytes: number): Compressors {
     capped[codec as keyof Compressors] = (input, outputLength) => {
       total += outputLength;
       if (total > maxDecompressedBytes) {
-        throw new DecodeLimitError(
+        throw decodeLimitError(
           `decompressed size passes the ${maxDecompressedBytes}-byte limit for one object`,
         );
       }
@@ -92,13 +112,13 @@ export async function* decodeParquetRowGroups({
   const metadata = parquetMetadata(file);
   const rows = metadata.row_groups.reduce((sum, group) => sum + Number(group.num_rows), 0);
   if (rows > limits.maxRows || Number(metadata.num_rows) > limits.maxRows) {
-    throw new DecodeLimitError(`${rows} rows pass the ${limits.maxRows}-row limit for one object`);
+    throw decodeLimitError(`${rows} rows pass the ${limits.maxRows}-row limit for one object`);
   }
   const declared = metadata.row_groups
     .flatMap((group) => group.columns)
     .reduce((sum, column) => sum + Number(column.meta_data?.total_uncompressed_size ?? 0), 0);
   if (declared > limits.maxDecompressedBytes) {
-    throw new DecodeLimitError(
+    throw decodeLimitError(
       `decompressed size passes the ${limits.maxDecompressedBytes}-byte limit for one object`,
     );
   }
@@ -112,7 +132,7 @@ export async function* decodeParquetRowGroups({
       for (const row of decoded) {
         decodedTotal += decodedBytes(row, limits.maxDecompressedBytes - decodedTotal);
         if (decodedTotal > limits.maxDecompressedBytes) {
-          throw new DecodeLimitError(
+          throw decodeLimitError(
             `decoded size passes the ${limits.maxDecompressedBytes}-byte limit for one object`,
           );
         }

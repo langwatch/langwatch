@@ -7,6 +7,8 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
+import { REMEDIATION_CODES, type RemediationCode, remediation } from "@langwatch/handled-error";
+import { isTipForPeople } from "@langwatch/handled-error/presentation";
 import { describe, expect, it } from "vitest";
 
 import { CLI_MISSING_KEY_LINES, presentLangyToolError } from "../langy-tool-failure.ts";
@@ -442,8 +444,106 @@ describe("presentLangyToolError", () => {
       ]);
     });
 
+    /** @scenario "A tip written for an API caller is not shown to a person" */
+    it("drops a next step that points an API caller at a meta field", () => {
+      const withMetaTip = failureDocument({
+        code: "trace_not_found",
+        message: "That trace is no longer available",
+        httpStatus: 404,
+        meta: {},
+        isHandled: true,
+        suggestions: [
+          "meta.traceId names the trace that was asked for",
+          "Traces are removed after the retention window",
+        ],
+      });
+      expect(present(withMetaTip, "Loading trace").tips).toEqual([
+        "Traces are removed after the retention window",
+      ]);
+    });
+
     it("shows the code alongside it", () => {
       expect(present(notFound, "Loading dataset").code).toBe("dataset_not_found");
+    });
+  });
+
+  // The wire message of a handled error is its code (#5984), so once the API-caller tips are
+  // hidden the card needs the registry's sentence, or it shows a slug and nothing to do.
+  describe("given a failure whose message is only its code and whose tips name meta", () => {
+    const codesWithCallerTips = REMEDIATION_CODES.filter((code) =>
+      (remediation(code).tips ?? []).some((tip) => !isTipForPeople(tip)),
+    );
+
+    const namedByTheReview: readonly [RemediationCode, RegExp][] = [
+      ["model_not_configured", /Default Models/],
+      ["instant_eval_already_finished", /nothing left to cancel/],
+    ];
+
+    it.each(namedByTheReview)("says what to do about %s", (code, expected) => {
+      const presentation = present(
+        failureDocument({
+          code,
+          message: code,
+          httpStatus: 409,
+          meta: {},
+          isHandled: true,
+          suggestions: remediation(code).tips,
+        }),
+        "Running tool",
+      );
+      expect(presentation.message).toMatch(expected);
+    });
+
+    /** @scenario "Hiding a tip written for an API caller never leaves a person without a next step" */
+    it.each(codesWithCallerTips)("gives %s a sentence or a tip, not a bare slug", (code) => {
+      const presentation = present(
+        failureDocument({
+          code,
+          message: code,
+          httpStatus: 400,
+          meta: {},
+          isHandled: true,
+          suggestions: remediation(code).tips,
+        }),
+        "Running tool",
+      );
+      expect(presentation.message !== code || (presentation.tips ?? []).length > 0).toBe(true);
+    });
+
+    it("reads the reason chain, so a refused key is not told to try again", () => {
+      const presentation = present(
+        failureDocument({
+          code: "llm_upstream_error",
+          message: "llm_upstream_error",
+          httpStatus: 502,
+          meta: {},
+          isHandled: true,
+          reasons: [
+            {
+              kind: "provider_error",
+              retryable: false,
+              reasons: [{ kind: "invalid_api_key", retryable: false }],
+            },
+          ],
+        }),
+        "Running tool",
+      );
+      expect(presentation.message).toMatch(/refused this key/);
+    });
+
+    it("falls back to the registered title when the code has no description", () => {
+      const presentation = present(
+        failureDocument({
+          code: "api_key_not_found",
+          message: "api_key_not_found",
+          httpStatus: 404,
+          meta: {},
+          isHandled: true,
+        }),
+        "Revoking key",
+      );
+      expect(presentation.message).not.toBe("api_key_not_found");
+      expect(presentation.code).toBe("api_key_not_found");
     });
   });
 

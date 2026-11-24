@@ -22,7 +22,7 @@ type Config struct {
 	RequireHTTPSCustomerEndpoints bool   `env:"REQUIRE_HTTPS_CUSTOM_ENDPOINTS"`
 	AllowedProxyHosts             string `env:"ALLOWED_PROXY_HOSTS"`
 	// A2APublicBaseURL is the gateway's public origin, used in the URLs of
-	// proxied Agent Cards. Empty uses the request's scheme and Host.
+	// proxied Agent Cards. Empty refuses Agent Card calls (a2a_public_url_unset).
 	A2APublicBaseURL    string                    `env:"A2A_PUBLIC_BASE_URL"`
 	Server              config.Server             `env:"SERVER"`
 	Log                 clog.Config               `env:"LOG"`

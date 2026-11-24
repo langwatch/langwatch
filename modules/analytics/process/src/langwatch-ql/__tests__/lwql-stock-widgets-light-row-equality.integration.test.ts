@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
 import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import { floorLangWatchQLDedup } from "../../rules/lwql-dedup-floor.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import {
   expectRestrictedIdentity,
@@ -206,13 +207,14 @@ function attributesOf(seed: TraceSeed): Record<string, string> {
 
 /**
  * A `trace_analytics` row. The goose 00126 columns are MATERIALIZED from `Attributes`; the
- * goose 00128 ones are the fold's to write, so the row carries them as the fold does.
+ * goose 00128 and 00133 ones are the fold's to write, so the row carries them as the fold does.
  */
 function analyticsRow(seed: TraceSeed, day = seed.day): Record<string, unknown> {
   return {
     MetadataOutcomeReason: seed.metadata.outcome_reason ?? "",
     MetadataPromptVersion: seed.metadata.prompt_version ?? "",
     MetadataEnvironment: seed.metadata.environment || seed.metadata.env || "",
+    LastUsedPromptVersionId: seed.promptVersion ?? "",
     TenantId: TENANT,
     TraceId: seed.trace,
     Version: "1",
@@ -646,15 +648,77 @@ describe("given traces, spans and evaluations of each source that the stock quer
     await postgres?.stop();
   });
 
-  /** Writes a second `trace_analytics` row for `trace`, as a pre-freeze row whose anchor moved. */
+  /**
+   * Writes a second `trace_analytics` row for `trace`, as a pre-freeze row whose anchor moved:
+   * an older write, so the seeded row stays the trace's newest, as `traces` keeps it.
+   */
   async function moveAnchor({ trace, day }: { trace: string; day: number }): Promise<void> {
     const seed = TRACES.find((candidate) => candidate.trace === trace);
     if (!seed) throw new Error(`no seed ${trace}`);
     await harness.admin.insert({
       table: `${harness.factDatabase}.trace_analytics`,
       format: "JSONEachRow",
-      values: [analyticsRow(seed, day)],
+      values: [{ ...analyticsRow(seed, day), UpdatedAt: onDay(seed.day - 0.5) }],
     });
+  }
+
+  /** One fold write of `seed` to both trace tables, anchored on its day, written on `updated`. */
+  async function writeTrace({ seed, updated }: { seed: TraceSeed; updated: number }) {
+    const facts = harness.factDatabase;
+    await harness.admin.insert({
+      table: `${facts}.trace_summaries`,
+      format: "JSONEachRow",
+      values: [{ ...summaryRow(seed), UpdatedAt: onDay(updated) }],
+    });
+    await harness.admin.insert({
+      table: `${facts}.trace_analytics`,
+      format: "JSONEachRow",
+      values: [{ ...analyticsRow(seed), UpdatedAt: onDay(updated) }],
+    });
+  }
+
+  type ChangeRow = { version: string; changed_at: string; previous: string };
+  const CHANGE = "att-change/change";
+
+  /** att-change/change as written, as the executor sends it (floored), and main's form. */
+  function changeForms(): { written: string; floored: string; main: string } {
+    const written = STOCK.get(CHANGE) ?? "";
+    const floored = floorLangWatchQLDedup({
+      sql: written,
+      database: harness.names.database,
+      views: LWQL_VIEW_CATALOG,
+    });
+    expect(floored).toContain("trace_metrics__floor(lwql_floor = ");
+    const main = MAIN.find((query) => query.label === CHANGE);
+    if (!main) throw new Error(`no main form of ${CHANGE}`);
+    return {
+      written,
+      floored,
+      main: readingFinalTwins({ sql: mainForm(main), database: finalTwins }),
+    };
+  }
+
+  async function changeRows({ sql, list }: { sql: string; list: readonly string[] }) {
+    const result = await client.query({
+      query: sql,
+      query_params: { ...PARAMETERS, dashboard_context_sources: list },
+      format: "JSONEachRow",
+    });
+    return result.json<ChangeRow>();
+  }
+
+  /** att-change/change, written and floored, returns main's rows under each list. */
+  async function expectChangeMatchesMain(): Promise<void> {
+    const forms = changeForms();
+    for (const { list } of LISTS) {
+      const before = await run({ sql: forms.main, list });
+      expect(before.error, `main under ${list.join()}`).toBeUndefined();
+      for (const sql of [forms.written, forms.floored]) {
+        const now = await run({ sql, list });
+        expect(now.error, `now under ${list.join()}`).toBeUndefined();
+        expect(now.rows, `against main under ${list.join()}`).toBe(before.rows);
+      }
+    }
   }
 
   /** @scenario "Each of the 39 rewritten stock queries returns the rows main's form returned" */
@@ -697,5 +761,188 @@ describe("given traces, spans and evaluations of each source that the stock quer
     expect((await differing(["application"])).toSorted()).toEqual(
       IN_WINDOW_DATED.filter((label) => !ON_TRACE_EVALUATIONS.has(label)),
     );
+  });
+
+  /** Writes one application trace (unless told another source) using `promptVersion` on `day`. */
+  async function writeVersion({
+    trace,
+    day,
+    promptVersion,
+    origin = "application",
+  }: {
+    trace: string;
+    day: number;
+    promptVersion: string;
+    origin?: string;
+  }): Promise<void> {
+    await writeTrace({ seed: { trace, day, origin, promptVersion, metadata: {} }, updated: day });
+  }
+
+  /** The one row att-change/change returns: `version` first used on `day`, after `previous`. */
+  function expectChange({
+    rows,
+    version,
+    previous,
+    day,
+  }: {
+    rows: readonly ChangeRow[];
+    version: string;
+    previous: string;
+    day: number;
+  }): void {
+    expect(rows).toEqual([expect.objectContaining({ version, previous })]);
+    expect(rows[0]?.changed_at.startsWith(onDay(day))).toBe(true);
+  }
+
+  // These add traces the comparisons above do not expect, so they run last. Each asserts only on
+  // versions it wrote, dated after the seed's and each earlier case's, so each also runs alone.
+  /** @scenario "A trace whose newest trace_metrics row changed its version reads the newest version" */
+  it("reads a trace's version and time from its newest row, as traces does", async () => {
+    // Reading U's older row, or its newer version at the older row's time, makes pv-u-prev newest.
+    const u: TraceSeed = { trace: "u", day: 5.05, origin: "application", metadata: {} };
+    await writeTrace({ seed: { ...u, promptVersion: "pv-u-old" }, updated: 5.05 });
+    await writeVersion({ trace: "u-prev", day: 5.1, promptVersion: "pv-u-prev" });
+    await writeTrace({ seed: { ...u, day: 5.2, promptVersion: "pv-u-new" }, updated: 5.25 });
+
+    await expectChangeMatchesMain();
+    const { floored } = changeForms();
+    expectChange({
+      rows: await changeRows({ sql: floored, list: ["application"] }),
+      version: "pv-u-new",
+      previous: "pv-u-prev",
+      day: 5.2,
+    });
+  });
+
+  /** @scenario "A version first used 200 days ago keeps the first-seen time it had" */
+  it("dates a version first used 200 days ago from its first use inside the window", async () => {
+    await writeVersion({ trace: "ancient", day: -200, promptVersion: "pv-200" });
+    await writeVersion({ trace: "p200-prev", day: 5.3, promptVersion: "pv-200-prev" });
+    await writeVersion({ trace: "a7", day: 5.4, promptVersion: "pv-200" });
+
+    await expectChangeMatchesMain();
+    // Its first use in the window, day 5.4, makes it the newest; all history would make it the
+    // oldest.
+    const { floored } = changeForms();
+    expectChange({
+      rows: await changeRows({ sql: floored, list: ["application"] }),
+      version: "pv-200",
+      previous: "pv-200-prev",
+      day: 5.4,
+    });
+  });
+
+  /** @scenario "A trace whose newest row anchored before the window counts with its in-window version" */
+  it("counts a trace whose newest row fell before the window with its in-window version", async () => {
+    const t: TraceSeed = { trace: "t", day: 5.6, origin: "application", metadata: {} };
+    await writeVersion({ trace: "t-prev", day: 5.5, promptVersion: "pv-t-prev" });
+    await writeTrace({ seed: { ...t, promptVersion: "pv-t-in-window" }, updated: 5.6 });
+    await writeTrace({
+      seed: { ...t, day: -10, promptVersion: "pv-t-before-window" },
+      updated: 5.65,
+    });
+
+    await expectChangeMatchesMain();
+    const { floored } = changeForms();
+    expectChange({
+      rows: await changeRows({ sql: floored, list: ["application"] }),
+      version: "pv-t-in-window",
+      previous: "pv-t-prev",
+      day: 5.6,
+    });
+  });
+
+  /**
+   * Under application `traces` leaves out a trace with any row from another source
+   * (stock-query-sources.ts:186-198), and so does the per-trace HAVING. Under langy both count
+   * S with its newest row, the langy one.
+   * @scenario "A trace with a row from a source not in the list is left out under the application list"
+   */
+  it("returns main's rows for a trace whose newest row is from another source", async () => {
+    await writeVersion({ trace: "s-app-prev", day: 5.7, promptVersion: "pv-s-app-prev" });
+    await writeVersion({ trace: "s-app", day: 5.75, promptVersion: "pv-s-app" });
+    await writeVersion({
+      trace: "s-langy-prev",
+      day: 5.8,
+      origin: "langy",
+      promptVersion: "pv-s-langy-prev",
+    });
+    const s: TraceSeed = { trace: "s", day: 6.8, origin: "application", metadata: {} };
+    await writeTrace({ seed: { ...s, promptVersion: "pv-s-old" }, updated: 6.8 });
+    await writeTrace({
+      seed: { ...s, day: 6.9, origin: "langy", promptVersion: "pv-s-new" },
+      updated: 6.9,
+    });
+
+    await expectChangeMatchesMain();
+    const { written, floored } = changeForms();
+    for (const sql of [written, floored]) {
+      expectChange({
+        rows: await changeRows({ sql, list: ["application"] }),
+        version: "pv-s-app",
+        previous: "pv-s-app-prev",
+        day: 5.75,
+      });
+      expectChange({
+        rows: await changeRows({ sql, list: ["langy"] }),
+        version: "pv-s-new",
+        previous: "pv-s-langy-prev",
+        day: 6.9,
+      });
+    }
+  });
+
+  /**
+   * S2's newest row is from application and would be the newest version if S2 counted: under
+   * application it stays out, because its older row is from langy.
+   * @scenario "A trace with a row from a source not in the list is left out under the application list"
+   */
+  it("leaves out under application a trace that also has a row from another source", async () => {
+    await writeVersion({ trace: "s2-app-prev", day: 5.85, promptVersion: "pv-s2-app-prev" });
+    await writeVersion({ trace: "s2-app", day: 5.9, promptVersion: "pv-s2-app" });
+    const s2: TraceSeed = { trace: "s2", day: 6.85, origin: "langy", metadata: {} };
+    await writeTrace({ seed: { ...s2, promptVersion: "pv-s2-langy" }, updated: 6.85 });
+    await writeTrace({
+      seed: { ...s2, day: 6.95, origin: "application", promptVersion: "pv-s2-application" },
+      updated: 6.95,
+    });
+
+    await expectChangeMatchesMain();
+    const { written, floored, main } = changeForms();
+    for (const sql of [main, written, floored]) {
+      expectChange({
+        rows: await changeRows({ sql, list: ["application"] }),
+        version: "pv-s2-app",
+        previous: "pv-s2-app-prev",
+        day: 5.9,
+      });
+    }
+  });
+
+  /**
+   * `traces` looks sources up one window and a day back (stock-query-sources.ts lookupBound): E's
+   * langy row on day -7.5 sits in that extra day, before the window before the period (day -7).
+   * @scenario "A trace with a row from a source not in the list is left out under the application list"
+   */
+  it("leaves out under application a trace whose other source's row is in the day before the window", async () => {
+    await writeVersion({ trace: "e-app-prev", day: 6, promptVersion: "pv-e-app-prev" });
+    await writeVersion({ trace: "e-app", day: 6.05, promptVersion: "pv-e-app" });
+    const e: TraceSeed = { trace: "e", day: -7.5, origin: "langy", metadata: {} };
+    await writeTrace({ seed: { ...e, promptVersion: "pv-e-langy" }, updated: -7.5 });
+    await writeTrace({
+      seed: { ...e, day: 6.97, origin: "application", promptVersion: "pv-e-application" },
+      updated: 6.97,
+    });
+
+    await expectChangeMatchesMain();
+    const { written, floored, main } = changeForms();
+    for (const sql of [main, written, floored]) {
+      expectChange({
+        rows: await changeRows({ sql, list: ["application"] }),
+        version: "pv-e-app",
+        previous: "pv-e-app-prev",
+        day: 6.05,
+      });
+    }
   });
 });

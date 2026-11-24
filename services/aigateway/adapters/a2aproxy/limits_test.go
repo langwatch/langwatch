@@ -23,6 +23,9 @@ func (f *fixture) doWith(cfg Config, method, path, body string) *httptest.Respon
 	if cfg.Client == nil {
 		cfg.Client = f.upstream.Client()
 	}
+	if cfg.PublicBaseURL == "" {
+		cfg.PublicBaseURL = testPublicBaseURL
+	}
 	cfg.Tracer = sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(f.spans)).Tracer("test")
 	req := httptest.NewRequest(method, "http://gw.acme.test"+path, strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer vk_support_secret")
@@ -136,4 +139,8 @@ func TestAllowedHostReachesLocalAddressWithoutEnvProxy(t *testing.T) {
 	_ = resp.Body.Close()
 	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
 	assert.Nil(t, allowed.Transport.(*http.Transport).Proxy)
+
+	byName := strings.Replace(up.URL, "127.0.0.1", "localhost", 1)
+	_, err = allowed.Get(byName)
+	require.ErrorIs(t, err, egress.ErrBlocked, "an allowed IP admits only a URL naming that IP, not a name resolving to it")
 }
