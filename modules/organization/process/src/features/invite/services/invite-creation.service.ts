@@ -33,6 +33,7 @@ import { buildInviteAcceptUrl } from "../../../rules/invite-link.rules.ts";
 import {
   assertAssignmentsWithinInvitedSeat,
   classifyInvitesByMemberType,
+  billingOnlyInviteOf,
 } from "../../../rules/invite-memberships.rules.ts";
 import { assertAdditionsNotHeldForPayment } from "../../../rules/payment-hold.rules.ts";
 import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
@@ -120,14 +121,18 @@ export class InviteCreationService {
       role: OrganizationUserRole;
       teams?: { customRoleId?: string }[];
       email?: string;
+      billingOnly?: boolean;
     }[];
     user?: PlanProviderUser;
   }): Promise<void> {
+    // Billing only takes no seat on any plan, so it never meets a seat pool (ADR-205).
+    const seatInvites = newInvites.filter((invite) => !invite.billingOnly);
+    if (seatInvites.length === 0) return;
     const subscriptionLimits = await this.planProvider.getActivePlan({
       organizationId,
       user,
     });
-    if (newInvites.length > 0) assertAdditionsNotHeldForPayment(subscriptionLimits);
+    assertAdditionsNotHeldForPayment(subscriptionLimits);
 
     const currentFullMembers = await this.deps.seats.getMemberCount(organizationId);
     const currentMembersLite = await this.deps.seats.getMembersLiteCount(organizationId);
@@ -148,13 +153,13 @@ export class InviteCreationService {
       (
         (await this.deps.seats.findHeldEmails?.({
           organizationId,
-          emails: newInvites.flatMap((invite) => (invite.email ? [invite.email] : [])),
+          emails: seatInvites.flatMap((invite) => (invite.email ? [invite.email] : [])),
         })) ?? []
       ).map((email) => email.toLowerCase()),
     );
-    const { liteMembers: newLiteMembers, fullMembers: newSeatsAsked } = classify(newInvites);
+    const { liteMembers: newLiteMembers, fullMembers: newSeatsAsked } = classify(seatInvites);
     const { fullMembers: heldSeatsTakenBack } = classify(
-      newInvites.filter((invite) => invite.email && heldEmails.has(invite.email.toLowerCase())),
+      seatInvites.filter((invite) => invite.email && heldEmails.has(invite.email.toLowerCase())),
     );
     const newFullMembers = newSeatsAsked - heldSeatsTakenBack;
 
@@ -225,6 +230,7 @@ export class InviteCreationService {
         : {}),
       role: input.role,
       requestedBy: input.requestedBy ?? null,
+      ...(input.billingOnly ? { billingOnly: true } : {}),
     });
   }
 
@@ -333,6 +339,7 @@ export class InviteCreationService {
             role: invite.role,
             teams: invite.teams,
             email: invite.email,
+            ...(invite.billingOnly ? { billingOnly: true } : {}),
           })),
           user,
         });
@@ -457,6 +464,10 @@ export class InviteCreationService {
     invite: CreateInvitesInviteInput;
     isStrict: boolean;
   }): Promise<CreateAdminInviteInput | null> {
+    if (invite.billingOnly) {
+      const email = invite.email.trim();
+      return email ? billingOnlyInviteOf({ organizationId, email, invite }) : null;
+    }
     const resolvedTeams = await this.teams.resolveInviteTeams({
       organizationId,
       invite,
