@@ -31,6 +31,12 @@ Feature: Billing-only invite
     Then they land on the plan page
     And the plan page opens for them although they are on no team
 
+  Scenario: A Billing-only member who opens the app lands on the plan page
+    Given a Billing-only member on no team
+    When they open the app root or their spent invite link
+    Then they land on the plan page
+    And they are not shown "Waiting for team access"
+
   Scenario: A Billing-only member is given no team, project or personal workspace
     Given a Billing-only member
     When their invite is accepted, an admin grants them a team or project, or a system write does
@@ -53,6 +59,12 @@ Feature: Billing-only invite
     When the person uses the link again
     Then it is refused with invite_already_accepted
     And Billing stays off
+
+  Scenario: A delayed second accept writes no grant
+    Given a person's two accept requests read the same pending invite
+    And the first one wins and an admin then removes a grant it wrote
+    When the delayed request finds the invite already claimed
+    Then it answers without writing any grant
 
   Scenario: Billing only is not granted through a group or an API key
     Given the Billing grant held through a group or on an API key

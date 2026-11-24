@@ -144,6 +144,27 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
   );
 }
 
+/** On no team: whoever pays (Billing only, ADR-205) goes to the plan page; others wait. */
+function NoTeamRefusal({ organizationName }: { organizationName: string }) {
+  const host = useNavigationHost();
+  const pays = host.hasOrganizationPermission("subscription:manage");
+  const planPage = planManagementHref(!!host.deployment().isSaaS);
+  useEffect(() => {
+    if (pays) host.replace(planPage);
+  }, [pays, planPage, host]);
+
+  if (pays) return null;
+  return (
+    host.teamAccessWaiting({ organizationName }) ?? (
+      <RestrictedAccess
+        area="this organization's projects"
+        description="You are not part of any team in this organization. Ask an organization admin to add you to a team so you can open its projects."
+        onBack={() => host.navigate("/")}
+      />
+    )
+  );
+}
+
 export const ShellPageBody = ({
   children,
   personalScope = false,
@@ -241,15 +262,7 @@ export const ShellPageBody = ({
         </ErrorBoundary>
       </Box>
     ) : (
-      (host.teamAccessWaiting({
-        organizationName: organization?.name ?? "your organization",
-      }) ?? (
-        <RestrictedAccess
-          area="this organization's projects"
-          description="You are not part of any team in this organization. Ask an organization admin to add you to a team so you can open its projects."
-          onBack={() => host.navigate("/")}
-        />
-      ))
+      <NoTeamRefusal organizationName={organization?.name ?? "your organization"} />
     );
 
   return (

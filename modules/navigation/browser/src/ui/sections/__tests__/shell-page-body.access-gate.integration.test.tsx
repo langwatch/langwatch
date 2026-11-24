@@ -80,6 +80,35 @@ describe("given the organization read has answered", () => {
     });
   });
 
+  describe("when a member on no team who pays opens any other page", () => {
+    /** @scenario "A Billing-only member who opens the app lands on the plan page" */
+    it("sends them to the plan page instead of the team refusal", () => {
+      const replace = vi.fn();
+      renderWithDesignSystem(
+        <WithStubNavigationHost
+          readings={{
+            pathname: "/settings",
+            currentUserId: "user_1",
+            isLoading: false,
+            organization,
+            organizationRole: "EXTERNAL",
+            organizationPermissions: ["subscription:manage"],
+            deployment: { isSaaS: true },
+          }}
+          actions={{ replace }}
+        >
+          <ShellPageBody>
+            <p>Private project content</p>
+          </ShellPageBody>
+        </WithStubNavigationHost>,
+      );
+
+      expect(replace).toHaveBeenCalledWith("/settings/subscription");
+      expect(screen.queryByText(REFUSAL)).toBeNull();
+      expect(screen.queryByText("Private project content")).toBeNull();
+    });
+  });
+
   describe("when the member is on the team", () => {
     /** @scenario "A member is never shown an access refusal before their access has been read" */
     it("draws the page", () => {

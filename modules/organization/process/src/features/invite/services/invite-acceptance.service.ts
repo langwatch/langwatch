@@ -100,10 +100,10 @@ export class InviteAcceptanceService {
     });
 
     if (!claimed) {
-      // The row moved between the caller's read and the claim. If it moved
-      // because THIS user's own concurrent accept won, the grant tail is a
-      // repair, exactly as in the retry path above; anyone else sees the
-      // stale-code refusal.
+      // The row moved between the caller's read and the claim. If THIS user's own concurrent
+      // accept won, that request runs the grant tail; this one writes nothing, so a delayed
+      // request never restores a grant an admin has removed since (ADR-205). Anyone else sees
+      // the stale-code refusal.
       const current = await this.invites
         .getInviteStatus({ inviteId: invite.id })
         .catch((error: unknown) => {
@@ -116,11 +116,7 @@ export class InviteAcceptanceService {
           userId,
           organizationId: invite.organizationId,
         }));
-      if (isCallerRacingItself) {
-        await this.completeAcceptance({ userId, invite });
-
-        return;
-      }
+      if (isCallerRacingItself) return;
 
       throw new InviteNotFoundError("Invitation is no longer open");
     }
