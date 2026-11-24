@@ -182,7 +182,7 @@ Every tenant-scoped table of the application database, derived from the schema. 
 | `ai_tool_entry_teams` | Per-team scope binding for AiToolEntry. | None | one row per (AiToolEntryTeamId), counted once across the projects read, under the lowest project id | None |
 | `analytics` | Rows of the Analytics table, one row per AnalyticsId. | `output` | one row per AnalyticsId | `CreatedAt` |
 | `annotation_queue_items` | Rows of the AnnotationQueueItem table, one row per AnnotationQueueItemId. | None | one row per AnnotationQueueItemId | `CreatedAt` |
-| `annotation_queue_scores` | Rows of the AnnotationQueueScores table, one row per (AnnotationQueueId, AnnotationScoreId), counted once across the projects read, under the lowest project id. | None | one row per (AnnotationQueueId, AnnotationScoreId), counted once across the projects read, under the lowest project id | None |
+| `annotation_queue_scores` | Rows of the AnnotationQueueScores table, one row per AnnotationQueueId, AnnotationScoreId. | None | one row per AnnotationQueueId, AnnotationScoreId | None |
 | `annotation_queues` | Rows of the AnnotationQueue table, one row per AnnotationQueueId. | `output` | one row per AnnotationQueueId | `CreatedAt` |
 | `annotation_scores` | Rows of the AnnotationScore table, one row per AnnotationScoreId. | `output` | one row per AnnotationScoreId | `CreatedAt` |
 | `anomaly_alerts` | Persisted anomaly detection. | `output`, `costs` | one row per (AnomalyAlertId), counted once across the projects read, under the lowest project id | `TriggerWindowStart` |

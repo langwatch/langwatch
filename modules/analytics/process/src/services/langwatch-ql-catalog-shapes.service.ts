@@ -144,8 +144,8 @@ export interface LangWatchQLPostgresMapping {
   readonly rowFilter?: string;
   /**
    * Exposed columns naming one source row, set when {@link tenantPath} repeats that row once per
-   * project of its team or organization. The LangWatchQL view keeps one copy per these columns,
-   * so a read over several of those projects counts the row once (tasks#1212).
+   * project of its team or organization. A read over several projects keeps one copy per these
+   * columns, so it counts the row once (tasks#1212); the view itself keeps every copy.
    */
   readonly entityKeyColumns?: readonly string[];
 }

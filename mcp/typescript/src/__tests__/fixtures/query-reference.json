@@ -9298,8 +9298,8 @@
         },
         {
           "name": "analytics.annotation_queue_scores",
-          "description": "Rows of the AnnotationQueueScores table, one row per (AnnotationQueueId, AnnotationScoreId), counted once across the projects read, under the lowest project id.",
-          "grain": "one row per (AnnotationQueueId, AnnotationScoreId), counted once across the projects read, under the lowest project id",
+          "description": "Rows of the AnnotationQueueScores table, one row per AnnotationQueueId, AnnotationScoreId.",
+          "grain": "one row per AnnotationQueueId, AnnotationScoreId",
           "joinKeys": [
             "TenantId",
             "AnnotationQueueId",

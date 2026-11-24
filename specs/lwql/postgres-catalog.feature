@@ -81,12 +81,27 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       And filtering on the other project's id reads no budget
       And grouping by TenantId puts the budget once under the lower project id and nowhere else
 
+    # The collapse sorts every copy and no filter passes it, so it runs only where copies repeat.
     @unit
-    Scenario: A fanned-out view keeps one row per entity across the projects read
+    Scenario: A read over several projects keeps one row per entity of a fanned-out view
       Given a model whose tenant column is organizationId or teamId
-      When its LangWatchQL view is rendered
-      Then the view keeps one row per primary key, the lowest in-scope project's, after the tenant predicate
-      And a project-scoped view is rendered without that step
+      When a statement reading its LangWatchQL view is scoped for a key set of more than one project
+      Then that reference keeps one row per primary key, the lowest project's that the read admits
+      And a project-scoped view in the same statement is read as written
+
+    @unit
+    Scenario: A single-project read of a fanned-out view carries no collapse
+      Given a model whose tenant column is organizationId or teamId
+      When its LangWatchQL view is rendered, or a statement reading it is scoped for one project
+      Then neither the view nor the statement sorts or limits its rows by key
+
+    # tasks#1212: a TenantId filter or GROUP BY would otherwise miss a shared row without a word.
+    @unit
+    Scenario: A multi-project read of a collapsed view says where shared rows sit
+      Given a caller who reads two projects
+      When they run a statement reading a view whose team- or organization-level rows are kept once
+      Then diagnostics holds one SHARED_ROWS_UNDER_LOWEST_PROJECT entry that names no project
+      And a single-project read, or one reading no such view, carries no such entry
 
     @unit
     Scenario: A fanned-out view keyed on its scope field keeps its fan-out
@@ -116,6 +131,15 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       When the Postgres catalog is derived
       Then the view exists and takes its TenantId from the parent
       And the model does not need a skip entry
+
+    # A parent chain is followed to its end: only a team or organization at the end fans out.
+    @unit
+    Scenario: A row reached through a project-scoped parent is not fanned out
+      Given a model with no tenant column whose declared parent is project-scoped
+      When the Postgres catalog is derived
+      Then its grain is one row per its own key, with no TenantId in the key
+      And no read collapses its rows
+      And a model whose parent chain ends at an organization still collapses
 
     @unit
     Scenario: A model with more than one tenant column uses the narrowest

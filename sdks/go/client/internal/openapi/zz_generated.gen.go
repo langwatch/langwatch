@@ -30446,18 +30446,20 @@ func (e PostApiV1Query200JSONResponseBodyCompletenessState) Valid() bool {
 
 // Defines values for PostApiV1Query200JSONResponseBodyDiagnosticsCode.
 const (
-	APPFUNCTIONRESULTTRUNCATED PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_RESULT_TRUNCATED"
-	APPFUNCTIONUNRESOLVEDKEYS  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_UNRESOLVED_KEYS"
-	APPFUNCTIONVALUETRUNCATED  PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_VALUE_TRUNCATED"
-	GRANULARITYCOARSENED       PostApiV1Query200JSONResponseBodyDiagnosticsCode = "GRANULARITY_COARSENED"
-	INCOMPLETECOMPARISONPERIOD PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INCOMPLETE_COMPARISON_PERIOD"
-	INSTANTEVALSKIPPED         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INSTANT_EVAL_SKIPPED"
-	MISSINGTIMEBUCKETS         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MISSING_TIME_BUCKETS"
-	MULTIPROJECTRESULT         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MULTI_PROJECT_RESULT"
-	POSSIBLEFANOUT             PostApiV1Query200JSONResponseBodyDiagnosticsCode = "POSSIBLE_FANOUT"
-	SHAREWINDOWLIMITED         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "SHARE_WINDOW_LIMITED"
-	SOURCESIGNORED             PostApiV1Query200JSONResponseBodyDiagnosticsCode = "SOURCES_IGNORED"
-	UNBOUNDEDTIMERANGE         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "UNBOUNDED_TIME_RANGE"
+	APPFUNCTIONRESULTTRUNCATED   PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_RESULT_TRUNCATED"
+	APPFUNCTIONUNRESOLVEDKEYS    PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_UNRESOLVED_KEYS"
+	APPFUNCTIONVALUETRUNCATED    PostApiV1Query200JSONResponseBodyDiagnosticsCode = "APP_FUNCTION_VALUE_TRUNCATED"
+	GRANULARITYCOARSENED         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "GRANULARITY_COARSENED"
+	INCOMPLETECOMPARISONPERIOD   PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INCOMPLETE_COMPARISON_PERIOD"
+	INSTANTEVALSKIPPED           PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INSTANT_EVAL_SKIPPED"
+	MISSINGTIMEBUCKETS           PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MISSING_TIME_BUCKETS"
+	MULTIPROJECTRESULT           PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MULTI_PROJECT_RESULT"
+	POSSIBLEFANOUT               PostApiV1Query200JSONResponseBodyDiagnosticsCode = "POSSIBLE_FANOUT"
+	SHAREDROWSUNDERLOWESTPROJECT PostApiV1Query200JSONResponseBodyDiagnosticsCode = "SHARED_ROWS_UNDER_LOWEST_PROJECT"
+	SHAREWINDOWLIMITED           PostApiV1Query200JSONResponseBodyDiagnosticsCode = "SHARE_WINDOW_LIMITED"
+	SHAREWINDOWMISSING           PostApiV1Query200JSONResponseBodyDiagnosticsCode = "SHARE_WINDOW_MISSING"
+	SOURCESIGNORED               PostApiV1Query200JSONResponseBodyDiagnosticsCode = "SOURCES_IGNORED"
+	UNBOUNDEDTIMERANGE           PostApiV1Query200JSONResponseBodyDiagnosticsCode = "UNBOUNDED_TIME_RANGE"
 )
 
 // Valid indicates whether the value is a known member of the PostApiV1Query200JSONResponseBodyDiagnosticsCode enum.
@@ -30481,7 +30483,11 @@ func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 		return true
 	case POSSIBLEFANOUT:
 		return true
+	case SHAREDROWSUNDERLOWESTPROJECT:
+		return true
 	case SHAREWINDOWLIMITED:
+		return true
+	case SHAREWINDOWMISSING:
 		return true
 	case SOURCESIGNORED:
 		return true

@@ -19,6 +19,21 @@ export function assertSafeIdentifier({ value, role }: { value: string; role: str
   return value;
 }
 
+/**
+ * Column-name shape, which unlike a table name may carry dots. ClickHouse's nested columns are
+ * stored under dotted names (`Messages.Content`), so a column identifier is validated more
+ * loosely than a database or table one and is always backtick-quoted where it is emitted.
+ */
+const SAFE_COLUMN = /^[A-Za-z_][A-Za-z0-9_.]*$/;
+
+/** A column name as SQL: backtick-quoted, because it may carry dots. */
+export function quotedColumn(value: string): string {
+  if (!SAFE_COLUMN.test(value)) {
+    throw new Error(`lwql: column must match ${String(SAFE_COLUMN)}, got "${value}"`);
+  }
+  return `\`${value}\``;
+}
+
 /** ClickHouse string literal: backslash-escaped, single quotes doubled out. */
 export function clickHouseLiteral(value: string): string {
   return `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;

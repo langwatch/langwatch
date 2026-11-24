@@ -696,34 +696,16 @@ describe("given PostgreSQL-resident views that repeat a row per project", () => 
     });
   };
 
-  describe("when an organization-scoped view is rendered", () => {
-    /** @scenario "A fanned-out view keeps one row per entity across the projects read" */
-    it("keeps one row per budget, the lowest project's, after the tenant predicate", () => {
-      const sql = render("gateway_budgets");
+  /** @scenario "A single-project read of a fanned-out view carries no collapse" */
+  it.each(["gateway_budgets", "ingestion_sources", "topics"])(
+    "renders %s with no sort or per-key limit",
+    (name) => {
+      const sql = render(name);
 
-      const tenantAt = sql.indexOf("WHERE src.`TenantId` >=");
-      expect(tenantAt).toBeGreaterThan(-1);
-      expect(tenantAt).toBeLessThan(sql.indexOf("\nORDER BY"));
-      expect(sql).toMatch(
-        /\nORDER BY src\.`GatewayBudgetId`, src\.`TenantId`\nLIMIT 1 BY src\.`GatewayBudgetId`$/,
-      );
-    });
-  });
-
-  describe("when a team-scoped view is rendered", () => {
-    /** @scenario "A fanned-out view keeps one row per entity across the projects read" */
-    it("keeps one row per ingestion source", () => {
-      expect(render("ingestion_sources")).toMatch(/\nLIMIT 1 BY src\.`IngestionSourceId`$/);
-    });
-  });
-
-  describe("when a project-scoped view is rendered", () => {
-    /** @scenario "A fanned-out view keeps one row per entity across the projects read" */
-    it("reads its rows with no collapse", () => {
-      const sql = render("topics");
-
-      expect(sql).not.toContain("LIMIT 1 BY");
-      expect(sql).not.toContain("ORDER BY");
-    });
-  });
+      expect({ orderBy: sql.includes("ORDER BY"), limitBy: sql.includes("LIMIT 1 BY") }).toEqual({
+        orderBy: false,
+        limitBy: false,
+      });
+    },
+  );
 });

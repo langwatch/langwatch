@@ -34,6 +34,7 @@ import type { LangWatchQLParameterValue } from "../../../model/lwql-request-stat
 /** The diagnostics that say the server limited a run, shown on the card as one (i) line. */
 const LIMIT_DIAGNOSTIC_CODES: readonly string[] = [
   "SHARE_WINDOW_LIMITED",
+  "SHARE_WINDOW_MISSING",
   "SOURCES_IGNORED",
   "GRANULARITY_COARSENED",
 ];

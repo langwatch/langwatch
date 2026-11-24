@@ -66,8 +66,8 @@ Feature: LangWatchQL on an aggregate project reads its members inside their gran
     When ana runs a statement that reads the same view twice
     Then both references are narrowed to the members' windows
 
-  # tasks#1212: a fanned-out PostgreSQL view keeps one copy of a team- or organization-level
-  # row, the lowest in-scope project's. That copy's window alone must not decide the row.
+  # tasks#1212: a read over several projects keeps one copy of a team- or organization-level
+  # row. The windows pick the copies first, so the lowest project's window alone never decides.
   @unit @integration
   Scenario: A member window on the kept copy does not hide a row a sibling's window admits
     Given two sibling projects of one organization and an organization-level row
@@ -113,6 +113,15 @@ Feature: LangWatchQL on an aggregate project reads its members inside their gran
     When ana's session reads that row's view through the predicate
     Then the row is not read
 
+  # Otherwise the missing project's rows would vanish from the answer without a word.
+  @unit
+  Scenario: A run says when a project it reads has no member window
+    Given ana reads projects A and B
+    And the member windows name only project A
+    When the statement runs
+    Then diagnostics holds one SHARE_WINDOW_MISSING entry that names no project and counts none
+    And a run where every project has a window, or that is given no windows, carries no such entry
+
   @unit
   Scenario: A view with no time column reads only members shared for their whole history
     Given project B is shared from a point in time
@@ -133,6 +142,7 @@ Feature: LangWatchQL on an aggregate project reads its members inside their gran
     Then the run is refused saying a WITH name cannot repeat a view's name
     And project B's rows from before its start are not read
     And a plain project's statement with the same WITH runs as written
+    And a read over several projects is refused the same way for a view whose shared rows it keeps once
 
   @unit
   Scenario: App functions read text only from members shared for their whole history
