@@ -1,6 +1,6 @@
 /**
- * Which committed render the CLI bundle is built from. `native` (Langy's render)
- * drops the login steps, so only the Langy image, whose bash tool can run the CLI, sets it.
+ * Which committed render the CLI bundle is built from. `native` (Langy's render) drops login steps;
+ * only langyagent (Dockerfile.langyagent) and host-tier Langy (haven's plan_langy.go) set it.
  */
 /** @type {readonly ["cli", "native"]} */
 const RENDER_MODES = ["cli", "native"];
