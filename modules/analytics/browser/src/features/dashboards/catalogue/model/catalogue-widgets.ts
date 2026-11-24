@@ -1127,9 +1127,9 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     prompt:
       "How much do I spend on testing versus real users? Answer it with LangWatchQL over the " +
       "dashboard period. What the answer shows: Spend split by where it came from: production " +
-      "traffic, evaluations and simulations. It needs: cost and tokens. Quote the real numbers " +
-      "from the query result and name the traces behind them. If a query returns no rows, say " +
-      "plainly that there is no data for the dashboard period.",
+      "traffic, evaluations, simulations and experiments (playground and workflows). It needs: " +
+      "cost and tokens. Quote the real numbers from the query result and name the traces behind " +
+      "them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "cost-by-model",

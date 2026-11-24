@@ -181,6 +181,8 @@ export function SandboxedChartFrame({
     return () => {
       bridgeRef.current = null;
       bridge.dispose();
+      // A frame taken away, say for an empty sources face, leaves no problem on the card.
+      onSignalRef.current?.({ problem: false });
     };
   }, [generation, codeGeneration, theme, noteTornDown, noteFrameMounted]);
 

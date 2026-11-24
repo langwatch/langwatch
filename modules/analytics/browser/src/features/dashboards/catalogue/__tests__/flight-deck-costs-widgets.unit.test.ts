@@ -177,7 +177,9 @@ describe("given the Running costs widgets", () => {
     const testingSpend = new Function(`${NUMBERS}\n${TESTING_SPEND}\nreturn testingSpend;`)() as (
       costOf: (key: string) => number | null,
       total: number | null,
+      tracesOf: (key: string) => number,
     ) => number | null;
+    const noTests = (key: string) => (key === "production" || key === "other" ? 10 : 0);
     const spend: Record<string, number | null> = {
       production: 96,
       evaluations: null,
@@ -187,13 +189,21 @@ describe("given the Running costs widgets", () => {
     };
     const costOf = (key: string) => spend[key] ?? null;
 
-    expect(testingSpend(costOf, 100)).toBe(0);
+    expect(testingSpend(costOf, 100, noTests)).toBe(0);
     expect(
-      testingSpend((key) => ({ ...spend, evaluations: 3, experiments: 2 })[key] ?? null, 105),
+      testingSpend(
+        (key) => ({ ...spend, evaluations: 3, experiments: 2 })[key] ?? null,
+        105,
+        noTests,
+      ),
     ).toBe(5);
-    expect(testingSpend(costOf, null)).toBeNull();
+    expect(testingSpend(costOf, null, noTests)).toBeNull();
+    // Simulated tests ran on a model with no price: their spend is unknown, never 0%.
+    const unpricedTests = (key: string) => (key === "simulations" ? null : costOf(key));
+    expect(testingSpend(unpricedTests, 100, (key) => (key === "simulations" ? 4 : 0))).toBeNull();
+    expect(testingSpend(unpricedTests, 100, noTests)).toBe(0);
     const { code } = build("cost-by-source");
-    expect(code).toContain("const test = testingSpend(costOf, total);");
+    expect(code).toContain("const test = testingSpend(costOf, total, tracesOf);");
     expect(code).not.toContain('total - (costOf("production")');
   });
 

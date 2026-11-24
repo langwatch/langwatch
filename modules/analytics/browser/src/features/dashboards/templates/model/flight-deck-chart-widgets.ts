@@ -15,6 +15,9 @@ import {
   type WidgetSource,
 } from "./widget-code-parts.ts";
 
+/** Past tenfold the exact rise says nothing more, as on the legacy summary tiles. */
+export const PAST_TENFOLD = `const pastTenfold = (current, previous) => current > previous * 10;`;
+
 /** The Status tiles, with the not-connected face of `source`. */
 export const statusCode = ({ source }: { source: WidgetSource }) =>
   widgetCode({
@@ -26,7 +29,8 @@ export const statusCode = ({ source }: { source: WidgetSource }) =>
     source,
     compactCallToAction: true,
     parts: [NUMBERS, COMPLETENESS],
-    components: `// rising is what a rise means for this figure: "good", "bad" or "neutral".
+    components: `${PAST_TENFOLD}
+// rising is what a rise means for this figure: "good", "bad" or "neutral".
 function Change({ current, previous, rising }) {
   const line = { marginTop: 2, fontSize: 11, fontWeight: 500 };
   if (!known(current)) return null;
@@ -40,8 +44,7 @@ function Change({ current, previous, rising }) {
   let arrow = "→";
   if (up) arrow = "↗";
   if (down) arrow = "↘";
-  // Past tenfold the exact rise says nothing more, as on the legacy summary tiles.
-  if (Math.abs(delta) > 9.99) {
+  if (pastTenfold(current, previous)) {
     return (
       <div style={{ ...line, color }}>
         {arrow} more than 10 times the previous period

@@ -76,6 +76,7 @@ describe("given every stock widget's card", () => {
   it("keeps those terms out of each info tip, title and setup step", () => {
     const texts = [
       ...built.map(({ key, definition }) => `${key}: ${definition.description ?? ""}`),
+      ...built.map(({ key, name }) => `${key}: ${name}`),
       ...CATALOGUE_WIDGETS.flatMap(({ id, title }) => `${id}: ${title}`),
       ...Object.entries(CALLS_TO_ACTION).flatMap(([source, { title, line, button, quiet }]) =>
         [title, line, button, quiet].map((text) => `${source}: ${text}`),

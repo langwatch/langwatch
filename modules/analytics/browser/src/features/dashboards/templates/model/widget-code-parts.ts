@@ -125,10 +125,11 @@ function Bars({ rows, format, height, kind }) {
     <div style={{ ...box, display: "flex", flexDirection: "column", justifyContent: "center",
       gap: 6 }}>
       {rows.map((row, index) => (
-        <div key={row.label} title={row.title}
+        <div key={row.key ?? row.label}
           {...(known(row.value)
             ? askable({ kind, label: row.label || "Unknown", value: row.key ?? row.label })
             : {})}
+          {...(row.title ? { title: row.title } : {})}
           style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5,
             ...(known(row.value) ? askCursor() : {}) }}>
           <span style={{ width: 128, flexShrink: 0, color: C.subtle, ...ELLIPSIS }}>

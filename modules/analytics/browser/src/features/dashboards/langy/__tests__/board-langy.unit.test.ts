@@ -194,6 +194,23 @@ describe("an ask made on a new board before it was stored", () => {
       'dashboard "Review \\"x\\" (id new)" (id board-9); widgets: dashboard "y" (id new)',
     );
   });
+
+  /** @scenario "AC162e Asking Langy on a new board stores it first" */
+  it("leaves a widget's name and queries as they were, and moves only its key", () => {
+    const board = boardSubject({ board: { id: "new", name: "Untitled dashboard 3" }, widgets: [] });
+    const widget = {
+      id: "w-1",
+      name: 'dashboard "y" (id new)',
+      definition: { queries: [{ name: "q", sql: "SELECT 'dashboard \"z\" (id new)'" }] },
+    };
+    const asked = widgetPromptDraft({ widget, board, period: PERIOD });
+
+    const told = askAboutStoredBoard({ request: asked, draftId: "new", dashboardId: "board-9" });
+
+    expect(told.context[1]?.ref).toBe(asked.context[1]?.ref);
+    expect(told.context[1]?.key).toBe("dashboard:board-9:widget:w-1");
+    expect(told.context[0]?.ref).toContain('"Untitled dashboard 3" (id board-9)');
+  });
 });
 
 describe("asking about the same board and widget twice", () => {
@@ -220,5 +237,16 @@ describe("asking about the same board and widget twice", () => {
     expect(clicked.context[0]?.key).toBe(chip.id);
     expect(added.context[1]?.ref).not.toBe(clicked.context[1]?.ref);
     expect(added.context[1]?.key).toBe(clicked.context[1]?.key);
+  });
+
+  /** @scenario "AC126c Langy context: a board and a widget asked about again are still listed once" */
+  it("keys two widgets of one name apart, on one board or on two", () => {
+    const other = boardSubject({ board: { id: "board-10", name: "Costs too" }, widgets: [] });
+    const keyOf = ({ id, board }: { id: string; board: typeof after }) =>
+      widgetPromptDraft({ widget: { ...widget, id }, board, period: PERIOD }).context[1]?.key;
+
+    expect(keyOf({ id: "w-1", board: after })).toBe(keyOf({ id: "w-1", board: after }));
+    expect(keyOf({ id: "w-1", board: after })).not.toBe(keyOf({ id: "w-2", board: after }));
+    expect(keyOf({ id: "w-1", board: after })).not.toBe(keyOf({ id: "w-1", board: other }));
   });
 });

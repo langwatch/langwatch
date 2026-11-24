@@ -43,9 +43,14 @@ export function lwqlExecutedText(sql: string): string {
   );
 }
 
+/** The sources placeholder, with the spacing inside its type the server's type check allows. */
+const SOURCES_PLACEHOLDER = new RegExp(
+  `\\{${LWQL_SOURCES_PARAMETER}:\\s*Array\\(\\s*String\\s*\\)\\s*\\}`,
+);
+
 /** Whether a statement reads the sources placeholder in an expression, not a comment or literal. */
 export function readsSourcesParameter(sql: string): boolean {
-  return lwqlExecutedText(sql).includes(`{${LWQL_SOURCES_PARAMETER}:Array(String)}`);
+  return SOURCES_PLACEHOLDER.test(lwqlExecutedText(sql));
 }
 
 /** The projects a run reads (`Array(String)`), set by the surface from `projects`. */

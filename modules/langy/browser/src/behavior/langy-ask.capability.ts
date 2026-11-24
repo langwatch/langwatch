@@ -26,11 +26,11 @@ function seedDraft({
 }
 
 /**
- * Attaches one piece of an ask's context. One the page already offers as a chip, by the chip's
- * id as its key or the same kind and ref, is that chip chosen; the rest is attached under its
- * key, so asking about the same board or widget again replaces its entry, never repeats it.
+ * Attaches one piece of an ask's context. A chip the page offers (its id as the key, or the same
+ * kind and ref) is chosen, and returned when the reader had not chosen it; the rest is attached
+ * under its key, so asking about the same board or widget again replaces its entry.
  */
-function attachAskContext(item: NonNullable<LangyAskRequest["context"]>[number]): void {
+function attachAskContext(item: NonNullable<LangyAskRequest["context"]>[number]): string[] {
   const langy = useLangyStore.getState();
   const onPage = useLangyPageContextStore
     .getState()
@@ -39,14 +39,26 @@ function attachAskContext(item: NonNullable<LangyAskRequest["context"]>[number])
     );
   if (onPage) {
     if (item.key !== void 0) langy.detachContext(item.key);
+    const wasChosen = langy.chosenChipIds.has(onPage.id);
     langy.chooseChip(onPage.id);
-    return;
+    return wasChosen ? [] : [onPage.id];
   }
   langy.attachContext({
     type: item.kind,
     id: item.ref,
     label: item.label,
     ...(item.key === void 0 ? {} : { key: item.key }),
+  });
+  return [];
+}
+
+/** Takes off the chips a dropped seed chose, leaving the rest as the reader set them. */
+function unchooseChips(ids: readonly string[]): void {
+  if (ids.length === 0) return;
+  useLangyStore.setState((state) => {
+    const chosen = new Set(state.chosenChipIds);
+    for (const id of ids) chosen.delete(id);
+    return { chosenChipIds: chosen };
   });
 }
 
@@ -63,6 +75,7 @@ export function createLangyAsk(): LangyAsk {
       const langy = useLangyStore.getState();
       const prompt = request.question?.trim() ?? "";
 
+      const before = seeded;
       if (prompt) {
         langy.askLangy(prompt);
       } else {
@@ -74,7 +87,11 @@ export function createLangyAsk(): LangyAsk {
 
       // After the ask: `askLangy` resets conversation-scoped state, so the
       // attachment belongs to the conversation being started, not the last one.
-      for (const item of request.context ?? []) attachAskContext(item);
+      const chipIds = (request.context ?? []).flatMap((item) => attachAskContext(item));
+      // A seed that replaced an untouched one takes over the chips that one chose.
+      if (seeded !== null && seeded !== before) {
+        seeded = { ...seeded, chipIds: [...(before?.chipIds ?? []), ...chipIds] };
+      }
     },
     onScreen: (about) => {
       screen = about;
@@ -89,6 +106,7 @@ export function createLangyAsk(): LangyAsk {
       const langy = useLangyStore.getState();
       langy.setDraft("");
       for (const id of dropped.contextIds) langy.detachContext(id);
+      unchooseChips(dropped.chipIds ?? []);
     },
   };
 }

@@ -90,7 +90,7 @@ export const SATISFACTION_CODE = widgetCode({
   });
   const mood = (value) => (value > 0.2 ? "Happy" : value < -0.2 ? "Unhappy" : "Neutral");
   let label = "on a scale from -1 to 1";
-  if (known(previous)) {
+  if (known(now) && known(previous)) {
     label += ", " + (now >= previous ? "up" : "down") + " from " + score(previous) +
       " in the previous period";
   }

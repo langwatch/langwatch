@@ -15,8 +15,9 @@ function ShareRows({ rows, kind }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {rows.map((row) => (
-        <div key={row.label} title={row.title}
+        <div key={row.key ?? row.label}
           {...(kind ? askable({ kind, label: row.label, value: row.key ?? row.label }) : {})}
+          {...(row.title ? { title: row.title } : {})}
           style={kind ? askCursor() : undefined}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12 }}>
             <span style={{ flex: 1, minWidth: 0, fontWeight: 500, overflow: "hidden",

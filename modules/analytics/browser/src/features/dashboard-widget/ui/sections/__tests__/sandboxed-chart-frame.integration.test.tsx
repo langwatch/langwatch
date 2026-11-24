@@ -39,6 +39,7 @@ const ui = (
   theme: "light" | "dark" = "light",
   onIdleChange?: (idle: boolean) => void,
   cover?: ReactNode,
+  onSignal?: (signal: { problem: boolean }) => void,
 ) => (
   <DesignSystemProvider forcedTheme="light">
     <SandboxedChartFrame
@@ -48,9 +49,19 @@ const ui = (
       onLog={vi.fn()}
       onIdleChange={onIdleChange}
       cover={cover}
+      onSignal={onSignal}
     />
   </DesignSystemProvider>
 );
+
+const reportedProblem = () => {
+  const options = bridgeMock.mock.calls.at(-1)?.[0] as {
+    onSignal: (signal: { problem: boolean }) => void;
+    onTeardown: () => void;
+  };
+  act(() => options.onSignal({ problem: true }));
+  return options;
+};
 
 afterEach(() => {
   cleanup();
@@ -148,25 +159,25 @@ describe("given a sandboxed chart frame", () => {
     /** @scenario "AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem" */
     it("clears the problem at teardown and again when the new frame starts", () => {
       const onSignal = vi.fn();
-      render(
-        <DesignSystemProvider forcedTheme="light">
-          <SandboxedChartFrame
-            code="A"
-            executeQuery={vi.fn()}
-            dashboardContext={dashboardContext}
-            onLog={vi.fn()}
-            onSignal={onSignal}
-          />
-        </DesignSystemProvider>,
-      );
-      const options = bridgeMock.mock.calls.at(-1)?.[0] as {
-        onSignal: (signal: { problem: boolean }) => void;
-        onTeardown: () => void;
-      };
-      act(() => options.onSignal({ problem: true }));
+      render(ui("A", "light", undefined, undefined, onSignal));
+      const options = reportedProblem();
       expect(onSignal).toHaveBeenLastCalledWith({ problem: true });
 
       act(() => options.onTeardown());
+
+      expect(onSignal).toHaveBeenLastCalledWith({ problem: false });
+    });
+  });
+
+  describe("when its frame reported a problem and is taken away", () => {
+    /** @scenario "AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem" */
+    it("clears the problem as the frame leaves", () => {
+      const onSignal = vi.fn();
+      const { unmount } = render(ui("A", "light", undefined, undefined, onSignal));
+      reportedProblem();
+      expect(onSignal).toHaveBeenLastCalledWith({ problem: true });
+
+      unmount();
 
       expect(onSignal).toHaveBeenLastCalledWith({ problem: false });
     });

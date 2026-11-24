@@ -167,6 +167,25 @@ export function restartStoredDraft(projectId: string): void {
   if (useDraftStore.getState().savedId !== void 0) restartDraft(projectId);
 }
 
+/**
+ * The draft's address opened: a stored draft, or one held for another project (or none, on a
+ * fresh load), starts over now, so the first edit never re-keys the screen under its editor.
+ */
+export function openDraftAddress(projectId: string): void {
+  const { savedId, projectId: heldFor } = useDraftStore.getState();
+  if (savedId !== void 0 || heldFor !== projectId) restartDraft(projectId);
+}
+
+/** Settles once the draft writes on this stored board, queued before now, have landed. */
+export function afterDraftWrites(dashboardId: string): Promise<void> {
+  const { savedId, saving } = useDraftStore.getState();
+  if (savedId !== dashboardId || !saving) return Promise.resolve();
+  return saving.then(
+    () => void 0,
+    () => void 0,
+  );
+}
+
 /** The draft this project has open; one from another project starts over. */
 function currentDraft(projectId: string): DraftState {
   const draft = useDraftStore.getState();
@@ -356,8 +375,11 @@ export function useDraftBoard({ takenNames }: { takenNames: readonly string[] })
   return {
     /** The draft as a board, which no list holds. */
     board,
-    /** Keys the board screen: the same before and after the draft is stored. */
-    key: `draft-${draft.generation}`,
+    /**
+     * Keys the board screen: the same before and after the draft is stored, and before and
+     * after a draft not held yet starts over, which moves the generation on by one.
+     */
+    key: `draft-${draft.generation + (held === draft ? 0 : 1)}`,
     /** The board this draft became, while the screen still shows it as the draft's. */
     savedId: held.savedId,
     materialise: (edit: DraftEdit = {}): Promise<string> => materialiseDraft({ writer, edit }),

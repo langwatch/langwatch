@@ -210,6 +210,8 @@ export function boardPromptDraft({
 
 /** A widget as a draft reads it: its name and the stored parts that explain it. */
 export interface WidgetSubject {
+  /** The stored widget's id; a widget not stored yet goes by its name. */
+  readonly id?: string;
   readonly name: string;
   readonly definition: {
     readonly prompt?: string;
@@ -247,10 +249,12 @@ function fittedSql({ sqls, room }: { sqls: readonly string[]; room: number }): s
  */
 export function widgetContext({
   widget,
+  board,
   period,
   focus,
 }: {
   widget: WidgetSubject;
+  board: Pick<BoardSubject, "id">;
   period: BoardPeriod;
   /** What the draft is about within the widget, such as the clicked value. */
   focus?: string;
@@ -277,8 +281,9 @@ export function widgetContext({
   return context({
     ref: ref(fittedSql({ sqls, room })),
     label: `${LANGY_WIDGET_CHIP_LABEL_PREFIX}${widget.name}`,
-    // Clicks on different values of one widget are still that widget, listed once.
-    key: `widget:${widget.name}`,
+    // Clicks on different values of one widget are still that widget, listed once; another
+    // widget of the same name, here or on another board, is listed beside it.
+    key: `${boardKey(board)}:widget:${widget.id ?? widget.name}`,
   });
 }
 
@@ -500,9 +505,14 @@ function generalClickPrompt({
   at: string | undefined;
   values: Readonly<Record<string, string>>;
 }): string {
+  const named = subject.kind && subject.kind !== "series" ? `the ${subject.kind} ` : "";
+  // A day's label is the bucket itself; any other value clicked at a bucket is named with it.
+  const value =
+    subject.kind && !["day", "series"].includes(subject.kind) ? [`${named}"${subject.label}"`] : [];
+  const on = [...value, ...(subject.series ? [subject.series] : [])].join(", ");
   const what = at
-    ? `${subject.series ? `${subject.series} on ` : ""}${at}`
-    : `${subject.kind && subject.kind !== "series" ? `the ${subject.kind} ` : ""}"${subject.label}" over ${values.period}`;
+    ? `${on ? `${on} on ` : ""}${at}`
+    : `${named}"${subject.label}" over ${values.period}`;
   return (
     `On "${values.question}", what stands out about ${what}? Find the requests behind it, ` +
     "show me 3 examples and tell me the most likely cause. If there is no data for it, say so " +
@@ -634,7 +644,8 @@ export function widgetBuildQuestion({
   const attached = widgetEditorContext({ widget, board, period });
   return {
     question: prompt,
-    context: widget.id === void 0 ? [attached] : [attached, widgetContext({ widget, period })],
+    context:
+      widget.id === void 0 ? [attached] : [attached, widgetContext({ widget, board, period })],
   };
 }
 
@@ -735,7 +746,7 @@ function widgetDraft({
   return {
     draft: prompt,
     about,
-    context: [attached, widgetContext({ widget, period, ...(focus ? { focus } : {}) })],
+    context: [attached, widgetContext({ widget, board, period, ...(focus ? { focus } : {}) })],
   };
 }
 
@@ -758,15 +769,24 @@ export function askAboutStoredBoard({
   dashboardId: string;
 }): AnalyticsLangyAskRequest {
   const { about } = request;
+  const draftKey = boardKey({ id: draftId });
+  const storedKey = boardKey({ id: dashboardId });
+  // Only the board's own context and the editor's name the board in their reference.
+  const namesBoard = (key: string) => key === draftKey || key.startsWith(`${draftKey}:editing:`);
   return {
     ...request,
     context: request.context.map((each) => ({
       ...each,
-      ref: each.ref.replace(
-        boardReference(draftId),
-        (_, named: string) => `${named}(id ${dashboardId})`,
-      ),
-      key: each.key.replace(boardKey({ id: draftId }), boardKey({ id: dashboardId })),
+      ref: namesBoard(each.key)
+        ? each.ref.replace(
+            boardReference(draftId),
+            (_, named: string) => `${named}(id ${dashboardId})`,
+          )
+        : each.ref,
+      key:
+        each.key === draftKey || each.key.startsWith(`${draftKey}:`)
+          ? `${storedKey}${each.key.slice(draftKey.length)}`
+          : each.key,
     })),
     ...(about === void 0
       ? {}

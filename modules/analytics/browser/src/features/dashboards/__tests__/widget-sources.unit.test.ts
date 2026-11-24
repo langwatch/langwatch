@@ -136,6 +136,15 @@ describe("runSources", () => {
     expect(runSources(query("present", ["application"], IGNORES))).toBeNull();
   });
 
+  /** @scenario "AC203 Sources: a query reading the parameter is kept to the list it stores" */
+  it("keeps the list of a query someone named present that reads the parameter", () => {
+    const own = query("present", ["application", "langy"]);
+
+    expect(runSources(own)).toEqual(["application", "langy"]);
+    expect(widgetSourcesLine([own])).toBe("Sources: application, langy");
+    expect(picksNoSources([query("present", [])])).toBe(true);
+  });
+
   /** @scenario "AC202i Stock widgets: a query over views with no origin raises no note that sources were ignored" */
   it("names what a query over an origin view stores, and null when it stores none", () => {
     expect(runSources(query("main", ["application", "langy"]))).toEqual(["application", "langy"]);

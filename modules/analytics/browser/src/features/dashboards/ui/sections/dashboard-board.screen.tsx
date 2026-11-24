@@ -31,7 +31,11 @@ import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.t
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
-import { restartStoredDraft, useDraftBoard } from "../../behavior/use-draft-board.ts";
+import {
+  afterDraftWrites,
+  openDraftAddress,
+  useDraftBoard,
+} from "../../behavior/use-draft-board.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
 import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
@@ -114,8 +118,11 @@ function useBoardTitleRename({
         host.failed({ error, fallbackTitle: "Couldn't save the dashboard" });
       });
   }
+  // A board a draft just became takes a rename after the draft's queued writes, never before.
   return (name) =>
-    edits.renameBoard({ board: { ...board, project: { id: board.projectId } }, name });
+    void afterDraftWrites(board.id).then(() =>
+      edits.renameBoard({ board: { ...board, project: { id: board.projectId } }, name }),
+    );
 }
 
 /** What the header's lent actions point at; a board not stored yet offers none. */
@@ -377,7 +384,7 @@ export function Board() {
   const draft = useDraftBoard({ takenNames: boards.map(({ name }) => name) });
   const isDraft = dashboardId === DRAFT_SEGMENT;
   useEffect(() => {
-    if (isDraft) restartStoredDraft(projectId);
+    if (isDraft && projectId) openDraftAddress(projectId);
   }, [isDraft, projectId]);
   if (isLoading) return <UiPageLoading />;
   // A member the list refuses sees the page the flag being off shows (AC21).

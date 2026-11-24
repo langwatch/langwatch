@@ -15,6 +15,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
+import { afterDraftWrites } from "../behavior/use-draft-board.ts";
 import {
   AGENT_KIND_CHIP_LABELS,
   CODING_PICKER_QUESTIONS,
@@ -1590,20 +1591,67 @@ describe("a member's board", () => {
 
       await user.click(within(drawer).getByRole("button", { name: "Save" }));
       await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(1));
-      fireEvent.click(screen.getByRole("button", { name: "Add a description", hidden: true }));
-      const field = screen.getByRole("textbox", { name: "Dashboard description", hidden: true });
-      fireEvent.change(field, { target: { value: "Refunds" } });
-      fireEvent.keyDown(field, { key: "Enter" });
+      const redescribe = (button: string, text: string) => {
+        fireEvent.click(screen.getByRole("button", { name: button, hidden: true }));
+        const field = screen.getByRole("textbox", { name: "Dashboard description", hidden: true });
+        fireEvent.change(field, { target: { value: text } });
+        fireEvent.keyDown(field, { key: "Enter" });
+      };
+      redescribe("Add a description", "Refunds");
+      redescribe("Refunds", "Returns");
       server.releaseBoardCreates();
 
       await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1));
-      await waitFor(() =>
-        expect(server.state.boards.at(-1)).toMatchObject({
-          id: "board-new-3",
-          description: "Refunds",
-        }),
-      );
+      await waitFor(() => expect(callsTo(server, "boards.update")).toHaveLength(2));
+      expect(callsTo(server, "boards.update").map(({ input }) => input)).toEqual([
+        expect.objectContaining({ description: "Refunds" }),
+        expect.objectContaining({ description: "Returns" }),
+      ]);
+      expect(server.state.boards.at(-1)).toMatchObject({
+        id: "board-new-3",
+        description: "Returns",
+      });
       expect(callsTo(server, "boards.create")).toHaveLength(1);
+    });
+
+    /** @scenario "AC162j Edits made while a new board is being stored land on it in the order made" */
+    it("lets a rename made once the board is stored wait for the edits queued before it", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS, holdBoardCreates: true });
+      const { host } = openBoard({ server, dashboardId: "new" });
+      await user.click(await screen.findByRole("button", { name: "Add a description" }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "Q{Enter}");
+      await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(1));
+      await user.click(screen.getByRole("button", { name: "Q" }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "R{Enter}");
+
+      server.releaseBoardCreates();
+      await waitFor(() => expect(host.replacements).toHaveLength(1));
+      await afterDraftWrites("board-new-3");
+
+      expect(callsTo(server, "boards.update").map(({ input }) => input)).toEqual([
+        expect.objectContaining({ description: "Q" }),
+        expect.objectContaining({ description: "QR" }),
+      ]);
+    });
+
+    /** @scenario "AC162f A refused store keeps the new board open" */
+    it("keeps the screen it opened when the first edit of a freshly loaded new board is refused", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS, refuseBoardCreates: 1 });
+      const host = new StubAnalyticsHost({
+        flags: FLAG_ON,
+        project: { id: "proj-fresh", slug: "fresh", name: "Fresh", hasFirstMessage: true },
+        route: { params: { dashboardId: "new" }, query: {} },
+      });
+      renderDashboards({ element: <DashboardBoardScreen />, host, answer: server.answer });
+      const title = await screen.findByRole("heading", { name: "Untitled dashboard 1" });
+
+      await user.click(screen.getByRole("button", { name: "Add a description" }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "Q{Enter}");
+      await waitFor(() => expect(host.failures).toHaveLength(1));
+
+      expect(screen.getByRole("heading", { name: "Untitled dashboard 1" })).toBe(title);
     });
 
     /** @scenario "AC162g Opening the new board's address again starts a new unsaved board" */

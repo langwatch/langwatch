@@ -506,15 +506,17 @@ function setWithout(ids: Set<string>, id: string): Set<string> {
 }
 
 function withContextAttached(state: LangyState, item: LangyAttachedContext): Partial<LangyState> {
-  const existingIndex = state.attachedContext.findIndex(
-    (attached) => attached.id === item.id || (item.key !== void 0 && attached.key === item.key),
-  );
+  const matches = (attached: LangyAttachedContext) =>
+    attached.id === item.id || (item.key !== void 0 && attached.key === item.key);
+  const existingIndex = state.attachedContext.findIndex(matches);
   // Re-attaching an id or a key is a refresh, not a duplicate: replace in place so a label,
   // meta or text that changed (a board that gained a widget) updates without stacking a
-  // second chip or losing the item's position.
+  // second chip or losing the item's position. Any other entry it matches goes.
   if (existingIndex >= 0) {
-    const next = [...state.attachedContext];
-    next[existingIndex] = item;
+    const next = state.attachedContext.flatMap((attached, index) => {
+      if (index === existingIndex) return [item];
+      return matches(attached) ? [] : [attached];
+    });
     return { attachedContext: next };
   }
   return { attachedContext: [...state.attachedContext, item] };

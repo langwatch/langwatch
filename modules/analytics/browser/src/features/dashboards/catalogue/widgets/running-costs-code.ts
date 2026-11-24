@@ -75,11 +75,15 @@ export const SPEND_CODE = widgetCode({
 
 /**
  * The spend the Production vs testing card calls testing: its automatic checks, simulated tests,
- * and playground and workflows rows. Your app and the Other row are not tests.
+ * and playground and workflows rows. Your app and the Other row are not tests. No test traffic
+ * is nothing spent; test traffic with no known price is unknown, never $0.
  */
 export const TESTING_SPEND = `const TESTING = ["evaluations", "simulations", "experiments"];
-function testingSpend(costOf, total) {
-  return known(total) ? (add(...TESTING.map((key) => costOf(key))) ?? 0) : null;
+function testingSpend(costOf, total, tracesOf) {
+  if (!known(total)) return null;
+  const spent = add(...TESTING.map((key) => costOf(key)));
+  if (known(spent)) return spent;
+  return TESTING.some((key) => tracesOf(key) > 0) ? null : 0;
 }`;
 
 /** Production vs testing: test traffic should stay a small share of the bill. */
@@ -161,7 +165,7 @@ function UnpricedRow({ traces }) {
   const spend = pivot(main.data, "source", (row) => num(row.cost));
   const points = labelled(withBuckets(main,
     series.map((item) => ({ key: item.key, kind: "count" })), spend));
-  const test = testingSpend(costOf, total);
+  const test = testingSpend(costOf, total, tracesOf);
   // A large share: testing takes a quarter of the spend or more.
   signalProblem((ratio(test, total) ?? 0) >= 0.25);
   return (

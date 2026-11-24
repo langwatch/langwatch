@@ -223,3 +223,62 @@ describe("given a widget added from the picker, then a value clicked on its card
     expect(state.chosenChipIds.size).toBe(0);
   });
 });
+
+describe("given an unsent draft that chose the page's board chip", () => {
+  const chip = {
+    id: "dashboard:board-1",
+    kind: "dashboard" as const,
+    label: "dashboard: My dashboard · 30d · 1d",
+    ref: 'dashboard "My dashboard" (id board-1)',
+  };
+  const askAboutBoard = () => {
+    const ask = createLangyAsk();
+    ask.onScreen({ ref: "board-1" });
+    ask.ask({
+      draft: "What stands out?",
+      about: { ref: "board-1" },
+      context: [{ kind: "dashboard", ref: chip.ref, label: "My dashboard", key: chip.id }],
+    });
+    return ask;
+  };
+
+  /** @scenario "Langy drafts: an unsent draft is dropped when the member moves to another board" */
+  it("takes the chip off with the draft when the member moves to another board", () => {
+    useLangyPageContextStore.setState({ pageContext: [chip] });
+    const ask = askAboutBoard();
+    expect(useLangyStore.getState().chosenChipIds.has(chip.id)).toBe(true);
+
+    ask.onScreen({ ref: "board-2" });
+
+    expect(useLangyStore.getState().chosenChipIds.has(chip.id)).toBe(false);
+    expect(useLangyStore.getState().dismissedChipIds.has(chip.id)).toBe(false);
+  });
+
+  /** @scenario "Langy drafts: an unsent draft is dropped when the member moves to another board" */
+  it("keeps a chip the member had chosen before the ask", () => {
+    useLangyPageContextStore.setState({ pageContext: [chip] });
+    useLangyStore.getState().chooseChip(chip.id);
+    const ask = askAboutBoard();
+
+    ask.onScreen({ ref: "board-2" });
+
+    expect(useLangyStore.getState().chosenChipIds.has(chip.id)).toBe(true);
+  });
+});
+
+describe("given context attached under one id and another key", () => {
+  /** @scenario "AC126c Langy context: a board and a widget asked about again are still listed once" */
+  it("lists an entry matching both once, where the first of them stood", () => {
+    const langy = useLangyStore.getState();
+    langy.attachContext({ type: "dashboard", id: "a", label: "A" });
+    langy.attachContext({ type: "dashboard", id: "b", label: "B", key: "k" });
+    langy.attachContext({ type: "dashboard", id: "c", label: "C" });
+
+    langy.attachContext({ type: "dashboard", id: "a", label: "A2", key: "k" });
+
+    expect(useLangyStore.getState().attachedContext).toEqual([
+      { type: "dashboard", id: "a", label: "A2", key: "k" },
+      { type: "dashboard", id: "c", label: "C" },
+    ]);
+  });
+});

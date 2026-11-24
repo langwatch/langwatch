@@ -16,6 +16,14 @@ import { canFollowSources, PRESENCE_QUERY } from "./sources-parameter.ts";
 
 type Sourced = Pick<DashboardWidgetQuery, "name" | "sources" | "sql">;
 
+/**
+ * The template-owned presence query, which reads every origin by design. A query someone named
+ * `present` that reads the sources parameter is theirs, and keeps the list it stores.
+ */
+function isPresenceQuery(query: Sourced): boolean {
+  return query.name === PRESENCE_QUERY && !readsSourcesParameter(query.sql);
+}
+
 /** The card line when no query reads the parameter but a view could follow it (AC204). */
 export const ALL_SOURCES_LINE = "Sources: all sources";
 
@@ -28,8 +36,7 @@ export const SOURCES_DO_NOT_APPLY_LINE =
  * so nothing is run. A query that ignores the parameter counts every origin whatever it stores.
  */
 export function picksNoSources(queries: readonly Sourced[]): boolean {
-  // The template-owned presence query reads every origin by design, whatever list it stores.
-  const counted = queries.filter((query) => query.name !== PRESENCE_QUERY);
+  const counted = queries.filter((query) => !isPresenceQuery(query));
   return (
     counted.length > 0 &&
     counted.every((query) => query.sources?.length === 0 && readsSourcesParameter(query.sql))
@@ -57,7 +64,7 @@ export function withStoredSources(
  * no note that the sources were ignored (AC202i).
  */
 export function runSources(query: Sourced): readonly TraceSource[] | null {
-  if (query.name === PRESENCE_QUERY || !canFollowSources(query.sql)) return null;
+  if (isPresenceQuery(query) || !canFollowSources(query.sql)) return null;
   return query.sources ?? null;
 }
 
@@ -66,7 +73,7 @@ export function runSources(query: Sourced): readonly TraceSource[] | null {
  * when they differ; "all sources" when none reads it; "" with no query.
  */
 export function widgetSourcesLine(allQueries: readonly Sourced[]): string {
-  const queries = allQueries.filter((query) => query.name !== PRESENCE_QUERY);
+  const queries = allQueries.filter((query) => !isPresenceQuery(query));
   if (queries.length === 0) return "";
   if (picksNoSources(queries)) return "No sources picked";
   const following = queries.filter((query) => readsSourcesParameter(query.sql));
@@ -123,7 +130,7 @@ const isDefault = (sources: readonly TraceSource[]) =>
  * none (AC240, AC240b); the editor keeps the full line from {@link widgetSourcesLine}.
  */
 export function widgetCardSourcesLine(allQueries: readonly Sourced[]): string {
-  const queries = allQueries.filter((query) => query.name !== PRESENCE_QUERY);
+  const queries = allQueries.filter((query) => !isPresenceQuery(query));
   if (queries.length === 0) return "";
   if (picksNoSources(queries)) return NO_SOURCES_CARD_LINE;
   // A query over origin-keeping views that ignores the parameter counts every source.

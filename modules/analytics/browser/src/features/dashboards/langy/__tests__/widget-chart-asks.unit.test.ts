@@ -86,6 +86,20 @@ describe("widgetChartDraft", () => {
     });
   });
 
+  describe("given a value clicked at one bucket, with no prompt declared for it", () => {
+    /** @scenario "AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period" */
+    it("names the value beside the bucket", () => {
+      const request = widgetChartDraft({
+        subject: { kind: "model", label: "gpt-5", at: "2026-09-03T00:00:00Z" },
+        widget: WIDGET,
+        board: BOARD,
+        period: PERIOD,
+      });
+
+      expect(request.draft).toMatch(/what stands out about the model "gpt-5" on /);
+    });
+  });
+
   describe("given a day clicked with the series under the pointer", () => {
     /** @scenario "AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period" */
     it("names the series and the day in words", () => {

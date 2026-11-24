@@ -405,16 +405,24 @@ const perKLabel = (value) => (known(value) ? value.toFixed(1) : GAP);`,
   );`,
 });
 
-/** The accuracy under which a cell turns red; no stored minimum exists to read instead. */
+/** The accuracy under which a cell turns orange; no stored minimum exists to read instead. */
 const FIELD_FLOOR = 0.9;
+/** Three points under the floor, a cell turns red. */
+const FIELD_RED_FLOOR = 0.87;
+/** Fewer checks than this colour nothing: the share is too noisy to flag. */
+const FIELD_MIN_CHECKED = 30;
 
 const EXT_FIELD_ACCURACY_CODE = widgetCode({
   summary: "Share of checked documents with each field right, per document type and overall.",
-  subtitle: `Share of checked documents where each field was right, red when under ${FIELD_FLOOR * 100}% right.`,
+  subtitle:
+    `Share of checked documents where each field was right. Once a field has ` +
+    `${FIELD_MIN_CHECKED} checks, orange marks under ${FIELD_FLOOR * 100}% right and red under ` +
+    `${FIELD_RED_FLOOR * 100}%.`,
   source: "evaluations",
   parts: [NUMBERS, TABLE, UNITS],
   components: `const FLOOR = ${FIELD_FLOOR};
-const MIN_CHECKED = 30;
+const RED_FLOOR = ${FIELD_RED_FLOOR};
+const MIN_CHECKED = ${FIELD_MIN_CHECKED};
 const fieldName = (field) => cap(field.replace(/_/g, " ").replace(/\\b(vat|po)\\b/g, (word) =>
   word.toUpperCase()));
 function Accuracy({ wrong, checked }) {
@@ -422,7 +430,7 @@ function Accuracy({ wrong, checked }) {
   const accuracy = 1 - wrong / checked;
   let colour = C.subtle;
   if (checked < MIN_CHECKED) colour = C.faint;
-  else if (accuracy < FLOOR - 0.03) colour = C.red;
+  else if (accuracy < RED_FLOOR) colour = C.red;
   else if (accuracy < FLOOR) colour = C.orange;
   return <span style={{ color: colour, fontWeight: colour === C.red ? 600 : 400 }}>
     {pct(accuracy, 0)}

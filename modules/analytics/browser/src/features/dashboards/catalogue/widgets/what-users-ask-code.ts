@@ -128,7 +128,7 @@ export const TOPIC_QUALITY_CODE = widgetCode({
   summary: "Per topic: traces, the share that went well, and requests the agent could not serve.",
   subtitle:
     "Went well counts resolved conversations (or checks passed, until outcomes are scored), and " +
-    "red marks a topic clearly below your others. Click a topic to open its conversations.",
+    "red marks a topic clearly below your others. Click a topic to ask Langy about it.",
   parts: [NUMBERS, TABLE, TOPIC_NAME],
   queries: ["topics"],
   body: `  if (topics.data.length === 0) {
