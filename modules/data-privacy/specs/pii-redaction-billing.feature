@@ -273,7 +273,16 @@ Feature: A PII redaction model call is priced per character, written to the spen
       When the month is reported
       Then no PII redaction meter event is sent and its checkpoint is not advanced
       And the first report after the price is added carries the month from zero
+      And a warning names the organization, the meter and the amount held
       # Stripe drops a meter event no subscription item prices, so sending it would lose the charge.
+
+    @unit
+    Scenario: A pending PII redaction total is replayed even while the price is missing
+      Given a PII redaction meter event whose send was cut off before it was confirmed
+      And a subscription that no longer carries the PII redaction price
+      When the month is reported
+      Then the pending total is sent again under its own identifier
+      # Stripe forgets an identifier after a day; waiting for the price could count it twice.
 
     @unit
     Scenario: Usage is reported once the subscription carries the PII redaction price
@@ -288,7 +297,16 @@ Feature: A PII redaction model call is priced per character, written to the spen
       And PII redaction spend this month
       When the month is reported
       Then no PII redaction meter event is sent and its checkpoint is not advanced
+      And the failed read is counted on the meter's checkpoint
       And another report is scheduled
+
+    @unit
+    Scenario: A PII redaction price read that keeps failing stops at the circuit breaker
+      Given an organization whose subscription read fails every time
+      And PII redaction spend this month
+      When the month is reported again and again
+      Then the read is tried five times, each counted on the PII redaction meter's checkpoint
+      And then an alarm is logged and no further report is scheduled
 
     @unit
     Scenario: The other meters do not wait on the PII redaction price
