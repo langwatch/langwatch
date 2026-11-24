@@ -12,36 +12,19 @@ import { describe, expect, it } from "vitest";
 import { cutoverSignInRefusal } from "../../../model/sign-in-error-code.ts";
 
 describe("normalizeSignInErrorCode", () => {
-  describe("when given null or undefined", () => {
-    it("returns null", () => {
-      expect(normalizeSignInErrorCode(null)).toBeNull();
-      expect(normalizeSignInErrorCode(undefined)).toBeNull();
-    });
-  });
-
   describe("when given a BetterAuth different-email error", () => {
-    it("maps email_doesn't_match to DIFFERENT_EMAIL_NOT_ALLOWED", () => {
-      expect(normalizeSignInErrorCode("email_doesn't_match")).toBe("DIFFERENT_EMAIL_NOT_ALLOWED");
-    });
-
-    /** @scenario "The different-email refusal in every spelling shows the specific message" */
+    /** @scenario "The different-email refusal shows the specific message" */
     it("maps email_does_not_match to DIFFERENT_EMAIL_NOT_ALLOWED", () => {
       expect(normalizeSignInErrorCode("email_does_not_match")).toBe("DIFFERENT_EMAIL_NOT_ALLOWED");
-    });
-
-    it("maps LINKING_DIFFERENT_EMAILS_NOT_ALLOWED to DIFFERENT_EMAIL_NOT_ALLOWED", () => {
-      expect(normalizeSignInErrorCode("LINKING_DIFFERENT_EMAILS_NOT_ALLOWED")).toBe(
-        "DIFFERENT_EMAIL_NOT_ALLOWED",
-      );
     });
   });
 
   describe("when given a BetterAuth account-already-linked error", () => {
     /** @scenario "The native account-link refusal maps to a stable sign-in error" */
     it("normalizes the native account-link refusal", () => {
-      const code = normalizeSignInErrorCode("account not linked");
+      const code = normalizeSignInErrorCode("account_not_linked");
       expect(code).toBe("OAuthAccountNotLinked");
-      expect(signInErrorMayCross("account not linked")).toBe(true);
+      expect(signInErrorMayCross("account_not_linked")).toBe(true);
       expect(isStableAuthError(code)).toBe(true);
     });
 

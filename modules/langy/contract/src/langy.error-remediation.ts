@@ -86,7 +86,7 @@ const tips: Record<string, readonly string[]> = {
     "The worker died mid-reply and the server already exhausted its recovery — the message is on record, retry manually",
   ],
   langy_agent_errored: [
-    "The model call was rejected upstream — check meta/reasons for the provider's typed failure, then retry",
+    "The reply failed on the cause named in meta/reasons; fix what it names, then retry",
   ],
   langy_turn_timeout: [
     "Retry — or ask for a narrower slice: a shorter time range or a single trace",

@@ -15,6 +15,11 @@ import {
   RETENTION_EXTENSION_EVENT_VERSION,
   type RetentionAppliedEvent,
   type RetentionExtendedEvent,
+  RECORD_RETENTION_POLICY_CHANGE_COMMAND_TYPE,
+  type RecordRetentionPolicyChangeCommandData,
+  recordRetentionPolicyChangeCommandDataSchema,
+  RETENTION_POLICY_CHANGED_EVENT_TYPE,
+  type RetentionPolicyChangedEvent,
   REQUEST_STORED_RETENTION_APPLY_COMMAND_TYPE,
   type RequestStoredRetentionApplyCommandData,
   requestStoredRetentionApplyCommandDataSchema,
@@ -66,6 +71,52 @@ export class RecordRetentionExtensionCommand implements CommandHandler<
     return {
       "payload.organization.id": payload.organizationId,
       "payload.retention_extension.id": payload.extensionId,
+    };
+  }
+}
+
+/** Records a period saved at one scope, once per save. Spec: retention-apply-record.feature */
+export class RecordRetentionPolicyChangeCommand implements CommandHandler<
+  Command<RecordRetentionPolicyChangeCommandData>,
+  RetentionPolicyChangedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_RETENTION_POLICY_CHANGE_COMMAND_TYPE,
+    recordRetentionPolicyChangeCommandDataSchema,
+    "Record a retention period saved at one scope",
+  );
+
+  async handle(
+    command: Command<RecordRetentionPolicyChangeCommandData>,
+  ): Promise<RetentionPolicyChangedEvent[]> {
+    const { organizationId, changeId, scope, category, retentionDays, shortens, changedAt } =
+      command.data;
+    return [
+      EventUtils.createEvent<RetentionPolicyChangedEvent>({
+        aggregateType: RETENTION_EXTENSION_AGGREGATE_TYPE,
+        aggregateId: organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: RETENTION_POLICY_CHANGED_EVENT_TYPE,
+        version: RETENTION_EXTENSION_EVENT_VERSION,
+        data: { organizationId, changeId, scope, category, retentionDays, shortens, changedAt },
+        metadata: {},
+        occurredAt: changedAt,
+        idempotencyKey: `retention-policy-changed:${changeId}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordRetentionPolicyChangeCommandData): string {
+    return payload.organizationId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordRetentionPolicyChangeCommandData,
+  ): Record<string, string> {
+    return {
+      "payload.organization.id": payload.organizationId,
+      "payload.retention_change.id": payload.changeId,
+      "payload.retention.category": payload.category,
     };
   }
 }
@@ -147,7 +198,7 @@ export class ApplyRetentionExtensionCommand implements CommandHandler<
   async handle(
     command: Command<ApplyRetentionExtensionCommandData>,
   ): Promise<RetentionAppliedEvent[]> {
-    const { organizationId, projectId, extensionId, category, occurredAt } = command.data;
+    const { organizationId, projectId, extensionId, category, occurredAt, scope } = command.data;
     const mode = command.data.mode ?? "raise";
     const { tables, retentionDays } =
       mode === "apply"
@@ -169,6 +220,7 @@ export class ApplyRetentionExtensionCommand implements CommandHandler<
           mode,
           tables,
           appliedAt: occurredAt,
+          ...(scope ? { scope } : {}),
         },
         metadata: {},
         occurredAt,

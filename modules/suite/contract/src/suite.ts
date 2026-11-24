@@ -10,6 +10,8 @@ import {
   runActorSchema,
   runNoteSchema,
   runParameterValuesSchema,
+  traceQuietPeriodMsSchema,
+  traceWaitTimeoutMsSchema,
 } from "@langwatch/scenario-contract";
 import { z } from "zod";
 
@@ -129,6 +131,9 @@ const suiteSchemaDefinition = z
     labels: z.array(z.string()),
     simulatorModel: z.string().nullable(),
     judgeModel: z.string().nullable(),
+    // The plan-wide judge trace wait in ms; optional so pre-column rows still parse.
+    traceQuietPeriodMs: z.number().int().nullish(),
+    traceWaitTimeoutMs: z.number().int().nullish(),
     archivedAt: z.date().nullable(),
     createdAt: z.date(),
     updatedAt: z.date(),
@@ -205,6 +210,8 @@ const runPlanConfigSchemaDefinition = z
     repeatCount: z.number().int().min(1).max(MAX_REPEAT_COUNT).optional(),
     simulatorModel: z.string().nullish(),
     judgeModel: z.string().nullish(),
+    traceQuietPeriodMs: traceQuietPeriodMsSchema.nullish(),
+    traceWaitTimeoutMs: traceWaitTimeoutMsSchema.nullish(),
     /** The scenarios a hand-picked scope covers; ignored by every other. */
     scenarioIds: z.array(z.string()).optional(),
     /** The plan's own evaluators, beside the suites'. Absent keeps what the plan holds. */

@@ -4,6 +4,7 @@
  * Specs: specs/billing/seat-subscription-retention-policy.feature, retention-apply-to-stored-data
  */
 import {
+  type StateProjectionStore,
   defineAggregate,
   defineEventingModule,
   definePipeline,
@@ -14,13 +15,19 @@ import type { DataRetentionModule } from "../app/data-retention.app.ts";
 import type { DataRetentionRepositories } from "../repositories/data-retention.repositories.ts";
 import type { RetentionExtensionService } from "../services/retention-extension.service.ts";
 import {
+  createRetentionApplyStatusProjection,
+  type RetentionApplyStatusState,
+} from "./retention-apply-status.projection.ts";
+import {
   ApplyRetentionExtensionCommand,
   RecordRetentionExtensionCommand,
+  RecordRetentionPolicyChangeCommand,
   RequestStoredRetentionApplyCommand,
 } from "./retention-extension.commands.ts";
 import {
   retentionAppliedEventSchema,
   retentionExtendedEventSchema,
+  retentionPolicyChangedEventSchema,
   RETENTION_EXTENSION_AGGREGATE_TYPE,
   RETENTION_EXTENSION_PIPELINE_NAME,
   storedRetentionApplyRequestedEventSchema,
@@ -37,6 +44,8 @@ import {
 export interface RetentionExtensionPipelineDeps {
   applyCommand: ApplyRetentionExtensionCommand;
   extensions: Pick<RetentionExtensionService, "applyToProjects">;
+  /** The per-scope status the settings page reads. */
+  applyStatusStore: StateProjectionStore<RetentionApplyStatusState>;
   /** The fan-out's backoff; tests shorten it, the deployment keeps the default. */
   applyRetryDelayMs?: (params: { attempt: number }) => number;
 }
@@ -54,9 +63,12 @@ const defineRetentionExtensionPipeline = (deps: RetentionExtensionPipelineDeps) 
       retentionExtendedEventSchema,
       retentionAppliedEventSchema,
       storedRetentionApplyRequestedEventSchema,
+      retentionPolicyChangedEventSchema,
     ])
+    .withPostgresProjection(createRetentionApplyStatusProjection({ store: deps.applyStatusStore }))
     .withCommand("recordRetentionExtension", RecordRetentionExtensionCommand)
     .withCommand("requestStoredRetentionApply", RequestStoredRetentionApplyCommand)
+    .withCommand("recordRetentionPolicyChange", RecordRetentionPolicyChangeCommand)
     .withCommandInstance({
       name: "applyRetentionExtension",
       handlerClass: ApplyRetentionExtensionCommand,

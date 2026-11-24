@@ -126,10 +126,18 @@ const registry = {
   // ---- traces ----
   trace_not_found: {
     tips: [
-      "Check the trace id; traces are deleted after the retention window",
       "If you just sent this trace, retry in a few seconds; ingestion is asynchronous",
+      "The id was looked up as a trace id, a trace id prefix, a span id and a scenario run id, in this project and every project of the organisation you can read",
+      'Find it by what it contained instead: `langwatch trace search -q "<text>" --since 30d`',
+      "Traces are deleted after the project's retention window",
     ],
     docsPath: "/platform/data-retention",
+  },
+  scenario_run_has_many_traces: {
+    tips: [
+      "Open one of the listed traces: `langwatch trace get <traceId>`",
+      'List them all: `langwatch trace search --filter "scenarioRun:<scenarioRunId>" --since 30d`',
+    ],
   },
   trace_withheld_over_plan: {
     tips: [
@@ -169,7 +177,12 @@ const registry = {
     ],
   },
   filter_field_unknown: {
-    tips: ["Use one of the fields listed in meta.knownFields", "Field names are case-sensitive"],
+    tips: [
+      "Use one of the fields listed in meta.knownFields; meta.hint names the likely one",
+      "Field names are case-sensitive",
+      "Text in the trace input or output has no field: search it with a quoted phrase and no field, or -q",
+      "`label:<name>` matches the trace's metadata labels",
+    ],
   },
   filter_value_refused: {
     tips: [
@@ -937,6 +950,15 @@ const registry = {
     docsPath: "/platform/model-providers",
   },
 
+  ai_content_filtered: {
+    tips: [
+      "The provider's own content filter refused the input; on Azure OpenAI the answer is 400 content_filter, often a jailbreak (Prompt Shields) match on instruction-like text",
+      "Relax or adjust the content filter on the deployment the feature's model points at, or try other text",
+      "Retrying the same text fails the same way",
+    ],
+    docsPath: "/platform/model-providers",
+  },
+
   model_provider_unavailable: {
     tips: [
       "meta.reason is not_configured when the project has no row for the provider, disabled when the row is switched off",
@@ -1117,7 +1139,7 @@ const registry = {
   },
   langy_agent_errored: {
     tips: [
-      "The model call was rejected upstream; check meta/reasons for the provider's typed failure, then retry",
+      "The reply failed before it finished; when meta/reasons name a cause, fix that first, then retry",
     ],
   },
   langy_turn_timeout: {

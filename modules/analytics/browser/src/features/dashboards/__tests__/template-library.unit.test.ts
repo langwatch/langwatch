@@ -12,6 +12,7 @@ import {
   CATALOGUE_TEMPLATES,
   CATALOGUE_WIDGETS,
   focusTemplateId,
+  implementedWidget,
   TRUNKS,
 } from "../catalogue/index.ts";
 import {
@@ -37,6 +38,10 @@ const poolIds = (templates: readonly LibraryTemplate[]) => templates.map(({ boar
 
 const shownIds = (filters: Partial<CatalogueFilters>) =>
   poolIds(filterCatalogue({ items: POOL, filters: { ...NO_CATALOGUE_FILTERS, ...filters } }));
+const unbuiltPreviewWidgets = () =>
+  TEMPLATE_LIBRARY.filter(({ board }) => !TEMPLATE_PREVIEW_IDS.has(board.id))
+    .flatMap(({ preview }) => (preview.kind === "layout" ? preview.widgets : []))
+    .filter(({ key }) => implementedWidget(key) === undefined);
 
 describe("the templates finder", () => {
   describe("given no agent type picked", () => {
@@ -195,6 +200,16 @@ describe("the templates finder", () => {
           expect(layout.gridColumn + layout.colSpan, key).toBeLessThanOrEqual(CHART_GRID_COLUMNS);
         }
       }
+    });
+
+    /** @scenario "AC107d Templates library: a card previews the template's real board" */
+    it("sketches every unbuilt widget at the board's default height", () => {
+      const unbuilt = unbuiltPreviewWidgets();
+
+      expect(unbuilt.length).toBeGreaterThan(0);
+      expect(unbuilt.map(({ key, layout }) => [key, layout.rowSpan])).toEqual(
+        unbuilt.map(({ key }) => [key, 5]),
+      );
     });
   });
 });

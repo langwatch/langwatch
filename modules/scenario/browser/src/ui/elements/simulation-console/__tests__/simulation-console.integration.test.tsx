@@ -1,7 +1,6 @@
 /**
  * Integration tests for SimulationConsole's status line.
  * @vitest-environment jsdom
- * @see modules/scenario/specs/red-team-scenario.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { SimulationRunStatus } from "@langwatch/scenario-contract";
@@ -13,23 +12,23 @@ import { SimulationConsole } from "../simulation-console.tsx";
 describe("<SimulationConsole />", () => {
   afterEach(cleanup);
 
-  describe("when a red team run supplies its own status line", () => {
-    /** @scenario The run view shows a held red team run */
-    it("shows the status line in place of passed or failed", () => {
-      renderWithDesignSystem(
-        <SimulationConsole status={SimulationRunStatus.SUCCESS} statusLine={<span>Held</span>} />,
-      );
+  describe("when the run passed", () => {
+    it("shows the pass status", () => {
+      renderWithDesignSystem(<SimulationConsole status={SimulationRunStatus.SUCCESS} />);
 
-      expect(screen.getByText("Held")).toBeTruthy();
-      expect(screen.queryByText(/PASSED|FAILED|SUCCESS/)).toBeNull();
+      expect(screen.getByText("Status:")).toBeTruthy();
+      expect(screen.getByText("SUCCESS")).toBeTruthy();
+      expect(screen.queryByText("FAILED")).toBeNull();
     });
   });
 
-  describe("when no status line is supplied", () => {
-    it("shows the pass or fail status", () => {
-      renderWithDesignSystem(<SimulationConsole status={SimulationRunStatus.SUCCESS} />);
+  describe("when the run failed", () => {
+    it("shows the fail status", () => {
+      renderWithDesignSystem(<SimulationConsole status={SimulationRunStatus.FAILED} />);
 
-      expect(screen.getByText(/SUCCESS/)).toBeTruthy();
+      expect(screen.getByText("Status:")).toBeTruthy();
+      expect(screen.getByText("FAILED")).toBeTruthy();
+      expect(screen.queryByText("SUCCESS")).toBeNull();
     });
   });
 });

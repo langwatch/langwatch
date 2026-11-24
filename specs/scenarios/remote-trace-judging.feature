@@ -43,7 +43,7 @@ Feature: Remote-trace judging for http targets
   Scenario: The child process passes the quiet period through
     Given a scenario run against an http or connected target
     When the child process assembles the SDK run configuration
-    Then the trace quiet period is two seconds
+    Then the trace quiet period is seven seconds, above the five second exporter flush
     And the judge treats a trace as complete only once its span set held still for that long
 
   @unit
@@ -62,9 +62,10 @@ Feature: Remote-trace judging for http targets
 
   @unit
   Scenario: Only http targets run with remote fetching
-    Given a scenario run against a prompt, code or workflow target
+    Given a scenario run against a prompt, code, workflow or voice target
     When the child process assembles the SDK run configuration
     Then remote trace fetching is not enabled
+    And none of them puts spans in LangWatch under the turn's trace id, so a fetch would only wait
 
   @integration
   Scenario: The vendored SDK can act on the remote-trace configuration
@@ -77,8 +78,8 @@ Feature: Remote-trace judging for http targets
   @unit
   Scenario: The prefetcher computes the wait budget only for http targets
     Given a run being prefetched
-    When the target is an http agent
-    Then the job data carries the project's trace wait budget
+    When the target is an http or connected agent
+    Then the job data carries the project's trace wait budget and quiet period
     And a prompt, code or workflow target's job data carries none
 
   @unit
