@@ -1,6 +1,6 @@
 /**
- * The run's effects: plan it, judge a page, finish it. The work costs money, so
- * an attempt below the cap rethrows and the final one fails the run instead.
+ * The run's effects: plan it, judge a page, finish it. Below the attempt cap a step rethrows;
+ * on its last attempt a plan or finish fails the run, and a page records its failure.
  * @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
 
@@ -289,13 +289,13 @@ function rethrowWhileRetried({
   }
   logger.error(
     { ...context, error: instantEvalErrorText(error) },
-    "Instant Eval step failed on its final attempt; failing the run",
+    "Instant Eval step failed on its final attempt; recording the failure",
   );
 }
 
 /**
- * The shared failure branch: retry while attempts remain, otherwise fail the
- * run and retire the message.
+ * The shared failure branch: retry while attempts remain, otherwise record the
+ * failure and retire the message.
  */
 async function handleInstantEvalIntentFailure({
   deps,
