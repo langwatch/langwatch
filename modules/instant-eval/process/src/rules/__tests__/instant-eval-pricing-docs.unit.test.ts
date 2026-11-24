@@ -22,7 +22,9 @@ const { instant, evals } = INSTANT_EVAL_PUBLISHED_RATES;
 
 /** One line that names the model and then its rate, so a rate cannot drift to the other model. */
 function modelAtRate({ model, rate }: { model: string; rate: string }): RegExp {
-  return new RegExp(`${model}[^\\n]*${rate.replace(/[$.]/g, "\\$&")} per million input tokens`);
+  return new RegExp(
+    `${model}[^\\n]*${rate.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} per million input tokens`,
+  );
 }
 
 describe("given the Instant tier's and the Evals tier's published rates", () => {
