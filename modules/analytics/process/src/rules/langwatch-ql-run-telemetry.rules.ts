@@ -79,8 +79,9 @@ export function langWatchQLTelemetryCaller(telemetry: LangWatchQLRunTelemetry | 
 }
 
 /**
- * The log line's own fields for a run: the caller, the first project (one value a log query can
- * group by) and all of them comma-joined, the widget's ids when it has them, then the hash.
+ * The log line's own fields for a run: the caller, the first project (one value a log query
+ * can group by) and all of them as an array, as the executed line has them, the widget's ids
+ * when it has them, then the hash.
  */
 export function langWatchQLTelemetryFields({
   telemetry,
@@ -92,11 +93,11 @@ export function langWatchQLTelemetryFields({
   sql: string;
   queryHashKey: Uint8Array;
   projectIds?: readonly string[];
-}): Readonly<Record<string, string>> {
+}): Readonly<Record<string, string | readonly string[]>> {
   const [projectId] = projectIds;
   return {
     caller: langWatchQLTelemetryCaller(telemetry),
-    ...(projectId === undefined ? {} : { projectId, projectIds: projectIds.join(",") }),
+    ...(projectId === undefined ? {} : { projectId, projectIds }),
     ...(telemetry?.dashboardId === undefined ? {} : { dashboardId: telemetry.dashboardId }),
     ...(telemetry?.widgetId === undefined ? {} : { widgetId: telemetry.widgetId }),
     ...(telemetry?.templateId === undefined ? {} : { templateId: telemetry.templateId }),

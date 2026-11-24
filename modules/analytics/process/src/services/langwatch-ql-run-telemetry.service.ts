@@ -89,7 +89,7 @@ export class LangWatchQLRunTelemetryService {
   }: {
     telemetry: LangWatchQLRunTelemetry | undefined;
     sql: string;
-  }): Readonly<Record<string, string>> {
+  }): Readonly<Record<string, string | readonly string[]>> {
     return langWatchQLTelemetryFields({ telemetry, sql, queryHashKey: this.queryHashKey });
   }
 

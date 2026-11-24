@@ -272,7 +272,7 @@ type LwqlProvisioningOperations = Readonly<{
   fillProjectKeys: (input: { dryRun: boolean }) => Promise<LwqlProjectKeyFillReport>;
 }>;
 
-/** Where a key run leaves the projects its scope resolved to, for its failed-run line. */
+/** Where a run leaves the projects its scope resolved to, for its failed-run line. */
 interface ResolvedProjectIds {
   projectIds: readonly string[] | undefined;
 }
@@ -1018,8 +1018,9 @@ export class AnalyticsModule
   async executeLangWatchQL(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
+    const resolved: ResolvedProjectIds = { projectIds: undefined };
     try {
-      return await this.#executeLangWatchQL(input);
+      return await this.#executeLangWatchQL({ ...input, resolved });
     } catch (error) {
       // Every refusal on the way counts, the window and the project scope included, not only
       // the database's: a gate that turns most widget runs away is the failure worth an alert.
@@ -1027,18 +1028,23 @@ export class AnalyticsModule
         telemetry: input.telemetry,
         sql: input.sql,
         error,
-        projectIds: langWatchQLRunProjectIds({ own: [input.project.id], named: input.projects }),
+        // The resolved scope speaks when it finished; a run refused earlier names what it asked.
+        projectIds:
+          resolved.projectIds ??
+          langWatchQLRunProjectIds({ own: [input.project.id], named: input.projects }),
       });
       throw error;
     }
   }
 
   async #executeLangWatchQL(
-    input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
+    input: LangWatchQLExecuteInput &
+      Readonly<{ authorization?: Authorization; resolved: ResolvedProjectIds }>,
   ): Promise<LangWatchQLQueryResult> {
-    const { authorization, project, projects: asked, userId, ...run } = input;
+    const { authorization, project, projects: asked, userId, resolved, ...run } = input;
     const selection = this.#runScope.select({ projects: asked });
     const scope = await this.#runScope.resolve({ authorization, project, selection, userId });
+    if (scope.kind !== "own") resolved.projectIds = scope.projects.map(({ id }) => id);
 
     if (scope.kind === "aggregate") {
       // A judged column is charged to one project, so an aggregate's statement may call none.

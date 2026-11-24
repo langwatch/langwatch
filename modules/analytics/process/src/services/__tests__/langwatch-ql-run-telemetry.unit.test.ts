@@ -311,7 +311,7 @@ describe("LangWatchQL run telemetry", () => {
       expect(levelOf("LangWatchQL failed")).toBe("warn");
       expect(lineNamed("LangWatchQL failed")).toMatchObject({
         projectId: "project-1",
-        projectIds: "project-1",
+        projectIds: ["project-1"],
       });
     });
   });
@@ -324,7 +324,7 @@ describe("LangWatchQL run telemetry", () => {
       expect(lineNamed("LangWatchQL failed")).toMatchObject({
         caller: "dashboard_widget",
         widgetId: "widget-1",
-        projectIds: "project-1",
+        projectIds: ["project-1"],
         outcome: code,
       });
       expect(
@@ -374,7 +374,7 @@ describe("LangWatchQL run telemetry", () => {
       const line = lineNamed("LangWatchQL failed");
       expect(line).toMatchObject({
         caller: "rest_api",
-        projectIds: "project-1",
+        projectIds: ["project-1"],
         queryHash: hashOf(SQL),
         outcome: code,
       });
@@ -434,7 +434,7 @@ describe("LangWatchQL run telemetry", () => {
         expect(levelOf("LangWatchQL failed"), error.code).toBe("error");
         expect(lineNamed("LangWatchQL failed")).toMatchObject({
           projectId: "project-1",
-          projectIds: "project-1,project-2",
+          projectIds: ["project-1", "project-2"],
           outcome: error.code,
         });
       }

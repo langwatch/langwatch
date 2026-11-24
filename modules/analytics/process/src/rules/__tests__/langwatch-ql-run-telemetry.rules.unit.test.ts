@@ -60,7 +60,7 @@ describe("langWatchQLRunProjectIds", () => {
 
 describe("langWatchQLTelemetryFields", () => {
   /** @scenario "Telemetry: a failed query is logged at its fault's level with the projects it ran over" */
-  it("names the first project on its own, and joins them all", () => {
+  it("names the first project on its own, and lists them all", () => {
     const fields = langWatchQLTelemetryFields({
       telemetry: { caller: "dashboard_widget", dashboardId: "dashboard-1", widgetId: "widget-1" },
       sql: "SELECT 1",
@@ -71,7 +71,7 @@ describe("langWatchQLTelemetryFields", () => {
     expect(fields).toMatchObject({
       caller: "dashboard_widget",
       projectId: "project-1",
-      projectIds: "project-1,project-2",
+      projectIds: ["project-1", "project-2"],
       dashboardId: "dashboard-1",
       widgetId: "widget-1",
     });

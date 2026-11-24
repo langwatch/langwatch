@@ -24,6 +24,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
+import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import { AnalyticsModule } from "../analytics.app.ts";
 import { analyticsTestSecrets } from "./analytics-secrets.fixture.ts";
 
@@ -95,6 +96,22 @@ async function appOver(input: {
       authz: createApiFixture<AuthzApi>({
         hasApiKeyPermission: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
         can: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
+        hasPermission: ({ permission }) => Promise.resolve(input.grants.includes(permission)),
+        getScope: ({ projectId }) =>
+          Promise.resolve({
+            type: "project",
+            id: projectId ?? PROJECT_ID,
+            teamId: `team-${projectId}`,
+            organizationId: ORGANIZATION_ID,
+          }),
+        canBatchByIds: ({ projects }) =>
+          Promise.resolve({
+            organizationRole: null,
+            teams: new Map(),
+            projects: new Map(
+              projects.map(({ projectId }) => [projectId, input.grants.includes("analytics:view")]),
+            ),
+          }),
         canBatchPermissionsByIds: ({ permissions, teams, projects }) =>
           Promise.resolve({
             organizationRole: null,
@@ -117,6 +134,7 @@ async function appOver(input: {
       }),
       projects: createApiFixture<ProjectApi>({
         getOrganizationId: () => Promise.resolve(ORGANIZATION_ID),
+        findOrganizationId: () => Promise.resolve(ORGANIZATION_ID),
         listByOrganization: ({ limit, projectIds }) => {
           const data = input.listed.filter(({ id }) => !projectIds || projectIds.includes(id));
           return Promise.resolve({ data, pagination: { page: 1, limit, total: data.length } });
@@ -330,7 +348,33 @@ describe("AnalyticsModule.runLangWatchQLForKey", () => {
       ).rejects.toBeDefined();
 
       const failed = logged.errors.find(({ message }) => message === "LangWatchQL failed");
-      expect(failed?.fields).toMatchObject({ projectIds: "project-a,project-b" });
+      expect(failed?.fields).toMatchObject({ projectIds: ["project-a", "project-b"] });
+    });
+  });
+});
+
+describe("AnalyticsModule.executeLangWatchQL", () => {
+  describe("when a member's run names projects other than its own and the engine fails", () => {
+    /** @scenario "Telemetry: a failed query is logged at its fault's level with the projects it ran over" */
+    it("names the projects its scope resolved to on the failed-run line", async () => {
+      logged.errors.length = 0;
+      const { app } = await appOver({
+        listed: [project("project-a"), project("project-b"), project("project-c")],
+        grants: ["analytics:view"],
+      });
+
+      await expect(
+        app.executeLangWatchQL({
+          project: { id: "project-a", lwqlKey: "lwql-project-a" },
+          protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+          sql: "SELECT count() FROM analytics.traces",
+          projects: ["project-b", "project-c"],
+          userId: "member-1",
+        }),
+      ).rejects.toBeDefined();
+
+      const failed = logged.errors.find(({ message }) => message === "LangWatchQL failed");
+      expect(failed?.fields).toMatchObject({ projectIds: ["project-b", "project-c"] });
     });
   });
 });
