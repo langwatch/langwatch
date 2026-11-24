@@ -4,7 +4,6 @@
  */
 import {
   type AppendStore,
-  type EventSubscriberDefinition,
   defineAggregate,
   defineEventingModule,
   definePipeline,
@@ -23,6 +22,10 @@ import type {
   ExperimentRunProgressState,
 } from "../repositories/experiment-run-fold.repository.ts";
 import { EXPERIMENT_RUN_RESULT_COALESCE_MAX_BATCH } from "../rules/experiment-run-event-types.rules.ts";
+import {
+  createExperimentRunActivitySubscriber,
+  type ExperimentRunActivityRecorder,
+} from "./experiment-run-activity.subscriber.ts";
 import {
   ExecuteExperimentCellCommand,
   type ExecuteExperimentCellCommandData,
@@ -104,7 +107,7 @@ interface ClickhouseExperimentRunProcessingRepository {
   /** The progress fold's reaction: each event's frames, live on the run's channel. */
   runFrames: ExperimentRunProgressSubscriber;
   /** Counts a run as active from its start to its completion, for later runs' concurrency. */
-  runActivity: EventSubscriberDefinition<ExperimentRunProcessingEvent>;
+  runActivity: ExperimentRunActivityRecorder;
   /** Trace's settled experiment trace, read back and folded into its run's cost. */
   traceMetricsSync: (input: {
     tenantId: string;
@@ -182,7 +185,10 @@ export function buildExperimentRunProcessingPipeline(
       "workflowEvaluationRequested",
       createWorkflowEvaluationRequestedSubscriber(deps.workflowEvaluations),
     )
-    .withEventSubscriber("experimentRunActivity", deps.runActivity)
+    .withEventSubscriber(
+      "experimentRunActivity",
+      createExperimentRunActivitySubscriber(deps.runActivity),
+    )
     .withProcessManager(
       EXPERIMENT_RUN_EXECUTION_PROCESS_NAME,
       experimentRunExecutionProcess(deps.runExecution),

@@ -9,11 +9,9 @@ import {
 } from "@langwatch/config";
 import { z } from "zod";
 
-/** A positive whole number, or nothing when the variable is unset or blank. */
-const optionalPositiveInt = z.preprocess(
-  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
-  z.coerce.number().int().positive().optional(),
-);
+/** A blank variable reads as unset, so its default applies. */
+const blankAsUnset = (value: unknown) =>
+  typeof value === "string" && value.trim() === "" ? undefined : value;
 
 /** The address fence a run reads a dataset row's attachment link behind, and its cell window. */
 export const experimentConfig = Config.define((c) => ({
@@ -24,13 +22,13 @@ export const experimentConfig = Config.define((c) => ({
   /** Soft cell budget a project's runs split at start (runs keep it; total can exceed it). */
   projectCellBudget: c.env(
     "EVAL_V3_PROJECT_CELL_BUDGET",
-    z.preprocess(
-      (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
-      z.coerce.number().int().positive().default(24),
-    ),
+    z.preprocess(blankAsUnset, z.coerce.number().int().positive().default(24)),
   ),
   /** Cells every project's runs share; caps the dynamic default when set. */
-  globalCellBudget: c.env("EVAL_V3_GLOBAL_CELL_BUDGET", optionalPositiveInt),
+  globalCellBudget: c.env(
+    "EVAL_V3_GLOBAL_CELL_BUDGET",
+    z.preprocess(blankAsUnset, z.coerce.number().int().positive().optional()),
+  ),
   /** The shared deployment origin: the link a polled run answers with; absent, runs are refused. */
   publicBaseUrl,
   /** Main's run-link origin, read only when BASE_HOST is unset; deprecated, warned at boot. */

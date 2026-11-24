@@ -57,7 +57,10 @@ type ConcurrencyPopoverProps = {
 
 const AUTO_LABEL = "Auto";
 
-function ConcurrencyPopover({ value, onChange }: ConcurrencyPopoverProps) {
+const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
+  value,
+  onChange,
+}: ConcurrencyPopoverProps) {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value?.toString() ?? "");
 
@@ -161,7 +164,7 @@ function ConcurrencyPopover({ value, onChange }: ConcurrencyPopoverProps) {
       </Popover.Content>
     </Popover.Root>
   );
-}
+});
 
 // =============================================================================
 // Main Component

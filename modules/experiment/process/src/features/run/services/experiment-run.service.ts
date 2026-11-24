@@ -15,7 +15,6 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { experimentAttachmentLinkChannels } from "../../../channels/experiment-attachment-link-channels.registry.ts";
-import { createExperimentRunActivitySubscriber } from "../../../eventing/experiment-run-activity.subscriber.ts";
 import { ExecuteExperimentCellCommand } from "../../../eventing/experiment-run-cell.commands.ts";
 import {
   completeRun,
@@ -303,7 +302,7 @@ function buildRunPipeline({
       complete: completeRun({ commands, boardWriteBack }),
     },
     runFrames: createExperimentRunFramesSubscriber({ stream }),
-    runActivity: createExperimentRunActivitySubscriber(concurrency),
+    runActivity: concurrency,
     traceMetricsSync: createExperimentTraceMetricsSyncHandler({
       findSummary: (input) => peers.traces.findSummary(input),
       findExperimentId: (input) => repositories.idLookup.findExperimentId(input),
