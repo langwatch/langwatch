@@ -48,6 +48,27 @@ export function billingMonthWindowMs(billingMonth: string): { fromMs: number; to
 }
 
 /**
+ * The window the Instant Evals meter reads: the month, from the later of its start and the
+ * usage-billed subscription's start, so free use before an upgrade is never invoiced (ADR-174
+ * decision 23). A month that ended before the subscription started covers no time at all.
+ */
+export function instantEvalWindowMs({
+  billingMonth,
+  usageBilledSinceMs,
+}: {
+  billingMonth: string;
+  usageBilledSinceMs: number | null;
+}): { fromMs: number; toMs: number } {
+  const month = billingMonthWindowMs(billingMonth);
+  if (usageBilledSinceMs === null) return month;
+
+  return {
+    fromMs: Math.min(Math.max(month.fromMs, usageBilledSinceMs), month.toMs),
+    toMs: month.toMs,
+  };
+}
+
+/**
  * The deterministic idempotency key for one Instant Evals delta. Its own
  * shape, and not the events meter's, so two meters converging on the same
  * numbers never share an identifier.

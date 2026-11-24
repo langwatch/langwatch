@@ -47,16 +47,16 @@ export class MemoryBillingReportOrganizationRepository extends BillingReportOrga
           subscription.status === "ACTIVE" &&
           growthSeatPlans.includes(subscription.plan),
       )
-      .slice(0, 1)
-      .map((subscription) => ({ id: subscription.id }));
+      .slice(0, 1);
 
     return {
       outcome: "usage_billed",
       organization: {
         id: organization.id,
         stripeCustomerId: organization.stripeCustomerId,
-        subscriptions,
+        subscriptions: subscriptions.map((subscription) => ({ id: subscription.id })),
         contract: "cloud",
+        usageBilledSinceMs: subscriptions[0]?.startDate?.epochMilliseconds ?? null,
       },
     };
   }
@@ -74,6 +74,8 @@ export class MemoryBillingReportOrganizationRepository extends BillingReportOrga
         // empty, and the caller skips the organization until it does.
         subscriptions: account.usageSubscriptionId ? [{ id: account.usageSubscriptionId }] : [],
         contract: "connected",
+        // ADR-174 decision 23 covers a Cloud upgrade; a connected month is read whole as before.
+        usageBilledSinceMs: null,
       },
     };
   }

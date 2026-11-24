@@ -13,6 +13,8 @@ export type BillingReportOrganization = {
   subscriptions: { id: string }[];
   /** Which of the two contracts invoices this organization's hosted usage. */
   contract: UsageBillingContract;
+  /** When the usage-billed subscription started, in epoch ms; null when unknown or connected. */
+  usageBilledSinceMs: number | null;
 };
 
 /**

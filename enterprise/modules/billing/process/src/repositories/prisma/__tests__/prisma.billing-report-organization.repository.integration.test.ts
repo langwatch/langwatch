@@ -162,6 +162,7 @@ describe("given organizations on either side of usage-based pricing", () => {
           stripeCustomerId: `cus_connected_${namespace}`,
           subscriptions: [{ id: "sub_usage" }],
           contract: "connected",
+          usageBilledSinceMs: null,
         },
       });
     });
@@ -171,7 +172,12 @@ describe("given organizations on either side of usage-based pricing", () => {
 
       expect(result).toMatchObject({
         outcome: "usage_billed",
-        organization: { id: halfOnboardedId, subscriptions: [], contract: "connected" },
+        organization: {
+          id: halfOnboardedId,
+          subscriptions: [],
+          contract: "connected",
+          usageBilledSinceMs: null,
+        },
       });
     });
   });

@@ -70,7 +70,7 @@ export class PrismaBillingReportOrganizationRepository extends BillingReportOrga
             plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
           },
           take: 1,
-          select: { id: true },
+          select: { id: true, startDate: true },
           orderBy: { startDate: "desc" },
         },
       },
@@ -89,13 +89,18 @@ export class PrismaBillingReportOrganizationRepository extends BillingReportOrga
         : { outcome: "not_usage_billed" };
     }
 
-    const {
-      pricingModel: _pricingModel,
-      selfHostedCustomer: _selfHostedCustomer,
-      ...forBilling
-    } = organization;
+    const { id, stripeCustomerId, subscriptions } = organization;
 
-    return { outcome: "usage_billed", organization: { ...forBilling, contract: "cloud" } };
+    return {
+      outcome: "usage_billed",
+      organization: {
+        id,
+        stripeCustomerId,
+        subscriptions: subscriptions.map((subscription) => ({ id: subscription.id })),
+        contract: "cloud",
+        usageBilledSinceMs: subscriptions[0]?.startDate?.getTime() ?? null,
+      },
+    };
   }
 
   /**
@@ -122,6 +127,8 @@ export class PrismaBillingReportOrganizationRepository extends BillingReportOrga
         // empty, and the caller skips the organization until it does.
         subscriptions: account.usageSubscriptionId ? [{ id: account.usageSubscriptionId }] : [],
         contract: "connected",
+        // ADR-174 decision 23 covers a Cloud upgrade; a connected month is read whole as before.
+        usageBilledSinceMs: null,
       },
     };
   }

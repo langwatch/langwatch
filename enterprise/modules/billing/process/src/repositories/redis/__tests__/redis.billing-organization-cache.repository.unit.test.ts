@@ -16,6 +16,7 @@ const ORGANIZATION: BillingReportOrganizationLookup = {
     stripeCustomerId: "cus_1",
     subscriptions: [{ id: "sub_1" }],
     contract: "cloud",
+    usageBilledSinceMs: Date.parse("2026-02-10T13:00:00.000Z"),
   },
 };
 
