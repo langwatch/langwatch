@@ -184,19 +184,36 @@ describe("given an invitation the caller has already accepted once", () => {
 
 describe("given two acceptances race on the same pending invitation", () => {
   describe("when the loser's claim reads the row after the winner already moved it", () => {
-    /** @scenario "A retried acceptance whose grant tail failed repairs the missing grants" */
-    it.concurrent("repairs the winner's own missing grant tail instead of refusing", async () => {
+    /** @scenario "A delayed second accept writes no grant" */
+    it.concurrent("answers the winner's own delayed request without writing a grant", async () => {
       const invites = new FakeOrganizationInviteRepository();
       const grants = new FakeAuthzGrantsService();
       const invite = makeInvite({ id: "invite-race", teamIds: "team-1" });
-      // The row already moved to ACCEPTED — an earlier attempt's transaction committed the
-      // membership — but the grant tail never ran: the exact shape a crash between the two
-      // steps leaves behind. The caller still holds only the stale PENDING read.
+      // The winner already moved the row to ACCEPTED and owns the grant tail; this delayed
+      // request still holds only the stale PENDING read, and grants written since may have
+      // been changed by an admin.
       invites.seedInvite({ ...invite, status: "ACCEPTED" });
       invites.seedMembership({ userId: "user-winner", organizationId: "org-1" });
       const service = InviteAcceptanceService.create(makeInviteDeps({ invites, grants }));
 
-      await service.applyInvite({ userId: "user-winner", invite });
+      await expect(service.applyInvite({ userId: "user-winner", invite })).resolves.toBeUndefined();
+
+      expect(grants.bindingsFor("user-winner")).toEqual([]);
+    });
+  });
+
+  describe("when a retry reads the row as ACCEPTED after the grant tail failed", () => {
+    /** @scenario "A retried acceptance whose grant tail failed repairs the missing grants" */
+    it.concurrent("repairs the missing grants", async () => {
+      const invites = new FakeOrganizationInviteRepository();
+      const grants = new FakeAuthzGrantsService();
+      const invite = makeInvite({ id: "invite-retry", teamIds: "team-1" });
+      const accepted = { ...invite, status: "ACCEPTED" as const };
+      invites.seedInvite(accepted);
+      invites.seedMembership({ userId: "user-winner", organizationId: "org-1" });
+      const service = InviteAcceptanceService.create(makeInviteDeps({ invites, grants }));
+
+      await service.applyInvite({ userId: "user-winner", invite: accepted });
 
       const bindings = grants.bindingsFor("user-winner");
       expect(bindings).toContainEqual(
@@ -206,7 +223,9 @@ describe("given two acceptances race on the same pending invitation", () => {
         expect.objectContaining({ scopeType: "TEAM", scopeId: "team-1" }),
       );
     });
+  });
 
+  describe("when a different caller loses the claim", () => {
     it.concurrent("refuses a different caller who holds no membership on the same stale read", async () => {
       const invites = new FakeOrganizationInviteRepository();
       const grants = new FakeAuthzGrantsService();

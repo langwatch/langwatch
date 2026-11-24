@@ -219,6 +219,25 @@ export class AuthzLiteMemberViewerOnlyError extends HandledError {
 }
 
 /** A role on anything shared was asked for somebody on a Developer seat (ADR-171). */
+/** Billing only holds the Billing grant and nothing else (ADR-205); a seat role comes first. */
+export class AuthzBillingOnlyNoAccessError extends HandledError {
+  declare readonly code: "billing_only_no_team_access";
+
+  constructor(scopeName?: string | null) {
+    super(
+      "billing_only_no_team_access",
+      "A Billing-only member holds no team, project or organization role; give them a seat role first.",
+      {
+        meta: scopeName ? { scopeName } : {},
+        httpStatus: 409,
+        fault: "customer",
+        ...remediation("billing_only_no_team_access"),
+      },
+    );
+    this.name = "AuthzBillingOnlyNoAccessError";
+  }
+}
+
 export class AuthzDeveloperSeatNoSharedAccessError extends HandledError {
   declare readonly code: "developer_seat_no_shared_access";
 
