@@ -24,6 +24,8 @@ Decide which one applies before you run anything.
 
 When the turn context says the current page is the Trace Explorer, the primary way applies to any trace-finding ask, even a small one, because the user is already looking at the list.
 
+Outside a Langy worker there is no page to drive: `langwatch ui call` refuses with "ui call needs LANGY_CONVERSATION_ID". There, answer every ask the secondary way, with the same filter and window, and give the user the filter to paste into the Trace Explorer.
+
 ## Step 1: Take the window and the filter from the page
 
 The turn context of the Trace Explorer carries `from`, `to` and `search and attribute filters`. Those are the defaults:
@@ -101,6 +103,6 @@ The card lists the traces and links to the Explorer on the same filter and windo
 
 - Reporting "no traces found" after one empty search. Run the forms in Step 3 first.
 - Passing `--origin application` by habit. The count then disagrees with the Explorer.
-- Using the 24 hour CLI default while the user looks at 30 days. Pass the page's window.
+- Using the 7 day CLI default while the user looks at 30 days. Pass the page's window.
 - Driving the Explorer away from a task the user is in the middle of. That is the secondary way: cards and a link.
 - Saying the page shows something when `executedVia` was `"backend"`.
