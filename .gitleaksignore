@@ -75,3 +75,13 @@ f483fe302e7c3dfb100e1d6fa9c99b6d9a049c20:specs/server/feature-configuration.feat
 # It was never a credential; the test now builds it with sha("pw"), so only
 # this pull request's history still carries the literal.
 394229f593f12061ac86dc2c53b294cb27b8a6d8:infra/clickhouse-serverless/internal/access/caps_test.go:generic-api-key:218
+
+# A crash-redaction test asserted that a token assigned in a crash message is
+# masked, using a made-up twenty-character value that clears the generic-api-key
+# bar beside a `token=` or `api_key=` name. It was never a credential; the test
+# now builds the value at runtime, so only this pull request's history carries it.
+1d121cc04de163d7029f63a3b1baa57c1b1bdea0:packages/browser-host/src/__tests__/crash-redaction.unit.test.ts:generic-api-key:15
+1d121cc04de163d7029f63a3b1baa57c1b1bdea0:packages/browser-host/src/__tests__/crash-redaction.unit.test.ts:generic-api-key:18
+1d121cc04de163d7029f63a3b1baa57c1b1bdea0:packages/browser-host/src/__tests__/crash-redaction.unit.test.ts:generic-api-key:56
+1d121cc04de163d7029f63a3b1baa57c1b1bdea0:packages/browser-host/src/__tests__/crash-redaction.unit.test.ts:generic-api-key:75
+1d121cc04de163d7029f63a3b1baa57c1b1bdea0:packages/browser-host/src/__tests__/crash-redaction.unit.test.ts:generic-api-key:76
