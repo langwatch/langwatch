@@ -1079,7 +1079,7 @@ describe("NurturingOrganizationUsageService given an organization that traced to
     expect(new Set(tracksOf(sent).map((call) => call.userId))).toEqual(new Set(["admin-1"]));
   });
 
-  /** @scenario "An organization past its counting window writes no counts" */
+  /** @scenario "An organization past its counting window gets no trace_active_day" */
   it("tracks none for an organization past its counting window", async () => {
     const { service, sent } = await tracedOrganization({
       createdAt: new Map([["org-1", NOW - 25 * DAY_MS]]),

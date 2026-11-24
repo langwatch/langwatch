@@ -403,6 +403,12 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     And each member the traits are mirrored onto is still tracked trace_active_day, in its own step after the mirror
 
   @unit
+  Scenario: An organization past its counting window gets no trace_active_day
+    Given an organization created more than 21 days ago whose project traced today
+    When its usage syncs
+    Then no member is sent trace_active_day
+
+  @unit
   Scenario: A habit is activity on 3 or more days at least 7 days apart, or in 3 ISO weeks
     Given an organization's active days within the window
     When the traits are built

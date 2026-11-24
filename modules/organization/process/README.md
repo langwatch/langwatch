@@ -2535,28 +2535,30 @@ Declared at `src/eventing/organization-audit.pipeline.ts:46`. Events: `organizat
 
 ### Pipeline `organization_lifecycle` (aggregate `organization`)
 
-Declared at `src/eventing/organization-lifecycle.pipeline.ts:122`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `personalTeamCreatedEventSchema`, `personalWorkspaceArchivedEventSchema`, `personalWorkspaceRevivedEventSchema`, `personalWorkspaceFeaturesChangedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`, `organizationDocsPlaygroundSessionsDisabledEventSchema`, `organizationMemberDisabledEventSchema`, `organizationMemberEnabledEventSchema`, `organizationMemberRemovedEventSchema`, `organizationMemberDepartmentChangedEventSchema`, `organizationCreatedEventSchema`, `organizationMemberListedEventSchema`.
+Declared at `src/eventing/organization-lifecycle.pipeline.ts:126`. Events: `organizationSignedUpEventSchema`, `membersInvitedEventSchema`, `inviteAcceptedEventSchema`, `integrationMethodChosenEventSchema`, `personalWorkspaceProvisionedEventSchema`, `personalTeamCreatedEventSchema`, `personalWorkspaceArchivedEventSchema`, `personalWorkspaceRevivedEventSchema`, `personalWorkspaceFeaturesChangedEventSchema`, `organizationPresenceSettingChangedEventSchema`, `organizationTraceSharingDisabledEventSchema`, `organizationDocsPlaygroundSessionsDisabledEventSchema`, `organizationMemberDisabledEventSchema`, `organizationMemberEnabledEventSchema`, `organizationMemberRemovedEventSchema`, `organizationMemberDepartmentChangedEventSchema`, `organizationMemberRoleChangedEventSchema`, `organizationMemberAdmittedEventSchema`, `organizationCreatedEventSchema`, `organizationMemberListedEventSchema`.
 
 | Kind    | Name                                     | Handles | Declared at                                           |
 | ------- | ---------------------------------------- | ------- | ----------------------------------------------------- |
-| command | `recordSignedUp`                         | –       | `src/eventing/organization-lifecycle.pipeline.ts:146` |
-| command | `recordMembersInvited`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:147` |
-| command | `recordInviteAccepted`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:148` |
-| command | `recordIntegrationMethodChosen`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:149` |
-| command | `recordPersonalWorkspaceProvisioned`     | –       | `src/eventing/organization-lifecycle.pipeline.ts:150` |
-| command | `recordPersonalTeamCreated`              | –       | `src/eventing/organization-lifecycle.pipeline.ts:151` |
-| command | `recordPersonalWorkspaceArchived`        | –       | `src/eventing/organization-lifecycle.pipeline.ts:152` |
-| command | `recordPersonalWorkspaceRevived`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:153` |
-| command | `recordPersonalWorkspaceFeaturesChanged` | –       | `src/eventing/organization-lifecycle.pipeline.ts:154` |
-| command | `recordPresenceSettingChanged`           | –       | `src/eventing/organization-lifecycle.pipeline.ts:158` |
-| command | `recordTraceSharingDisabled`             | –       | `src/eventing/organization-lifecycle.pipeline.ts:159` |
-| command | `recordDocsPlaygroundSessionsDisabled`   | –       | `src/eventing/organization-lifecycle.pipeline.ts:160` |
-| command | `recordMemberDisabled`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:164` |
-| command | `recordMemberEnabled`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:165` |
-| command | `recordMemberRemoved`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:166` |
-| command | `recordMemberDepartmentChanged`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:167` |
-| command | `recordCreated`                          | –       | `src/eventing/organization-lifecycle.pipeline.ts:168` |
-| command | `recordMemberListed`                     | –       | `src/eventing/organization-lifecycle.pipeline.ts:169` |
+| command | `recordSignedUp`                         | –       | `src/eventing/organization-lifecycle.pipeline.ts:152` |
+| command | `recordMembersInvited`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:153` |
+| command | `recordInviteAccepted`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:154` |
+| command | `recordIntegrationMethodChosen`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:155` |
+| command | `recordPersonalWorkspaceProvisioned`     | –       | `src/eventing/organization-lifecycle.pipeline.ts:156` |
+| command | `recordPersonalTeamCreated`              | –       | `src/eventing/organization-lifecycle.pipeline.ts:157` |
+| command | `recordPersonalWorkspaceArchived`        | –       | `src/eventing/organization-lifecycle.pipeline.ts:158` |
+| command | `recordPersonalWorkspaceRevived`         | –       | `src/eventing/organization-lifecycle.pipeline.ts:159` |
+| command | `recordPersonalWorkspaceFeaturesChanged` | –       | `src/eventing/organization-lifecycle.pipeline.ts:160` |
+| command | `recordPresenceSettingChanged`           | –       | `src/eventing/organization-lifecycle.pipeline.ts:164` |
+| command | `recordTraceSharingDisabled`             | –       | `src/eventing/organization-lifecycle.pipeline.ts:165` |
+| command | `recordDocsPlaygroundSessionsDisabled`   | –       | `src/eventing/organization-lifecycle.pipeline.ts:166` |
+| command | `recordMemberDisabled`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:170` |
+| command | `recordMemberEnabled`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:171` |
+| command | `recordMemberRemoved`                    | –       | `src/eventing/organization-lifecycle.pipeline.ts:172` |
+| command | `recordMemberDepartmentChanged`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:173` |
+| command | `recordMemberRoleChanged`                | –       | `src/eventing/organization-lifecycle.pipeline.ts:174` |
+| command | `recordMemberAdmitted`                   | –       | `src/eventing/organization-lifecycle.pipeline.ts:175` |
+| command | `recordCreated`                          | –       | `src/eventing/organization-lifecycle.pipeline.ts:176` |
+| command | `recordMemberListed`                     | –       | `src/eventing/organization-lifecycle.pipeline.ts:177` |
 
 ### Pipeline `organization_private_dataplane_recorder` (aggregate `global`)
 
