@@ -60,6 +60,7 @@ function render({
     if (call.path === "boards.listStarred") return Promise.resolve([]);
     if (call.path === "boards.storeProjects") return Promise.resolve(storeProjects);
     if (call.path === "boards.update") return Promise.resolve({});
+    if (call.path === "boards.getAll") return Promise.resolve([]);
     return NO_PROCEDURES(call);
   };
   renderDashboards({ element, host, answer });
@@ -310,6 +311,32 @@ describe("a product's Dashboards section", () => {
       expect(move).toHaveAttribute("aria-disabled", "true");
       expect(screen.queryByRole("menuitem", { name: "Rename" })).toBeNull();
       expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
+    });
+  });
+
+  describe("given a new board open and not stored yet", () => {
+    /** @scenario "AC162h The product sidebar lists the new board while it is open" */
+    it("lists it first by its untitled name as the page in view, with no empty note", async () => {
+      render({
+        element: <ProductDashboardsSection product="llm-ops" />,
+        listed: [],
+        host: new StubAnalyticsHost({ route: { params: { dashboardId: "new" }, query: {} } }),
+      });
+
+      const list = await screen.findByRole("list", { name: "New dashboard" });
+      const row = within(list).getByRole("link", { name: /Untitled dashboard/ });
+      expect(row).toHaveAttribute("aria-current", "page");
+      expect(screen.queryByText("No dashboards yet")).toBeNull();
+    });
+  });
+
+  describe("given no new board open", () => {
+    /** @scenario "AC162h The product sidebar lists the new board while it is open" */
+    it("lists no new board row", async () => {
+      render({ element: <ProductDashboardsSection product="llm-ops" />, listed: [] });
+
+      expect(await screen.findByText("No dashboards yet")).toBeInTheDocument();
+      expect(screen.queryByRole("list", { name: "New dashboard" })).toBeNull();
     });
   });
 });

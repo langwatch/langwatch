@@ -14,11 +14,13 @@ import { type ReactNode, useState } from "react";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardReader } from "../../behavior/use-board-access.ts";
 import { useBoardMenuActions } from "../../behavior/use-board-menu-actions.ts";
+import { useDraftBoard } from "../../behavior/use-draft-board.ts";
 import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
 import { useLibraryCreate, useLibraryDuplicate } from "../../behavior/use-library-writes.ts";
 import { useProductDashboards } from "../../behavior/use-product-dashboards.ts";
+import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { type StoreProject, useStoreProject } from "../../behavior/use-store-project.ts";
-import { dashboardTemplatesPath } from "../../model/boards.ts";
+import { dashboardTemplatesPath, DRAFT_SEGMENT, draftBoardPath } from "../../model/boards.ts";
 import {
   type LibraryBoard,
   libraryBoardPath,
@@ -45,6 +47,7 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
   const { duplicateBoard } = useLibraryDuplicate();
   if (!isLoaded) return null;
   const projectSlug = host.project()?.slug;
+  const isDraftOpen = projectSlug !== void 0 && host.route().params.dashboardId === DRAFT_SEGMENT;
 
   return (
     <VStack as="section" aria-label={LABEL} align="stretch" gap={0.5} width="full">
@@ -54,16 +57,23 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           <NewDashboardButton onCreate={() => setIsNewDialogOpen(true)} />
         )}
       </HStack>
-      <BoardRows
-        boards={boards}
-        openId={host.route().params.dashboardId}
-        isShowingAll={isShowingAll}
-        onToggleShowAll={() => setIsShowingAll(!isShowingAll)}
-        // A copy goes to the store project, so with none nothing is copied.
-        onDuplicate={store.storeProject ? duplicateBoard : void 0}
-        onMove={setPendingMove}
-        onDelete={setPendingDelete}
-      />
+      {isDraftOpen && (
+        <RowList label="New dashboard">
+          <DraftRow projectSlug={projectSlug} />
+        </RowList>
+      )}
+      {!(isDraftOpen && boards.length === 0) && (
+        <BoardRows
+          boards={boards}
+          openId={host.route().params.dashboardId}
+          isShowingAll={isShowingAll}
+          onToggleShowAll={() => setIsShowingAll(!isShowingAll)}
+          // A copy goes to the store project, so with none nothing is copied.
+          onDuplicate={store.storeProject ? duplicateBoard : void 0}
+          onMove={setPendingMove}
+          onDelete={setPendingDelete}
+        />
+      )}
       {projectSlug && product === "llm-ops" && (
         <RowList label="Templates">
           <SidebarLinkRow
@@ -188,6 +198,21 @@ function BoardRow({
       isActive={isOpen}
       menu={<BoardMenu name={board.name} actions={actions} />}
       renaming={isRenaming ? renaming : void 0}
+    />
+  );
+}
+
+/** The new board in view, listed while nothing is stored; its own row takes over once it is. */
+function DraftRow({ projectSlug }: { projectSlug: string }) {
+  const saved = useSavedDashboards();
+  const draft = useDraftBoard({ existingCount: saved.boards.length });
+  if (draft.savedId !== void 0) return null;
+  return (
+    <SidebarLinkRow
+      name={draft.board.name}
+      href={draftBoardPath({ projectSlug })}
+      icon={<LayoutDashboard size={14} />}
+      isActive
     />
   );
 }
