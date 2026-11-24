@@ -292,7 +292,7 @@ describe("a crash a screen caught", () => {
       }).captureException({ error });
 
       const sent = captureException.mock.calls[0]?.[0] as Error;
-      expect(sent.message).toBe("fetch failed with Bearer [redacted]");
+      expect(sent.message).toBe("fetch failed with Bearer [SECRET]");
       expect(sent.stack).not.toContain("abcdef0123456789");
       expect(sent.stack).toContain("https://app.example.com/chunk.js:1:2");
     });

@@ -9,20 +9,26 @@ describe("redactCrashText", () => {
     /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
     it("masks a bearer token, an sk- key and a key=value secret", () => {
       expect(redact("Authorization failed: Bearer abc.def.ghi")).toBe(
-        "Authorization failed: Bearer [redacted]",
+        "Authorization failed: Bearer [SECRET]",
       );
-      expect(redact("bad key sk-lw-0123456789abcdef")).toBe("bad key [redacted]");
-      expect(redact("url?api_key=hunter2&x=1")).toBe("url?api_key=[redacted]&x=1");
-      expect(redact('{"token": "s3cr3t"}')).toBe('{"token": "[redacted]"}');
+      expect(redact("bad key sk-lw-0123456789abcdef")).toBe("bad key [SECRET]");
+      expect(redact("retry with api_key=Zx9Kq2Lm7Tv4Wb8Ncd5R now")).toBe(
+        "retry with api_key=[SECRET] now",
+      );
+      expect(redact('{"token": "Zx9Kq2Lm7Tv4Wb8Ncd5R"}')).toBe('{"token": "[SECRET]"}');
+    });
+
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("masks a short assigned value the shared redactor leaves", () => {
+      expect(redact("password=hunter2")).toBe("password=[SECRET]");
+      expect(redact("url?api_key=abc123&x=1")).toBe("url?api_key=[SECRET]&x=1");
     });
 
     /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
     it("masks an email, a long hex run and a long base64 run", () => {
       expect(redact("user ada@example.com not found")).toBe("user [email] not found");
-      expect(redact(`hash ${"a1".repeat(20)} differs`)).toBe("hash [redacted] differs");
-      expect(redact(`payload ${"QmFzZTY0"}${"x9Y".repeat(14)}== end`)).toBe(
-        "payload [redacted] end",
-      );
+      expect(redact(`hash ${"a1".repeat(20)} differs`)).toBe("hash [SECRET] differs");
+      expect(redact(`payload ${"QmFzZTY0"}${"x9Y".repeat(14)}== end`)).toBe("payload [SECRET] end");
     });
   });
 
@@ -47,7 +53,7 @@ describe("redactCrashError", () => {
   describe("given a 200 KB digit-free message and stack", () => {
     /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
     it("redacts a huge digit-free crash quickly, still masking a token near the start", () => {
-      const huge = `token=abc123 ${"a".repeat(200_000)}`;
+      const huge = `token=Zx9Kq2Lm7Tv4Wb8Ncd5R ${"a".repeat(200_000)}`;
       const error = new Error(huge);
       error.stack = huge;
 
@@ -56,9 +62,9 @@ describe("redactCrashError", () => {
       const elapsedMs = performance.now() - startedAt;
 
       expect(elapsedMs).toBeLessThan(200);
-      expect(redacted.message.startsWith("token=[redacted] ")).toBe(true);
+      expect(redacted.message.startsWith("token=[SECRET] ")).toBe(true);
       expect(redacted.message.length).toBeLessThanOrEqual(500 + " [truncated]".length);
-      expect(redacted.stack?.startsWith("token=[redacted] ")).toBe(true);
+      expect(redacted.stack?.startsWith("token=[SECRET] ")).toBe(true);
       expect(redacted.stack?.length).toBeLessThanOrEqual(4_000 + " [truncated]".length);
     });
   });
@@ -66,15 +72,15 @@ describe("redactCrashError", () => {
   describe("given an error whose message and stack carry a token", () => {
     /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
     it("keeps its name and frames and masks the token in both", () => {
-      const error = new TypeError("token=abc123 rejected");
-      error.stack = `TypeError: token=abc123 rejected\n    at draw (https://app.example.com/a.js:3:4)`;
+      const error = new TypeError("token=Zx9Kq2Lm7Tv4Wb8Ncd5R rejected");
+      error.stack = `TypeError: token=Zx9Kq2Lm7Tv4Wb8Ncd5R rejected\n    at draw (https://app.example.com/a.js:3:4)`;
 
       const redacted = redactCrashError(error);
 
       expect(redacted.name).toBe("TypeError");
-      expect(redacted.message).toBe("token=[redacted] rejected");
+      expect(redacted.message).toBe("token=[SECRET] rejected");
       expect(redacted.stack).toBe(
-        "TypeError: token=[redacted] rejected\n    at draw (https://app.example.com/a.js:3:4)",
+        "TypeError: token=[SECRET] rejected\n    at draw (https://app.example.com/a.js:3:4)",
       );
     });
   });

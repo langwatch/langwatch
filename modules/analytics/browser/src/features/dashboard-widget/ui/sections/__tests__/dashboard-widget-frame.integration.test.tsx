@@ -229,6 +229,27 @@ describe("given a placed dashboard widget whose frame reports an error", () => {
     });
   });
 
+  describe("when two crashes share a first line but differ on later lines", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports the crash once", () => {
+      const analytics = new RecordingUiAnalytics();
+      renderWithDesignSystem(reportingWidget(analytics));
+      const crashWith = (detail: string) =>
+        ({
+          level: "error",
+          source: "lw.error",
+          text: `Render error: x is undefined\n  at ${detail}`,
+        }) as const;
+
+      act(() => {
+        lastFrameProps().onLog(crashWith("row one"));
+        lastFrameProps().onLog(crashWith("row two"));
+      });
+
+      expect(analytics.exceptions).toHaveLength(1);
+    });
+  });
+
   describe("when the crash text is one very long line", () => {
     /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
     it("reports at most 200 characters", () => {

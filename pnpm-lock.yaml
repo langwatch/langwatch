@@ -17419,12 +17419,18 @@ importers:
       '@langwatch/react-rum':
         specifier: workspace:*
         version: link:../react-rum
+      '@langwatch/redaction':
+        specifier: workspace:*
+        version: link:../redaction
       '@langwatch/time':
         specifier: workspace:*
         version: link:../time
       '@microsoft/fetch-event-source':
         specifier: ^2.0.1
         version: 2.0.1
+      '@opentelemetry/api':
+        specifier: 'catalog:'
+        version: 1.9.1
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.4(react@19.2.8)
@@ -17465,9 +17471,6 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
-      '@opentelemetry/api':
-        specifier: 'catalog:'
-        version: 1.9.1
       '@opentelemetry/sdk-trace-base':
         specifier: 'catalog:'
         version: 2.10.0(@opentelemetry/api@1.9.1)

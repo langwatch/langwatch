@@ -74,11 +74,13 @@ export function useFrameDiagnostic({
     setDiagnostic(entry);
     if (isFatal(entry)) setFatal(true);
     const surface = reportedSurface(entry);
-    if (surface === undefined || reported.current.has(entry.text)) return;
-    reported.current.add(entry.text);
+    if (surface === undefined) return;
+    const error = surface === "dashboard_widget_frame" ? crashTitle(entry.text) : entry.text;
+    if (reported.current.has(error)) return;
+    reported.current.add(error);
     // A string, not an Error: the host's stack would point at this file, not the widget.
     reporting.current.analytics.captureException({
-      error: surface === "dashboard_widget_frame" ? crashTitle(entry.text) : entry.text,
+      error,
       properties: { surface, ...reporting.current.crashContext },
     });
   }, []);
