@@ -10,6 +10,7 @@ import { useFacetHoverStore } from "../../../../features/facet/behavior/facet-ho
 import { formatCount, paletteFromColor } from "./utils.ts";
 
 const MIN_VISIBLE_FILL_PCT = 4;
+const GROUPED_TITLE = "Part of a group in the search bar";
 
 function facetCheckedState(state: FacetValueState): boolean | "indeterminate" {
   if (state === "include") return true;
@@ -20,6 +21,7 @@ function facetCheckedState(state: FacetValueState): boolean | "indeterminate" {
 function facetStateLabel(state: FacetValueState): string {
   if (state === "include") return "included";
   if (state === "exclude") return "excluded";
+  if (state === "grouped") return GROUPED_TITLE;
   return "click to include";
 }
 
@@ -59,6 +61,7 @@ export const FacetRow = memo(function FacetRow({
 
   const isInclude = state === "include";
   const isExclude = state === "exclude";
+  const isGrouped = state === "grouped";
   const isActive = isInclude || isExclude;
 
   const palette = isExclude ? "red" : paletteFromColor(item.dotColor);
@@ -127,6 +130,7 @@ export const FacetRow = memo(function FacetRow({
           overflow="hidden"
           background={isActive ? subtleBg : "transparent"}
           borderWidth={0}
+          title={isGrouped ? GROUPED_TITLE : undefined}
           data-state={state}
           data-facet-field={field}
           data-facet-value={item.value}
@@ -177,6 +181,17 @@ export const FacetRow = memo(function FacetRow({
             >
               {item.label}
             </Text>
+            {isGrouped && (
+              <Text
+                textStyle="2xs"
+                color="blue.fg"
+                fontWeight="medium"
+                flexShrink={0}
+                data-facet-grouped
+              >
+                in group
+              </Text>
+            )}
             {!item.synthetic && item.countState !== "pending" && (
               <Text
                 data-facet-count
