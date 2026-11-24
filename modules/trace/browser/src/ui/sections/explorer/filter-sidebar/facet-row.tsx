@@ -6,8 +6,9 @@ import { memo, useCallback } from "react";
 import { type FacetItem } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import { useFacetHoverStore } from "../../../../features/facet/behavior/facet-hover.store.ts";
 import {
-  IN_GROUP_TITLE,
   InGroupLabel,
+  inGroupStateLabel,
+  inGroupTitle,
 } from "../../../elements/explorer/filter-sidebar/in-group-label.tsx";
 import { formatCount, paletteFromColor } from "./utils.ts";
 
@@ -22,7 +23,7 @@ function facetCheckedState(state: FacetDisplayState): boolean | "indeterminate" 
 function facetStateLabel(state: FacetDisplayState): string {
   if (state === "include") return "included";
   if (state === "exclude") return "excluded";
-  if (isGroupedState(state)) return "in group";
+  if (isGroupedState(state)) return inGroupStateLabel(state);
   return "click to include";
 }
 
@@ -64,8 +65,6 @@ export const FacetRow = memo(function FacetRow({
   const isExclude = state === "exclude";
   const isGrouped = isGroupedState(state);
   const isActive = isInclude || isExclude;
-  // What the exclude button does follows the query: a negated term in a group is cleared by it.
-  const queryNegates = isExclude || state === "grouped-exclude";
 
   const palette = isExclude ? "red" : paletteFromColor(item.dotColor);
   const orbOpacity = orbOpacityFor({ dimmed: item.dimmed, isActive });
@@ -133,7 +132,7 @@ export const FacetRow = memo(function FacetRow({
           overflow="hidden"
           background={isActive ? subtleBg : "transparent"}
           borderWidth={0}
-          title={isGrouped ? IN_GROUP_TITLE : undefined}
+          title={isGrouped ? inGroupTitle(state) : undefined}
           data-state={state}
           data-facet-field={field}
           data-facet-value={item.value}
@@ -207,35 +206,50 @@ export const FacetRow = memo(function FacetRow({
             hidden at rest, fades in on row hover, and stays solid (as a `Ban`
             ∅, in red) while the value is excluded. Sibling of the checkbox card, not a
             child — you can't nest a <button> inside the row's <button>. */}
-        <ExcludeButton
-          label={item.label}
-          negates={queryNegates}
-          excluded={isExclude}
-          onClick={() => onExclude(item.value)}
-        />
+        <ExcludeButton label={item.label} state={state} onClick={() => onExclude(item.value)} />
       </HStack>
     </Box>
   );
 });
 
-/** The trailing exclude button: it says what a click does, which follows the query's negation. */
+/** The exclude button's words: what a click does, read from the same state the click reads. */
+function excludeButtonWords({ label, state }: { label: string; state: FacetDisplayState }): {
+  ariaLabel: string;
+  title: string;
+  pressed: boolean | undefined;
+} {
+  if (state === "exclude") {
+    return { ariaLabel: `Stop excluding ${label}`, title: "Stop excluding", pressed: true };
+  }
+  // A click removes a negated term from its group, which can widen or narrow what it hides.
+  if (state === "grouped-exclude") {
+    return {
+      ariaLabel: `Remove ${label} from the group`,
+      title: "Remove from the group",
+      pressed: undefined,
+    };
+  }
+  return { ariaLabel: `Exclude ${label}`, title: "Exclude (NOT)", pressed: false };
+}
+
+/** The trailing exclude button: it says what a click does. */
 function ExcludeButton({
   label,
-  negates,
-  excluded,
+  state,
   onClick,
 }: {
   label: string;
-  negates: boolean;
-  excluded: boolean;
+  state: FacetDisplayState;
   onClick: () => void;
 }) {
+  const excluded = state === "exclude";
+  const words = excludeButtonWords({ label, state });
   return (
     <chakra.button
       type="button"
-      aria-label={negates ? `Stop excluding ${label}` : `Exclude ${label}`}
-      title={negates ? "Stop excluding" : "Exclude (NOT)"}
-      aria-pressed={negates}
+      aria-label={words.ariaLabel}
+      title={words.title}
+      aria-pressed={words.pressed}
       data-facet-exclude
       flexShrink={0}
       // Reserved fixed slot at the end of the line, after the count — a
@@ -264,7 +278,7 @@ function ExcludeButton({
       }}
       onClick={onClick}
     >
-      <Icon boxSize="13px">{negates ? <Ban /> : <Minus />}</Icon>
+      <Icon boxSize="13px">{excluded ? <Ban /> : <Minus />}</Icon>
     </chakra.button>
   );
 }

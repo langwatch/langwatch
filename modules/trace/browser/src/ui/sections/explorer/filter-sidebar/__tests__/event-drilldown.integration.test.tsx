@@ -139,15 +139,30 @@ describe("EventDrilldown", () => {
     });
 
     describe("when a group in the query makes a vote value optional", () => {
-      /** @scenario "Attribute and event rows a group makes optional also say in group" */
+      /** @scenario "Attribute, metadata and event rows a group makes optional also say in group" */
       it("names the row in group, neither included nor excluded", () => {
         renderDrilldown({
           ast: parse("NOT (event.attribute.event.metrics.vote:-1 AND status:error)"),
         });
 
-        const row = screen.getByRole("button", { name: "vote thumbs down — in group" });
-        expect(row).toHaveAttribute("title", "Part of a group in the search bar");
+        const row = screen.getByRole("button", {
+          name: "vote thumbs down — in group, click to remove from the group",
+        });
+        expect(row).toHaveAttribute(
+          "title",
+          "Part of a group in the search bar. Click to remove from the group.",
+        );
         expect(row).toHaveTextContent("in group");
+      });
+
+      it("names a plain vote value in a group with the exclude its click does", () => {
+        renderDrilldown({
+          ast: parse("event.attribute.event.metrics.vote:-1 OR status:error"),
+        });
+
+        expect(
+          screen.getByRole("button", { name: "vote thumbs down — in group, click to exclude" }),
+        ).toHaveAttribute("title", "Part of a group in the search bar. Click to exclude.");
       });
 
       it("still toggles that metric value on click", () => {
@@ -155,7 +170,11 @@ describe("EventDrilldown", () => {
           ast: parse("NOT (event.attribute.event.metrics.vote:-1 AND status:error)"),
         });
 
-        fireEvent.click(screen.getByRole("button", { name: "vote thumbs down — in group" }));
+        fireEvent.click(
+          screen.getByRole("button", {
+            name: "vote thumbs down — in group, click to remove from the group",
+          }),
+        );
         expect(toggleFacet).toHaveBeenLastCalledWith({
           field: "event.attribute.event.metrics.vote",
           value: "-1",

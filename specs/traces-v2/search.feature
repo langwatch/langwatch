@@ -668,7 +668,7 @@ Rule: Categorical facet selection logic
   Scenario: A value a group in the search bar makes optional is marked as in group
     When the user searches for "NOT (@status:error AND @model:gpt-5-mini)" or "@status:error OR @model:gpt-5-mini"
     Then the "Error" row under Status and the "gpt-5-mini" row under Model are neither included nor excluded
-    And each says "in group", titled "Part of a group in the search bar"
+    And each says "in group", titled "Part of a group in the search bar" and then what a click does
     And clicking such a row does what it did before
 
   @unit
@@ -679,13 +679,15 @@ Rule: Categorical facet selection logic
   @unit
   Scenario: The exclude button on a row in a group says what a click does
     When the user searches for "NOT (@status:error AND @model:gpt-5-mini)" and hovers the "Error" row
-    Then its exclude button reads "Stop excluding error" and shows as pressed, because a click removes that negation
-    And on a row in a group the query does not negate, the button reads "Exclude <value>"
+    Then its exclude button reads "Remove Error from the group" and is not pressed, because a click removes "Error" from that group, which can widen or narrow what it hides
+    And the same holds for "NOT (@evaluator:abc AND @evaluatorVerdict:fail)" and the "gpt-5-mini" row of "@status:error AND NOT (@status:error AND @model:gpt-5-mini)"
+    And on a row in a group the query names plainly, as in "@status:error OR @model:gpt-5-mini", the button reads "Exclude <value>", because a click excludes it from every result
 
   @unit
-  Scenario: Attribute and event rows a group makes optional also say in group
-    When a group in the search bar makes an attribute or event value optional
-    Then its row in the sidebar says "in group", titled "Part of a group in the search bar", and is neither included nor excluded
+  Scenario: Attribute, metadata and event rows a group makes optional also say in group
+    When a group in the search bar makes an attribute, metadata or event value optional, as "NOT (@status:error AND @attribute.metadata.customer:acme)" does for the "acme" row under Metadata
+    Then its row in the sidebar says "in group" and is neither included nor excluded
+    And its title and accessible name say what a click does: "remove from the group" for a negated term, "exclude" for a plain one
     And clicking it does what it did before
 
 

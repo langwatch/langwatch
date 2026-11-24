@@ -24,17 +24,23 @@ afterEach(() => cleanup());
 
 describe("<AttributeValueRow /> in a group", () => {
   describe("given the attribute term is part of a group", () => {
-    /** @scenario "Attribute and event rows a group makes optional also say in group" */
-    it.each<FacetDisplayState>(["grouped-include", "grouped-exclude"])(
-      "says in group when %s, neither checked nor struck out",
-      (state) => {
+    /** @scenario "Attribute, metadata and event rows a group makes optional also say in group" */
+    it.each<[FacetDisplayState, string]>([
+      ["grouped-include", "exclude"],
+      ["grouped-exclude", "remove from the group"],
+    ])(
+      "says in group when %s and what a click does (%s), neither checked nor struck out",
+      (state, action) => {
         const { container } = renderRow(state);
         expect(groupedLabelOf(container)).toHaveTextContent("in group");
         expect(
-          container.querySelector('[title="Part of a group in the search bar"]'),
+          container.querySelector(
+            `[title="Part of a group in the search bar. Click to ${action}."]`,
+          ),
         ).not.toBeNull();
-        expect(screen.getByRole("checkbox")).not.toBeChecked();
-        expect(screen.getByRole("checkbox")).not.toBePartiallyChecked();
+        const row = screen.getByRole("checkbox", { name: `a — in group, click to ${action}` });
+        expect(row).not.toBeChecked();
+        expect(row).not.toBePartiallyChecked();
         expect(screen.getByText("a")).not.toHaveStyle({ textDecoration: "line-through" });
       },
     );
@@ -50,12 +56,14 @@ describe("<AttributeValueRow /> in a group", () => {
   });
 
   describe("given the attribute term is required", () => {
-    it.each<FacetDisplayState>(["include", "exclude", "neutral"])(
-      "shows no in group label when %s",
-      (state) => {
-        const { container } = renderRow(state);
-        expect(groupedLabelOf(container)).toBeNull();
-      },
-    );
+    it.each<[FacetDisplayState, string]>([
+      ["include", "included"],
+      ["exclude", "excluded"],
+      ["neutral", "click to include"],
+    ])("shows no in group label when %s, and is named %s after its label", (state, word) => {
+      const { container } = renderRow(state);
+      expect(groupedLabelOf(container)).toBeNull();
+      expect(screen.getByRole("checkbox", { name: `a — ${word}` })).toBeInTheDocument();
+    });
   });
 });

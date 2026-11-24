@@ -4,8 +4,9 @@ import { memo } from "react";
 
 import { hashColor } from "../../../../model/display-formatters.ts";
 import {
-  IN_GROUP_TITLE,
   InGroupLabel,
+  inGroupStateLabel,
+  inGroupTitle,
 } from "../../../elements/explorer/filter-sidebar/in-group-label.tsx";
 import { paletteFromColor } from "./utils.ts";
 
@@ -13,6 +14,13 @@ function attributeCheckedState(state: FacetDisplayState): boolean | "indetermina
   if (state === "include") return true;
   if (state === "exclude") return "indeterminate";
   return false;
+}
+
+function attributeStateLabel(state: FacetDisplayState): string {
+  if (state === "include") return "included";
+  if (state === "exclude") return "excluded";
+  if (isGroupedState(state)) return inGroupStateLabel(state);
+  return "click to include";
 }
 
 export const AttributeValueRow = memo(function AttributeValueRow({
@@ -42,7 +50,7 @@ export const AttributeValueRow = memo(function AttributeValueRow({
       unstyled
       checked={attributeCheckedState(state)}
       onCheckedChange={() => onToggle(attrKey, value)}
-      title={isGrouped ? IN_GROUP_TITLE : undefined}
+      title={isGrouped ? inGroupTitle(state) : undefined}
       data-state={state}
       display="block"
       position="relative"
@@ -70,7 +78,7 @@ export const AttributeValueRow = memo(function AttributeValueRow({
         outlineOffset: "-2px",
       }}
     >
-      <CheckboxCard.HiddenInput />
+      <CheckboxCard.HiddenInput aria-label={`${label} — ${attributeStateLabel(state)}`} />
       <Box
         data-facet-bar
         position="absolute"

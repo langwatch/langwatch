@@ -15,8 +15,9 @@ import {
   type FacetItem,
 } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import {
-  IN_GROUP_TITLE,
   InGroupLabel,
+  inGroupStateLabel,
+  inGroupTitle,
 } from "../../../elements/explorer/filter-sidebar/in-group-label.tsx";
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 import { formatCount } from "./utils.ts";
@@ -134,7 +135,7 @@ const MetricGroup: React.FC<{
 };
 
 function metricStateLabel(state: FacetDisplayState): string {
-  if (isGroupedState(state)) return "in group";
+  if (isGroupedState(state)) return inGroupStateLabel(state);
   if (state === "include") return "included";
   if (state === "exclude") return "excluded";
   return "click to filter";
@@ -157,7 +158,6 @@ const MetricValueRow: React.FC<{
   onClick: () => void;
 }> = ({ value: _value, displayValue, displayKey, count, maxCount, state, onClick }) => {
   const active = state === "include" || state === "exclude";
-  const grouped = isGroupedState(state);
   const palette = state === "exclude" ? "red" : "blue";
   const fillPct = maxCount > 0 ? Math.max((count / maxCount) * 100, MIN_VISIBLE_FILL_PCT) : 0;
   // The key qualifies the value: two metrics on one event may share a value
@@ -169,7 +169,7 @@ const MetricValueRow: React.FC<{
       type="button"
       aria-label={`${displayKey} ${displayValue} — ${stateLabel}`}
       data-state={state}
-      title={grouped ? IN_GROUP_TITLE : undefined}
+      title={isGroupedState(state) ? inGroupTitle(state) : undefined}
       position="relative"
       width="full"
       paddingY={0.5}
@@ -217,7 +217,7 @@ const MetricValueRow: React.FC<{
         <Text textStyle="2xs" color="fg.muted" truncate>
           {displayValue}
         </Text>
-        {grouped && <InGroupLabel />}
+        {isGroupedState(state) && <InGroupLabel />}
         <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
           {formatCount(count)}
         </Text>
