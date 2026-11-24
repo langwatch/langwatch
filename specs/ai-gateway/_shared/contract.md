@@ -826,6 +826,7 @@ Alexis owns the final shape in Prisma schema; this is the agreed surface.
 - `gatewayProviders: view | manage` (gateway-only settings layered on existing ModelProvider)
 - `gatewayCacheRules: view | create | update | delete | manage` (Lane B iter 38 — org-scoped cache-control rule CRUD)
 - `gatewayGuardrails: attach | detach`
+- `gatewayA2aTargets: view | manage` (outbound A2A agents and their sealed upstream headers; viewer, member and admin view, admin manages)
 - `gatewayLogs: view` (per-project access to gateway request logs)
 - `gatewayUsage: view` (cost/usage reports)
 

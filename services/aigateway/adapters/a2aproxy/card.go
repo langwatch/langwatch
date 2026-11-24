@@ -1,8 +1,11 @@
 package a2aproxy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -25,7 +28,7 @@ func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
 			c.span.SetAttributes(attribute.String(attrAgentName, name))
 		}
 	}
-	rewriteCard(card, target.UpstreamURL, proxyBase(h.cfg.PublicBaseURL, c.r, target.Name))
+	rewriteCard(card, target.UpstreamURL, proxyBase(h.cfg.PublicBaseURL, target.Name))
 	out, _ := json.Marshal(card)
 	setJSONReply(c.w.Header())
 	c.w.WriteHeader(http.StatusOK)
@@ -33,14 +36,17 @@ func (h *Handler) serveCard(c *call, target domain.A2ATarget) {
 }
 
 // fetchCard reads the upstream Agent Card, parsed and raw, refusing the call
-// when it cannot. The target's upstream headers go only to a card on the
+// when it cannot. Without a card URL it reads the discovery path the caller
+// asked for. The target's upstream headers go only to a card on the
 // upstream's own origin: a card elsewhere is fetched without them.
 func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, []byte, bool) {
 	cardURL := target.CardURL
 	if cardURL == "" {
-		cardURL = upstreamEndpoint(target.UpstreamURL, cardPath, "")
+		cardURL = upstreamEndpoint(target.UpstreamURL, c.cardPath, "")
 	}
-	req, err := http.NewRequestWithContext(c.ctx, http.MethodGet, cardURL, nil)
+	ctx, cancel := context.WithCancel(c.ctx)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cardURL, nil)
 	if err != nil {
 		c.refuse(refuseUpstream.withMessage("the Agent Card URL is invalid"))
 		return nil, nil, false
@@ -53,29 +59,51 @@ func (h *Handler) fetchCard(c *call, target domain.A2ATarget) (map[string]any, [
 	propagation.TraceContext{}.Inject(c.ctx, propagation.HeaderCarrier(req.Header))
 	resp, err := h.cfg.Client.Do(req)
 	if err != nil {
-		c.refuse(upstreamRefusal(err))
+		h.refuseUpstreamFailure(c, err)
 		return nil, nil, false
 	}
 	defer func() { _ = resp.Body.Close() }()
-	raw, tooLarge, err := readLimited(resp.Body)
+	raw, tooLarge, err := h.readReply(resp.Body, cancel)
 	if tooLarge {
 		c.refuse(refuseReplyTooLarge)
 		return nil, nil, false
 	}
-	var card map[string]any
-	if err != nil || resp.StatusCode != http.StatusOK || json.Unmarshal(raw, &card) != nil {
+	if err != nil {
+		h.refuseWithCause(c, refuseUpstream.withMessage("the A2A agent reply was cut off"), err)
+		return nil, nil, false
+	}
+	card, isCard := decodeObject(raw)
+	if resp.StatusCode != http.StatusOK || !isCard {
 		c.refuse(refuseUpstream.withMessage("the A2A agent has no readable Agent Card"))
 		return nil, nil, false
 	}
 	return card, raw, true
 }
 
+// decodeObject reads a body that is exactly one JSON object. Numbers keep the
+// digits they were written with, so an id or extension value survives a
+// rewrite. JSON null, another value and trailing input are no object.
+func decodeObject(raw []byte) (map[string]any, bool) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var obj map[string]any
+	if dec.Decode(&obj) != nil || obj == nil {
+		return nil, false
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return nil, false
+	}
+	return obj, true
+}
+
 // rewriteCard points the card at the proxy. The proxy serves one endpoint per
 // target, the upstream URL, so the card's url becomes the proxy base, an
 // interface at the upstream URL does too, and every other interface (another
-// path or host the proxy does not serve) is dropped.
+// path or host the proxy does not serve) is dropped. The upstream's signatures
+// signed the URLs replaced here, so they go too: they would no longer verify.
 func rewriteCard(card map[string]any, upstream, proxy string) {
 	card["url"] = proxy
+	delete(card, "signatures")
 	for _, key := range []string{"supportedInterfaces", "additionalInterfaces"} {
 		list, isList := card[key].([]any)
 		if !isList {
@@ -120,17 +148,24 @@ func isHTTPS(raw string) bool {
 	return strings.HasPrefix(strings.ToLower(raw), "https://")
 }
 
-// sameEndpoint reports whether u names the upstream endpoint itself.
+// sameEndpoint reports whether u names the upstream endpoint itself: the same
+// origin, path (a trailing slash aside) and query.
 func sameEndpoint(u, upstream string) bool {
-	return strings.TrimSuffix(u, "/") == strings.TrimSuffix(upstream, "/")
+	a, errA := url.Parse(u)
+	b, errB := url.Parse(upstream)
+	if errA != nil || errB != nil || !sameOrigin(u, upstream) {
+		return false
+	}
+	return strings.TrimSuffix(a.EscapedPath(), "/") == strings.TrimSuffix(b.EscapedPath(), "/") &&
+		a.RawQuery == b.RawQuery
 }
 
 // rewriteReplyCard rewrites the card in an extended Agent Card reply, bare
 // (HTTP+JSON) or as a JSON-RPC result. An error reply, or one it cannot read,
 // is unchanged.
 func rewriteReplyCard(body []byte, upstream, proxy string) []byte {
-	var reply map[string]any
-	if json.Unmarshal(body, &reply) != nil {
+	reply, ok := decodeObject(body)
+	if !ok {
 		return body
 	}
 	card, ok := replyCard(reply)
@@ -159,32 +194,7 @@ func replyCard(reply map[string]any) (map[string]any, bool) {
 	return reply, true
 }
 
-func proxyBase(public string, r *http.Request, target string) string {
-	if public != "" {
-		return strings.TrimSuffix(public, "/") + strings.TrimSuffix(PathPrefix, "/") + "/" + target
-	}
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	if p := r.Header.Get("X-Forwarded-Proto"); p == "http" || p == "https" {
-		scheme = p
-	}
-	return scheme + "://" + r.Host + strings.TrimSuffix(PathPrefix, "/") + "/" + target
-}
-
-// BundleRegistry finds targets in the caller's config bundle, which the
-// control plane fills from the project's A2A target registry.
-type BundleRegistry struct{}
-
-// Lookup implements Registry.
-func (BundleRegistry) Lookup(_ context.Context, bundle *domain.Bundle, name string) (domain.A2ATarget, error) {
-	if bundle != nil {
-		for _, t := range bundle.Config.A2ATargets {
-			if t.Name == name {
-				return t, nil
-			}
-		}
-	}
-	return domain.A2ATarget{}, domain.ErrA2ATargetNotFound
+// proxyBase is the target's endpoint on the gateway's configured public origin.
+func proxyBase(public, target string) string {
+	return strings.TrimSuffix(public, "/") + strings.TrimSuffix(PathPrefix, "/") + "/" + target
 }

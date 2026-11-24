@@ -442,6 +442,24 @@ describe("presentLangyToolError", () => {
       ]);
     });
 
+    /** @scenario "A tip written for an API caller is not shown to a person" */
+    it("drops a next step that points an API caller at a meta field", () => {
+      const withMetaTip = failureDocument({
+        code: "trace_not_found",
+        message: "That trace is no longer available",
+        httpStatus: 404,
+        meta: {},
+        isHandled: true,
+        suggestions: [
+          "meta.traceId names the trace that was asked for",
+          "Traces are removed after the retention window",
+        ],
+      });
+      expect(present(withMetaTip, "Loading trace").tips).toEqual([
+        "Traces are removed after the retention window",
+      ]);
+    });
+
     it("shows the code alongside it", () => {
       expect(present(notFound, "Loading dataset").code).toBe("dataset_not_found");
     });

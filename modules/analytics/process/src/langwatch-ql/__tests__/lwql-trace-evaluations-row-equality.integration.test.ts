@@ -180,7 +180,7 @@ function attributesOf(seed: TraceSeed): Record<string, string> {
 
 /**
  * A `trace_analytics` row. The goose 00126 columns are MATERIALIZED from `Attributes`; the
- * goose 00128 ones are the fold's to write, so the row carries them as the fold does.
+ * goose 00128 and 00133 ones are the fold's to write, so the row carries them as the fold does.
  */
 function analyticsRow(seed: TraceSeed): Record<string, unknown> {
   const version = seed.version ?? 1;
@@ -188,6 +188,7 @@ function analyticsRow(seed: TraceSeed): Record<string, unknown> {
     MetadataOutcomeReason: seed.metadata.outcome_reason ?? "",
     MetadataPromptVersion: seed.metadata.prompt_version ?? "",
     MetadataEnvironment: "",
+    LastUsedPromptVersionId: seed.promptVersion ?? "",
     TenantId: TENANT,
     TraceId: seed.trace,
     Version: String(version),

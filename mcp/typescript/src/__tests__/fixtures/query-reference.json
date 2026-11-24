@@ -1622,6 +1622,14 @@
               "unit": null,
               "gates": [],
               "available": true
+            },
+            {
+              "name": "LastUsedPromptVersionId",
+              "type": "String",
+              "description": "Version of the last managed prompt the trace used, by the rule traces.LastUsedPromptVersionId follows; the two can differ for a trace whose prompt span arrived late. Empty when the trace used none, or was last folded before this column existed.",
+              "unit": null,
+              "gates": [],
+              "available": true
             }
           ],
           "exampleSql": "SELECT TraceId, OccurredAt, UpdatedAt\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
