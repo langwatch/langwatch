@@ -540,6 +540,12 @@ describe("presentLangyToolError", () => {
       expect(presentation.code).toBe("made_up_failure");
     });
 
+    it("does not blame the reader when the code and message are both empty", () => {
+      const presentation = codeOnly({ code: "", message: "", httpStatus: 500 });
+      expect(presentation.message).not.toBe("Check your input");
+      expect(presentation.message).not.toBe("");
+    });
+
     it("reads the reason chain, so a refused key is not told to try again", () => {
       const presentation = present(
         failureDocument({

@@ -11,7 +11,11 @@ import {
   isTerminalFailure,
   readCliErrorDocument,
 } from "@langwatch/handled-error/langwatch-handled-error";
-import { explainHandledError, supplementalTips } from "@langwatch/handled-error/presentation";
+import {
+  explainHandledError,
+  supplementalTips,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "@langwatch/handled-error/presentation";
 import { parseCliJson } from "@langwatch/langy-contract";
 
 import { LIMIT_TYPE_LABELS } from "../../../../model/limit-type-labels.ts";
@@ -391,7 +395,9 @@ function platformSentence(domain: LangWatchHandledErrorShape): string {
     traceId: undefined,
     reasons: serializedReasons(domain.reasons),
   });
-  if (!copy.isRegistered) return copy.title;
+  if (!copy.isRegistered) {
+    return domain.code.trim() !== "" ? copy.title : UNKNOWN_ERROR_PRESENTATION.title;
+  }
   return copy.description !== "" ? copy.description : copy.title;
 }
 
