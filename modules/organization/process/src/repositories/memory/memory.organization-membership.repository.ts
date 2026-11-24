@@ -622,6 +622,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
         seatPendingSince: row.seatPendingSince ?? null,
         email: user?.email ?? null,
         name: user?.name ?? null,
+        billingOnly: row.billingOnly ?? false,
       },
     ];
   }
@@ -930,6 +931,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     }
     this.assertCustomRolesAssignable({ organizationId, updates: effectiveTeamRoleUpdates });
     row.role = role;
+    row.billingOnly = false;
     row.updatedAt = nowInstant();
     this.applySeatTransition({ row, seat: input.seat });
     this.applyDeveloperSeat({ organizationId, userId, role });
@@ -1063,12 +1065,14 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     disabledAt: Instant | null;
     createdAt: Instant;
     updatedAt: Instant;
+    billingOnly?: boolean;
   }): OrganizationMemberSummary {
     const user = this.userRow(row.userId);
     return {
       userId: row.userId,
       organizationId: row.organizationId,
       role: row.role,
+      ...(row.billingOnly ? { billingOnly: true } : {}),
       disabledAt: row.disabledAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

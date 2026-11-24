@@ -93,6 +93,7 @@ export class InviteAcceptanceService {
         organizationId: invite.organizationId,
         role: invite.role,
         admission: { inviteId: invite.id, actorUserId: invite.requestedBy ?? null },
+        billingOnly: invite.billingOnly === true,
       });
 
       return true;
@@ -262,6 +263,19 @@ export class InviteAcceptanceService {
 
     if (holdsOrganizationBinding(invite.role)) {
       await this.attachOrganizationGrant({ userId, invite, actor });
+    }
+    // Billing only (ADR-205): the Billing grant and no team. The command id makes a retry a no-op.
+    if (invite.billingOnly) {
+      await writer.setBillingRole({
+        organizationId: invite.organizationId,
+        userId,
+        holds: true,
+        caller: { type: "system" },
+        actor,
+        commandId: `billing-only-invite:${invite.id}`,
+        source: "invite",
+      });
+      return;
     }
 
     const teamMembershipData = await this.assignableTeamMemberships(invite);

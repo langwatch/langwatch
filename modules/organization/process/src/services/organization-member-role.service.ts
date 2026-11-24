@@ -295,7 +295,7 @@ export class OrganizationMemberRoleService {
     lease,
   }: {
     change: Parameters<OrganizationMembershipRepository["updateMemberRole"]>[0];
-    currentMember: { role: OrganizationUserRole; disabledAt: unknown };
+    currentMember: { role: OrganizationUserRole; disabledAt: unknown; billingOnly?: boolean };
     oldPermissions: string[] | undefined;
     planUser: OrganizationPlanUser | undefined;
     lease: SeatLease;
@@ -307,6 +307,7 @@ export class OrganizationMemberRoleService {
       active: currentMember.disabledAt === null,
       oldRole: currentMember.role,
       oldPermissions,
+      oldBillingOnly: currentMember.billingOnly ?? false,
       role,
       planUser,
     });

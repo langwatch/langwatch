@@ -12,6 +12,7 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   CannotRemoveSelfAsLastAdminError,
+  BillingOnlyNoTeamAccessError,
   DeveloperSeatNoSharedAccessError,
   LiteMemberViewerOnlyError,
   TeamLastAdminRequiredError,
@@ -706,6 +707,8 @@ async function readMemberSeat({
   const membership = await tx.organizationUser.findUnique({
     where: { userId_organizationId: { userId, organizationId } },
   });
+  // A Billing-only member joins no team (ADR-205); a seat role must be given first.
+  if (membership?.billingOnly) throw new BillingOnlyNoTeamAccessError();
   return membership?.role ?? "no-membership";
 }
 
@@ -1715,6 +1718,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         disabledAt: true,
         createdAt: true,
         updatedAt: true,
+        billingOnly: true,
         user: { select: { id: true, name: true, email: true } },
       },
     });
@@ -1870,6 +1874,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         createdAt: true,
         fullSeatSince: true,
         seatPendingSince: true,
+        billingOnly: true,
         user: { select: { email: true, name: true } },
       },
     });
@@ -1883,6 +1888,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         seatPendingSince: row.seatPendingSince ? fromDate(row.seatPendingSince) : null,
         email: row.user.email,
         name: row.user.name,
+        billingOnly: row.billingOnly,
       },
     ];
   }
@@ -2280,7 +2286,8 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           });
           await tx.organizationUser.update({
             where: { userId_organizationId: { userId, organizationId } },
-            data: { role, ...columns },
+            // Any role change ends Billing only; the new role is metered (ADR-205).
+            data: { role, billingOnly: false, ...columns },
           });
           return columns;
         },

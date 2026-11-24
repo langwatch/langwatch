@@ -438,6 +438,7 @@ function intendedGrants(
     role: OrganizationUserRole;
     teamIds?: string;
     teams?: OrganizationApiCreateInvitationsInput["invites"][number]["teams"];
+    billingOnly?: boolean;
   }>,
 ): OrganizationIntendedGrant[] {
   const organizationGrant: OrganizationIntendedGrant = {
@@ -445,6 +446,8 @@ function intendedGrants(
     scopeType: "ORGANIZATION",
     scopeId: organizationId,
   };
+  // Billing only writes the Billing grant at the organization and nothing else (ADR-205).
+  if (invite.billingOnly) return [{ ...organizationGrant, billing: true }];
   // As invite-team-assignment.service.ts resolves: explicit teams, else legacy ids at the
   // default team role.
   if (!invite.teams || invite.teams.length === 0) {

@@ -45,6 +45,8 @@ const organizationInviteRowSchema = z
     subscriptionId: z.string().nullable(),
     acceptedByUserId: z.string().nullable(),
     acceptedViaIdentifierId: z.string().nullable(),
+    /** The Billing grant and no seat (ADR-205). */
+    billingOnly: z.boolean().optional(),
     createdAt: z.date(),
     updatedAt: z.date(),
   })
@@ -286,6 +288,8 @@ const organizationMemberDirectorySchemaDefinition = z.object({
       updatedAt: z.date(),
       departmentId: z.string().nullable(),
       disabledAt: z.date().nullable(),
+      /** A Billing-only member: the Billing grant, no team and no seat (ADR-205). */
+      billingOnly: z.boolean().optional(),
       /** Set while the person waits for a full seat; such a row is disabled until admitted. */
       seatPendingSince: z.date().nullable(),
       user: z.object({

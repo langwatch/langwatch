@@ -33,6 +33,12 @@ const registry = {
       "A key that reads exactly one project, such as a project API key, needs none: it defaults to that project",
     ],
   },
+  billing_only_no_team_access: {
+    tips: [
+      "Send the Billing-only invite with no `teams` and no `teamIds`",
+      "To give the person a team, invite them with a seat role instead, which uses a seat",
+    ],
+  },
   projects_unreadable: {
     tips: [
       "Ask an admin to grant the key's owner `analytics:view` on a project, or use a key that has it",

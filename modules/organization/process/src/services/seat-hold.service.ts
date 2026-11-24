@@ -106,11 +106,12 @@ export class SeatHoldService {
   async memberTypeOf(input: {
     organizationId: string;
     userId: string;
-    standing: Pick<MemberSeatStanding, "role">;
+    standing: Pick<MemberSeatStanding, "role" | "billingOnly">;
   }): Promise<MemberType> {
     const { memberships } = this.dependencies;
     if (input.standing.role !== "EXTERNAL")
       return classifyMemberType(input.standing.role, undefined);
+    if (input.standing.billingOnly) return "BillingOnly";
     const teamIds = await memberships.findSharedTeamIds({ organizationId: input.organizationId });
     const customRoleIds = customRoleIdsOf({
       bindings: await memberships.findTeamGrants({ ...input, teamIds }),
