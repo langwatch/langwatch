@@ -81,6 +81,8 @@ export function InviteMemberDrawer({
     >
       {organization && (
         <AddMembersForm
+          // The limit dialog can reopen this drawer on Billing only while it is already open.
+          key={initialSeat ?? "default"}
           teamOptions={teamOptions}
           organizationId={organization.id}
           onSubmit={onSubmit}

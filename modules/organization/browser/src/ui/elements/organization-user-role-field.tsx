@@ -41,6 +41,18 @@ export const orgRoleOptions: OrgRoleOption[] = [
   },
 ];
 
+/** The seat a member or invitation holds, in the picker's words; Billing only by its flag. */
+export function seatLabel({
+  role,
+  billingOnly,
+}: {
+  role: OrganizationUserRole;
+  billingOnly?: boolean;
+}): string {
+  const seat: InviteSeat = billingOnly ? BILLING_ONLY_SEAT : role;
+  return orgRoleOptions.find((option) => option.value === seat)?.label ?? role;
+}
+
 /** The seats whose boundary is explained behind the (i) in the picker. */
 const SEAT_EXPLANATIONS: Partial<Record<InviteSeat, { description: string; testId: string }>> = {
   [OrganizationUserRole.EXTERNAL]: {
