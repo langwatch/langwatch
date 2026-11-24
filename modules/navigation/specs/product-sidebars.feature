@@ -206,11 +206,11 @@ Feature: Product sidebars
   # Gateway and Coding agents are about no project: the section works in the one LLM Ops opens.
   # Retired in S6 by "Each product's sidebar lists its own boards" in modules/dashboard/specs/dashboards-organization-area.feature.
   @integration
-  Scenario: Gateway and Coding agents show the Dashboards section, naming its project
+  Scenario: Gateway and Coding agents show the Dashboards section of the project LLM Ops opens
     Given I can reach Dashboards and Dashboards in every product is on
     And LLM Ops would open the project "Shop"
     When I am in Gateway or Coding agents
-    Then the sidebar shows a "Dashboards · Shop" section under the product's own pages
+    Then the sidebar shows a "Dashboards" section for "Shop" under the product's own pages, titled with no project name
     And it lists the dashboards I pinned to "Shop"
     And Governance still shows no Dashboards section
     And a member who cannot reach Dashboards sees no such section
@@ -224,13 +224,13 @@ Feature: Product sidebars
     Given nothing sets Dashboards in every product, so it holds its registry default
     And I can reach Dashboards in "Shop", the project LLM Ops would open
     When I am in Gateway or Coding agents
-    Then the sidebar shows a "Dashboards · Shop" section under the product's own pages
+    Then the sidebar shows a "Dashboards" section for "Shop" under the product's own pages, titled with no project name
 
   # Retired in S6 by "A product's "+" fixes the product and says where the board lives" in modules/dashboard/specs/dashboards-organization-area.feature.
   @integration
   Scenario: The plus button in Gateway or Coding agents makes the dashboard in the named project
     Given Dashboards in every product is on and I may create dashboards
-    And the section in Gateway or Coding agents is titled "Dashboards · Shop"
+    And the Dashboards section in Gateway or Coding agents works in "Shop"
     When I press the "+" at the right of the title
     Then a new dashboard is made in "Shop" and pinned to it for me
     And it opens in "Shop" with "Add a widget" open
@@ -240,7 +240,7 @@ Feature: Product sidebars
   Scenario: In Gateway or Coding agents, what I may do follows the named project's grants
     Given Dashboards in every product is on
     And I may only view dashboards in "Shop", whatever I may do in the page's own project
-    When I am in Gateway or Coding agents and the section is titled "Dashboards · Shop"
+    When I am in Gateway or Coding agents and the Dashboards section works in "Shop"
     Then it offers no "+" and no "Add dashboard" item
     And a pinned dashboard's "⋮" menu offers only Unpin
     And with nothing pinned to "Shop" there is no such section
@@ -253,7 +253,7 @@ Feature: Product sidebars
     Given Dashboards in every product is on
     And I am an organization admin with no membership in the team that owns "Shop"
     And my own permissions in "Shop" let me create dashboards but not delete them
-    When I am in Gateway or Coding agents and the section is titled "Dashboards · Shop"
+    When I am in Gateway or Coding agents and the Dashboards section works in "Shop"
     Then I may create dashboards in "Shop", so the section offers the "+"
     But I may not delete them there
 
@@ -270,7 +270,7 @@ Feature: Product sidebars
   @unit
   Scenario: Events from the Dashboards section in Gateway or Coding agents are about the named project
     Given Dashboards in every product is on
-    And the section in Gateway or Coding agents is titled "Dashboards · Shop"
+    And the Dashboards section in Gateway or Coding agents works in "Shop"
     When something I do in the section is tracked
     Then that event is about "Shop"
     And the events after it are about the page's own project again

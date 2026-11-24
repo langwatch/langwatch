@@ -334,7 +334,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: true,
     description:
-      'Shows the Dashboards section in the Gateway and Coding agents sidebars as well as in LLM Ops (spec: modules/navigation/specs/product-sidebars.feature). Those pages are about no project, so the section is titled "Dashboards · <project>" and works in the project LLM Ops would open: it lists the boards pinned there, and its "+" and menus offer what the member\'s grants in that project allow. Needs release_dashboards and analytics:view in that project; with no project for LLM Ops to open there is no section. Governance shows no Dashboards section either way. Default on; while off only LLM Ops shows the Dashboards section. Turn it off from the operator store (/ops/feature-flags), or in dev with RELEASE_DASHBOARDS_IN_EVERY_PRODUCT=0.',
+      'Shows the Dashboards section in the Gateway and Coding agents sidebars as well as in LLM Ops (spec: modules/navigation/specs/product-sidebars.feature). Those pages are about no project, so the section, titled "Dashboards", works in the project LLM Ops would open: it lists the boards pinned there, and its "+" and menus offer what the member\'s grants in that project allow. Needs release_dashboards and analytics:view in that project; with no project for LLM Ops to open there is no section. Governance shows no Dashboards section either way. Default on; while off only LLM Ops shows the Dashboards section. Turn it off from the operator store (/ops/feature-flags), or in dev with RELEASE_DASHBOARDS_IN_EVERY_PRODUCT=0.',
   },
   {
     key: "release_insights",

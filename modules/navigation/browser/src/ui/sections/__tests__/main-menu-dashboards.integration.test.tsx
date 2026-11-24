@@ -408,7 +408,7 @@ describe("the Dashboards section with Dashboards in every product on", () => {
   ] as const;
 
   describe("given a member who can reach Dashboards, in Gateway or Coding agents", () => {
-    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    /** @scenario "Gateway and Coding agents show the Dashboards section of the project LLM Ops opens" */
     it.each(outsideLlmOps)(
       "hands the section the project LLM Ops would open, in $surface",
       async ({ surface, pathname, project }) => {
@@ -449,7 +449,7 @@ describe("the Dashboards section with Dashboards in every product on", () => {
   });
 
   describe("given the same member, in Governance", () => {
-    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    /** @scenario "Gateway and Coding agents show the Dashboards section of the project LLM Ops opens" */
     it("draws no section", async () => {
       renderSidebar({ surface: "governance", pathname: "/governance", everyProductFlag: true });
 
@@ -458,7 +458,7 @@ describe("the Dashboards section with Dashboards in every product on", () => {
   });
 
   describe("given a member who cannot reach Dashboards, in Gateway or Coding agents", () => {
-    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    /** @scenario "Gateway and Coding agents show the Dashboards section of the project LLM Ops opens" */
     it.each(outsideLlmOps)("draws no section in $surface", async ({ surface, pathname }) => {
       renderSidebar({ surface, pathname, permissions: [], everyProductFlag: true });
 
@@ -467,7 +467,7 @@ describe("the Dashboards section with Dashboards in every product on", () => {
   });
 
   describe("given no project LLM Ops could open", () => {
-    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    /** @scenario "Gateway and Coding agents show the Dashboards section of the project LLM Ops opens" */
     it("draws no section in Coding agents", async () => {
       renderSidebar({
         surface: "me",
