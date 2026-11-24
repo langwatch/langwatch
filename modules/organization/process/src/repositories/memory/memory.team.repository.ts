@@ -2,6 +2,7 @@ import {
   TeamMembershipChangedError,
   TeamNotFoundError,
   TeamSlugConflictError,
+  BillingOnlyNoTeamAccessError,
   UserNotInOrganizationError,
   type OrganizationTeam,
   type OrganizationTeamPage,
@@ -147,20 +148,21 @@ export class MemoryTeamRepository extends TeamRepository {
     userIds: string[];
     organizationId: string;
     activeOnly?: boolean;
+    grantingAccess?: boolean;
   }): Promise<string[]> => {
     if (input.userIds.length === 0) return [];
-    const found = new Set(
-      this.memory.organizationUsers
-        .filter(
-          (row) =>
-            row.organizationId === input.organizationId &&
-            input.userIds.includes(row.userId) &&
-            (!input.activeOnly || row.disabledAt === null),
-        )
-        .map((row) => row.userId),
+    const rows = this.memory.organizationUsers.filter(
+      (row) =>
+        row.organizationId === input.organizationId &&
+        input.userIds.includes(row.userId) &&
+        (!input.activeOnly || row.disabledAt === null),
     );
+    const found = new Set(rows.map((row) => row.userId));
     const missing = input.userIds.find((userId) => !found.has(userId));
     if (missing) throw new UserNotInOrganizationError(missing);
+    if (input.grantingAccess && rows.some((row) => row.billingOnly)) {
+      throw new BillingOnlyNoTeamAccessError();
+    }
     return input.userIds;
   };
 
