@@ -151,7 +151,8 @@ export type RecordUnbudgetedSpendCommandData = z.infer<
 
 /**
  * `<organization>:unbudgeted:<ISO week>`: gateway's idempotency key for the fact, and the source
- * id and Customer.io message id nurturing sends it under, so each layer dedupes on one string.
+ * id and Customer.io message id nurturing sends it under. Every sweep appends its own fact; the log
+ * collapses repeats only later, so nurturing's claim and the message id stop a second send.
  */
 export function unbudgetedSpendKeyOf(
   data: Pick<RecordUnbudgetedSpendCommandData, "organization_id" | "iso_week">,

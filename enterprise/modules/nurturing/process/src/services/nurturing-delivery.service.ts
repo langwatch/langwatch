@@ -24,6 +24,7 @@ import {
   fireTeamMemberInvited,
   fireWorkflowCreated,
 } from "../rules/nurturing-feature-adoption-service.rules.ts";
+import { isGatewayKeySignal } from "../rules/nurturing-gateway-facts.rules.ts";
 import {
   fireGuidedOnboardingPaths,
   fireGuidedOnboardingProgress,
@@ -334,6 +335,10 @@ export class NurturingDeliveryService {
   private async toCustomerIo(signal: NurturingSignal, deliveredClaim: string): Promise<void> {
     if (!this.deps.customerIo) return;
     if (isCodingOrAppSignal(signal)) return this.sendCustomerIoCalls(fireCodingOrApp(signal));
+    // Each call is claimed on its own; a refused one fails the delivery, so its job retries.
+    if (isGatewayKeySignal(signal)) {
+      return this.parts.gatewayKeys?.deliver({ signal, deliveredClaim });
+    }
     switch (signal.kind) {
       case "scenario_created":
         return this.sendCustomerIoCalls(fireScenarioCreated(signal));
@@ -388,12 +393,6 @@ export class NurturingDeliveryService {
         );
       case "self_hosted_crm":
         return this.selfHostedCrm(signal);
-      case "virtual_key_created":
-      case "key_budget_threshold":
-      case "key_first_request":
-      case "gateway_spend_without_budget":
-        // Each call is claimed on its own; a refused one fails the delivery, so its job retries.
-        return this.parts.gatewayKeys?.deliver({ signal, deliveredClaim });
       default:
         return;
     }

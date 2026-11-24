@@ -29,7 +29,8 @@ function isoWeekOf(at: Instant): string {
 
 /**
  * Product default: an organization hears of unbudgeted spend at most once a week. The ISO week
- * is the fact's identity, so every sweep inside one week records it once.
+ * is the fact's identity: every sweep inside one week records a fact under it, and nurturing
+ * sends only the first.
  */
 export const UNBUDGETED_SPEND_PERIOD_OF: (at: Instant) => string = isoWeekOf;
 

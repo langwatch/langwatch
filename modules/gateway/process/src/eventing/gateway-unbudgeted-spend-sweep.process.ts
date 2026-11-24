@@ -4,8 +4,9 @@ import { z } from "zod";
 export const UNBUDGETED_SPEND_SWEEP_PROCESS_NAME = "unbudgetedSpendSweep" as const;
 
 /**
- * Every six hours. The fact is recorded at most once per organization per ISO week, so a finer
- * tick buys only an earlier first send at the cost of more ledger reads.
+ * Every six hours. Each sweep records the fact again, but it is sent at most once per
+ * organization per ISO week, so a finer tick buys only an earlier first send at the cost of more
+ * ledger reads.
  */
 export const UNBUDGETED_SPEND_SWEEP_INTERVAL_MS = 6 * 60 * 60 * 1000;
 

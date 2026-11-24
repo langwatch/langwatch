@@ -118,7 +118,7 @@ describe("gateway governance facts", () => {
   });
 
   describe("when an organization's unbudgeted spend is recorded twice in a week", () => {
-    /** @scenario "An organization's unbudgeted spend is recorded at most once a week" */
+    /** @scenario "Every sweep of one ISO week records the organization's unbudgeted spend under one key" */
     it("keys both appends on the organization and ISO week alone, and a new week mints a new key", async () => {
       const record = (isoWeek: string, occurredAt: number) =>
         new RecordUnbudgetedSpendCommand().handle({

@@ -8,8 +8,8 @@ Feature: Customer.io hears when a person's gateway key is created, first used, a
   they are, else the organization's admin if they are, else no one. Connect and Langy keys send
   nothing. A key no person holds or made goes to the organization's admin.
   Gateway also records a key's first admitted request; the person told of the key's creation
-  is then identified with has_app_request true. Once a week at most, gateway records an
-  organization's person keys that spent without a budget; its admin is then told.
+  is then identified with has_app_request true. On every sweep, gateway records an
+  organization's person keys that spent without a budget; its admin is told once a week at most.
 
   @unit
   Scenario: A created person's key sets has_virtual_key and sends virtual_key_created
@@ -365,6 +365,7 @@ Feature: Customer.io hears when a person's gateway key is created, first used, a
     When the fact is delivered
     Then Customer.io tracks one gateway_spend_without_budget to the organization's admin
     And it carries keys (name and spend of at most five), key_count, total_spend and organization_id, and no key id
+    And each spend and total_spend is a number rounded to cents
     And its message id is "<organization>:unbudgeted:<ISO week>"
 
   @unit
@@ -381,6 +382,12 @@ Feature: Customer.io hears when a person's gateway key is created, first used, a
     Then Customer.io receives one gateway_spend_without_budget
     And the next week's fact sends again
 
+  @unit
+  Scenario: Two sweeps' facts in one ISO week send once
+    Given gateway records an organization's unbudgeted spend on two sweeps of one ISO week, with different spend and instants
+    When both facts are delivered
+    Then Customer.io receives one gateway_spend_without_budget, with the first fact's figures
+
   @integration
   Scenario: Unbudgeted spend delivered twice tracks once over Redis claims
     Given nurturing's delivery claims in Redis
@@ -393,7 +400,7 @@ Feature: Customer.io hears when a person's gateway key is created, first used, a
   # "no admin, no send"                          -> Scenario: Unbudgeted spend with no admin to tell sends nothing
   # "redelivery once, memory and Redis"          -> Scenario: Unbudgeted spend delivered twice tracks once
   #                                               -> Scenario: Unbudgeted spend delivered twice tracks once over Redis claims
-  # "at most weekly per organization"            -> gateway's gateway-governance-events.feature
+  # "at most weekly per organization"            -> Scenario: Two sweeps' facts in one ISO week send once
   # "replay never sends"                         -> eventing/__tests__/nurturing-replay.no-send.unit.test.ts
 
   # --- AC Coverage Map (key_top_model) ---

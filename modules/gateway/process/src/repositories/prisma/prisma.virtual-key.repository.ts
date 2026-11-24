@@ -234,7 +234,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
          AND "lastUsedAt" >= ${toDate(input.since)}
        ORDER BY "id"
       ${skipTenantCheck({
-        // The weekly unbudgeted-spend sweep spans every organization; it reads no secret column.
+        // The 6-hourly unbudgeted-spend sweep spans every organization; it reads no secret column.
         SKIP_TENANT_CHECK: true,
       })}
     `;

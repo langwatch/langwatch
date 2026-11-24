@@ -52,6 +52,44 @@ describe("an organization's spend without a budget in nurturing", () => {
       ]);
       expect(facts.requests.join("")).not.toContain("vk_");
     });
+
+    /** @scenario "Unbudgeted spend sends gateway_spend_without_budget to the organization's admin" */
+    it("rounds each spend and the total to cents, as numbers", async () => {
+      const facts = await gatewayFactsOver();
+
+      await facts.deliverFact(
+        unbudgeted({
+          keys: [{ virtual_key_id: "vk_1", name: "Support bot key", spent_usd: "12.873421066" }],
+          key_count: 1,
+          total_spent_usd: "12.873421066",
+        }),
+      );
+
+      expect(facts.sent).toMatchObject([
+        { properties: { keys: [{ name: "Support bot key", spend: 12.87 }], total_spend: 12.87 } },
+      ]);
+    });
+  });
+
+  describe("when two sweeps of one ISO week record different facts", () => {
+    /** @scenario "Two sweeps' facts in one ISO week send once" */
+    it("tracks once, with the first fact's figures", async () => {
+      const facts = await gatewayFactsOver();
+
+      await facts.deliverFact(unbudgeted());
+      await facts.deliverFact(
+        unbudgeted({
+          keys: [{ virtual_key_id: "vk_1", name: "Support bot key", spent_usd: "60" }],
+          key_count: 1,
+          total_spent_usd: "60",
+          occurred_at: 6_000 + 6 * 60 * 60 * 1000,
+        }),
+      );
+
+      expect(facts.sent).toMatchObject([
+        { event: "gateway_spend_without_budget", properties: { key_count: 2, total_spend: 49.5 } },
+      ]);
+    });
   });
 
   describe("when the organization's copied admin is no current member", () => {

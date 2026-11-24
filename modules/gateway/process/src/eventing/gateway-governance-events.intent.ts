@@ -178,8 +178,9 @@ export class RecordVkFirstRequestCommand implements CommandHandler<
 }
 
 /**
- * Keyed on (organization, ISO week), with no instant: that key IS the at-most-weekly rule, so
- * every sweep of the week that finds the organization still unbudgeted records it once.
+ * Keyed on (organization, ISO week), with no instant. Every sweep of the week that finds the
+ * organization still unbudgeted appends a fact under that one key: the log collapses repeats
+ * only later, so nurturing's claim and the Customer.io message id stop a second send.
  */
 export class RecordUnbudgetedSpendCommand implements CommandHandler<
   Command<RecordUnbudgetedSpendCommandData>,

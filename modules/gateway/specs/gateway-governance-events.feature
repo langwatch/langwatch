@@ -115,11 +115,11 @@ Feature: Gateway records its governance facts for webhook delivery
     And it counts all seven keys and totals their spend
 
   @unit
-  Scenario: An organization's unbudgeted spend is recorded at most once a week
+  Scenario: Every sweep of one ISO week records the organization's unbudgeted spend under one key
     Given the sweep finds the same organization unbudgeted twice in one ISO week
     When both facts are recorded
-    Then both carry the idempotency key "<organization>:unbudgeted:<ISO week>", so the week records once
-    And the next ISO week records again
+    Then both facts are appended, each carrying the idempotency key "<organization>:unbudgeted:<ISO week>"
+    And the next ISO week's fact carries a new key
 
   @integration
   Scenario: The unbudgeted-spend sweep reads live person keys across organizations in Postgres

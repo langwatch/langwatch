@@ -7,7 +7,11 @@
  * names its top keys by name and spend only, never their ids.
  * Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
  */
-import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
+import type {
+  CioBatchCall,
+  NurturingSignal,
+  NurturingSignalOf,
+} from "@langwatch/enterprise-nurturing-contract";
 import {
   CYCLIC_WINDOWS,
   type RecordBudgetCrossingCommandData,
@@ -29,11 +33,19 @@ export type VirtualKeyCreatedSignal = NurturingSignalOf<"virtual_key_created">;
 export type KeyBudgetThresholdSignal = NurturingSignalOf<"key_budget_threshold">;
 export type KeyFirstRequestSignal = NurturingSignalOf<"key_first_request">;
 export type SpendWithoutBudgetSignal = NurturingSignalOf<"gateway_spend_without_budget">;
-export type GatewayKeySignal =
-  | VirtualKeyCreatedSignal
-  | KeyBudgetThresholdSignal
-  | KeyFirstRequestSignal
-  | SpendWithoutBudgetSignal;
+const GATEWAY_KEY_KINDS = [
+  "virtual_key_created",
+  "key_budget_threshold",
+  "key_first_request",
+  "gateway_spend_without_budget",
+] as const;
+
+export type GatewayKeySignal = NurturingSignalOf<(typeof GATEWAY_KEY_KINDS)[number]>;
+
+/** The signals gateway's key facts make: each Customer.io call is claimed on its own. */
+export function isGatewayKeySignal(signal: NurturingSignal): signal is GatewayKeySignal {
+  return (GATEWAY_KEY_KINDS as readonly string[]).includes(signal.kind);
+}
 
 /** Who hears a key fact, and the holders before them whom the member copy holds no row for. */
 export type KeyRecipient = Readonly<{
@@ -263,6 +275,11 @@ export function fireKeyFirstRequest(signal: KeyFirstRequestSignal): CioBatchCall
   return [{ type: "identify", userId: signal.userId, traits: { has_app_request: true } }];
 }
 
+/** Template 581 prints the figure as sent, with no rounding filter of its own. */
+function centsOf(usd: number): number {
+  return Math.round(usd * 100) / 100;
+}
+
 /**
  * One event to the admin, under the fact's own id as its Customer.io message id, so a resend
  * after the delivery claim expired is still dropped by Customer.io.
@@ -274,9 +291,9 @@ export function fireSpendWithoutBudget(signal: SpendWithoutBudgetSignal): CioBat
       userId: signal.userId,
       event: "gateway_spend_without_budget",
       properties: {
-        keys: signal.keys.map(({ name, spendUsd }) => ({ name, spend: spendUsd })),
+        keys: signal.keys.map(({ name, spendUsd }) => ({ name, spend: centsOf(spendUsd) })),
         key_count: signal.keyCount,
-        total_spend: signal.totalSpendUsd,
+        total_spend: centsOf(signal.totalSpendUsd),
         organization_id: signal.organizationId,
       },
       messageId: signal.sourceEventId,

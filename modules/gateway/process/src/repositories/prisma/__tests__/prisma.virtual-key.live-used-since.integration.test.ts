@@ -4,6 +4,12 @@
  * guard and lists only live keys of the purpose asked for, used inside the window.
  * @see modules/gateway/specs/gateway-governance-events.feature
  */
+import { createLogger } from "@langwatch/observability";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaTenancyGuardService,
+} from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { Temporal, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
@@ -13,8 +19,18 @@ import { createGatewayTestPrismaConnection } from "../../../app/__tests__/gatewa
 import { PrismaGatewayVirtualKeyRepository } from "../prisma.virtual-key.repository.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
+// Seeding and cleanup only: the read under test goes through the production guard below.
 const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
+const skippedTables: string[] = [];
+const guarded = databaseUrl
+  ? PrismaConnectionService.create({
+      guard: PrismaTenancyGuardService.create({
+        onSkippedTenantCheck: ({ table }) => skippedTables.push(table),
+      }),
+      logger: createLogger("langwatch:gateway:test:live-used-since"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
+  : null;
 
 const ns = nanoid(8);
 const ORG_IDS = [`org-used-a-${ns}`, `org-used-b-${ns}`];
@@ -79,11 +95,21 @@ describe.skipIf(!databaseUrl)("the fleet read of recently used virtual keys", ()
     await prisma.virtualKey.deleteMany({ where: { organizationId: { in: ORG_IDS } } });
     await prisma.organization.deleteMany({ where: { id: { in: ORG_IDS } } });
     await connection?.closeOnce();
+    await guarded?.closeOnce();
+  });
+
+  /** @scenario "The unbudgeted-spend sweep reads live person keys across organizations in Postgres" */
+  it("passes the tenancy guard as one counted skip", async () => {
+    const repository = PrismaGatewayVirtualKeyRepository.create(guarded?.client as PrismaClient);
+
+    await repository.findLiveUsedSince({ purpose: "USER", since: SINCE });
+
+    expect(skippedTables).toEqual(["VirtualKey"]);
   });
 
   /** @scenario "The unbudgeted-spend sweep reads live person keys across organizations in Postgres" */
   it("lists each organization's active, unrevoked USER keys used since the instant, by id", async () => {
-    const repository = PrismaGatewayVirtualKeyRepository.create(prisma);
+    const repository = PrismaGatewayVirtualKeyRepository.create(guarded?.client as PrismaClient);
 
     const used = await repository.findLiveUsedSince({ purpose: "USER", since: SINCE });
 
