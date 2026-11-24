@@ -211,7 +211,8 @@ export class ModelProviderDecisionModelService {
     const isOwnModelAllowed = await this.options.isOwnModelAllowed({ organizationId });
     if (!isOwnModelAllowed && picksOwnDecisionModel({ config, stored: stored ?? {} })) {
       throw new ModelDefaultValidationError(
-        "Running Instant Evals on your own decision model is not enabled for this organization. Keep LangWatch Instant (preview), or ask LangWatch to enable it.",
+        "Running Instant Evals on your own decision model is not enabled for this organization. " +
+          "Keep LangWatch Instant (preview), or ask LangWatch to enable it.",
       );
     }
     if (!isOwnModelAllowed) return;
