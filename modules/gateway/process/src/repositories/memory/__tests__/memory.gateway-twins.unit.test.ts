@@ -89,6 +89,46 @@ describe("memory gateway twins", () => {
       expect(await keys.findByHashedSecret("hash_vk_1")).toBeNull();
     });
 
+    it("lists every organization's live keys of one purpose used since an instant, by id", async () => {
+      const keys = MemoryGatewayVirtualKeyRepository.create(MemoryGatewayStore.create());
+      const since = Temporal.Instant.from("2026-11-19T00:00:00Z");
+      for (const id of ["vk_used", "vk_old", "vk_revoked", "vk_disabled", "vk_never"]) {
+        await keys.create(keyInput(id));
+      }
+      await keys.create({ ...keyInput("vk_other_org"), organizationId: "org_2" });
+      await keys.create({ ...keyInput("vk_langy"), purpose: "LANGY" });
+      for (const id of ["vk_used", "vk_revoked", "vk_disabled", "vk_other_org", "vk_langy"]) {
+        await keys.recordUsage(id, since);
+      }
+      await keys.recordUsage("vk_old", since.subtract({ milliseconds: 1 }));
+      await keys.revoke({ id: "vk_revoked", organizationId: ORG, revokedById: "usr_1" });
+      await keys.setDisabled({
+        id: "vk_disabled",
+        organizationId: ORG,
+        disabled: true,
+        reason: "paused",
+      });
+
+      const used = await keys.findLiveUsedSince({ purpose: "USER", since });
+
+      expect(used).toEqual([
+        {
+          id: "vk_other_org",
+          organizationId: "org_2",
+          name: "vk_other_org",
+          principalUserId: null,
+          traceProjectId: null,
+        },
+        {
+          id: "vk_used",
+          organizationId: ORG,
+          name: "vk_used",
+          principalUserId: null,
+          traceProjectId: null,
+        },
+      ]);
+    });
+
     it("refuses a second key holding the same external id in the organization", async () => {
       const keys = MemoryGatewayVirtualKeyRepository.create(MemoryGatewayStore.create());
       await keys.create(keyInput("vk_1", { externalId: "ext" }));

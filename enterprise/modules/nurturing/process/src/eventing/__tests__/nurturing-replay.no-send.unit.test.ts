@@ -27,6 +27,7 @@ import {
   sealPipelineDefinition,
 } from "@langwatch/eventing";
 import {
+  GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
   GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
 } from "@langwatch/gateway-contract";
@@ -67,7 +68,11 @@ import type { MemoryNurturingTracedProjectRepository } from "../../repositories/
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { utcDayOf } from "../../rules/nurturing-time.rules.ts";
 import { buildNurturingProjectUsagePipeline } from "../nurturing-project-usage.pipeline.ts";
-import { firstRequestFact, lifecycleFact } from "./nurturing-gateway-facts.test-helpers.ts";
+import {
+  firstRequestFact,
+  lifecycleFact,
+  unbudgetedSpendFact,
+} from "./nurturing-gateway-facts.test-helpers.ts";
 import {
   ADMINS_STEP,
   AUTH_MEMBERS_STEP,
@@ -154,11 +159,13 @@ const projectFact = (type: string, projectId: string, data: Record<string, unkno
 /**
  * One owner fact for each of the fifteen lanes the deploy replays: the two erasure marks, the key,
  * the evaluation day, the plan, and the organization, project and trace copies. Gateway's
- * first-request fact sits in the log too: only a live subscriber reads it, so no step sends it.
+ * first-request and unbudgeted-spend facts sit in the log too: only a live subscriber reads them,
+ * so no step sends them.
  */
 function ownerLogs(): ReplayEvent[] {
   const gateway = lifecycleFact({ occurred_at: AT });
   const firstRequest = firstRequestFact({ occurred_at: AT });
+  const unbudgeted = unbudgetedSpendFact({ occurred_at: AT });
   return [
     // User marks, identity marks.
     logged({
@@ -197,6 +204,14 @@ function ownerLogs(): ReplayEvent[] {
       tenantId: firstRequest.tenantId,
       version: "2026-07-31",
       data: firstRequest,
+    }),
+    logged({
+      type: GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
+      aggregateType: "governance_subject",
+      aggregateId: `org:${unbudgeted.organization_id}`,
+      tenantId: unbudgeted.tenantId,
+      version: "2026-07-31",
+      data: unbudgeted,
     }),
     // Evaluation days.
     logged({

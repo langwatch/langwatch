@@ -8,7 +8,8 @@ Feature: Customer.io hears when a person's gateway key is created, first used, a
   they are, else the organization's admin if they are, else no one. Connect and Langy keys send
   nothing. A key no person holds or made goes to the organization's admin.
   Gateway also records a key's first admitted request; the person told of the key's creation
-  is then identified with has_app_request true.
+  is then identified with has_app_request true. Once a week at most, gateway records an
+  organization's person keys that spent without a budget; its admin is then told.
 
   @unit
   Scenario: A created person's key sets has_virtual_key and sends virtual_key_created
@@ -357,6 +358,43 @@ Feature: Customer.io hears when a person's gateway key is created, first used, a
     Given nurturing's delivery claims in Redis
     When a key's first-request fact is delivered twice
     Then Customer.io receives one has_app_request identify
+
+  @unit
+  Scenario: Unbudgeted spend sends gateway_spend_without_budget to the organization's admin
+    Given gateway records that an organization's person keys spent without a budget this week
+    When the fact is delivered
+    Then Customer.io tracks one gateway_spend_without_budget to the organization's admin
+    And it carries keys (name and spend of at most five), key_count, total_spend and organization_id, and no key id
+    And its message id is "<organization>:unbudgeted:<ISO week>"
+
+  @unit
+  Scenario: Unbudgeted spend with no admin to tell sends nothing
+    Given the organization's copied admin is no current member, or it has no copied admin
+    When gateway's unbudgeted-spend fact is delivered
+    Then Customer.io receives no call
+    And the dropped fact is logged at debug level
+
+  @unit
+  Scenario: Unbudgeted spend delivered twice tracks once
+    Given an organization's unbudgeted-spend fact for one ISO week
+    When it is delivered twice
+    Then Customer.io receives one gateway_spend_without_budget
+    And the next week's fact sends again
+
+  @integration
+  Scenario: Unbudgeted spend delivered twice tracks once over Redis claims
+    Given nurturing's delivery claims in Redis
+    When an organization's unbudgeted-spend fact is delivered twice
+    Then Customer.io receives one gateway_spend_without_budget
+
+  # --- AC Coverage Map (gateway_spend_without_budget) ---
+  # "budgeted keys left out, $5 edge, top 5"     -> gateway's gateway-governance-events.feature
+  # "one track with the template's payload"      -> Scenario: Unbudgeted spend sends gateway_spend_without_budget to the organization's admin
+  # "no admin, no send"                          -> Scenario: Unbudgeted spend with no admin to tell sends nothing
+  # "redelivery once, memory and Redis"          -> Scenario: Unbudgeted spend delivered twice tracks once
+  #                                               -> Scenario: Unbudgeted spend delivered twice tracks once over Redis claims
+  # "at most weekly per organization"            -> gateway's gateway-governance-events.feature
+  # "replay never sends"                         -> eventing/__tests__/nurturing-replay.no-send.unit.test.ts
 
   # --- AC Coverage Map (key_top_model) ---
   # AC 1: "62% on gpt-5-mini, every property"        -> Scenario: A threshold crossing names the model the key spent most on

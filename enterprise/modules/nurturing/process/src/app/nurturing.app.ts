@@ -191,6 +191,7 @@ export class NurturingModule implements NurturingApi {
         virtualKeyCreated: (input) => gatewayFacts.virtualKeyCreated(input),
         keyBudgetCrossed: (input) => gatewayFacts.keyBudgetCrossed(input),
         keyFirstRequested: (input) => gatewayFacts.keyFirstRequested(input),
+        unbudgetedSpendRecorded: (input) => gatewayFacts.unbudgetedSpendRecorded(input),
       }),
       delivery,
       organizationUsage,

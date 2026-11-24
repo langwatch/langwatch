@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   RecordBudgetCrossingCommand,
+  RecordUnbudgetedSpendCommand,
   RecordVkFirstRequestCommand,
   RecordVkLifecycleCommand,
 } from "../gateway-governance-events.intent.ts";
@@ -113,6 +114,40 @@ describe("gateway governance facts", () => {
         idempotencyKey: "project-1:vk_first_request:key-1",
       });
       expect(twice?.idempotencyKey).toBe(once?.idempotencyKey);
+    });
+  });
+
+  describe("when an organization's unbudgeted spend is recorded twice in a week", () => {
+    /** @scenario "An organization's unbudgeted spend is recorded at most once a week" */
+    it("keys both appends on the organization and ISO week alone, and a new week mints a new key", async () => {
+      const record = (isoWeek: string, occurredAt: number) =>
+        new RecordUnbudgetedSpendCommand().handle({
+          type: "lw.governance.record_unbudgeted_spend",
+          tenantId: createTenantId("project-1"),
+          aggregateId: "org:org-1",
+          data: {
+            tenantId: "project-1",
+            organization_id: "org-1",
+            iso_week: isoWeek,
+            keys: [{ virtual_key_id: "key-1", name: "CI key", spent_usd: "12.5" }],
+            key_count: 1,
+            total_spent_usd: "12.5",
+            occurred_at: occurredAt,
+          },
+        });
+      const [once] = await record("2026-W48", 1_000);
+      const [twice] = await record("2026-W48", 21_601_000);
+      const [nextWeek] = await record("2026-W49", 604_801_000);
+
+      expect(once).toMatchObject({
+        aggregateType: "governance_subject",
+        aggregateId: "org:org-1",
+        type: "lw.governance.unbudgeted_spend",
+        version: "2026-07-31",
+        idempotencyKey: "org-1:unbudgeted:2026-W48",
+      });
+      expect(twice?.idempotencyKey).toBe(once?.idempotencyKey);
+      expect(nextWeek?.idempotencyKey).toBe("org-1:unbudgeted:2026-W49");
     });
   });
 });

@@ -91,3 +91,38 @@ Feature: Gateway records its governance facts for webhook delivery
     When the key budget's spend by model is read since its period start
     Then each successful request in the period counts once, for the key's budget only
     And gpt-5-mini is named at a 0.62 share
+
+  @unit
+  Scenario: A key at or over the threshold with no budget is named, one under it is not
+    Given two live USER keys with no budget, one that spent exactly $5 over the last seven UTC days and one a nano-dollar less
+    When the unbudgeted-spend sweep runs
+    Then the fact names the $5 key only
+    And a key of another purpose, or a revoked or disabled key, is never named
+
+  @unit
+  Scenario: A key any budget applies to is left out of unbudgeted spend
+    Given an organization's keys over the threshold, one under its own budget, one whose trace project's team or project has a budget, one whose person has a budget, and one under none
+    When the unbudgeted-spend sweep runs
+    Then the fact names only the key no budget applies to, resolved as the key's config bundle resolves it
+    And an organization whose every key over the threshold is budgeted records nothing
+    And one organization's failed read is logged and the other organizations are still recorded
+
+  @unit
+  Scenario: The fact names the five keys that spent most, and counts and totals all of them
+    Given seven unbudgeted keys over the threshold in one organization
+    When the unbudgeted-spend sweep runs
+    Then the fact names the five that spent most, most first and ties by id, by name and spend
+    And it counts all seven keys and totals their spend
+
+  @unit
+  Scenario: An organization's unbudgeted spend is recorded at most once a week
+    Given the sweep finds the same organization unbudgeted twice in one ISO week
+    When both facts are recorded
+    Then both carry the idempotency key "<organization>:unbudgeted:<ISO week>", so the week records once
+    And the next ISO week records again
+
+  @integration
+  Scenario: The unbudgeted-spend sweep reads live person keys across organizations in Postgres
+    Given USER keys in two organizations used since the window opened, and keys used before it, never used, revoked, disabled or of another purpose
+    When the sweep lists the keys used since the window opened
+    Then the read passes the tenancy guard and lists only the two live USER keys, by id

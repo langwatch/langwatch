@@ -86,9 +86,10 @@ schemas of the owners it listens to, and the `UserApi` and `OrganizationApi`
 contracts only for the exceptions above. Gateway's contract
 (`@langwatch/gateway-contract`) is one of those owners: its
 `lw.governance.vk_lifecycle` and `lw.governance.budget_crossing` facts carry who
-created a key, who it acts for, its purpose and a crossing's period end, and its
-`lw.governance.vk_first_request` fact says a key served its first request, so
-nurturing never reads gateway's tables
+created a key, who it acts for, its purpose and a crossing's period end, its
+`lw.governance.vk_first_request` fact says a key served its first request, and its
+`lw.governance.unbudgeted_spend` fact names an organization's top unbudgeted keys
+by name and spend, so nurturing never reads gateway's tables
 (https://github.com/langwatch/tasks/issues/1200). No feature module depends on
 nurturing's process, so no peer cycle can pass through it.
 
@@ -154,8 +155,8 @@ trace twice, and so can a root span stored more than once; accepted (owner
 decision, issue 9378).
 Signals are events on the `nurturing` pipeline.
 A delivered signal is claimed in Redis for seven days under the process-wide idempotency key prefix,
-so a redelivered event sends nothing. A gateway key's creation, its first request and its
-budget's crossings are claimed per call, the identify apart from the track, so a retry after a refused call
+so a redelivered event sends nothing. A gateway key's creation, its first request, its
+budget's crossings and an organization's unbudgeted spend are claimed per call, the identify apart from the track, so a retry after a refused call
 sends only that call. Billing's catch-up `subscription_changed` fact, recorded by
 the `customer-io-plan-resync` task, is never claimed. Every `subscription_changed` fact folds into
 `NurturingOrganizationPlan` as ADR-174 decision 17 folds billing's facts: the newest billing fact

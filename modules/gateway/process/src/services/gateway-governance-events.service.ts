@@ -2,6 +2,7 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import type {
   VkLifecycleAction,
   RecordBudgetCrossingCommandData,
+  RecordUnbudgetedSpendCommandData,
   RecordVkFirstRequestCommandData,
   RecordVkLifecycleCommandData,
   VirtualKeyPurpose,
@@ -19,12 +20,13 @@ type GovernanceSenders = Readonly<{
   recordBudgetCrossing?: GovernanceSender;
   recordVkLifecycle?: GovernanceSender;
   recordVkFirstRequest?: GovernanceSender;
+  recordUnbudgetedSpend?: GovernanceSender;
 }>;
 
 /**
- * Records gateway's governance facts; the senders arrive when the pipeline connects.
- * A crossing that cannot be recorded throws, so its debit is re-driven; a lifecycle fact
- * and a first request are best effort: a key mutation or a spend batch never fails on them.
+ * Records gateway's governance facts; the senders arrive when the pipeline connects. A crossing
+ * or unbudgeted spend that cannot be recorded throws, so its debit or sweep is re-driven; a
+ * lifecycle fact and a first request are best effort: a key mutation or spend batch never fails.
  */
 export class GatewayGovernanceEventsService implements GatewayGovernanceSignals {
   #senders: GovernanceSenders = {};
@@ -49,6 +51,7 @@ export class GatewayGovernanceEventsService implements GatewayGovernanceSignals 
       recordBudgetCrossing: commands.recordBudgetCrossing,
       recordVkLifecycle: commands.recordVkLifecycle,
       recordVkFirstRequest: commands.recordVkFirstRequest,
+      recordUnbudgetedSpend: commands.recordUnbudgetedSpend,
     };
   }
 
@@ -113,8 +116,28 @@ export class GatewayGovernanceEventsService implements GatewayGovernanceSignals 
     }
   }
 
+  /**
+   * Records an organization's unbudgeted spend under one stable organization project. Throws when
+   * it cannot, so the sweep logs the organization and its next run tries again.
+   */
+  async recordUnbudgetedSpend(
+    fact: Omit<RecordUnbudgetedSpendCommandData, "tenantId">,
+  ): Promise<void> {
+    const sender = this.#senders.recordUnbudgetedSpend;
+    if (!sender) throw new Error("governance_events_processing is not registered in this process");
+    const tenantId = await this.tenantOf({
+      organizationId: fact.organization_id,
+      traceProjectId: null,
+    });
+    if (!tenantId) return;
+    const data: RecordUnbudgetedSpendCommandData = { tenantId, ...fact };
+    await sender.send(data);
+  }
+
   /** The key's trace project, else one stable organization project for event tenancy. */
-  private async tenantOf(virtualKey: GatewayFirstRequestKey): Promise<string | null> {
+  private async tenantOf(
+    virtualKey: Pick<GatewayFirstRequestKey, "organizationId" | "traceProjectId">,
+  ): Promise<string | null> {
     if (virtualKey.traceProjectId) return virtualKey.traceProjectId;
     const ids = await this.projects.listIdsByOrganization({
       organizationId: virtualKey.organizationId,

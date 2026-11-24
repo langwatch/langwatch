@@ -30,6 +30,7 @@ function laneAliases() {
     virtualKeyCreated: async () => undefined,
     keyBudgetCrossed: async () => undefined,
     keyFirstRequested: async () => undefined,
+    unbudgetedSpendRecorded: async () => undefined,
   }).laneAliases;
 }
 

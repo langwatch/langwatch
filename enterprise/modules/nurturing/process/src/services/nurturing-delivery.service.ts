@@ -391,6 +391,7 @@ export class NurturingDeliveryService {
       case "virtual_key_created":
       case "key_budget_threshold":
       case "key_first_request":
+      case "gateway_spend_without_budget":
         // Each call is claimed on its own; a refused one fails the delivery, so its job retries.
         return this.parts.gatewayKeys?.deliver({ signal, deliveredClaim });
       default:

@@ -127,4 +127,32 @@ describe("GatewayGovernanceEventsService", () => {
       ).rejects.toThrow("governance_events_processing");
     });
   });
+
+  describe("when an organization's unbudgeted spend is recorded", () => {
+    const fact = {
+      organization_id: "org-1",
+      iso_week: "2026-W48",
+      keys: [{ virtual_key_id: "vk-1", name: "CI key", spent_usd: "12.5" }],
+      key_count: 1,
+      total_spent_usd: "12.5",
+      occurred_at: 1,
+    };
+
+    it("records it under one stable organization project", async () => {
+      const { service, lifecycle } = harness();
+      service.connect({ recordUnbudgetedSpend: lifecycle.sender });
+
+      await service.recordUnbudgetedSpend(fact);
+
+      expect(lifecycle.sent).toEqual([{ tenantId: "project-a", ...fact }]);
+    });
+
+    it("refuses it where the pipeline is not registered, so the sweep logs and retries it", async () => {
+      const { service } = harness();
+
+      await expect(service.recordUnbudgetedSpend(fact)).rejects.toThrow(
+        "governance_events_processing",
+      );
+    });
+  });
 });

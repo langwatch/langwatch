@@ -51,10 +51,13 @@ import {
 } from "@langwatch/experiment-contract";
 import {
   GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+  GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
   GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
   type RecordBudgetCrossingCommandData,
   recordBudgetCrossingCommandDataSchema,
+  type RecordUnbudgetedSpendCommandData,
+  recordUnbudgetedSpendCommandDataSchema,
   type RecordVkFirstRequestCommandData,
   recordVkFirstRequestCommandDataSchema,
   type RecordVkLifecycleCommandData,
@@ -277,6 +280,11 @@ export function buildNurturingPipeline(deps: {
   /** A key's first request: a copied person's key delivers one person's signal. */
   keyFirstRequested: (input: {
     data: RecordVkFirstRequestCommandData;
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** An organization's weekly unbudgeted spend: its admin's signal. */
+  unbudgetedSpendRecorded: (input: {
+    data: RecordUnbudgetedSpendCommandData;
     deliver: (signal: NurturingSignal) => Promise<void>;
   }) => Promise<void>;
 }): NurturingPipeline {
@@ -571,6 +579,11 @@ export function buildNurturingPipeline(deps: {
         eventType: GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
         data: recordVkFirstRequestCommandDataSchema,
         handle: (data) => deps.keyFirstRequested({ data, deliver: deliverSignal }),
+      })
+      .withPeerSubscriber("gatewaySpendWithoutBudget", {
+        eventType: GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
+        data: recordUnbudgetedSpendCommandDataSchema,
+        handle: (data) => deps.unbudgetedSpendRecorded({ data, deliver: deliverSignal }),
       })
       .withPeerSubscriber("langyFirstMessageSeen", {
         eventType: LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE,

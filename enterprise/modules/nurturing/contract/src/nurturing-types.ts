@@ -230,7 +230,9 @@ export type CioEventName =
   | "self_hosted_license_sync_stale"
   | "virtual_key_created"
   /** A key's budget crossed its warn line or its limit; `budget_reached` tells them apart. */
-  | "key_budget_threshold";
+  | "key_budget_threshold"
+  /** An organization's person keys spent without a budget this week; to its admin, weekly. */
+  | "gateway_spend_without_budget";
 
 // ---------------------------------------------------------------------------
 // Batch call discriminated union
