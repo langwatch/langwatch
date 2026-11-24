@@ -441,7 +441,7 @@ export function SingleRunTable({
   // Memoize getCoreRowModel to prevent React scheduling loops
   const coreRowModel = useMemo(() => getCoreRowModel(), []);
 
-  const heldRows = useMemo(() => (data ? rowsInRun(data.rows) : []), [data]);
+  const heldRows = data ? rowsInRun(data.rows) : [];
 
   // Create table instance
   const table = useReactTable({
