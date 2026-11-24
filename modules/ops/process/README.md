@@ -2333,7 +2333,7 @@ interface Output {
 
 ### `ops.upgrade`
 
-Contract `../contract/src/features/migrations/ops-upgrade.ts:364`, router `src/transport/ops-upgrade.trpc.ts:16`.
+Contract `../contract/src/features/migrations/ops-upgrade.ts:366`, router `src/transport/ops-upgrade.trpc.ts:16`.
 
 | Procedure                                               | Kind     | Gate                                                                                                                                                                                 | Input                                             | Output                                    |
 | ------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- | ----------------------------------------- |
@@ -2363,22 +2363,22 @@ Contract `../contract/src/features/migrations/ops-upgrade.ts:364`, router `src/t
 
 ```typescript
 // ops.upgrade.status
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:367
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:369
 type Input = unknown;
 type Output = z.infer<typeof opsUpgradeStatusSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:140
 
 // ops.upgrade.attentionNotice
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:375
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:377
 type Input = unknown;
-// Output: opsUpgradeAttentionNoticeSchema, ../contract/src/features/migrations/ops-upgrade.ts:361
+// Output: opsUpgradeAttentionNoticeSchema, ../contract/src/features/migrations/ops-upgrade.ts:363
 interface Output {
   show: boolean;
 }
 
 // ops.upgrade.listReleases
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:380
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:382
 type Input = unknown;
-// Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:261
+// Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:263
 interface Output {
   items: {
     release: string | null;
@@ -2391,28 +2391,28 @@ interface Output {
 }
 
 // ops.upgrade.listSteps
-// Input: opsUpgradeListStepsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:285
+// Input: opsUpgradeListStepsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:287
 interface Input {
   release?: string | null;
   mode?: string;
   status?: string;
 }
-type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:268
+type Output = z.infer<typeof opsUpgradeStepPageSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:270
 
 // ops.upgrade.getStep
-// Input: opsUpgradeIdInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:323
+// Input: opsUpgradeIdInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:325
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:227
+type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:229
 
 // ops.upgrade.listRuns
-// Input: opsUpgradeListRunsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:296
+// Input: opsUpgradeListRunsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:298
 interface Input {
   cursor?: string | null;
   limit?: number;
 }
-// Output: opsUpgradeRunPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:272
+// Output: opsUpgradeRunPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:274
 interface Output {
   items: {
     id: string;
@@ -2426,13 +2426,13 @@ interface Output {
 }
 
 // ops.upgrade.getRun
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:323
-type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:253
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:325
+type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:255
 
 // ops.upgrade.listTargets
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:404
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:406
 type Input = unknown;
-// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:405
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:407
 type Output = {
   target: string;
   version: string | null;
@@ -2442,15 +2442,15 @@ type Output = {
 }[];
 
 // ops.upgrade.retryStep
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:323
-type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:227
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:325
+type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:229
 
 // ops.upgrade.getDiagnostics
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:323
+type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:325
 type Output = z.infer<typeof upgradeDiagnosticsBundleSchema>; // ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:82
 
 // ops.upgrade.diagnosticsAvailability
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:418
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:420
 type Input = unknown;
 // Output: opsUpgradeDiagnosticsAvailabilitySchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:96
 interface Output {
@@ -2460,7 +2460,7 @@ interface Output {
 }
 
 // ops.upgrade.sendDiagnostics
-type Input = z.infer<typeof opsUpgradeSendDiagnosticsInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:334
+type Input = z.infer<typeof opsUpgradeSendDiagnosticsInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:336
 // Output: opsUpgradeDiagnosticsReceiptSchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:110
 interface Output {
   reportId: string;
@@ -2468,19 +2468,19 @@ interface Output {
 }
 
 // ops.upgrade.listSystemMigrations
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:432
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:434
 type Input = unknown;
-// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:433)
+// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:435)
 
 // ops.upgrade.listTenants
-// Input: opsUpgradeListTenantsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:310
+// Input: opsUpgradeListTenantsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:312
 interface Input {
   step?: string;
   state?: "migrated" | "finalized" | "parked" | "rolled_back";
   cursor?: string | null;
   limit?: number;
 }
-// Output: opsUpgradeTenantPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:317
+// Output: opsUpgradeTenantPageSchema, ../contract/src/features/migrations/ops-upgrade.ts:319
 interface Output {
   items: {
     migrationName: string;
@@ -2493,7 +2493,7 @@ interface Output {
 }
 
 // ops.upgrade.listMigrationEnrollments
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:445
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:447
 type Input = unknown;
 // Output: opsMigrationEnrollmentListingSchema, ../contract/src/features/migrations/ops-system-migration.ts:160
 interface Output {
@@ -2512,7 +2512,7 @@ interface Output {
 interface Input {
   query: string;
 }
-// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:454
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:456
 type Output = {
   id: string;
   name: string;
@@ -2573,7 +2573,7 @@ interface Output {
 }
 
 // ops.upgrade.runSystemMigrationPass
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:497
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:499
 type Input = Record<string, unknown>;
 // Output: opsMigrationPassStartedSchema, ../contract/src/ops.responses.ts:450
 interface Output {
