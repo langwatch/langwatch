@@ -263,7 +263,7 @@ Feature: Product sidebars
     And the section in Gateway or Coding agents is titled "Dashboards · Shop"
     When something I do in the section is tracked
     Then that event is about "Shop"
-    And the events after it are about the page's own project again
+    And the events after it are about the page's own project
     And on a page about no project, the events after it are about no project
 
   # ADR-002's release gate: Dashboards opens per project, so the section follows "Shop", where

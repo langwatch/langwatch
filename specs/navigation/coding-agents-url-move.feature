@@ -5,9 +5,10 @@ Feature: The personal workspace moves from /me to /coding-agents
 
   The personal workspace is the Coding agents product, so its pages move
   from /me/* to /coding-agents/*. Old addresses redirect to the new ones
-  with the request intact: the sub-path, the query string and the hash all
-  survive, and the browser history keeps only the new address. CLIs that
-  are already installed still print /me links, so the redirects stay.
+  with the request intact: the sub-path as far as a page serves it, the
+  query string and the hash all survive, and the browser history keeps only
+  the new address. CLIs that are already installed still print /me links,
+  so the redirects stay.
 
   @integration
   Scenario: The bare old address lands on the Coding agents home
@@ -19,6 +20,19 @@ Feature: The personal workspace moves from /me to /coding-agents
     When I cold-load "/me/sessions?range=7d#latest"
     Then I land on "/coding-agents/sessions?range=7d#latest"
     And the old address is not kept in the browser history
+
+  @integration
+  Scenario: An old address below a Coding agents page lands on that page
+    When I cold-load "/me/sessions/abc?range=7d#latest"
+    Then I land on "/coding-agents/sessions?range=7d#latest"
+    And the same holds below configure and pull-requests
+    # No /coding-agents page sits below those pages, so the path below them is dropped.
+
+  @integration
+  Scenario: An old address in another letter case still moves
+    When I cold-load "/Me/sessions?range=7d"
+    Then I land on "/coding-agents/sessions?range=7d"
+    # The router matches an address whatever its case, so the redirect reads it the same way.
 
   @integration
   Scenario: An old address that a project page also matches still moves

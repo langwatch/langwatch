@@ -6092,9 +6092,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/user-contract':
-        specifier: workspace:*
-        version: link:../../user/contract
       '@paper-design/shaders-react':
         specifier: 'catalog:'
         version: 0.0.76(@types/react@19.2.18)(react@19.2.8)
@@ -11738,9 +11735,6 @@ importers:
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../authz/contract
       '@langwatch/browser':
         specifier: workspace:*
         version: link:../../../packages/browser

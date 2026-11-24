@@ -11,13 +11,14 @@ import { analyticsHostInProject, uiAnalyticsInProject } from "../analytics-host-
 const PAGE = { id: "proj-page", slug: "page", name: "Page", hasFirstMessage: true };
 const SHOP = { id: "proj-shop", slug: "shop", name: "Shop" };
 
-/** A destination that keeps its registered properties and records each event with them. */
+/** A destination that keeps its registered properties; an event's own win, as in PostHog. */
 class RegisteringUiAnalytics extends UiAnalytics {
   readonly properties = new Map<string, unknown>();
   readonly sent: { event: UiAnalyticsEvent; projectId: unknown }[] = [];
 
   track(event: UiAnalyticsEvent): void {
-    this.sent.push({ event, projectId: this.properties.get("projectId") });
+    const projectId = event.attributes?.projectId ?? this.properties.get("projectId");
+    this.sent.push({ event, projectId });
   }
 
   override register(properties: Readonly<Record<string, unknown>>): void {
@@ -78,19 +79,16 @@ describe("uiAnalyticsInProject()", () => {
   describe("given the page is about its own project", () => {
     describe("when the section tracks an event", () => {
       /** @scenario "Events from the Dashboards section in Gateway or Coding agents are about the named project" */
-      it("sends it about the named project, then puts the page's project back", () => {
+      it("sends it about the named project, leaving the page's project registered", () => {
         const analytics = new RegisteringUiAnalytics();
         analytics.register({ projectId: PAGE.id });
-        const inProject = uiAnalyticsInProject({
-          analytics,
-          projectId: SHOP.id,
-          pageProjectId: PAGE.id,
-        });
+        const inProject = uiAnalyticsInProject({ analytics, projectId: SHOP.id });
 
         inProject.track({ name: "dashboard", action: "created" });
         analytics.track({ name: "page", action: "viewed" });
 
         expect(analytics.sent.map(({ projectId }) => projectId)).toEqual([SHOP.id, PAGE.id]);
+        expect(analytics.properties.get("projectId")).toBe(PAGE.id);
       });
     });
   });
@@ -100,11 +98,7 @@ describe("uiAnalyticsInProject()", () => {
       /** @scenario "Events from the Dashboards section in Gateway or Coding agents are about the named project" */
       it("sends it about the named project, then leaves later events about no project", () => {
         const analytics = new RegisteringUiAnalytics();
-        const inProject = uiAnalyticsInProject({
-          analytics,
-          projectId: SHOP.id,
-          pageProjectId: undefined,
-        });
+        const inProject = uiAnalyticsInProject({ analytics, projectId: SHOP.id });
 
         inProject.track({ name: "dashboard", action: "created" });
         analytics.track({ name: "page", action: "viewed" });

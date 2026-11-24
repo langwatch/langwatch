@@ -1016,7 +1016,7 @@ const servedPaths: readonly string[] = [
 ];
 
 /** The first segment of every `/:project/<segment>` page, in served order. */
-function projectSegments(paths: readonly string[]): string[] {
+function projectSegments({ paths }: { paths: readonly string[] }): string[] {
   const segments = paths.flatMap((path) => path.match(/^\/:project\/([^/:*]+)/)?.[1] ?? []);
   return [...new Set(segments)];
 }
@@ -1026,14 +1026,14 @@ function projectSegments(paths: readonly string[]): string[] {
  * outranks `:project` at any depth, where the `/me/<segment>/*` rows lose to a deeper project
  * page. One-segment pages and a bare `/*` tail are already covered by those rows.
  */
-function projectPageTwins(paths: readonly string[]): string[] {
+function projectPageTwins({ paths }: { paths: readonly string[] }): string[] {
   const deep = paths.filter((path) => /^\/:project\/[^/]+\/(?!\*$)/.test(path));
   const twins = deep.map((path) => path.replace(":project", RETIRED_PERSONAL_SEGMENT));
   return [...new Set(twins)];
 }
 
 /** Every page under `/coding-agents/`, as the path after it: `sessions`, `budget/request`. */
-function codingAgentsPages(table: readonly UiRouteDescriptor[]): string[] {
+function codingAgentsPages({ table }: { table: readonly UiRouteDescriptor[] }): string[] {
   return uiRouteDescriptors(table).flatMap((descriptor) => {
     const prefix = `${CODING_AGENTS_PATH}/`;
     const page = descriptor.path?.startsWith(prefix) ? descriptor.path.slice(prefix.length) : "";
@@ -1041,22 +1041,33 @@ function codingAgentsPages(table: readonly UiRouteDescriptor[]): string[] {
   });
 }
 
-const codingAgentsPageList = codingAgentsPages(uiRouteTable);
+const codingAgentsPageList = codingAgentsPages({ table: uiRouteTable });
 
-/**
- * Old first segments with their own /coding-agents page keep their sub-path there; any other
- * segment lands on the Coding agents home, and the query and hash still travel. Deeper pages
- * such as `budget/request` get exact rows below.
- */
-const KEPT_SEGMENTS: Readonly<Record<string, string>> = Object.fromEntries(
-  codingAgentsPageList.filter((page) => !page.includes("/")).map((page) => [page, page]),
+/** The first segments with a /coding-agents page of their own. */
+const KEPT_SEGMENTS: ReadonlySet<string> = new Set(
+  codingAgentsPageList.filter((page) => !page.includes("/")),
 );
 
-const toCodingAgents = {
-  from: RETIRED_PERSONAL_PATH,
-  to: CODING_AGENTS_PATH,
-  mapSegment: KEPT_SEGMENTS,
-} as const;
+/**
+ * An old `/me/<segment>` lands on that segment's /coding-agents page, or on the Coding agents
+ * home when it has none; `mapSegment: {}` drops the path below, which no page serves. The query
+ * and hash still travel. Deeper pages such as `budget/request` get exact rows below.
+ */
+function toCodingAgents({ segment }: { segment?: string } = {}): UiRedirectDescriptor {
+  if (segment === void 0 || !KEPT_SEGMENTS.has(segment)) {
+    return { from: RETIRED_PERSONAL_PATH, to: CODING_AGENTS_PATH, mapSegment: {} };
+  }
+  return {
+    from: `${RETIRED_PERSONAL_PATH}/${segment}`,
+    to: `${CODING_AGENTS_PATH}/${segment}`,
+    mapSegment: {},
+  };
+}
+
+/** Every old first segment that gets rows of its own: each project page's, and each kept one. */
+const retiredSegments = [
+  ...new Set([...projectSegments({ paths: servedPaths }), ...KEPT_SEGMENTS]),
+];
 
 /**
  * Moved /me to /coding-agents; CLIs still print /me links. Mounted above the chrome, which would
@@ -1089,13 +1100,16 @@ export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] 
       path: `${RETIRED_PERSONAL_PATH}/${page}`,
       redirect: { from: RETIRED_PERSONAL_PATH, to: CODING_AGENTS_PATH },
     })),
-  ...projectSegments(servedPaths).flatMap((segment) => [
-    { path: `${RETIRED_PERSONAL_PATH}/${segment}`, redirect: toCodingAgents },
-    { path: `${RETIRED_PERSONAL_PATH}/${segment}/*`, redirect: toCodingAgents },
+  ...retiredSegments.flatMap((segment) => [
+    { path: `${RETIRED_PERSONAL_PATH}/${segment}`, redirect: toCodingAgents({ segment }) },
+    { path: `${RETIRED_PERSONAL_PATH}/${segment}/*`, redirect: toCodingAgents({ segment }) },
   ]),
-  ...projectPageTwins(servedPaths).map((path) => ({ path, redirect: toCodingAgents })),
-  { path: `${RETIRED_PERSONAL_PATH}/*`, redirect: toCodingAgents },
-  { path: RETIRED_PERSONAL_PATH, redirect: toCodingAgents },
+  ...projectPageTwins({ paths: servedPaths }).map((path) => ({
+    path,
+    redirect: toCodingAgents({ segment: path.split("/")[2] }),
+  })),
+  { path: `${RETIRED_PERSONAL_PATH}/*`, redirect: toCodingAgents() },
+  { path: RETIRED_PERSONAL_PATH, redirect: toCodingAgents() },
 ];
 
 /** What the router mounts: the /me redirect rows at the top level, then `uiRouteTable`. */

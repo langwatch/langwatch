@@ -116,37 +116,24 @@ export function analyticsHostInProject({
 }
 
 /**
- * Each event goes out with `projectId` registered as this project, as the shell registers the
- * page's, and the page's is put back straight after: tracking is synchronous, so none slips by.
+ * Each event carries `projectId` as one of its own properties, which a destination puts over the
+ * one the shell registered, so what the shell registered is never touched.
  */
 class UiAnalyticsInProject extends UiAnalytics {
   private readonly analytics: UiAnalytics;
   private readonly projectId: string;
-  private readonly pageProjectId: string | undefined;
 
-  constructor({
-    analytics,
-    projectId,
-    pageProjectId,
-  }: {
-    analytics: UiAnalytics;
-    projectId: string;
-    pageProjectId: string | undefined;
-  }) {
+  constructor({ analytics, projectId }: { analytics: UiAnalytics; projectId: string }) {
     super();
     this.analytics = analytics;
     this.projectId = projectId;
-    this.pageProjectId = pageProjectId;
   }
 
   track(event: UiAnalyticsEvent): void {
-    this.analytics.register({ projectId: this.projectId });
-    try {
-      this.analytics.track(event);
-    } finally {
-      if (this.pageProjectId) this.analytics.register({ projectId: this.pageProjectId });
-      else this.analytics.unregister("projectId");
-    }
+    this.analytics.track({
+      ...event,
+      attributes: { ...event.attributes, projectId: this.projectId },
+    });
   }
 
   register(properties: Readonly<Record<string, unknown>>): void {
@@ -171,17 +158,15 @@ class UiAnalyticsInProject extends UiAnalytics {
 }
 
 /**
- * `analytics`, sending every event about `projectId`: a board made from Gateway or Coding
- * agents belongs to it, not to `pageProjectId`, the project the shell registered for the page.
+ * `analytics`, sending every event about `projectId`: a board made from Gateway or Coding agents
+ * belongs to it, not to the project the shell registered for the page.
  */
 export function uiAnalyticsInProject({
   analytics,
   projectId,
-  pageProjectId,
 }: {
   analytics: UiAnalytics;
   projectId: string;
-  pageProjectId: string | undefined;
 }): UiAnalytics {
-  return new UiAnalyticsInProject({ analytics, projectId, pageProjectId });
+  return new UiAnalyticsInProject({ analytics, projectId });
 }

@@ -39,18 +39,27 @@ const LATENCY = {
 };
 
 /**
- * Keeps what is registered as PostHog does, and notes the projectId each event went out with.
- * Starts as the shell leaves it: the page's project ("proj-1") registered.
+ * Keeps what is registered and sends each event as PostHog does: its own properties over the
+ * registered ones. Starts as the shell leaves it: `projectId` "proj-1" (the page's) unless named.
  */
 class RegisteringUiAnalytics extends RecordingUiAnalytics {
-  registered: Readonly<Record<string, unknown>> = { projectId: "proj-1" };
-  readonly sent: { action?: string; attributes?: unknown; projectId: unknown }[] = [];
+  registered: Readonly<Record<string, unknown>>;
+  /** Every register and unregister call, so a test can see that none was made. */
+  readonly registrations: unknown[] = [];
+  readonly sent: { action?: string; properties: Readonly<Record<string, unknown>> }[] = [];
+
+  constructor({ projectId = "proj-1" }: { projectId?: string } = {}) {
+    super();
+    this.registered = { projectId };
+  }
 
   override register(properties: Readonly<Record<string, unknown>>): void {
+    this.registrations.push(properties);
     this.registered = { ...this.registered, ...properties };
   }
 
   override unregister(property: string): void {
+    this.registrations.push(property);
     this.registered = Object.fromEntries(
       Object.entries(this.registered).filter(([key]) => key !== property),
     );
@@ -59,7 +68,7 @@ class RegisteringUiAnalytics extends RecordingUiAnalytics {
   override track(event: UiAnalyticsEvent): void {
     super.track(event);
     const { action, attributes } = event;
-    this.sent.push({ action, attributes, projectId: this.registered.projectId });
+    this.sent.push({ action, properties: { ...this.registered, ...attributes } });
   }
 }
 
@@ -429,6 +438,7 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
       const { host, calls } = renderSection({
         stars: [{ kind: "board", dashboard: { ...LATENCY, projectId: "proj-shop" } }],
         project: SHOP,
+        projectPermissions: SHOP_MEMBER,
       });
 
       const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
@@ -499,9 +509,66 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
     });
   });
 
+  describe("given the member may view dashboards on the page's project but not in that project", () => {
+    /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's view grant" */
+    it("draws nothing and reads no pins there", async () => {
+      const { calls } = renderSection({
+        stars: [{ kind: "board", dashboard: { ...LATENCY, projectId: "proj-shop" } }],
+        permissions: VIEWER,
+        project: SHOP,
+        projectPermissions: { "proj-shop": [] },
+      });
+
+      expect(screen.queryByRole("region", { name: "Dashboards · Shop" })).not.toBeInTheDocument();
+      expect(inputsTo(calls, "boards.listStarred")).toEqual([]);
+    });
+  });
+
+  describe("given the member may view dashboards in that project but not on the page's", () => {
+    /** @scenario "In Gateway or Coding agents, the Dashboards section follows the named project's view grant" */
+    it("draws the section for that project", async () => {
+      renderSection({
+        stars: [{ kind: "board", dashboard: { ...LATENCY, projectId: "proj-shop" } }],
+        permissions: [],
+        project: SHOP,
+        projectPermissions: { "proj-shop": VIEWER },
+      });
+
+      const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
+      expect(await group.findByRole("link", { name: "Latency" })).toBeInTheDocument();
+    });
+  });
+
+  describe("given the shell registered a project other than the page's, then a board is made", () => {
+    /** @scenario "Events from the Dashboards section in Gateway or Coding agents are about the named project" */
+    it("sends it about that project, and later events still carry the shell's", async () => {
+      const user = userEvent.setup();
+      const tracked = new RegisteringUiAnalytics({ projectId: "proj-registered" });
+      const { host } = renderSection({
+        stars: [],
+        project: SHOP,
+        projectPermissions: SHOP_MEMBER,
+        tracked,
+      });
+      expect(host.project()?.id).toBe("proj-1");
+
+      const group = within(await screen.findByRole("region", { name: "Dashboards · Shop" }));
+      await user.click(group.getByRole("button", { name: "New dashboard" }));
+      await waitFor(() => expect(host.navigations).toHaveLength(1));
+      await waitFor(() => expect(tracked.sent).toHaveLength(1));
+      tracked.track({ name: "page", action: "viewed" });
+
+      expect(tracked.sent).toEqual([
+        { action: "created", properties: { createdFrom: "blank", projectId: "proj-shop" } },
+        { action: "viewed", properties: { projectId: "proj-registered" } },
+      ]);
+      expect(tracked.registrations).toEqual([]);
+    });
+  });
+
   describe("when the member makes a board, then unpins one", () => {
     /** @scenario "Telemetry: a board made or unpinned from Gateway or Coding agents names its project" */
-    it("sends each event with that project registered, then puts the page's back", async () => {
+    it("sends each event about that project, leaving the page's registered", async () => {
       const user = userEvent.setup();
       const tracked = new RegisteringUiAnalytics();
       const { host } = renderSection({
@@ -519,11 +586,12 @@ describe("the Dashboards section handed a project, in Gateway or Coding agents",
 
       await waitFor(() =>
         expect(tracked.sent).toEqual([
-          { action: "created", attributes: { createdFrom: "blank" }, projectId: "proj-shop" },
-          { action: "favourited", attributes: { starred: false }, projectId: "proj-shop" },
+          { action: "created", properties: { createdFrom: "blank", projectId: "proj-shop" } },
+          { action: "favourited", properties: { starred: false, projectId: "proj-shop" } },
         ]),
       );
       expect(tracked.registered).toEqual({ projectId: "proj-1" });
+      expect(tracked.registrations).toEqual([]);
     });
   });
 

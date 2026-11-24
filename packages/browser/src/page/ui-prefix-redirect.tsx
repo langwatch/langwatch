@@ -45,7 +45,9 @@ export function UiPrefixRedirect({
 
   const start = fillParams(from, params);
   const target = fillParams(to, params);
-  const suffix = location.pathname.startsWith(start) ? location.pathname.slice(start.length) : "";
+  // The router matches whatever the case, so `/Me/sessions` reached this row as `/me/sessions` did.
+  const isUnderStart = location.pathname.toLowerCase().startsWith(start.toLowerCase());
+  const suffix = isUnderStart ? location.pathname.slice(start.length) : "";
 
   let pathname = target + suffix;
   if (mapSegment) {
