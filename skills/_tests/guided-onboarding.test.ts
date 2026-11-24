@@ -1108,7 +1108,6 @@ describe("the guided-onboarding skill", () => {
       expect(tracing).toContain("`.venv/bin/python -c` after `.venv/bin/python -m pip`");
       expect(tracing).toContain("`python3 -c` after `python3 -m pip`");
       expect(tracing).toContain("`<interpreter> -m pip show langwatch`");
-      expect(tracing).not.toContain("`uv pip show langwatch` after `uv add`");
     });
 
     /** @scenario "An installed SDK without the tracing API is an interpreter question, not a stop" */

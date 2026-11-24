@@ -927,9 +927,9 @@ Feature: Langy guides the first setup after sign-up
     @e2e
     Scenario: A command not found moves the install ladder to the next rung
       Given a shared folder whose manifest is requirements.txt, with no lock file and no virtual environment
-      And a terminal whose PATH has no pip and no pip3, while python3 -m pip works
+      And a terminal whose PATH has no python3, so python3 -m pip is a rung that fails, while python -m pip works
       When Langy runs the llmops path
-      Then Langy tries pip at most once and installs through the next spelling on the ladder
+      Then Langy tries python3 -m pip at most once and installs through python -m pip, the next rung on the ladder
       And the manifest names langwatch and the interpreter can import it
       And the question offering to install uv is never asked
       And nothing Langy says calls the folder unmanaged

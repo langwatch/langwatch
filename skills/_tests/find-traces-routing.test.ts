@@ -79,6 +79,15 @@ describe("the find-traces skill", () => {
     });
   });
 
+  describe("given its common mistakes", () => {
+    /** @scenario "The skill takes the window and the filter from the page" */
+    it("warns against the 7 day CLI default when the user looks at a longer window", () => {
+      const section = sectionOf(renderedSkill(), "Common mistakes");
+      expect(section).toContain("Using the 7 day CLI default while the user looks at 30 days");
+      expect(section).toContain("Pass the page's window.");
+    });
+  });
+
   describe("given its section on learning the fields", () => {
     /** @scenario "A CLI older than the skill is named, not worked around" */
     it("names a CLI too old for the commands it needs instead of answering none", () => {

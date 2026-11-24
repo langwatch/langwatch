@@ -362,14 +362,15 @@ Each file's header links here rather than repeating its narrative.
   answers. The run screenshots the panel with the card open.
 - **llmops-pip-missing**: the shared folder's `requirements.txt` names `pip`
   as the package manager, and the install ladder's first rung,
-  `pip install langwatch`, is not on the terminal's PATH — `pip` and `pip3`
-  answer "command not found" and exit 127, while `python3 -m pip` works. A
+  `python3 -m pip install langwatch`, is not on the terminal's PATH —
+  `python3` answers "command not found" and exits 127, while `python -m pip`
+  works. Bare `pip` and `pip3` are spellings that are not rungs. A
   command not found is a missing spelling, never a missing capability, so the
   ladder is expected to move to the next rung instead of
   retrying the one that is gone or telling the developer their folder has no
   package manager. Layer 2 comes before the judge: what the manifest names
   afterwards, whether the interpreter can import the package, how many
-  `pip install` attempts Langy made, and that the "no pip or uv" unlock card
+  `python3 -m pip install` attempts Langy made, and that the "no pip or uv" unlock card
   never came up, since only one rung was missing.
 - **llmops-pip-gone**: every rung above `python3 -m pip` is gone — `uv`,
   `pip` and `pip3` each answer "command not found" and exit 127, and the

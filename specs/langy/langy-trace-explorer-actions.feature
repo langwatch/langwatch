@@ -191,6 +191,7 @@ Feature: Langy drives and reads the Trace Explorer
       Given the find-traces skill
       Then it says to search with the page's from, to and filter
       And it does not tell Langy to add an application origin
+      And it warns against the 7 day CLI default when the user looks at a longer window
 
     # The Explorer leaves Langy's own traces out server side, so a search that
     # names no origin counts what the Explorer counts. Naming `application`
