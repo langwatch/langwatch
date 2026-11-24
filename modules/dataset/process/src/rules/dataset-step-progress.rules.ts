@@ -39,3 +39,19 @@ export function stepProgressReport<Totals extends Record<string, unknown>>({
 }): Totals & { afterProjectId?: string } {
   return afterProjectId === undefined ? { ...totals } : { ...totals, afterProjectId };
 }
+
+/** Runs one project's work; when it throws, the totals so far are saved, then it rethrows. */
+export async function savingProgressOnThrow({
+  work,
+  save,
+}: {
+  work: () => Promise<void>;
+  save: () => Promise<void>;
+}): Promise<void> {
+  try {
+    await work();
+  } catch (error) {
+    await save().catch(() => undefined);
+    throw error;
+  }
+}

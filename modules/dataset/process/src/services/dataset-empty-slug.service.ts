@@ -13,6 +13,7 @@ import { datasetSlugCandidate } from "../rules/dataset-selection.rules.ts";
 import {
   carriedCount,
   resumedStepProgress,
+  savingProgressOnThrow,
   stepProgressReport,
 } from "../rules/dataset-step-progress.rules.ts";
 
@@ -57,7 +58,10 @@ export class DatasetEmptySlugService {
       const projects = await this.deps.projects.listAllIds({ after, limit: PROJECT_ID_PAGE_LIMIT });
       for (const projectId of projects.ids) {
         if (signal.aborted) return { ...summary, dryRun };
-        await this.fillProject({ projectId, dryRun, summary, signal });
+        await savingProgressOnThrow({
+          work: () => this.fillProject({ projectId, dryRun, summary, signal }),
+          save: () => saveProgress({ checkpoint, dryRun, afterProjectId: finished, summary }),
+        });
         // After any failure the cursor stays before it; the totals are saved regardless.
         if (!signal.aborted && summary.failed === 0) finished = projectId;
         await saveProgress({ checkpoint, dryRun, afterProjectId: finished, summary });

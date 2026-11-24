@@ -251,8 +251,11 @@ describe("DatasetMigrationService as an upgrade step", () => {
   });
 });
 
-/** Two postgres-layout datasets in each of three projects, over the memory twins. */
-function memoryStep() {
+/** Two postgres-layout datasets per project; one commit, or one later page read, fails once. */
+function memoryStep({
+  failCommitOf = "dataset_project_b_2",
+  failNextPageOf,
+}: { failCommitOf?: string; failNextPageOf?: string } = {}) {
   const database = MemoryDatasetDatabase.create();
   const repository = MemoryDatasetMigrationRepository.create({ database });
   const now = new Date(Date.UTC(2026, 0, 1));
@@ -297,11 +300,20 @@ function memoryStep() {
   const commit = repository.commit.bind(repository);
   let failedOnce = false;
   vi.spyOn(repository, "commit").mockImplementation(async (input) => {
-    if (input.datasetId === "dataset_project_b_2" && !failedOnce) {
+    if (input.datasetId === failCommitOf && !failedOnce) {
       failedOnce = true;
       throw new Error("row unreadable");
     }
     return commit(input);
+  });
+  const findIds = repository.findPostgresDatasetIds.bind(repository);
+  let pageFailedOnce = false;
+  vi.spyOn(repository, "findPostgresDatasetIds").mockImplementation(async (input) => {
+    if (input.projectId === failNextPageOf && input.afterId && !pageFailedOnce) {
+      pageFailedOnce = true;
+      throw new Error("page read failed");
+    }
+    return findIds(input);
   });
   const migration = DatasetMigrationService.create({
     repository,
@@ -346,6 +358,18 @@ describe("DatasetMigrationService report across attempts", () => {
         failed: 0,
         skippedConcurrentWrite: 0,
       });
+    });
+  });
+
+  describe("given project_b's next page read fails after both its datasets moved", () => {
+    /** @scenario "A move that retried reports every dataset it moved across its attempts" */
+    it("saves the two moved datasets before the error, so the retry reports all six", async () => {
+      const { ledger, attempt } = memoryStep({ failCommitOf: "none", failNextPageOf: "project_b" });
+
+      await expect(attempt()).rejects.toThrow("page read failed");
+      expect(ledger.report).toMatchObject({ afterProjectId: "project_a", migrated: 4 });
+
+      await expect(attempt()).resolves.toMatchObject({ migrated: 6, failed: 0 });
     });
   });
 

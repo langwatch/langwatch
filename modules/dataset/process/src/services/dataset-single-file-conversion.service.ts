@@ -12,6 +12,7 @@ import {
   carriedCount,
   carriedList,
   resumedStepProgress,
+  savingProgressOnThrow,
   stepProgressReport,
 } from "../rules/dataset-step-progress.rules.ts";
 import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
@@ -159,7 +160,10 @@ export class DatasetSingleFileConversionService {
       const page = await this.options.projects.listAllIds({ after, limit: PROJECT_ID_PAGE_LIMIT });
       for (const projectId of page.ids) {
         if (input.signal?.aborted) return report;
-        await this.convertProject({ projectId, input, report });
+        await savingProgressOnThrow({
+          work: () => this.convertProject({ projectId, input, report }),
+          save: async () => input.onProgress?.({ afterProjectId: finished, report }),
+        });
         if (!input.signal?.aborted && leftBehind(report) === 0) finished = projectId;
         await input.onProgress?.({ afterProjectId: finished, report });
         if (input.signal?.aborted) return report;

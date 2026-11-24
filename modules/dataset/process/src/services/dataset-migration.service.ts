@@ -15,6 +15,7 @@ import {
   carriedCount,
   carriedList,
   resumedStepProgress,
+  savingProgressOnThrow,
   stepProgressReport,
 } from "../rules/dataset-step-progress.rules.ts";
 import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
@@ -183,7 +184,10 @@ export class DatasetMigrationService {
       const projects = await this.projects.listAllIds({ after, limit: PROJECT_ID_PAGE_LIMIT });
       for (const projectId of projects.ids) {
         if (input.signal?.aborted) return summary;
-        await this.migrateProject({ projectId, input, summary });
+        await savingProgressOnThrow({
+          work: () => this.migrateProject({ projectId, input, summary }),
+          save: async () => input.onProgress?.({ afterProjectId: finished, summary }),
+        });
         // Once any dataset is left behind, the cursor stays before it for the retry.
         if (!input.signal?.aborted && remaining(summary) === 0) finished = projectId;
         await input.onProgress?.({ afterProjectId: finished, summary });
