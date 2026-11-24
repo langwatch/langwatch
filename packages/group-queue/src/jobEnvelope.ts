@@ -15,7 +15,7 @@ import {
 import { errorText as errText, safeParseErrorText as safeParseErrText } from "./errors.ts";
 import { gqPayloadTooLargeTotal } from "./metrics.ts";
 import type { TenantId } from "./storage.ts";
-import type { BlobRef, TieredBlobStore } from "./tieredBlobStore.ts";
+import { type BlobRef, type TieredBlobStore, TransientBlobStoreError } from "./tieredBlobStore.ts";
 
 /**
  * zlib reports an over-limit result as ERR_BUFFER_TOO_LARGE (or an "output
@@ -442,10 +442,12 @@ async function decodeGq1Ref({
   header,
   blobs,
   readMode,
+  tenant,
 }: {
   header: EnvelopeHeader;
   blobs?: JobBlobStore;
   readMode: "get" | "peek";
+  tenant?: TenantId;
 }): Promise<Record<string, unknown>> {
   if (typeof header.r !== "string" || header.r.length === 0) {
     throw new DecodeFailureError({
@@ -456,8 +458,14 @@ async function decodeGq1Ref({
   if (!blobs) {
     throw new Error("Job envelope references an offloaded blob but no blob store was provided");
   }
-  const data =
-    readMode === "peek" ? await blobs.peek({ id: header.r }) : await blobs.get({ id: header.r });
+  const id = header.r;
+  const data = await (readMode === "peek" ? blobs.peek({ id }) : blobs.get({ id })).catch(
+    (cause: unknown) => {
+      // A missing key is a null answer; a thrown read is the client, so the job retries.
+      if (!tenant) throw cause;
+      throw new TransientBlobStoreError({ projectId: tenant, hash: id, cause });
+    },
+  );
   if (!data) {
     throw new DecodeFailureError({
       message: "Job envelope blob is missing (deleted or expired)",
@@ -473,6 +481,7 @@ export async function decodeJobEnvelope<Destination>({
   blobs,
   readMode = "get",
   parsed,
+  tenant,
 }: {
   value: string;
   tieredBlobs?: TieredBlobStore<Destination>;
@@ -488,11 +497,13 @@ export async function decodeJobEnvelope<Destination>({
    * have already parsed the envelope (e.g. `EnvelopeBlobLifecycle.decode`) don't
    * pay for a second `Buffer.from` + `JSON.parse` on the hot path. */
   parsed?: { header: EnvelopeHeader; body: string };
+  /** The group's tenant: a failed GQ1 blob read then fails as transient, not as a drop. */
+  tenant?: TenantId;
 }): Promise<Record<string, unknown>> {
   if (!isEnvelope(value)) return decodeLegacyBareJson(value);
 
   const { header, body } = parsed ?? splitEnvelope(value);
-  if (header.e === "ref") return decodeGq1Ref({ header, blobs, readMode });
+  if (header.e === "ref") return decodeGq1Ref({ header, blobs, readMode, tenant });
 
   // GQ2: content-addressed tiered blob.
   if (header.e === "redis" || header.e === "s3") {

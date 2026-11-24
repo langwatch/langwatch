@@ -218,6 +218,13 @@ Feature: GroupQueue decode-drop durability and attribution
     When the current worker decodes it
     Then the decode fails as a malformed envelope
 
+  @unit
+  Scenario: A GQ1 job whose offloaded body cannot be read for a moment is retried, not dropped
+    Given a value staged by 3.20.1 as a GQ1 envelope whose body lives in the queue's blob keys
+    When the current worker decodes it and the read of the body fails
+    Then the decode fails as a transient blob-store error for the group's tenant, so the job retries
+    And a body that is gone is still a missing blob
+
   @integration
   Scenario: A job staged by 3.20.1 runs on the current worker instead of being dropped
     Given a job a 3.20.1 worker staged as bare JSON or as a GQ1 envelope

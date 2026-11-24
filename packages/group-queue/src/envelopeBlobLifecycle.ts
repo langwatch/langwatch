@@ -173,6 +173,7 @@ export class EnvelopeBlobLifecycle<Destination = unknown> {
       tieredBlobs: this.tieredBlobs,
       blobs: this.blobs,
       parsed,
+      tenant: this.projectIdFor(groupId),
     });
     // The decode's GETEX refreshed the blob TTL; renew this holder's lease at the
     // same touch point so live work remains protected while crashed siblings age out.
