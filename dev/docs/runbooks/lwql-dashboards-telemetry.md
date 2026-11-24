@@ -43,7 +43,9 @@ load from the CDN (`dashboard_widget_frame_load`, usually the reader's network o
 a CDN outage rather than the widget). Each carries the active `trace_id` and
 `span_id` when there is one. A frame's compile error or missing export, and a chart's
 blocked resource load, are not reported. Tokens, emails and long encoded runs
-are masked in the message and stack before they leave the browser.
+are masked in the message and stack before they leave the browser. A widget frame
+crash reports only its first line, cut to at most 200 characters at a word
+boundary, and repeats of the same first line in one mount report once.
 
 ### What people do (PostHog)
 

@@ -40,8 +40,16 @@ const reportedSurface = (entry: ChartFrameLogEntry) => {
 
 const MAX_CRASH_TITLE_LENGTH = 200;
 
-/** Widget author text may quote trace values, so a crash report keeps its first line, cut short. */
-const crashTitle = (text: string) => (text.split("\n")[0] ?? "").slice(0, MAX_CRASH_TITLE_LENGTH);
+/**
+ * Widget author text may quote trace values, so a crash report keeps its first line, cut short
+ * at a word boundary: a key straddling the cut would leave a start the masker cannot recognise.
+ */
+const crashTitle = (text: string) => {
+  const line = text.split("\n")[0] ?? "";
+  if (line.length <= MAX_CRASH_TITLE_LENGTH) return line;
+  const atWord = line.slice(0, MAX_CRASH_TITLE_LENGTH + 1).replace(/\s*\S*$/, "");
+  return atWord || line.slice(0, MAX_CRASH_TITLE_LENGTH);
+};
 
 export function useFrameDiagnostic({
   /** Identifies one run of the code (code and retry attempt); a change clears the last error. */

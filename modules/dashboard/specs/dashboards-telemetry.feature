@@ -214,6 +214,7 @@ Feature: Dashboards telemetry: product events and query telemetry
     And the exception carries the trace and span ids active where it was caught, when there is one
     And its message and stack have tokens, emails and long encoded runs masked, and are cut short past a limit
     And a frame or a chart that hits the same failure again while mounted reports it once
+    And only the crash's first line is sent, cut to 200 characters at a word boundary, and a repeat of the same first line is sent once
     And a chart whose specification asked to load a resource reports nothing, since the loader refusing it is the specification's own doing
     And a frame refusing the widget's own source (a compile error, no default export, a failed import) or the widget's own console error reports nothing
     And it carries no query text and no SQL

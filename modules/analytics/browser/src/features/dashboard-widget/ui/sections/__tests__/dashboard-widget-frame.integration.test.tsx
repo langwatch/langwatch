@@ -268,6 +268,29 @@ describe("given a placed dashboard widget whose frame reports an error", () => {
     });
   });
 
+  describe("when a crash's first line runs past 200 characters with a key across the cut", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("drops the partial word, so no start of the key is sent", () => {
+      const analytics = new RecordingUiAnalytics();
+      renderWithDesignSystem(reportingWidget(analytics));
+      const prefix = `Widget crashed while rendering: ${"x ".repeat(79)}`;
+      const key = `sk-${"A1b2C3d4E5".repeat(3)}`;
+
+      act(() => {
+        lastFrameProps().onLog({
+          level: "error",
+          source: "lw.error",
+          text: `${prefix}${key} and then more text`,
+        });
+      });
+
+      const reported = String(analytics.exceptions[0]?.error);
+      expect(prefix).toHaveLength(190);
+      expect(reported).not.toContain("sk-");
+      expect(reported).not.toContain("A1b2C3d4E5");
+    });
+  });
+
   describe("when the frame's own libraries do not load", () => {
     /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
     it("reports it under the frame's load surface", () => {
