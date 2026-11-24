@@ -824,6 +824,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     filters: Readonly<Record<string, unknown>>;
     window?: { startDate?: number; endDate?: number };
     fenced?: boolean;
+    /** Lets a span-type filter read span_analytics where it is complete. */
+    spanAnalyticsFloor?: SpanAnalyticsFloor | null;
   }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
   /**
    * The Explorer's own filter: the query compiled, hidden origins left out

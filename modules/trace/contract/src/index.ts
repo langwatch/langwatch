@@ -46,6 +46,7 @@ export * from "./features/query/trace-langwatch-ql-filter.ts";
 export * from "./features/query/trace-query-analysis.ts";
 export * from "./features/query/trace-query-ast.ts";
 export * from "./features/query/trace-custom-metadata-conditions.ts";
+export * from "./features/query/span-analytics-source.ts";
 export * from "./features/query/trace-query-evaluator-group.ts";
 export * from "./features/query/trace-query-examples.ts";
 export * from "./features/query/trace-query-grammar.ts";
