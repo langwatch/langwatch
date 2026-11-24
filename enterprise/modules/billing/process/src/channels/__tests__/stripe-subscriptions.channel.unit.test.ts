@@ -12,6 +12,7 @@ import type {
   BillingCheckoutRequest,
   BillingSubscription,
 } from "../../rules/billing-stripe-shapes.rules.ts";
+import { carriesPrice } from "../../rules/subscription-price.rules.ts";
 import { HttpStripeSubscriptionsChannel } from "../http/http.stripe-subscriptions.channel.ts";
 import { MemoryStripeSubscriptionsChannel } from "../memory/memory.stripe-subscriptions.channel.ts";
 import type { StripeSubscriptionsChannel } from "../stripe-subscriptions.channel.ts";
@@ -358,6 +359,46 @@ describe("Billing's subscription shapes over the provider", () => {
         langwatchKey: "GROWTH_INSTANT_EVAL_USD",
       },
     ]);
+  });
+
+  /** @scenario "A re-priced Instant Evals line is still recognised" */
+  it("never takes a nickname for the key, so a line named alike only is held", async () => {
+    const stripe = stripeDouble({
+      subscriptions: {
+        retrieve: async () => ({
+          ...ACTIVE,
+          items: {
+            data: [
+              {
+                id: "si_lookalike",
+                price: {
+                  id: "price_lookalike",
+                  unit_amount: null,
+                  recurring: { interval: "month" },
+                  lookup_key: null,
+                  nickname: "GROWTH_INSTANT_EVAL_USD",
+                  metadata: {},
+                },
+              },
+            ],
+          },
+        }),
+      },
+    });
+
+    const subscription = await HttpStripeSubscriptionsChannel.create({ stripe }).getSubscription({
+      subscriptionId: "sub_1",
+    });
+
+    expect(subscription.items[0]).not.toHaveProperty("lookupKey");
+    expect(subscription.items[0]).not.toHaveProperty("langwatchKey");
+    expect(
+      carriesPrice({
+        subscriptions: [subscription],
+        priceName: "GROWTH_INSTANT_EVAL_USD",
+        priceId: "price_catalogue",
+      }),
+    ).toBe(false);
   });
 
   /** @scenario "A re-priced Instant Evals line is still recognised" */

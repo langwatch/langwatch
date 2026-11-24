@@ -35,7 +35,7 @@ function isLineOn({
 /**
  * Whether one of the customer's invoiced subscriptions has a line on the price. Stripe accepts
  * a meter event no line prices and bills it at nothing, so a meter reports only once this holds.
- * A mode that maps no price for the name holds nothing.
+ * A mode that maps no price for the name never carries it, so its usage is held.
  */
 export function carriesPrice({
   subscriptions,
