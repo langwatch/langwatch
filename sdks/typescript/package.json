@@ -107,7 +107,7 @@
     "@types/prompts": "catalog:",
     "@types/ws": "catalog:",
     "@typescript-eslint/parser": "^8.58.1",
-    "@vitest/coverage-v8": "^5.0.1",
+    "@vitest/coverage-v8": "catalog:",
     "chalk": "catalog:",
     "commander": "catalog:",
     "dotenv": "catalog:",

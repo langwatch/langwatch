@@ -31,6 +31,7 @@ import { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/r
 import { TraceDestinationReportTask } from "./tasks/trace-destination-report.task.ts";
 import { agentCacheRest } from "./transport/agent-cache.rest.ts";
 import { elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
+import { gatewayA2aTargetTrpcTransport } from "./transport/gateway-a2a-target.trpc.ts";
 import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 import { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 import { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
@@ -54,6 +55,7 @@ export const gatewayProcessModule: PublishedProcessModule<
     elevenLabsWebhookRest,
     gatewayInternalRest,
     gatewayBudgetTrpcTransport,
+    gatewayA2aTargetTrpcTransport,
     gatewayCacheRuleTrpcTransport,
     gatewayGuardrailTrpcTransport,
     gatewayPlatformRest,

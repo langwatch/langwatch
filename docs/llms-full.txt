@@ -3383,6 +3383,30 @@ When only the status and the message are available, the gateway writes the same 
   responses.
 </Note>
 
+## A2A proxy errors
+
+Calls to `/a2a/{target}` answer in the A2A binding the caller used. A JSON-RPC call gets a JSON-RPC error with `error.code`, `error.message` and `error.data.reason`. An HTTP+JSON call gets the HTTP status and a body with `error.code` (the status), `error.status`, `error.message` and `error.reason`. Branch on the reason.
+
+| Reason                        | JSON-RPC code | HTTP | Cause                                                                              |
+| ----------------------------- | ------------- | ---- | ---------------------------------------------------------------------------------- |
+| `a2a_invalid_request`         | -32600        | 400  | The body or path is not a valid A2A request.                                       |
+| `a2a_operation_not_supported` | -32601        | 404  | The method and path is not an A2A operation.                                       |
+| `a2a_target_blocked`          | -32011        | 403  | An administrator blocked the A2A agent.                                            |
+| `a2a_content_blocked`         | -32012        | 403  | A guardrail blocked the message or the reply.                                      |
+| `a2a_target_not_found`        | -32013        | 404  | No such A2A agent in the project, or the key is not on its allow list.             |
+| `a2a_scan_unavailable`        | -32014        | 503  | The guardrail scan could not complete and the key fails closed.                    |
+| `a2a_upstream_unreachable`    | -32015        | 502  | The A2A agent did not answer, redirected, or its stream broke off.                 |
+| `a2a_unauthenticated`         | -32016        | 401  | The request carried no virtual key.                                                |
+| `a2a_registry_unavailable`    | -32017        | 503  | The gateway could not read the key's A2A agents.                                   |
+| `a2a_content_unscannable`     | -32018        | 422  | The request is not JSON the guardrail scan can read. A reply like that gets 502.   |
+| `a2a_payload_too_large`       | -32019        | 413  | The request body is over 1 MiB. A reply or stream event over 1 MiB gets 502.       |
+| `a2a_too_many_requests`       | -32020        | 429  | The key has 8 A2A calls in flight.                                                 |
+| `a2a_rate_limited`            | -32021        | 429  | The key is over its requests-per-minute or requests-per-day limit.                 |
+| `a2a_budget_exceeded`         | -32022        | 402  | A budget on the key is used up.                                                    |
+| `a2a_target_not_https`        | -32023        | 502  | The gateway calls customer endpoints over https only and the agent's URL is http.  |
+
+The gateway calls an A2A agent under the same egress rule as provider endpoints. With `BLOCK_LOCAL_HTTP_CALLS` on, a private address is refused (`a2a_upstream_unreachable`) unless the agent's host, or the IP address it resolves to, is in `ALLOWED_PROXY_HOSTS`. Listing an IP address therefore admits every hostname that resolves to it. A query parameter the agent's registered URL sets always wins: the gateway drops a caller parameter of the same name.
+
 ## Streaming errors
 
 Once the stream is open the status is already `200`, so a failure arrives as a terminal `event: error` frame and the stream ends:
@@ -7680,7 +7704,7 @@ The LangWatch AI Gateway is two processes. The gateway service is a Go binary on
 
 | Component | Where it runs | What it does |
 |---|---|---|
-| Gateway service | The `aigateway` Go binary, port `5563` by default | Serves `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/images/generations`, `/v1/images/edits`, `/v1/models`, and a Gemini passthrough under `/v1beta`. Health on `/healthz`, `/readyz`, `/startupz` and `/health`; Prometheus metrics on `/metrics` of the metrics listener (port `9464`, bearer `METRICS_API_KEY`, opt-in). |
+| Gateway service | The `aigateway` Go binary, port `5563` by default | Serves `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/speech`, `/v1/audio/transcriptions`, `/v1/images/generations`, `/v1/images/edits`, `/v1/models`, a Gemini passthrough under `/v1beta`, and the agent-to-agent proxy under `/a2a`. Health on `/healthz`, `/readyz`, `/startupz` and `/health`; Prometheus metrics on `/metrics` of the metrics listener (port `9464`, bearer `METRICS_API_KEY`, opt-in). |
 | Request pipeline | Inside the gateway service | Runs each request through interceptors in this order: spend admission, rate limit, policy rules, model resolution, cache rules, budget precheck, guardrails, trace span, then the provider dispatch. |
 | Provider dispatch | Inside the gateway service | Sends the request to the first credential in the routing chain through Bifrost and falls through to the next credential on a provider failure. A per-credential circuit breaker opens after 10 failures in 30 seconds and lets one probe through every 60 seconds. |
 | Auth cache | Inside the gateway service | Caches resolved virtual keys in an in-memory LRU of 10,000 entries. See [Auth cache](#auth-cache). |
@@ -7946,6 +7970,28 @@ An event is identified by `source` and `metadata.uid`: sending it again replaces
 The tRPC query `governance.ocsfExport` still returns the governance events in their stored OCSF 1.1 row shape, for the signed-in UI. Use the REST routes above for a SIEM job.
 
 **Also check:** [Anomaly rules](/ai-governance/anomaly-rules) for how a fired alert reaches you, and [Retention](/ai-gateway/governance/retention) for how long the source traces are kept.
+
+## Read AI events from AWS Security Lake
+
+LangWatch can subscribe to your AWS Security Lake and read the CloudTrail management and data events for Bedrock and SageMaker calls. Add a Security Lake source under Governance, Ingestion sources, with the subscriber role ARN, Region and queue URL that Security Lake gave you when you created the subscriber.
+
+LangWatch generates the source's external id when you add it. You can't choose it. Copy it from the source's edit form, or read it from the API, and set it as the `sts:ExternalId` condition in the subscriber role's trust policy. The trust policy must require it, or any LangWatch customer that knows the role ARN could ask LangWatch to assume your role.
+
+LangWatch reads each Parquet object the queue announces, keeps the model, agent and endpoint calls, and deletes the message only after the events are written. A message that keeps failing is recorded as poison once it passes its receive limit.
+
+### Minimal IAM for the subscriber role
+
+The access keys you store on the source are the base identity. That identity needs `sts:AssumeRole` on the subscriber role, and the role's trust policy must allow it only with the external id LangWatch generated as the `sts:ExternalId` condition. Before each read, LangWatch assumes the subscriber role with that external id and reads the queue and the bucket with the role's temporary credentials.
+
+The subscriber role needs only these permissions:
+
+- `s3:GetObject` on the Security Lake bucket prefix of the selected sources.
+- `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:ChangeMessageVisibility` and `sqs:GetQueueAttributes` on the subscriber queue. LangWatch extends a message's visibility while it reads the file. The connection test uses `sqs:GetQueueAttributes`.
+- `kms:Decrypt` on the lake key, only when the lake uses a customer managed KMS key.
+
+### Callers without traces
+
+The source page lists the principals that called a model in the last 30 days and sent no traces. A principal counts as traced when a trace in any project of the organisation carries its ARN in the `aws.principal.arn` attribute.
 
 ---
 
@@ -11649,7 +11695,7 @@ ingress:
       secretName: gateway-tls
 ```
 
-Replace both hosts. The chart renders a second Ingress, `<release>-gateway-ingress`, with the same `className` and `annotations`. It routes `/v1` and `/health` on the gateway host to the gateway Service. The control plane derives the public URL CLI users get from `ingress.gateway.host`.
+Replace both hosts. The chart renders a second Ingress, `<release>-gateway-ingress`, with the same `className` and `annotations`. It routes `/v1`, `/a2a` and `/health` on the gateway host to the gateway Service. The control plane derives the public URL CLI users get from `ingress.gateway.host`.
 
 With `className: nginx` the chart adds annotations to the gateway Ingress only. They keep streamed responses unbuffered, let a stream run for an hour, and raise the body limit to 32 MB. Keys in `ingress.gateway.annotations` override them.
 
@@ -12265,7 +12311,7 @@ Expected:
 
 This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Add a selector for the probe pod to `ingressFrom` to run it.
 
-The chart Ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. To reach `/healthz` from outside, add your own route to the gateway Service for it, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
+The chart Ingress is no way around this: it publishes `/v1`, `/a2a` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. To reach `/healthz` from outside, add your own route to the gateway Service for it, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## 3. The gateway reaches the control plane
 
@@ -66059,6 +66105,7 @@ The table lists each limit's current value; the **Kind** column marks which ones
 | GitHub pull requests per day           | 20                             | Hardcoded       | `LANGY_GITHUB_PRS_PER_DAY` (a code constant, not an env var)     |
 | Max concurrent workers                 | 20 (default)                   | Configurable    | `LANGY_MAX_WORKERS`                                              |
 | Idle worker reap                       | 10 minutes (600000 ms default) | Configurable    | `LANGY_WORKER_IDLE_MS`                                           |
+| Max worker age                         | 5 hours (18000000 ms default)  | Configurable    | `LANGY_WORKER_MAX_AGE_MS`                                        |
 | Per-session LangWatch API key lifetime | Short-lived, auto-expiring     | Fixed by design | Minted per chat, owned by the requesting user                    |
 | GitHub installation token lifetime     | 1 hour                         | Fixed by GitHub | Minted per turn, cached in Redis just under 1 hour, self-expires |
 
@@ -66074,7 +66121,7 @@ Langy runs one isolated worker per conversation. `LANGY_MAX_WORKERS` caps how ma
 
 ### Idle worker reap
 
-A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so no sensitive data stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. See [Sandbox](/langy/security/sandbox).
+A worker with no activity for longer than `LANGY_WORKER_IDLE_MS` (default 600000 ms, 10 minutes) is reaped. Its clone and per-worker home are deleted, so no sensitive data stays at rest worker-side. A later turn in the same conversation spawns a fresh worker. A worker older than `LANGY_WORKER_MAX_AGE_MS` (default 5 hours) is replaced between turns, never during one, so its session key never expires mid-conversation; the next turn gets a fresh worker and key and resumes the session. See [Sandbox](/langy/security/sandbox).
 
 ### Per-session LangWatch API key
 
@@ -69756,7 +69803,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.26.0 # x-release-please-version
+    targetRevision: 3.28.0 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -69811,7 +69858,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.26.0 # x-release-please-version
+      targetRevision: 3.28.0 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -70220,7 +70267,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.26.0 # x-release-please-version
+VERSION=3.28.0 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -70236,13 +70283,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.26.0" # x-release-please-version
+    tag: "3.28.0" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.26.0" # x-release-please-version
+    tag: "3.28.0" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.26.0" # x-release-please-version
+    tag: "3.28.0" # x-release-please-version
 ```
 
 Mirror and override the bundled services the same way: `gateway.image.repository`, `langyagent.image.repository`, `clickhouse.image.repository`, `postgresql.image.repository`, `redis.image.repository`, `prometheus.server.image.repository`, `cronjobs.image.repository` and `app.storedObjects.localFilesystem.serializeUpgradesImage` (the image the stored-objects upgrade hooks run).
@@ -70291,6 +70338,25 @@ Deploy LangWatch on any Kubernetes cluster using the official Helm chart. The ch
 - A StorageClass that supports dynamic provisioning (for persistent volumes)
 - A domain name (for Ingress with TLS)
 - **Default resource requirements:** ~5 CPU and ~17 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
+
+<Note>
+The chart's PersistentVolumeClaims use the cluster's default StorageClass. A new EKS cluster (1.33 and later) has none, so the claims stay `Pending` and the pods never start. Install the EBS CSI driver add-on and mark a StorageClass as default, for example:
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+volumeBindingMode: WaitForFirstConsumer
+```
+
+Or name a class in the chart values: `postgresql.primary.persistence.storageClass`, `clickhouse.storage.storageClass`, `redis.master.persistence.storageClass` and `app.storedObjects.localFilesystem.storageClassName`.
+</Note>
 
 ## Quick Start
 
@@ -71091,10 +71157,11 @@ LangWatch uses two hostnames. Browsers and SDKs reach the app. LLM clients and c
 | App | `/api/internal` | Prefix | Do not route. Block it. | |
 | Gateway, for example `gateway.acme.com` | `/v1` | Prefix | `<release>-gateway` | `80` |
 | Gateway | `/health` | Exact | `<release>-gateway` | `80` |
+| Gateway | `/a2a` | Prefix | `<release>-gateway` | `80` |
 
 `<release>` is the Helm release name. The gateway Service forwards port 80 to container port 5563.
 
-Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Metrics are served on a separate port (`9464`) and are not part of the gateway Service. Gemini-native clients also need `/v1beta`. Add it as a third Prefix rule if you use them.
+Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Metrics are served on a separate port (`9464`) and are not part of the gateway Service. `/a2a` is the agent-to-agent proxy; route it if agents call A2A targets through the gateway. Gemini-native clients also need `/v1beta`. Add it as another Prefix rule if you use them.
 
 `/api/internal` on the app is the private control plane that the gateway and the Langy agent call over cluster DNS. The chart Ingress blocks it by default with `ingress.blockedPaths`. Your own routes must block it too. See [Security](/self-hosting/security#private-control-plane-paths-are-blocked-at-the-ingress).
 
@@ -71524,7 +71591,7 @@ Periodic work (topic clustering, alert triggers, webhook delivery log pruning) i
 
 ## Network Topology
 
-The App is exposed externally. The AI Gateway is exposed only when you set `ingress.gateway.host`, which renders a second Ingress for `/v1` and `/health` with the app Ingress class. See [Routing](/self-hosting/deployment/routing). Everything else is cluster-internal:
+The App is exposed externally. The AI Gateway is exposed only when you set `ingress.gateway.host`, which renders a second Ingress for `/v1`, `/a2a` and `/health` with the app Ingress class. See [Routing](/self-hosting/deployment/routing). Everything else is cluster-internal:
 
 | Component | Service Type | External |
 |-----------|-------------|----------|
@@ -71647,6 +71714,7 @@ The agent-side variables (`LANGY_*` apart from the one below) are set on the `la
 |---|---|---|---|
 | `LANGY_MAX_WORKERS` | Max concurrent worker subprocesses before the pod returns 503. | No | `20` |
 | `LANGY_WORKER_IDLE_MS` | Idle-worker reap timeout. | No | `600000` (10 min) |
+| `LANGY_WORKER_MAX_AGE_MS` | Max worker age. A worker older than this is replaced between turns, so its session key (6 hours) never expires mid-conversation. | No | `18000000` (5 hours) |
 | `LANGY_READINESS_TIMEOUT_MS` | How long to wait for a freshly spawned worker to report ready. The Go default is 15000; the chart raises it to 60000 for gVisor cold boot. | No | `60000` (chart) |
 | `LANGY_WORKSPACE_ROOT` | Writable workspace root (an `emptyDir` mount). | No | `/workspace` |
 
@@ -75248,7 +75316,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.26.0 \
+  --version 3.28.0 \
   -f values-production.yaml
 # x-release-please-end
 ```
@@ -75462,7 +75530,7 @@ ingress:
       secretName: gateway-tls
 ```
 
-With `className: nginx` the chart still adds the streaming and timeout annotations to the gateway Ingress, and now sets a 32 MB body limit. The paths are fixed at `/v1` (Prefix) and `/health` (Exact). For other paths, such as `/v1beta`, write your own route. If you relied on a cert-manager issuer only on the gateway Ingress, add it to `ingress.annotations` or `ingress.gateway.annotations`.
+With `className: nginx` the chart still adds the streaming and timeout annotations to the gateway Ingress, and now sets a 32 MB body limit. The paths are fixed at `/v1` (Prefix), `/a2a` (Prefix) and `/health` (Exact). For other paths, such as `/v1beta`, write your own route. If you relied on a cert-manager issuer only on the gateway Ingress, add it to `ingress.annotations` or `ingress.gateway.annotations`.
 
 A values file that still sets `gateway.ingress.*` fails to render with a message naming `ingress.gateway.host`, so the Ingress cannot disappear on upgrade without an error. `gateway.ingress.enabled: false` on its own is accepted. If you route to the gateway another way, remove the block and set `gateway.publicUrl`. See [Routing and ingress controllers](/self-hosting/deployment/routing).
 
@@ -78058,6 +78126,64 @@ Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activ
 ---
 title: "Push OCSF events in from another source"
 openapi: "POST /api/v1/governance/ocsf/ingest"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/add-an-aws-security-lake-source.mdx
+
+---
+title: "Add an AWS Security Lake source"
+openapi: "POST /api/v1/governance/security-lake/sources"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/edit-an-aws-security-lake-source.mdx
+
+---
+title: "Edit an AWS Security Lake source"
+openapi: "PATCH /api/v1/governance/security-lake/sources/{sourceId}"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/overview.mdx
+
+---
+title: "Overview"
+description: "Add an AWS Security Lake subscriber as a source, test its queue and read its health. LangWatch reads the subscriber queue on the source's schedule and stores the AI activity it finds as OCSF events."
+---
+
+## Intro
+
+Add an AWS Security Lake subscriber as a source, test its queue and read its health. LangWatch reads the subscriber queue on the source's schedule and stores the AI activity it finds as OCSF events.
+
+---
+
+# FILE: ./api-reference/governance-security-lake/read-a-security-lake-source-s-health.mdx
+
+---
+title: "Read a Security Lake source's health"
+openapi: "GET /api/v1/governance/security-lake/sources/{sourceId}/health"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/read-a-security-lake-source.mdx
+
+---
+title: "Read a Security Lake source"
+openapi: "GET /api/v1/governance/security-lake/sources/{sourceId}"
+---
+
+---
+
+# FILE: ./api-reference/governance-security-lake/test-a-security-lake-source-s-connection.mdx
+
+---
+title: "Test a Security Lake source's connection"
+openapi: "POST /api/v1/governance/security-lake/sources/{sourceId}/test"
 ---
 
 ---
