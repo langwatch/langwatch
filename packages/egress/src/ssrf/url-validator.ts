@@ -30,9 +30,9 @@ export interface SsrfPolicy {
    */
   allowedHosts: string[];
   /**
-   * When true, a host under `.amazonaws.com` (a regional or VPC endpoint the caller signs to)
-   * skips the cloud-domain block. It is still resolved and judged: metadata always refused,
-   * private and loopback addresses refused under `blockLocal`.
+   * When true, any host under `.amazonaws.com` skips the cloud-domain block: service, regional
+   * and VPC endpoints, and EC2 public names alike. The name is not the fence; the address is
+   * still resolved and judged: metadata always refused, private and loopback under `blockLocal`.
    */
   allowAwsServiceHosts?: boolean;
 }
