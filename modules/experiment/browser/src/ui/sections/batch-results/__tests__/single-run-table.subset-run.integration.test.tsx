@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 /**
- * The results table of a run of some rows draws only the rows the run holds, under their dataset numbers.
+ * The results table of a run of some rows draws only the rows the run holds, under their
+ * dataset numbers.
  * @vitest-environment jsdom
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
