@@ -1823,6 +1823,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           disabledAt: true,
           createdAt: true,
           updatedAt: true,
+          billingOnly: true,
           user: { select: { id: true, name: true, email: true } },
         },
         orderBy: [{ user: { name: "asc" } }, { user: { email: "asc" } }, { userId: "asc" }],

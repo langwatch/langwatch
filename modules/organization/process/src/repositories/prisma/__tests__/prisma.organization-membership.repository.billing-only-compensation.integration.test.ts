@@ -115,6 +115,22 @@ describe.skipIf(!DB_URL)(
       await prisma.$disconnect();
     });
 
+    describe("when the members are listed page by page", () => {
+      it("marks the Billing-only member apart from a Lite member", async () => {
+        const { members } = await repository.listAllMembers({
+          organizationId,
+          includeDisabled: true,
+          offset: 0,
+          limit: 50,
+        });
+
+        expect(members.find((member) => member.userId === movedPayerUserId)?.billingOnly).toBe(
+          true,
+        );
+        expect(members.find((member) => member.userId === adminUserId)?.billingOnly).toBe(false);
+      });
+    });
+
     describe("given the grant correction after a role change fails", () => {
       it("refuses the change and leaves the member Billing only", async () => {
         await expect(

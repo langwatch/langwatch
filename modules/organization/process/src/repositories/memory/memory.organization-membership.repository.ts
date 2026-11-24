@@ -1089,6 +1089,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     seatPendingSince?: Instant | null;
     createdAt: Instant;
     updatedAt: Instant;
+    billingOnly?: boolean;
   }): OrganizationMemberWithUser {
     const user = toUser(this.userRow(row.userId));
     const teamMemberships = this.memory.teamUsers
@@ -1119,6 +1120,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       departmentId: null,
+      ...(row.billingOnly ? { billingOnly: true } : {}),
       user: { ...user, teamMemberships },
     };
   }
