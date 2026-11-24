@@ -41,7 +41,7 @@ On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the 
 
 Name it, pick the judge model, and replace the default prompt with your criteria. The model picker also lists **Decision models**, such as OpenAI Decisions API, TypeSafe Jev, Cloudflare Clef or Gemini Decision 1, which answer yes or no, score and category questions on your own provider key. [Your own model](/features/instant-evals/own-model) lists each one and the key it needs.
 
-The picker can also list **Instant Evals**, a judge that needs no key of your own; see [Judge with Instant Evals](#judge-with-instant-evals).
+On LangWatch Cloud the picker can also list **Instant Evals**, a judge that needs no key of your own; see [Judge with Instant Evals](#judge-with-instant-evals).
 
 Write the criteria as a checklist the judge can apply to one answer at a time. For example:
 
@@ -71,7 +71,7 @@ In **Variables**, map `input` to the dataset's `input` column and `output` to th
 </Step>
 
 <Step title="Read the reasons">
-Click an evaluator chip to open its **Result** block. **Status** is the verdict and **Details** holds the judge's reasoning, including the criterion that failed. On [Instant Evals](#judge-with-instant-evals), **Details** holds only the verdict and its confidence, such as `Instant Evals: true, 82% confident`. Read the failed rows first: a reason that names the same criterion on many rows points at what to change in the prompt.
+Click an evaluator chip to open its **Result** block. **Status** is the verdict and **Details** holds the judge's reasoning, including the criterion that failed. On [Instant Evals](#judge-with-instant-evals), **Details** holds only the answer, with its confidence on a Boolean or Category judge, such as `Instant Evals: true, 82% confident`. Read the failed rows first: a reason that names the same criterion on many rows points at what to change in the prompt.
 
 <Frame>
 <img src="/images/evaluations/workbench-evaluator-result.png" alt="An evaluator chip popover with the score, label, status and the judge's reasoning in Details" />
@@ -81,9 +81,9 @@ Click an evaluator chip to open its **Result** block. **Status** is the verdict 
 
 ## Judge with Instant Evals
 
-Once Instant Evals is switched on for your organization, the judge model picker lists **Instant Evals** first. It runs on LangWatch's key, so it needs no model provider or key of your own. A self-hosted install judges with it through [Connect](/self-hosting/connect) when its license names Instant Evals.
+On LangWatch Cloud, once Instant Evals is switched on for your organization, the judge model picker lists **Instant Evals** first. It runs on LangWatch's key, so it needs no model provider or key of your own. A self-hosted install cannot judge on LangWatch's model, even through [Connect](/self-hosting/connect); it judges only on a decision model of your own.
 
-If the project's **Instant Evals** [default model](/features/instant-evals/own-model) is a decision model, the judge runs on that model and your key instead. How Instant Evals is switched on, and who processes the text, is in [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes).
+If the project's **Instant Evals** [default model](/features/instant-evals/own-model) is a decision model of your own, the judge runs on that model and your key instead. How Instant Evals is switched on, and who processes the text, is in [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes).
 
 - **What it reads.** Your prompt, plus the input, output and contexts you mapped, each as its own section. Your input, output and contexts share the room the judge has. A short one stays whole; a long one keeps its beginning and its end, so a long input never pushes out a short output.
 - **What it returns.** The Boolean, Score and Category judges keep their usual result. A Score judge on Instant Evals shows a minimum and a maximum: a whole-number range of at most ten values, such as 1 to 5 (but not 0 to 1), is asked as it is, and any other range is asked on 1 to 10 and mapped back onto yours. With no range set, the score is between 0 and 1.
