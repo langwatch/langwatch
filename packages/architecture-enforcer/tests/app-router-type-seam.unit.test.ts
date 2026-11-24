@@ -18,8 +18,8 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
  * -192, -188, agent/evaluator versions; 1,570 `dataset-version.ts`; 1,576 seat requests; 1,578
  * Langy, Grok; 1,583 trace-limit cache, coalescer, entitlements, client-fault telemetry; 1,585
  * seat peak; 1,589 braids; 1,592 agent registry; 1,593 docs playground; 1,594 http-mux; 1,595
- * payments; 1,596-1,600 SIEM, kill switch, coding agents, run wait, Lake; 1,602 A2A, 1,603 span. */
-const CEILING = 1_603;
+ * payments; 1,596-1,600 SIEM, kill switch, agents, run wait, Lake; 1,602-1,604 A2A, span, floor. */
+const CEILING = 1_604;
 
 /** Every browser file that declares a module's typed procedures through `createModuleApi`. */
 function moduleApiDeclarations(): string[] {

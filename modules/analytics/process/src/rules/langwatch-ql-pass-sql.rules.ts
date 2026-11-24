@@ -32,16 +32,67 @@ function pagesBySpan(keyColumns: readonly LangWatchQLPassKeyColumn[]): boolean {
   return keyColumns.includes(SPAN_COLUMN);
 }
 
+/** The trace id, and the span id when rows are spans: what identifies one row of a pass. */
+function rowIdColumns(keyColumns: readonly LangWatchQLPassKeyColumn[]): readonly string[] {
+  return pagesBySpan(keyColumns) ? [LWQL_PASS_TRACE_COLUMN, SPAN_COLUMN] : [LWQL_PASS_TRACE_COLUMN];
+}
+
+/** The row ids as one expression over `alias`: a bare column, or a tuple for spans. */
+function rowId({
+  keyColumns,
+  alias,
+}: {
+  keyColumns: readonly LangWatchQLPassKeyColumn[];
+  alias: string;
+}): string {
+  const columns = rowIdColumns(keyColumns)
+    .map((column) => `${alias}.${column}`)
+    .join(", ");
+  return pagesBySpan(keyColumns) ? `(${columns})` : columns;
+}
+
+/**
+ * One page of row keys, picked on the row ids alone; the other key columns are read only for
+ * the page's rows. A map lookup projected over the whole window ran out of memory at the 1 GB cap.
+ * @see specs/analytics/clickhouse-memory-safety.feature
+ */
+function boundedKeys({
+  sql,
+  keyColumns,
+  where,
+  limit,
+}: {
+  sql: string;
+  keyColumns: readonly LangWatchQLPassKeyColumn[];
+  /** The condition that picks the page, over the alias it is given; absent, every row. */
+  where?: (alias: string) => string;
+  limit: number;
+}): string {
+  const page = ({ projection, alias }: { projection: string; alias: string }) =>
+    `SELECT ${projection}\nFROM (\n${sql}\n) AS ${alias}` +
+    (where === undefined ? "" : `\nWHERE ${where(alias)}`) +
+    `\nORDER BY ${rowId({ keyColumns, alias })}\nLIMIT ${limit}`;
+  if (keyColumns.every((column) => column === SPAN_COLUMN)) {
+    return page({ projection: keyProjection(keyColumns), alias: "q" });
+  }
+  const ids = page({
+    projection: rowIdColumns(keyColumns)
+      .map((column) => `k.${column}`)
+      .join(", "),
+    alias: "k",
+  });
+  const id = rowId({ keyColumns, alias: "q" });
+
+  return (
+    `SELECT ${keyProjection(keyColumns)}\nFROM (\n${sql}\n) AS q` +
+    `\nWHERE ${id} IN (\n${ids}\n)\nORDER BY ${id}\nLIMIT ${limit}`
+  );
+}
+
 function keyProjection(keyColumns: readonly LangWatchQLPassKeyColumn[]): string {
   return [LWQL_PASS_TRACE_COLUMN, ...keyColumns]
     .map((column) => `q.${column} AS ${column}`)
     .join(", ");
-}
-
-function keyOrder(keyColumns: readonly LangWatchQLPassKeyColumn[]): string {
-  return pagesBySpan(keyColumns)
-    ? `(q.${LWQL_PASS_TRACE_COLUMN}, q.${SPAN_COLUMN})`
-    : `q.${LWQL_PASS_TRACE_COLUMN}`;
 }
 
 /** The key pass: one page of keys in order, after the key the previous page ended on. */
@@ -53,16 +104,21 @@ function keysPass({
   pass: Extract<LangWatchQLPass, { kind: "keys" }>;
 }): LangWatchQLComposedPass {
   const bySpan = pagesBySpan(pass.keyColumns);
-  const order = keyOrder(pass.keyColumns);
   const after = bySpan
     ? `({${LWQL_PASS_AFTER_TRACE_PARAMETER}:String}, {${LWQL_PASS_AFTER_SPAN_PARAMETER}:String})`
     : `{${LWQL_PASS_AFTER_TRACE_PARAMETER}:String}`;
-  const where = pass.after === undefined ? "" : `\nWHERE ${order} > ${after}`;
 
   return {
-    sql:
-      `SELECT ${keyProjection(pass.keyColumns)}\nFROM (\n${sql}\n) AS q${where}` +
-      `\nORDER BY ${order}\nLIMIT ${pass.limit}`,
+    sql: boundedKeys({
+      sql,
+      keyColumns: pass.keyColumns,
+      ...(pass.after === undefined
+        ? {}
+        : {
+            where: (alias: string) => `${rowId({ keyColumns: pass.keyColumns, alias })} > ${after}`,
+          }),
+      limit: pass.limit,
+    }),
     parameters:
       pass.after === undefined
         ? {}
@@ -81,15 +137,16 @@ function samplePass({
   sql: string;
   pass: Extract<LangWatchQLPass, { kind: "sample" }>;
 }): LangWatchQLComposedPass {
-  const hashed = pagesBySpan(pass.keyColumns)
-    ? `q.${LWQL_PASS_TRACE_COLUMN}, q.${SPAN_COLUMN}`
-    : `q.${LWQL_PASS_TRACE_COLUMN}`;
-
   return {
-    sql:
-      `SELECT ${keyProjection(pass.keyColumns)}\nFROM (\n${sql}\n) AS q` +
-      `\nWHERE cityHash64(${hashed}) % {${LWQL_PASS_SAMPLE_BUCKET_PARAMETER}:UInt64} = 0` +
-      `\nORDER BY q.${LWQL_PASS_TRACE_COLUMN}\nLIMIT ${pass.limit}`,
+    sql: boundedKeys({
+      sql,
+      keyColumns: pass.keyColumns,
+      where: (alias) =>
+        `cityHash64(${rowIdColumns(pass.keyColumns)
+          .map((column) => `${alias}.${column}`)
+          .join(", ")}) % {${LWQL_PASS_SAMPLE_BUCKET_PARAMETER}:UInt64} = 0`,
+      limit: pass.limit,
+    }),
     parameters: { [LWQL_PASS_SAMPLE_BUCKET_PARAMETER]: pass.buckets },
   };
 }

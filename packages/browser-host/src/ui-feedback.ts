@@ -8,6 +8,7 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { isServerUnreachable } from "@langwatch/handled-error/is-server-unreachable";
 import {
   explainHandledError,
+  isTipForPeople,
   UNKNOWN_ERROR_PRESENTATION,
 } from "@langwatch/handled-error/presentation";
 import {
@@ -155,10 +156,11 @@ function supplementalTips({
   tips: readonly string[];
   description: string;
 }): readonly string[] {
+  const forPeople = tips.filter(isTipForPeople);
   const target = normalise(description);
-  if (!target) return tips;
+  if (!target) return forPeople;
 
-  return tips.filter((tip) => {
+  return forPeople.filter((tip) => {
     const candidate = normalise(tip);
     if (!candidate) return false;
     return !target.includes(candidate) && !candidate.includes(target);

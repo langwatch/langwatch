@@ -219,6 +219,14 @@ Feature: A PII redaction model call is priced per character, written to the spen
       When gateway handles a priced fact
       Then the handler throws so the fact is delivered again
 
+  Rule: The spend page names a PII redaction row by what it is
+
+    @unit
+    Scenario: A spend row with no virtual key and the pii redaction request type reads as PII redaction
+      Given a spend row of request type pii_redaction
+      When the spend page names its key
+      Then it says PII redaction rather than nothing
+
   Rule: PII redaction spend is outside gateway budgets
 
     @unit
