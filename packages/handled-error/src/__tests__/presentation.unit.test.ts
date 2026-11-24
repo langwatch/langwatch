@@ -74,6 +74,17 @@ describe("explainHandledError", () => {
       expect(description).toBe('There\'s no field called "trace.durationn".');
     });
 
+    it("adds the hint the trace filter gave for an unknown field", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "filter_field_unknown",
+          meta: { field: "metadata.labels", hint: "Did you mean @label?" },
+        }),
+      );
+
+      expect(description).toBe('There\'s no field called "metadata.labels". Did you mean @label?');
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("titles a refused test fire as not sent, its reason naming the fix", () => {
       const { title, description } = explainHandledError(
@@ -85,6 +96,27 @@ describe("explainHandledError", () => {
 
       expect(title).toBe("Test message not sent");
       expect(description).toBe("Slack no longer accepts this webhook.");
+    });
+
+    /** @scenario "The refusal names the Developer seats and the minimum" */
+    it("names Developer seats when a Developer seat change is refused", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "seat_quantity_below_in_use",
+          meta: { seat: "developer", requested: 1, minimum: 2 },
+        }),
+      );
+
+      expect(title).toBe("That's too few seats");
+      expect(description).toBe("Nothing changed. Choose at least 2 developer seats.");
+    });
+
+    it("keeps the full-seat wording when the refusal names no seat kind", () => {
+      const { description } = explainHandledError(
+        shape({ code: "seat_quantity_below_in_use", meta: { requested: 0, minimum: 1 } }),
+      );
+
+      expect(description).toBe("Nothing changed. Choose at least 1 seat.");
     });
 
     /** @scenario "meta is read only where the client knows its shape" */
@@ -255,6 +287,21 @@ describe("explainHandledError", () => {
       );
 
       expect(description).toContain("3 simulations");
+    });
+
+    /** @scenario The suite cap refusal names suites */
+    it("names suites when the suite cap refused a template apply", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "scenarioSets", current: 3, max: 3, countedAs: "testSuites" },
+        }),
+      );
+
+      expect(description).toBe(
+        "Your plan includes 3 suites. Upgrade to create more. Everything you already have keeps working.",
+      );
     });
 
     it("keeps the generic plan-limit line for every other allowance", () => {
@@ -1142,6 +1189,25 @@ describe("instant_eval_opt_in_not_offered", () => {
       );
     });
   });
+
+  describe("when LangWatch's hosted model is switched off for the organization", () => {
+    /** @scenario "A hosted-off refusal never sends the reader to the enterprise plan" */
+    it("says the hosted model is off and names the own decision model, never the plan", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "instant_eval_opt_in_not_offered",
+          httpStatus: 403,
+          meta: { deployment: "hosted_off" },
+        }),
+      );
+
+      expect(title).toBe("LangWatch's hosted model is off for this organization");
+      expect(description).toBe(
+        "Run Instant Evals on your own decision model: pick one in the Instant Evals column of Default models.",
+      );
+      expect(description).not.toMatch(/enterprise/i);
+    });
+  });
 });
 
 describe("agent_test_refused", () => {
@@ -1283,5 +1349,84 @@ describe("budget_exceeded", () => {
         "Requests are blocked until the limit is raised. An admin can raise it in AI Gateway budgets.",
       );
     });
+  });
+});
+
+describe("instant_eval_gateway_budget_exceeded", () => {
+  const stopped = (meta: Record<string, unknown>) =>
+    explainHandledError(
+      shape({ code: "instant_eval_gateway_budget_exceeded", httpStatus: 402, meta }),
+    );
+
+  describe("when the refusal names a known scope", () => {
+    it("names whose budget stopped the run", () => {
+      expect(stopped({ scope: "team" }).title).toBe(
+        "Your team's gateway budget stopped Instant Evals",
+      );
+    });
+  });
+
+  describe("when the scope is one the registry does not name", () => {
+    it("keeps the plain headline and never echoes the value", () => {
+      expect(stopped({ scope: "toString" }).title).toBe("A gateway budget stopped Instant Evals");
+    });
+  });
+});
+
+describe("provider_refused", () => {
+  const refused = (status: number) =>
+    explainHandledError(
+      shape({ code: "provider_refused", fault: "provider", meta: { provider: "azure", status } }),
+    );
+
+  describe("when the provider answered 404", () => {
+    it("points at the address instead of calling it temporary", () => {
+      const copy = refused(404);
+
+      expect(copy.title).toBe("Nothing answers at that address");
+      expect(copy.description).toContain("Check the endpoint");
+      expect(copy.description).not.toContain("temporary");
+    });
+  });
+
+  describe("when the provider refused with any other status", () => {
+    it("keeps the try-again copy", () => {
+      const copy = refused(503);
+
+      expect(copy.title).toBe("The provider refused the check");
+      expect(copy.description).toContain("try again");
+    });
+  });
+});
+
+describe("activation_code_already_redeemed", () => {
+  const describeUsed = (meta: Record<string, unknown>) =>
+    explainHandledError(shape({ code: "activation_code_already_redeemed", meta, httpStatus: 403 }))
+      .description;
+
+  /** @scenario "A used code is explained in words that match where it was used" */
+  it("says where the code was used, or that it was used when the host does not say", () => {
+    expect(describeUsed({ sameInstall: true })).toBe(
+      "This code was already used on this install. Ask LangWatch for a new one.",
+    );
+    expect(describeUsed({ sameInstall: false })).toBe(
+      "This code was already used on another install. Ask LangWatch for a new one.",
+    );
+    expect(describeUsed({})).toBe("This code was already used. Ask LangWatch for a new one.");
+  });
+});
+
+describe("connect_unreachable", () => {
+  const describeUnreachable = (meta: Record<string, unknown>) =>
+    explainHandledError(shape({ code: "connect_unreachable", meta, httpStatus: 503 })).description;
+
+  /** @scenario "A refresh that cannot reach LangWatch names the host and port to allow" */
+  it("names the host and port the install could not reach", () => {
+    expect(describeUnreachable({ host: "connect.langwatch.ai", port: 443 })).toBe(
+      "LangWatch-hosted services could not be reached. Allow outbound access to connect.langwatch.ai on port 443.",
+    );
+    expect(describeUnreachable({})).toBe(
+      "LangWatch-hosted services could not be reached. Allow outbound access from this install to LangWatch.",
+    );
   });
 });

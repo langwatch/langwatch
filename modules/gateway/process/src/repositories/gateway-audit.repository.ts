@@ -1,4 +1,9 @@
 export type GatewayAuditAction =
+  | "gateway.a2a_target.archived"
+  | "gateway.a2a_target.blocked"
+  | "gateway.a2a_target.created"
+  | "gateway.a2a_target.unblocked"
+  | "gateway.a2a_target.updated"
   | "gateway.budget.created"
   | "gateway.budget.deleted"
   | "gateway.budget.reset"
@@ -23,6 +28,7 @@ export type GatewayAuditAction =
   | "gateway.virtual_key.updated";
 
 export type GatewayAuditTargetKind =
+  | "a2a_target"
   | "budget"
   | "cache_rule"
   | "guardrail"

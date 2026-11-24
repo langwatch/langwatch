@@ -5,9 +5,9 @@
  */
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
-import { screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost, type StubAnalyticsHostOptions } from "../../../testing.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
@@ -65,6 +65,9 @@ function hostOpening({
   });
 }
 
+// Unmounting disposes each chart frame, whose heartbeat timer would otherwise outlive jsdom.
+afterEach(cleanup);
+
 describe("the Dashboards screens", () => {
   describe("given the release_dashboards flag is off for the project", () => {
     describe("when a member opens /[project]/dashboards", () => {
@@ -76,6 +79,16 @@ describe("the Dashboards screens", () => {
         expect(screen.getByRole("heading", NOT_FOUND)).toBeInTheDocument();
         expect(host.navigations).toEqual([]);
       });
+    });
+
+    /** @scenario "AC3j The Dashboards pages show no old-Analytics banner when they do not open" */
+    it("shows no old-Analytics banner", () => {
+      renderDashboards({
+        element: <DashboardBoardScreen />,
+        host: hostOpening({ dashboardId: "board-1", flags: FLAG_OFF }),
+      });
+
+      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
     });
   });
 
@@ -214,18 +227,6 @@ describe("the Dashboards screens", () => {
           "/test-project/analytics",
         );
       });
-    });
-  });
-
-  describe("given the flag is off", () => {
-    /** @scenario "AC3j The Dashboards pages show no old-Analytics banner when they do not open" */
-    it("shows no old-Analytics banner", () => {
-      renderDashboards({
-        element: <DashboardBoardScreen />,
-        host: hostOpening({ dashboardId: "board-1", flags: FLAG_OFF }),
-      });
-
-      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
     });
   });
 });

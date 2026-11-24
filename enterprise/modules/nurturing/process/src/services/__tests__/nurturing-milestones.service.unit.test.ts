@@ -259,6 +259,7 @@ describe("NurturingMilestonesService", () => {
       let failuresLeft = 1;
       const milestones: NurturingMilestonesRepository = {
         recordOrganization: (input) => memory.recordOrganization(input),
+        findOrganization: (input) => memory.findOrganization(input),
         countSimulationRun: (input) => memory.countSimulationRun(input),
         countEvaluation: async (input) => {
           if (input.organizationId === "org-1" && failuresLeft > 0) {
@@ -310,10 +311,13 @@ describe("NurturingMilestonesService", () => {
       let failuresLeft = 1;
       const projects: NurturingProjectDirectoryRepository = {
         getPlacement: (input) => directory.getPlacement(input),
+        findPersonalOwnerUserIds: (input) => directory.findPersonalOwnerUserIds(input),
         getFirstProjectCreatedAt: async (input) => {
           if (failuresLeft-- > 0) throw new Error("database unavailable");
           return directory.getFirstProjectCreatedAt(input);
         },
+        getOrganizationCreatedAt: (input) => directory.getOrganizationCreatedAt(input),
+        hasTracedProject: (input) => directory.hasTracedProject(input),
       };
       const service = serviceOver({ milestones, projects });
       await service.projectCreated(projectCreatedFact());
@@ -331,6 +335,7 @@ describe("NurturingMilestonesService", () => {
         const service = NurturingMilestonesService.create({
           milestones: {
             recordOrganization: (input) => memory.recordOrganization(input),
+            findOrganization: (input) => memory.findOrganization(input),
             countSimulationRun: (input) => memory.countSimulationRun(input),
             countEvaluation: async (input) => {
               if (input.organizationId === "org-1") throw new Error("database unavailable");

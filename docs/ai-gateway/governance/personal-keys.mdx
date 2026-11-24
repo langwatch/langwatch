@@ -66,7 +66,7 @@ The first run issues your personal key, prints `issued your personal virtual key
 
 ## Your keys and devices
 
-Open **Configure** in your personal workspace (`/me/configure`). The **Virtual keys** tab lists your keys with their label, the device that issued them and their last use. **Add a new key** creates a second key with a label of your choice, for example `jane-laptop-2`; the secret is shown once. The **Devices and keys** tab lists the CLI sessions signed in on your account, each with the ingestion keys it minted.
+Open **Configure** in your personal workspace (`/coding-agents/configure`). The **Virtual keys** tab lists your keys with their label, the device that issued them and their last use. **Add a new key** creates a second key with a label of your choice, for example `jane-laptop-2`; the secret is shown once. The **Devices and keys** tab lists the CLI sessions signed in on your account, each with the ingestion keys it minted.
 
 Revoke a key from the same list when a laptop is lost or a secret leaked. The gateway refuses the key on the next request.
 
@@ -78,11 +78,11 @@ An ingestion key that the CLI mints for a tool belongs to the login session on t
 
 ## Your usage and budget
 
-Open **My Usage** (`/me`) for your spend, your requests and your recent traces. The page lists every budget that applies to you and warns from 80% of a limit.
+Open **My Usage** (`/coding-agents`) for your spend, your requests and your recent traces. The page lists every budget that applies to you and warns from 80% of a limit.
 
 A budget applies to you when your admin creates one with **Applies to: Member** and picks you, or binds one to your personal team, your personal project or your key. Your admin sets the window: per day, per week, per calendar month, or a total with no reset.
 
-When a blocking budget is reached, the gateway refuses the request with `402 budget_exceeded`. The wrapper checks your budget before it starts the tool and prints a link to `/me/budget/request` with the limit and the spend filled in, so you can ask your admin for an increase from there.
+When a blocking budget is reached, the gateway refuses the request with `402 budget_exceeded`. The wrapper checks your budget before it starts the tool and prints a link to `/coding-agents/budget/request` with the limit and the spend filled in, so you can ask your admin for an increase from there.
 
 **Also check:** [Budgets](/ai-gateway/budgets) for the budget windows and the error body.
 

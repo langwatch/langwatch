@@ -267,6 +267,25 @@ describe("createSaaSPlanProvider", () => {
       });
     });
 
+    describe("when the Developer seat cap is set on a Growth subscription", () => {
+      /** @scenario A subscription's Developer seat cap overrides the plan's */
+      it("allows the Developer seats the subscription states", async () => {
+        const subscription = {
+          plan: PlanTypes.GROWTH,
+          status: SubscriptionStatus.ACTIVE,
+          ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
+          maxMembersDeveloper: 4,
+        };
+
+        const { db } = createMockDb({ findFirstResult: subscription });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(PLAN_LIMITS[PlanTypes.GROWTH].maxMembersDeveloper).toBe(0);
+        expect(plan.maxMembersDeveloper).toBe(4);
+      });
+    });
+
     describe("when new override fields are set", () => {
       it.each([
         ["maxMembersLite", 15],

@@ -14,6 +14,12 @@ export function datasetSlugOf(value: string): string {
   return slug || "dataset";
 }
 
+/** The slug to try on the `attempt`th try (from 1): the name's slug, then numbered from 2. */
+export function datasetSlugCandidate({ name, attempt }: { name: string; attempt: number }): string {
+  const base = datasetSlugOf(name);
+  return attempt === 1 ? base : `${base}-${attempt}`;
+}
+
 /** Whether the record read failed because the row is not there. */
 export function isDatasetRecordNotFound(error: unknown): boolean {
   return error instanceof Error && error.name === "DatasetRecordNotFoundError";

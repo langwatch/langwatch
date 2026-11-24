@@ -15,6 +15,7 @@ import { useOrganizationTeamProject } from "../../../behavior/use-organization-t
 import { dueInstantEvalRefetches } from "../../../model/instant-eval-refetch-pacing.ts";
 import { useInstantEvalRunStore } from "./instant-eval-run.store.ts";
 import { useInstantEvalRuns } from "./use-instant-eval-runs.ts";
+import { useMarkRegisteredChipsTyped } from "./use-mark-registered-chips-typed.ts";
 
 export function useInstantEvalRunWatch(): void {
   const { project } = useOrganizationTeamProject();
@@ -54,8 +55,37 @@ export function useInstantEvalRunWatch(): void {
     storeNewAnswers({ answers, lastAnswer: lastAnswer.current, setRun });
   });
 
+  useMarkRegisteredChipsTyped();
   useRefetchOnRunProgress(runs);
+  useConfirmEndedRuns({ projectId, runs });
   useSettleQuietRuns();
+}
+
+/**
+ * An ended run is read once more as soon as its ended answer lands: a run that
+ * fails sends one event, so no later hint would bring the second read that
+ * settles it. Each distinct answer asks once; no timer is involved.
+ */
+function useConfirmEndedRuns({
+  projectId,
+  runs,
+}: {
+  projectId: string;
+  runs: Record<string, ExplorerInstantEvalProgress>;
+}): void {
+  const trpcUtils = api.useUtils();
+  const quiet = useInstantEvalRunStore((s) => s.quiet);
+  const asked = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!projectId) return;
+    for (const run of Object.values(runs)) {
+      if (isExplorerInstantEvalRunActive(run.status) || quiet[run.id]) continue;
+      const answer = `${run.id}:${run.status}:${run.progress}:${run.total ?? ""}:${run.matched ?? ""}`;
+      if (asked.current.has(answer)) continue;
+      asked.current.add(answer);
+      void trpcUtils.instantEval.get.invalidate({ projectId, runId: run.id });
+    }
+  }, [projectId, runs, quiet, trpcUtils]);
 }
 
 /** Each poll answer the store has not already been given, once. */

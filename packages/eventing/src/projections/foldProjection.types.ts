@@ -1,6 +1,8 @@
 import type { ExhaustedOutcome } from "@langwatch/group-queue";
 
 import type { Event } from "../domain/types.ts";
+import type { EventLogPageCursor } from "../stores/event-log-page-order.ts";
+import type { EventLogProbe } from "../stores/repositories/eventRepository.types.ts";
 import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 
 // Stateful projection folding events into accumulated state via pure functions:
@@ -65,14 +67,24 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
   }) => Promise<Event[]>;
 
   // Paginated variant of eventLoaderUpTo for streaming store-miss re-folds of
-  // huge aggregates; auto-wired when event store supports paginated reads.
+  // huge aggregates; auto-wired when event store supports paginated reads. Pages come in
+  // key order, not time order, so only an order-insensitive fold may use it.
   eventLoaderUpToPaged?: (context: {
     tenantId: string;
     aggregateId: string;
     upToEvent: Event;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
   }) => Promise<Event[]>;
+
+  // Whether the log holds `event` and anything accepted before it, for a store miss under
+  // refoldOnStoreMiss to tell a new aggregate from a saved state not visible yet. Auto-wired.
+  eventLogProbe?: (context: {
+    tenantId: string;
+    aggregateId: string;
+    event: Event;
+    ignoreEventIds?: readonly string[];
+  }) => Promise<EventLogProbe>;
 }
 
 /**
@@ -117,8 +129,12 @@ export type FoldStateRead<State> = { kind: "folded"; state: State } | { kind: "e
  * Handles persistence and retrieval of fold state.
  */
 export interface FoldProjectionStore<State> {
-  /** Persists the current fold state for an aggregate. */
-  store: (state: State, context: ProjectionStoreContext) => Promise<void>;
+  /**
+   * Persists the current fold state for an aggregate. A store that stamps columns of its own
+   * onto the state answers the state as persisted, so a cache in front holds what a read-back
+   * would decode; answering nothing means the state handed in was persisted as is.
+   */
+  store: (state: State, context: ProjectionStoreContext) => Promise<State | void>;
 
   /** Optional batch store for persisting multiple fold states at once. */
   storeBatch?: (entries: { state: State; context: ProjectionStoreContext }[]) => Promise<void>;

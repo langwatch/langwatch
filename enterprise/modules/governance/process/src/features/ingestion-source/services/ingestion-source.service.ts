@@ -1,5 +1,7 @@
 import {
   GOVERNANCE_INGESTION_SOURCE_TYPES,
+  SECURITY_LAKE_ADAPTER_ID,
+  SECURITY_LAKE_SOURCE_TYPE,
   GovernanceValidationError,
   isPushSourceType,
   IngestionSourceCapReachedError,
@@ -23,6 +25,7 @@ import type {
 } from "../../../repositories/ingestion-source.repository.ts";
 import type { GovernanceDiagnosticsSink } from "../../../services/governance-policy.service.ts";
 import type { PullDestinationService } from "../../ingestion-pull/services/pull-destination.service.ts";
+import { plainUpdateFields } from "../rules/ingestion-source-update.rules.ts";
 import { IngestionSourceParserConfigService } from "./ingestion-source-parser-config.service.ts";
 import type { IngestionSecretService } from "./ingestion-source-secret.service.ts";
 import { IngestionSourceValidationService } from "./ingestion-source-validation.service.ts";
@@ -108,6 +111,8 @@ export class IngestionSourceService {
     diagnostics: GovernanceDiagnosticsSink;
     ottl: Pick<GovernanceOttlGateway, "validate">;
     now?: () => number;
+    /** A keyless S3 polling source reads as the deployment's own AWS identity (self-hosted). */
+    deploymentAwsIdentity?: boolean;
   }): IngestionSourceService {
     return new IngestionSourceService({
       repository: options.repository,
@@ -120,7 +125,10 @@ export class IngestionSourceService {
       diagnostics: options.diagnostics,
       now: options.now ?? Date.now,
       ottl: options.ottl,
-      validation: IngestionSourceValidationService.create({ projects: options.projects }),
+      validation: IngestionSourceValidationService.create({
+        projects: options.projects,
+        deploymentAwsIdentity: options.deploymentAwsIdentity ?? false,
+      }),
       parserConfigs: IngestionSourceParserConfigService.create({
         repository: options.repository,
         providerAccounts: options.providerAccounts,
@@ -172,6 +180,36 @@ export class IngestionSourceService {
         );
       }) ?? null
     );
+  }
+
+  /**
+   * What the generic create and edit may touch: Security Lake has routes and checks of its own, so
+   * neither its source type nor its adapter is accepted here, sent or already stored.
+   */
+  async assertGenericallyManaged(input: {
+    organizationId: string;
+    sourceType?: string;
+    id?: string;
+    parserConfig?: Record<string, unknown> | null;
+    pullConfig?: Record<string, unknown> | null;
+  }): Promise<void> {
+    const stored =
+      input.id === undefined
+        ? undefined
+        : await this.getById({ id: input.id, organizationId: input.organizationId });
+    const sourceType = stored === undefined ? input.sourceType : stored.sourceType;
+    const adapters = [
+      stored?.parserConfig.adapter,
+      input.pullConfig?.adapter,
+      input.parserConfig?.adapter,
+    ];
+    if (sourceType === SECURITY_LAKE_SOURCE_TYPE || adapters.includes(SECURITY_LAKE_ADAPTER_ID)) {
+      throw unsupportedValue({
+        field: "sourceType",
+        value: SECURITY_LAKE_SOURCE_TYPE,
+        allowed: GOVERNANCE_INGESTION_SOURCE_TYPES.filter((t) => t !== SECURITY_LAKE_SOURCE_TYPE),
+      });
+    }
   }
 
   async createSource(
@@ -251,7 +289,7 @@ export class IngestionSourceService {
   ): Promise<GovernanceIngestionSource> {
     const existing = await this.getById({ id: input.id, organizationId: input.organizationId });
     this.validation.assertPullSchedule(input.pullSchedule);
-    const update: UpdateIngestionSourceRecord = this.plainUpdateFields(input);
+    const update: UpdateIngestionSourceRecord = plainUpdateFields(input);
     let cursorMustNotMove = false;
     if (input.parserConfig !== undefined) {
       const incoming = this.parserConfigs.mergedParserConfig({
@@ -317,34 +355,6 @@ export class IngestionSourceService {
     if (result.status === "invalid") {
       throw new OttlStatementsInvalidError({ statements, errors: result.errors });
     }
-  }
-
-  /** The fields whose only rule is that they were supplied. */
-  private plainUpdateFields(
-    input: UpdateGovernanceIngestionSourceCommand,
-  ): UpdateIngestionSourceRecord {
-    const update: UpdateIngestionSourceRecord = {};
-    if (input.name !== undefined) {
-      update.name = input.name;
-    }
-
-    if (input.description !== undefined) {
-      update.description = input.description;
-    }
-
-    if (input.status !== undefined) {
-      update.status = input.status;
-    }
-
-    if (input.teamId !== undefined) {
-      update.teamId = input.teamId;
-    }
-
-    if (input.pullSchedule !== undefined) {
-      update.pullSchedule = input.pullSchedule;
-    }
-
-    return update;
   }
 
   private async updatePinnedToCursor({
@@ -420,11 +430,12 @@ export class IngestionSourceService {
     return source;
   }
 
+  /** A disabled source is never stamped back to active; the repository write says so. */
   async recordEventReceived(id: string): Promise<void> {
-    await this.repository.update(id, {
-      lastEventAt: Temporal.Instant.fromEpochMilliseconds(this.now()),
-      status: "active",
-    });
+    await this.repository.recordEventReceived(
+      id,
+      Temporal.Instant.fromEpochMilliseconds(this.now()),
+    );
   }
 
   async getById({

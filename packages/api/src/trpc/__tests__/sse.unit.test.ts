@@ -3,6 +3,7 @@
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
+import { LiveStreamCrossSiteBlockedError } from "../../errors.ts";
 import { SseLane } from "../sse.ts";
 
 type LogRecord = { level: string; fields: unknown; message: string | undefined };
@@ -186,4 +187,50 @@ describe("a live subscription the access policy refuses", () => {
       );
     },
   );
+});
+
+describe("a live subscription opened on a deployment served over plain HTTP", () => {
+  const laneFor = ({ plainHttp }: { plainHttp: boolean }) =>
+    SseLane.create({
+      plainHttp,
+      members: {
+        createCaller: async () => ({
+          traces: {
+            watch: async function* () {
+              yield "tick";
+            },
+          },
+        }),
+        procedureTypeAt: () => "subscription",
+      },
+      logger: recordingLogger([]),
+    });
+  const unsignalled = (accept: string) =>
+    new Request("http://langwatch.internal:5560/api/sse/traces/watch", { headers: { accept } });
+
+  /** @scenario "A same-origin live stream on a plain-HTTP install opens" */
+  it("streams to the app's own EventSource, which sends neither Sec-Fetch-Site nor Origin", async () => {
+    const response = await laneFor({ plainHttp: true }).answer(
+      unsignalled("text/event-stream"),
+      new Headers(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    await response.body?.cancel();
+  });
+
+  /** @scenario "A navigation to the live update channel on a plain-HTTP install is refused" */
+  it("refuses a navigation, which asks for a document", async () => {
+    await expect(
+      laneFor({ plainHttp: true }).answer(unsignalled("text/html"), new Headers()),
+    ).rejects.toBeInstanceOf(LiveStreamCrossSiteBlockedError);
+  });
+
+  /** @scenario "An HTTPS install keeps refusing an unsignalled live stream" */
+  it("keeps refusing the same request on an HTTPS deployment", async () => {
+    await expect(
+      laneFor({ plainHttp: false }).answer(unsignalled("text/event-stream"), new Headers()),
+    ).rejects.toBeInstanceOf(LiveStreamCrossSiteBlockedError);
+  });
 });

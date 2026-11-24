@@ -94,8 +94,9 @@ def sync_detailed(
     | GetApiMeProjectResponse500
 ]:
     """Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal
-    workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key
-    targets without any further access.
+    workspace project. Answers any API key bound to the project, an ingestion key holding only
+    traces:create included, so a client (the CLI's identity notice, a widget, a traces link) can say
+    which project a key targets without any further access.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -126,8 +127,9 @@ def sync(
     | None
 ):
     """Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal
-    workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key
-    targets without any further access.
+    workspace project. Answers any API key bound to the project, an ingestion key holding only
+    traces:create included, so a client (the CLI's identity notice, a widget, a traces link) can say
+    which project a key targets without any further access.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -153,8 +155,9 @@ async def asyncio_detailed(
     | GetApiMeProjectResponse500
 ]:
     """Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal
-    workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key
-    targets without any further access.
+    workspace project. Answers any API key bound to the project, an ingestion key holding only
+    traces:create included, so a client (the CLI's identity notice, a widget, a traces link) can say
+    which project a key targets without any further access.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -183,8 +186,9 @@ async def asyncio(
     | None
 ):
     """Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal
-    workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key
-    targets without any further access.
+    workspace project. Answers any API key bound to the project, an ingestion key holding only
+    traces:create included, so a client (the CLI's identity notice, a widget, a traces link) can say
+    which project a key targets without any further access.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

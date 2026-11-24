@@ -21,6 +21,13 @@ import { nowInstant } from "@langwatch/time";
 import { type Dispatcher, Pool, fetch as undiciFetch } from "undici";
 
 import {
+  classifierBreakerAllowsSend,
+  CLOSED_CLASSIFIER_BREAKER,
+  recordClassifierSend,
+  type ClassifierBreakerState,
+  type ClassifierSendHealth,
+} from "../../rules/instant-eval-classifier-breaker.rules.ts";
+import {
   cutInstantEvalTextForRetry,
   prepareInstantEvalText,
 } from "../../rules/instant-eval-classifier-text.rules.ts";
@@ -59,6 +66,8 @@ interface HttpInstantEvalClassifierOptions {
   /** Injected by suites; a keep-alive pool to the judge otherwise. */
   readonly dispatcher?: Dispatcher;
   readonly sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+  /** Epoch milliseconds for the breaker; injected by suites. */
+  readonly now?: () => number;
 }
 
 /** What one attempt came back as. */
@@ -76,6 +85,9 @@ export class HttpInstantEvalClassifierChannel implements InstantEvalClassifierCh
   private readonly dispatcher: Dispatcher;
   private readonly ownsDispatcher: boolean;
   private readonly sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
+  private readonly now: () => number;
+  /** Shared by every text on this pod: one destination, LangWatch's own key. */
+  private breaker: ClassifierBreakerState = CLOSED_CLASSIFIER_BREAKER;
 
   private constructor(private readonly options: HttpInstantEvalClassifierOptions) {
     const baseUrl = options.baseUrl?.trim() ?? JEV_DEFAULT_BASE_URL;
@@ -93,6 +105,7 @@ export class HttpInstantEvalClassifierChannel implements InstantEvalClassifierCh
         allowH2: false,
       });
     this.sleep = options.sleep ?? abortableSleep;
+    this.now = options.now ?? (() => nowInstant().epochMilliseconds);
   }
 
   static create(options: HttpInstantEvalClassifierOptions): HttpInstantEvalClassifierChannel {
@@ -152,29 +165,101 @@ export class HttpInstantEvalClassifierChannel implements InstantEvalClassifierCh
     let limiterWaitMs = 0;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const waitedFrom = nowInstant().epochMilliseconds;
-      await request.limiter.acquire(
-        {
-          tokens:
-            estimateJudgedTextTokens({ text: state.text, limits: this.limits }) + questionTokens,
-          tenantId: request.projectId,
-        },
-        signal,
-      );
-      limiterWaitMs += nowInstant().epochMilliseconds - waitedFrom;
-      const outcome = await this.send({
-        text: state.text,
-        request,
-        isTruncated: state.isTruncated,
-        attempt,
-        ...(signal ? { signal } : {}),
-      });
+      const gate = this.breakerAllowsSend();
+      if (!gate.isAllowed) {
+        const held = await this.holdBack({
+          isAwaitingProbe: gate.isAwaitingProbe,
+          attempt,
+          state,
+          signal,
+        });
+        if (held.judgement) return { ...held.judgement, limiterWaitMs };
+        attempt -= 1 - held.attemptsSpent;
+        continue;
+      }
+      let outcome: Attempt;
+      try {
+        const waitedFrom = nowInstant().epochMilliseconds;
+        await request.limiter.acquire(
+          {
+            tokens:
+              estimateJudgedTextTokens({ text: state.text, limits: this.limits }) + questionTokens,
+            tenantId: request.projectId,
+          },
+          signal,
+        );
+        limiterWaitMs += nowInstant().epochMilliseconds - waitedFrom;
+        outcome = await this.send({
+          text: state.text,
+          request,
+          isTruncated: state.isTruncated,
+          attempt,
+          ...(signal ? { signal } : {}),
+        });
+      } catch (error) {
+        // A cancelled or broken send says nothing about the classifier, but frees the probe.
+        this.recordSend("neutral", gate.probe);
+        throw error;
+      }
+      this.recordSend(sendHealthOf(outcome), gate.probe);
 
       const settled = settle({ outcome, state, isLastAttempt: attempt === MAX_ATTEMPTS });
       if (settled.kind === "settled") return { ...settled.judgement, limiterWaitMs };
       if (outcome.kind === "retry") await this.sleep(outcome.waitMs, signal);
     }
     return { ...instantEvalSkipped("classifier_rate_limited"), limiterWaitMs };
+  }
+
+  /**
+   * One held-back turn, not sent. Behind an unanswered probe it is free until the probe is
+   * overdue, and an answer lets the text use every attempt it has left.
+   * Otherwise it fails as a 500 would, with the same wait.
+   */
+  private async holdBack({
+    isAwaitingProbe,
+    attempt,
+    state,
+    signal,
+  }: {
+    isAwaitingProbe: boolean;
+    attempt: number;
+    state: AttemptState;
+    signal: AbortSignal | undefined;
+  }): Promise<{ judgement?: InstantEvalJudgement; attemptsSpent: 0 | 1 }> {
+    const waitMs = backoffMs(attempt);
+    if (!isAwaitingProbe) {
+      const held: Attempt = { kind: "retry", waitMs, isRateLimited: false };
+      const settled = settle({ outcome: held, state, isLastAttempt: attempt === MAX_ATTEMPTS });
+      if (settled.kind === "settled") return { judgement: settled.judgement, attemptsSpent: 1 };
+    }
+    await this.sleep(waitMs, signal);
+    return { attemptsSpent: isAwaitingProbe ? 0 : 1 };
+  }
+
+  private breakerAllowsSend(): {
+    isAllowed: boolean;
+    probe: number | null;
+    isAwaitingProbe: boolean;
+  } {
+    const { state, ...decision } = classifierBreakerAllowsSend({
+      state: this.breaker,
+      now: this.now(),
+    });
+    this.breaker = state;
+    return decision;
+  }
+
+  private recordSend(health: ClassifierSendHealth, probe: number | null): void {
+    const before = this.breaker;
+    this.breaker = recordClassifierSend({ state: before, health, now: this.now(), probe });
+    if (before.openedAt === null && this.breaker.openedAt !== null) {
+      logger.warn(
+        { consecutiveFailures: this.breaker.consecutiveFailures },
+        "Instant Evals judge is down; holding sends back and probing",
+      );
+    } else if (before.openedAt !== null && this.breaker.openedAt === null) {
+      logger.info("Instant Evals judge answered a probe; sending again");
+    }
   }
 
   /**
@@ -253,6 +338,16 @@ async function readAnswer({
       isTextTruncated: isTruncated,
     },
   };
+}
+
+/**
+ * What a send says about the classifier for the breaker: a rate limit (429, 529) or a permanent
+ * refusal is neutral; any other retry is a 5xx, a transport error or our own timeout.
+ */
+function sendHealthOf(outcome: Attempt): ClassifierSendHealth {
+  if (outcome.kind === "answered" || outcome.kind === "too_large") return "up";
+  if (outcome.kind === "permanent" || outcome.isRateLimited) return "neutral";
+  return "down";
 }
 
 /** What one text has become across the attempts so far. */

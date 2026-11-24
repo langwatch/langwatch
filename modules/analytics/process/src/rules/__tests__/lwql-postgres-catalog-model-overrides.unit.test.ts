@@ -206,6 +206,17 @@ describe("given the derived Postgres catalog's overrides", () => {
     });
   });
 
+  describe("when the ingestion templates view is derived", () => {
+    /** @scenario "LWQL reads a template's OTTL rules only with aiTools:manage" */
+    it("gates the OTTL rules column behind aiTools:manage", () => {
+      const ottl = byModel
+        .get("IngestionTemplate")!
+        .columns.find((column) => column.name === "OttlRules")!;
+
+      expect(ottl.gates).toContain("aiTools:manage");
+    });
+  });
+
   describe("when a model's own repository enforces per-user visibility", () => {
     const LANGY_MODELS = [
       "LangyConversationProjection",

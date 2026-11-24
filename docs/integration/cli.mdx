@@ -82,6 +82,8 @@ You'll see two questions:
 
 The browser shows an "Approve" or "Send API key" button (depending on the chosen mode); after you click, the credential is delivered back to the CLI over the same RFC 8628 device-code poll. **You never copy-paste a key.**
 
+The code in the link is valid for 15 minutes. If the command stops before you approve, for example when an agent's command times out, run the same `langwatch login` again (from the same folder for a project key login): it waits on the code it already printed instead of starting a new one, and picks up an approval you gave while no command was running.
+
 ### What the login key can access
 
 The AI-tools login mints a login key that inherits your own access. The authorize screen shows the scopes and permissions before you approve:
@@ -350,6 +352,15 @@ Ask Langy for a code change in the LangWatch panel first. Its request appears in
 ╰─────────────────────────────────────────────────────────────────────────────╯
 ```
 
+The terminal only sees requests made by the account it is signed in as. With `--as <email>`, available in releases after 2.2.0 (an older CLI refuses the option), it checks that its login is the person who asked Langy. If it is not, it says so and offers to sign in as that person.
+
+After 30 seconds with no request, with or without `--as`, it names the account it is signed in as and tells you how to switch, then keeps waiting.
+
+```text
+Signed in as riley@acme.test, the request came from sam@acme.test.
+? Sign in as sam@acme.test? › (Y/n)
+```
+
 When two conversations asked for the same folder, you pick one first. After you share it, the command prints what Langy does, one line per call:
 
 ```text
@@ -524,6 +535,14 @@ Each command uses the values differently:
 
 ```bash
 langwatch experiment run <experiment-slug> --dataset-version 1
+```
+
+To see how often each row passes when outputs vary, add `--repeat <n>`, from 1 to 5. The server runs every dataset row that many times against every target in one run. With `--wait`, the output lists each dataset row's pass rate per target, such as `Row 1 · support-prompt: 2/3 passed (67%)`, and the JSON output carries the same numbers under `rowPassRates`.
+
+A repetition fails when its target errors or any evaluator fails it, and one with no pass or fail verdict is left out of the count. A repeated run does not write its outputs back into the experiment's workbench; its results page numbers each row by dataset row and repetition and adds a Pass rate column.
+
+```bash
+langwatch experiment run <experiment-slug> --repeat 3 --wait
 ```
 
 ### Inspect simulation runs

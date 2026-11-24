@@ -22,3 +22,15 @@ export function langyWorkerRuntimeOf({
     mirrorProjectId: config.mirrorProjectId,
   };
 }
+
+/** How the worker takes a turn: revive a parked one, create a session, or continue the live one. */
+export function langyDispatchIntentOf({
+  resumable,
+  hasApiKey,
+}: {
+  resumable: boolean;
+  hasApiKey: boolean;
+}): "create" | "revive" | "continue" {
+  if (resumable) return "revive";
+  return hasApiKey ? "create" : "continue";
+}

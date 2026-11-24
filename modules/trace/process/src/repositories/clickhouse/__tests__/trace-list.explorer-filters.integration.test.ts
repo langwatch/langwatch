@@ -5,6 +5,7 @@
  * default, and an eval chip read through a run's verdicts.
  * @see specs/traces-v2/origin-badge-filter.feature
  * @see specs/traces-v2/instant-eval-search.feature
+ * @see specs/traces-v2/search.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
@@ -16,6 +17,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
+import { createInitState } from "../../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import {
   CLICKHOUSE_FACET_CATALOG,
   FACET_REGISTRY,
@@ -28,7 +30,10 @@ import {
   findHiddenOriginConditions,
   type TraceFilterWhere,
 } from "../../../rules/trace-filter-hidden-origins.rules.ts";
-import { traceQueryTranslation } from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
+import {
+  traceQueryEvaluation,
+  traceQueryTranslation,
+} from "../../../services/__tests__/fixtures/trace-query-services.fixtures.ts";
 import { MemoryTraceEvaluationRunsRepository } from "../../memory/memory.trace-evaluation-runs.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import { authorizedClickHouseFor } from "./support/authorized-clickhouse.support.ts";
@@ -51,12 +56,14 @@ function traceRow({
   offset,
   attributes,
   containsErrorStatus = false,
+  models = ["gpt-5-mini"],
 }: {
   tenantId: string;
   traceId: string;
   offset: number;
   attributes: Record<string, string>;
   containsErrorStatus?: boolean;
+  models?: string[];
 }) {
   const at = new Date(base + offset);
   return {
@@ -76,7 +83,7 @@ function traceRow({
     SpanCount: 1,
     ContainsErrorStatus: containsErrorStatus,
     ContainsOKStatus: !containsErrorStatus,
-    Models: ["gpt-5-mini"],
+    Models: models,
     TraceName: "checkout flow",
   };
 }
@@ -251,6 +258,7 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
   const passedB = "evalchip-passed-b";
   const failed = "evalchip-failed";
   const unjudged = "evalchip-unjudged";
+  const skipped = "evalchip-skipped";
   let writtenAt = 0;
 
   const runOf = (id: string): ResolvedInstantEvalRun => ({
@@ -273,8 +281,11 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
     tenant: string;
     run: string;
     traceId: string;
-    passed: boolean;
+    /** null is a skipped or failed judgement, with no verdict. */
+    passed: boolean | null;
   }) {
+    let probability: number | null = null;
+    if (passed !== null) probability = passed ? 0.9 : 0.1;
     return {
       TenantId: tenant,
       RunId: run,
@@ -283,11 +294,11 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
       ThreadId: "",
       SpanId: "",
       Kind: "boolean",
-      Status: "judged",
-      Passed: passed ? 1 : 0,
+      Status: passed === null ? "skipped" : "judged",
+      Passed: passed === null ? null : Number(passed),
       Score: null,
       Label: "",
-      Probability: passed ? 0.9 : 0.1,
+      Probability: probability,
       Probabilities: "",
       Error: "",
       OccurredAt: new Date(base),
@@ -298,7 +309,7 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
 
   beforeAll(async () => {
     await insertTraces(
-      [passedA, passedB, failed, unjudged].map((traceId, offset) =>
+      [passedA, passedB, failed, unjudged, skipped].map((traceId, offset) =>
         traceRow({
           tenantId,
           traceId,
@@ -315,6 +326,7 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
         judgment({ tenant: tenantId, run: runId, traceId: passedA, passed: true }),
         judgment({ tenant: tenantId, run: runId, traceId: passedB, passed: true }),
         judgment({ tenant: tenantId, run: runId, traceId: failed, passed: false }),
+        judgment({ tenant: tenantId, run: runId, traceId: skipped, passed: null }),
         judgment({ tenant: otherTenantId, run: foreignRunId, traceId: passedA, passed: true }),
       ],
       format: "JSONEachRow",
@@ -356,6 +368,17 @@ describe.skipIf(!clickHouseConfigured)("an eval chip on the trace list", () => {
 
       expect(page.totalHits).toBe(0);
     });
+
+    /** @scenario "A negated eval chip keeps the traces the judge did not match" */
+    it("under NOT lists only the judged no, not a passed, skipped or unjudged trace", async () => {
+      const page = await listWith({
+        tenantId,
+        filterWhere: chipFilter({ query: `NOT eval:"${question}"`, run: runId }),
+      });
+
+      expect(page.rows.map((row) => row.traceId)).toEqual([failed]);
+      expect(page.totalHits).toBe(1);
+    });
   });
 
   describe("given a run whose verdicts belong to another project", () => {
@@ -388,6 +411,7 @@ async function sidebarCounts({
   const facets = await service.getFacets({
     authorization: ownProof({ projectId: tenantId }),
     timeRange,
+    filterKey: query,
     filterFor: createFacetFilterResolver({
       queryText: query,
       compile: (text) =>
@@ -466,6 +490,116 @@ describe.skipIf(!clickHouseConfigured)("the sidebar's counts against the table",
         .flatMap(([key, values]) => Object.values(values).map((count) => [key, count] as const))
         .filter(([, count]) => count > 0);
       expect(shown).toEqual([]);
+    });
+  });
+});
+
+describe.skipIf(!clickHouseConfigured)("a NOT over a bracketed group on the trace list", () => {
+  const tenantId = `test-not-group-${nanoid()}`;
+  const traces = [
+    { traceId: "ng-error-mini", isError: true, model: "gpt-5-mini" },
+    { traceId: "ng-error-other", isError: true, model: "gpt-5" },
+    { traceId: "ng-ok-mini", isError: false, model: "gpt-5-mini" },
+    { traceId: "ng-ok-other", isError: false, model: "gpt-5" },
+  ];
+
+  beforeAll(async () => {
+    await insertTraces(
+      traces.map(({ traceId, isError, model }, offset) =>
+        traceRow({
+          tenantId,
+          traceId,
+          offset,
+          attributes: { "service.name": "api" },
+          containsErrorStatus: isError,
+          models: [model],
+        }),
+      ),
+    );
+  }, 120_000);
+
+  /** The same rows through the in-memory check automations use. */
+  function matchedInMemory(query: string): string[] {
+    return traces
+      .filter(({ traceId, isError, model }) =>
+        traceQueryEvaluation.traceMatchesQuery(query, {
+          summary: {
+            ...createInitState(),
+            traceId,
+            containsErrorStatus: isError,
+            containsOKStatus: !isError,
+            models: [model],
+          },
+        }),
+      )
+      .map(({ traceId }) => traceId)
+      .toSorted();
+  }
+
+  afterAll(async () => {
+    if (!ch) return;
+    await ch.exec({
+      query: "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+      query_params: { tenantId },
+    });
+  });
+
+  async function listed(query: string): Promise<{ ids: string[]; total: number }> {
+    const page = await listWith({ tenantId, filterWhere: compiled({ queryText: query }) });
+    return { ids: page.rows.map((r) => r.traceId).toSorted(), total: page.totalHits };
+  }
+
+  describe("given errors and non-errors on two models", () => {
+    /** @scenario "The table lists exactly the complement of a group under NOT" */
+    it("hides only the errors on the model for a NOT over an AND group", async () => {
+      expect(await listed("NOT (status:error AND model:gpt-5-mini)")).toEqual({
+        ids: ["ng-error-other", "ng-ok-mini", "ng-ok-other"],
+        total: 3,
+      });
+    });
+
+    /** @scenario "The table lists exactly the complement of a group under NOT" */
+    it("hides every error and every trace on the model for a NOT over an OR group", async () => {
+      expect(await listed("NOT (status:error OR model:gpt-5-mini)")).toEqual({
+        ids: ["ng-ok-other"],
+        total: 1,
+      });
+    });
+
+    /** @scenario "The table lists exactly the complement of a group under NOT" */
+    it.each([
+      "NOT (status:error AND model:gpt-5-mini)",
+      "NOT (status:error OR model:gpt-5-mini)",
+      "NOT (NOT status:error AND model:gpt-5-mini)",
+      "NOT ((status:error AND model:gpt-5-mini) OR model:gpt-5)",
+      "NOT (NOT (status:error AND model:gpt-5-mini))",
+    ])("lists the same traces the in-memory check matches for %s", async (query) => {
+      expect((await listed(query)).ids).toEqual(matchedInMemory(query));
+    });
+
+    /** @scenario "The table lists exactly the complement of a group under NOT" */
+    it.each([
+      ["NOT (status:error AND model:gpt-5-mini)", 3],
+      ["NOT (status:error OR model:gpt-5-mini)", 1],
+    ])("counts %s in the sidebar as the table does", async (query, total) => {
+      const counts = await sidebarCounts({ tenantId, query });
+      expect(counts.get("service")?.api).toBe(total);
+      expect((await listed(query)).total).toBe(total);
+    });
+
+    /** @scenario "A facet whose term an OR joins to other terms counts under the whole query" */
+    it("counts the status facet over exactly the listed traces for a NOT over an AND group", async () => {
+      const query = "NOT (status:error AND model:gpt-5-mini)";
+      const counts = await sidebarCounts({ tenantId, query });
+      expect(counts.get("status")).toEqual({ error: 1, ok: 2 });
+    });
+
+    /** @scenario "A facet whose term an OR joins to other terms counts under the whole query" */
+    it("still drops the status terms for a NOT over an OR group, which ANDs them", async () => {
+      const query = "NOT (status:error OR model:gpt-5-mini)";
+      const counts = await sidebarCounts({ tenantId, query });
+      expect(counts.get("status")).toEqual({ error: 1, ok: 1 });
+      expect(counts.get("status")?.ok).toBe((await listed(query)).total);
     });
   });
 });

@@ -15,6 +15,7 @@ const harness = vi.hoisted(() => ({
   isEnterprise: true,
 }));
 
+vi.mock("@langwatch/auth-client", () => ({ useRecordPageOpened: () => undefined }));
 vi.mock("../../../../behavior/governance-api.ts", () => {
   // Shaped the way tRPC hands a failure to a component: the code rides on
   // `error.data.code`, and the page reads that rather than the message.

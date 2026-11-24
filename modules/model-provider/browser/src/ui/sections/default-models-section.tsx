@@ -40,6 +40,7 @@ import {
 import type { ReactNode } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
+import { useHostedDecisionModelOffered } from "../../behavior/use-hosted-decision-model.ts";
 import {
   DECISION_MODEL_DISPLAY_NAMES,
   isShownDecisionModel,
@@ -47,7 +48,7 @@ import {
 import {
   compareConfigsByScopeThenName,
   mostSpecificScope,
-  resolveAtScope,
+  resolveRoleAtScope,
   MODEL_ROLE_LABEL,
   type AnchorScope,
 } from "../../model/default-model-cascade.ts";
@@ -91,6 +92,7 @@ export function DefaultModelsSection({
     { projectId: projectId ?? "" },
     { enabled: !!projectId },
   );
+  const isHostedOffered = useHostedDecisionModelOffered({ projectId });
 
   const utils = modelProviderApi.useUtils();
   const deleteMutation = modelProviderApi.modelProvider.deleteDefaultModelsConfig.useMutation();
@@ -181,6 +183,7 @@ export function DefaultModelsSection({
         onAdd={openAdd}
         enabledProviderKeys={enabledProviderKeys}
         displayNames={displayNames}
+        isHostedOffered={isHostedOffered}
       />
     </VStack>
   );
@@ -208,6 +211,7 @@ function AllConfigsView({
   onAdd,
   enabledProviderKeys,
   displayNames,
+  isHostedOffered,
 }: {
   configs: ConfigRow[];
   /** Full cascade input. `configs` is filter-narrowed for display, but cells
@@ -221,6 +225,7 @@ function AllConfigsView({
   onAdd: () => void;
   enabledProviderKeys: Set<string> | null;
   displayNames: Record<string, string>;
+  isHostedOffered: boolean;
 }) {
   if (configs.length === 0) {
     return (
@@ -277,6 +282,7 @@ function AllConfigsView({
                   onEdit={() => onEdit(config)}
                   enabledProviderKeys={enabledProviderKeys}
                   displayNames={displayNames}
+                  isHostedOffered={isHostedOffered}
                 />
               </ListTable.Cell>
             ))}
@@ -343,6 +349,7 @@ function ConfigCell({
   onEdit,
   enabledProviderKeys,
   displayNames,
+  isHostedOffered,
 }: {
   role: ModelRole;
   config: Record<string, string>;
@@ -357,6 +364,8 @@ function ConfigCell({
   onEdit: () => void;
   enabledProviderKeys: Set<string> | null;
   displayNames: Record<string, string>;
+  /** Whether Evals Preview may be offered; not, an unset Instant Evals cell reads "Not set". */
+  isHostedOffered: boolean;
 }) {
   const isInvalid = (model: string) =>
     !!enabledProviderKeys && !enabledProviderKeys.has(model.split("/")[0] ?? "");
@@ -366,9 +375,10 @@ function ConfigCell({
   // carries the role, the cell renders a "Not configured" badge — AI features
   // for this role are disabled at this scope until the reader fixes it.
   const resolvedRole = anchorScope
-    ? resolveAtScope({ key: role, configs, anchor: anchorScope, hierarchy })
+    ? resolveRoleAtScope({ role, configs, anchor: anchorScope, hierarchy })
     : null;
   const resolvedRoleModel = resolvedRole?.model ?? config[role] ?? null;
+  const isBorrowed = !!resolvedRole?.inherited;
 
   // Feature override rows render only when THIS policy pins a feature key AND
   // its value differs from the role-resolved model. If the role is itself
@@ -383,10 +393,15 @@ function ConfigCell({
     <VStack align="start" gap={1}>
       <ChipWithEdit onEdit={onEdit}>
         {role === "INSTANT_EVALS" ? (
-          <DecisionModelChip model={resolvedRoleModel} isInvalid={isInvalid} />
+          <DecisionModelChip
+            model={resolvedRoleModel}
+            isInvalid={isInvalid}
+            isHostedOffered={isHostedOffered}
+          />
         ) : (
           <RoleModelChip
             model={resolvedRoleModel}
+            isBorrowed={isBorrowed}
             isInvalid={isInvalid}
             displayNames={displayNames}
           />
@@ -410,18 +425,28 @@ function ConfigCell({
 }
 
 /**
- * The Instant Evals cell: unset, or an id the catalogue no longer offers, reads as the
- * LangWatch Instant Preview default (faded), never "Not configured" (ADR-182 decision 1).
- * Only an own model can need an update: the hosted default has no provider row.
+ * The Instant Evals cell: unset, or an id the catalogue dropped, reads as the faded Evals Preview
+ * default, never "Not configured" (ADR-182 decision 1). Where Evals Preview is not offered, unset
+ * or pinned to it reads "Not set". Only an own model can need an update: no hosted provider row.
  */
 function DecisionModelChip({
   model,
   isInvalid,
+  isHostedOffered,
 }: {
   model: string | null;
   isInvalid: (model: string) => boolean;
+  isHostedOffered: boolean;
 }) {
-  const shown = isShownDecisionModel(model) ? model : null;
+  const shown =
+    isShownDecisionModel(model) && (isHostedOffered || isOwnDecisionModelId(model)) ? model : null;
+  if (!shown && !isHostedOffered) {
+    return (
+      <Badge colorPalette="gray" variant="subtle" data-testid="instant-evals-not-set">
+        Not set
+      </Badge>
+    );
+  }
   return (
     <ModelChip
       model={shown ?? LANGWATCH_DECISION_MODEL_ID}
@@ -433,13 +458,18 @@ function DecisionModelChip({
   );
 }
 
-/** Any other role's cell: its resolved model, or "Not configured" when the cascade has none. */
+/**
+ * Any other role's cell: its resolved model, faded when borrowed from its fallback role
+ * (Judge reads Default), or "Not configured" when the cascade has none.
+ */
 function RoleModelChip({
   model,
+  isBorrowed,
   isInvalid,
   displayNames,
 }: {
   model: string | null;
+  isBorrowed: boolean;
   isInvalid: (model: string) => boolean;
   displayNames: Record<string, string>;
 }) {
@@ -451,7 +481,13 @@ function RoleModelChip({
     );
   }
   return (
-    <ModelChip model={model} size="sm" invalid={isInvalid(model)} displayNames={displayNames} />
+    <ModelChip
+      model={model}
+      size="sm"
+      inherited={isBorrowed}
+      invalid={isInvalid(model)}
+      displayNames={displayNames}
+    />
   );
 }
 

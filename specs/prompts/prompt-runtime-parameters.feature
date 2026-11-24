@@ -38,6 +38,27 @@ Feature: Prompt runtime parameters
     And the prompt response contains parameters {"confidence_threshold": 0.9}
 
   @integration
+  Scenario: Updating a prompt over the REST API with only messages keeps every other stored field
+    Given prompt "search-agent" has version 1 with parameters, inputs, outputs, model, temperature and max tokens set
+    When I send PUT /api/prompts/search-agent with only messages and a commit message
+    Then the prompt response contains version 2
+    And version 2 keeps the parameters, inputs, outputs, model, temperature and max tokens of version 1
+
+  @integration
+  Scenario: Updating messages without a system message keeps the stored system prompt
+    Given prompt "search-agent" has version 1 with a system prompt and a user message
+    When I send PUT /api/prompts/search-agent with only a user message and a commit message
+    Then version 2 keeps the system prompt of version 1
+    And version 2 carries the new user message
+
+  @integration
+  Scenario: Updating a prompt over the REST API replaces the inputs, outputs and parameters it names
+    Given prompt "search-agent" has version 1 with parameters, inputs, outputs, temperature and max tokens set
+    When I send PUT /api/prompts/search-agent with new inputs, outputs and parameters
+    Then version 2 carries the new inputs, outputs and parameters
+    And version 2 keeps the system prompt, temperature and max tokens of version 1
+
+  @integration
   Scenario: Fetching prompts returns the selected version parameters
     Given prompt "search-agent" has version 1 with parameters {"environment": "production"}
     And prompt "search-agent" has version 2 with parameters {"environment": "staging"}

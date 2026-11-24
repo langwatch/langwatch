@@ -100,9 +100,11 @@ function toBudgetPeriod(row: {
   currentPeriodStartedAt: Date;
   lastResetAt: Date | null;
   cycleAnchorAt: Date | null;
+  timezone: string | null;
 }) {
   return {
     window: row.window,
+    timezone: row.timezone,
     currentPeriodStartedAt: fromDate(row.currentPeriodStartedAt),
     lastResetAt: row.lastResetAt ? fromDate(row.lastResetAt) : null,
     cycleAnchorAt: row.cycleAnchorAt ? fromDate(row.cycleAnchorAt) : null,

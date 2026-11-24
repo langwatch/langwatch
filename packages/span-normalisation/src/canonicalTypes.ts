@@ -18,6 +18,8 @@ export const canonicalSpanContextSchema = z.object({
   statusMessage: z.string().nullable(),
   statusCode: z.number().nullable(),
   parentSpanId: z.string().nullable(),
+  /** The span's resource; read for declarations such as `langwatch.session.id`, never copied. */
+  resourceAttributes: canonicalAttributesSchema.optional(),
 });
 
 export type CanonicalAttributes = z.infer<typeof canonicalAttributesSchema>;

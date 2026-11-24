@@ -20,8 +20,10 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
+import { MemoryExperimentRunActivityRepository } from "../../../../repositories/memory/memory.experiment-run-activity.repository.ts";
 import type { ExperimentWorkflowDsl } from "../../../../services/experiment-execution-data.service.ts";
 import type { ExperimentService } from "../../../../services/experiment.service.ts";
+import { ExperimentRunConcurrencyService } from "../../../run/services/experiment-run-concurrency.service.ts";
 import { ExperimentSavedRunPreparationService } from "../experiment-saved-run-preparation.service.ts";
 import type { ExperimentWorkbenchObserver } from "../experiment-workbench-observer.service.ts";
 import type { WorkbenchRunPipeline } from "../experiment-workbench-pipeline-run.service.ts";
@@ -178,7 +180,8 @@ class VersionedDataset {
 const savedExperiment = ({
   datasetVersion,
   results,
-}: { datasetVersion?: number; results?: SavedResults } = {}): Experiment => ({
+  inline,
+}: { datasetVersion?: number; results?: SavedResults; inline?: boolean } = {}): Experiment => ({
   id: EXPERIMENT_ID,
   projectId: PROJECT_ID,
   slug: SLUG,
@@ -192,14 +195,25 @@ const savedExperiment = ({
   workbenchState: {
     name: "Support eval",
     datasets: [
-      {
-        id: "ds-ref",
-        name: "Questions",
-        type: "saved",
-        datasetId: DATASET_ID,
-        ...(datasetVersion !== undefined ? { datasetVersion } : {}),
-        columns: [{ id: "question", name: "question", type: "string" }],
-      },
+      inline
+        ? {
+            id: "ds-ref",
+            name: "Questions",
+            type: "inline",
+            inline: {
+              columns: [{ id: "question", name: "question", type: "string" }],
+              records: { question: ["inline row"] },
+            },
+            columns: [{ id: "question", name: "question", type: "string" }],
+          }
+        : {
+            id: "ds-ref",
+            name: "Questions",
+            type: "saved",
+            datasetId: DATASET_ID,
+            ...(datasetVersion !== undefined ? { datasetVersion } : {}),
+            columns: [{ id: "question", name: "question", type: "string" }],
+          },
     ],
     activeDatasetId: "ds-ref",
     evaluators: [],
@@ -212,17 +226,25 @@ function harness({
   dataset,
   datasetVersion,
   results,
+  inline,
+  startFails,
 }: {
   dataset: VersionedDataset;
+  /** The run's start command fails to send, after its concurrency was claimed. */
+  startFails?: boolean;
   datasetVersion?: number;
+  /** The active dataset tab is inline rows rather than a saved dataset. */
+  inline?: boolean;
   /** The board's saved results, keyed by the board's rows. */
   results?: SavedResults;
 }) {
   const started: { runId: string; total: number }[] = [];
+  const activity = MemoryExperimentRunActivityRepository.create();
   const plans: ExperimentRunPlan[] = [];
   const runs: WorkbenchRunPipeline = {
     commands: createApiFixture<WorkbenchRunPipeline["commands"]>({
       startExperimentRun: async (start) => {
+        if (startFails) throw new Error("dispatch failed");
         started.push({ runId: start.runId, total: start.total });
         if ("plan" in start && start.plan) plans.push(start.plan);
       },
@@ -242,7 +264,10 @@ function harness({
       projects: { getOrganizationId: async () => "organization-1" },
     },
     ownership: { assertConnectedAgentsRunnable: async () => {} },
-    concurrency: 4,
+    concurrency: ExperimentRunConcurrencyService.create({
+      activity,
+      config: { runConcurrency: 4, projectCellBudget: 20 },
+    }),
     refusals: {},
   };
   const experiments = createApiFixture<ExperimentService>({
@@ -250,6 +275,7 @@ function harness({
       savedExperiment({
         ...(datasetVersion !== undefined ? { datasetVersion } : {}),
         ...(results ? { results } : {}),
+        ...(inline ? { inline } : {}),
       }),
   });
   const service = ExperimentWorkbenchRunService.create({
@@ -304,7 +330,7 @@ function harness({
       { id: "user-1" },
     );
 
-  return { run, started, plans, executeOnPage, prepare };
+  return { run, started, plans, executeOnPage, prepare, activity };
 }
 
 const questions = (...names: string[]): Row[] => names.map((question) => ({ question }));
@@ -393,6 +419,64 @@ describe("given a saved experiment over a saved dataset", () => {
         run({ body: JSON.stringify({ data: questions("x"), dataset_version: 1 }) }),
       ).rejects.toMatchObject({ code: "experiment_evaluation_input_invalid" });
       expect(dataset.resolved).toEqual([]);
+    });
+  });
+
+  describe("when the run API is called with dataset_version 1 and the active dataset is inline", () => {
+    /** @scenario "The run API refuses a dataset version with no saved dataset to read" */
+    it("refuses the run with a 400 and starts nothing", async () => {
+      const dataset = new VersionedDataset(questions("a"));
+      dataset.save({ rows: questions("a"), trigger: "manual" });
+      const { run, started } = harness({ dataset, inline: true });
+
+      await expect(run({ body: JSON.stringify({ dataset_version: 1 }) })).rejects.toMatchObject({
+        code: "experiment_evaluation_input_invalid",
+        httpStatus: 400,
+      });
+      expect(dataset.resolved).toEqual([]);
+      expect(started).toEqual([]);
+    });
+
+    /** @scenario "The run API refuses a dataset version with no saved dataset to read" */
+    it("refuses an empty dataset_id rather than reading it as no dataset_id", async () => {
+      const dataset = new VersionedDataset(questions("a"));
+      dataset.save({ rows: questions("a"), trigger: "manual" });
+      const { run, started } = harness({ dataset, inline: true });
+
+      await expect(
+        run({ body: JSON.stringify({ dataset_id: "", dataset_version: 1 }) }),
+      ).rejects.toMatchObject({ code: "experiment_evaluation_input_invalid", httpStatus: 400 });
+      expect(dataset.resolved).toEqual([]);
+      expect(started).toEqual([]);
+    });
+
+    /** @scenario "The run API refuses a dataset version with no saved dataset to read" */
+    it("reads the version when the body also names the saved dataset", async () => {
+      const dataset = new VersionedDataset(questions("a", "b"));
+      dataset.save({ rows: questions("a"), trigger: "manual" });
+      const { run } = harness({ dataset, inline: true });
+
+      await run({ body: JSON.stringify({ dataset_id: DATASET_ID, dataset_version: 1 }) });
+
+      expect(dataset.read).toEqual([1]);
+    });
+  });
+
+  describe("when the run's start fails to send after its concurrency was claimed", () => {
+    it("gives the claim back, so later runs do not count it", async () => {
+      const { run, activity } = harness({
+        dataset: new VersionedDataset(questions("a")),
+        startFails: true,
+      });
+
+      await expect(run()).rejects.toThrow("dispatch failed");
+      const now = Date.now();
+      expect(
+        await activity.claim({ projectId: PROJECT_ID, runId: "probe", now, expiresAt: now + 1 }),
+      ).toEqual({
+        project: 0,
+        global: 0,
+      });
     });
   });
 

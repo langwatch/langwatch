@@ -14,28 +14,48 @@ Feature: Coding agent terminal view
   Background:
     Given a coding agent session with prompts, tool calls, and a final reply
 
+  @integration
   Scenario: The transcript shows every beat, not just the final turn
     Given the session's last model call is a single tool request with no reply text
     When the Terminal tab renders the session
     Then every prompt, message, and tool call from the whole session is shown
     And the session does not collapse to a single step
 
+  @integration
   Scenario: A tool the user denied is shown even though it left no span
     Given the user denied a tool call partway through the session
     When the Terminal tab renders the session
     Then the denied call is shown as rejected, not silently missing
 
+  @integration
   Scenario: A tool call that was aborted reads differently from one the user denied
     Given a tool call was cancelled or timed out before it ran
     When the Terminal tab renders the session
     Then the call is shown as aborted and never ran
     And it is not said to be denied, nor pinned on the user
 
+  # The agents' own decision source says who refused: Claude and Grok send "user_*",
+  # Codex "User"; "config", "hook", "classifier" or no source at all is a policy.
+  @integration
+  Scenario: A tool call a policy denied is not pinned on the user
+    Given a permission rule, hook or reviewer refused a tool call before it ran
+    When the Terminal tab renders the session
+    Then the call is shown as denied and never ran
+    And it is not said to be the user's denial
+
+  @integration
+  Scenario: A tool call the user answered instead of approving reads differently from a denial
+    Given the user typed a reply at a tool prompt instead of approving the call
+    When the Terminal tab renders the session
+    Then the call is shown as answered by the user and never ran
+    And it is not said to be denied
+
   Scenario: A tool call shows what actually ran, not just what the model was told
     Given a tool span carries real stdout, a real file's content, or a real structured patch
     When the Terminal tab renders that tool call
     Then the real output is shown in place of the model's capped echo
 
+  @integration
   Scenario: The top of the session identifies the agent, model, and repo
     Given the session was run by Claude Code version 2.1.207 against a repo
     When the Terminal tab renders the session
@@ -97,21 +117,26 @@ Feature: Coding agent terminal view
   # `pi.ai.request` is a model call (MODEL_CALL_SPAN_NAMES); anything else falls
   # through to the tool branch.
 
-  # pi declares no arguments and no result on pi.harness.tool, only the tool's
-  # name, its call id and whether it errored. A pi tool run therefore shows
-  # less than a Claude or Copilot one, and the transcript has to render that
-  # honestly rather than leave empty argument and result panes behind.
+  # pi's tool span carries its arguments and result only with content capture
+  # on. Without it a pi tool run shows its name, its call id and whether it
+  # errored, and the transcript renders that honestly rather than leave empty
+  # argument and result panes behind.
 
-  # Parked: a pi tool run is dropped from the transcript, not shown. The tool-name
-  # reader (deriveToolName) reads gen_ai.tool.name only on an execute_tool span.
-  # becomes @unit
-  @unimplemented
+  @unit
   Scenario: A pi session reads back as a transcript, not as a span tree
     Given a pi session whose run, turns and tool executions were captured
     When the Terminal tab renders the session
     Then its spans and logs read in timestamp order, not in parent order
     And each tool execution shows its name and whether it errored
     And no empty arguments or result pane is shown for it
+
+  # pi's model calls carry no prompt: the user's message rides only the run span.
+
+  @unit
+  Scenario: A pi session's prompt reads from its run span
+    Given a pi session whose run span carries the user's message
+    When the Terminal tab renders the session
+    Then the prompt shows once, before the first model call
 
   @unit
   Scenario: A pi model call is shown as a model call, not as a tool run
@@ -120,14 +145,43 @@ Feature: Coding agent terminal view
     Then each model call appears once with the tokens it used
     And none of them appears among the tool runs
 
-  # Parked: the model half holds, but the banner's agent list in
-  # modules/trace/browser has no pi, so the top of the session reads unknown.
-  # becomes @unit
-  @unimplemented
+  # pi stamps no service name the banner can test (`pi` is a substring of
+  # `copilot` and `api`), so the banner names it from its span namespace.
+
+  @unit
   Scenario: The banner of a pi session names the model pi called
     Given a pi session whose model calls name their model
     When the Terminal tab renders the session
     Then the top of the session shows pi and the model it called
+
+  # A trace with no name of its own is named after its root span (`pi.harness.run`),
+  # which the user never typed.
+
+  @unit
+  Scenario: The prompt line never shows a span name as if the user had typed it
+    Given a session whose trace is named after its own root span
+    When the Terminal tab renders the session
+    Then the bottom bar's prompt line shows the session's first prompt
+    And when the session has no prompt text it shows the untitled placeholder, not the span name
+
+  # A logs-only trace (Grok) has no span to name it, so it is named after its own id.
+
+  @unit
+  Scenario: The prompt line never shows a trace id as if the user had typed it
+    Given a logs-only session whose trace is named after its own id
+    When the Terminal tab renders the session
+    Then the bottom bar's prompt line shows the session's first prompt
+
+  # A launcher names the session it runs (langwatch.session.name), often with no
+  # prompt text recorded at all.
+
+  @unit
+  Scenario: The prompt line shows the session's name when the trace has none of its own
+    Given a session whose trace is named after its own root span
+    And the session has a name, on its session row or declared on its resource
+    When the Terminal tab renders the session
+    Then the bottom bar's prompt line shows the session's name
+    And it shows the untitled placeholder only when no name and no prompt text is known
 
   # The system prompt is the context the user pays for on every call - CLAUDE.md,
   # MCP tool definitions, skills. It rides the first request body of the session.
@@ -144,6 +198,12 @@ Feature: Coding agent terminal view
     Given a session long enough to scroll
     When the reader scrolls through the transcript
     Then the bottom bar stays fixed and keeps showing the session name and running stats
+
+  @integration
+  Scenario: The terminal screen stays dark in both colour modes
+    When the Terminal tab renders the session in light mode and in dark mode
+    Then the screen is the same dark terminal in both
+    And its text colours stay readable on that screen
 
   # A coding-agent session is many traces: one per turn. The Terminal tab opens
   # on ONE of them, so the session's earlier turns are simply not on screen, and
@@ -187,6 +247,28 @@ Rule: The terminal reads back the whole session
     Given a turn short enough that the reader is at the bottom of it
     When an earlier turn is prepended above it
     Then the screen stays where the reader left it instead of following the tail
+
+  # The size bands: "growing" from 50K tokens, "large" from 300K, or from 60% of
+  # the model's window when that is wider (a 1M-context model is large at 600K).
+
+  @unit
+  Scenario: A context that a frontier model handles comfortably is not called large
+    Given a model call whose context is 151K tokens
+    When the replay names its context size band
+    Then the band is "growing", not "large"
+
+  @unit
+  Scenario: A context is large from 300K tokens
+    Given a model call whose context is 300K tokens on a standard-window model
+    When the replay names its context size band
+    Then the band is "large"
+
+  @unit
+  Scenario: A model with a wider window is large later
+    Given a model call whose context is 400K tokens on a 1M-context model
+    When the replay names its context size band
+    Then the band is "growing"
+    And at 600K tokens on the same model the band is "large"
 
   # A context note says the context crossed into a bigger size band, which is a
   # comparison against the call BEFORE the crossing. While earlier turns are
@@ -359,3 +441,145 @@ Rule: An injected notification reads as a note, not as the user's words
     When the Terminal view asks for the session's transcript
     Then the log read names its time window with parameters the tenant guard does not mistake for a FROM clause
     And the transcript request answers instead of failing with a tenant-scope refusal
+
+  # In Claude Code's Code Mode the model has two tools: REPL runs a JavaScript
+  # script and Poll waits for a running one. The real tools (Bash, Read, Write)
+  # run inside the script, so they export no span and no result log of their
+  # own: each leaves only an accepted decision whose tool use id starts with
+  # "repl_". The real CLI draws the script as Code(<description>) and each
+  # call inside it as its usual tool row.
+
+Rule: A Code Mode session reads like the real CLI, not like REPL and Poll
+
+  @integration
+  Scenario: A Code Mode script is shown as a Code row with its script collapsed
+    Given a Claude Code session in Code Mode whose REPL call carries its script and description
+    When the Terminal tab renders the session
+    Then the call is one Code row named after the script's description
+    And the row counts the script's lines and keeps the script collapsed until opened
+    And no status summary is shown as the call's output
+
+  @unit
+  Scenario: The calls a Code Mode script made are listed as tool calls
+    Given a Claude Code session in Code Mode whose script ran Bash commands
+    When the transcript is derived from the session's spans and logs
+    Then each call the script made is a tool call marked as running inside the script
+    And it is named after the tool and carries the command it ran
+    And it is ordered by the time it was decided, after the script that made it
+
+  @unit
+  Scenario: A script result Claude Code delivered without a Poll call is listed
+    Given a Claude Code session in Code Mode whose script finished before the model called Poll
+    And Claude Code handed its result to the model as a Poll call of its own in the next request
+    When the transcript is derived from the session's spans and logs
+    Then that result is a Poll tool call carrying the delivered text
+    And it is listed once although later requests repeat it
+    And a request body that does not parse adds nothing
+
+  @integration
+  Scenario: The calls a Code Mode script made are shown under its Code row
+    Given a Claude Code session in Code Mode whose script ran Bash commands
+    When the Terminal tab renders the session
+    Then each call is shown under the Code row as its tool name and the command it ran
+    And no "(no output)" filler is shown for a call whose output was not recorded
+
+  @integration
+  Scenario: A metadata-only Code Mode session still names the script's calls
+    Given a Claude Code session in Code Mode exported without content
+    When the Terminal tab renders the session
+    Then the script is shown as a Code row with no description
+    And the tools the script called are still listed by name
+    And no status summary is shown for the script
+
+  @integration
+  Scenario: Waiting on a running script is one quiet line with its duration
+    Given a Claude Code session in Code Mode where the model polled a running script
+    When the Terminal tab renders the session
+    Then the poll is one faint line saying it waited for the script and for how long
+    And no status summary is shown for the poll
+
+  @integration
+  Scenario: A poll that failed still shows its error
+    Given a Claude Code session in Code Mode where polling a running script failed
+    When the Terminal tab renders the session
+    Then the poll is shown as a failed call with the error it returned
+
+  @integration
+  Scenario: A script with no description falls back to Code
+    Given a REPL call whose input carries a script but no description
+    When the Terminal tab renders the session
+    Then the row reads Code with the script's line count
+
+  # A script often runs shell commands and file reads through the script's own
+  # helpers, not through tools, so the script and what it handed back are the
+  # whole record. The REPL call answers "(dispatched #N)" and a later Poll
+  # carries the settled result as an event element, after a harness preamble.
+
+  @unit
+  Scenario: A poll's result is read from the settled script event
+    Given a Poll output with a harness preamble and a settled script event carrying a result
+    When the poll's result is read
+    Then it is the result text with the script's number, status and duration
+    And the harness preamble is not part of it
+    And an event carrying an error is read as a failed result
+    And an <event> element the script printed itself, without the harness's kind, stays plain text
+
+  @unit
+  Scenario: A status summary or a dispatch receipt is never read as a result
+    Given a Poll or REPL output that is the span's status summary or "(dispatched #3)"
+    When the result is read
+    Then there is no result
+
+  @integration
+  Scenario: A poll shows what the script handed back
+    Given a Claude Code session in Code Mode where a poll returned the script's settled result
+    When the Terminal tab renders the session
+    Then the wait line is followed by the result the script handed back
+    And the harness preamble and the event markup are not shown
+
+  @integration
+  Scenario: A script that failed shows its error under the poll
+    Given a Claude Code session in Code Mode where the settled script event carries an error
+    When the Terminal tab renders the session
+    Then the error is shown under the wait line as a failed result
+
+  @integration
+  Scenario: A dispatched script does not show its receipt as a result
+    Given a REPL call whose output is "(dispatched #3)"
+    When the Terminal tab renders the session
+    Then the Code row shows no "(dispatched #3)" text
+
+  @integration
+  Scenario: A script Claude Code cut short says how long it was
+    Given a REPL call whose script Claude Code's telemetry cut to its first characters
+    When the Terminal tab renders the session and the script is opened
+    Then the script's first characters are shown without the cut marker
+    And a faint note says Claude Code recorded only the start of the script and its full length
+
+  @integration
+  Scenario: A session exported without content says so once
+    Given a Claude Code session in Code Mode exported without content, two scripts and a poll
+    When the Terminal tab renders the session
+    Then one faint line at the top says "This agent sends metadata only, so its prompts, scripts and output are not recorded"
+    And each Code row reads "Code" with no note of its own
+    And the poll is still one wait line with its duration
+
+  @integration
+  Scenario: A Code call with no script recorded says so
+    Given a Claude Code session in Code Mode that recorded its prompt, with one script exported without its source
+    When the Terminal tab renders the session
+    Then that Code row says the script was not recorded
+    And no line says the agent sends metadata only
+
+  @unit
+  Scenario: A model reply that only names its tool calls adds no line of its own
+    Given a Claude Code model call whose answer is a tool call, written as "[tool_use: REPL]" and its input
+    When the transcript is derived from the session's spans and logs
+    Then the call adds no assistant line, since the tool row already shows it
+    And prose written beside the tool call is still shown
+
+  @unit
+  Scenario: Claude Code's own utility calls are not the agent talking
+    Given a Claude Code model call made to generate the session title
+    When the transcript is derived from the session's spans and logs
+    Then its answer is not shown as an assistant line

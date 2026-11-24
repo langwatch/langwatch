@@ -42,3 +42,22 @@ export function runIdForSlot(slotMs: number): string {
     .slice(0, 19)
     .replace(/[-:]/g, "");
 }
+
+/** Traces younger than this at a run's start wait for the next run, so their input has landed. */
+export const TOPIC_CLUSTERING_TRACE_SETTLE_MS = 60 * 60 * 1000;
+
+/** A run reads the traces that occurred after the last finished run and settled before it began. */
+export function runWindowFor({
+  clusteredThroughMs,
+  startedAtMs,
+}: {
+  clusteredThroughMs: number | null;
+  startedAtMs: number;
+}): { sinceMs: number | null; untilMs: number } {
+  return { sinceMs: clusteredThroughMs, untilMs: startedAtMs - TOPIC_CLUSTERING_TRACE_SETTLE_MS };
+}
+
+/** A walk that ended unconfigured or gate-skipped clustered nothing, so its window stays open. */
+export function walkClusteredItsWindow(skippedReason: string | null | undefined): boolean {
+  return skippedReason !== "not_configured" && skippedReason !== "recently_clustered";
+}

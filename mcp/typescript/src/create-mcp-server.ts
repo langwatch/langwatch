@@ -3,8 +3,14 @@ import { z } from "zod";
 
 import packageJson from "../package.json" with { type: "json" };
 import { requireApiKey } from "./config.ts";
-import { fetchDocumentation } from "./documentation-fetch.ts";
+import {
+  DOCS_ENDPOINT_FETCH_LIMITS,
+  type DocumentationKind,
+  fetchDocumentation,
+  SharedDocumentationFetcher,
+} from "./documentation-fetch.ts";
 import { createDatasetSchema, datasetColumnDefinitionSchema } from "./schemas/create-dataset.ts";
+import { runExperimentSchema } from "./schemas/run-experiment.ts";
 import {
   runParametersSchema,
   runPlanScopeSchema,
@@ -40,6 +46,22 @@ import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experim
 import { handleTestAgent } from "./tools/test-agent.ts";
 import { handleUpdateTestSuite } from "./tools/update-test-suite.ts";
 
+const PROMPT_INPUT_TYPES = [
+  "str",
+  "float",
+  "bool",
+  "image",
+  "file",
+  "list",
+  "list[str]",
+  "list[float]",
+  "list[int]",
+  "list[bool]",
+  "dict",
+  "chat_messages",
+] as const;
+const PROMPT_OUTPUT_TYPES = ["str", "float", "bool", "json_schema"] as const;
+
 const modelSchema = z
   .string()
   .describe(
@@ -52,14 +74,46 @@ const modelSchema = z
  * This is used both for stdio mode (single server) and HTTP mode (per-session servers).
  */
 export function createMcpServer(): McpServer {
-  const server = new McpServer({
-    name: "LangWatch",
-    version: packageJson.version,
-  });
+  const server = newLangWatchServer();
 
   registerTools(server);
 
   return server;
+}
+
+let docsEndpointFetcher: SharedDocumentationFetcher | undefined;
+
+/**
+ * A server with only the documentation tools, for callers that present no credential: the
+ * hosted docs endpoint. Nothing it registers reads the config, an API key or a project.
+ */
+export function createDocsMcpServer(): McpServer {
+  const server = newLangWatchServer();
+
+  // One fetcher for every docs server in the process, so its bound and cache hold across callers.
+  const fetcher = (docsEndpointFetcher ??= new SharedDocumentationFetcher({
+    limits: DOCS_ENDPOINT_FETCH_LIMITS,
+  }));
+  registerDocsTools(server, (input) => fetcher.fetch(input));
+
+  return server;
+}
+
+/** Reads one documentation page; `signal` aborts when the client's request goes away. */
+type DocumentationReader = (input: {
+  kind: DocumentationKind;
+  url: string | undefined;
+  signal: AbortSignal;
+}) => Promise<string>;
+
+const fetchDocumentationDirectly: DocumentationReader = ({ kind, url, signal }) =>
+  fetchDocumentation(kind, url, fetch, signal);
+
+function newLangWatchServer(): McpServer {
+  return new McpServer({
+    name: "LangWatch",
+    version: packageJson.version,
+  });
 }
 
 /**
@@ -86,7 +140,8 @@ function withToolLogging<T extends unknown[], R>(
 }
 
 function registerTools(server: McpServer): void {
-  registerDocsTools(server);
+  registerDocsTools(server, fetchDocumentationDirectly);
+  registerReportIssueTool(server);
   registerObservabilityTools(server);
   registerPromptTools(server);
   registerScenarioTools(server);
@@ -109,7 +164,7 @@ function registerTools(server: McpServer): void {
   registerApiKeyTools(server);
 }
 
-function registerDocsTools(server: McpServer): void {
+function registerDocsTools(server: McpServer, readDocumentation: DocumentationReader): void {
   server.tool(
     "fetch_langwatch_docs",
     "Fetches the LangWatch docs for understanding how to implement LangWatch in your codebase. Always use this tool when the user asks for help with LangWatch. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
@@ -121,12 +176,35 @@ function registerDocsTools(server: McpServer): void {
           "The full url of the specific doc page. If not provided, the docs index will be fetched.",
         ),
     },
-    withToolLogging("fetch_langwatch_docs", async ({ url }) => {
-      const text = await fetchDocumentation("langwatch", url);
+    withToolLogging("fetch_langwatch_docs", async ({ url }, extra) => {
+      const text = await readDocumentation({ kind: "langwatch", url, signal: extra.signal });
       return { content: [{ type: "text", text }] };
     }),
   );
 
+  server.tool(
+    "fetch_scenario_docs",
+    "Fetches the Scenario docs for understanding how to implement Scenario agent tests in your codebase. Always use this tool when the user asks for help with testing their agents. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
+    {
+      url: z
+        .string()
+        .optional()
+        .describe(
+          "The full url of the specific doc page. If not provided, the docs index will be fetched.",
+        ),
+    },
+    withToolLogging("fetch_scenario_docs", async ({ url }, extra) => {
+      const text = await readDocumentation({ kind: "scenario", url, signal: extra.signal });
+      return { content: [{ type: "text", text }] };
+    }),
+  );
+}
+
+/**
+ * Works without an API key, but not without the config: the report goes to the configured
+ * endpoint. That is why the docs-only server leaves it out.
+ */
+function registerReportIssueTool(server: McpServer): void {
   server.tool(
     "report_issue",
     "Report an issue to the LangWatch team: anything that did not work, confused you, or took trial and error while using LangWatch (docs, MCP tools, CLI, SDKs, the platform). Use it whenever you struggled, it is how rough edges get fixed for every agent. Ask the user for permission first, then call with user_approved=true. Works without an API key. Put VERBATIM error messages in the summary; optionally attach raw session content. Secrets, API keys, emails and phone numbers are redacted locally before anything is sent.",
@@ -160,23 +238,6 @@ function registerDocsTools(server: McpServer): void {
       return {
         content: [{ type: "text", text: await handleReportIssue(params) }],
       };
-    }),
-  );
-
-  server.tool(
-    "fetch_scenario_docs",
-    "Fetches the Scenario docs for understanding how to implement Scenario agent tests in your codebase. Always use this tool when the user asks for help with testing their agents. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
-    {
-      url: z
-        .string()
-        .optional()
-        .describe(
-          "The full url of the specific doc page. If not provided, the docs index will be fetched.",
-        ),
-    },
-    withToolLogging("fetch_scenario_docs", async ({ url }) => {
-      const text = await fetchDocumentation("scenario", url);
-      return { content: [{ type: "text", text }] };
     }),
   );
 }
@@ -485,7 +546,9 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
 
   server.tool(
     "platform_update_prompt",
-    "Update an existing prompt on the LangWatch platform. Every update creates a new version.",
+    "Update an existing prompt on the LangWatch platform. Every update creates a new version. " +
+      "Only the fields you pass change; everything else (inputs, outputs, parameters, model, " +
+      "temperature, max tokens, messages) is carried over from the current version.",
     {
       idOrHandle: z.string().describe("Prompt ID or handle to update"),
       messages: z
@@ -498,6 +561,38 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         .optional()
         .describe("Updated messages"),
       model: modelSchema.optional(),
+      temperature: z.number().optional().describe("Sampling temperature"),
+      maxTokens: z.number().int().positive().optional().describe("Maximum output tokens"),
+      inputs: z
+        .array(
+          z.object({
+            identifier: z.string().min(1),
+            type: z.enum(PROMPT_INPUT_TYPES),
+          }),
+        )
+        .optional()
+        .describe(
+          "Prompt variables, replacing the current list, e.g. [{ identifier: 'question', type: 'str' }]",
+        ),
+      outputs: z
+        .array(
+          z.object({
+            identifier: z.string().min(1),
+            type: z.enum(PROMPT_OUTPUT_TYPES),
+            json_schema: z
+              .object({ type: z.string().min(1, "Type cannot be empty") })
+              .passthrough()
+              .optional(),
+          }),
+        )
+        .optional()
+        .describe(
+          "Prompt outputs, replacing the current list. Use type 'json_schema' with a json_schema for structured output",
+        ),
+      parameters: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe("Runtime parameters (free-form JSON object), replacing the current ones"),
       commitMessage: z.string().describe("Commit message describing the change"),
       tags: z
         .array(z.string())
@@ -1076,14 +1171,21 @@ function registerSimulationRunTools(server: McpServer): void {
 function registerEvaluatorTools(server: McpServer): void {
   server.tool(
     "platform_create_evaluator",
-    `Create an evaluator on the LangWatch platform. Useful for setting up LLM-as-judge and other evaluators to use in evaluation notebooks. Call discover_schema({ category: 'evaluators' }) first to see available evaluator types and their settings.`,
+    `Create an evaluator on the LangWatch platform: a built-in one (LLM-as-judge and others), a custom Python code evaluator, or one that wraps a workflow. For a built-in one, call discover_schema({ category: 'evaluators' }) first to see available evaluator types and their settings.`,
     {
       name: z.string().describe("Evaluator name"),
+      type: z
+        .enum(["evaluator", "code", "workflow"])
+        .optional()
+        .describe(
+          'The kind of evaluator: "evaluator" (default, a built-in type), "code" (a custom Python evaluator) or "workflow" (wraps workflowId).',
+        ),
       config: z
         .record(z.string(), z.unknown())
         .describe(
-          'Evaluator config object. Must include "evaluatorType" (e.g. "langevals/llm_boolean") and optional "settings" overrides.',
+          'For a built-in evaluator: "evaluatorType" (e.g. "langevals/llm_boolean") and optional "settings" overrides. For type "code": "code" (a Python class Code with __call__) and "inputs" ([{ identifier, type }]). For type "workflow": {}.',
         ),
+      workflowId: z.string().optional().describe('The workflow a "workflow" evaluator wraps.'),
     },
     withToolLogging("platform_create_evaluator", async (params) => {
       requireApiKey();
@@ -2138,19 +2240,8 @@ function registerSecretTools(server: McpServer): void {
 function registerExperimentTools(server: McpServer): void {
   server.tool(
     "platform_run_experiment",
-    "Start an experiment run by slug. Returns a run ID for polling status.",
-    {
-      slug: z.string().describe("The experiment slug to run"),
-      concurrency: z
-        .number()
-        .int()
-        .min(1)
-        .max(24)
-        .optional()
-        .describe(
-          "Cells (one row against one target) to run at once, for this run only (default: the server's setting). Use 1 to run them one at a time, in order.",
-        ),
-    },
+    "Start an experiment run by slug. Returns a run ID for polling status. Models rarely answer the same way twice, so before calling a failing row a real failure, run again with `repeat` (3 or more): every dataset row then runs that many times in one run, and a row that fails only some of its runs is noise, not a regression.",
+    runExperimentSchema.shape,
     withToolLogging("platform_run_experiment", async (params) => {
       requireApiKey();
       return {

@@ -24,25 +24,44 @@ describe("the coding-agent session-stored fact", () => {
   });
 
   describe("when its schema is read", () => {
-    /** @scenario "The session-stored fact carries ids, the agent and the first-session flag only" */
-    it("names exactly the six agreed keys", () => {
+    /** @scenario "The session-stored fact carries ids, the agent, the first-session flag, the terminal type and the repo key only" */
+    it("names exactly the agreed keys", () => {
       expect(Object.keys(codingAgentSessionStoredEventDataSchema.shape).toSorted()).toEqual([
         "agentType",
         "firstForProject",
         "occurredAt",
         "projectId",
+        "repositoryKey",
         "sessionId",
         "tenantId",
+        "terminalType",
       ]);
     });
 
-    it("rejects a key outside the agreed six", () => {
+    it("rejects any other key", () => {
       expect(
         codingAgentSessionStoredEventDataSchema.validate({ ...fact, userEmail: "a@b.c" }),
       ).toBe(false);
     });
 
-    it("accepts the six keys", () => {
+    it("accepts a fact with the terminal type and the repo key", () => {
+      expect(
+        codingAgentSessionStoredEventDataSchema.validate({
+          ...fact,
+          terminalType: "vscode",
+          repositoryKey: "a1b2",
+        }),
+      ).toBe(true);
+    });
+
+    /** @scenario "A client's terminal string reaches peers only as one of a closed set" */
+    it("rejects a terminal type outside the closed set", () => {
+      expect(
+        codingAgentSessionStoredEventDataSchema.validate({ ...fact, terminalType: "my-terminal" }),
+      ).toBe(false);
+    });
+
+    it("accepts a fact recorded before those two existed", () => {
       expect(codingAgentSessionStoredEventDataSchema.validate(fact)).toBe(true);
     });
   });

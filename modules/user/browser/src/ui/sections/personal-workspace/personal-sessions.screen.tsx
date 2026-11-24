@@ -1,12 +1,13 @@
+import { useRecordPageOpened } from "@langwatch/auth-client";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { codingAgentsPath } from "@langwatch/user-contract";
 
 import { CodingAgentSessionsTable } from "../../../behavior/lent-coding-agent-tables.tsx";
 import { usePersonalRouter } from "../../../behavior/personal-workspace-router.ts";
 import { usePersonalContext } from "../../../behavior/use-personal-context.ts";
 import { PERSONAL_WORKSPACE_WAIT_HINT } from "../../../behavior/use-personal-workspace-wait.ts";
-import { useRecordPageOpened } from "../../../behavior/use-record-page-opened.ts";
 import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
 
 /**
@@ -68,7 +69,7 @@ export function PersonalSessionsScreen() {
                 {
                   kind: "setting",
                   label: "Connect your AI tools",
-                  href: "/me/configure",
+                  href: codingAgentsPath({ page: "configure" }),
                   onNavigate: ({ href }) => router.push(href),
                 },
               ]}

@@ -20,6 +20,7 @@ import { SettingsField } from "@langwatch/design-system/settings-field";
 import { TriangleAlert } from "lucide-react";
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
+import { useGrantablePermissions } from "../../behavior/use-grantable-permissions.ts";
 import {
   bindingsToPermissionMode,
   bindingsToScopes,
@@ -27,7 +28,6 @@ import {
   categoryAccessAvailability,
   clampSelectionsToAvailability,
   deriveBindingRole,
-  getUserPermissionsAcrossScopes,
   teamRolePermissions,
   type PermissionMode,
 } from "../../model/api-key-permissions.ts";
@@ -82,6 +82,30 @@ function highestSelections(userPermissions: string[]): Record<string, Permission
 }
 
 const ACCESS_UNREADABLE = "Your access couldn't be read. Close this drawer and try again.";
+const ACCESS_LOADING = "Loading your access…";
+
+function saveBlockedReason({
+  accessUnreadable,
+  accessLoading,
+}: {
+  accessUnreadable: boolean;
+  accessLoading: boolean;
+}): string | undefined {
+  if (accessUnreadable) return ACCESS_UNREADABLE;
+  if (accessLoading) return ACCESS_LOADING;
+  return void 0;
+}
+
+function ceilingScopesFor({
+  selectedScopes,
+  currentProjectId,
+}: {
+  selectedScopes: ScopeTriadEntry[];
+  currentProjectId: string | undefined;
+}): ScopeTriadEntry[] {
+  if (selectedScopes.length > 0) return selectedScopes;
+  return [{ scopeType: "PROJECT", scopeId: currentProjectId ?? "" }];
+}
 
 function storedSelections({
   apiKey,
@@ -161,6 +185,44 @@ function updateKeyInput({
   };
 }
 
+/**
+ * The ceiling the update checks, read off the mint's resolver: every scope, for the owner.
+ * Until it lands every row clamps to none, and a save would send no permissions.
+ */
+function useKeyCeiling({
+  apiKey,
+  selectedScopes,
+  currentProjectId,
+  organizationId,
+  isServiceKey,
+  myBindings,
+}: {
+  apiKey: ApiKeyRow | null;
+  selectedScopes: ScopeTriadEntry[];
+  currentProjectId: string | undefined;
+  organizationId: string;
+  isServiceKey: boolean;
+  myBindings: MyBindings;
+}) {
+  const ceilingScopes = useMemo(
+    () => ceilingScopesFor({ selectedScopes, currentProjectId }),
+    [selectedScopes, currentProjectId],
+  );
+  const grantable = useGrantablePermissions({
+    organizationId,
+    scopes: ceilingScopes,
+    ownerUserId: apiKey?.userId ?? void 0,
+    isServiceKey,
+    enabled: !!apiKey,
+  });
+  return {
+    primaryScope: ceilingScopes[0]!,
+    userPermissions: grantable.permissions,
+    accessUnreadable: myBindings.isError || grantable.isError,
+    accessLoading: myBindings.isLoading || grantable.isLoading,
+  };
+}
+
 export function EditApiKeyDrawer({
   apiKey,
   isUpdating,
@@ -200,32 +262,14 @@ export function EditApiKeyDrawer({
 
   const isServiceKey = apiKey ? !apiKey.userId : false;
 
-  const ceilingScopes = useMemo(
-    () =>
-      selectedScopes.length > 0
-        ? selectedScopes
-        : [
-            {
-              scopeType: "PROJECT" as const,
-              scopeId: currentProjectId ?? "",
-            },
-          ],
-    [selectedScopes, currentProjectId],
-  );
-  const primaryScope = ceilingScopes[0]!;
-
-  // Same ceiling as the create drawer: team-role bags carry no org, gateway,
-  // governance or playground permissions, so reading them directly would
-  // lock rows a service/admin key can grant. Checked across every scope.
-  const userPermissions = useMemo(() => {
-    return getUserPermissionsAcrossScopes({
-      myBindings: myBindings.data,
-      scopes: ceilingScopes,
-      organizationId,
-      orgProjects,
-      isServiceKey,
-    });
-  }, [myBindings.data, ceilingScopes, organizationId, orgProjects, isServiceKey]);
+  const { primaryScope, userPermissions, accessUnreadable, accessLoading } = useKeyCeiling({
+    apiKey,
+    selectedScopes,
+    currentProjectId,
+    organizationId,
+    isServiceKey,
+    myBindings,
+  });
 
   useEffect(() => {
     if (apiKey) {
@@ -300,12 +344,12 @@ export function EditApiKeyDrawer({
           label: "Save",
           onClick: handleSave,
           loading: isUpdating,
-          disabledReason: myBindings.isError ? ACCESS_UNREADABLE : void 0,
+          disabledReason: saveBlockedReason({ accessUnreadable, accessLoading }),
         },
       }}
     >
       <VStack gap={5} align="start">
-        {myBindings.isError && (
+        {accessUnreadable && (
           <StatusCard palette="red" icon={TriangleAlert} title="Couldn't read your access">
             A key can only carry the access you hold, so it can't be saved until it loads. Close
             this drawer and try again.

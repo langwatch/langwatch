@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable model-provider operations shared by process peers after composition.
 
-Peers call these through the token, declared at `../contract/src/model-provider.api.ts:197`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/model-provider.api.ts:204`; nothing else in this package is public.
 
 #### `estimateCost`
 
@@ -64,6 +64,14 @@ findRowServingModel(input: { projectId: string; provider: string; model: string;
 
 ```typescript
 getExecutionProviders(input: ModelProviderListProjectInput): Promise<Record<string, ModelProviderExecution>>;
+```
+
+#### `listForProjectWithServedModels`
+
+`listForProject`, each row carrying the bare ids its provider's own model list answers with (cached per credential), or null when the provider was not asked or did not answer.
+
+```typescript
+listForProjectWithServedModels(input: ModelProviderListProjectInput): Promise<ModelProviderWithServedModels[]>;
 ```
 
 #### `prepareExecution`
@@ -625,11 +633,11 @@ Contract `../contract/src/model-provider.trpc.ts:44`, router `src/transport/mode
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof modelProviderListEntryMapTrpcSchema>; // ../contract/src/model-provider.trpc-schemas.ts:345
+type Output = z.infer<typeof modelProviderListEntryMapTrpcSchema>; // ../contract/src/model-provider.trpc-schemas.ts:347
 
 // modelProvider.getAllForProjectForFrontend
 type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:67
-type Output = z.infer<typeof modelProviderListEntryMapTrpcSchema>; // ../contract/src/model-provider.trpc-schemas.ts:345
+type Output = z.infer<typeof modelProviderListEntryMapTrpcSchema>; // ../contract/src/model-provider.trpc-schemas.ts:347
 
 // modelProvider.listAllForProjectForFrontend
 type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:67
@@ -644,7 +652,7 @@ type Output = {
 }[];
 
 // modelProvider.listDecisionModelsForScopes
-// Input: decisionModelsForScopesTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:322
+// Input: decisionModelsForScopesTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:324
 interface Input {
   projectId: string;
   scopes: {
@@ -667,7 +675,7 @@ interface Input {
 
 // modelProvider.update
 type Input = z.infer<typeof modelProviderUpdateTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:142
-type Output = z.infer<typeof modelProviderListEntrySchema>; // ../contract/src/model-provider-list-entry.ts:51
+type Output = z.infer<typeof modelProviderListEntrySchema>; // ../contract/src/model-provider-list-entry.ts:56
 
 // modelProvider.delete
 // Input: modelProviderDeleteTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:155
@@ -679,12 +687,13 @@ interface Input {
 }
 
 // modelProvider.validateApiKey
-// Input: modelProviderValidateApiKeyTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:172
+// Input: modelProviderValidateApiKeyTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:174
 interface Input {
   projectId?: string;
   organizationId?: string;
   provider: string;
   customKeys: Record<string, string>;
+  model?: string;
   scopes?: {
     scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
     scopeId: string;
@@ -693,7 +702,7 @@ interface Input {
 type Output = z.infer<typeof modelProviderCredentialVerdictSchema>; // ../contract/src/model-provider.ts:328
 
 // modelProvider.testConnection
-// Input: modelProviderTestConnectionTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:185
+// Input: modelProviderTestConnectionTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:187
 interface Input {
   projectId?: string;
   organizationId?: string;
@@ -704,7 +713,7 @@ type Output = z.infer<typeof modelProviderCredentialVerdictSchema>; // ../contra
 
 // modelProvider.codexSignInStart
 type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:67
-// Output: modelProviderCodexSignInStartSchema, ../contract/src/model-provider.trpc-schemas.ts:360
+// Output: modelProviderCodexSignInStartSchema, ../contract/src/model-provider.trpc-schemas.ts:362
 interface Output {
   userCode: string;
   deviceAuthId: string;
@@ -713,7 +722,7 @@ interface Output {
 }
 
 // modelProvider.codexSignInPoll
-// Input: modelProviderCodexSignInPollTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:202
+// Input: modelProviderCodexSignInPollTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:204
 interface Input {
   projectId: string;
   deviceAuthId: string;
@@ -725,7 +734,7 @@ interface Input {
   setAsCodingDefaults?: boolean;
   modelProviderId?: string;
 }
-// Output: modelProviderCodexSignInPollSchema, ../contract/src/model-provider.trpc-schemas.ts:381
+// Output: modelProviderCodexSignInPollSchema, ../contract/src/model-provider.trpc-schemas.ts:383
 type Output =
   | {
       status: "pending";
@@ -738,7 +747,7 @@ type Output =
     };
 
 // modelProvider.codexApplyCodingDefaults
-// Input: modelProviderCodexApplyCodingDefaultsTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:212
+// Input: modelProviderCodexApplyCodingDefaultsTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:214
 interface Input {
   projectId: string;
   scopes: {
@@ -746,7 +755,7 @@ interface Input {
     scopeId: string;
   }[];
 }
-// Output: modelProviderCodexDefaultsAppliedSchema, ../contract/src/model-provider.trpc-schemas.ts:399
+// Output: modelProviderCodexDefaultsAppliedSchema, ../contract/src/model-provider.trpc-schemas.ts:401
 interface Output {
   applied: true;
 }
@@ -765,18 +774,18 @@ type Output =
     };
 
 // modelProvider.isManagedProvider
-// Input: modelProviderIsManagedTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:222
+// Input: modelProviderIsManagedTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:224
 interface Input {
   organizationId: string;
   provider: string;
 }
-// Output: modelProviderIsManagedSchema, ../contract/src/model-provider.trpc-schemas.ts:407
+// Output: modelProviderIsManagedSchema, ../contract/src/model-provider.trpc-schemas.ts:409
 interface Output {
   managed: boolean;
 }
 
 // modelProvider.validateKeyWithCustomUrl
-// Input: modelProviderValidateKeyWithCustomUrlTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:233
+// Input: modelProviderValidateKeyWithCustomUrlTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:235
 interface Input {
   projectId: string;
   provider: string;
@@ -785,7 +794,7 @@ interface Input {
 type Output = z.infer<typeof modelProviderCredentialVerdictSchema>; // ../contract/src/model-provider.ts:328
 
 // modelProvider.getResolvedDefault
-// Input: modelDefaultResolvedTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:258
+// Input: modelDefaultResolvedTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:260
 interface Input {
   projectId: string;
   featureKey: string;
@@ -803,30 +812,30 @@ type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract
 type Output = z.infer<typeof modelDefaultSnapshotSchema>; // ../contract/src/model-provider.ts:523
 
 // modelProvider.setRoleAssignmentForScope
-// Input: modelDefaultRoleAssignmentTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:270
+// Input: modelDefaultRoleAssignmentTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:272
 interface Input {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
-  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS" | "INSTANT_EVALS";
+  role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS" | "INSTANT_EVALS" | "JUDGE";
   model: string | null;
 }
-// Output: modelProviderOkAckSchema, ../contract/src/model-provider.trpc-schemas.ts:389
+// Output: modelProviderOkAckSchema, ../contract/src/model-provider.trpc-schemas.ts:391
 interface Output {
   ok: true;
 }
 
 // modelProvider.setFeatureOverrideForScope
-// Input: modelDefaultFeatureOverrideTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:282
+// Input: modelDefaultFeatureOverrideTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:284
 interface Input {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
   featureKey: string;
   model: string | null;
 }
-type Output = z.infer<typeof modelProviderOkAckSchema>; // ../contract/src/model-provider.trpc-schemas.ts:389
+type Output = z.infer<typeof modelProviderOkAckSchema>; // ../contract/src/model-provider.trpc-schemas.ts:391
 
 // modelProvider.saveDefaultModelsConfig
-// Input: modelDefaultConfigSaveTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:293
+// Input: modelDefaultConfigSaveTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:295
 interface Input {
   id?: string;
   config: Record<string, string>;
@@ -835,20 +844,20 @@ interface Input {
     scopeId: string;
   }[];
 }
-// Output: modelDefaultConfigSavedSchema, ../contract/src/model-provider.trpc-schemas.ts:415
+// Output: modelDefaultConfigSavedSchema, ../contract/src/model-provider.trpc-schemas.ts:417
 interface Output {
   id: string;
 }
 
 // modelProvider.deleteDefaultModelsConfig
-// Input: modelDefaultConfigDeleteTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:300
+// Input: modelDefaultConfigDeleteTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:302
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof modelProviderOkAckSchema>; // ../contract/src/model-provider.trpc-schemas.ts:389
+type Output = z.infer<typeof modelProviderOkAckSchema>; // ../contract/src/model-provider.trpc-schemas.ts:391
 
 // modelProvider.getInheritedValuesForScopes
-// Input: modelDefaultInheritedValuesTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:311
+// Input: modelDefaultInheritedValuesTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:313
 interface Input {
   projectId: string;
   scopes: {
@@ -893,15 +902,15 @@ Run by the tasks process, before serve.
 
 | Task                                   | Class                                  | Declared at                                                 |
 | -------------------------------------- | -------------------------------------- | ----------------------------------------------------------- |
-| `model-registry-sync`                  | `ModelRegistrySyncTask`                | `src/tasks/model-registry-sync.task.ts:493`                 |
+| `model-registry-sync`                  | `ModelRegistrySyncTask`                | `src/tasks/model-registry-sync.task.ts:498`                 |
 | `model-provider-migrate-custom-models` | `ModelProviderCustomModelsMigrateTask` | `src/tasks/model-provider-custom-models-migrate.task.ts:62` |
 
 ## Configuration
 
 | Kind   | Leaf                                         | Environment variable                           | Declared at                                   |
 | ------ | -------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:256`           |
-| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:257`           |
+| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:272`           |
+| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:273`           |
 | config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:31` |
 | config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:32` |
 | config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:33` |

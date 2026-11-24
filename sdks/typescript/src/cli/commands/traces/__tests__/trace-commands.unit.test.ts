@@ -29,6 +29,23 @@ vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal
   };
 });
 
+const recordedCounts = vi.hoisted(() => [] as { count: number; message: string }[]);
+
+vi.mock("../../../telemetry/events", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    createCommandEvents: () => ({
+      started: () => undefined,
+      count: (args: { count: number; message: string }) => recordedCounts.push(args),
+      progress: () => undefined,
+      completed: () => undefined,
+      failed: () => undefined,
+      flush: () => Promise.resolve(),
+    }),
+  };
+});
+
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
     apiKey: "test-key",
@@ -43,6 +60,10 @@ vi.mock("ora", () => ({
     succeed: vi.fn(),
     fail: vi.fn(),
   }),
+}));
+
+vi.mock("../../../utils/searchedProject", () => ({
+  searchedProjectSlug: vi.fn(async ({ project }: { project?: string }) => project ?? "acme-app"),
 }));
 
 vi.mock("@/cli/utils/governance/resolveEndpoint", () => ({
@@ -254,15 +275,182 @@ describe("searchTracesCommand()", () => {
       // A trace search says how many it matched as `totalHits`, and every
       // resource list says it as `total`. Both are printed, so a caller has
       // one name to read on any list.
-      expect(console.log).toHaveBeenCalledWith(
-        JSON.stringify(
-          {
-            traces: [{ traceId: "t1" }],
-            pagination: { totalHits: 1, total: 1 },
-          },
-          null,
-          2,
-        ),
+      const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string) as Record<
+        string,
+        unknown
+      >;
+      expect(printed.traces).toEqual([{ traceId: "t1" }]);
+      expect(printed.pagination).toEqual({ totalHits: 1, total: 1 });
+      expect(printed.window).toMatchObject({ lookback: "7d", widened: false });
+    });
+  });
+
+  describe("when no window is given", () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const sentWindow = (call: number) => {
+      const body = mockSearch.mock.calls[call]?.[0] as { startDate: number; endDate: number };
+      return body.endDate - body.startDate;
+    };
+
+    /** @scenario A trace read with no window reads the last 7 days */
+    it("reads the last 7 days", async () => {
+      mockSearch.mockResolvedValue({ traces: [{ traceId: "t1" }], pagination: { totalHits: 1 } });
+
+      await searchTracesCommand({});
+
+      expect(mockSearch).toHaveBeenCalledOnce();
+      expect(sentWindow(0)).toBe(7 * DAY);
+    });
+
+    /** @scenario An empty default search widens once to 30 days and says so */
+    it("widens once to 30 days when the default week is empty, and says so", async () => {
+      mockSearch
+        .mockResolvedValueOnce({ traces: [], pagination: { totalHits: 0 } })
+        .mockResolvedValueOnce({ traces: [{ traceId: "t1" }], pagination: { totalHits: 1 } });
+
+      await searchTracesCommand({ query: "refund", format: "json" });
+
+      expect(mockSearch).toHaveBeenCalledTimes(2);
+      expect(sentWindow(1)).toBe(30 * DAY);
+      const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string) as {
+        window: Record<string, unknown>;
+      };
+      expect(printed.window).toMatchObject({ lookback: "30d", widened: true });
+    });
+
+    it("says in the table that it widened", async () => {
+      mockSearch
+        .mockResolvedValueOnce({ traces: [], pagination: { totalHits: 0 } })
+        .mockResolvedValueOnce({ traces: [{ traceId: "t1" }], pagination: { totalHits: 1 } });
+
+      await searchTracesCommand({});
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("searched the last 30d");
+    });
+  });
+
+  describe("when the caller names the window", () => {
+    it("accepts --since as a lookback and never widens it", async () => {
+      mockSearch.mockResolvedValue({ traces: [], pagination: { totalHits: 0 } });
+
+      await searchTracesCommand({ since: "2d" });
+
+      expect(mockSearch).toHaveBeenCalledOnce();
+      const body = mockSearch.mock.calls[0]?.[0] as { startDate: number; endDate: number };
+      expect(body.endDate - body.startDate).toBe(2 * 24 * 60 * 60 * 1000);
+    });
+
+    it("refuses --since together with --start-date before searching", async () => {
+      await expect(searchTracesCommand({ since: "2d", startDate: "yesterday" })).rejects.toThrow(
+        ProcessExitError,
+      );
+      expect(mockSearch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the widened search is empty too", () => {
+    beforeEach(() => {
+      mockSearch.mockResolvedValue({ traces: [], pagination: { totalHits: 0 } });
+    });
+
+    /** @scenario An empty search names what was searched and the command to widen it */
+    it("describes what was searched and the command that reads further back, as JSON", async () => {
+      await searchTracesCommand({
+        query: "refund",
+        origin: "application",
+        errorsOnly: true,
+        format: "json",
+      });
+
+      const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string) as Record<
+        string,
+        unknown
+      >;
+      expect(printed.traces).toEqual([]);
+      expect(printed.window).toMatchObject({ widened: true, lookback: "30d" });
+      expect(printed.searched).toMatchObject({
+        project: "acme-app",
+        query: "refund",
+        filter: null,
+        origin: ["application"],
+        errorsOnly: true,
+      });
+      expect(printed.widen).toBe(
+        "langwatch trace search -q refund --origin application --errors-only --since 90d",
+      );
+    });
+
+    describe("when the search had a free-text query", () => {
+      /** @scenario An empty text search says which fields it matched and how to look inside spans */
+      it("names the matched fields and the way into spans, as JSON", async () => {
+        await searchTracesCommand({ query: "54 soldiers", format: "json" });
+
+        const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string) as {
+          searched: { queryFields: string[] };
+          inSpans: string;
+        };
+        expect(printed.searched.queryFields).toEqual(["input", "output", "name", "span names"]);
+        expect(printed.inSpans).toContain("langwatch trace get <traceId>");
+        expect(printed.inSpans).toContain('grep its spans for "54 soldiers"');
+      });
+
+      it("names the matched fields and the way into spans in the table", async () => {
+        await searchTracesCommand({ query: "cease-fire" });
+
+        const printed = vi
+          .mocked(console.log)
+          .mock.calls.map((c) => String(c[0]))
+          .join("\n");
+        expect(printed).toContain(
+          "Query:   cease-fire (matched against input, output, name, span names)",
+        );
+        expect(printed).toContain("not span content");
+        expect(printed).toContain("langwatch trace get <traceId>");
+      });
+    });
+
+    describe("when the query is blank", () => {
+      it("reads as no query, with no span suggestion", async () => {
+        await searchTracesCommand({ query: "", format: "json" });
+
+        const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string) as {
+          searched: { query: unknown; queryFields: unknown };
+          inSpans?: unknown;
+        };
+        expect(printed.searched.query).toBeNull();
+        expect(printed.searched.queryFields).toBeNull();
+        expect(printed.inSpans).toBeUndefined();
+      });
+    });
+
+    describe("when the search had no query", () => {
+      it("carries no span suggestion", async () => {
+        await searchTracesCommand({ errorsOnly: true, format: "json" });
+
+        const printed = JSON.parse(
+          vi.mocked(console.log).mock.calls.at(-1)![0] as string,
+        ) as Record<string, unknown>;
+        expect(printed.inSpans).toBeUndefined();
+        expect((printed.searched as { queryFields: unknown }).queryFields).toBeNull();
+      });
+    });
+
+    it("names the project, window and widen command in the table", async () => {
+      await searchTracesCommand({ query: "late refund", project: "acme-app" });
+
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("Project: acme-app");
+      expect(printed).toMatch(/Window: {2}\d{4}-\d{2}-\d{2}T.* to \d{4}-/);
+      expect(printed).toContain("Query:   late refund");
+      expect(printed).toContain(
+        "langwatch trace search -q 'late refund' --project acme-app --since 90d",
       );
     });
   });
@@ -441,6 +629,41 @@ describe("exportTracesCommand()", () => {
     });
   });
 
+  describe("when the window is given as a lookback", () => {
+    it("sends that many days before now", async () => {
+      await exportTracesCommand({ since: "30d" });
+
+      const body = JSON.parse((fetchMock.mock.calls[0]![1] as { body: string }).body) as {
+        startDate: number;
+        endDate: number;
+      };
+      expect(body.endDate - body.startDate).toBe(30 * 24 * 60 * 60 * 1000);
+    });
+
+    it("refuses a date it cannot read instead of sending NaN", async () => {
+      await expect(exportTracesCommand({ startDate: "last tuesday" })).rejects.toThrow(
+        ProcessExitError,
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when nothing matches", () => {
+    /** @scenario An empty export says what it read on stderr and keeps stdout the file */
+    it("says on stderr what it read and how to export further back, leaving stdout the file", async () => {
+      await exportTracesCommand({ query: "refund", format: "json" });
+
+      const stderr = vi
+        .mocked(console.error)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(stderr).toContain("No traces to export");
+      expect(stderr).toContain("Project: acme-app");
+      expect(stderr).toContain("langwatch trace export -q refund --since 30d");
+      expect(writtenOutput()).toBe("[]");
+    });
+  });
+
   describe("when --origin is not provided", () => {
     it("sends no filters field so the export body stays unchanged", async () => {
       await exportTracesCommand({});
@@ -507,7 +730,7 @@ describe("exportTracesCommand()", () => {
       expect(bodies[0]!.pageSize).toBe(1000);
       expect(bodies[1]!.scrollId).toBe("s1");
       expect(bodies[2]!.scrollId).toBe("s2");
-      expect(bodies[2]!.pageSize).toBe(500);
+      expect(bodies[2]!.pageSize).toBe(1000);
       expect(writtenOutput().trim().split("\n")).toHaveLength(2500);
     });
 
@@ -544,7 +767,7 @@ describe("exportTracesCommand()", () => {
     });
 
     /** @scenario export requests one page when the limit fits in a single page */
-    it("makes exactly one request with pageSize matching the limit", async () => {
+    it("makes exactly one request asking for the limit", async () => {
       fetchMock.mockResolvedValueOnce(
         pageResponse({ count: 50, from: 0, scrollId: "s1", totalHits: 500 }),
       );
@@ -553,18 +776,43 @@ describe("exportTracesCommand()", () => {
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(requestBodies()[0]!.pageSize).toBe(50);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(50);
     });
 
-    /** @scenario export ends the walk on a short page without skipped rows */
-    it("stops on a short page whose shortfall is not accounted for by skipped", async () => {
-      fetchMock.mockResolvedValueOnce(
-        pageResponse({ count: 990, from: 0, scrollId: "s1", totalHits: 5000 }),
-      );
+    /** @scenario export reports the match count once, from the first page */
+    it("reports the match count once when the first page held only skipped rows", async () => {
+      recordedCounts.length = 0;
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({ count: 0, from: 0, scrollId: "s1", totalHits: 5000, skipped: 10 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 1000, from: 0, scrollId: "s2", totalHits: 5000 }),
+        );
+
+      await exportTracesCommand({ limit: "1000" });
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(recordedCounts.map(({ count }) => count)).toEqual([5000]);
+    });
+
+    /** @scenario export keeps paging through a page the server answered short */
+    it("follows the cursor past a short page and stops on an empty one", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({ count: 990, from: 0, scrollId: "s1", totalHits: 5000 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 10, from: 990, scrollId: "s2", totalHits: 5000 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 0, from: 1000, scrollId: "s3", totalHits: 5000 }),
+        );
 
       await exportTracesCommand({ limit: "3000" });
 
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(writtenOutput().trim().split("\n")).toHaveLength(990);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(1000);
     });
 
     /** @scenario export rejects a non-numeric limit */
@@ -602,12 +850,34 @@ describe("exportTracesCommand()", () => {
     });
 
     /** @scenario export with --include-spans requests smaller pages */
-    it("caps each page at 200 so per-trace span joining stays bounded", async () => {
-      fetchMock.mockResolvedValueOnce(pageResponse({ count: 200, from: 0, totalHits: 200 }));
+    it("asks for at most the server's 100-trace cap per page", async () => {
+      fetchMock.mockResolvedValueOnce(pageResponse({ count: 100, from: 0, totalHits: 100 }));
 
       await exportTracesCommand({ includeSpans: true });
 
-      expect(requestBodies()[0]!.pageSize).toBe(200);
+      expect(requestBodies()[0]!.pageSize).toBe(100);
+    });
+
+    /** @scenario export with --include-spans walks past the server's page cap */
+    it("follows the cursor past the server's page cap until the limit is met", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          pageResponse({ count: 100, from: 0, scrollId: "s1", totalHits: 400 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 100, from: 100, scrollId: "s2", totalHits: 400 }),
+        )
+        .mockResolvedValueOnce(
+          pageResponse({ count: 100, from: 200, scrollId: "s3", totalHits: 400 }),
+        );
+
+      await exportTracesCommand({ includeSpans: true, limit: "250" });
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(requestBodies()[2]!.scrollId).toBe("s2");
+      // A limit that is not a multiple of the cap still asks the cap, so the cursor holds.
+      expect(requestBodies().map((body) => body.pageSize)).toEqual([100, 100, 100]);
+      expect(writtenOutput().trim().split("\n")).toHaveLength(250);
     });
 
     /** @scenario export without --include-spans keeps the legacy request shape */
@@ -743,6 +1013,76 @@ describe("getTraceCommand()", () => {
       mockGet.mockRejectedValue(new TracesApiError("Not found", "get trace"));
 
       await expect(getTraceCommand("nonexistent", {})).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when the trace is still arriving", () => {
+    const stillArriving = Object.assign(new Error("Trace not found"), {
+      code: "trace_not_found",
+      retryable: true,
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario The CLI retries a trace that is still arriving */
+    it("retries briefly and prints the trace once it lands", async () => {
+      vi.useFakeTimers();
+      mockGet
+        .mockRejectedValueOnce(stillArriving)
+        .mockRejectedValueOnce(stillArriving)
+        .mockResolvedValue({ trace_id: "trace_abc", spans: [] });
+
+      const run = getTraceCommand("trace_abc", { format: "json" });
+      await vi.advanceTimersByTimeAsync(10_000);
+      await run;
+
+      expect(mockGet).toHaveBeenCalledTimes(3);
+      expect(vi.mocked(console.log).mock.calls.flat().join("\n")).toContain("trace_abc");
+    });
+
+    it("gives up after the last retry and exits with code 1", async () => {
+      vi.useFakeTimers();
+      mockGet.mockRejectedValue(stillArriving);
+
+      const run = getTraceCommand("trace_abc", {}).catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(await run).toBeInstanceOf(ProcessExitError);
+      expect(mockGet).toHaveBeenCalledTimes(4);
+    });
+
+    it("does not retry a failure the platform did not mark retryable", async () => {
+      mockGet.mockRejectedValue(
+        Object.assign(new Error("That is a scenario run id"), {
+          code: "scenario_run_has_many_traces",
+          retryable: false,
+        }),
+      );
+
+      await expect(getTraceCommand("trace_abc", {})).rejects.toThrow(ProcessExitError);
+      expect(mockGet).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when --format json is given", () => {
+    /** @scenario The CLI and the REST route answer the same for one id */
+    it("prints the REST route's document for that id unchanged", async () => {
+      const document = {
+        trace_id: "0123456789abcdef0123456789abcdef",
+        requested_id: "8f1c2d3e4a5b6c7d",
+        resolved_from: "span_id",
+        spans: [],
+        evaluations: [],
+      };
+      mockGet.mockResolvedValue(document);
+
+      await getTraceCommand("8f1c2d3e4a5b6c7d", { format: "json" });
+
+      expect(mockGet).toHaveBeenCalledWith("8f1c2d3e4a5b6c7d", { format: "json" });
+      const printed = JSON.parse(vi.mocked(console.log).mock.calls.at(-1)![0] as string);
+      expect(printed).toEqual(document);
     });
   });
 });

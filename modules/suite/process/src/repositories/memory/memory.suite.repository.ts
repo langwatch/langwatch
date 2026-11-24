@@ -77,6 +77,8 @@ export class MemorySuiteRepository extends SuiteRepository {
       labels: input.labels ?? [],
       simulatorModel: input.simulatorModel ?? null,
       judgeModel: input.judgeModel ?? null,
+      traceQuietPeriodMs: input.traceQuietPeriodMs ?? null,
+      traceWaitTimeoutMs: input.traceWaitTimeoutMs ?? null,
       archivedAt: null,
       createdAt: now,
       updatedAt: now,
@@ -235,6 +237,8 @@ export class MemorySuiteRepository extends SuiteRepository {
       repeatCount: input.config.repeatCount ?? 1,
       simulatorModel: input.config.simulatorModel ?? null,
       judgeModel: input.config.judgeModel ?? null,
+      traceQuietPeriodMs: input.config.traceQuietPeriodMs ?? null,
+      traceWaitTimeoutMs: input.config.traceWaitTimeoutMs ?? null,
     };
     const now = toDate(nowInstant());
 

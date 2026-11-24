@@ -1,17 +1,17 @@
 /**
  * Engine's streaming studio route on project's own Lambda; uses object storage for large payloads.
  */
-import { createLogger } from "@langwatch/observability";
-import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
-import { nowInstant } from "@langwatch/time";
-import { WorkflowExecutionFailedError } from "@langwatch/workflow-contract";
-
 import {
   LWA_DEFAULT_STATUS,
   LWA_PRELUDE_SEPARATOR_LENGTH,
   findLwaPreludeSeparator,
   readLwaPreludeStatus,
-} from "../rules/lambda-web-adapter-stream.rules.ts";
+} from "@langwatch/aws-client";
+import { createLogger } from "@langwatch/observability";
+import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
+import { nowInstant } from "@langwatch/time";
+import { WorkflowExecutionFailedError } from "@langwatch/workflow-contract";
+
 import { STUDIO_STAGING_PREFIX } from "../rules/nlp-lambda-config.rules.ts";
 import { s3CacheKeyHeaders } from "../rules/s3-cache-key.rules.ts";
 import { sealStagedPayload } from "../rules/staged-payload-seal.rules.ts";

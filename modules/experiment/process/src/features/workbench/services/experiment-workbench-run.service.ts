@@ -85,11 +85,17 @@ export class ExperimentWorkbenchRunService {
     // The refusal a process without Redis or a public address owes, as before the pipeline.
     const runs = this.#startable();
     const runId = generateHumanReadableId();
+    const concurrency = await runs.concurrency.resolve({
+      projectId,
+      runId,
+      requested: saved.runInputs.concurrency,
+    });
     const savedRun = (options: { persistResults: boolean; runUrl?: string }): PipelineRunStart => {
       const plan = ExperimentRunPlanService.create().buildPlan({
         request: { state: saved.state, scope: saved.scope },
         data: saved.data,
-        concurrency: saved.runInputs.concurrency ?? runs.concurrency,
+        concurrency,
+        ...(saved.repeat ? { repeat: saved.repeat } : {}),
         origin: "saved",
         actor: workbenchActorFrom({ credential: input.credential }),
         experimentSlug: slug,
@@ -117,18 +123,49 @@ export class ExperimentWorkbenchRunService {
       };
     };
 
+    const built = (options: { persistResults: boolean; runUrl?: string }) =>
+      this.#builtOrReleased({ build: () => savedRun(options), projectId, runId });
+
     // A stream never wrote the board; a polled run of the saved dataset fills the cells it shows.
     if (input.acceptsEvents) {
       return {
         kind: "streaming",
-        events: this.#runsOn().streamRun(savedRun({ persistResults: false })),
+        events: this.#runsOn().streamRun(await built({ persistResults: false })),
       };
     }
     const runUrl = this.#runUrl({ projectSlug: input.projectSlug, slug, runId });
-    const run = savedRun({ persistResults: runsSavedDataset(saved.runInputs), runUrl });
+    const persistResults = !saved.repeat && runsSavedDataset(saved.runInputs);
+    const run = await built({ persistResults, runUrl });
     await this.#runsOn().startRun(run);
 
-    return { kind: "started", runId, status: "running", total: run.start.total, runUrl };
+    return {
+      kind: "started",
+      runId,
+      status: "running",
+      total: run.start.total,
+      ...(run.start.plan ? { concurrency: run.start.plan.concurrency } : {}),
+      runUrl,
+    };
+  }
+
+  /**
+   * A run that cannot even be built gives its claim back; once built, `startRun` and `streamRun`
+   * release it themselves if the start command is never sent.
+   */
+  async #builtOrReleased(input: {
+    build: () => PipelineRunStart;
+    projectId: string;
+    runId: string;
+  }): Promise<PipelineRunStart> {
+    try {
+      return input.build();
+    } catch (error) {
+      await this.#startable().concurrency.release({
+        projectId: input.projectId,
+        runId: input.runId,
+      });
+      throw error;
+    }
   }
 
   /** `POST /execute`: the browser's run, planned here and executed by the worker's run pipeline. */
@@ -160,51 +197,58 @@ export class ExperimentWorkbenchRunService {
     const state = workbenchRunState(input);
 
     const experimentId = input.experimentId ?? "";
-    const plan = ExperimentRunPlanService.create().buildPlan({
-      request: {
-        state,
-        scope: input.scope,
-        ...(input.seedTargetOutputs ? { seedTargetOutputs: input.seedTargetOutputs } : {}),
-      },
-      data: dataResult,
-      concurrency: input.concurrency ?? runs.concurrency,
-      origin: "workbench",
-      // The page saves these cells too; the server writes them so the board outlives the tab.
-      persistResults:
-        experimentId !== "" &&
-        runsSavedDataset({
-          ...(input.data !== undefined ? { data: input.data } : {}),
-          ...(input.dataset_id !== undefined ? { dataset_id: input.dataset_id } : {}),
-          ...(input.parameters !== undefined ? { parameters: input.parameters } : {}),
-        }),
-      actor: { userId: by.id, label: "user" },
-      ...(input.experimentSlug !== undefined ? { experimentSlug: input.experimentSlug } : {}),
-    });
-
-    return {
-      kind: "streaming",
-      events: this.#runsOn().streamRun({
-        start: this.#runsOn().startOf({
-          projectId,
-          runId: generateHumanReadableId(),
-          experimentId,
-          plan,
-          state,
+    const runId = generateHumanReadableId();
+    const { concurrency: requested } = input;
+    const concurrency = await runs.concurrency.resolve({ projectId, runId, requested });
+    const run = await this.#builtOrReleased({
+      projectId,
+      runId,
+      build: () => {
+        const plan = ExperimentRunPlanService.create().buildPlan({
+          request: {
+            state,
+            scope: input.scope,
+            ...(input.seedTargetOutputs ? { seedTargetOutputs: input.seedTargetOutputs } : {}),
+          },
           data: dataResult,
-        }),
-        actor: { id: by.id, label: "user" },
-        data: dataResult,
-        state,
-        carriedOverCells: input.carriedOverCells ?? [],
-        reportContext: { projectId },
-        ran: {
-          userId: by.id,
-          projectId,
-          experimentId: input.experimentId,
-          isFullRun: input.scope.type === "full",
-        },
-      }),
-    };
+          concurrency,
+          origin: "workbench",
+          // The page saves these cells too; the server writes them so the board outlives the tab.
+          persistResults:
+            experimentId !== "" &&
+            runsSavedDataset({
+              ...(input.data !== undefined ? { data: input.data } : {}),
+              ...(input.dataset_id !== undefined ? { dataset_id: input.dataset_id } : {}),
+              ...(input.parameters !== undefined ? { parameters: input.parameters } : {}),
+            }),
+          actor: { userId: by.id, label: "user" },
+          ...(input.experimentSlug !== undefined ? { experimentSlug: input.experimentSlug } : {}),
+        });
+
+        return {
+          start: this.#runsOn().startOf({
+            projectId,
+            runId,
+            experimentId,
+            plan,
+            state,
+            data: dataResult,
+          }),
+          actor: { id: by.id, label: "user" },
+          data: dataResult,
+          state,
+          carriedOverCells: input.carriedOverCells ?? [],
+          reportContext: { projectId },
+          ran: {
+            userId: by.id,
+            projectId,
+            experimentId: input.experimentId,
+            isFullRun: input.scope.type === "full",
+          },
+        };
+      },
+    });
+    return { kind: "streaming", events: this.#runsOn().streamRun(run) };
   }
 
   /** `GET /runs`: one page of an experiment's runs, newest first. */
@@ -260,15 +304,24 @@ export class ExperimentWorkbenchRunService {
     }
 
     // Started, not yet folded by the worker: main's just-registered run (spec section 7).
+    // The concurrency the run's plan fixed; a run started without a plan answers none.
+    const concurrency = run.concurrency !== undefined ? { concurrency: run.concurrency } : {};
     if (!runState) {
-      return { runId, status: "running", progress: 0, total: run.total, startedAt: run.startedAt };
+      return {
+        runId,
+        status: "running",
+        progress: 0,
+        total: run.total,
+        ...concurrency,
+        startedAt: run.startedAt,
+      };
     }
 
     logger.debug({ runId, status: runState.status }, "Run status queried");
 
     const { status, progress, total, startedAt } = runState;
     if (status === "running" || status === "pending") {
-      return { runId: runState.runId, status, progress, total, startedAt };
+      return { runId: runState.runId, status, progress, total, ...concurrency, startedAt };
     }
 
     const { finishedAt } = runState;
@@ -278,6 +331,7 @@ export class ExperimentWorkbenchRunService {
         status,
         progress,
         total,
+        ...concurrency,
         startedAt,
         finishedAt,
         summary: runState.summary,
@@ -290,6 +344,7 @@ export class ExperimentWorkbenchRunService {
         status,
         progress,
         total,
+        ...concurrency,
         startedAt,
         finishedAt,
         // The code, never the thrown message (ADR-045).
@@ -299,7 +354,15 @@ export class ExperimentWorkbenchRunService {
       };
     }
 
-    return { runId: runState.runId, status, progress, total, startedAt, finishedAt };
+    return {
+      runId: runState.runId,
+      status,
+      progress,
+      total,
+      ...concurrency,
+      startedAt,
+      finishedAt,
+    };
   }
 
   /** `GET /runs/:runId/results`: every row of a run, found through the cache or the slug. */

@@ -54,7 +54,7 @@ func classifyNodeFault(ne *NodeError) fault {
 	switch ne.Type {
 	case "invalid_dataset", "invalid_workflow", "unsupported_node_kind",
 		"code_runner_error", "code_block_timeout", "ssrf_blocked",
-		"http_error", "upstream_http_error", "context_canceled":
+		"http_error", "upstream_http_error", "jsonpath_no_match", "context_canceled":
 		return faultCustomer
 	case "llm_error", "evaluator_error", "agent_workflow_error", "custom_workflow_error":
 		// LLM-dependent blocks without a status failed on the way to or at

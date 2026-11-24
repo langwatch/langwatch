@@ -2,7 +2,9 @@ import { createLogger } from "@langwatch/observability";
 
 import { EventNotFoundError } from "../../services/errorHandling.ts";
 import { compareOrdinal } from "../../utils/compareOrdinal.ts";
+import { compareEventLogPagePositions, type EventLogPageCursor } from "../event-log-page-order.ts";
 import type {
+  EventLogProbe,
   EventOccurredAtWindow,
   EventRecord,
   EventRepository,
@@ -173,7 +175,7 @@ export class EventRepositoryMemory implements EventRepository {
     aggregateId: string;
     upToTimestamp: number;
     upToEventId: string;
-    after: { timestamp: number; eventId: string } | undefined;
+    after: EventLogPageCursor | undefined;
     limit: number;
     occurredAtFromMs?: number;
   }): Promise<EventRecord[]> {
@@ -203,27 +205,25 @@ export class EventRepositoryMemory implements EventRepository {
       record.EventTimestamp < upToTimestamp ||
       (record.EventTimestamp === upToTimestamp && record.EventId <= upToEventId);
 
-    // Strict cursor: only records ordered AFTER (after.timestamp, after.eventId).
-    const afterCursor = (record: EventRecord): boolean => {
-      if (!after) return true;
-      if (record.EventTimestamp > after.timestamp) return true;
-      return record.EventTimestamp === after.timestamp && record.EventId > after.eventId;
-    };
+    // Page order, as ClickHouse pages: the stored key, then arrival, then id.
+    const positionOf = (record: EventRecord): EventLogPageCursor => ({
+      idempotencyKey: record.IdempotencyKey,
+      timestamp: record.EventTimestamp,
+      eventId: record.EventId,
+    });
+
+    // Strict cursor: only records ordered AFTER it in page order.
+    const afterCursor = (record: EventRecord): boolean =>
+      !after || compareEventLogPagePositions(positionOf(record), after) > 0;
 
     const filtered = records.filter(
       (record) => withinLowerBound(record) && withinUpperBound(record) && afterCursor(record),
     );
 
-    // Plain relational comparison, not localeCompare: withinUpperBound and
-    // afterCursor above already order EventId with `<=`/`>`, so the sort must
-    // use the same (locale-independent) comparison or the cursor's boundary
-    // can disagree with where a record lands in the sorted page.
-    const sorted = [...filtered].toSorted((a, b) => {
-      if (a.EventTimestamp !== b.EventTimestamp) {
-        return a.EventTimestamp - b.EventTimestamp;
-      }
-      return compareOrdinal(a.EventId, b.EventId);
-    });
+    // The cursor's own comparison, so its boundary and the page's agree.
+    const sorted = [...filtered].toSorted((a, b) =>
+      compareEventLogPagePositions(positionOf(a), positionOf(b)),
+    );
 
     return sorted.slice(0, limit).map((record) => ({ ...record }));
   }
@@ -254,6 +254,42 @@ export class EventRepositoryMemory implements EventRepository {
       }
       return false;
     }).length;
+  }
+
+  async probeEventRecordsBefore({
+    tenantId,
+    aggregateType,
+    aggregateId,
+    eventTimestamp,
+    eventId,
+    occurredAtFromMs,
+    ignoreEventIds = [],
+  }: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    eventTimestamp: number;
+    eventId: string;
+    occurredAtFromMs?: number;
+    ignoreEventIds?: readonly string[];
+  }): Promise<EventLogProbe> {
+    const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
+    const hasLowerBound = typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+    // The same lower bound as the ClickHouse probe; an unknown occurred time stays in.
+    const records = (this.eventsByKey.get(key) ?? []).filter(
+      (record) =>
+        !hasLowerBound || !record.EventOccurredAt || record.EventOccurredAt >= occurredAtFromMs,
+    );
+    return {
+      hasEvent: records.some((record) => record.EventId === eventId),
+      hasEarlierEvents: records.some(
+        (record) =>
+          record.EventId !== eventId &&
+          !ignoreEventIds.includes(record.EventId) &&
+          (record.EventTimestamp < eventTimestamp ||
+            (record.EventTimestamp === eventTimestamp && record.EventId < eventId)),
+      ),
+    };
   }
 
   async insertEventRecords(records: EventRecord[]): Promise<void> {

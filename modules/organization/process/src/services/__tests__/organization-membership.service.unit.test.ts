@@ -18,10 +18,12 @@ import {
 } from "../organization-membership.service.ts";
 import type { OrganizationCreationNotice } from "../organization-provisioning.service.ts";
 import type { OrganizationSeatLicense } from "../organization-seat-license.service.ts";
+import { withSeatHolds } from "./support/seat-holds.ts";
 
 const mockInvalidateOrganization = vi.fn();
 const mockCheckLimit = vi.fn();
 const mockAssertRoleChangeAllowed = vi.fn();
+const mockHoldsFullSeat = vi.fn(async () => true);
 const mockMemberDisabled = vi.fn();
 const mockMemberEnabled = vi.fn();
 const mockCreateAndAssign = vi.fn();
@@ -36,6 +38,7 @@ describe("OrganizationMembershipService", () => {
   const mockRepo: OrganizationMembershipRepository = {
     createMembership: vi.fn(),
     readJoinerSeat: vi.fn(),
+    findMembershipStates: vi.fn(),
     findPersonalTeamsInScopes: vi.fn(),
     findSharedTeamIds: vi.fn(),
     findTeamGrants: vi.fn(),
@@ -75,6 +78,12 @@ describe("OrganizationMembershipService", () => {
     updateMemberRole: vi.fn(),
     updateTeamMemberRole: vi.fn(),
     getAuditLogs: vi.fn(),
+    findSeatStandings: vi.fn().mockResolvedValue([]),
+    findWaitingMembers: vi.fn().mockResolvedValue([]),
+    writeSeatHold: vi.fn(),
+    takeHeldSeat: vi.fn(),
+    admitWaitingMember: vi.fn(),
+    findUnfinishedSeatAdmissions: vi.fn().mockResolvedValue([]),
   };
 
   const mockCreations: OrganizationCreationNotice = {
@@ -84,6 +93,8 @@ describe("OrganizationMembershipService", () => {
   const seats: OrganizationSeatLicense = {
     checkLimit: mockCheckLimit,
     assertRoleChangeAllowed: mockAssertRoleChangeAllowed,
+    holdsFullSeat: mockHoldsFullSeat,
+    withSeat: ({ work }) => work({ assertHeld: async () => {} }),
   };
   const seatNotices: OrganizationSeatRevocationNotice = {
     memberDisabled: mockMemberDisabled,
@@ -122,7 +133,7 @@ describe("OrganizationMembershipService", () => {
     service = OrganizationMembershipService.create({
       workspaceNotices: { personalWorkspaceArchived },
       memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
-      repository: mockRepo,
+      ...withSeatHolds({ repository: mockRepo }),
       creations: mockCreations,
       seats,
       seatNotices,
@@ -165,6 +176,7 @@ describe("OrganizationMembershipService", () => {
       expect(mockCreations.created).toHaveBeenCalledWith({
         organizationId: "org-123",
         organizationName: "Acme",
+        userId: "user-456",
       });
     });
   });
@@ -494,7 +506,7 @@ describe("OrganizationMembershipService", () => {
       OrganizationMembershipService.create({
         workspaceNotices: { personalWorkspaceArchived },
         memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
-        repository: mockRepo,
+        ...withSeatHolds({ repository: mockRepo }),
         creations: mockCreations,
         seats,
         seatNotices,
@@ -651,6 +663,8 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           userId: "user-456",
           actingUserId: "admin-789",
+          // The repository reads no seat standing here, so no seat is held.
+          seatHold: null,
         });
       });
     });
@@ -755,6 +769,8 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           userId: "user-456",
           disabled: true,
+          seat: { kind: "unchanged" },
+          actorUserId: "admin-789",
         });
         expect(mockInvalidateOrganization).toHaveBeenCalledWith({ organizationId: "org-123" });
       });
@@ -779,6 +795,7 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           userId: "user-456",
           disabledByUserId: "admin-789",
+          heldFullSeat: true,
         });
       });
 
@@ -840,7 +857,7 @@ describe("OrganizationMembershipService", () => {
         const unrecorded = OrganizationMembershipService.create({
           workspaceNotices: { personalWorkspaceArchived },
           memberNotices: { memberRemoved: async () => {}, memberDepartmentChanged: async () => {} },
-          repository: mockRepo,
+          ...withSeatHolds({ repository: mockRepo }),
           creations: mockCreations,
           seats,
           seatNotices: {
@@ -946,6 +963,8 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           userId: "user-456",
           disabled: true,
+          seat: { kind: "unchanged" },
+          actorUserId: "admin-789",
         });
         // Disabling frees a seat, so consulting the seat limit here would
         // refuse the very action that makes room. Named, or a regression that
@@ -987,6 +1006,67 @@ describe("OrganizationMembershipService", () => {
       });
     });
 
+    describe("when re-enabling a member who is not on a full seat", () => {
+      const disabledAs = (role: OrganizationUserRole) => {
+        vi.mocked(mockRepo.getMembership).mockResolvedValue({
+          userId: "user-456",
+          organizationId: "org-123",
+          role,
+          disabledAt: nowInstant(),
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
+          user: { id: "user-456", name: null, email: null },
+        });
+        vi.mocked(mockRepo.findSeatStandings).mockResolvedValue([
+          {
+            role,
+            disabledAt: nowInstant(),
+            createdAt: nowInstant(),
+            fullSeatSince: null,
+            seatPendingSince: null,
+            email: null,
+            name: null,
+          },
+        ]);
+        mockCheckLimit.mockResolvedValue({
+          allowed: true,
+          limitType: "membersLite",
+          current: 1,
+          max: 5,
+        });
+      };
+      const enable = () =>
+        service.setMemberDisabled({
+          organizationId: "org-123",
+          userId: "user-456",
+          disabled: false,
+          actingUser: { id: "admin-789" },
+        });
+
+      /** @scenario "Re-enabling a Lite Member asks for a Lite Member seat" */
+      it("checks the Lite Member seats for a Lite Member", async () => {
+        disabledAs(OrganizationUserRole.EXTERNAL);
+
+        await enable();
+
+        expect(mockCheckLimit).toHaveBeenCalledWith(
+          expect.objectContaining({ resource: "membersLite" }),
+        );
+      });
+
+      /** @scenario "Re-enabling a Developer is never refused for seats" */
+      it("checks no capped seat for a Developer", async () => {
+        disabledAs(OrganizationUserRole.DEVELOPER);
+
+        await enable();
+
+        expect(mockCheckLimit).not.toHaveBeenCalled();
+        expect(mockRepo.setMemberDisabled).toHaveBeenCalledWith(
+          expect.objectContaining({ disabled: false, seat: { kind: "unchanged" } }),
+        );
+      });
+    });
+
     describe("when re-enabling a member the plan has a seat for", () => {
       /** @scenario A disabled member can be re-enabled when a seat is free */
       it("delegates to the repository", async () => {
@@ -1017,6 +1097,8 @@ describe("OrganizationMembershipService", () => {
           organizationId: "org-123",
           userId: "user-456",
           disabled: false,
+          seat: { kind: "unchanged" },
+          actorUserId: "admin-789",
         });
       });
     });

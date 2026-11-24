@@ -23,15 +23,16 @@ import {
   mapTraceEvaluationsToLegacyEvaluations,
   type ClickHouseEvaluationRunRow,
 } from "../../../rules/trace-evaluation-mapping.rules.ts";
+import type { ResolvedTraceSpans } from "../../../services/trace-offload-resolution.service.ts";
 import {
   applyEventProtections,
   applyTraceProtections,
   extractRedactionsForObject,
-} from "../../../rules/trace-read-redaction.rules.ts";
-import type { ResolvedTraceSpans } from "../../../services/trace-offload-resolution.service.ts";
+} from "../../read/rules/trace-read-redaction.rules.ts";
 import type {
   ResolveTraceSpansBatchFn,
   ResolveTraceSpansFn,
+  SpanAnalyticsFloorFor,
   TraceLegacyReadRepository,
   TraceLegacyRow,
 } from "../repositories/trace-legacy-read.repository.ts";
@@ -48,6 +49,8 @@ type MappingInputs = {
   resolveTraceSpansBatch?: ResolveTraceSpansBatchFn | undefined;
   /** The tenant's retention policy; absent, the span read floors at the platform default. */
   retentionDays?: RetentionDaysProvider | undefined;
+  /** The floor a span type filter reads by, never throwing; absent, it reads stored_spans. */
+  spanAnalyticsFloor?: SpanAnalyticsFloorFor | undefined;
 };
 
 /** Maps the legacy read's stored rows to legacy traces: canonical IO, offload, protections. */
@@ -57,6 +60,7 @@ export class LegacyTraceMappingService {
   private readonly resolveTraceSpans: ResolveTraceSpansFn | undefined;
   private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
   private readonly retentionDays: RetentionDaysProvider | undefined;
+  private readonly readSpanAnalyticsFloor: SpanAnalyticsFloorFor | undefined;
 
   private constructor(inputs: MappingInputs) {
     this.repository = inputs.repository;
@@ -64,6 +68,7 @@ export class LegacyTraceMappingService {
     this.resolveTraceSpans = inputs.resolveTraceSpans;
     this.resolveTraceSpansBatch = inputs.resolveTraceSpansBatch;
     this.retentionDays = inputs.retentionDays;
+    this.readSpanAnalyticsFloor = inputs.spanAnalyticsFloor;
   }
 
   static create(inputs: MappingInputs): LegacyTraceMappingService {
@@ -100,6 +105,45 @@ export class LegacyTraceMappingService {
       resolveBlobs: opts?.resolveBlobs,
       failure: "Failed to fetch traces with spans",
     });
+  }
+
+  /** One trace built from its stored spans while its summary is not written yet. */
+  async findTraceFromStoredSpans({
+    projectId,
+    authorization,
+    traceId,
+    protections,
+    opts,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    traceId: string;
+    protections: Protections;
+    opts?: { resolveBlobs?: boolean | undefined };
+  }): Promise<Trace[]> {
+    const rows = await this.repository.findTraceFromStoredSpans({
+      authorization,
+      projectId,
+      traceId,
+      retentionDays: this.retentionDays,
+    });
+    return this.resolveAndMerge({
+      projectId,
+      rows,
+      protections,
+      resolveBlobs: opts?.resolveBlobs,
+      failure: "Failed to build a trace from its stored spans",
+    });
+  }
+
+  /** The traces holding a span with this id, since the project's retention floor. */
+  findTraceIdsBySpanId(input: {
+    authorization: Authorization;
+    projectId: string;
+    spanId: string;
+    limit: number;
+  }): Promise<string[]> {
+    return this.repository.resolveTraceIdsBySpanId({ ...input, retentionDays: this.retentionDays });
   }
 
   async findTracesByThreadId({
@@ -175,8 +219,8 @@ export class LegacyTraceMappingService {
         options,
         retentionDays: this.retentionDays,
         ownRead,
+        spanAnalyticsFloor: (await this.readSpanAnalyticsFloor?.(input.filters)) ?? null,
       });
-
     const fetched = summaries.map((summary) =>
       this.mapTrace({ projectId, summary, protections, resolution: unresolved([]) }),
     );
@@ -205,7 +249,6 @@ export class LegacyTraceMappingService {
         trace.projectedAnnotations = annotations.get(trace.trace_id) ?? [];
       }
     }
-
     return { groups, totalHits, traceChecks, scrollId, ...rest };
   }
 

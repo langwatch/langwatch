@@ -449,7 +449,9 @@
                 "test-suite update",
                 "test-suite rename",
                 "test-suite archive",
-                "test-suite run"
+                "test-suite run",
+                "test-suite templates",
+                "test-suite apply-template"
               ],
               "hints": {
                 "test-suite list": "langwatch test-suite list -o json",
@@ -458,7 +460,9 @@
                 "test-suite update": "langwatch test-suite update <id-or-name> --field golden_sql:text --evaluator sql-query-equivalence --evaluator answer-quality-judge --not-required",
                 "test-suite rename": "langwatch test-suite rename <id-or-name> \"Refunds and credits\"",
                 "test-suite archive": "langwatch test-suite archive <id-or-name>",
-                "test-suite run": "langwatch test-suite run <id-or-name> --target http:agent_abc123 --note \"nightly regression\" --wait"
+                "test-suite run": "langwatch test-suite run <id-or-name> --target http:agent_abc123 --note \"nightly regression\" --wait",
+                "test-suite templates": "langwatch test-suite templates -f json",
+                "test-suite apply-template": "langwatch test-suite apply-template prompt-injection --agent-name \"Support bot\" --tool lookup_order --tool issue_refund"
               },
               "skill": null,
               "docs": null

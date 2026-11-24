@@ -8,6 +8,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 // Routing keys are cross-process contract; test builds definition through the module.
 import { describe, expect, it } from "vitest";
 
+import { memoryAuthzChannels } from "../../app/__tests__/authz-channels.fixture.ts";
 import { AuthzModule, type AuthzSetup } from "../../app/authz.app.ts";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
 import { MemoryAuthzRepositories } from "../../repositories/memory/memory.authz.repositories.ts";
@@ -112,6 +113,7 @@ function buildAuthz() {
     },
     resources: { own: () => void 0, ownService: () => void 0 },
     secrets: createApiFixture<AuthzSetup["secrets"]>(),
+    channels: memoryAuthzChannels(),
     repositories: MemoryAuthzRepositories.create(),
   });
   return { pipeline: app.eventingPipeline() };

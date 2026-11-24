@@ -18,6 +18,11 @@ const mockListAllForProjectForFrontend = vi.fn();
 const mockSave = vi.fn();
 const mockInvalidate = vi.fn();
 
+// The drawer asks the judge router flag; off unless a case turns it on.
+vi.mock("@langwatch/feature-flag-client", () => ({
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
+
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({
     closeDrawer: mockCloseDrawer,
@@ -43,6 +48,8 @@ vi.mock("@langwatch/design-system/scope-chip-picker", async () => {
 
 vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
+    // Not answered yet: Evals Preview stays offered, as before the read lands.
+    instantEval: { access: { useQuery: () => ({ data: undefined, isLoading: true }) } },
     useUtils: () => ({ modelProvider: { invalidate: mockInvalidate } }),
     modelProvider: {
       getDefaultModelsForProject: {
