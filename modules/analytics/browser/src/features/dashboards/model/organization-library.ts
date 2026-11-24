@@ -10,7 +10,7 @@ import {
   type DashboardScope,
 } from "@langwatch/dashboard-contract";
 
-import { MY_DASHBOARD_NAME, organizationBoardPath } from "./boards.ts";
+import { MY_DASHBOARD_NAME, organizationBoardPath, untitledBoardName } from "./boards.ts";
 
 /** What the library's header says it is. */
 export const LIBRARY_HEADER = {
@@ -235,12 +235,7 @@ export function boardMenuActions({
   };
 }
 
-/** The first "Untitled dashboard N" no board in the project has taken. */
+/** The first "Untitled dashboard N" no board in `taken` has, as a new draft is named. */
 export function firstUntitledName(taken: readonly string[]): string {
-  const names = new Set(taken);
-  const candidates = Array.from(
-    { length: names.size + 1 },
-    (_, index) => `Untitled dashboard ${index + 1}`,
-  );
-  return candidates.find((name) => !names.has(name)) ?? `Untitled dashboard ${names.size + 1}`;
+  return untitledBoardName({ takenNames: taken });
 }

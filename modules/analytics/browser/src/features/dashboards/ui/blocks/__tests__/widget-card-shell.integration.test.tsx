@@ -85,3 +85,20 @@ describe("given a widget card with no description", () => {
     });
   });
 });
+
+describe("given a card narrower than its title", () => {
+  /** @scenario "AC242c Widget cards: a narrow card wraps its title to a second line" */
+  it("wraps the title to at most two lines instead of cutting it to one", async () => {
+    renderWithAnalyticsHost(
+      <WidgetCardShell name="What is my agent not sending yet?">
+        <div>chart</div>
+      </WidgetCardShell>,
+    );
+
+    const title = await screen.findByTestId("widget-card-title");
+    const style = getComputedStyle(title);
+    expect(title).toHaveTextContent("What is my agent not sending yet?");
+    expect(style.whiteSpace).not.toBe("nowrap");
+    expect(style.getPropertyValue("-webkit-line-clamp")).toBe("2");
+  });
+});

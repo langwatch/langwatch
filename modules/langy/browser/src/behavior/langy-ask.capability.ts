@@ -2,6 +2,7 @@ import type { LangyAsk } from "@langwatch/langy-client";
 import type { LangyAskRequest, LangyDraftAbout } from "@langwatch/langy-contract";
 
 import { followScreen, isOnScreen, maySeed, type SeededDraft } from "../model/langy-draft-scope.ts";
+import { useLangyPageContextStore } from "./langy-page-context.store.ts";
 import { useLangyStore } from "./langy.store.ts";
 
 type Seed = Pick<LangyAskRequest, "draft" | "about" | "context">;
@@ -22,6 +23,22 @@ function seedDraft({
   if (!about) return null;
   const contextIds = context.map(({ ref }) => ref);
   return { text: draft, about, contextIds, shown: isOnScreen({ about, onScreen: screen }) };
+}
+
+/**
+ * Attaches one piece of an ask's context. One the page already offers as a chip, the same kind
+ * and ref, is that chip chosen, so the composer lists it once under the page's own label.
+ */
+function attachAskContext(item: NonNullable<LangyAskRequest["context"]>[number]): void {
+  const langy = useLangyStore.getState();
+  const onPage = useLangyPageContextStore
+    .getState()
+    .pageContext.find((chip) => chip.kind === item.kind && chip.ref === item.ref);
+  if (onPage) {
+    langy.chooseChip(onPage.id);
+    return;
+  }
+  langy.attachContext({ type: item.kind, id: item.ref, label: item.label });
 }
 
 /**
@@ -48,11 +65,7 @@ export function createLangyAsk(): LangyAsk {
 
       // After the ask: `askLangy` resets conversation-scoped state, so the
       // attachment belongs to the conversation being started, not the last one.
-      for (const item of request.context ?? []) {
-        useLangyStore
-          .getState()
-          .attachContext({ type: item.kind, id: item.ref, label: item.label });
-      }
+      for (const item of request.context ?? []) attachAskContext(item);
     },
     onScreen: (about) => {
       screen = about;

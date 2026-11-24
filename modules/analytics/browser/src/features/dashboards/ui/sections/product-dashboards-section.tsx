@@ -14,7 +14,7 @@ import { type ReactNode, useState } from "react";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardReader } from "../../behavior/use-board-access.ts";
 import { useBoardMenuActions } from "../../behavior/use-board-menu-actions.ts";
-import { useDraftBoard } from "../../behavior/use-draft-board.ts";
+import { useDraftBoard, useStartDraft } from "../../behavior/use-draft-board.ts";
 import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
 import { useLibraryCreate, useLibraryDuplicate } from "../../behavior/use-library-writes.ts";
 import { useProductDashboards } from "../../behavior/use-product-dashboards.ts";
@@ -205,7 +205,7 @@ function BoardRow({
 /** The new board in view, listed while nothing is stored; its own row takes over once it is. */
 function DraftRow({ projectSlug }: { projectSlug: string }) {
   const saved = useSavedDashboards();
-  const draft = useDraftBoard({ existingCount: saved.boards.length });
+  const draft = useDraftBoard({ takenNames: saved.boards.map(({ name }) => name) });
   if (draft.savedId !== void 0) return null;
   return (
     <SidebarLinkRow
@@ -246,7 +246,10 @@ function RowList({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** The "+" opens the library's create dialog with the product fixed; made, the board opens. */
+/**
+ * The "+" opens the library's create dialog with the product fixed; made, the board opens
+ * unsaved. In LLM Ops inside the store project it opens in that project, so this sidebar lists it.
+ */
 function ProductNewDashboard({
   product,
   allBoards,
@@ -258,9 +261,20 @@ function ProductNewDashboard({
   store: StoreProject;
   onClose: () => void;
 }) {
+  const host = useAnalyticsHost();
   const creating = useLibraryCreate();
+  const startDraft = useStartDraft();
   const { organizationName } = useBoardReader();
   if (!store.storeProject) return null;
+  const inView = host.project();
+  const projectDraft =
+    product === "llm-ops" && inView?.id === store.storeProject.id ? inView : void 0;
+  const create: typeof creating.createBoard = projectDraft
+    ? (choices) => {
+        startDraft({ projectId: projectDraft.id, projectSlug: projectDraft.slug, ...choices });
+        return Promise.resolve(true);
+      }
+    : creating.createBoard;
   return (
     <NewDashboardDialog
       product={product}
@@ -269,7 +283,7 @@ function ProductNewDashboard({
       organizationName={organizationName}
       mayShare={store.mayShare}
       isCreating={creating.isCreating}
-      onCreate={creating.createBoard}
+      onCreate={create}
       onClose={onClose}
     />
   );

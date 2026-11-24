@@ -129,9 +129,17 @@ export function dashboardsPlace(openPath: string): DashboardsPlace {
   return { kind: "board", dashboardId: first };
 }
 
-/** The name a board gets when created blank, before the member renames it. */
-export function untitledBoardName({ existingCount }: { existingCount: number }): string {
-  return `Untitled dashboard ${existingCount + 1}`;
+/**
+ * The name a board gets when created blank, before the member renames it: the first
+ * "Untitled dashboard N" none of `takenNames` has, the same rule in every place a board is made.
+ */
+export function untitledBoardName({ takenNames }: { takenNames: readonly string[] }): string {
+  const names = new Set(takenNames);
+  const candidates = Array.from(
+    { length: names.size + 1 },
+    (_, index) => `Untitled dashboard ${index + 1}`,
+  );
+  return candidates.find((name) => !names.has(name)) ?? `Untitled dashboard ${names.size + 1}`;
 }
 
 /** The name a duplicate is offered before numbering: the board's, marked as a copy. */

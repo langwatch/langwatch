@@ -5,6 +5,7 @@ import { createLangyAsk, langyAsk } from "../langy-ask.capability.ts";
  * The ask capability: what another module's question becomes on the panel,
  * proven against the store it writes.
  */
+import { useLangyPageContextStore } from "../langy-page-context.store.ts";
 import { useLangyStore } from "../langy.store.ts";
 
 const view = {
@@ -20,7 +21,10 @@ beforeEach(() => {
     pendingPrompt: null,
     attachedContext: [],
     composerFocusRequested: false,
+    chosenChipIds: new Set(),
+    dismissedChipIds: new Set(),
   });
+  useLangyPageContextStore.setState({ pageContext: [] });
 });
 
 describe("given another module asking Langy a question", () => {
@@ -121,5 +125,34 @@ describe("given a dashboard draft about one board", () => {
 
       expect(useLangyStore.getState().draft).toBe("Explain this widget");
     });
+  });
+});
+
+describe("given the page offers the board an ask is about", () => {
+  const boardRef = 'dashboard "My dashboard" (id board-1); widgets: none yet; period: last 30 days';
+  const chip = {
+    id: "dashboard:board-1",
+    kind: "dashboard" as const,
+    label: "dashboard: My dashboard · 30d · 1d",
+    ref: boardRef,
+  };
+
+  /** @scenario "AC126b Langy context: the open board is listed once, and a widget says what Langy reads" */
+  it("chooses the page's chip for it instead of attaching the board a second time", () => {
+    useLangyPageContextStore.setState({ pageContext: [chip] });
+
+    langyAsk.ask({
+      draft: "What stands out?",
+      context: [
+        { kind: "dashboard", ref: boardRef, label: "My dashboard" },
+        { kind: "dashboard", ref: 'widget "Traffic"', label: "widget: Traffic" },
+      ],
+    });
+
+    const state = useLangyStore.getState();
+    expect(state.chosenChipIds.has(chip.id)).toBe(true);
+    expect(state.attachedContext).toEqual([
+      { type: "dashboard", id: 'widget "Traffic"', label: "widget: Traffic" },
+    ]);
   });
 });

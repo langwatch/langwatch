@@ -211,9 +211,9 @@ describe("the Dashboards sidebar", () => {
         "My dashboard",
         "Costs",
         "Weekly review",
-        "Untitled dashboard 5",
+        "Untitled dashboard 1",
       ]);
-      const row = screen.getByRole("link", { name: "Untitled dashboard 5" });
+      const row = screen.getByRole("link", { name: "Untitled dashboard 1" });
       expect(row).toHaveAttribute("aria-current", "page");
       expect(row).toHaveAttribute("href", "/test-project/dashboards/new");
     });
@@ -222,7 +222,7 @@ describe("the Dashboards sidebar", () => {
     it("drops the row once the member is elsewhere, having stored nothing", async () => {
       const { calls } = renderSection({ openPath: "board-1" });
 
-      expect(await namesIn("Your dashboards")).not.toContain("Untitled dashboard 5");
+      expect(await namesIn("Your dashboards")).not.toContain("Untitled dashboard 1");
       expect(inputsTo(calls, "boards.create")).toEqual([]);
     });
 
@@ -231,7 +231,7 @@ describe("the Dashboards sidebar", () => {
       const { user, calls } = renderSection({ openPath: "new" });
       await listNamed("Your dashboards");
 
-      await user.click(screen.getByRole("button", { name: "Actions for Untitled dashboard 5" }));
+      await user.click(screen.getByRole("button", { name: "Actions for Untitled dashboard 1" }));
       await user.click(await screen.findByRole("menuitem", { name: /Rename/ }));
       const field = screen.getByRole("textbox", { name: "Dashboard name" });
       await user.clear(field);
@@ -248,7 +248,7 @@ describe("the Dashboards sidebar", () => {
     /** @scenario "AC162d Renaming, describing or pinning a new board stores it with that edit" */
     it("stores and pins the board when its pin is pressed", async () => {
       const { user, calls } = renderSection({ openPath: "new" });
-      const draftLink = await screen.findByRole("link", { name: "Untitled dashboard 5" });
+      const draftLink = await screen.findByRole("link", { name: "Untitled dashboard 1" });
 
       await user.click(within(draftLink).getByRole("button", { name: "Pin dashboard" }));
 

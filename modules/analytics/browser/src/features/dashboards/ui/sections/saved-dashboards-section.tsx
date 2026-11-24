@@ -171,7 +171,7 @@ function DraftRow({
 }) {
   const host = useAnalyticsHost();
   const saved = useSavedDashboards();
-  const draft = useDraftBoard({ existingCount: saved.boards.length });
+  const draft = useDraftBoard({ takenNames: saved.boards.map(({ name }) => name) });
   const { projectId } = useBoardReader();
   useEffect(() => restartStoredDraft(projectId), [projectId]);
   // Stored and about to move to its own address, where its own row takes over.

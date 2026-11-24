@@ -1372,7 +1372,7 @@ describe("a member's board", () => {
       openBoard({ server, dashboardId: "new" });
 
       expect(
-        await screen.findByRole("heading", { name: "Untitled dashboard 3" }),
+        await screen.findByRole("heading", { name: "Untitled dashboard 1" }),
       ).toBeInTheDocument();
       expect(await screen.findByText("Or start from a template")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
@@ -1394,7 +1394,7 @@ describe("a member's board", () => {
       await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(1));
       expect(callsTo(server, "boards.create")[0]?.input).toEqual({
         projectId: "proj-1",
-        name: "Untitled dashboard 3",
+        name: "Untitled dashboard 1",
         homeProduct: "llm-ops",
       });
     });
@@ -1421,7 +1421,7 @@ describe("a member's board", () => {
 
       await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1));
       expect(callsTo(server, "boards.create").map(({ input }) => input)).toEqual([
-        { projectId: "proj-1", name: "Untitled dashboard 3", homeProduct: "llm-ops" },
+        { projectId: "proj-1", name: "Untitled dashboard 1", homeProduct: "llm-ops" },
       ]);
       expect(server.state.widgets.map(({ dashboardId }) => dashboardId)).toEqual(["board-new-3"]);
       expect(host.replacements).toEqual(["/test-project/dashboards/board-new-3?addBlock=open"]);
@@ -1458,7 +1458,7 @@ describe("a member's board", () => {
       await waitFor(() => expect(host.failures).toHaveLength(1));
       expect(callsTo(server, "dashboardWidgets.create")).toEqual([]);
       expect(host.replacements).toEqual([]);
-      expect(screen.getByRole("heading", { name: "Untitled dashboard 3" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Untitled dashboard 1" })).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Add a description" }));
       await user.type(
@@ -1485,7 +1485,7 @@ describe("a member's board", () => {
 
       openBoard({ server, dashboardId: "new", query: { addBlock: "open" } });
       expect(
-        await screen.findByRole("heading", { name: "Untitled dashboard 4" }),
+        await screen.findByRole("heading", { name: "Untitled dashboard 2" }),
       ).toBeInTheDocument();
       await pickTraffic(user);
 

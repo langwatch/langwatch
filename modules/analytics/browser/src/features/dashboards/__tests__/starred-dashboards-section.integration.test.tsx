@@ -135,7 +135,7 @@ const draft: { edit: (edit?: DraftEdit) => Promise<string> } = {
 };
 
 function DraftEdits() {
-  const { materialise } = useDraftBoard({ existingCount: 0 });
+  const { materialise } = useDraftBoard({ takenNames: [] });
   draft.edit = materialise;
   return null;
 }

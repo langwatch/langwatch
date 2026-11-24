@@ -5,7 +5,7 @@
  */
 
 import type { ChartAskSubject } from "@langwatch/analytics-contract/chart-frame-protocol";
-import type { LangyContextChip } from "@langwatch/langy-contract";
+import { type LangyContextChip, LANGY_WIDGET_CHIP_LABEL_PREFIX } from "@langwatch/langy-contract";
 import { Temporal } from "@langwatch/time";
 
 import type {
@@ -258,7 +258,10 @@ export function widgetContext({
     ].join("; ");
   const sqls = queries.map(({ sql }) => sql.replace(/\s+/g, " ").trim());
   const room = MAX_REF_LENGTH - ref(queries.map(() => "")).length;
-  return context({ ref: ref(fittedSql({ sqls, room })), label: `widget: ${widget.name}` });
+  return context({
+    ref: ref(fittedSql({ sqls, room })),
+    label: `${LANGY_WIDGET_CHIP_LABEL_PREFIX}${widget.name}`,
+  });
 }
 
 /** What every widget draft fills in: the card's title and the board's period in words. */

@@ -128,7 +128,7 @@ afterEach(cleanup);
 describe("given a member making and deleting boards", () => {
   /** @scenario "Telemetry: making a board sends dashboards.created.dashboard with where it came from" */
   it("sends a new board's creation once its first edit stored it, and none before", async () => {
-    const { latest, host } = mount(() => useDraftBoard({ existingCount: 0 }), {
+    const { latest, host } = mount(() => useDraftBoard({ takenNames: [] }), {
       route: { params: { dashboardId: "new" }, query: {} },
     });
     expect(tracked.events).toEqual([]);

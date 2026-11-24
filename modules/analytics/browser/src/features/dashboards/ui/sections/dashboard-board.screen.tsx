@@ -381,7 +381,7 @@ export function Board() {
   const projectId = host.project()?.id ?? "";
   const dashboardId = host.route().params.dashboardId;
   const { boards, organizationBoards, isLoading, isRefreshing, loadError } = useSavedDashboards();
-  const draft = useDraftBoard({ existingCount: boards.length });
+  const draft = useDraftBoard({ takenNames: boards.map(({ name }) => name) });
   const isDraft = dashboardId === DRAFT_SEGMENT;
   useEffect(() => {
     if (isDraft) restartStoredDraft(projectId);

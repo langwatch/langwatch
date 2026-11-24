@@ -79,7 +79,10 @@ export function useDraftFrame(): Pick<DraftState, "project" | "savedId"> {
   return { project, savedId };
 }
 
-/** "+": opens a new, unsaved board; `pin` pins it once stored, `addWidget` opens the picker. */
+/**
+ * "+": opens a new, unsaved board in the project; `pin` pins it once stored, `addWidget` opens
+ * the picker. A product sidebar's dialog passes the `name`, `scope` and `homeProduct` it picked.
+ */
 export function useStartDraft() {
   const host = useAnalyticsHost();
   return ({
@@ -87,11 +90,17 @@ export function useStartDraft() {
     projectSlug,
     pin = false,
     addWidget = false,
+    name,
+    scope = PROJECT_FRAME.scope,
+    homeProduct = PROJECT_FRAME.homeProduct,
   }: {
     projectId: string;
     projectSlug: string;
     pin?: boolean;
     addWidget?: boolean;
+    name?: string;
+    scope?: DashboardScope;
+    homeProduct?: DashboardHomeProduct;
   }) => {
     useDraftStore.setState(({ generation }) => ({
       generation: generation + 1,
@@ -99,6 +108,9 @@ export function useStartDraft() {
       ...PROJECT_FRAME,
       ...FRESH,
       pin,
+      name,
+      scope,
+      homeProduct,
     }));
     const path = draftBoardPath({ projectSlug });
     host.navigate(addWidget ? withBlockPickerOpen(path) : path);
@@ -162,7 +174,8 @@ function currentDraft(projectId: string): DraftState {
 type DraftWriter = {
   projectId: string;
   projectSlug: string;
-  existingCount: number;
+  /** The names of the boards beside it, so an unnamed draft is numbered past them. */
+  takenNames: readonly string[];
   host: AnalyticsHostApi;
   analytics: UiAnalytics;
   utils: ReturnType<typeof analyticsApi.useUtils>;
@@ -226,8 +239,8 @@ async function storeDraft({
   edit: DraftEdit;
   at: DraftState;
 }): Promise<string> {
-  const { utils, projectId, host, analytics, existingCount } = writer;
-  const name = edit.name ?? at.name ?? untitledBoardName({ existingCount });
+  const { utils, projectId, host, analytics, takenNames } = writer;
+  const name = edit.name ?? at.name ?? untitledBoardName({ takenNames });
   const made = { projectId, name, homeProduct: at.homeProduct };
   // Another scope also asks analytics:update, so a seat refused it is refused before a write.
   const created =
@@ -278,7 +291,7 @@ function materialiseDraft({ writer, edit }: { writer: DraftWriter; edit: DraftEd
   return saving;
 }
 
-export function useDraftBoard({ existingCount }: { existingCount: number }) {
+export function useDraftBoard({ takenNames }: { takenNames: readonly string[] }) {
   const host = useAnalyticsHost();
   const analytics = useUiAnalytics();
   const utils = analyticsApi.useUtils();
@@ -287,7 +300,7 @@ export function useDraftBoard({ existingCount }: { existingCount: number }) {
   const writer: DraftWriter = {
     projectId,
     projectSlug: project?.slug ?? "",
-    existingCount,
+    takenNames,
     host,
     analytics,
     utils,
@@ -298,7 +311,7 @@ export function useDraftBoard({ existingCount }: { existingCount: number }) {
   const board: SavedBoard = {
     id: DRAFT_SEGMENT,
     projectId,
-    name: held.name ?? untitledBoardName({ existingCount }),
+    name: held.name ?? untitledBoardName({ takenNames }),
     description: held.description,
     createdById: host.userId() ?? null,
     scope: held.scope,

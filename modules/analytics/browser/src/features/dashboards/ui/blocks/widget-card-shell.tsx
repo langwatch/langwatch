@@ -17,7 +17,7 @@ import { boardCardHeightPx } from "../../model/board-grid.ts";
 import { WIDGET_ACTION_ROW_HEIGHT_PX } from "./widget-action-row.tsx";
 import { WidgetInfoTip } from "./widget-info-tip.tsx";
 
-/** The title row's height: its top padding and one 24px row of controls. */
+/** The title row's least height: its top padding and one 24px row of controls. */
 const HEADER_HEIGHT_PX = 34;
 /** The footer line's height: one caption line and its bottom padding. */
 const FOOTER_HEIGHT_PX = 22;
@@ -73,14 +73,24 @@ export function WidgetCardShell({
       background="bg.panel"
       boxShadow="xs"
     >
+      {/* A narrow card wraps its title to a second line, which the body gives up room for. */}
       <HStack
-        height={`${HEADER_HEIGHT_PX}px`}
+        minHeight={`${HEADER_HEIGHT_PX}px`}
+        flexShrink={0}
+        alignItems="flex-start"
         paddingTop="10px"
         paddingLeft={4}
         paddingRight={2}
         gap={1}
       >
-        <Text minWidth={0} truncate textStyle="label" title={name}>
+        <Text
+          minWidth={0}
+          lineClamp={2}
+          wordBreak="break-word"
+          textStyle="label"
+          title={name}
+          data-testid="widget-card-title"
+        >
           {name}
         </Text>
         {(description || hasNotes) && (
