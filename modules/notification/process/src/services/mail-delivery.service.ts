@@ -91,6 +91,9 @@ export class MailDeliveryService {
     for (const request of rest) {
       await settleOne(request, await outcomeOf(() => customerIo.send(request)));
     }
+    for (const failure of failures) {
+      logger.error({ errorName: errorNameOf(failure) }, "The own mailer failed to send an email");
+    }
     if (failures.length > 0) throw failures[0];
   }
 
@@ -222,16 +225,25 @@ type CustomerIoAnswer =
 
 /**
  * Nurturing answers a refusal rather than throwing one; anything that still throws is a refusal
- * too, so the recipient gets the own mailer. The error is not logged: it may hold the address.
+ * too, so the recipient gets the own mailer. Only the error class is logged: the message may hold
+ * the address.
  */
 async function outcomeOf(
   send: () => Promise<TransactionalEmailOutcome>,
 ): Promise<CustomerIoAnswer> {
   try {
     return await send();
-  } catch {
+  } catch (error) {
+    logger.error(
+      { errorName: errorNameOf(error) },
+      "Customer.io send threw, so the own mailer sends it",
+    );
     return { outcome: "refused", reason: "unexpected" };
   }
+}
+
+function errorNameOf(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error;
 }
 
 /** A bare sender address has no domain to read, so `langwatch.ai` stands in, as on main. */

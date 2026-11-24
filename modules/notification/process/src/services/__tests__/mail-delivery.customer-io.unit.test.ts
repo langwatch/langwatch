@@ -247,17 +247,16 @@ describe("given Customer.io and the own mailer both refuse a routed send", () =>
   });
 });
 
-describe("given a routed message with an unsubscribe link and a hidden recipient", () => {
+describe("given a routed message with a hidden recipient", () => {
   describe("when it is sent through Customer.io", () => {
-    /** @scenario "The unsubscribe pair, the reply-to and hidden recipients reach Customer.io" */
-    it("gives every recipient its own request carrying the one-click pair and the reply-to", async () => {
+    /** @scenario "The reply-to and hidden recipients reach Customer.io" */
+    it("gives every recipient its own request carrying the reply-to", async () => {
       const { customerIo, mail } = compose();
 
       await mail.sendEmail({
         to: "ada@acme.test",
         undisclosedRecipients: ["grace@acme.test"],
         replyless: { tag: "tag" },
-        unsubscribe: { url: "https://app.langwatch.test/api/unsubscribe?token=t" },
         subject: "You reached your plan's usage limit",
         html: "<p>Upgrade to keep tracing</p>",
         template: "usage-limit",
@@ -269,10 +268,6 @@ describe("given a routed message with an unsubscribe link and a hidden recipient
         subject: "You reached your plan's usage limit",
         body: "<p>Upgrade to keep tracing</p>",
         replyTo: "LangWatch Triggers <no-reply+tag@langwatch.test>",
-        headers: {
-          "List-Unsubscribe": "<https://app.langwatch.test/api/unsubscribe?token=t>",
-          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        },
       };
       expect(customerIo.sent).toEqual([
         { ...shared, to: "ada@acme.test", identifiers: { email: "ada@acme.test" } },
@@ -280,8 +275,27 @@ describe("given a routed message with an unsubscribe link and a hidden recipient
       ]);
     });
   });
+});
 
-  describe("when the message also carries an attachment", () => {
+describe("given a routed message carrying a per-recipient unsubscribe token", () => {
+  describe("when it is sent", () => {
+    /** @scenario "Every other message stays on the own mailer on Cloud" */
+    it("leaves it to the own mailer", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+
+      await mail.sendEmail({
+        ...usageLimit(),
+        unsubscribe: { url: "https://app.langwatch.test/api/unsubscribe?token=t" },
+      });
+
+      expect(customerIo.sent).toEqual([]);
+      expect(ownMailer.sent).toHaveLength(1);
+    });
+  });
+});
+
+describe("given a routed message with an attachment", () => {
+  describe("when it is sent", () => {
     /** @scenario "Every other message stays on the own mailer on Cloud" */
     it("leaves it to the own mailer", async () => {
       const { customerIo, ownMailer, mail } = compose();

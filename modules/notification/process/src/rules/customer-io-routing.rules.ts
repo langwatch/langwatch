@@ -1,35 +1,28 @@
 import type { TransactionalEmail } from "@langwatch/enterprise-nurturing-contract";
 import type { SendEmailCommand } from "@langwatch/notification-contract";
 
-import { oneClickUnsubscribeHeaders } from "./email-mime.rules.ts";
-
-/** What becomes of a recipient Customer.io did not accept. */
-export type CustomerIoRoute = Readonly<{ fallback: "own-mailer" }>;
-
-const ownMailerFallback: CustomerIoRoute = { fallback: "own-mailer" };
-
 /**
  * Templates LangWatch Cloud sends through Customer.io; the rest stays on the own mailer. Never
  * security mail, nor HTML carrying a per-recipient token, a one-click action link or customer
  * content. Full exclusions: modules/notification/README.md, "Customer.io on LangWatch Cloud".
  */
-export const CUSTOMER_IO_ROUTES: Readonly<Record<string, CustomerIoRoute>> = {
-  "invite-re-request": ownMailerFallback,
-  "join-request-arrived": ownMailerFallback,
-  "join-request-reminder": ownMailerFallback,
-  "join-request-approved": ownMailerFallback,
-  "join-request-rejected": ownMailerFallback,
-  "join-request-expired": ownMailerFallback,
-  "domain-auto-joined": ownMailerFallback,
-  "seat-request": ownMailerFallback,
-  "usage-limit": ownMailerFallback,
-  "automation-limit": ownMailerFallback,
-};
+export const CUSTOMER_IO_ROUTES: ReadonlySet<string> = new Set([
+  "invite-re-request",
+  "join-request-arrived",
+  "join-request-reminder",
+  "join-request-approved",
+  "join-request-rejected",
+  "join-request-expired",
+  "domain-auto-joined",
+  "seat-request",
+  "usage-limit",
+  "automation-limit",
+]);
 
 /**
  * The Customer.io requests one send becomes, one per recipient (the visible one and every hidden
  * one), or none when the own mailer sends it: an untagged or unrouted template, or a message
- * with attachments, which this route does not carry.
+ * with attachments or a one-click unsubscribe token, which this route does not carry.
  */
 export function findCustomerIoRequests({
   command,
@@ -42,8 +35,10 @@ export function findCustomerIoRequests({
   replyTo: string | undefined;
 }): TransactionalEmail[] {
   const { template } = command;
-  if (template === undefined || !Object.hasOwn(CUSTOMER_IO_ROUTES, template)) return [];
+  if (template === undefined || !CUSTOMER_IO_ROUTES.has(template)) return [];
   if (command.attachments !== undefined && command.attachments.length > 0) return [];
+  // Its one-click token is per recipient and must not leave for Customer.io.
+  if (command.unsubscribe !== undefined) return [];
 
   return recipientsOf(command).map((recipient) => ({
     transactionalMessageId: template,
@@ -53,9 +48,6 @@ export function findCustomerIoRequests({
     subject: command.subject,
     body: command.html,
     ...(replyTo === undefined ? {} : { replyTo }),
-    ...(command.unsubscribe === undefined
-      ? {}
-      : { headers: oneClickUnsubscribeHeaders(command.unsubscribe.url) }),
   }));
 }
 

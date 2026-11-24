@@ -35,14 +35,11 @@ const SECURITY = [
 
 describe("the Customer.io routing list", () => {
   /** @scenario "The routing list holds the agreed product messages and no security mail" */
-  it("holds exactly the ten agreed template ids, each falling back to the own mailer", () => {
+  it("holds exactly the ten agreed template ids", () => {
     expect(AGREED).toHaveLength(10);
-    expect(Object.keys(CUSTOMER_IO_ROUTES).toSorted()).toEqual(AGREED.toSorted());
+    expect([...CUSTOMER_IO_ROUTES].toSorted()).toEqual(AGREED.toSorted());
     // Nothing on main sends it yet, so it is not routed.
-    expect(Object.hasOwn(CUSTOMER_IO_ROUTES, "payment-recovery")).toBe(false);
-    for (const route of Object.values(CUSTOMER_IO_ROUTES)) {
-      expect(route).toEqual({ fallback: "own-mailer" });
-    }
+    expect(CUSTOMER_IO_ROUTES.has("payment-recovery")).toBe(false);
   });
 
   /** @scenario "The routing list holds the agreed product messages and no security mail" */
@@ -50,14 +47,14 @@ describe("the Customer.io routing list", () => {
     const sent = new Set(mailTemplates.map((template) => template.id));
     for (const id of SECURITY) {
       expect(sent.has(id), `${id} is a template`).toBe(true);
-      expect(Object.hasOwn(CUSTOMER_IO_ROUTES, id), `${id} is not routed`).toBe(false);
+      expect(CUSTOMER_IO_ROUTES.has(id), `${id} is not routed`).toBe(false);
     }
   });
 
   /** @scenario "The routing list holds the agreed product messages and no security mail" */
   it("names only templates the app sends", () => {
     const sent = new Set(mailTemplates.map((template) => template.id));
-    expect(Object.keys(CUSTOMER_IO_ROUTES).filter((id) => !sent.has(id))).toEqual([]);
+    expect([...CUSTOMER_IO_ROUTES].filter((id) => !sent.has(id))).toEqual([]);
   });
 });
 

@@ -41,7 +41,7 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
   @unit
   Scenario: Every other message stays on the own mailer on Cloud
     Given IS_SAAS is set and nurturing holds CUSTOMER_IO_APP_API_KEY
-    When a message of any template off the list, or with no template, or with an attachment, is sent
+    When a message of any template off the list, or with no template, or with an attachment, or with an unsubscribe token, is sent
     Then nothing reaches Customer.io
     And the own mailer sends it
 
@@ -113,11 +113,11 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
     Then no log line contains the Customer.io key or any recipient address
 
   @unit
-  Scenario: The unsubscribe pair, the reply-to and hidden recipients reach Customer.io
-    Given a routed message with an unsubscribe link and a hidden recipient
+  Scenario: The reply-to and hidden recipients reach Customer.io
+    Given a routed message with a hidden recipient
     When it is sent through Customer.io
     Then every recipient gets its own request
-    And each carries the List-Unsubscribe pair and the reply-to
+    And each carries the reply-to
 
   @unit
   Scenario: Nurturing answers whether Customer.io took the message
