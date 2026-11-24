@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fireInviteAccepted,
   fireJoinedOrganization,
+  fireMemberRoleChanged,
   fireSsoAutoAdded,
   seatTraitOf,
 } from "../nurturing-membership-join-service.rules.ts";
@@ -124,6 +125,42 @@ describe("a person who joins", () => {
     expect(identifies(inviteCalls())).toEqual([]);
     expect(identifies(inviteCalls("OWNER"))).toEqual([]);
     expect(identifies(ssoCalls())[0]).not.toHaveProperty("traits.seat");
+  });
+});
+
+describe("a member whose role changed", () => {
+  const changed = (role: string) =>
+    fireMemberRoleChanged({
+      kind: "member_role_changed",
+      ...joinSource,
+      role,
+      previousRole: "MEMBER",
+    });
+
+  /** @scenario "A role change tells Customer.io the person's new seat" */
+  it.each([
+    ["ADMIN", "admin"],
+    ["MEMBER", "member"],
+    ["EXTERNAL", "lite_member"],
+    ["DEVELOPER", "developer"],
+  ])("is identified once with the seat of %s", (role, seat) => {
+    expect(changed(role).filter((call) => call.type === "identify")).toEqual([
+      { type: "identify", userId: "user-1", traits: { seat } },
+    ]);
+  });
+
+  /** @scenario "A role change groups the person into the organization" */
+  it("is grouped into the organization", () => {
+    expect(changed("ADMIN")).toContainEqual({
+      type: "group",
+      userId: "user-1",
+      groupId: "org-1",
+    });
+  });
+
+  /** @scenario "A role change to a role with no seat sends no seat" */
+  it("is not identified for a role we cannot name, and is still grouped", () => {
+    expect(changed("OWNER")).toEqual([{ type: "group", userId: "user-1", groupId: "org-1" }]);
   });
 });
 

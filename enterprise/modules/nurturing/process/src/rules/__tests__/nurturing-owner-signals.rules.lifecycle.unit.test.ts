@@ -10,6 +10,7 @@ import {
   firstTraceRecordedSignal,
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
+  memberRoleChangedSignal,
   membersInvitedSignal,
   promptCreatedSignal,
   scenarioCreatedSignal,
@@ -128,6 +129,20 @@ describe("organization's lifecycle events", () => {
       userId: "user_new",
       organizationId: "org_acme",
       organizationName: "Acme",
+    });
+  });
+
+  it("raise a role change with the new and previous role, once per person and moment", () => {
+    const data = { ...org, userId: "user_new", role: "ADMIN", previousRole: "MEMBER" };
+    expect(memberRoleChangedSignal({ data, aggregateId: "org_acme" })).toEqual({
+      kind: "member_role_changed",
+      sourceEventId: `org_acme:role:user_new:${AT}`,
+      tenantId: "org_acme",
+      occurredAt: AT,
+      userId: "user_new",
+      organizationId: "org_acme",
+      role: "ADMIN",
+      previousRole: "MEMBER",
     });
   });
 

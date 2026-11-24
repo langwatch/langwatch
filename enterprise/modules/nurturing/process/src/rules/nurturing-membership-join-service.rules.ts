@@ -112,6 +112,21 @@ export function fireInviteAccepted({
 }
 
 /**
+ * Decides the calls for a member whose role changed: the new seat when we can name it, and the
+ * person grouped into the Company so the change reaches an account that missed the join.
+ */
+export function fireMemberRoleChanged(
+  signal: NurturingSignalOf<"member_role_changed">,
+): CioBatchCall[] {
+  const { userId, organizationId, role } = signal;
+  const traits = seatTraitOf(role);
+  return [
+    ...(traits.seat ? [{ type: "identify" as const, userId, traits }] : []),
+    { type: "group", userId, groupId: organizationId },
+  ];
+}
+
+/**
  * Decides the calls for a person the SSO domain match added: a new person, so every milestone
  * starts false but the traces nurturing knows of. No email here: it has one home, signed_up's send.
  */

@@ -19,6 +19,7 @@ import type {
 import type {
   IntegrationMethodChosenEventData,
   InviteAcceptedEventData,
+  OrganizationMemberRoleChangedEventData,
   MembersInvitedEventData,
   OrganizationSignedUpEventData,
 } from "@langwatch/organization-contract";
@@ -337,6 +338,25 @@ export function inviteAcceptedSignal({
   const sourceEventId = `${aggregateId}:${data.inviteId}`;
   const who = { userId, organizationId, organizationName, role };
   return { kind: "invite_accepted", sourceEventId, tenantId, occurredAt, ...who };
+}
+
+/** An admin's change of a member's role, once per person and moment. */
+export function memberRoleChangedSignal({
+  data,
+  aggregateId,
+}: OwnerEvent<OrganizationMemberRoleChangedEventData>): NurturingSignal {
+  const { tenantId, occurredAt, userId, organizationId, role, previousRole } = data;
+  const sourceEventId = `${aggregateId}:role:${userId}:${occurredAt}`;
+  return {
+    kind: "member_role_changed",
+    sourceEventId,
+    tenantId,
+    occurredAt,
+    userId,
+    organizationId,
+    role,
+    previousRole,
+  };
 }
 
 /** A person's chosen integration method, under their own id. */
