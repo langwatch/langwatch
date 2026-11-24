@@ -42,6 +42,11 @@ const traceDayOf = (row: TraceDayRow): NurturingTraceDay => ({
 
 const dateOf = (at: number | null) => (at === null ? null : new Date(at));
 
+/** Rows one prune statement deletes at most. */
+const PRUNE_BATCH_ROWS = 5_000;
+/** Statements one sweep's prune runs at most: about a day of rows per hourly sweep keeps up. */
+const PRUNE_MAX_BATCHES = 20;
+
 /**
  * A replay folds every span of the log, so a day of only child, sample or Langy spans folds to an
  * empty state; live delivery never stages those, so it keeps no row for that day, and neither does
@@ -141,15 +146,26 @@ export class PrismaNurturingTraceDayRepository
     await this.#database.nurturingProjectTraceDayCount.deleteMany({ where });
   }
 
+  /**
+   * Deletes in batches so no statement holds row locks the folds' writes would wait on, and stops
+   * after a bounded number of them so one sweep cannot run on; the hourly sweep takes the rest.
+   */
   async pruneEveryProjectBefore({ beforeDay }: Readonly<{ beforeDay: string }>): Promise<void> {
-    await this.#database.$executeRaw`
-      DELETE FROM "NurturingProjectTraceDayCount"
-      WHERE "day" < ${beforeDay}
-      ${skipTenantCheck({
-        // Nurturing's trace-day retention sweep (system-owned maintenance), across every project
-        SKIP_TENANT_CHECK: true,
-      })}
-    `;
+    for (let batch = 0; batch < PRUNE_MAX_BATCHES; batch++) {
+      const deleted = await this.#database.$executeRaw`
+        DELETE FROM "NurturingProjectTraceDayCount"
+        WHERE ("projectId", "day", "source") IN (
+          SELECT "projectId", "day", "source" FROM "NurturingProjectTraceDayCount"
+          WHERE "day" < ${beforeDay}
+          LIMIT ${PRUNE_BATCH_ROWS}
+        )
+        ${skipTenantCheck({
+          // Nurturing's trace-day retention sweep (system-owned maintenance), across every project
+          SKIP_TENANT_CHECK: true,
+        })}
+      `;
+      if (deleted < PRUNE_BATCH_ROWS) return;
+    }
   }
 
   async pruneProjects({ projectIds }: Readonly<{ projectIds: readonly string[] }>): Promise<void> {

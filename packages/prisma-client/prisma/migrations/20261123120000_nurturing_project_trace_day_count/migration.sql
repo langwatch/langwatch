@@ -5,7 +5,21 @@
 -- projection replay rebuilds the rows from trace's log. Replaces "NurturingProjectTraceDay", which
 -- stays in place, unread; dropping it is an operator step.
 --
--- Expand only: a new table nobody else reads or writes. Nothing is altered or dropped.
+-- The new table is seeded from NurturingProjectTraceDay, so the readers that switch to it at deploy
+-- never see fewer traces than the old table held: each old row becomes a `spans` row (traceCount,
+-- lastTraceAt) and a `failures` row (errorCount, lastFailedTraceAt), at the folds' projection
+-- version, with no applied event ids. A source with nothing counted gets no row, as the folds never
+-- store an empty state. No event is counted twice:
+--   * A queued job is consumed once, by an old pod (into the old table, so in the seed if it ran
+--     before this migration) or by a new pod (into this table, on top of the seed); never both.
+--   * The deploy replay refolds each day with an event in the window from trace's log and
+--     overwrites the row whole, appliedEventIds included, so the seed's counts are replaced, not
+--     added to. Days the replay does not reach are older than the counting window and pruned.
+--   * ON CONFLICT DO NOTHING keeps a rerun from touching rows the folds have since written.
+-- Jobs an old pod runs after this migration land only in the old table; the replay restores them.
+--
+-- Expand only: a new table, seeded by INSERT ... SELECT, which only reads the old one. Nothing is
+-- altered or dropped, so the previous release keeps reading and writing NurturingProjectTraceDay.
 -- No foreign key, as for NurturingProjectTraceDay.
 --
 -- Spec: enterprise/modules/nurturing/specs/project-usage.feature
@@ -29,3 +43,17 @@ CREATE TABLE IF NOT EXISTS "NurturingProjectTraceDayCount" (
 );
 
 CREATE INDEX IF NOT EXISTS "NurturingProjectTraceDayCount_day_idx" ON "NurturingProjectTraceDayCount"("day");
+
+INSERT INTO "NurturingProjectTraceDayCount"
+  ("projectId", "day", "source", "traceCount", "lastTraceAt", "projectionVersion")
+SELECT "projectId", "day", 'spans', "traceCount", "lastTraceAt", '2026-11-23'
+FROM "NurturingProjectTraceDay"
+WHERE "traceCount" > 0
+ON CONFLICT DO NOTHING;
+
+INSERT INTO "NurturingProjectTraceDayCount"
+  ("projectId", "day", "source", "errorCount", "lastFailedTraceAt", "projectionVersion")
+SELECT "projectId", "day", 'failures', "errorCount", "lastFailedTraceAt", '2026-11-23'
+FROM "NurturingProjectTraceDay"
+WHERE "errorCount" > 0
+ON CONFLICT DO NOTHING;

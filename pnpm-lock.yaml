@@ -4001,9 +4001,6 @@ importers:
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../../../modules/gateway/contract
-      '@langwatch/group-queue':
-        specifier: workspace:*
-        version: link:../../../../packages/group-queue
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../../../modules/identity/contract

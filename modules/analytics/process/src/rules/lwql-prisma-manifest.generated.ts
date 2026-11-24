@@ -2084,6 +2084,17 @@ export interface LwqlPrismaRows {
     readonly lastTraceAt: "DateTime?";
     readonly lastFailedTraceAt: "DateTime?";
   };
+  readonly NurturingProjectTraceDayCount: {
+    readonly projectId: "String";
+    readonly day: "String";
+    readonly source: "String";
+    readonly traceCount: "Int";
+    readonly errorCount: "Int";
+    readonly lastTraceAt: "DateTime?";
+    readonly lastFailedTraceAt: "DateTime?";
+    readonly appliedEventIds: "String[]";
+    readonly projectionVersion: "String";
+  };
   readonly NurturingProjectEvaluationDay: {
     readonly projectId: "String";
     readonly day: "String";
