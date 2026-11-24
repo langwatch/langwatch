@@ -6,7 +6,7 @@ The server half of [data-retention](../README.md). Data retention: the retention
 
 ## Installation
 
-`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionSeatPolicyEventing).withEventing(retentionExtensionEventing).withEventing(retentionStorageReportEventing).withTasks(…).withMigrations(…)`, `src/data-retention.module.ts:21`.
+`defineProcessModule("data-retention").withRepositories(dataRetentionRepositories).withApi(DataRetentionModule).withTransports(dataRetentionTrpcTransport).withEventing(dataRetentionSeatPolicyEventing).withEventing(retentionExtensionEventing).withEventing(retentionStorageReportEventing).withEventing(retentionDriftEventing).withTasks(…).withMigrations(…)`, `src/data-retention.module.ts:23`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -240,7 +240,7 @@ Contract `../contract/src/data-retention.trpc.ts:82`, router `src/transport/data
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof retentionPolicySnapshotSchema>; // ../contract/src/data-retention.snapshot.ts:80
+type Output = z.infer<typeof retentionPolicySnapshotSchema>; // ../contract/src/data-retention.snapshot.ts:97
 
 // dataRetention.setForScope
 // Input: inline, ../contract/src/data-retention.trpc.ts:99
@@ -352,7 +352,7 @@ interface Input {
     scopeId: string;
   };
 }
-// Output: retentionStorageUsageSchema, ../contract/src/data-retention.snapshot.ts:95
+// Output: retentionStorageUsageSchema, ../contract/src/data-retention.snapshot.ts:112
 interface Output {
   totalBytes: number;
   projectCount: number;
@@ -360,7 +360,7 @@ interface Output {
 
 // dataRetention.getStoredPastRetention
 type Input = z.infer<typeof retentionScopeTargetInputSchema>; // ../contract/src/data-retention.trpc.ts:56
-type Output = z.infer<typeof storedPastRetentionSchema>; // ../contract/src/data-retention.snapshot.ts:124
+type Output = z.infer<typeof storedPastRetentionSchema>; // ../contract/src/data-retention.snapshot.ts:141
 
 // dataRetention.applyScopeRetentionToStoredData
 type Input = z.infer<typeof retentionScopeWriteInputSchema>; // ../contract/src/data-retention.trpc.ts:70
@@ -370,7 +370,7 @@ type Input = z.infer<typeof retentionScopeWriteInputSchema>; // ../contract/src/
 interface Input {
   organizationId: string;
 }
-// Output: organizationStorageEstimateSchema, ../contract/src/data-retention.snapshot.ts:140
+// Output: organizationStorageEstimateSchema, ../contract/src/data-retention.snapshot.ts:157
 interface Output {
   totalBytes: number;
   coveredDays: number;
@@ -381,7 +381,7 @@ interface Output {
 interface Input {
   organizationId: string;
 }
-// Output: organizationRetentionSchema, ../contract/src/data-retention.snapshot.ts:151
+// Output: organizationRetentionSchema, ../contract/src/data-retention.snapshot.ts:168
 interface Output {
   retentionDays: number;
 }
@@ -401,16 +401,27 @@ Declared at `src/eventing/data-retention-seat-policy.pipeline.ts:32`.
 | --------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | peer subscriber | `dataRetentionSeatActivation` | `lw.billing.subscription_started` from [billing](../../../enterprise/modules/billing/README.md) | `src/eventing/data-retention-seat-policy.pipeline.ts:38` |
 
+### Pipeline `data_retention_drift_check` (aggregate `data_retention_drift`)
+
+Declared at `src/eventing/retention-drift.pipeline.ts:37`. Events: `retentionDriftDetectedEventSchema`.
+
+| Kind            | Name                  | Handles                                                                                   | Declared at                                   |
+| --------------- | --------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------- |
+| command         | –                     | –                                                                                         | `src/eventing/retention-drift.pipeline.ts:42` |
+| process manager | `retentionDriftCheck` | every 1 d (`RETENTION_DRIFT_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/retention-drift.pipeline.ts:47` |
+
 ### Pipeline `data_retention_extension` (aggregate `data_retention_extension`)
 
-Declared at `src/eventing/retention-extension.pipeline.ts:49`. Events: `retentionExtendedEventSchema`, `retentionAppliedEventSchema`, `storedRetentionApplyRequestedEventSchema`.
+Declared at `src/eventing/retention-extension.pipeline.ts:58`. Events: `retentionExtendedEventSchema`, `retentionAppliedEventSchema`, `storedRetentionApplyRequestedEventSchema`, `retentionPolicyChangedEventSchema`.
 
-| Kind            | Name                          | Handles                            | Declared at                                       |
-| --------------- | ----------------------------- | ---------------------------------- | ------------------------------------------------- |
-| command         | `recordRetentionExtension`    | –                                  | `src/eventing/retention-extension.pipeline.ts:58` |
-| command         | `requestStoredRetentionApply` | –                                  | `src/eventing/retention-extension.pipeline.ts:59` |
-| command         | –                             | –                                  | `src/eventing/retention-extension.pipeline.ts:60` |
-| process manager | `retentionExtensionApply`     | intents `applyToProjects` (outbox) | `src/eventing/retention-extension.pipeline.ts:65` |
+| Kind                | Name                                                                       | Handles                            | Declared at                                       |
+| ------------------- | -------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------- |
+| command             | `recordRetentionExtension`                                                 | –                                  | `src/eventing/retention-extension.pipeline.ts:69` |
+| command             | `requestStoredRetentionApply`                                              | –                                  | `src/eventing/retention-extension.pipeline.ts:70` |
+| command             | `recordRetentionPolicyChange`                                              | –                                  | `src/eventing/retention-extension.pipeline.ts:71` |
+| command             | –                                                                          | –                                  | `src/eventing/retention-extension.pipeline.ts:72` |
+| process manager     | `retentionExtensionApply`                                                  | intents `applyToProjects` (outbox) | `src/eventing/retention-extension.pipeline.ts:77` |
+| Postgres projection | `≈ createRetentionApplyStatusProjection({ store: deps.applyStatusStore })` | –                                  | `src/eventing/retention-extension.pipeline.ts:68` |
 
 ### Pipeline `data_retention_storage_report` (aggregate `data_retention_storage`)
 
@@ -429,6 +440,7 @@ Run by the tasks process, before serve.
 | Task                       | Class                        | Declared at                                     |
 | -------------------------- | ---------------------------- | ----------------------------------------------- |
 | `retention-storage-report` | `RetentionStorageReportTask` | `src/tasks/retention-storage-report.task.ts:15` |
+| `retention-drift-check`    | `RetentionDriftCheckTask`    | `src/tasks/retention-drift-check.task.ts:14`    |
 
 ## Configuration
 

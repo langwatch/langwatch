@@ -387,11 +387,20 @@ describe("given the LangWatchQL view catalog when the map filter is compared wit
     ).toEqual(expected);
 
     const sql = contentKeyExclusionSql("k");
+    expect(sql.startsWith("NOT match(k, '^(?:"), "the filter is one anchored match").toBe(true);
+    expect(sql, "the filter must not run a lambda per key").not.toContain("arrayExists");
     for (const key of expected) {
-      expect(sql, `the filter never mentions ${key}`).toContain(`'${key}'`);
-      expect(sql, `the filter does not exclude the exploded form of ${key}`).toContain(`'${key}.'`);
+      // In the SQL literal a regex `\.` is written `\\.`: an unescaped dot would match any byte.
+      expect(sql, `the filter never names ${key}`).toContain(key.replaceAll(".", "\\\\."));
       expect(isContentAttributeKey(key)).toBe(true);
       expect(isContentAttributeKey(`${key}.0.content`)).toBe(true);
+      const dotSwapped = key.includes(".")
+        ? [key.replaceAll(".", "_"), key.replaceAll(".", "X")]
+        : [];
+      for (const probe of [`${key}x`, `x${key}`, ...dotSwapped]) {
+        const isContent = expected.some((k) => probe === k || probe.startsWith(`${k}.`));
+        expect(isContentAttributeKey(probe), probe).toBe(isContent);
+      }
     }
     // A dimension the analytics views exist to group by must survive.
     expect(isContentAttributeKey("gen_ai.request.model")).toBe(false);

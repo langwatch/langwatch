@@ -22,12 +22,11 @@ export const CHART_GRID_MARGIN_PX = 16;
  */
 export const CHART_GRID_MAX_ROW_SPAN = 20;
 
-/**
- * The size a chart lands at when nothing chose one: half the row wide and
- * three rows tall — the same footprint the old grid's single default cell had.
- */
-export const CHART_GRID_DEFAULT_COL_SPAN = 4;
-export const CHART_GRID_DEFAULT_ROW_SPAN = 3;
+// The default footprint lives in the contract, so server and browser cannot drift.
+export {
+  CHART_GRID_DEFAULT_COL_SPAN,
+  CHART_GRID_DEFAULT_ROW_SPAN,
+} from "@langwatch/analytics-contract/chart-grid";
 
 /**
  * The ceiling a grid row may carry. Far beyond any real dashboard, but within

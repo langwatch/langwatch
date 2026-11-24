@@ -426,17 +426,17 @@ Feature: Canonical user lifecycle
       And the issue action is disabled with a "Setting up your workspace" hint
       And the personal workspace is read again
 
-    # /me renders before its organisation resolves; a placeholder id would be answered FORBIDDEN.
+    # /coding-agents renders before its organisation resolves; a placeholder id would be answered FORBIDDEN.
     @integration
     Scenario: The trace ingest section waits for the organisation before reading
-      Given /me has rendered and its organisation has not resolved yet
+      Given /coding-agents has rendered and its organisation has not resolved yet
       When the trace ingest section renders
       Then it sends no ingestion template or key read
       And no read names a placeholder organisation
 
     @integration
     Scenario: The trace ingest section reads for the organisation once it resolves
-      Given /me whose organisation has resolved
+      Given /coding-agents whose organisation has resolved
       When the trace ingest section renders
       Then it reads the ingestion templates and keys for that organisation
 
@@ -449,14 +449,14 @@ Feature: Canonical user lifecycle
   Rule: The personal workspace offers the Langy ask only to a reader who may start a Langy turn
 
     @integration
-    Scenario: A reader who may start a Langy turn is offered Explore via Langy on /me
+    Scenario: A reader who may start a Langy turn is offered Explore via Langy on /coding-agents
       Given a reader holding "langy:create" where Langy is rolled out
       When the personal workspace host is asked whether the assistant can be asked
       Then it answers yes
       And asking it hands the prompt to Langy's ask
 
     @integration
-    Scenario: A reader who may not start a Langy turn is not offered Explore via Langy on /me
+    Scenario: A reader who may not start a Langy turn is not offered Explore via Langy on /coding-agents
       Given a reader without "langy:create", or where Langy is not rolled out
       When the personal workspace host is asked whether the assistant can be asked
       Then it answers no

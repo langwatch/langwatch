@@ -3,6 +3,9 @@ import {
   GITHUB_INSTALLATION_CONNECTED_EVENT_TYPE,
   GITHUB_INSTALLATION_CONNECTED_EVENT_VERSION,
   githubInstallationConnectedEventDataSchema,
+  GITHUB_PULL_REQUEST_CHECKS_COMPLETED_EVENT_TYPE,
+  GITHUB_PULL_REQUEST_CHECKS_COMPLETED_EVENT_VERSION,
+  githubPullRequestChecksCompletedEventDataSchema,
 } from "@langwatch/github-contract";
 import { z } from "zod";
 
@@ -23,4 +26,23 @@ export const githubInstallationConnectedEventSchema = z.object({
 });
 export type GithubInstallationConnectedEvent = z.infer<
   typeof githubInstallationConnectedEventSchema
+>;
+
+export const RECORD_PULL_REQUEST_CHECKS_COMPLETED_COMMAND_TYPE =
+  "lw.github.record_pull_request_checks_completed" as const;
+
+export const recordPullRequestChecksCompletedCommandDataSchema =
+  githubPullRequestChecksCompletedEventDataSchema;
+export type RecordPullRequestChecksCompletedCommandData = z.infer<
+  typeof recordPullRequestChecksCompletedCommandDataSchema
+>;
+
+export const githubPullRequestChecksCompletedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(GITHUB_PULL_REQUEST_CHECKS_COMPLETED_EVENT_TYPE),
+  version: z.literal(GITHUB_PULL_REQUEST_CHECKS_COMPLETED_EVENT_VERSION),
+  data: githubPullRequestChecksCompletedEventDataSchema,
+});
+export type GithubPullRequestChecksCompletedEvent = z.infer<
+  typeof githubPullRequestChecksCompletedEventSchema
 >;

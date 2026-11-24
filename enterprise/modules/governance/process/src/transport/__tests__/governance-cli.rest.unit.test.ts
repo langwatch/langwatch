@@ -623,6 +623,7 @@ describe("the CLI governance plane", () => {
   });
 
   describe("when a budget binding the caller's personal key is exhausted", () => {
+    /** @scenario The CLI budget request link points at the new address */
     it("answers 402 with the nested budget_exceeded document the CLI renders", async () => {
       const api = mountCli({
         supportContact: "admin@acme.test",
@@ -658,7 +659,7 @@ describe("the CLI governance plane", () => {
           spent_usd: "120.00",
           period: "monthly",
           request_increase_url:
-            "https://app.test/me/budget/request?scope=organization&scope_id=org_1&limit_usd=100.00&spent_usd=120.00",
+            "https://app.test/coding-agents/budget/request?scope=organization&scope_id=org_1&limit_usd=100.00&spent_usd=120.00",
           admin_email: "admin@acme.test",
         },
       });

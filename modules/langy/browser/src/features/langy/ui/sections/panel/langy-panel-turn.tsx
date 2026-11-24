@@ -154,13 +154,20 @@ export function LangyFailureSurface({
   failure,
   organizationId,
   onGithubConnected,
+  onShareLocalFolder,
 }: {
   floating: boolean;
   failure: TurnFailure;
   organizationId: string | undefined;
   onGithubConnected: () => void;
+  onShareLocalFolder: () => void;
 }) {
-  const surface = failureSurface({ failure, organizationId, onGithubConnected });
+  const surface = failureSurface({
+    failure,
+    organizationId,
+    onGithubConnected,
+    onShareLocalFolder,
+  });
   if (!surface) return null;
   // Padded to the message column's own measure, since it sits outside that column.
   return (
@@ -174,10 +181,12 @@ function failureSurface({
   failure,
   organizationId,
   onGithubConnected,
+  onShareLocalFolder,
 }: {
   failure: TurnFailure;
   organizationId: string | undefined;
   onGithubConnected: () => void;
+  onShareLocalFolder: () => void;
 }): ReactNode {
   const { recovery, needsGithubConnect, turnError, onErrorAction } = failure;
   if (recovery.isRecovering && recovery.message) {
@@ -185,7 +194,11 @@ function failureSurface({
   }
   if (needsGithubConnect && organizationId) {
     return (
-      <LangyGitHubConnectCard organizationId={organizationId} onConnected={onGithubConnected} />
+      <LangyGitHubConnectCard
+        organizationId={organizationId}
+        onConnected={onGithubConnected}
+        onShareLocalFolder={onShareLocalFolder}
+      />
     );
   }
   if (!turnError || turnError.render === "composer-notice" || recovery.willAutoRecover) return null;

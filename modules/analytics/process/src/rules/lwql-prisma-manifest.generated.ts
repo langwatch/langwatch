@@ -1276,6 +1276,7 @@ export interface LwqlPrismaRows {
     readonly PendingHandoffTurnId: "String?";
     readonly RunToken: "String?";
     readonly ArchivedAt: "Float?";
+    readonly CiFollowUpsInARow: "Int";
     readonly CreatedAt: "Float";
     readonly UpdatedAt: "Float";
     readonly OccurredAt: "Float";
@@ -1328,6 +1329,16 @@ export interface LwqlPrismaRows {
     readonly AcceptedAt: "Float";
     readonly LastEventId: "String";
     readonly ProjectionVersion: "String";
+  };
+  readonly LangyPullRequest: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly RepositoryFullName: "String";
+    readonly PrNumber: "Int";
+    readonly ConversationId: "String";
+    readonly UserId: "String";
+    readonly OpenedAt: "Float";
+    readonly SourceEventId: "String";
   };
   readonly LangyMessageProjection: {
     readonly id: "String";
@@ -1476,6 +1487,22 @@ export interface LwqlPrismaRows {
     readonly retentionDays: "Int";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+  };
+  readonly RetentionApplyStatus: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly scopeType: "RetentionPolicyScopeType";
+    readonly scopeId: "String";
+    readonly changedAt: "Float?";
+    readonly appliedAt: "Float?";
+    readonly raisedAt: "Float?";
+    readonly shortenedAt: "Float?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
   };
   readonly DataPrivacyPolicy: {
     readonly id: "String";
@@ -1736,6 +1763,8 @@ export interface LwqlPrismaRows {
     readonly parameters: "Json?";
     readonly simulatorModel: "String?";
     readonly judgeModel: "String?";
+    readonly traceQuietPeriodMs: "Int?";
+    readonly traceWaitTimeoutMs: "Int?";
     readonly maxTurns: "Int?";
     readonly minTurns: "Int?";
     readonly fields: "Json?";
@@ -1774,6 +1803,8 @@ export interface LwqlPrismaRows {
     readonly labels: "String[]";
     readonly simulatorModel: "String?";
     readonly judgeModel: "String?";
+    readonly traceQuietPeriodMs: "Int?";
+    readonly traceWaitTimeoutMs: "Int?";
     readonly kind: "String";
     readonly scope: "Json?";
     readonly fields: "Json?";
@@ -2292,6 +2323,24 @@ export interface LwqlPrismaRows {
     readonly updatedAt: "DateTime";
     readonly createdById: "String?";
     readonly updatedById: "String?";
+  };
+  readonly GatewayA2ATarget: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly projectId: "String?";
+    readonly name: "String";
+    readonly agentName: "String";
+    readonly cardUrl: "String";
+    readonly upstreamUrl: "String";
+    readonly encryptedUpstreamHeaders: "String?";
+    readonly restrictToAllowList: "Boolean";
+    readonly allowedVirtualKeyIds: "String[]";
+    readonly blocked: "Boolean";
+    readonly blockReason: "String?";
+    readonly createdById: "String";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+    readonly archivedAt: "DateTime?";
   };
   readonly GatewayConnectUpstream: {
     readonly organizationId: "String";

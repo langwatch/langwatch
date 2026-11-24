@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * Dashboards boards, stars and widget deletes on memory and Postgres; no delete reaches Reports.
+ * Dashboards boards, stars, widget default size and deletes on memory and Postgres; no delete
+ * reaches Reports.
  * @see specs/dashboards-v2.feature
  */
 import { randomUUID } from "node:crypto";
@@ -71,6 +72,23 @@ function contractCases(backend: DashboardBackend): void {
 
       await expect(assign("dash_absent")).rejects.toThrow(DashboardNotFoundError);
       await expect(assign(foreign.id)).rejects.toThrow(DashboardNotFoundError);
+    });
+  });
+
+  describe("when a widget is created without a size", () => {
+    /** @scenario "A dashboard widget created without a size lands four columns by five board rows" */
+    it("stores it four columns by five board rows", async () => {
+      const created = await widget((await board()).id);
+
+      const stored = await backend
+        .widgets()
+        .getById({ id: created.id, projectId: backend.projectId() });
+
+      // Literal on purpose: a constant-derived expectation would follow a regression.
+      expect({ colSpan: stored.colSpan, rowSpan: stored.rowSpan }).toEqual({
+        colSpan: 4,
+        rowSpan: 5,
+      });
     });
   });
 

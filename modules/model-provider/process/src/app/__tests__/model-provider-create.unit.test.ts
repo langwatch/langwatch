@@ -1,3 +1,6 @@
+import { createServer, type IncomingHttpHeaders } from "node:http";
+import type { AddressInfo } from "node:net";
+
 import { sealAuthorization } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -118,6 +121,7 @@ function createRealModelProviderApp(
   deployment: {
     providerFallbacks?: Partial<ModelProviderServerConfig["providerFallbacks"]>;
     environment?: Record<string, string>;
+    nlpServiceUrl?: string;
   } = {},
 ): Promise<ModelProviderModule> {
   return ModelProviderModule.create({
@@ -136,7 +140,7 @@ function createRealModelProviderApp(
       blockLocalHttpCalls: true,
       allowedProxyHosts: [],
       defaultModel: undefined,
-      nlpServiceUrl: undefined,
+      nlpServiceUrl: deployment.nlpServiceUrl,
       gatewayInternalUrl: undefined,
       gatewayPublicUrl: undefined,
       gatewayLegacyUrl: undefined,
@@ -300,6 +304,64 @@ describe("ModelProviderModule.create", () => {
 
         expect(snapshot.configs).toEqual([]);
         expect(snapshot.effective.DEFAULT).toMatchObject({ scope: "organization" });
+      });
+    });
+  });
+
+  describe("given a deployment whose NLP engine requires its internal secret", () => {
+    describe("when a trace message is translated", () => {
+      /** @scenario "Translate built through the app sends the NLP engine its internal secret" */
+      it("presents X-LangWatch-NLP-Secret on the engine call", async () => {
+        const seen: IncomingHttpHeaders[] = [];
+        const engine = createServer((request, response) => {
+          seen.push(request.headers);
+          request.resume();
+          request.on("end", () => {
+            response.writeHead(200, { "content-type": "application/json" });
+            response.end(
+              JSON.stringify({
+                id: "chatcmpl-1",
+                object: "chat.completion",
+                created: 1,
+                model: "gpt-5-mini",
+                choices: [
+                  {
+                    index: 0,
+                    message: { role: "assistant", content: "Hello" },
+                    finish_reason: "stop",
+                  },
+                ],
+                usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+              }),
+            );
+          });
+        });
+        await new Promise<void>((resolve) => engine.listen(0, "127.0.0.1", resolve));
+        const repositories = MemoryModelProviderRepositories.create();
+        await repositories.defaults.save({
+          id: "config-organization",
+          organizationId: "organization-1",
+          config: { FAST: "openai/gpt-5-mini" },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
+          authorId: null,
+        });
+        const app = await createRealModelProviderApp(repositories, undefined, {
+          nlpServiceUrl: `http://127.0.0.1:${(engine.address() as AddressInfo).port}`,
+          environment: { LANGWATCH_NLP_INTERNAL_SECRET: "nlp-engine-secret" },
+        });
+        await app.upsertUnattributed({
+          projectId: "project-1",
+          provider: "openai",
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: "sk-test" },
+        });
+
+        const result = await app
+          .translate({ projectId: "project-1", text: "Hei" })
+          .finally(() => engine.close());
+
+        expect(result).toEqual({ translation: "Hello" });
+        expect(seen[0]?.["x-langwatch-nlp-secret"]).toBe("nlp-engine-secret");
       });
     });
   });

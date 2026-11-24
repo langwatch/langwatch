@@ -20,6 +20,7 @@ import {
   deriveToolName,
   SESSION_CONTEXT_EVENT_NAME,
   deriveSessionTitleFromPrompt,
+  isUsableSessionTitle,
 } from "../coding-agent-normalization.ts";
 
 describe("detectCodingAgent", () => {
@@ -149,6 +150,17 @@ describe("deriveSpanConversationKey", () => {
         },
       }),
     ).toBe("01a00987-1926-74b1-b765-turn");
+  });
+
+  it("puts a launcher's declared session ahead of codex's thread id", () => {
+    expect(
+      deriveSpanConversationKey({
+        agent: "codex",
+        name: "session_task.turn",
+        attrs: { "thread.id": "01a00987-187a-7b23-b6d8-session" },
+        resourceAttrs: { "langwatch.session.id": "agent_scout" },
+      }),
+    ).toBe("agent_scout");
   });
 
   it("leaves every other agent on the shared order", () => {
@@ -480,6 +492,17 @@ describe("isCodingAgentMetricName", () => {
   });
 });
 
+describe("isUsableSessionTitle", () => {
+  /** @scenario A stored name that reads as a markdown heading or a tag is not shown */
+  it("refuses a heading, a tag or nothing, and accepts a person's words", () => {
+    expect(isUsableSessionTitle("## Your skills")).toBe(false);
+    expect(isUsableSessionTitle("<system-reminder>")).toBe(false);
+    expect(isUsableSessionTitle(null)).toBe(false);
+    expect(isUsableSessionTitle("  ")).toBe(false);
+    expect(isUsableSessionTitle("Fix the retry loop")).toBe(true);
+  });
+});
+
 describe("deriveSessionTitleFromPrompt", () => {
   describe("given the first thing a user typed", () => {
     /** @scenario A session with no generated title is named by the first thing the user asked */
@@ -504,6 +527,20 @@ describe("deriveSessionTitleFromPrompt", () => {
           "<current_datetime>2026-10-21T15:36:06+02:00</current_datetime>\n\nCount the files",
         ),
       ).toBe("Count the files");
+    });
+  });
+
+  describe("given a prompt that opens with a document the harness injected", () => {
+    /** @scenario A first prompt that opens with a markdown heading does not name the session */
+    it("answers null for a heading, front matter or a code fence", () => {
+      expect(deriveSessionTitleFromPrompt("## Your skills\n- laze: read your inbox")).toBeNull();
+      expect(deriveSessionTitleFromPrompt("# Context\nYou are Content.")).toBeNull();
+      expect(deriveSessionTitleFromPrompt("---\nname: content\n---\nWrite it")).toBeNull();
+      expect(deriveSessionTitleFromPrompt("```json\n{}\n```")).toBeNull();
+    });
+
+    it("keeps a line that only mentions a hash", () => {
+      expect(deriveSessionTitleFromPrompt("#9775 needs a rebase")).toBe("#9775 needs a rebase");
     });
   });
 

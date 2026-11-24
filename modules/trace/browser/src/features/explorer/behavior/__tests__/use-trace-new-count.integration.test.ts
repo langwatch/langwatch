@@ -123,6 +123,11 @@ vi.mock("../../../instant-eval/behavior/use-instant-eval-runs.ts", () => ({
   useInstantEvalRuns: () => ({ chips: [], evalRuns: instantEvalRuns.current }),
 }));
 
+const pendingNegatedEval = vi.hoisted(() => ({ value: false }));
+vi.mock("../../../instant-eval/behavior/use-has-pending-negated-eval.ts", () => ({
+  useHasPendingNegatedEval: () => pendingNegatedEval.value,
+}));
+
 const lastCall = (): QueryCall => {
   const call = capturedCalls[capturedCalls.length - 1];
   if (!call) {
@@ -145,6 +150,7 @@ describe("useTraceNewCount", () => {
     stores.sseConnectionState = "disconnected";
     stores.liveUpdatesMode = "live";
     instantEvalRuns.current = undefined;
+    pendingNegatedEval.value = false;
     vi.clearAllMocks();
   });
 
@@ -197,6 +203,21 @@ describe("useTraceNewCount", () => {
       renderHook(() => useTraceNewCount());
 
       expect(lastOptions()).not.toHaveProperty("refetchInterval");
+    });
+  });
+
+  describe("when a NOT eval chip no run has judged yet is in the query", () => {
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("does not query and counts no new trace, as the table shows no row", () => {
+      pendingNegatedEval.value = true;
+      queryResult.data = { count: 7 };
+      queryResult.isLoading = true;
+
+      const { result } = renderHook(() => useTraceNewCount());
+
+      expect(lastOptions().enabled).toBe(false);
+      expect(result.current.count).toBe(0);
+      expect(result.current.isLoading).toBe(false);
     });
   });
 

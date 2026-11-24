@@ -20757,6 +20757,678 @@ func (e GetApiGovernanceRegistrySchema500JSONResponseBodyFault) Valid() bool {
 	}
 }
 
+// Defines values for PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources.
+const (
+	PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSourcesCLOUDTRAILMGMT  PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources = "CLOUD_TRAIL_MGMT"
+	PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSourcesLAMBDAEXECUTION PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources = "LAMBDA_EXECUTION"
+	PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSourcesS3DATA          PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources = "S3_DATA"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources enum.
+func (e PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSourcesCLOUDTRAILMGMT:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSourcesLAMBDAEXECUTION:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSourcesS3DATA:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSources200JSONResponseBodySources.
+const (
+	PostApiGovernanceSecurityLakeSources200JSONResponseBodySourcesCLOUDTRAILMGMT  PostApiGovernanceSecurityLakeSources200JSONResponseBodySources = "CLOUD_TRAIL_MGMT"
+	PostApiGovernanceSecurityLakeSources200JSONResponseBodySourcesLAMBDAEXECUTION PostApiGovernanceSecurityLakeSources200JSONResponseBodySources = "LAMBDA_EXECUTION"
+	PostApiGovernanceSecurityLakeSources200JSONResponseBodySourcesS3DATA          PostApiGovernanceSecurityLakeSources200JSONResponseBodySources = "S3_DATA"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSources200JSONResponseBodySources enum.
+func (e PostApiGovernanceSecurityLakeSources200JSONResponseBodySources) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSources200JSONResponseBodySourcesCLOUDTRAILMGMT:
+		return true
+	case PostApiGovernanceSecurityLakeSources200JSONResponseBodySourcesLAMBDAEXECUTION:
+		return true
+	case PostApiGovernanceSecurityLakeSources200JSONResponseBodySourcesS3DATA:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources422JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSources500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources.
+const (
+	GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesCLOUDTRAILMGMT  GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources = "CLOUD_TRAIL_MGMT"
+	GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesLAMBDAEXECUTION GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources = "LAMBDA_EXECUTION"
+	GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesS3DATA          GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources = "S3_DATA"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources enum.
+func (e GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesCLOUDTRAILMGMT:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesLAMBDAEXECUTION:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesS3DATA:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources.
+const (
+	PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSourcesCLOUDTRAILMGMT  PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources = "CLOUD_TRAIL_MGMT"
+	PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSourcesLAMBDAEXECUTION PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources = "LAMBDA_EXECUTION"
+	PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSourcesS3DATA          PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources = "S3_DATA"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources enum.
+func (e PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSourcesCLOUDTRAILMGMT:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSourcesLAMBDAEXECUTION:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSourcesS3DATA:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus.
+const (
+	PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatusActive   PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus = "active"
+	PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatusDisabled PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus enum.
+func (e PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatusActive:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources.
+const (
+	PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesCLOUDTRAILMGMT  PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources = "CLOUD_TRAIL_MGMT"
+	PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesLAMBDAEXECUTION PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources = "LAMBDA_EXECUTION"
+	PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesS3DATA          PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources = "S3_DATA"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources enum.
+func (e PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesCLOUDTRAILMGMT:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesLAMBDAEXECUTION:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySourcesS3DATA:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault.
+const (
+	PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultCustomer         PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "customer"
+	PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPlatform         PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "platform"
+	PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPresumedPlatform PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "presumed_platform"
+	PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultProvider         PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault enum.
+func (e PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault.
+const (
+	PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultCustomer         PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "customer"
+	PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPlatform         PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "platform"
+	PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPresumedPlatform PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "presumed_platform"
+	PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultProvider         PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault enum.
+func (e PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault.
+const (
+	PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultCustomer         PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "customer"
+	PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPlatform         PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "platform"
+	PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPresumedPlatform PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "presumed_platform"
+	PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultProvider         PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault enum.
+func (e PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault.
+const (
+	PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultCustomer         PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault = "customer"
+	PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultPlatform         PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault = "platform"
+	PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultPresumedPlatform PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault = "presumed_platform"
+	PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultProvider         PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault enum.
+func (e PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault.
+const (
+	PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultCustomer         PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "customer"
+	PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPlatform         PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "platform"
+	PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPresumedPlatform PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "presumed_platform"
+	PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultProvider         PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault enum.
+func (e PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultCustomer:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault.
+const (
+	GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultCustomer         GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault = "customer"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultPlatform         GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault = "platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultPresumedPlatform GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault = "presumed_platform"
+	GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultProvider         GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault enum.
+func (e GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultCustomer:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources.
+const (
+	PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSourcesCLOUDTRAILMGMT  PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources = "CLOUD_TRAIL_MGMT"
+	PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSourcesLAMBDAEXECUTION PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources = "LAMBDA_EXECUTION"
+	PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSourcesS3DATA          PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources = "S3_DATA"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources enum.
+func (e PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSourcesCLOUDTRAILMGMT:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSourcesLAMBDAEXECUTION:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSourcesS3DATA:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault.
+const (
+	PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultCustomer         PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault = "customer"
+	PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultPlatform         PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault = "platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultPresumedPlatform PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault = "presumed_platform"
+	PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultProvider         PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault = "provider"
+)
+
+// Valid indicates whether the value is a known member of the PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault enum.
+func (e PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault) Valid() bool {
+	switch e {
+	case PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultCustomer:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultPresumedPlatform:
+		return true
+	case PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFaultProvider:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListGrantsParamsPrincipalType.
 const (
 	ListGrantsParamsPrincipalTypeApiKey ListGrantsParamsPrincipalType = "apiKey"
@@ -22028,19 +22700,19 @@ func (e PostLangyControlFramesJSONBodyFrames3Type) Valid() bool {
 
 // Defines values for PostLangyControlFramesJSONBodyFrames4Decision.
 const (
-	PostLangyControlFramesJSONBodyFrames4DecisionAllowOnce    PostLangyControlFramesJSONBodyFrames4Decision = "allow_once"
-	PostLangyControlFramesJSONBodyFrames4DecisionAllowPattern PostLangyControlFramesJSONBodyFrames4Decision = "allow_pattern"
-	PostLangyControlFramesJSONBodyFrames4DecisionDeny         PostLangyControlFramesJSONBodyFrames4Decision = "deny"
+	AllowOnce    PostLangyControlFramesJSONBodyFrames4Decision = "allow_once"
+	AllowPattern PostLangyControlFramesJSONBodyFrames4Decision = "allow_pattern"
+	Deny         PostLangyControlFramesJSONBodyFrames4Decision = "deny"
 )
 
 // Valid indicates whether the value is a known member of the PostLangyControlFramesJSONBodyFrames4Decision enum.
 func (e PostLangyControlFramesJSONBodyFrames4Decision) Valid() bool {
 	switch e {
-	case PostLangyControlFramesJSONBodyFrames4DecisionAllowOnce:
+	case AllowOnce:
 		return true
-	case PostLangyControlFramesJSONBodyFrames4DecisionAllowPattern:
+	case AllowPattern:
 		return true
-	case PostLangyControlFramesJSONBodyFrames4DecisionDeny:
+	case Deny:
 		return true
 	default:
 		return false
@@ -44739,8 +45411,8 @@ type PostApiGatewayV1VirtualKeysJSONBody struct {
 			Label *string   `json:"label,omitempty"`
 			Tags  *[]string `json:"tags,omitempty"`
 		} `json:"metadata,omitempty"`
-		ModelsAllowed    *PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed    `json:"modelsAllowed,omitempty"`
-		ProvidersAllowed *PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed `json:"providersAllowed,omitempty"`
+		ModelsAllowed    *[]string `json:"modelsAllowed,omitempty"`
+		ProvidersAllowed *[]string `json:"providersAllowed,omitempty"`
 		RateLimits       *struct {
 			Rpd *PostApiGatewayV1VirtualKeysJSONBody_Config_RateLimits_Rpd `json:"rpd,omitempty"`
 			Rpm *PostApiGatewayV1VirtualKeysJSONBody_Config_RateLimits_Rpm `json:"rpm,omitempty"`
@@ -44795,22 +45467,6 @@ type PostApiGatewayV1VirtualKeysJSONBodyConfigCacheMode string
 
 // PostApiGatewayV1VirtualKeysJSONBodyConfigGuardrailAttachmentsDirection defines parameters for PostApiGatewayV1VirtualKeys.
 type PostApiGatewayV1VirtualKeysJSONBodyConfigGuardrailAttachmentsDirection string
-
-// PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0 defines parameters for PostApiGatewayV1VirtualKeys.
-type PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0 = []string
-
-// PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed defines parameters for PostApiGatewayV1VirtualKeys.
-type PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed struct {
-	union json.RawMessage
-}
-
-// PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0 defines parameters for PostApiGatewayV1VirtualKeys.
-type PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0 = []string
-
-// PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed defines parameters for PostApiGatewayV1VirtualKeys.
-type PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed struct {
-	union json.RawMessage
-}
 
 // PostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0 defines parameters for PostApiGatewayV1VirtualKeys.
 type PostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0 = int
@@ -44944,8 +45600,8 @@ type PatchApiGatewayV1VirtualKeysByIdJSONBody struct {
 			Label *string   `json:"label,omitempty"`
 			Tags  *[]string `json:"tags,omitempty"`
 		} `json:"metadata,omitempty"`
-		ModelsAllowed    *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed    `json:"modelsAllowed,omitempty"`
-		ProvidersAllowed *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed `json:"providersAllowed,omitempty"`
+		ModelsAllowed    *[]string `json:"modelsAllowed,omitempty"`
+		ProvidersAllowed *[]string `json:"providersAllowed,omitempty"`
 		RateLimits       *struct {
 			Rpd *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_RateLimits_Rpd `json:"rpd,omitempty"`
 			Rpm *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_RateLimits_Rpm `json:"rpm,omitempty"`
@@ -44991,22 +45647,6 @@ type PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigCacheMode string
 
 // PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigGuardrailAttachmentsDirection defines parameters for PatchApiGatewayV1VirtualKeysById.
 type PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigGuardrailAttachmentsDirection string
-
-// PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0 defines parameters for PatchApiGatewayV1VirtualKeysById.
-type PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0 = []string
-
-// PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed defines parameters for PatchApiGatewayV1VirtualKeysById.
-type PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed struct {
-	union json.RawMessage
-}
-
-// PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0 defines parameters for PatchApiGatewayV1VirtualKeysById.
-type PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0 = []string
-
-// PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed defines parameters for PatchApiGatewayV1VirtualKeysById.
-type PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed struct {
-	union json.RawMessage
-}
 
 // PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigRateLimitsRpd0 defines parameters for PatchApiGatewayV1VirtualKeysById.
 type PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigRateLimitsRpd0 = int
@@ -52187,6 +52827,14 @@ type GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency struct {
 	union json.RawMessage
 }
 
+// GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0 defines parameters for GetApiExperimentsRuns.
+type GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0 = int
+
+// GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat defines parameters for GetApiExperimentsRuns.
+type GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat struct {
+	union json.RawMessage
+}
+
 // GetApiExperimentsRunsByRunId200JSONResponseBodyStatus defines parameters for GetApiExperimentsRunsByRunId.
 type GetApiExperimentsRunsByRunId200JSONResponseBodyStatus string
 
@@ -52206,6 +52854,14 @@ type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency struct {
 
 // GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatus defines parameters for GetApiExperimentsRunsByRunIdResults.
 type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyEvaluationsStatus string
+
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0 defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0 = int
+
+// GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat defines parameters for GetApiExperimentsRunsByRunIdResults.
+type GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat struct {
+	union json.RawMessage
+}
 
 // GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0 defines parameters for GetApiExperimentsRunsByRunIdResults.
 type GetApiExperimentsRunsByRunIdResults200JSONResponseBodyTargets0 = []struct {
@@ -52260,6 +52916,7 @@ type PostApiExperimentsBySlugRunJSONBody struct {
 	DatasetId      *string                                                                         `json:"dataset_id,omitempty"`
 	DatasetVersion *int                                                                            `json:"dataset_version,omitempty"`
 	Parameters     *map[string]PostApiExperimentsBySlugRunJSONBody_Parameters_AdditionalProperties `json:"parameters,omitempty"`
+	Repeat         *int                                                                            `json:"repeat,omitempty"`
 	RowIndices     *[]int                                                                          `json:"row_indices,omitempty"`
 }
 
@@ -53490,6 +54147,158 @@ type GetApiGovernanceRegistrySchema403JSONResponseBodyFault string
 // GetApiGovernanceRegistrySchema500JSONResponseBodyFault defines parameters for GetApiGovernanceRegistrySchema.
 type GetApiGovernanceRegistrySchema500JSONResponseBodyFault string
 
+// PostApiGovernanceSecurityLakeSourcesJSONBody defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSourcesJSONBody struct {
+	Config struct {
+		MaxMessagesPerRun *int                                                         `json:"maxMessagesPerRun,omitempty"`
+		MaxReceives       *int                                                         `json:"maxReceives,omitempty"`
+		QueueUrl          string                                                       `json:"queueUrl"`
+		Region            string                                                       `json:"region"`
+		S3Endpoint        *string                                                      `json:"s3Endpoint,omitempty"`
+		Schedule          *string                                                      `json:"schedule,omitempty"`
+		Sources           *[]PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources `json:"sources,omitempty"`
+		SqsEndpoint       *string                                                      `json:"sqsEndpoint,omitempty"`
+		SubscriberRoleArn string                                                       `json:"subscriberRoleArn"`
+	} `json:"config"`
+	Credentials struct {
+		AwsAccessKeyId     string  `json:"aws_access_key_id"`
+		AwsSecretAccessKey string  `json:"aws_secret_access_key"`
+		AwsSessionToken    *string `json:"aws_session_token,omitempty"`
+	} `json:"credentials"`
+	Description *string `json:"description,omitempty"`
+	Name        string  `json:"name"`
+}
+
+// PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSourcesJSONBodyConfigSources string
+
+// PostApiGovernanceSecurityLakeSources200JSONResponseBodySources defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSources200JSONResponseBodySources string
+
+// PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSources.
+type PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources defines parameters for GetApiGovernanceSecurityLakeSourcesById.
+type GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources string
+
+// GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesById.
+type GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesById.
+type GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesById.
+type GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesById.
+type GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault string
+
+// PatchApiGovernanceSecurityLakeSourcesByIdJSONBody defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesByIdJSONBody struct {
+	Config *struct {
+		MaxMessagesPerRun *int                                                              `json:"maxMessagesPerRun,omitempty"`
+		MaxReceives       *int                                                              `json:"maxReceives,omitempty"`
+		QueueUrl          *string                                                           `json:"queueUrl,omitempty"`
+		Region            *string                                                           `json:"region,omitempty"`
+		S3Endpoint        *string                                                           `json:"s3Endpoint,omitempty"`
+		Schedule          *string                                                           `json:"schedule,omitempty"`
+		Sources           *[]PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources `json:"sources,omitempty"`
+		SqsEndpoint       *string                                                           `json:"sqsEndpoint,omitempty"`
+		SubscriberRoleArn *string                                                           `json:"subscriberRoleArn,omitempty"`
+	} `json:"config,omitempty"`
+	Credentials *struct {
+		AwsAccessKeyId     string  `json:"aws_access_key_id"`
+		AwsSecretAccessKey string  `json:"aws_secret_access_key"`
+		AwsSessionToken    *string `json:"aws_session_token,omitempty"`
+	} `json:"credentials,omitempty"`
+	Description *string                                                  `json:"description,omitempty"`
+	Name        *string                                                  `json:"name,omitempty"`
+	Status      *PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus `json:"status,omitempty"`
+}
+
+// PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyConfigSources string
+
+// PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesByIdJSONBodyStatus string
+
+// PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources string
+
+// PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault string
+
+// PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault string
+
+// PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault string
+
+// PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault string
+
+// PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault defines parameters for PatchApiGovernanceSecurityLakeSourcesById.
+type PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesByIdHealth.
+type GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesByIdHealth.
+type GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesByIdHealth.
+type GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault string
+
+// GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault defines parameters for GetApiGovernanceSecurityLakeSourcesByIdHealth.
+type GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSourcesByIdTestJSONBody defines parameters for PostApiGovernanceSecurityLakeSourcesByIdTest.
+type PostApiGovernanceSecurityLakeSourcesByIdTestJSONBody struct {
+	Config *struct {
+		MaxMessagesPerRun *int                                                                 `json:"maxMessagesPerRun,omitempty"`
+		MaxReceives       *int                                                                 `json:"maxReceives,omitempty"`
+		QueueUrl          *string                                                              `json:"queueUrl,omitempty"`
+		Region            *string                                                              `json:"region,omitempty"`
+		S3Endpoint        *string                                                              `json:"s3Endpoint,omitempty"`
+		Schedule          *string                                                              `json:"schedule,omitempty"`
+		Sources           *[]PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources `json:"sources,omitempty"`
+		SqsEndpoint       *string                                                              `json:"sqsEndpoint,omitempty"`
+		SubscriberRoleArn *string                                                              `json:"subscriberRoleArn,omitempty"`
+	} `json:"config,omitempty"`
+	Credentials *struct {
+		AwsAccessKeyId     string  `json:"aws_access_key_id"`
+		AwsSecretAccessKey string  `json:"aws_secret_access_key"`
+		AwsSessionToken    *string `json:"aws_session_token,omitempty"`
+	} `json:"credentials,omitempty"`
+}
+
+// PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources defines parameters for PostApiGovernanceSecurityLakeSourcesByIdTest.
+type PostApiGovernanceSecurityLakeSourcesByIdTestJSONBodyConfigSources string
+
+// PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSourcesByIdTest.
+type PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSourcesByIdTest.
+type PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSourcesByIdTest.
+type PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault string
+
+// PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault defines parameters for PostApiGovernanceSecurityLakeSourcesByIdTest.
+type PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault string
+
 // ListGrantsParams defines parameters for ListGrants.
 type ListGrantsParams struct {
 	PrincipalType *ListGrantsParamsPrincipalType `form:"principalType,omitempty" json:"principalType,omitempty"`
@@ -53592,14 +54401,14 @@ type GetApiGraphsParams struct {
 
 // PostApiGraphsJSONBody defines parameters for PostApiGraphs.
 type PostApiGraphsJSONBody struct {
-	ColSpan     *float32                `json:"colSpan,omitempty"`
+	ColSpan     *int                    `json:"colSpan,omitempty"`
 	DashboardId *string                 `json:"dashboardId,omitempty"`
 	Filters     *map[string]interface{} `json:"filters,omitempty"`
 	Graph       map[string]interface{}  `json:"graph"`
-	GridColumn  *float32                `json:"gridColumn,omitempty"`
-	GridRow     *float32                `json:"gridRow,omitempty"`
+	GridColumn  *int                    `json:"gridColumn,omitempty"`
+	GridRow     *int                    `json:"gridRow,omitempty"`
 	Name        string                  `json:"name"`
-	RowSpan     *float32                `json:"rowSpan,omitempty"`
+	RowSpan     *int                    `json:"rowSpan,omitempty"`
 }
 
 // PatchApiGraphsByIdJSONBody defines parameters for PatchApiGraphsById.
@@ -56822,6 +57631,22 @@ type ListRunPlans200JSONResponseBody_Targets_ScenarioMappings_AdditionalProperti
 // ListRunPlans200JSONResponseBodyTargetsType defines parameters for ListRunPlans.
 type ListRunPlans200JSONResponseBodyTargetsType string
 
+// ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0 defines parameters for ListRunPlans.
+type ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0 = int
+
+// ListRunPlans200JSONResponseBody_TraceQuietPeriodMs defines parameters for ListRunPlans.
+type ListRunPlans200JSONResponseBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0 defines parameters for ListRunPlans.
+type ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0 = int
+
+// ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs defines parameters for ListRunPlans.
+type ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
+
 // RunRunPlanJSONBody defines parameters for RunRunPlan.
 type RunRunPlanJSONBody struct {
 	// Config What this run covers and what it runs against. Written onto the run plan the name resolves.
@@ -56864,6 +57689,12 @@ type RunRunPlanJSONBody struct {
 			ScenarioMappings        *map[string]RunRunPlanJSONBody_Config_Targets_ScenarioMappings_AdditionalProperties `json:"scenarioMappings,omitempty"`
 			Type                    RunRunPlanJSONBodyConfigTargetsType                                                 `json:"type"`
 		} `json:"targets"`
+
+		// TraceQuietPeriodMs Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.
+		TraceQuietPeriodMs *RunRunPlanJSONBody_Config_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+		// TraceWaitTimeoutMs Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.
+		TraceWaitTimeoutMs *RunRunPlanJSONBody_Config_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 	} `json:"config"`
 
 	// IdempotencyKey Repeat the same key to make a retry join the batch the first call started instead of running everything again. Send the same request with it: the same key over a different configuration starts its own batch. Defaults to a new key per call.
@@ -57001,6 +57832,22 @@ type RunRunPlanJSONBody_Config_Targets_ScenarioMappings_AdditionalProperties str
 
 // RunRunPlanJSONBodyConfigTargetsType defines parameters for RunRunPlan.
 type RunRunPlanJSONBodyConfigTargetsType string
+
+// RunRunPlanJSONBodyConfigTraceQuietPeriodMs0 defines parameters for RunRunPlan.
+type RunRunPlanJSONBodyConfigTraceQuietPeriodMs0 = int
+
+// RunRunPlanJSONBody_Config_TraceQuietPeriodMs defines parameters for RunRunPlan.
+type RunRunPlanJSONBody_Config_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0 defines parameters for RunRunPlan.
+type RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0 = int
+
+// RunRunPlanJSONBody_Config_TraceWaitTimeoutMs defines parameters for RunRunPlan.
+type RunRunPlanJSONBody_Config_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
 
 // RunRunPlanJSONBodyParameters0 defines parameters for RunRunPlan.
 type RunRunPlanJSONBodyParameters0 = string
@@ -57166,6 +58013,22 @@ type GetRunPlan200JSONResponseBody_Targets_ScenarioMappings_AdditionalProperties
 
 // GetRunPlan200JSONResponseBodyTargetsType defines parameters for GetRunPlan.
 type GetRunPlan200JSONResponseBodyTargetsType string
+
+// GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0 defines parameters for GetRunPlan.
+type GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0 = int
+
+// GetRunPlan200JSONResponseBody_TraceQuietPeriodMs defines parameters for GetRunPlan.
+type GetRunPlan200JSONResponseBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0 defines parameters for GetRunPlan.
+type GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0 = int
+
+// GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs defines parameters for GetRunPlan.
+type GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
 
 // RerunRunPlanJSONBody defines parameters for RerunRunPlan.
 type RerunRunPlanJSONBody struct {
@@ -58089,6 +58952,22 @@ type GetApiScenarios200JSONResponseBody_Parameters_Options_Item struct {
 // GetApiScenarios200JSONResponseBodyParametersType defines parameters for GetApiScenarios.
 type GetApiScenarios200JSONResponseBodyParametersType string
 
+// GetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0 defines parameters for GetApiScenarios.
+type GetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0 = int
+
+// GetApiScenarios200JSONResponseBody_TraceQuietPeriodMs defines parameters for GetApiScenarios.
+type GetApiScenarios200JSONResponseBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// GetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0 defines parameters for GetApiScenarios.
+type GetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0 = int
+
+// GetApiScenarios200JSONResponseBody_TraceWaitTimeoutMs defines parameters for GetApiScenarios.
+type GetApiScenarios200JSONResponseBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
+
 // PostApiScenariosJSONBody defines parameters for PostApiScenarios.
 type PostApiScenariosJSONBody struct {
 	Criteria *[]string `json:"criteria,omitempty"`
@@ -58138,6 +59017,12 @@ type PostApiScenariosJSONBody struct {
 
 	// TestSuiteId The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite.
 	TestSuiteId *string `json:"testSuiteId,omitempty"`
+
+	// TraceQuietPeriodMs Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation.
+	TraceQuietPeriodMs *PostApiScenariosJSONBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+	// TraceWaitTimeoutMs Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation.
+	TraceWaitTimeoutMs *PostApiScenariosJSONBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 }
 
 // PostApiScenariosJSONBodyFields0 defines parameters for PostApiScenarios.
@@ -58223,6 +59108,22 @@ type PostApiScenariosJSONBody_SimulatorModel struct {
 	union json.RawMessage
 }
 
+// PostApiScenariosJSONBodyTraceQuietPeriodMs0 defines parameters for PostApiScenarios.
+type PostApiScenariosJSONBodyTraceQuietPeriodMs0 = int
+
+// PostApiScenariosJSONBody_TraceQuietPeriodMs defines parameters for PostApiScenarios.
+type PostApiScenariosJSONBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// PostApiScenariosJSONBodyTraceWaitTimeoutMs0 defines parameters for PostApiScenarios.
+type PostApiScenariosJSONBodyTraceWaitTimeoutMs0 = int
+
+// PostApiScenariosJSONBody_TraceWaitTimeoutMs defines parameters for PostApiScenarios.
+type PostApiScenariosJSONBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
+
 // PostApiScenarios201JSONResponseBodyFields0 defines parameters for PostApiScenarios.
 type PostApiScenarios201JSONResponseBodyFields0 = string
 
@@ -58283,6 +59184,22 @@ type PostApiScenarios201JSONResponseBody_Parameters_Options_Item struct {
 
 // PostApiScenarios201JSONResponseBodyParametersType defines parameters for PostApiScenarios.
 type PostApiScenarios201JSONResponseBodyParametersType string
+
+// PostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0 defines parameters for PostApiScenarios.
+type PostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0 = int
+
+// PostApiScenarios201JSONResponseBody_TraceQuietPeriodMs defines parameters for PostApiScenarios.
+type PostApiScenarios201JSONResponseBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// PostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0 defines parameters for PostApiScenarios.
+type PostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0 = int
+
+// PostApiScenarios201JSONResponseBody_TraceWaitTimeoutMs defines parameters for PostApiScenarios.
+type PostApiScenarios201JSONResponseBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
 
 // GetApiScenariosById200JSONResponseBodyFields0 defines parameters for GetApiScenariosById.
 type GetApiScenariosById200JSONResponseBodyFields0 = string
@@ -58345,6 +59262,22 @@ type GetApiScenariosById200JSONResponseBody_Parameters_Options_Item struct {
 // GetApiScenariosById200JSONResponseBodyParametersType defines parameters for GetApiScenariosById.
 type GetApiScenariosById200JSONResponseBodyParametersType string
 
+// GetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 defines parameters for GetApiScenariosById.
+type GetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 = int
+
+// GetApiScenariosById200JSONResponseBody_TraceQuietPeriodMs defines parameters for GetApiScenariosById.
+type GetApiScenariosById200JSONResponseBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// GetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 defines parameters for GetApiScenariosById.
+type GetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 = int
+
+// GetApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs defines parameters for GetApiScenariosById.
+type GetApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
+
 // PatchApiScenariosByIdJSONBody defines parameters for PatchApiScenariosById.
 type PatchApiScenariosByIdJSONBody struct {
 	Criteria *[]string `json:"criteria,omitempty"`
@@ -58380,6 +59313,12 @@ type PatchApiScenariosByIdJSONBody struct {
 
 	// TestSuiteId The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite.
 	TestSuiteId *string `json:"testSuiteId,omitempty"`
+
+	// TraceQuietPeriodMs Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation.
+	TraceQuietPeriodMs *PatchApiScenariosByIdJSONBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+	// TraceWaitTimeoutMs Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation.
+	TraceWaitTimeoutMs *PatchApiScenariosByIdJSONBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 }
 
 // PatchApiScenariosByIdJSONBodyFields0 defines parameters for PatchApiScenariosById.
@@ -58459,6 +59398,22 @@ type PatchApiScenariosByIdJSONBody_SimulatorModel struct {
 	union json.RawMessage
 }
 
+// PatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0 defines parameters for PatchApiScenariosById.
+type PatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0 = int
+
+// PatchApiScenariosByIdJSONBody_TraceQuietPeriodMs defines parameters for PatchApiScenariosById.
+type PatchApiScenariosByIdJSONBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// PatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0 defines parameters for PatchApiScenariosById.
+type PatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0 = int
+
+// PatchApiScenariosByIdJSONBody_TraceWaitTimeoutMs defines parameters for PatchApiScenariosById.
+type PatchApiScenariosByIdJSONBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
+
 // PatchApiScenariosById200JSONResponseBodyFields0 defines parameters for PatchApiScenariosById.
 type PatchApiScenariosById200JSONResponseBodyFields0 = string
 
@@ -58520,6 +59475,22 @@ type PatchApiScenariosById200JSONResponseBody_Parameters_Options_Item struct {
 // PatchApiScenariosById200JSONResponseBodyParametersType defines parameters for PatchApiScenariosById.
 type PatchApiScenariosById200JSONResponseBodyParametersType string
 
+// PatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 defines parameters for PatchApiScenariosById.
+type PatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 = int
+
+// PatchApiScenariosById200JSONResponseBody_TraceQuietPeriodMs defines parameters for PatchApiScenariosById.
+type PatchApiScenariosById200JSONResponseBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// PatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 defines parameters for PatchApiScenariosById.
+type PatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 = int
+
+// PatchApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs defines parameters for PatchApiScenariosById.
+type PatchApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
+
 // PutApiScenariosByIdJSONBody defines parameters for PutApiScenariosById.
 type PutApiScenariosByIdJSONBody struct {
 	Criteria *[]string `json:"criteria,omitempty"`
@@ -58555,6 +59526,12 @@ type PutApiScenariosByIdJSONBody struct {
 
 	// TestSuiteId The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite.
 	TestSuiteId *string `json:"testSuiteId,omitempty"`
+
+	// TraceQuietPeriodMs Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it. Null uses the project's recommendation.
+	TraceQuietPeriodMs *PutApiScenariosByIdJSONBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+	// TraceWaitTimeoutMs Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict. Null uses the project's recommendation.
+	TraceWaitTimeoutMs *PutApiScenariosByIdJSONBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 }
 
 // PutApiScenariosByIdJSONBodyFields0 defines parameters for PutApiScenariosById.
@@ -58634,6 +59611,22 @@ type PutApiScenariosByIdJSONBody_SimulatorModel struct {
 	union json.RawMessage
 }
 
+// PutApiScenariosByIdJSONBodyTraceQuietPeriodMs0 defines parameters for PutApiScenariosById.
+type PutApiScenariosByIdJSONBodyTraceQuietPeriodMs0 = int
+
+// PutApiScenariosByIdJSONBody_TraceQuietPeriodMs defines parameters for PutApiScenariosById.
+type PutApiScenariosByIdJSONBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// PutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0 defines parameters for PutApiScenariosById.
+type PutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0 = int
+
+// PutApiScenariosByIdJSONBody_TraceWaitTimeoutMs defines parameters for PutApiScenariosById.
+type PutApiScenariosByIdJSONBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
+
 // PutApiScenariosById200JSONResponseBodyFields0 defines parameters for PutApiScenariosById.
 type PutApiScenariosById200JSONResponseBodyFields0 = string
 
@@ -58694,6 +59687,22 @@ type PutApiScenariosById200JSONResponseBody_Parameters_Options_Item struct {
 
 // PutApiScenariosById200JSONResponseBodyParametersType defines parameters for PutApiScenariosById.
 type PutApiScenariosById200JSONResponseBodyParametersType string
+
+// PutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 defines parameters for PutApiScenariosById.
+type PutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 = int
+
+// PutApiScenariosById200JSONResponseBody_TraceQuietPeriodMs defines parameters for PutApiScenariosById.
+type PutApiScenariosById200JSONResponseBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// PutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 defines parameters for PutApiScenariosById.
+type PutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 = int
+
+// PutApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs defines parameters for PutApiScenariosById.
+type PutApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
 
 // GetApiScenariosByIdVersionsParams defines parameters for GetApiScenariosByIdVersions.
 type GetApiScenariosByIdVersionsParams struct {
@@ -59556,6 +60565,12 @@ type PostApiSuitesByIdRunJSONBody struct {
 		ScenarioMappings        *map[string]PostApiSuitesByIdRunJSONBody_Targets_ScenarioMappings_AdditionalProperties `json:"scenarioMappings,omitempty"`
 		Type                    PostApiSuitesByIdRunJSONBodyTargetsType                                                `json:"type"`
 	} `json:"targets,omitempty"`
+
+	// TraceQuietPeriodMs Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Used only when the id names a test suite.
+	TraceQuietPeriodMs *PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+	// TraceWaitTimeoutMs Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Used only when the id names a test suite.
+	TraceWaitTimeoutMs *PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 }
 
 // PostApiSuitesByIdRunJSONBodyParameters0 defines parameters for PostApiSuitesByIdRun.
@@ -59612,6 +60627,22 @@ type PostApiSuitesByIdRunJSONBody_Targets_ScenarioMappings_AdditionalProperties 
 
 // PostApiSuitesByIdRunJSONBodyTargetsType defines parameters for PostApiSuitesByIdRun.
 type PostApiSuitesByIdRunJSONBodyTargetsType string
+
+// PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0 defines parameters for PostApiSuitesByIdRun.
+type PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0 = int
+
+// PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs defines parameters for PostApiSuitesByIdRun.
+type PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0 defines parameters for PostApiSuitesByIdRun.
+type PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0 = int
+
+// PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs defines parameters for PostApiSuitesByIdRun.
+type PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
 
 // PostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0 defines parameters for PostApiSuitesByIdRun.
 type PostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0 = string
@@ -59978,6 +61009,12 @@ type RunTestSuiteJSONBody struct {
 		ScenarioMappings        *map[string]RunTestSuiteJSONBody_Targets_ScenarioMappings_AdditionalProperties `json:"scenarioMappings,omitempty"`
 		Type                    RunTestSuiteJSONBodyTargetsType                                                `json:"type"`
 	} `json:"targets"`
+
+	// TraceQuietPeriodMs Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.
+	TraceQuietPeriodMs *RunTestSuiteJSONBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+	// TraceWaitTimeoutMs Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.
+	TraceWaitTimeoutMs *RunTestSuiteJSONBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 }
 
 // RunTestSuiteJSONBodyJudgeModel0 defines parameters for RunTestSuite.
@@ -60050,6 +61087,22 @@ type RunTestSuiteJSONBody_Targets_ScenarioMappings_AdditionalProperties struct {
 
 // RunTestSuiteJSONBodyTargetsType defines parameters for RunTestSuite.
 type RunTestSuiteJSONBodyTargetsType string
+
+// RunTestSuiteJSONBodyTraceQuietPeriodMs0 defines parameters for RunTestSuite.
+type RunTestSuiteJSONBodyTraceQuietPeriodMs0 = int
+
+// RunTestSuiteJSONBody_TraceQuietPeriodMs defines parameters for RunTestSuite.
+type RunTestSuiteJSONBody_TraceQuietPeriodMs struct {
+	union json.RawMessage
+}
+
+// RunTestSuiteJSONBodyTraceWaitTimeoutMs0 defines parameters for RunTestSuite.
+type RunTestSuiteJSONBodyTraceWaitTimeoutMs0 = int
+
+// RunTestSuiteJSONBody_TraceWaitTimeoutMs defines parameters for RunTestSuite.
+type RunTestSuiteJSONBody_TraceWaitTimeoutMs struct {
+	union json.RawMessage
+}
 
 // RunTestSuite200JSONResponseBodyItemsTargetRunParameters0 defines parameters for RunTestSuite.
 type RunTestSuite200JSONResponseBodyItemsTargetRunParameters0 = string
@@ -63610,6 +64663,15 @@ type PostApiGovernanceOcsfIngestJSONRequestBody PostApiGovernanceOcsfIngestJSONB
 
 // PostApiGovernanceRegistryArdSearchJSONRequestBody defines body for PostApiGovernanceRegistryArdSearch for application/json ContentType.
 type PostApiGovernanceRegistryArdSearchJSONRequestBody PostApiGovernanceRegistryArdSearchJSONBody
+
+// PostApiGovernanceSecurityLakeSourcesJSONRequestBody defines body for PostApiGovernanceSecurityLakeSources for application/json ContentType.
+type PostApiGovernanceSecurityLakeSourcesJSONRequestBody PostApiGovernanceSecurityLakeSourcesJSONBody
+
+// PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody defines body for PatchApiGovernanceSecurityLakeSourcesById for application/json ContentType.
+type PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody PatchApiGovernanceSecurityLakeSourcesByIdJSONBody
+
+// PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody defines body for PostApiGovernanceSecurityLakeSourcesByIdTest for application/json ContentType.
+type PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody PostApiGovernanceSecurityLakeSourcesByIdTestJSONBody
 
 // CreateGrantJSONRequestBody defines body for CreateGrant for application/json ContentType.
 type CreateGrantJSONRequestBody CreateGrantJSONBody
@@ -85625,78 +86687,6 @@ func (t *PostApiGatewayV1VirtualKeysJSONBody_Budget_LimitUsd) UnmarshalJSON(b []
 	return err
 }
 
-// AsPostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0 returns the union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed as a PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0
-func (t PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed) AsPostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0() (PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0, error) {
-	var body PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromPostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0 overwrites any union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed as the provided PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0
-func (t *PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed) FromPostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0(v PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergePostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0 performs a merge with any union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed, using the provided PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0
-func (t *PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed) MergePostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0(v PostApiGatewayV1VirtualKeysJSONBodyConfigModelsAllowed0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *PostApiGatewayV1VirtualKeysJSONBody_Config_ModelsAllowed) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsPostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0 returns the union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed as a PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0
-func (t PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed) AsPostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0() (PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0, error) {
-	var body PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromPostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0 overwrites any union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed as the provided PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0
-func (t *PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed) FromPostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0(v PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergePostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0 performs a merge with any union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed, using the provided PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0
-func (t *PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed) MergePostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0(v PostApiGatewayV1VirtualKeysJSONBodyConfigProvidersAllowed0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *PostApiGatewayV1VirtualKeysJSONBody_Config_ProvidersAllowed) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
 // AsPostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0 returns the union data inside the PostApiGatewayV1VirtualKeysJSONBody_Config_RateLimits_Rpd as a PostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0
 func (t PostApiGatewayV1VirtualKeysJSONBody_Config_RateLimits_Rpd) AsPostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0() (PostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0, error) {
 	var body PostApiGatewayV1VirtualKeysJSONBodyConfigRateLimitsRpd0
@@ -85971,78 +86961,6 @@ func (t PatchApiGatewayV1VirtualKeysByIdJSONBody_Budget_LimitUsd) MarshalJSON() 
 }
 
 func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Budget_LimitUsd) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0 returns the union data inside the PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed as a PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0
-func (t PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed) AsPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0() (PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0, error) {
-	var body PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0 overwrites any union data inside the PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed as the provided PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0
-func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed) FromPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0(v PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergePatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0 performs a merge with any union data inside the PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed, using the provided PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0
-func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed) MergePatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0(v PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigModelsAllowed0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ModelsAllowed) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0 returns the union data inside the PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed as a PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0
-func (t PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed) AsPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0() (PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0, error) {
-	var body PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0 overwrites any union data inside the PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed as the provided PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0
-func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed) FromPatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0(v PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergePatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0 performs a merge with any union data inside the PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed, using the provided PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0
-func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed) MergePatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0(v PatchApiGatewayV1VirtualKeysByIdJSONBodyConfigProvidersAllowed0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *PatchApiGatewayV1VirtualKeysByIdJSONBody_Config_ProvidersAllowed) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -108975,6 +109893,42 @@ func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency) UnmarshalJSO
 	return err
 }
 
+// AsGetApiExperimentsRuns200JSONResponseBodyRunsRepeat0 returns the union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat as a GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0
+func (t GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat) AsGetApiExperimentsRuns200JSONResponseBodyRunsRepeat0() (GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0, error) {
+	var body GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiExperimentsRuns200JSONResponseBodyRunsRepeat0 overwrites any union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat as the provided GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat) FromGetApiExperimentsRuns200JSONResponseBodyRunsRepeat0(v GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiExperimentsRuns200JSONResponseBodyRunsRepeat0 performs a merge with any union data inside the GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat, using the provided GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat) MergeGetApiExperimentsRuns200JSONResponseBodyRunsRepeat0(v GetApiExperimentsRuns200JSONResponseBodyRunsRepeat0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0 returns the union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency as a GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
 func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0() (GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0, error) {
 	var body GetApiExperimentsRunsByRunIdResults200JSONResponseBodyConcurrency0
@@ -109007,6 +109961,42 @@ func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) Mars
 }
 
 func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Concurrency) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0 returns the union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat as a GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat) AsGetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0() (GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0, error) {
+	var body GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0 overwrites any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat as the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat) FromGetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0 performs a merge with any union data inside the GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat, using the provided GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat) MergeGetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0(v GetApiExperimentsRunsByRunIdResults200JSONResponseBodyRepeat0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -115437,6 +116427,78 @@ func (t *ListRunPlans200JSONResponseBody_Targets_ScenarioMappings_AdditionalProp
 	return err
 }
 
+// AsListRunPlans200JSONResponseBodyTraceQuietPeriodMs0 returns the union data inside the ListRunPlans200JSONResponseBody_TraceQuietPeriodMs as a ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0
+func (t ListRunPlans200JSONResponseBody_TraceQuietPeriodMs) AsListRunPlans200JSONResponseBodyTraceQuietPeriodMs0() (ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0, error) {
+	var body ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromListRunPlans200JSONResponseBodyTraceQuietPeriodMs0 overwrites any union data inside the ListRunPlans200JSONResponseBody_TraceQuietPeriodMs as the provided ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0
+func (t *ListRunPlans200JSONResponseBody_TraceQuietPeriodMs) FromListRunPlans200JSONResponseBodyTraceQuietPeriodMs0(v ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeListRunPlans200JSONResponseBodyTraceQuietPeriodMs0 performs a merge with any union data inside the ListRunPlans200JSONResponseBody_TraceQuietPeriodMs, using the provided ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0
+func (t *ListRunPlans200JSONResponseBody_TraceQuietPeriodMs) MergeListRunPlans200JSONResponseBodyTraceQuietPeriodMs0(v ListRunPlans200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ListRunPlans200JSONResponseBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ListRunPlans200JSONResponseBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0 returns the union data inside the ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs as a ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0
+func (t ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs) AsListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0() (ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0, error) {
+	var body ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0 overwrites any union data inside the ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs as the provided ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs) FromListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0(v ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs, using the provided ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs) MergeListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0(v ListRunPlans200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsRunRunPlanJSONBodyConfigEvaluatorsMappings0 returns the union data inside the RunRunPlanJSONBody_Config_Evaluators_Mappings_AdditionalProperties as a RunRunPlanJSONBodyConfigEvaluatorsMappings0
 func (t RunRunPlanJSONBody_Config_Evaluators_Mappings_AdditionalProperties) AsRunRunPlanJSONBodyConfigEvaluatorsMappings0() (RunRunPlanJSONBodyConfigEvaluatorsMappings0, error) {
 	var body RunRunPlanJSONBodyConfigEvaluatorsMappings0
@@ -115831,6 +116893,78 @@ func (t RunRunPlanJSONBody_Config_Targets_ScenarioMappings_AdditionalProperties)
 }
 
 func (t *RunRunPlanJSONBody_Config_Targets_ScenarioMappings_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRunRunPlanJSONBodyConfigTraceQuietPeriodMs0 returns the union data inside the RunRunPlanJSONBody_Config_TraceQuietPeriodMs as a RunRunPlanJSONBodyConfigTraceQuietPeriodMs0
+func (t RunRunPlanJSONBody_Config_TraceQuietPeriodMs) AsRunRunPlanJSONBodyConfigTraceQuietPeriodMs0() (RunRunPlanJSONBodyConfigTraceQuietPeriodMs0, error) {
+	var body RunRunPlanJSONBodyConfigTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRunRunPlanJSONBodyConfigTraceQuietPeriodMs0 overwrites any union data inside the RunRunPlanJSONBody_Config_TraceQuietPeriodMs as the provided RunRunPlanJSONBodyConfigTraceQuietPeriodMs0
+func (t *RunRunPlanJSONBody_Config_TraceQuietPeriodMs) FromRunRunPlanJSONBodyConfigTraceQuietPeriodMs0(v RunRunPlanJSONBodyConfigTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRunRunPlanJSONBodyConfigTraceQuietPeriodMs0 performs a merge with any union data inside the RunRunPlanJSONBody_Config_TraceQuietPeriodMs, using the provided RunRunPlanJSONBodyConfigTraceQuietPeriodMs0
+func (t *RunRunPlanJSONBody_Config_TraceQuietPeriodMs) MergeRunRunPlanJSONBodyConfigTraceQuietPeriodMs0(v RunRunPlanJSONBodyConfigTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RunRunPlanJSONBody_Config_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RunRunPlanJSONBody_Config_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRunRunPlanJSONBodyConfigTraceWaitTimeoutMs0 returns the union data inside the RunRunPlanJSONBody_Config_TraceWaitTimeoutMs as a RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0
+func (t RunRunPlanJSONBody_Config_TraceWaitTimeoutMs) AsRunRunPlanJSONBodyConfigTraceWaitTimeoutMs0() (RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0, error) {
+	var body RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRunRunPlanJSONBodyConfigTraceWaitTimeoutMs0 overwrites any union data inside the RunRunPlanJSONBody_Config_TraceWaitTimeoutMs as the provided RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0
+func (t *RunRunPlanJSONBody_Config_TraceWaitTimeoutMs) FromRunRunPlanJSONBodyConfigTraceWaitTimeoutMs0(v RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRunRunPlanJSONBodyConfigTraceWaitTimeoutMs0 performs a merge with any union data inside the RunRunPlanJSONBody_Config_TraceWaitTimeoutMs, using the provided RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0
+func (t *RunRunPlanJSONBody_Config_TraceWaitTimeoutMs) MergeRunRunPlanJSONBodyConfigTraceWaitTimeoutMs0(v RunRunPlanJSONBodyConfigTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RunRunPlanJSONBody_Config_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RunRunPlanJSONBody_Config_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -116395,6 +117529,78 @@ func (t GetRunPlan200JSONResponseBody_Targets_ScenarioMappings_AdditionalPropert
 }
 
 func (t *GetRunPlan200JSONResponseBody_Targets_ScenarioMappings_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetRunPlan200JSONResponseBodyTraceQuietPeriodMs0 returns the union data inside the GetRunPlan200JSONResponseBody_TraceQuietPeriodMs as a GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0
+func (t GetRunPlan200JSONResponseBody_TraceQuietPeriodMs) AsGetRunPlan200JSONResponseBodyTraceQuietPeriodMs0() (GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0, error) {
+	var body GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetRunPlan200JSONResponseBodyTraceQuietPeriodMs0 overwrites any union data inside the GetRunPlan200JSONResponseBody_TraceQuietPeriodMs as the provided GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0
+func (t *GetRunPlan200JSONResponseBody_TraceQuietPeriodMs) FromGetRunPlan200JSONResponseBodyTraceQuietPeriodMs0(v GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetRunPlan200JSONResponseBodyTraceQuietPeriodMs0 performs a merge with any union data inside the GetRunPlan200JSONResponseBody_TraceQuietPeriodMs, using the provided GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0
+func (t *GetRunPlan200JSONResponseBody_TraceQuietPeriodMs) MergeGetRunPlan200JSONResponseBodyTraceQuietPeriodMs0(v GetRunPlan200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetRunPlan200JSONResponseBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetRunPlan200JSONResponseBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0 returns the union data inside the GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs as a GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0
+func (t GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs) AsGetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0() (GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0, error) {
+	var body GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0 overwrites any union data inside the GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs as the provided GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs) FromGetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0(v GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs, using the provided GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs) MergeGetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0(v GetRunPlan200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -118917,6 +120123,78 @@ func (t *GetApiScenarios200JSONResponseBody_Parameters_Options_Item) UnmarshalJS
 	return err
 }
 
+// AsGetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0 returns the union data inside the GetApiScenarios200JSONResponseBody_TraceQuietPeriodMs as a GetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0
+func (t GetApiScenarios200JSONResponseBody_TraceQuietPeriodMs) AsGetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0() (GetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0, error) {
+	var body GetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0 overwrites any union data inside the GetApiScenarios200JSONResponseBody_TraceQuietPeriodMs as the provided GetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0
+func (t *GetApiScenarios200JSONResponseBody_TraceQuietPeriodMs) FromGetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0(v GetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0 performs a merge with any union data inside the GetApiScenarios200JSONResponseBody_TraceQuietPeriodMs, using the provided GetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0
+func (t *GetApiScenarios200JSONResponseBody_TraceQuietPeriodMs) MergeGetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0(v GetApiScenarios200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiScenarios200JSONResponseBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiScenarios200JSONResponseBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0 returns the union data inside the GetApiScenarios200JSONResponseBody_TraceWaitTimeoutMs as a GetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0
+func (t GetApiScenarios200JSONResponseBody_TraceWaitTimeoutMs) AsGetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0() (GetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0, error) {
+	var body GetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0 overwrites any union data inside the GetApiScenarios200JSONResponseBody_TraceWaitTimeoutMs as the provided GetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *GetApiScenarios200JSONResponseBody_TraceWaitTimeoutMs) FromGetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0(v GetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the GetApiScenarios200JSONResponseBody_TraceWaitTimeoutMs, using the provided GetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *GetApiScenarios200JSONResponseBody_TraceWaitTimeoutMs) MergeGetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0(v GetApiScenarios200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiScenarios200JSONResponseBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiScenarios200JSONResponseBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPostApiScenariosJSONBodyFields0 returns the union data inside the PostApiScenariosJSONBody_Fields_AdditionalProperties as a PostApiScenariosJSONBodyFields0
 func (t PostApiScenariosJSONBody_Fields_AdditionalProperties) AsPostApiScenariosJSONBodyFields0() (PostApiScenariosJSONBodyFields0, error) {
 	var body PostApiScenariosJSONBodyFields0
@@ -119325,6 +120603,78 @@ func (t *PostApiScenariosJSONBody_SimulatorModel) UnmarshalJSON(b []byte) error 
 	return err
 }
 
+// AsPostApiScenariosJSONBodyTraceQuietPeriodMs0 returns the union data inside the PostApiScenariosJSONBody_TraceQuietPeriodMs as a PostApiScenariosJSONBodyTraceQuietPeriodMs0
+func (t PostApiScenariosJSONBody_TraceQuietPeriodMs) AsPostApiScenariosJSONBodyTraceQuietPeriodMs0() (PostApiScenariosJSONBodyTraceQuietPeriodMs0, error) {
+	var body PostApiScenariosJSONBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiScenariosJSONBodyTraceQuietPeriodMs0 overwrites any union data inside the PostApiScenariosJSONBody_TraceQuietPeriodMs as the provided PostApiScenariosJSONBodyTraceQuietPeriodMs0
+func (t *PostApiScenariosJSONBody_TraceQuietPeriodMs) FromPostApiScenariosJSONBodyTraceQuietPeriodMs0(v PostApiScenariosJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiScenariosJSONBodyTraceQuietPeriodMs0 performs a merge with any union data inside the PostApiScenariosJSONBody_TraceQuietPeriodMs, using the provided PostApiScenariosJSONBodyTraceQuietPeriodMs0
+func (t *PostApiScenariosJSONBody_TraceQuietPeriodMs) MergePostApiScenariosJSONBodyTraceQuietPeriodMs0(v PostApiScenariosJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiScenariosJSONBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiScenariosJSONBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiScenariosJSONBodyTraceWaitTimeoutMs0 returns the union data inside the PostApiScenariosJSONBody_TraceWaitTimeoutMs as a PostApiScenariosJSONBodyTraceWaitTimeoutMs0
+func (t PostApiScenariosJSONBody_TraceWaitTimeoutMs) AsPostApiScenariosJSONBodyTraceWaitTimeoutMs0() (PostApiScenariosJSONBodyTraceWaitTimeoutMs0, error) {
+	var body PostApiScenariosJSONBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiScenariosJSONBodyTraceWaitTimeoutMs0 overwrites any union data inside the PostApiScenariosJSONBody_TraceWaitTimeoutMs as the provided PostApiScenariosJSONBodyTraceWaitTimeoutMs0
+func (t *PostApiScenariosJSONBody_TraceWaitTimeoutMs) FromPostApiScenariosJSONBodyTraceWaitTimeoutMs0(v PostApiScenariosJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiScenariosJSONBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the PostApiScenariosJSONBody_TraceWaitTimeoutMs, using the provided PostApiScenariosJSONBodyTraceWaitTimeoutMs0
+func (t *PostApiScenariosJSONBody_TraceWaitTimeoutMs) MergePostApiScenariosJSONBodyTraceWaitTimeoutMs0(v PostApiScenariosJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiScenariosJSONBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiScenariosJSONBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPostApiScenarios201JSONResponseBodyFields0 returns the union data inside the PostApiScenarios201JSONResponseBody_Fields_AdditionalProperties as a PostApiScenarios201JSONResponseBodyFields0
 func (t PostApiScenarios201JSONResponseBody_Fields_AdditionalProperties) AsPostApiScenarios201JSONResponseBodyFields0() (PostApiScenarios201JSONResponseBodyFields0, error) {
 	var body PostApiScenarios201JSONResponseBodyFields0
@@ -119661,6 +121011,78 @@ func (t *PostApiScenarios201JSONResponseBody_Parameters_Options_Item) UnmarshalJ
 	return err
 }
 
+// AsPostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0 returns the union data inside the PostApiScenarios201JSONResponseBody_TraceQuietPeriodMs as a PostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0
+func (t PostApiScenarios201JSONResponseBody_TraceQuietPeriodMs) AsPostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0() (PostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0, error) {
+	var body PostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0 overwrites any union data inside the PostApiScenarios201JSONResponseBody_TraceQuietPeriodMs as the provided PostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0
+func (t *PostApiScenarios201JSONResponseBody_TraceQuietPeriodMs) FromPostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0(v PostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0 performs a merge with any union data inside the PostApiScenarios201JSONResponseBody_TraceQuietPeriodMs, using the provided PostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0
+func (t *PostApiScenarios201JSONResponseBody_TraceQuietPeriodMs) MergePostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0(v PostApiScenarios201JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiScenarios201JSONResponseBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiScenarios201JSONResponseBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0 returns the union data inside the PostApiScenarios201JSONResponseBody_TraceWaitTimeoutMs as a PostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0
+func (t PostApiScenarios201JSONResponseBody_TraceWaitTimeoutMs) AsPostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0() (PostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0, error) {
+	var body PostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0 overwrites any union data inside the PostApiScenarios201JSONResponseBody_TraceWaitTimeoutMs as the provided PostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0
+func (t *PostApiScenarios201JSONResponseBody_TraceWaitTimeoutMs) FromPostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0(v PostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the PostApiScenarios201JSONResponseBody_TraceWaitTimeoutMs, using the provided PostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0
+func (t *PostApiScenarios201JSONResponseBody_TraceWaitTimeoutMs) MergePostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0(v PostApiScenarios201JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiScenarios201JSONResponseBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiScenarios201JSONResponseBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsGetApiScenariosById200JSONResponseBodyFields0 returns the union data inside the GetApiScenariosById200JSONResponseBody_Fields_AdditionalProperties as a GetApiScenariosById200JSONResponseBodyFields0
 func (t GetApiScenariosById200JSONResponseBody_Fields_AdditionalProperties) AsGetApiScenariosById200JSONResponseBodyFields0() (GetApiScenariosById200JSONResponseBodyFields0, error) {
 	var body GetApiScenariosById200JSONResponseBodyFields0
@@ -119993,6 +121415,78 @@ func (t GetApiScenariosById200JSONResponseBody_Parameters_Options_Item) MarshalJ
 }
 
 func (t *GetApiScenariosById200JSONResponseBody_Parameters_Options_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 returns the union data inside the GetApiScenariosById200JSONResponseBody_TraceQuietPeriodMs as a GetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0
+func (t GetApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) AsGetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0() (GetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0, error) {
+	var body GetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 overwrites any union data inside the GetApiScenariosById200JSONResponseBody_TraceQuietPeriodMs as the provided GetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0
+func (t *GetApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) FromGetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0(v GetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 performs a merge with any union data inside the GetApiScenariosById200JSONResponseBody_TraceQuietPeriodMs, using the provided GetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0
+func (t *GetApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) MergeGetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0(v GetApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsGetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 returns the union data inside the GetApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs as a GetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0
+func (t GetApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) AsGetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0() (GetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0, error) {
+	var body GetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromGetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 overwrites any union data inside the GetApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs as the provided GetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *GetApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) FromGetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0(v GetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeGetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the GetApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs, using the provided GetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *GetApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) MergeGetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0(v GetApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t GetApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *GetApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -120405,6 +121899,78 @@ func (t *PatchApiScenariosByIdJSONBody_SimulatorModel) UnmarshalJSON(b []byte) e
 	return err
 }
 
+// AsPatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0 returns the union data inside the PatchApiScenariosByIdJSONBody_TraceQuietPeriodMs as a PatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0
+func (t PatchApiScenariosByIdJSONBody_TraceQuietPeriodMs) AsPatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0() (PatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0, error) {
+	var body PatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0 overwrites any union data inside the PatchApiScenariosByIdJSONBody_TraceQuietPeriodMs as the provided PatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0
+func (t *PatchApiScenariosByIdJSONBody_TraceQuietPeriodMs) FromPatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0(v PatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0 performs a merge with any union data inside the PatchApiScenariosByIdJSONBody_TraceQuietPeriodMs, using the provided PatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0
+func (t *PatchApiScenariosByIdJSONBody_TraceQuietPeriodMs) MergePatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0(v PatchApiScenariosByIdJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiScenariosByIdJSONBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiScenariosByIdJSONBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0 returns the union data inside the PatchApiScenariosByIdJSONBody_TraceWaitTimeoutMs as a PatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0
+func (t PatchApiScenariosByIdJSONBody_TraceWaitTimeoutMs) AsPatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0() (PatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0, error) {
+	var body PatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0 overwrites any union data inside the PatchApiScenariosByIdJSONBody_TraceWaitTimeoutMs as the provided PatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0
+func (t *PatchApiScenariosByIdJSONBody_TraceWaitTimeoutMs) FromPatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0(v PatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the PatchApiScenariosByIdJSONBody_TraceWaitTimeoutMs, using the provided PatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0
+func (t *PatchApiScenariosByIdJSONBody_TraceWaitTimeoutMs) MergePatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0(v PatchApiScenariosByIdJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiScenariosByIdJSONBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiScenariosByIdJSONBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPatchApiScenariosById200JSONResponseBodyFields0 returns the union data inside the PatchApiScenariosById200JSONResponseBody_Fields_AdditionalProperties as a PatchApiScenariosById200JSONResponseBodyFields0
 func (t PatchApiScenariosById200JSONResponseBody_Fields_AdditionalProperties) AsPatchApiScenariosById200JSONResponseBodyFields0() (PatchApiScenariosById200JSONResponseBodyFields0, error) {
 	var body PatchApiScenariosById200JSONResponseBodyFields0
@@ -120737,6 +122303,78 @@ func (t PatchApiScenariosById200JSONResponseBody_Parameters_Options_Item) Marsha
 }
 
 func (t *PatchApiScenariosById200JSONResponseBody_Parameters_Options_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 returns the union data inside the PatchApiScenariosById200JSONResponseBody_TraceQuietPeriodMs as a PatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0
+func (t PatchApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) AsPatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0() (PatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0, error) {
+	var body PatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 overwrites any union data inside the PatchApiScenariosById200JSONResponseBody_TraceQuietPeriodMs as the provided PatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0
+func (t *PatchApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) FromPatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0(v PatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 performs a merge with any union data inside the PatchApiScenariosById200JSONResponseBody_TraceQuietPeriodMs, using the provided PatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0
+func (t *PatchApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) MergePatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0(v PatchApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 returns the union data inside the PatchApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs as a PatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0
+func (t PatchApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) AsPatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0() (PatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0, error) {
+	var body PatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 overwrites any union data inside the PatchApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs as the provided PatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *PatchApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) FromPatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0(v PatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the PatchApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs, using the provided PatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *PatchApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) MergePatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0(v PatchApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PatchApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PatchApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -121149,6 +122787,78 @@ func (t *PutApiScenariosByIdJSONBody_SimulatorModel) UnmarshalJSON(b []byte) err
 	return err
 }
 
+// AsPutApiScenariosByIdJSONBodyTraceQuietPeriodMs0 returns the union data inside the PutApiScenariosByIdJSONBody_TraceQuietPeriodMs as a PutApiScenariosByIdJSONBodyTraceQuietPeriodMs0
+func (t PutApiScenariosByIdJSONBody_TraceQuietPeriodMs) AsPutApiScenariosByIdJSONBodyTraceQuietPeriodMs0() (PutApiScenariosByIdJSONBodyTraceQuietPeriodMs0, error) {
+	var body PutApiScenariosByIdJSONBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPutApiScenariosByIdJSONBodyTraceQuietPeriodMs0 overwrites any union data inside the PutApiScenariosByIdJSONBody_TraceQuietPeriodMs as the provided PutApiScenariosByIdJSONBodyTraceQuietPeriodMs0
+func (t *PutApiScenariosByIdJSONBody_TraceQuietPeriodMs) FromPutApiScenariosByIdJSONBodyTraceQuietPeriodMs0(v PutApiScenariosByIdJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutApiScenariosByIdJSONBodyTraceQuietPeriodMs0 performs a merge with any union data inside the PutApiScenariosByIdJSONBody_TraceQuietPeriodMs, using the provided PutApiScenariosByIdJSONBodyTraceQuietPeriodMs0
+func (t *PutApiScenariosByIdJSONBody_TraceQuietPeriodMs) MergePutApiScenariosByIdJSONBodyTraceQuietPeriodMs0(v PutApiScenariosByIdJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutApiScenariosByIdJSONBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutApiScenariosByIdJSONBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0 returns the union data inside the PutApiScenariosByIdJSONBody_TraceWaitTimeoutMs as a PutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0
+func (t PutApiScenariosByIdJSONBody_TraceWaitTimeoutMs) AsPutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0() (PutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0, error) {
+	var body PutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0 overwrites any union data inside the PutApiScenariosByIdJSONBody_TraceWaitTimeoutMs as the provided PutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0
+func (t *PutApiScenariosByIdJSONBody_TraceWaitTimeoutMs) FromPutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0(v PutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the PutApiScenariosByIdJSONBody_TraceWaitTimeoutMs, using the provided PutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0
+func (t *PutApiScenariosByIdJSONBody_TraceWaitTimeoutMs) MergePutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0(v PutApiScenariosByIdJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutApiScenariosByIdJSONBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutApiScenariosByIdJSONBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPutApiScenariosById200JSONResponseBodyFields0 returns the union data inside the PutApiScenariosById200JSONResponseBody_Fields_AdditionalProperties as a PutApiScenariosById200JSONResponseBodyFields0
 func (t PutApiScenariosById200JSONResponseBody_Fields_AdditionalProperties) AsPutApiScenariosById200JSONResponseBodyFields0() (PutApiScenariosById200JSONResponseBodyFields0, error) {
 	var body PutApiScenariosById200JSONResponseBodyFields0
@@ -121481,6 +123191,78 @@ func (t PutApiScenariosById200JSONResponseBody_Parameters_Options_Item) MarshalJ
 }
 
 func (t *PutApiScenariosById200JSONResponseBody_Parameters_Options_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 returns the union data inside the PutApiScenariosById200JSONResponseBody_TraceQuietPeriodMs as a PutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0
+func (t PutApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) AsPutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0() (PutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0, error) {
+	var body PutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 overwrites any union data inside the PutApiScenariosById200JSONResponseBody_TraceQuietPeriodMs as the provided PutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0
+func (t *PutApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) FromPutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0(v PutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0 performs a merge with any union data inside the PutApiScenariosById200JSONResponseBody_TraceQuietPeriodMs, using the provided PutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0
+func (t *PutApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) MergePutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0(v PutApiScenariosById200JSONResponseBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutApiScenariosById200JSONResponseBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 returns the union data inside the PutApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs as a PutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0
+func (t PutApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) AsPutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0() (PutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0, error) {
+	var body PutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 overwrites any union data inside the PutApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs as the provided PutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *PutApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) FromPutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0(v PutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the PutApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs, using the provided PutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0
+func (t *PutApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) MergePutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0(v PutApiScenariosById200JSONResponseBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -123943,6 +125725,78 @@ func (t *PostApiSuitesByIdRunJSONBody_Targets_ScenarioMappings_AdditionalPropert
 	return err
 }
 
+// AsPostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0 returns the union data inside the PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs as a PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0
+func (t PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs) AsPostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0() (PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0, error) {
+	var body PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0 overwrites any union data inside the PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs as the provided PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0
+func (t *PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs) FromPostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0(v PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0 performs a merge with any union data inside the PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs, using the provided PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0
+func (t *PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs) MergePostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0(v PostApiSuitesByIdRunJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiSuitesByIdRunJSONBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0 returns the union data inside the PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs as a PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0
+func (t PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs) AsPostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0() (PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0, error) {
+	var body PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0 overwrites any union data inside the PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs as the provided PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0
+func (t *PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs) FromPostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0(v PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs, using the provided PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0
+func (t *PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs) MergePostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0(v PostApiSuitesByIdRunJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostApiSuitesByIdRunJSONBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0 returns the union data inside the PostApiSuitesByIdRun200JSONResponseBody_Items_Target_RunParameters_AdditionalProperties as a PostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0
 func (t PostApiSuitesByIdRun200JSONResponseBody_Items_Target_RunParameters_AdditionalProperties) AsPostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0() (PostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0, error) {
 	var body PostApiSuitesByIdRun200JSONResponseBodyItemsTargetRunParameters0
@@ -124771,6 +126625,78 @@ func (t RunTestSuiteJSONBody_Targets_ScenarioMappings_AdditionalProperties) Mars
 }
 
 func (t *RunTestSuiteJSONBody_Targets_ScenarioMappings_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRunTestSuiteJSONBodyTraceQuietPeriodMs0 returns the union data inside the RunTestSuiteJSONBody_TraceQuietPeriodMs as a RunTestSuiteJSONBodyTraceQuietPeriodMs0
+func (t RunTestSuiteJSONBody_TraceQuietPeriodMs) AsRunTestSuiteJSONBodyTraceQuietPeriodMs0() (RunTestSuiteJSONBodyTraceQuietPeriodMs0, error) {
+	var body RunTestSuiteJSONBodyTraceQuietPeriodMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRunTestSuiteJSONBodyTraceQuietPeriodMs0 overwrites any union data inside the RunTestSuiteJSONBody_TraceQuietPeriodMs as the provided RunTestSuiteJSONBodyTraceQuietPeriodMs0
+func (t *RunTestSuiteJSONBody_TraceQuietPeriodMs) FromRunTestSuiteJSONBodyTraceQuietPeriodMs0(v RunTestSuiteJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRunTestSuiteJSONBodyTraceQuietPeriodMs0 performs a merge with any union data inside the RunTestSuiteJSONBody_TraceQuietPeriodMs, using the provided RunTestSuiteJSONBodyTraceQuietPeriodMs0
+func (t *RunTestSuiteJSONBody_TraceQuietPeriodMs) MergeRunTestSuiteJSONBodyTraceQuietPeriodMs0(v RunTestSuiteJSONBodyTraceQuietPeriodMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RunTestSuiteJSONBody_TraceQuietPeriodMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RunTestSuiteJSONBody_TraceQuietPeriodMs) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRunTestSuiteJSONBodyTraceWaitTimeoutMs0 returns the union data inside the RunTestSuiteJSONBody_TraceWaitTimeoutMs as a RunTestSuiteJSONBodyTraceWaitTimeoutMs0
+func (t RunTestSuiteJSONBody_TraceWaitTimeoutMs) AsRunTestSuiteJSONBodyTraceWaitTimeoutMs0() (RunTestSuiteJSONBodyTraceWaitTimeoutMs0, error) {
+	var body RunTestSuiteJSONBodyTraceWaitTimeoutMs0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRunTestSuiteJSONBodyTraceWaitTimeoutMs0 overwrites any union data inside the RunTestSuiteJSONBody_TraceWaitTimeoutMs as the provided RunTestSuiteJSONBodyTraceWaitTimeoutMs0
+func (t *RunTestSuiteJSONBody_TraceWaitTimeoutMs) FromRunTestSuiteJSONBodyTraceWaitTimeoutMs0(v RunTestSuiteJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRunTestSuiteJSONBodyTraceWaitTimeoutMs0 performs a merge with any union data inside the RunTestSuiteJSONBody_TraceWaitTimeoutMs, using the provided RunTestSuiteJSONBodyTraceWaitTimeoutMs0
+func (t *RunTestSuiteJSONBody_TraceWaitTimeoutMs) MergeRunTestSuiteJSONBodyTraceWaitTimeoutMs0(v RunTestSuiteJSONBodyTraceWaitTimeoutMs0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RunTestSuiteJSONBody_TraceWaitTimeoutMs) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RunTestSuiteJSONBody_TraceWaitTimeoutMs) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -136030,6 +137956,27 @@ type ClientInterface interface {
 	// GetApiGovernanceRegistrySchema request
 	GetApiGovernanceRegistrySchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PostApiGovernanceSecurityLakeSourcesWithBody request with any body
+	PostApiGovernanceSecurityLakeSourcesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostApiGovernanceSecurityLakeSources(ctx context.Context, body PostApiGovernanceSecurityLakeSourcesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiGovernanceSecurityLakeSourcesById request
+	GetApiGovernanceSecurityLakeSourcesById(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchApiGovernanceSecurityLakeSourcesByIdWithBody request with any body
+	PatchApiGovernanceSecurityLakeSourcesByIdWithBody(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PatchApiGovernanceSecurityLakeSourcesById(ctx context.Context, sourceId string, body PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiGovernanceSecurityLakeSourcesByIdHealth request
+	GetApiGovernanceSecurityLakeSourcesByIdHealth(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostApiGovernanceSecurityLakeSourcesByIdTestWithBody request with any body
+	PostApiGovernanceSecurityLakeSourcesByIdTestWithBody(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PostApiGovernanceSecurityLakeSourcesByIdTest(ctx context.Context, sourceId string, body PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListGrants request
 	ListGrants(ctx context.Context, params *ListGrantsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -136739,6 +138686,9 @@ type ClientInterface interface {
 	PostApiTracesSearchWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	PostApiTracesSearch(ctx context.Context, body PostApiTracesSearchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetApiTracesSettleSettings request
+	GetApiTracesSettleSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetApiTracesByTraceId request
 	GetApiTracesByTraceId(ctx context.Context, traceId string, params *GetApiTracesByTraceIdParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -140543,6 +142493,102 @@ func (c *Client) GetApiGovernanceRegistrySchema(ctx context.Context, reqEditors 
 	return c.Client.Do(req)
 }
 
+func (c *Client) PostApiGovernanceSecurityLakeSourcesWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiGovernanceSecurityLakeSourcesRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiGovernanceSecurityLakeSources(ctx context.Context, body PostApiGovernanceSecurityLakeSourcesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiGovernanceSecurityLakeSourcesRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiGovernanceSecurityLakeSourcesById(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiGovernanceSecurityLakeSourcesByIdRequest(c.Server, sourceId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PatchApiGovernanceSecurityLakeSourcesByIdWithBody(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchApiGovernanceSecurityLakeSourcesByIdRequestWithBody(c.Server, sourceId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PatchApiGovernanceSecurityLakeSourcesById(ctx context.Context, sourceId string, body PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchApiGovernanceSecurityLakeSourcesByIdRequest(c.Server, sourceId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiGovernanceSecurityLakeSourcesByIdHealth(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiGovernanceSecurityLakeSourcesByIdHealthRequest(c.Server, sourceId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiGovernanceSecurityLakeSourcesByIdTestWithBody(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiGovernanceSecurityLakeSourcesByIdTestRequestWithBody(c.Server, sourceId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PostApiGovernanceSecurityLakeSourcesByIdTest(ctx context.Context, sourceId string, body PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostApiGovernanceSecurityLakeSourcesByIdTestRequest(c.Server, sourceId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListGrants(ctx context.Context, params *ListGrantsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListGrantsRequest(c.Server, params)
 	if err != nil {
@@ -143677,6 +145723,18 @@ func (c *Client) PostApiTracesSearchWithBody(ctx context.Context, contentType st
 
 func (c *Client) PostApiTracesSearch(ctx context.Context, body PostApiTracesSearchJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostApiTracesSearchRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetApiTracesSettleSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetApiTracesSettleSettingsRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -154436,6 +156494,208 @@ func NewGetApiGovernanceRegistrySchemaRequest(server string) (*http.Request, err
 	return req, nil
 }
 
+// NewPostApiGovernanceSecurityLakeSourcesRequest calls the generic PostApiGovernanceSecurityLakeSources builder with application/json body
+func NewPostApiGovernanceSecurityLakeSourcesRequest(server string, body PostApiGovernanceSecurityLakeSourcesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostApiGovernanceSecurityLakeSourcesRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostApiGovernanceSecurityLakeSourcesRequestWithBody generates requests for PostApiGovernanceSecurityLakeSources with any type of body
+func NewPostApiGovernanceSecurityLakeSourcesRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/security-lake/sources")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiGovernanceSecurityLakeSourcesByIdRequest generates requests for GetApiGovernanceSecurityLakeSourcesById
+func NewGetApiGovernanceSecurityLakeSourcesByIdRequest(server string, sourceId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sourceId", sourceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/security-lake/sources/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPatchApiGovernanceSecurityLakeSourcesByIdRequest calls the generic PatchApiGovernanceSecurityLakeSourcesById builder with application/json body
+func NewPatchApiGovernanceSecurityLakeSourcesByIdRequest(server string, sourceId string, body PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPatchApiGovernanceSecurityLakeSourcesByIdRequestWithBody(server, sourceId, "application/json", bodyReader)
+}
+
+// NewPatchApiGovernanceSecurityLakeSourcesByIdRequestWithBody generates requests for PatchApiGovernanceSecurityLakeSourcesById with any type of body
+func NewPatchApiGovernanceSecurityLakeSourcesByIdRequestWithBody(server string, sourceId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sourceId", sourceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/security-lake/sources/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetApiGovernanceSecurityLakeSourcesByIdHealthRequest generates requests for GetApiGovernanceSecurityLakeSourcesByIdHealth
+func NewGetApiGovernanceSecurityLakeSourcesByIdHealthRequest(server string, sourceId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sourceId", sourceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/security-lake/sources/%s/health", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostApiGovernanceSecurityLakeSourcesByIdTestRequest calls the generic PostApiGovernanceSecurityLakeSourcesByIdTest builder with application/json body
+func NewPostApiGovernanceSecurityLakeSourcesByIdTestRequest(server string, sourceId string, body PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostApiGovernanceSecurityLakeSourcesByIdTestRequestWithBody(server, sourceId, "application/json", bodyReader)
+}
+
+// NewPostApiGovernanceSecurityLakeSourcesByIdTestRequestWithBody generates requests for PostApiGovernanceSecurityLakeSourcesByIdTest with any type of body
+func NewPostApiGovernanceSecurityLakeSourcesByIdTestRequestWithBody(server string, sourceId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sourceId", sourceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/governance/security-lake/sources/%s/test", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListGrantsRequest generates requests for ListGrants
 func NewListGrantsRequest(server string, params *ListGrantsParams) (*http.Request, error) {
 	var err error
@@ -162631,6 +164891,33 @@ func NewPostApiTracesSearchRequestWithBody(server string, contentType string, bo
 	return req, nil
 }
 
+// NewGetApiTracesSettleSettingsRequest generates requests for GetApiTracesSettleSettings
+func NewGetApiTracesSettleSettingsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/traces/settle-settings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetApiTracesByTraceIdRequest generates requests for GetApiTracesByTraceId
 func NewGetApiTracesByTraceIdRequest(server string, traceId string, params *GetApiTracesByTraceIdParams) (*http.Request, error) {
 	var err error
@@ -165034,6 +167321,27 @@ type ClientWithResponsesInterface interface {
 	// GetApiGovernanceRegistrySchemaWithResponse request
 	GetApiGovernanceRegistrySchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiGovernanceRegistrySchemaResponse, error)
 
+	// PostApiGovernanceSecurityLakeSourcesWithBodyWithResponse request with any body
+	PostApiGovernanceSecurityLakeSourcesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesResponse, error)
+
+	PostApiGovernanceSecurityLakeSourcesWithResponse(ctx context.Context, body PostApiGovernanceSecurityLakeSourcesJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesResponse, error)
+
+	// GetApiGovernanceSecurityLakeSourcesByIdWithResponse request
+	GetApiGovernanceSecurityLakeSourcesByIdWithResponse(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*GetApiGovernanceSecurityLakeSourcesByIdResponse, error)
+
+	// PatchApiGovernanceSecurityLakeSourcesByIdWithBodyWithResponse request with any body
+	PatchApiGovernanceSecurityLakeSourcesByIdWithBodyWithResponse(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiGovernanceSecurityLakeSourcesByIdResponse, error)
+
+	PatchApiGovernanceSecurityLakeSourcesByIdWithResponse(ctx context.Context, sourceId string, body PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiGovernanceSecurityLakeSourcesByIdResponse, error)
+
+	// GetApiGovernanceSecurityLakeSourcesByIdHealthWithResponse request
+	GetApiGovernanceSecurityLakeSourcesByIdHealthWithResponse(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*GetApiGovernanceSecurityLakeSourcesByIdHealthResponse, error)
+
+	// PostApiGovernanceSecurityLakeSourcesByIdTestWithBodyWithResponse request with any body
+	PostApiGovernanceSecurityLakeSourcesByIdTestWithBodyWithResponse(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesByIdTestResponse, error)
+
+	PostApiGovernanceSecurityLakeSourcesByIdTestWithResponse(ctx context.Context, sourceId string, body PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesByIdTestResponse, error)
+
 	// ListGrantsWithResponse request
 	ListGrantsWithResponse(ctx context.Context, params *ListGrantsParams, reqEditors ...RequestEditorFn) (*ListGrantsResponse, error)
 
@@ -165743,6 +168051,9 @@ type ClientWithResponsesInterface interface {
 	PostApiTracesSearchWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiTracesSearchResponse, error)
 
 	PostApiTracesSearchWithResponse(ctx context.Context, body PostApiTracesSearchJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiTracesSearchResponse, error)
+
+	// GetApiTracesSettleSettingsWithResponse request
+	GetApiTracesSettleSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiTracesSettleSettingsResponse, error)
 
 	// GetApiTracesByTraceIdWithResponse request
 	GetApiTracesByTraceIdWithResponse(ctx context.Context, traceId string, params *GetApiTracesByTraceIdParams, reqEditors ...RequestEditorFn) (*GetApiTracesByTraceIdResponse, error)
@@ -178419,8 +180730,11 @@ type GetApiExperimentsRunsResponse struct {
 			Concurrency  *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency `json:"concurrency,omitempty"`
 			ExperimentId string                                                     `json:"experimentId"`
 			Progress     *float32                                                   `json:"progress,omitempty"`
-			RunId        string                                                     `json:"runId"`
-			Summary      struct {
+
+			// Repeat How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.
+			Repeat  *GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat `json:"repeat,omitempty"`
+			RunId   string                                                `json:"runId"`
+			Summary struct {
 				DatasetAverageCost     *float32 `json:"datasetAverageCost,omitempty"`
 				DatasetAverageDuration *float32 `json:"datasetAverageDuration,omitempty"`
 				DatasetCost            *float32 `json:"datasetCost,omitempty"`
@@ -178673,7 +180987,10 @@ type GetApiExperimentsRunsByRunIdResultsResponse struct {
 		ExperimentId string   `json:"experimentId"`
 		Progress     *float32 `json:"progress,omitempty"`
 		ProjectId    string   `json:"projectId"`
-		RunId        string   `json:"runId"`
+
+		// Repeat How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.
+		Repeat *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat `json:"repeat,omitempty"`
+		RunId  string                                                         `json:"runId"`
 
 		// Targets Resolves the targetId each dataset row and evaluation carries
 		Targets    *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets `json:"targets,omitempty"`
@@ -182838,6 +185155,632 @@ func (r GetApiGovernanceRegistrySchemaResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetApiGovernanceRegistrySchemaResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiGovernanceSecurityLakeSourcesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ExternalId        string                                                           `json:"externalId"`
+		Id                string                                                           `json:"id"`
+		Name              string                                                           `json:"name"`
+		QueueUrl          string                                                           `json:"queueUrl"`
+		Region            string                                                           `json:"region"`
+		Schedule          *string                                                          `json:"schedule"`
+		Sources           []PostApiGovernanceSecurityLakeSources200JSONResponseBodySources `json:"sources"`
+		Status            string                                                           `json:"status"`
+		SubscriberRoleArn string                                                           `json:"subscriberRoleArn"`
+	}
+	JSON400 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON422 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                        `json:"code"`
+		DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                        `json:"message"`
+		Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+		Retryable bool                                                          `json:"retryable"`
+		SpanId    *string                                                       `json:"span_id,omitempty"`
+		Tips      *[]string                                                     `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiGovernanceSecurityLakeSourcesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiGovernanceSecurityLakeSourcesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiGovernanceSecurityLakeSourcesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiGovernanceSecurityLakeSourcesByIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ExternalId        string                                                              `json:"externalId"`
+		Id                string                                                              `json:"id"`
+		Name              string                                                              `json:"name"`
+		QueueUrl          string                                                              `json:"queueUrl"`
+		Region            string                                                              `json:"region"`
+		Schedule          *string                                                             `json:"schedule"`
+		Sources           []GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources `json:"sources"`
+		Status            string                                                              `json:"status"`
+		SubscriberRoleArn string                                                              `json:"subscriberRoleArn"`
+	}
+	JSON400 *struct {
+		Code      string                                                           `json:"code"`
+		DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                           `json:"message"`
+		Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+		Retryable bool                                                             `json:"retryable"`
+		SpanId    *string                                                          `json:"span_id,omitempty"`
+		Tips      *[]string                                                        `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                           `json:"code"`
+		DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                           `json:"message"`
+		Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+		Retryable bool                                                             `json:"retryable"`
+		SpanId    *string                                                          `json:"span_id,omitempty"`
+		Tips      *[]string                                                        `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                           `json:"code"`
+		DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                           `json:"message"`
+		Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+		Retryable bool                                                             `json:"retryable"`
+		SpanId    *string                                                          `json:"span_id,omitempty"`
+		Tips      *[]string                                                        `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                           `json:"code"`
+		DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                           `json:"message"`
+		Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+		Retryable bool                                                             `json:"retryable"`
+		SpanId    *string                                                          `json:"span_id,omitempty"`
+		Tips      *[]string                                                        `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiGovernanceSecurityLakeSourcesByIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiGovernanceSecurityLakeSourcesByIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiGovernanceSecurityLakeSourcesByIdResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PatchApiGovernanceSecurityLakeSourcesByIdResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		ExternalId        string                                                                `json:"externalId"`
+		Id                string                                                                `json:"id"`
+		Name              string                                                                `json:"name"`
+		QueueUrl          string                                                                `json:"queueUrl"`
+		Region            string                                                                `json:"region"`
+		Schedule          *string                                                               `json:"schedule"`
+		Sources           []PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources `json:"sources"`
+		Status            string                                                                `json:"status"`
+		SubscriberRoleArn string                                                                `json:"subscriberRoleArn"`
+	}
+	JSON400 *struct {
+		Code      string                                                             `json:"code"`
+		DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+		Fault     *PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                             `json:"message"`
+		Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+		Retryable bool                                                               `json:"retryable"`
+		SpanId    *string                                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                             `json:"code"`
+		DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+		Fault     *PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                             `json:"message"`
+		Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+		Retryable bool                                                               `json:"retryable"`
+		SpanId    *string                                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                             `json:"code"`
+		DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+		Fault     *PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                             `json:"message"`
+		Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+		Retryable bool                                                               `json:"retryable"`
+		SpanId    *string                                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON422 *struct {
+		Code      string                                                             `json:"code"`
+		DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+		Fault     *PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                             `json:"message"`
+		Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+		Retryable bool                                                               `json:"retryable"`
+		SpanId    *string                                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                             `json:"code"`
+		DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+		Fault     *PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                             `json:"message"`
+		Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+		Retryable bool                                                               `json:"retryable"`
+		SpanId    *string                                                            `json:"span_id,omitempty"`
+		Tips      *[]string                                                          `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PatchApiGovernanceSecurityLakeSourcesByIdResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PatchApiGovernanceSecurityLakeSourcesByIdResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PatchApiGovernanceSecurityLakeSourcesByIdResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiGovernanceSecurityLakeSourcesByIdHealthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Health struct {
+			Dropped    int      `json:"dropped"`
+			Invalid    int      `json:"invalid"`
+			LagMs      *float32 `json:"lagMs"`
+			LastReadAt *float32 `json:"lastReadAt"`
+			Messages   int      `json:"messages"`
+			Objects    int      `json:"objects"`
+			Poison     []struct {
+				At        float32 `json:"at"`
+				Key       string  `json:"key"`
+				MessageId string  `json:"messageId"`
+				Reason    string  `json:"reason"`
+			} `json:"poison"`
+			PoisonCount int `json:"poisonCount"`
+			Retried     int `json:"retried"`
+			Rows        int `json:"rows"`
+			Runs        int `json:"runs"`
+			Written     int `json:"written"`
+		} `json:"health"`
+		LastError *string `json:"lastError"`
+		SourceId  string  `json:"sourceId"`
+		Status    string  `json:"status"`
+	}
+	JSON400 *struct {
+		Code      string                                                                 `json:"code"`
+		DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                 `json:"message"`
+		Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+		Retryable bool                                                                   `json:"retryable"`
+		SpanId    *string                                                                `json:"span_id,omitempty"`
+		Tips      *[]string                                                              `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                                 `json:"code"`
+		DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                 `json:"message"`
+		Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+		Retryable bool                                                                   `json:"retryable"`
+		SpanId    *string                                                                `json:"span_id,omitempty"`
+		Tips      *[]string                                                              `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                                 `json:"code"`
+		DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                 `json:"message"`
+		Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+		Retryable bool                                                                   `json:"retryable"`
+		SpanId    *string                                                                `json:"span_id,omitempty"`
+		Tips      *[]string                                                              `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                                 `json:"code"`
+		DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+		Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                 `json:"message"`
+		Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+		Retryable bool                                                                   `json:"retryable"`
+		SpanId    *string                                                                `json:"span_id,omitempty"`
+		Tips      *[]string                                                              `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiGovernanceSecurityLakeSourcesByIdHealthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiGovernanceSecurityLakeSourcesByIdHealthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiGovernanceSecurityLakeSourcesByIdHealthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostApiGovernanceSecurityLakeSourcesByIdTestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Error    *string `json:"error"`
+		InFlight *int    `json:"inFlight"`
+		Ok       bool    `json:"ok"`
+		Waiting  *int    `json:"waiting"`
+	}
+	JSON400 *struct {
+		Code      string                                                                `json:"code"`
+		DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                `json:"message"`
+		Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+		Retryable bool                                                                  `json:"retryable"`
+		SpanId    *string                                                               `json:"span_id,omitempty"`
+		Tips      *[]string                                                             `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON401 *struct {
+		Code      string                                                                `json:"code"`
+		DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                `json:"message"`
+		Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+		Retryable bool                                                                  `json:"retryable"`
+		SpanId    *string                                                               `json:"span_id,omitempty"`
+		Tips      *[]string                                                             `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON403 *struct {
+		Code      string                                                                `json:"code"`
+		DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                `json:"message"`
+		Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+		Retryable bool                                                                  `json:"retryable"`
+		SpanId    *string                                                               `json:"span_id,omitempty"`
+		Tips      *[]string                                                             `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+	JSON500 *struct {
+		Code      string                                                                `json:"code"`
+		DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+		Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault `json:"fault,omitempty"`
+		Message   string                                                                `json:"message"`
+		Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+		Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+		Retryable bool                                                                  `json:"retryable"`
+		SpanId    *string                                                               `json:"span_id,omitempty"`
+		Tips      *[]string                                                             `json:"tips,omitempty"`
+		Trace     *struct {
+			LogsUrl  *string `json:"logsUrl,omitempty"`
+			SpanId   *string `json:"spanId,omitempty"`
+			TraceId  *string `json:"traceId,omitempty"`
+			TraceUrl *string `json:"traceUrl,omitempty"`
+		} `json:"trace,omitempty"`
+		TraceId *string `json:"trace_id,omitempty"`
+		Type    string  `json:"type"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r PostApiGovernanceSecurityLakeSourcesByIdTestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostApiGovernanceSecurityLakeSourcesByIdTestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostApiGovernanceSecurityLakeSourcesByIdTestResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -191320,6 +194263,12 @@ type ListRunPlansResponse struct {
 			Type                    ListRunPlans200JSONResponseBodyTargetsType                                                `json:"type"`
 		} `json:"targets"`
 
+		// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceQuietPeriodMs *ListRunPlans200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+		// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceWaitTimeoutMs *ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
+
 		// UpdatedAt When the plan was last written.
 		UpdatedAt string `json:"updatedAt"`
 	}
@@ -191536,6 +194485,12 @@ type GetRunPlanResponse struct {
 			ScenarioMappings        *map[string]GetRunPlan200JSONResponseBody_Targets_ScenarioMappings_AdditionalProperties `json:"scenarioMappings,omitempty"`
 			Type                    GetRunPlan200JSONResponseBodyTargetsType                                                `json:"type"`
 		} `json:"targets"`
+
+		// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceQuietPeriodMs *GetRunPlan200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+		// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceWaitTimeoutMs *GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 
 		// UpdatedAt When the plan was last written.
 		UpdatedAt string `json:"updatedAt"`
@@ -191846,6 +194801,12 @@ type GetApiScenariosResponse struct {
 
 		// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 		TestSuiteId *string `json:"testSuiteId,omitempty"`
+
+		// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceQuietPeriodMs *GetApiScenarios200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+		// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceWaitTimeoutMs *GetApiScenarios200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 	}
 }
 
@@ -191910,6 +194871,12 @@ type PostApiScenariosResponse struct {
 
 		// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 		TestSuiteId *string `json:"testSuiteId,omitempty"`
+
+		// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceQuietPeriodMs *PostApiScenarios201JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+		// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceWaitTimeoutMs *PostApiScenarios201JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 	}
 }
 
@@ -192010,6 +194977,12 @@ type GetApiScenariosByIdResponse struct {
 
 		// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 		TestSuiteId *string `json:"testSuiteId,omitempty"`
+
+		// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceQuietPeriodMs *GetApiScenariosById200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+		// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceWaitTimeoutMs *GetApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 	}
 	JSON404 *struct {
 		Error string `json:"error"`
@@ -192077,6 +195050,12 @@ type PatchApiScenariosByIdResponse struct {
 
 		// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 		TestSuiteId *string `json:"testSuiteId,omitempty"`
+
+		// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceQuietPeriodMs *PatchApiScenariosById200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+		// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceWaitTimeoutMs *PatchApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 	}
 	JSON404 *struct {
 		Error string `json:"error"`
@@ -192144,6 +195123,12 @@ type PutApiScenariosByIdResponse struct {
 
 		// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 		TestSuiteId *string `json:"testSuiteId,omitempty"`
+
+		// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceQuietPeriodMs *PutApiScenariosById200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+		// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+		TraceWaitTimeoutMs *PutApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 	}
 	JSON404 *struct {
 		Error string `json:"error"`
@@ -194480,6 +197465,56 @@ func (r PostApiTracesSearchResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PostApiTracesSearchResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetApiTracesSettleSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		QuietPeriodMs   int `json:"quietPeriodMs"`
+		WaitExtensionMs int `json:"waitExtensionMs"`
+		WaitTimeoutMs   int `json:"waitTimeoutMs"`
+	}
+	JSON400 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON401 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON422 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+	JSON500 *struct {
+		Error   string  `json:"error"`
+		Message *string `json:"message,omitempty"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r GetApiTracesSettleSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetApiTracesSettleSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetApiTracesSettleSettingsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -198686,6 +201721,75 @@ func (c *ClientWithResponses) GetApiGovernanceRegistrySchemaWithResponse(ctx con
 	return ParseGetApiGovernanceRegistrySchemaResponse(rsp)
 }
 
+// PostApiGovernanceSecurityLakeSourcesWithBodyWithResponse request with arbitrary body returning *PostApiGovernanceSecurityLakeSourcesResponse
+func (c *ClientWithResponses) PostApiGovernanceSecurityLakeSourcesWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesResponse, error) {
+	rsp, err := c.PostApiGovernanceSecurityLakeSourcesWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiGovernanceSecurityLakeSourcesResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostApiGovernanceSecurityLakeSourcesWithResponse(ctx context.Context, body PostApiGovernanceSecurityLakeSourcesJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesResponse, error) {
+	rsp, err := c.PostApiGovernanceSecurityLakeSources(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiGovernanceSecurityLakeSourcesResponse(rsp)
+}
+
+// GetApiGovernanceSecurityLakeSourcesByIdWithResponse request returning *GetApiGovernanceSecurityLakeSourcesByIdResponse
+func (c *ClientWithResponses) GetApiGovernanceSecurityLakeSourcesByIdWithResponse(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*GetApiGovernanceSecurityLakeSourcesByIdResponse, error) {
+	rsp, err := c.GetApiGovernanceSecurityLakeSourcesById(ctx, sourceId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiGovernanceSecurityLakeSourcesByIdResponse(rsp)
+}
+
+// PatchApiGovernanceSecurityLakeSourcesByIdWithBodyWithResponse request with arbitrary body returning *PatchApiGovernanceSecurityLakeSourcesByIdResponse
+func (c *ClientWithResponses) PatchApiGovernanceSecurityLakeSourcesByIdWithBodyWithResponse(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchApiGovernanceSecurityLakeSourcesByIdResponse, error) {
+	rsp, err := c.PatchApiGovernanceSecurityLakeSourcesByIdWithBody(ctx, sourceId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchApiGovernanceSecurityLakeSourcesByIdResponse(rsp)
+}
+
+func (c *ClientWithResponses) PatchApiGovernanceSecurityLakeSourcesByIdWithResponse(ctx context.Context, sourceId string, body PatchApiGovernanceSecurityLakeSourcesByIdJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchApiGovernanceSecurityLakeSourcesByIdResponse, error) {
+	rsp, err := c.PatchApiGovernanceSecurityLakeSourcesById(ctx, sourceId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchApiGovernanceSecurityLakeSourcesByIdResponse(rsp)
+}
+
+// GetApiGovernanceSecurityLakeSourcesByIdHealthWithResponse request returning *GetApiGovernanceSecurityLakeSourcesByIdHealthResponse
+func (c *ClientWithResponses) GetApiGovernanceSecurityLakeSourcesByIdHealthWithResponse(ctx context.Context, sourceId string, reqEditors ...RequestEditorFn) (*GetApiGovernanceSecurityLakeSourcesByIdHealthResponse, error) {
+	rsp, err := c.GetApiGovernanceSecurityLakeSourcesByIdHealth(ctx, sourceId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiGovernanceSecurityLakeSourcesByIdHealthResponse(rsp)
+}
+
+// PostApiGovernanceSecurityLakeSourcesByIdTestWithBodyWithResponse request with arbitrary body returning *PostApiGovernanceSecurityLakeSourcesByIdTestResponse
+func (c *ClientWithResponses) PostApiGovernanceSecurityLakeSourcesByIdTestWithBodyWithResponse(ctx context.Context, sourceId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesByIdTestResponse, error) {
+	rsp, err := c.PostApiGovernanceSecurityLakeSourcesByIdTestWithBody(ctx, sourceId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiGovernanceSecurityLakeSourcesByIdTestResponse(rsp)
+}
+
+func (c *ClientWithResponses) PostApiGovernanceSecurityLakeSourcesByIdTestWithResponse(ctx context.Context, sourceId string, body PostApiGovernanceSecurityLakeSourcesByIdTestJSONRequestBody, reqEditors ...RequestEditorFn) (*PostApiGovernanceSecurityLakeSourcesByIdTestResponse, error) {
+	rsp, err := c.PostApiGovernanceSecurityLakeSourcesByIdTest(ctx, sourceId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostApiGovernanceSecurityLakeSourcesByIdTestResponse(rsp)
+}
+
 // ListGrantsWithResponse request returning *ListGrantsResponse
 func (c *ClientWithResponses) ListGrantsWithResponse(ctx context.Context, params *ListGrantsParams, reqEditors ...RequestEditorFn) (*ListGrantsResponse, error) {
 	rsp, err := c.ListGrants(ctx, params, reqEditors...)
@@ -200966,6 +204070,15 @@ func (c *ClientWithResponses) PostApiTracesSearchWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParsePostApiTracesSearchResponse(rsp)
+}
+
+// GetApiTracesSettleSettingsWithResponse request returning *GetApiTracesSettleSettingsResponse
+func (c *ClientWithResponses) GetApiTracesSettleSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiTracesSettleSettingsResponse, error) {
+	rsp, err := c.GetApiTracesSettleSettings(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetApiTracesSettleSettingsResponse(rsp)
 }
 
 // GetApiTracesByTraceIdWithResponse request returning *GetApiTracesByTraceIdResponse
@@ -215382,8 +218495,11 @@ func ParseGetApiExperimentsRunsResponse(rsp *http.Response) (*GetApiExperimentsR
 				Concurrency  *GetApiExperimentsRuns200JSONResponseBody_Runs_Concurrency `json:"concurrency,omitempty"`
 				ExperimentId string                                                     `json:"experimentId"`
 				Progress     *float32                                                   `json:"progress,omitempty"`
-				RunId        string                                                     `json:"runId"`
-				Summary      struct {
+
+				// Repeat How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.
+				Repeat  *GetApiExperimentsRuns200JSONResponseBody_Runs_Repeat `json:"repeat,omitempty"`
+				RunId   string                                                `json:"runId"`
+				Summary struct {
 					DatasetAverageCost     *float32 `json:"datasetAverageCost,omitempty"`
 					DatasetAverageDuration *float32 `json:"datasetAverageDuration,omitempty"`
 					DatasetCost            *float32 `json:"datasetCost,omitempty"`
@@ -215634,7 +218750,10 @@ func ParseGetApiExperimentsRunsByRunIdResultsResponse(rsp *http.Response) (*GetA
 			ExperimentId string   `json:"experimentId"`
 			Progress     *float32 `json:"progress,omitempty"`
 			ProjectId    string   `json:"projectId"`
-			RunId        string   `json:"runId"`
+
+			// Repeat How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.
+			Repeat *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Repeat `json:"repeat,omitempty"`
+			RunId  string                                                         `json:"runId"`
 
 			// Targets Resolves the targetId each dataset row and evaluation carries
 			Targets    *GetApiExperimentsRunsByRunIdResults200JSONResponseBody_Targets `json:"targets,omitempty"`
@@ -220454,6 +223573,744 @@ func ParseGetApiGovernanceRegistrySchemaResponse(rsp *http.Response) (*GetApiGov
 			Retryable bool                                                    `json:"retryable"`
 			SpanId    *string                                                 `json:"span_id,omitempty"`
 			Tips      *[]string                                               `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiGovernanceSecurityLakeSourcesResponse parses an HTTP response from a PostApiGovernanceSecurityLakeSourcesWithResponse call
+func ParsePostApiGovernanceSecurityLakeSourcesResponse(rsp *http.Response) (*PostApiGovernanceSecurityLakeSourcesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiGovernanceSecurityLakeSourcesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ExternalId        string                                                           `json:"externalId"`
+			Id                string                                                           `json:"id"`
+			Name              string                                                           `json:"name"`
+			QueueUrl          string                                                           `json:"queueUrl"`
+			Region            string                                                           `json:"region"`
+			Schedule          *string                                                          `json:"schedule"`
+			Sources           []PostApiGovernanceSecurityLakeSources200JSONResponseBodySources `json:"sources"`
+			Status            string                                                           `json:"status"`
+			SubscriberRoleArn string                                                           `json:"subscriberRoleArn"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSources400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSources401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSources403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSources422JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                        `json:"code"`
+			DocsUrl   *string                                                       `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSources500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                        `json:"message"`
+			Meta      *map[string]interface{}                                       `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                `json:"reasons,omitempty"`
+			Retryable bool                                                          `json:"retryable"`
+			SpanId    *string                                                       `json:"span_id,omitempty"`
+			Tips      *[]string                                                     `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiGovernanceSecurityLakeSourcesByIdResponse parses an HTTP response from a GetApiGovernanceSecurityLakeSourcesByIdWithResponse call
+func ParseGetApiGovernanceSecurityLakeSourcesByIdResponse(rsp *http.Response) (*GetApiGovernanceSecurityLakeSourcesByIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiGovernanceSecurityLakeSourcesByIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ExternalId        string                                                              `json:"externalId"`
+			Id                string                                                              `json:"id"`
+			Name              string                                                              `json:"name"`
+			QueueUrl          string                                                              `json:"queueUrl"`
+			Region            string                                                              `json:"region"`
+			Schedule          *string                                                             `json:"schedule"`
+			Sources           []GetApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources `json:"sources"`
+			Status            string                                                              `json:"status"`
+			SubscriberRoleArn string                                                              `json:"subscriberRoleArn"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                           `json:"code"`
+			DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                           `json:"message"`
+			Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+			Retryable bool                                                             `json:"retryable"`
+			SpanId    *string                                                          `json:"span_id,omitempty"`
+			Tips      *[]string                                                        `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                           `json:"code"`
+			DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                           `json:"message"`
+			Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+			Retryable bool                                                             `json:"retryable"`
+			SpanId    *string                                                          `json:"span_id,omitempty"`
+			Tips      *[]string                                                        `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                           `json:"code"`
+			DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                           `json:"message"`
+			Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+			Retryable bool                                                             `json:"retryable"`
+			SpanId    *string                                                          `json:"span_id,omitempty"`
+			Tips      *[]string                                                        `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                           `json:"code"`
+			DocsUrl   *string                                                          `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                           `json:"message"`
+			Meta      *map[string]interface{}                                          `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                   `json:"reasons,omitempty"`
+			Retryable bool                                                             `json:"retryable"`
+			SpanId    *string                                                          `json:"span_id,omitempty"`
+			Tips      *[]string                                                        `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePatchApiGovernanceSecurityLakeSourcesByIdResponse parses an HTTP response from a PatchApiGovernanceSecurityLakeSourcesByIdWithResponse call
+func ParsePatchApiGovernanceSecurityLakeSourcesByIdResponse(rsp *http.Response) (*PatchApiGovernanceSecurityLakeSourcesByIdResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PatchApiGovernanceSecurityLakeSourcesByIdResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			ExternalId        string                                                                `json:"externalId"`
+			Id                string                                                                `json:"id"`
+			Name              string                                                                `json:"name"`
+			QueueUrl          string                                                                `json:"queueUrl"`
+			Region            string                                                                `json:"region"`
+			Schedule          *string                                                               `json:"schedule"`
+			Sources           []PatchApiGovernanceSecurityLakeSourcesById200JSONResponseBodySources `json:"sources"`
+			Status            string                                                                `json:"status"`
+			SubscriberRoleArn string                                                                `json:"subscriberRoleArn"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                             `json:"code"`
+			DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+			Fault     *PatchApiGovernanceSecurityLakeSourcesById400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                             `json:"message"`
+			Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+			Retryable bool                                                               `json:"retryable"`
+			SpanId    *string                                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                             `json:"code"`
+			DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+			Fault     *PatchApiGovernanceSecurityLakeSourcesById401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                             `json:"message"`
+			Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+			Retryable bool                                                               `json:"retryable"`
+			SpanId    *string                                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                             `json:"code"`
+			DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+			Fault     *PatchApiGovernanceSecurityLakeSourcesById403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                             `json:"message"`
+			Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+			Retryable bool                                                               `json:"retryable"`
+			SpanId    *string                                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Code      string                                                             `json:"code"`
+			DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+			Fault     *PatchApiGovernanceSecurityLakeSourcesById422JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                             `json:"message"`
+			Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+			Retryable bool                                                               `json:"retryable"`
+			SpanId    *string                                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                             `json:"code"`
+			DocsUrl   *string                                                            `json:"docs_url,omitempty"`
+			Fault     *PatchApiGovernanceSecurityLakeSourcesById500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                             `json:"message"`
+			Meta      *map[string]interface{}                                            `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                     `json:"reasons,omitempty"`
+			Retryable bool                                                               `json:"retryable"`
+			SpanId    *string                                                            `json:"span_id,omitempty"`
+			Tips      *[]string                                                          `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiGovernanceSecurityLakeSourcesByIdHealthResponse parses an HTTP response from a GetApiGovernanceSecurityLakeSourcesByIdHealthWithResponse call
+func ParseGetApiGovernanceSecurityLakeSourcesByIdHealthResponse(rsp *http.Response) (*GetApiGovernanceSecurityLakeSourcesByIdHealthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiGovernanceSecurityLakeSourcesByIdHealthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Health struct {
+				Dropped    int      `json:"dropped"`
+				Invalid    int      `json:"invalid"`
+				LagMs      *float32 `json:"lagMs"`
+				LastReadAt *float32 `json:"lastReadAt"`
+				Messages   int      `json:"messages"`
+				Objects    int      `json:"objects"`
+				Poison     []struct {
+					At        float32 `json:"at"`
+					Key       string  `json:"key"`
+					MessageId string  `json:"messageId"`
+					Reason    string  `json:"reason"`
+				} `json:"poison"`
+				PoisonCount int `json:"poisonCount"`
+				Retried     int `json:"retried"`
+				Rows        int `json:"rows"`
+				Runs        int `json:"runs"`
+				Written     int `json:"written"`
+			} `json:"health"`
+			LastError *string `json:"lastError"`
+			SourceId  string  `json:"sourceId"`
+			Status    string  `json:"status"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                                 `json:"code"`
+			DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                 `json:"message"`
+			Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+			Retryable bool                                                                   `json:"retryable"`
+			SpanId    *string                                                                `json:"span_id,omitempty"`
+			Tips      *[]string                                                              `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                                 `json:"code"`
+			DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                 `json:"message"`
+			Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+			Retryable bool                                                                   `json:"retryable"`
+			SpanId    *string                                                                `json:"span_id,omitempty"`
+			Tips      *[]string                                                              `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                                 `json:"code"`
+			DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                 `json:"message"`
+			Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+			Retryable bool                                                                   `json:"retryable"`
+			SpanId    *string                                                                `json:"span_id,omitempty"`
+			Tips      *[]string                                                              `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                                 `json:"code"`
+			DocsUrl   *string                                                                `json:"docs_url,omitempty"`
+			Fault     *GetApiGovernanceSecurityLakeSourcesByIdHealth500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                 `json:"message"`
+			Meta      *map[string]interface{}                                                `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                         `json:"reasons,omitempty"`
+			Retryable bool                                                                   `json:"retryable"`
+			SpanId    *string                                                                `json:"span_id,omitempty"`
+			Tips      *[]string                                                              `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostApiGovernanceSecurityLakeSourcesByIdTestResponse parses an HTTP response from a PostApiGovernanceSecurityLakeSourcesByIdTestWithResponse call
+func ParsePostApiGovernanceSecurityLakeSourcesByIdTestResponse(rsp *http.Response) (*PostApiGovernanceSecurityLakeSourcesByIdTestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostApiGovernanceSecurityLakeSourcesByIdTestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Error    *string `json:"error"`
+			InFlight *int    `json:"inFlight"`
+			Ok       bool    `json:"ok"`
+			Waiting  *int    `json:"waiting"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Code      string                                                                `json:"code"`
+			DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest400JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                `json:"message"`
+			Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+			Retryable bool                                                                  `json:"retryable"`
+			SpanId    *string                                                               `json:"span_id,omitempty"`
+			Tips      *[]string                                                             `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Code      string                                                                `json:"code"`
+			DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest401JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                `json:"message"`
+			Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+			Retryable bool                                                                  `json:"retryable"`
+			SpanId    *string                                                               `json:"span_id,omitempty"`
+			Tips      *[]string                                                             `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest struct {
+			Code      string                                                                `json:"code"`
+			DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest403JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                `json:"message"`
+			Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+			Retryable bool                                                                  `json:"retryable"`
+			SpanId    *string                                                               `json:"span_id,omitempty"`
+			Tips      *[]string                                                             `json:"tips,omitempty"`
+			Trace     *struct {
+				LogsUrl  *string `json:"logsUrl,omitempty"`
+				SpanId   *string `json:"spanId,omitempty"`
+				TraceId  *string `json:"traceId,omitempty"`
+				TraceUrl *string `json:"traceUrl,omitempty"`
+			} `json:"trace,omitempty"`
+			TraceId *string `json:"trace_id,omitempty"`
+			Type    string  `json:"type"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Code      string                                                                `json:"code"`
+			DocsUrl   *string                                                               `json:"docs_url,omitempty"`
+			Fault     *PostApiGovernanceSecurityLakeSourcesByIdTest500JSONResponseBodyFault `json:"fault,omitempty"`
+			Message   string                                                                `json:"message"`
+			Meta      *map[string]interface{}                                               `json:"meta,omitempty"`
+			Reasons   *[]interface{}                                                        `json:"reasons,omitempty"`
+			Retryable bool                                                                  `json:"retryable"`
+			SpanId    *string                                                               `json:"span_id,omitempty"`
+			Tips      *[]string                                                             `json:"tips,omitempty"`
 			Trace     *struct {
 				LogsUrl  *string `json:"logsUrl,omitempty"`
 				SpanId   *string `json:"spanId,omitempty"`
@@ -229590,6 +233447,12 @@ func ParseListRunPlansResponse(rsp *http.Response) (*ListRunPlansResponse, error
 				Type                    ListRunPlans200JSONResponseBodyTargetsType                                                `json:"type"`
 			} `json:"targets"`
 
+			// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceQuietPeriodMs *ListRunPlans200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+			// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceWaitTimeoutMs *ListRunPlans200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
+
 			// UpdatedAt When the plan was last written.
 			UpdatedAt string `json:"updatedAt"`
 		}
@@ -229800,6 +233663,12 @@ func ParseGetRunPlanResponse(rsp *http.Response) (*GetRunPlanResponse, error) {
 				ScenarioMappings        *map[string]GetRunPlan200JSONResponseBody_Targets_ScenarioMappings_AdditionalProperties `json:"scenarioMappings,omitempty"`
 				Type                    GetRunPlan200JSONResponseBodyTargetsType                                                `json:"type"`
 			} `json:"targets"`
+
+			// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceQuietPeriodMs *GetRunPlan200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+			// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the scenario setting or the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceWaitTimeoutMs *GetRunPlan200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 
 			// UpdatedAt When the plan was last written.
 			UpdatedAt string `json:"updatedAt"`
@@ -230180,6 +234049,12 @@ func ParseGetApiScenariosResponse(rsp *http.Response) (*GetApiScenariosResponse,
 
 			// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 			TestSuiteId *string `json:"testSuiteId,omitempty"`
+
+			// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceQuietPeriodMs *GetApiScenarios200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+			// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceWaitTimeoutMs *GetApiScenarios200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -230240,6 +234115,12 @@ func ParsePostApiScenariosResponse(rsp *http.Response) (*PostApiScenariosRespons
 
 			// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 			TestSuiteId *string `json:"testSuiteId,omitempty"`
+
+			// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceQuietPeriodMs *PostApiScenarios201JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+			// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceWaitTimeoutMs *PostApiScenarios201JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -230338,6 +234219,12 @@ func ParseGetApiScenariosByIdResponse(rsp *http.Response) (*GetApiScenariosByIdR
 
 			// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 			TestSuiteId *string `json:"testSuiteId,omitempty"`
+
+			// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceQuietPeriodMs *GetApiScenariosById200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+			// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceWaitTimeoutMs *GetApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -230407,6 +234294,12 @@ func ParsePatchApiScenariosByIdResponse(rsp *http.Response) (*PatchApiScenariosB
 
 			// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 			TestSuiteId *string `json:"testSuiteId,omitempty"`
+
+			// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceQuietPeriodMs *PatchApiScenariosById200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+			// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceWaitTimeoutMs *PatchApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -230476,6 +234369,12 @@ func ParsePutApiScenariosByIdResponse(rsp *http.Response) (*PutApiScenariosByIdR
 
 			// TestSuiteId The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.
 			TestSuiteId *string `json:"testSuiteId,omitempty"`
+
+			// TraceQuietPeriodMs Milliseconds the agent's trace must stay unchanged before the judge reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceQuietPeriodMs *PutApiScenariosById200JSONResponseBody_TraceQuietPeriodMs `json:"traceQuietPeriodMs,omitempty"`
+
+			// TraceWaitTimeoutMs Milliseconds the judge waits for the agent's trace before a verdict, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+			TraceWaitTimeoutMs *PutApiScenariosById200JSONResponseBody_TraceWaitTimeoutMs `json:"traceWaitTimeoutMs,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -232715,6 +236614,76 @@ func ParsePostApiTracesSearchResponse(rsp *http.Response) (*PostApiTracesSearchR
 				From string `json:"from"`
 			} `json:"schema,omitempty"`
 			Traces []interface{} `json:"traces"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest struct {
+			Error   string  `json:"error"`
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetApiTracesSettleSettingsResponse parses an HTTP response from a GetApiTracesSettleSettingsWithResponse call
+func ParseGetApiTracesSettleSettingsResponse(rsp *http.Response) (*GetApiTracesSettleSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetApiTracesSettleSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			QuietPeriodMs   int `json:"quietPeriodMs"`
+			WaitExtensionMs int `json:"waitExtensionMs"`
+			WaitTimeoutMs   int `json:"waitTimeoutMs"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
