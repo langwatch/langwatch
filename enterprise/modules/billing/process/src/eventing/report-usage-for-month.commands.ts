@@ -26,6 +26,7 @@ import {
   instantEvalMeterUnitsToUsd,
   instantEvalWindowMs,
   INSTANT_EVAL_USD_EVENT_NAME,
+  usageBilledSinceInMonth,
 } from "../rules/instant-eval-meter.rules.ts";
 import { meterEventTimestampSeconds } from "../rules/meter-event-timestamp.rules.ts";
 import {
@@ -76,7 +77,7 @@ interface BillingMeter {
     organizationId: string;
     billingMonth: string;
     billableEvents: number | undefined;
-    /** When the usage-billed subscription started, or null; see ADR-174 decision 23. */
+    /** When usage billing started for the month, or null; ADR-174 decision 23 (proposed in v22). */
     usageBilledSinceMs: number | null;
     lastReportedTotal: number;
   }) => Promise<BillableEventsTotalResult>;
@@ -224,7 +225,7 @@ function totalWithinContractCeiling({
 /**
  * A month the subscription window narrows never reports below what it already reported: the
  * window keeps free use before an upgrade off what is still to send, never takes back what was
- * sent (ADR-174 decision 23). A whole-month read keeps its lower corrections.
+ * sent (ADR-174 decision 23, proposed in v22). A whole-month read keeps its lower corrections.
  */
 function notBelowReportedInNarrowedWindow({
   measured,
@@ -370,6 +371,8 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       }
 
       const org = verdict.organization;
+      const since = usageBilledSinceInMonth({ billingMonth, periods: org.growthSeatPeriods });
+      const usageBilledSinceMs = since.outcome === "since" ? since.startMs : null;
 
       // 2. Report for billing month, one meter after the other. A meter that
       // fails does not stop the next: each keeps its own checkpoint and its
@@ -383,8 +386,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
             billingMonth,
             stripeCustomerId: org.stripeCustomerId,
             contract: org.contract,
-            // A read cached before the start was carried has none: the month is read whole.
-            usageBilledSinceMs: org.usageBilledSinceMs ?? null,
+            usageBilledSinceMs,
             billableEvents,
             countedEventId,
           })) || shouldSelfDispatch;

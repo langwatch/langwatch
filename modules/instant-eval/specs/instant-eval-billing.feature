@@ -223,7 +223,7 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       When the price is added to its subscription and the month is reported
       Then the Instant Eval meter event carries the month's total from zero
 
-    # Up to the free dollar used before upgrading never reaches the first invoice (ADR-174 decision 23).
+    # Up to the free dollar used before upgrading never reaches the first invoice (ADR-174 decision 23, proposed in v22).
     @unit
     Scenario: Free use before an upgrade mid-month is not reported
       Given an organization whose usage-billed subscription started on the 10th of the month
@@ -258,6 +258,14 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       When the month is reported
       Then no Instant Eval meter event is sent and the checkpoint stays at 1.5000
       And spend past 1.5000 since the upgrade is reported as a positive delta
+
+    @unit
+    Scenario: A subscription replaced mid-month keeps the month's window
+      Given an organization whose subscription was replaced by a new one on the 15th after the month was already reported
+      When the month is reported
+      Then the spend is read from the replaced subscription's start
+      And spend since the last report is sent as a positive delta
+      # The window only ever starts earlier within a month, so the floor never swallows new spend.
 
     @unit
     Scenario: A subscription that cannot be read holds the Instant Eval usage and retries

@@ -13,9 +13,12 @@ export type BillingReportOrganization = {
   subscriptions: { id: string }[];
   /** Which of the two contracts invoices this organization's hosted usage. */
   contract: UsageBillingContract;
-  /** When the usage-billed subscription started, in epoch ms; null when unknown or connected. */
-  usageBilledSinceMs: number | null;
+  /** Growth-seat subscriptions live or ended, newest start first (no start first); empty when connected. */
+  growthSeatPeriods: GrowthSeatPeriod[];
 };
+
+/** When one growth-seat subscription ran, in epoch ms; a null end is still running. */
+export type GrowthSeatPeriod = { startMs: number | null; endMs: number | null };
 
 /**
  * Why the lookup did or did not yield an organization: "no such organization"

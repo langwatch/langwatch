@@ -41,7 +41,7 @@ export class InstantEvalSpendQueryService {
   /**
    * `unavailable` where there is no ledger, which the caller treats as "not
    * now" rather than as a verified zero it would checkpoint against.
-   * The month starts no earlier than `usageBilledSinceMs`, null when unknown (ADR-174 decision 23).
+   * The month starts no earlier than `usageBilledSinceMs` (ADR-174 decision 23, proposed in v22).
    */
   async queryInstantEvalSpendTotal({
     organizationId,

@@ -48,9 +48,36 @@ export function billingMonthWindowMs(billingMonth: string): { fromMs: number; to
 }
 
 /**
+ * When usage billing started for a month: the earliest start among the growth-seat periods that
+ * overlap it, so a replacement mid-month never moves the start later (ADR-174 decision 23,
+ * proposed in v22). A period with no start reads the whole month; none overlapping, the earliest.
+ */
+export function usageBilledSinceInMonth({
+  billingMonth,
+  periods,
+}: {
+  billingMonth: string;
+  periods: readonly { startMs: number | null; endMs: number | null }[];
+}): { outcome: "whole_month" } | { outcome: "since"; startMs: number } {
+  const month = billingMonthWindowMs(billingMonth);
+  const overlapping = periods.filter(
+    ({ startMs, endMs }) =>
+      (endMs === null || endMs >= month.fromMs) && (startMs === null || startMs < month.toMs),
+  );
+  if (overlapping.some(({ startMs }) => startMs === null)) return { outcome: "whole_month" };
+  const starts = (overlapping.length > 0 ? overlapping : periods).flatMap(({ startMs }) =>
+    startMs === null ? [] : [startMs],
+  );
+
+  return starts.length > 0
+    ? { outcome: "since", startMs: Math.min(...starts) }
+    : { outcome: "whole_month" };
+}
+
+/**
  * The window the Instant Evals meter reads: the month, from the later of its start and the
  * usage-billed subscription's start, so free use before an upgrade is never invoiced (ADR-174
- * decision 23). A month that ended before the subscription started covers no time at all.
+ * decision 23, proposed in v22). A month that ended before the subscription started covers none.
  */
 export function instantEvalWindowMs({
   billingMonth,

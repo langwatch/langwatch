@@ -25,7 +25,7 @@ function billed({
       stripeCustomerId,
       subscriptions,
       contract,
-      usageBilledSinceMs: null,
+      growthSeatPeriods: [],
     },
   };
 }

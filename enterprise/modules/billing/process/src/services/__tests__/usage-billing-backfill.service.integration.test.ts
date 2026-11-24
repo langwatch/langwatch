@@ -26,7 +26,7 @@ function billedLookup(organizationId: string): BillingReportOrganizationLookup {
       stripeCustomerId: `cus_${organizationId}`,
       subscriptions: [{ id: `sub_${organizationId}` }],
       contract: "cloud",
-      usageBilledSinceMs: null,
+      growthSeatPeriods: [],
     },
   };
 }
