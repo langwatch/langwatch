@@ -56,8 +56,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 
 | User intent | Skill | Primary commands |
 | --- | --- | --- |
-| Primary, traces are the ask: "find the traces where" | `find-traces` | `langwatch ui call explorer.setFilter` |
-| Secondary, traces feed a task | `find-traces` | `langwatch trace search --filter` |
+| "find the traces where" | `find-traces` | `langwatch ui call explorer.setFilter`; inside a task: `trace search --filter` |
 | "recent activity", "been up to", "what failed" | `agent-performance` | `langwatch trace search --errors-only` (errors live on spans), `trace get <id>` |
 | "cost", "latency", "stats", "usage", "pass rate" | `agent-performance`; Claude Code cost: `coding-agent-cost` | `langwatch analytics query --metric <metric>` |
 | "what should I do next", "improve my agent", "why does this keep failing" | `agent-improve` | `langwatch trace export`, `scenario create`, `monitor create`, `experiment run` |
@@ -65,7 +64,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 | "optimize this prompt", "bad answers", "answer better" | `prompt-optimization` | `langwatch workbench get-state` |
 | "monitor production", "online eval", "guardrail", "live quality" | `online-evaluations` | `langwatch evaluator types\|create`, `monitor list\|create` |
 | "evaluate my agent" (no batch or live context) | `evaluations` | ask batch or live first, then that row |
-| "red team my agent", "security test", "jailbreak", "prompt leak" | `red-team`; full OWASP sweep: `red-team-owasp` | scenario tests with `RedTeamAgent` |
+| "red team", "jailbreak", "prompt leak" | `red-team`; OWASP: `red-team-owasp` | `RedTeamAgent` tests |
 | "scenario", "multi-turn test" | `scenarios` | `langwatch scenario list\|create <name> --situation <situation>`, `suite run <id>` |
 | "prompts", "version a prompt", "update prompt" | `prompts` | `langwatch prompt list\|versions <handle>\|create` |
 | "datasets", "training data", "add examples" | `datasets` | `langwatch dataset list`, `dataset create --columns input:string,output:string`, `dataset records add <slug>` (rows match the created columns) |
@@ -84,7 +83,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 | "dashboards", "build a chart" | `dashboard-widgets` if listed, else `lwql-charts` | its schema first |
 | "AI Gateway", "virtual keys", "spend limits", "gateway budgets" | direct CLI | `langwatch virtual-keys`, budgets `gateway-budgets` (`--help`) |
 | "alert me", "Slack/email me when" | `automations` | `langwatch trigger list\|create\|disable` |
-| "annotations", "thumbs up/down a trace" | direct CLI | `langwatch annotation list\|create <traceId> --thumbs-up\|--thumbs-down --comment "…"` |
+| "annotations", "thumbs up/down a trace" | direct CLI | `langwatch annotation list\|create <traceId> --thumbs-up\|--thumbs-down` |
 | "delete X", "remove", "clean up" in LangWatch | direct CLI | look the id up, then delete (the platform asks for the click); none? name the page. Not folder files |
 
 No row matches? Check the `skill` tool's list.
