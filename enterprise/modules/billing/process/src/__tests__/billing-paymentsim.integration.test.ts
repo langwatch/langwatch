@@ -47,6 +47,8 @@ const GROWTH_PII_REDACTION_USD = "price_1Uat9tIMsTw08cudpWWrZG4a";
 const GROWTH_SEAT_EUR_MONTHLY = "price_1SyxCwIMsTw08cudPPOqniRl";
 const GROWTH_INSTANT_EVAL_USD = "price_instant_eval_usd_sim";
 const INSTANT_EVAL_METER = "mtr_instant_eval_usd_sim";
+const GROWTH_INSTANT_EVAL_USD_REPRICED = "price_instant_eval_usd_sim_v2";
+const NICKNAMED_LOOKALIKE = "price_instant_eval_lookalike_sim";
 const REPO_ROOT = fileURLToPath(new URL("../../../../../../", import.meta.url));
 const CATALOG = fileURLToPath(
   new URL("../../../contract/src/stripe-catalog.json", import.meta.url),
@@ -433,6 +435,7 @@ describe.skipIf(!goPresent)(
             subscriptions: await stripeChannels.subscriptions.listCustomerSubscriptions({
               customerId: stripeCustomerId,
             }),
+            priceName: price,
             priceId: price === "GROWTH_PII_REDACTION_USD" ? GROWTH_PII_REDACTION_USD : undefined,
           }),
         selfDispatch: async () => {},
@@ -482,7 +485,9 @@ describe.skipIf(!goPresent)(
       await customer.reportMonth();
 
       expect(customer.errors).toEqual([]);
+      // The held run reads the ledger too, to log what it holds.
       expect(customer.ledgerReads).toEqual([
+        { requestType: "pii_redaction" },
         { requestType: "pii_redaction" },
         { requestType: "pii_redaction" },
       ]);
@@ -525,6 +530,7 @@ describe.skipIf(!goPresent)(
     }, 30_000);
 
     /** @scenario "Only a subscription with the Instant Evals price reaches the Stripe simulator" */
+    /** @scenario "A re-priced Instant Evals line is still recognised" */
     it("reports Instant Eval usage only to the subscription that carries its price", async () => {
       // The catalog maps no Instant Evals meter or price in test mode yet, so both are seeded here.
       await control("/meters", {
@@ -539,6 +545,31 @@ describe.skipIf(!goPresent)(
           usage_type: "metered",
           meter: INSTANT_EVAL_METER,
           lookup_key: "GROWTH_INSTANT_EVAL_USD",
+        },
+      });
+      // A re-price under the same keys with another nickname, and a price only named alike.
+      await control("/prices", {
+        body: {
+          id: GROWTH_INSTANT_EVAL_USD_REPRICED,
+          currency: "usd",
+          unit_amount: 120,
+          interval: "month",
+          usage_type: "metered",
+          meter: INSTANT_EVAL_METER,
+          lookup_key: "GROWTH_INSTANT_EVAL_USD",
+          nickname: "Instant Evals, renamed in the dashboard",
+          metadata: { langwatch_key: "GROWTH_INSTANT_EVAL_USD" },
+        },
+      });
+      await control("/prices", {
+        body: {
+          id: NICKNAMED_LOOKALIKE,
+          currency: "usd",
+          unit_amount: 100,
+          interval: "month",
+          usage_type: "metered",
+          meter: INSTANT_EVAL_METER,
+          nickname: "GROWTH_INSTANT_EVAL_USD",
         },
       });
       const growth = async ({
@@ -594,11 +625,23 @@ describe.skipIf(!goPresent)(
         currency: "USD",
         lines: [GROWTH_SEAT_USD_MONTHLY, GROWTH_INSTANT_EVAL_USD],
       });
-      // The month's Instant Eval spend in the meter's units: 0.30, 0.30 and 5.0428 dollars.
+      const repriced = await growth({
+        organizationId: "org-instant-repriced",
+        currency: "USD",
+        lines: [GROWTH_SEAT_USD_MONTHLY, GROWTH_INSTANT_EVAL_USD_REPRICED],
+      });
+      const lookalike = await growth({
+        organizationId: "org-instant-lookalike",
+        currency: "USD",
+        lines: [GROWTH_SEAT_USD_MONTHLY, NICKNAMED_LOOKALIKE],
+      });
+      // The month's Instant Eval spend in the meter's units: 0.30, 0.30, 5.0428, 0.30 and 0.30.
       const spend: Record<string, number> = {
         "org-instant-old-usd": 3_000,
         "org-instant-eur": 3_000,
         "org-instant-paying": 50_428,
+        "org-instant-repriced": 3_000,
+        "org-instant-lookalike": 3_000,
       };
       const stripeChannels = composeHttpBillingStripe({
         secretKey: SECRET_KEY,
@@ -629,6 +672,7 @@ describe.skipIf(!goPresent)(
             subscriptions: await stripeChannels.subscriptions.listCustomerSubscriptions({
               customerId: stripeCustomerId,
             }),
+            priceName: price,
             priceId: price === "GROWTH_INSTANT_EVAL_USD" ? GROWTH_INSTANT_EVAL_USD : undefined,
           }),
         selfDispatch: async () => {},
@@ -661,6 +705,10 @@ describe.skipIf(!goPresent)(
       expect(await instantUsage(paying)).toEqual([
         expect.objectContaining({ value: 5.0428, events: 1 }),
       ]);
+      expect(await instantUsage(repriced)).toEqual([
+        expect.objectContaining({ value: 0.3, events: 1 }),
+      ]);
+      expect(await instantUsage(lookalike)).toEqual([]);
     }, 30_000);
 
     /** @scenario "A failed renewal payment is recorded" */

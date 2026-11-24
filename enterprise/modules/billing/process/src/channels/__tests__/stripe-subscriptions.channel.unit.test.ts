@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-/** @see enterprise/modules/billing/specs/billing.feature */
+/**
+ * @see enterprise/modules/billing/specs/billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
+ */
 import { stripeDouble } from "@langwatch/test-harness/client-doubles/stripe";
 import Stripe from "stripe";
 import { describe, expect, it } from "vitest";
@@ -313,6 +316,48 @@ describe("Billing's subscription shapes over the provider", () => {
       currentPeriodEnd: 1_701_388_800,
       currency: "eur",
     });
+  });
+
+  /** @scenario "A re-priced Instant Evals line is still recognised" */
+  it("reads a line's lookup key and langwatch_key, and never its nickname", async () => {
+    const stripe = stripeDouble({
+      subscriptions: {
+        retrieve: async () => ({
+          ...ACTIVE,
+          items: {
+            data: [
+              {
+                id: "si_instant",
+                price: {
+                  id: "price_instant_v2",
+                  unit_amount: null,
+                  recurring: { interval: "month" },
+                  lookup_key: "GROWTH_INSTANT_EVAL_USD",
+                  nickname: "Renamed in the dashboard",
+                  metadata: { langwatch_key: "GROWTH_INSTANT_EVAL_USD" },
+                },
+              },
+            ],
+          },
+        }),
+      },
+    });
+
+    const subscription = await HttpStripeSubscriptionsChannel.create({ stripe }).getSubscription({
+      subscriptionId: "sub_1",
+    });
+
+    expect(subscription.items).toEqual([
+      {
+        id: "si_instant",
+        priceId: "price_instant_v2",
+        unitAmount: null,
+        interval: "month",
+        quantity: null,
+        lookupKey: "GROWTH_INSTANT_EVAL_USD",
+        langwatchKey: "GROWTH_INSTANT_EVAL_USD",
+      },
+    ]);
   });
 
   it("sends a seat change and a billing threshold as Stripe's update parameters and timeout", async () => {

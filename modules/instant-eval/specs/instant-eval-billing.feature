@@ -189,7 +189,7 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       # report after the meter is mapped carries the month from zero.
 
     # Stripe bills a meter event no subscription line prices at nothing, so
-    # sending it would advance the checkpoint and lose the charge (ADR-174, v20).
+    # sending it would advance the checkpoint and lose the charge (ADR-174 decision 18).
     @unit
     Scenario: Usage is held while the subscription carries no Instant Evals price
       Given a Stripe mode whose catalog maps the Instant Evals meter
@@ -199,6 +199,7 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       Then no Instant Eval meter event is sent and its checkpoint is not advanced
       And no other report is scheduled for it
       And the billable events meter is reported as usual
+      And a warning names the organization, the meter and the amount held
 
     @unit
     Scenario: A Growth subscription in euros holds its Instant Eval usage
@@ -206,7 +207,8 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       And Instant Eval spend this month
       When the month is reported
       Then no Instant Eval meter event is sent and its checkpoint is not advanced
-      # The price is in dollars; a euro subscription cannot carry it.
+      And the billable events meter is reported as usual
+      # The price is in dollars and no euro price exists, so the month is held until one does.
 
     @unit
     Scenario: Usage is reported once the subscription carries the Instant Evals price
@@ -227,7 +229,31 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       And Instant Eval spend this month
       When the month is reported
       Then no Instant Eval meter event is sent and its checkpoint is not advanced
+      And the failed read is counted on the meter's checkpoint
       And another report is scheduled
+
+    @unit
+    Scenario: A price read that keeps failing stops at the circuit breaker
+      Given an organization whose subscription read fails every time
+      When the month is reported again and again
+      Then the read is tried five times, each counted on the meter's checkpoint
+      And then an alarm is logged and no further report is scheduled
+
+    @unit
+    Scenario: A pending total is replayed even while the price is missing
+      Given a meter event whose send was cut off before it was confirmed
+      And a subscription that no longer carries the Instant Evals price
+      When the month is reported
+      Then the pending total is sent again under its own identifier
+      # Stripe forgets an identifier after a day; waiting for the price could count it twice.
+
+    @unit
+    Scenario: A re-priced Instant Evals line is still recognised
+      Given a subscription whose Instant Evals line is on a newer price
+      And that price carries the lookup key or the langwatch_key metadata GROWTH_INSTANT_EVAL_USD
+      When the month is reported
+      Then the usage is reported
+      And a price named like it only in its nickname is not taken for it
 
     @integration
     Scenario: Only a subscription with the Instant Evals price reaches the Stripe simulator

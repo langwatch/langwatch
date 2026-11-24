@@ -9,6 +9,10 @@ import type { Command } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { BillingCheckpointRepository } from "../../repositories/billing-checkpoint.repository.ts";
+import { MemoryBillingCheckpointRepository } from "../../repositories/memory/memory.billing-checkpoint.repository.ts";
+import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
+
 // ---------------------------------------------------------------------------
 // Hoisted mocks
 // ---------------------------------------------------------------------------
@@ -169,13 +173,15 @@ function usageBilledOrg({
   };
 }
 
-async function createHandler() {
+async function createHandler({
+  billingCheckpoints = mockBillingCheckpoints as any,
+}: { billingCheckpoints?: BillingCheckpointRepository } = {}) {
   const { ReportUsageForMonthCommandHandler } =
     await import("../report-usage-for-month.commands.ts");
 
   return new ReportUsageForMonthCommandHandler({
     organizations: mockOrganizations as any,
-    billingCheckpoints: mockBillingCheckpoints as any,
+    billingCheckpoints,
     getUsageReportingService: () => ({
       reportUsageDelta: mockReportUsageDelta,
       reportUsageSet: vi.fn(),
@@ -668,12 +674,45 @@ describe("ReportUsageForMonthCommand", () => {
         stripeCustomerId: "cus_123",
         price: "GROWTH_INSTANT_EVAL_USD",
       });
-      expect(mockQueryInstantEvalSpendTotal).not.toHaveBeenCalled();
-      expect(mockBillingCheckpoints.findCheckpoint).not.toHaveBeenCalledWith(
-        expect.objectContaining({ meter: "langwatch_instant_eval_usd" }),
-      );
       expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.confirm).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.incrementFailures).not.toHaveBeenCalled();
       expect(mockSelfDispatch).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Usage is held while the subscription carries no Instant Evals price" */
+    it("warns with the organization, the meter and the amount held", async () => {
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org-1",
+          meter: "langwatch_instant_eval_usd",
+          heldValue: 0.3,
+        }),
+        expect.stringContaining("holding"),
+      );
+    });
+
+    /** @scenario "A pending total is replayed even while the price is missing" */
+    it("replays a pending total under its own identifier", async () => {
+      mockBillingCheckpoints.findCheckpoint.mockImplementation(
+        async ({ meter }: { meter: string }) =>
+          meter === "langwatch_instant_eval_usd"
+            ? { lastReportedTotal: 0, pendingReportedTotal: 3_000, consecutiveFailures: 0 }
+            : null,
+      );
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockReportUsageDelta.mock.calls[0]?.[0].events[0]).toMatchObject({
+        eventName: "langwatch_instant_eval_usd",
+        identifier: "org-1:2026-02:langwatch_instant_eval_usd:from:0:to:3000",
+      });
     });
 
     /** @scenario "Usage is held while the subscription carries no Instant Evals price" */
@@ -714,15 +753,22 @@ describe("ReportUsageForMonthCommand", () => {
       );
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      countedTotal = 150;
       mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 3_000 });
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       const handler = await createHandler();
 
       await handler.handle(makeCommand());
 
-      expect(mockReportUsageDelta).not.toHaveBeenCalled();
-      expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
-      expect(mockBillingCheckpoints.confirm).not.toHaveBeenCalled();
+      expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
+        stripeCustomerId: "cus_123",
+        price: "GROWTH_INSTANT_EVAL_USD",
+      });
+      const sent = mockReportUsageDelta.mock.calls.map(([input]) => input.events[0].eventName);
+      expect(sent).toEqual(["langwatch_billable_events"]);
+      expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalledWith(
+        expect.objectContaining({ meter: "langwatch_instant_eval_usd" }),
+      );
     });
   });
 
@@ -778,8 +824,50 @@ describe("ReportUsageForMonthCommand", () => {
 
       expect(mockReportUsageDelta).not.toHaveBeenCalled();
       expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
-      expect(mockBillingCheckpoints.incrementFailures).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.incrementFailures).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        meter: "langwatch_instant_eval_usd",
+        lastReportedTotal: 0,
+        pendingReportedTotal: null,
+        consecutiveFailures: 1,
+      });
       expect(mockSelfDispatch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a price read that always fails", () => {
+    /** @scenario "A price read that keeps failing stops at the circuit breaker" */
+    it("stops reading and scheduling after five failed reads", async () => {
+      const store = MemoryBillingStore.create();
+      const checkpoints = MemoryBillingCheckpointRepository.create(store);
+      mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
+        if (price === "GROWTH_INSTANT_EVAL_USD") throw new Error("No such customer");
+        return true;
+      });
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 3_000 });
+      const handler = await createHandler({ billingCheckpoints: checkpoints });
+
+      for (let run = 0; run < 8; run++) await handler.handle(makeCommand());
+
+      const reads = mockSubscriptionCarriesPrice.mock.calls.filter(
+        ([input]) => input.price === "GROWTH_INSTANT_EVAL_USD",
+      );
+      expect(reads).toHaveLength(5);
+      expect(mockSelfDispatch).toHaveBeenCalledTimes(5);
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(
+        await checkpoints.findCheckpoint({
+          organizationId: "org-1",
+          billingMonth: "2026-02",
+          meter: "langwatch_instant_eval_usd",
+        }),
+      ).toMatchObject({ lastReportedTotal: 0, pendingReportedTotal: null, consecutiveFailures: 5 });
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ meter: "langwatch_instant_eval_usd", consecutiveFailures: 5 }),
+        expect.stringContaining("ALARM"),
+      );
     });
   });
 
@@ -917,12 +1005,9 @@ describe("ReportUsageForMonthCommand", () => {
         stripeCustomerId: "cus_123",
         price: "GROWTH_PII_REDACTION_USD",
       });
-      expect(mockQueryPiiRedactionSpendTotal).not.toHaveBeenCalled();
       expect(mockReportUsageDelta).not.toHaveBeenCalled();
-      expect(mockBillingCheckpoints.findCheckpoint).not.toHaveBeenCalledWith(
-        expect.objectContaining({ meter: "langwatch_pii_redaction_usd" }),
-      );
       expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.confirm).not.toHaveBeenCalled();
       expect(mockSelfDispatch).not.toHaveBeenCalled();
     });
 
@@ -1000,7 +1085,13 @@ describe("ReportUsageForMonthCommand", () => {
 
       expect(mockReportUsageDelta).not.toHaveBeenCalled();
       expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalled();
-      expect(mockBillingCheckpoints.incrementFailures).not.toHaveBeenCalled();
+      expect(mockBillingCheckpoints.incrementFailures).toHaveBeenCalledWith(
+        expect.objectContaining({
+          meter: "langwatch_pii_redaction_usd",
+          pendingReportedTotal: null,
+          consecutiveFailures: 1,
+        }),
+      );
       expect(mockSelfDispatch).toHaveBeenCalledTimes(1);
     });
   });
@@ -1363,36 +1454,21 @@ describe("ReportUsageForMonthCommand", () => {
       expect(hostedUsageEvent()?.value).toBe(9);
     });
 
-    /** @scenario "Hosted usage is priced by the quarterly usage line, not the Growth price" */
-    it("asks the subscription for the connected hosted usage price, not the Growth one", async () => {
+    /** @scenario "Hosted usage is reported without a price check until its meter is confirmed" */
+    it("reports hosted usage without asking the subscription for any Instant Evals price", async () => {
       arrange({ measured: 90_000, ceiling: null });
-      missingPrices = ["GROWTH_INSTANT_EVAL_USD"];
+      missingPrices = ["GROWTH_INSTANT_EVAL_USD", "CONNECTED_HOSTED_USAGE_QUARTERLY"];
       const handler = await createHandler();
 
       await handler.handle(makeCommand());
 
-      expect(mockSubscriptionCarriesPrice).toHaveBeenCalledWith({
-        stripeCustomerId: "cus_123",
-        price: "CONNECTED_HOSTED_USAGE_QUARTERLY",
-      });
       expect(mockSubscriptionCarriesPrice).not.toHaveBeenCalledWith(
         expect.objectContaining({ price: "GROWTH_INSTANT_EVAL_USD" }),
       );
-      expect(hostedUsageEvent()?.value).toBe(9);
-    });
-
-    /** @scenario "Hosted usage is held while the usage subscription has no quarterly line" */
-    it("holds hosted usage while the usage subscription has no quarterly line", async () => {
-      arrange({ measured: 90_000, ceiling: null });
-      missingPrices = ["CONNECTED_HOSTED_USAGE_QUARTERLY"];
-      const handler = await createHandler();
-
-      await handler.handle(makeCommand());
-
-      expect(hostedUsageEvent()).toBeUndefined();
-      expect(mockBillingCheckpoints.writeIntent).not.toHaveBeenCalledWith(
-        expect.objectContaining({ meter: "langwatch_instant_eval_usd" }),
+      expect(mockSubscriptionCarriesPrice).not.toHaveBeenCalledWith(
+        expect.objectContaining({ price: "CONNECTED_HOSTED_USAGE_QUARTERLY" }),
       );
+      expect(hostedUsageEvent()?.value).toBe(9);
     });
 
     it("dates the event at the end of the month, because the quarter is still open", async () => {

@@ -1079,6 +1079,7 @@ export class BillingModule
           subscriptions: await stripeSubscriptions.listCustomerSubscriptions({
             customerId: stripeCustomerId,
           }),
+          priceName: price,
           priceId: catalogue().prices[price],
         }),
       organizationCache: repositories.organizationCache,
