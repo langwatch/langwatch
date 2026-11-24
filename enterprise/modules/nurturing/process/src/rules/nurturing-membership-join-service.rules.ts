@@ -144,7 +144,13 @@ function seatAndCompanyCalls({
   const traits = seatTraitOf(role);
   return [
     ...(traits.seat ? [{ type: "identify" as const, userId, traits }] : []),
-    { type: "group", userId, groupId: organizationId },
+    {
+      type: "group",
+      userId,
+      groupId: organizationId,
+      // Per-organization seat, so a role change reaches the link and not only the person.
+      ...(traits.seat ? { traits: { relationshipAttributes: { seat: traits.seat } } } : {}),
+    },
   ];
 }
 

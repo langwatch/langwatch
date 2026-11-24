@@ -183,6 +183,17 @@ describe("a member whose role changed", () => {
       type: "group",
       userId: "user-1",
       groupId: "org-1",
+      traits: { relationshipAttributes: { seat: "admin" } },
+    });
+  });
+
+  /** @scenario "A role change or admission links the person to the organization with their new seat" */
+  it("is linked to the organization with the new seat", () => {
+    expect(changed("EXTERNAL")).toContainEqual({
+      type: "group",
+      userId: "user-1",
+      groupId: "org-1",
+      traits: { relationshipAttributes: { seat: "lite_member" } },
     });
   });
 
@@ -200,7 +211,12 @@ describe("a member admitted without a join event", () => {
   it("is identified with their seat and grouped into the organization", () => {
     expect(admitted("EXTERNAL")).toEqual([
       { type: "identify", userId: "user-1", traits: { seat: "lite_member" } },
-      { type: "group", userId: "user-1", groupId: "org-1" },
+      {
+        type: "group",
+        userId: "user-1",
+        groupId: "org-1",
+        traits: { relationshipAttributes: { seat: "lite_member" } },
+      },
     ]);
   });
 });

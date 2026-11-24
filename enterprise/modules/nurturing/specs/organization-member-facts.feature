@@ -248,6 +248,12 @@ Feature: An organization's session facts reach every active member in Customer.i
     Then Customer.io groups user-1 into org-1
 
   @unit
+  Scenario: A role change or admission links the person to the organization with their new seat
+    Given a member's role changes to EXTERNAL
+    When the role change is delivered
+    Then Customer.io groups the person into the organization with relationshipAttributes seat lite_member
+
+  @unit
   Scenario: A role change to a role with no seat sends no seat
     Given a member_role_changed signal for user-1 of org-1 holding a role nurturing cannot name
     When the signal is delivered
