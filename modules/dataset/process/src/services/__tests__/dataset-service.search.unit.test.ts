@@ -47,7 +47,6 @@ const makeService = (overrides: {
   );
   const storage = createApiFixture<DatasetChunkRepository>(
     {
-      readChunks: (params) => activeStorage.readChunks(params),
       readChunk: (params) => activeStorage.readChunk(params),
       readMeasuredChunk: (params) => activeStorage.readMeasuredChunk(params),
     },
@@ -111,17 +110,16 @@ const mockChunks = (
   byIndex: Record<number, unknown[]> = chunks,
   storedBytes: Record<number, number> = {},
 ) => {
-  const readChunks = vi.fn();
   const readChunk = vi.fn(({ index }: { index: number }) => Promise.resolve(byIndex[index] ?? []));
   const readMeasuredChunk = vi.fn(({ index }: { index: number }) => {
     const rows = byIndex[index] ?? [];
     return Promise.resolve({ rows, byteSize: storedBytes[index] ?? jsonlBytes(rows) });
   });
   activeStorage = createApiFixture<DatasetChunkRepository>(
-    { readChunks, readChunk, readMeasuredChunk },
+    { readChunk, readMeasuredChunk },
     "dataset storage",
   );
-  return { readChunks, readChunk, readMeasuredChunk };
+  return { readChunk, readMeasuredChunk };
 };
 
 const searchPage = ({
@@ -212,10 +210,9 @@ describe("dataset search (s3_jsonl)", () => {
       });
 
       it("reads one chunk at a time rather than loading the dataset at once", async () => {
-        // `readChunks` (plural) pulls every chunk into the heap. A search must not
-        // use it: heap stays at one chunk plus the matches kept for the window,
-        // whatever the dataset's size.
-        const { readChunks, readMeasuredChunk } = mockChunks();
+        // Heap stays at one chunk plus the matches kept for the window, whatever
+        // the dataset's size: the repository has no whole-dataset read.
+        const { readMeasuredChunk } = mockChunks();
         const service = makeService({});
 
         await searchPage({
@@ -224,7 +221,6 @@ describe("dataset search (s3_jsonl)", () => {
           search: "escalation",
         });
 
-        expect(readChunks).not.toHaveBeenCalled();
         expect(readMeasuredChunk).toHaveBeenCalledTimes(3);
       });
 

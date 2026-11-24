@@ -115,6 +115,8 @@ Feature: Single-file datasets keep working where the previous release kept them
 
   Rule: The conversion step reports across its attempts
 
+    # An attempt stopped by a lost lease or its deadline cannot save its last project's totals (the
+    # ledger refuses the checkpoint), so the report may undercount what that project moved.
     @unit
     Scenario: A conversion that retried reports every dataset it converted across its attempts
       Given the conversion converted some datasets and failed on one, so it retried

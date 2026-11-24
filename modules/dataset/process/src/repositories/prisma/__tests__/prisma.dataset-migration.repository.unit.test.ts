@@ -26,9 +26,6 @@ class FixtureStorage implements DatasetChunkRepository {
   );
   readonly deleteChunksFrom = vi.fn(async () => {});
 
-  readChunks(): Promise<unknown[]> {
-    throw new Error("unused");
-  }
   readChunk(): Promise<unknown[]> {
     throw new Error("unused");
   }

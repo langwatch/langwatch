@@ -49,15 +49,13 @@ const dataset: Dataset = datasetSchema.parse({
 
 function content() {
   const readChunk = vi.fn(({ index }: { index: number }) => Promise.resolve(chunks[index] ?? []));
-  const readChunks = vi.fn(async () => Object.values(chunks).flat());
   const storage = createApiFixture<DatasetChunkRepository>(
-    { readChunk: readChunk as never, readChunks: readChunks as never },
+    { readChunk: readChunk as never },
     "dataset chunks",
   );
 
   return {
     readChunk,
-    readChunks,
     service: DatasetContentService.create({
       datasets: createApiFixture<DatasetContentRepository>({}, "dataset content"),
       storage,
@@ -70,7 +68,7 @@ describe("DatasetContentService at its size limits", () => {
     describe("when every row is read under a byte budget", () => {
       /** @scenario "A read that stops early reports the same on a dataset stored in chunks" */
       it("stops at the first row that does not fit and reports the rows left out", async () => {
-        const { service, readChunk, readChunks } = content();
+        const { service, readChunk } = content();
 
         const read = await service.getDatasetWithRecords({
           dataset,
@@ -84,7 +82,6 @@ describe("DatasetContentService at its size limits", () => {
         expect(read.totalRows).toBe(6);
         // Only the one chunk fetched ahead is read past the stop (ADR-032 v21), never the whole.
         expect(readChunk).toHaveBeenCalledTimes(3);
-        expect(readChunks).not.toHaveBeenCalled();
       });
 
       it("reports nothing left out when every row fits", async () => {

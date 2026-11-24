@@ -4,15 +4,10 @@ import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Alert, Heading, HStack, Stack, Table, Text } from "@langwatch/design-system/primitives";
 import { SummaryList, SummaryListItem } from "@langwatch/design-system/summary-list";
-import { nowEpochMs } from "@langwatch/time";
 
-import {
-  modeLabel,
-  oldWritersGraceLine,
-  releaseName,
-  statusTone,
-} from "../../model/upgrade-labels.ts";
+import { modeLabel, releaseName, statusTone } from "../../model/upgrade-labels.ts";
 import type { UpgradeStepDetailView, UpgradeTargetView } from "../../model/upgrade-view.ts";
+import { OldWritersGraceNote } from "../elements/old-writers-grace-note.tsx";
 import { UpgradeStatusBadge } from "../elements/upgrade-status-badge.tsx";
 
 function TargetsTable({ targets }: { targets: readonly UpgradeTargetView[] }) {
@@ -64,7 +59,7 @@ export function UpgradeStepDetail({ step }: { step: UpgradeStepDetailView }) {
           <Alert.Content>
             <Alert.Title>Waiting for the older release to stop</Alert.Title>
             <Alert.Description>
-              {oldWritersGraceLine({ endsAt: step.oldWritersGraceEndsAt, nowMs: nowEpochMs() })}
+              <OldWritersGraceNote endsAt={step.oldWritersGraceEndsAt} />
             </Alert.Description>
           </Alert.Content>
         </Alert.Root>

@@ -467,6 +467,8 @@ describe("UpgradeStepsTab", () => {
         expect(row).toHaveTextContent("processes of the older release");
         expect(row).toHaveTextContent("about 23 more minutes");
         expect(row).toHaveTextContent("pnpm task upgrade old-writers-gone");
+        expect(row.textContent).not.toContain("`");
+        expect(row.textContent).not.toContain("30 minutes");
       });
     });
 
@@ -649,6 +651,7 @@ describe("UpgradeStepDetail", () => {
       const grace = screen.getByTestId("upgrade-step-grace");
       expect(grace).toHaveTextContent("about 23 more minutes");
       expect(grace).toHaveTextContent("pnpm task upgrade old-writers-gone");
+      expect(grace.textContent).not.toContain("`");
     });
   });
 

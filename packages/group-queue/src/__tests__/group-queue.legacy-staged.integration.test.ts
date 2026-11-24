@@ -1,9 +1,13 @@
+import { randomUUID } from "node:crypto";
+import { gzipSync } from "node:zlib";
+
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
+import { RedisJobBlobStore } from "../redisJobBlobStore.ts";
 import { GroupStagingScripts } from "../scripts.ts";
 import { InMemoryObjectStore, mintTestUri } from "./blob-test-doubles.ts";
 
@@ -48,6 +52,40 @@ function legacyGq1({ id, groupId }: { id: string; groupId: string }): string {
   });
   return `GQ1|${Buffer.byteLength(header)}|${header}${json}`;
 }
+
+/** GQ1 with the body offloaded whole, gzip, to the queue's blob keys, as 3.20.1 did over 32 KiB. */
+async function legacyGq1Ref({
+  id,
+  groupId,
+  redis,
+  name,
+}: {
+  id: string;
+  groupId: string;
+  redis: Redis;
+  name: string;
+}): Promise<string> {
+  const json = legacyBareJson({ id, groupId });
+  const blobId = randomUUID();
+  await new RedisJobBlobStore({ redis, queueName: name }).put({ id: blobId, data: gzipSync(json) });
+  const header = JSON.stringify({
+    v: 1,
+    e: "ref",
+    r: blobId,
+    p: ROUTING.__pipelineName,
+    t: ROUTING.__jobType,
+    n: ROUTING.__jobName,
+    s: Buffer.byteLength(json),
+  });
+  return `GQ1|${Buffer.byteLength(header)}|${header}`;
+}
+
+type Encode = (input: {
+  id: string;
+  groupId: string;
+  redis: Redis;
+  name: string;
+}) => string | Promise<string>;
 
 describe("GroupQueueProcessor, jobs staged by 3.20.1 (#9840)", () => {
   let redis: Redis;
@@ -105,10 +143,12 @@ describe("GroupQueueProcessor, jobs staged by 3.20.1 (#9840)", () => {
   const recorded = (name: string, instrument: string) =>
     meter.recorded.filter((r) => r.instrument === instrument && r.attributes.queue_name === name);
 
-  for (const { format, encode } of [
+  const formats: { format: string; encode: Encode }[] = [
     { format: "bare JSON", encode: legacyBareJson },
     { format: "a GQ1 inline envelope", encode: legacyGq1 },
-  ]) {
+    { format: "a GQ1 envelope with its body in the queue's blob keys", encode: legacyGq1Ref },
+  ];
+  for (const { format, encode } of formats) {
     describe(`given a job the old worker staged as ${format}`, () => {
       describe("when the new worker claims it", () => {
         /** @scenario "A job staged by 3.20.1 runs on the current worker instead of being dropped" */
@@ -119,7 +159,7 @@ describe("GroupQueueProcessor, jobs staged by 3.20.1 (#9840)", () => {
             name,
             groupId,
             stagedJobId: "legacy-1",
-            jobDataJson: encode({ id: "legacy-1", groupId }),
+            jobDataJson: await encode({ id: "legacy-1", groupId, redis, name }),
           });
 
           const received: TestPayload[] = [];
@@ -169,7 +209,7 @@ describe("GroupQueueProcessor, jobs staged by 3.20.1 (#9840)", () => {
             name,
             groupId,
             stagedJobId: "legacy-p",
-            jobDataJson: encode({ id: "legacy-p", groupId }),
+            jobDataJson: await encode({ id: "legacy-p", groupId, redis, name }),
           });
           const scripts = new GroupStagingScripts(redis, name);
           await scripts.addPauseKey(PAUSE_KEY);

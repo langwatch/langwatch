@@ -346,7 +346,7 @@ export class DatasetTooLargeToEditColumnsError extends HandledError {
 /**
  * A chunk that the PG-authoritative `chunkCount` claims must exist is missing from object
  * storage. From a read's perspective this is corruption, not emptiness, so the read paths
- * (`readChunks`/`readChunk`) throw it rather than silently truncate.
+ * (`readChunk`) throw it rather than silently truncate.
  */
 export class MissingChunkError extends Error {
   readonly key: string;

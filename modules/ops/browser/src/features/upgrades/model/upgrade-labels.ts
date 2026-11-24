@@ -327,12 +327,11 @@ export function statusWords(status: string): string {
 /** The command that records old writers gone, so a held step need not wait out the grace. */
 export const OLD_WRITERS_GONE_COMMAND = "pnpm task upgrade old-writers-gone";
 
-/** Why a step held by the grace for writers before the roster waits, and for how long (ADR-173). */
+/** How long a step held by the grace for writers before the roster still waits (ADR-173). */
 export function oldWritersGraceLine({ endsAt, nowMs }: { endsAt: string; nowMs: number }): string {
   const minutes = Math.ceil((Temporal.Instant.from(endsAt).epochMilliseconds - nowMs) / 60_000);
-  const wait =
-    minutes > 0
-      ? `Waiting about ${minutes} more ${minutes === 1 ? "minute" : "minutes"} for processes of the older release to stop`
-      : "The wait for processes of the older release is over; the step starts on the next pass";
-  return `${wait}. That release cannot report its processes, so the step waits a fixed 30 minutes after the upgrade, or until \`${OLD_WRITERS_GONE_COMMAND}\` records they have stopped.`;
+  if (minutes <= 0) {
+    return "The wait for processes of the older release is over; the step starts on the next pass";
+  }
+  return `Waiting about ${minutes} more ${minutes === 1 ? "minute" : "minutes"} for processes of the older release to stop`;
 }

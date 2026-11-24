@@ -108,12 +108,13 @@ async function worker() {
     return dataset.id;
   };
   const row = (datasetId: string) => db.getDataset(projectId, datasetId);
-  const chunkRows = async (datasetId: string) =>
-    chunkStore.readChunks({
-      projectId,
-      datasetId,
-      chunkCount: row(datasetId).chunkCount ?? 0,
-    });
+  const chunkRows = async (datasetId: string) => {
+    const rows: unknown[] = [];
+    for (let index = 0; index < (row(datasetId).chunkCount ?? 0); index++) {
+      rows.push(...(await chunkStore.readChunk({ projectId, datasetId, index })));
+    }
+    return rows;
+  };
   const read = async (datasetId: string) =>
     (
       await runtime

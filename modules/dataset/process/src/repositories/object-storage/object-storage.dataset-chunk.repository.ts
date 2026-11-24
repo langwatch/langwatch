@@ -46,18 +46,6 @@ export class ObjectStorageDatasetChunkRepository implements DatasetChunkReposito
     return chunks;
   }
 
-  async readChunks(params: {
-    projectId: string;
-    datasetId: string;
-    chunkCount: number;
-  }): Promise<unknown[]> {
-    const rows: unknown[] = [];
-    for (let index = 0; index < params.chunkCount; index++) {
-      rows.push(...(await this.readChunk({ ...params, index })));
-    }
-    return rows;
-  }
-
   async readChunk(params: {
     projectId: string;
     datasetId: string;

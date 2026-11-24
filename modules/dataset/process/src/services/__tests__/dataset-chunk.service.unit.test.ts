@@ -101,7 +101,6 @@ function fakeStorage(chunks: unknown[][] = []) {
     deleteChunksFrom: async ({ fromIndex }) => {
       chunks.length = Math.min(chunks.length, fromIndex);
     },
-    readChunks: unwired("readChunks"),
     readMeasuredChunk: unwired("readMeasuredChunk"),
     readStagedUpload: unwired("readStagedUpload"),
     removeStagedUpload: unwired("removeStagedUpload"),

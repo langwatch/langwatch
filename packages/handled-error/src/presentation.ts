@@ -4535,7 +4535,7 @@ const presentations = {
     // fault: platform, retryable. The store answered a server fault or asked
     // us to slow down; the same request usually works a moment later.
     title: "Storage couldn't answer right now",
-    describe: () => "Nothing was saved. Try again in a moment.",
+    describe: () => "Storage could not answer. Try again in a moment.",
   },
   export_failed: {
     // fault: platform. The export ran on our side and did not finish, so the
