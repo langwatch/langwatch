@@ -39,6 +39,13 @@ function root(node: unknown): Element {
 const containers = (node: unknown) =>
   descendants(node).filter((element) => element.type === "ResponsiveContainer");
 
+/** The chart the auto-picker chose, drawn as the frame's React would. */
+function drawPicked(node: unknown): Element {
+  const picked = root(node);
+  const chart = picked.type as (props: Record<string, unknown> | null) => unknown;
+  return root(chart(picked.props));
+}
+
 const scope = globalThis as { window?: unknown };
 
 const colors = Object.fromEntries(
@@ -84,13 +91,14 @@ describe("a chart with no height", () => {
 
   /** @scenario "AC262 Langy widgets: a prebuilt chart with no height fills its card" */
   it("fills for every chart the auto-picker and the bar charts draw", () => {
-    const picked = root(LwqlChart({ data: rows }));
+    const picked = drawPicked(LwqlChart({ data: rows }));
     const bars = root(StackedBars({ data: rows, x: "day", series: ["traces"] }));
     const projection = root(
       ProjectionBars({ data: rows, x: "day", y: "traces", projectionFrom: "2026-11-02 00:00:00" }),
     );
 
-    expect(picked.props).toMatchObject({ height: "100%" });
+    expect(picked.props?.style).toMatchObject({ height: "100%" });
+    expect(containers(picked)[0]?.props).toMatchObject({ minHeight: 120 });
     expect(bars.props?.style).toMatchObject({ height: "100%" });
     expect(containers(projection)[0]?.props).toMatchObject({ height: "100%", minHeight: 120 });
   });
@@ -126,5 +134,16 @@ describe("a chart with no height", () => {
     expect(containers(area)[0]?.props).not.toHaveProperty("minHeight");
     expect(containers(projection)[0]?.props).toMatchObject({ height: 80 });
     expect(containers(projection)[0]?.props).not.toHaveProperty("minHeight");
+  });
+
+  /** @scenario "AC262 Langy widgets: a prebuilt chart with no height fills its card" */
+  it("keeps a passed full height without the fill floor, through the auto-picker too", () => {
+    const area = root(AreaTimeseries({ data: rows, x: "day", series: "traces", height: "100%" }));
+    const picked = drawPicked(LwqlChart({ data: rows, height: "100%" }));
+
+    expect(area.props?.style).toMatchObject({ height: "100%" });
+    expect(containers(area)[0]?.props).not.toHaveProperty("minHeight");
+    expect(picked.props?.style).toMatchObject({ height: "100%" });
+    expect(containers(picked)[0]?.props).not.toHaveProperty("minHeight");
   });
 });

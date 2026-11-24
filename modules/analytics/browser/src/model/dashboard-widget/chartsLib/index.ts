@@ -41,9 +41,9 @@ declare const window: {
 const DEFAULT_HEIGHT = "100%";
 const MIN_FILL_HEIGHT_PX = 120;
 
-/** The floor a filling chart keeps; a height the widget passes is kept as given. */
-function fillFloor(height: number | string): { minHeight?: number } {
-  return height === DEFAULT_HEIGHT ? { minHeight: MIN_FILL_HEIGHT_PX } : {};
+/** The floor a chart with no height keeps; a passed height, `"100%"` included, is kept as given. */
+function fillFloor(height: number | string | undefined): { minHeight?: number } {
+  return height === undefined ? { minHeight: MIN_FILL_HEIGHT_PX } : {};
 }
 
 /** Resolved by the host before crossing the opaque iframe boundary. */
@@ -693,7 +693,7 @@ export function AreaTimeseries({
   stacked,
   projectionFrom,
   colors,
-  height = DEFAULT_HEIGHT,
+  height,
   format,
   gapLabel = (date) => `No data on ${date}`,
 }: AreaTimeseriesProps) {
@@ -760,7 +760,7 @@ export function AreaTimeseries({
 
   return h(
     "div",
-    { style: { height, display: "flex", flexDirection: "column" } },
+    { style: { height: height ?? DEFAULT_HEIGHT, display: "flex", flexDirection: "column" } },
     keys.length > 1 && legendBar(keys, palette, c),
     h(
       "div",
@@ -845,14 +845,7 @@ export interface StackedBarsProps {
   height?: number | string;
 }
 
-export function StackedBars({
-  data,
-  x,
-  series,
-  projectionFrom,
-  colors,
-  height = DEFAULT_HEIGHT,
-}: StackedBarsProps) {
+export function StackedBars({ data, x, series, projectionFrom, colors, height }: StackedBarsProps) {
   const R = recharts();
   const c = chrome();
   const palette = paletteFor(colors);
@@ -860,7 +853,7 @@ export function StackedBars({
 
   return h(
     "div",
-    { style: { height, display: "flex", flexDirection: "column" } },
+    { style: { height: height ?? DEFAULT_HEIGHT, display: "flex", flexDirection: "column" } },
     series.length > 1 && legendBar(series, palette, c),
     h(
       "div",
@@ -918,20 +911,14 @@ export interface GroupedBarsProps {
   height?: number | string;
 }
 
-export function GroupedBars({
-  data,
-  x,
-  series,
-  colors,
-  height = DEFAULT_HEIGHT,
-}: GroupedBarsProps) {
+export function GroupedBars({ data, x, series, colors, height }: GroupedBarsProps) {
   const R = recharts();
   const c = chrome();
   const palette = paletteFor(colors);
 
   return h(
     "div",
-    { style: { height, display: "flex", flexDirection: "column" } },
+    { style: { height: height ?? DEFAULT_HEIGHT, display: "flex", flexDirection: "column" } },
     series.length > 1 && legendBar(series, palette, c),
     h(
       "div",
@@ -996,7 +983,7 @@ export function ProjectionBars({
   projectionFrom,
   budget,
   colors,
-  height = DEFAULT_HEIGHT,
+  height,
 }: ProjectionBarsProps) {
   const R = recharts();
   const c = chrome();
@@ -1005,7 +992,7 @@ export function ProjectionBars({
 
   return h(
     R.ResponsiveContainer,
-    { width: "100%", height, ...fillFloor(height) },
+    { width: "100%", height: height ?? DEFAULT_HEIGHT, ...fillFloor(height) },
     h(
       R.BarChart,
       { data, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
@@ -1074,21 +1061,14 @@ export interface DonutProps {
   height?: number | string;
 }
 
-export function Donut({
-  data,
-  nameKey,
-  valueKey,
-  centerLabel,
-  colors,
-  height = DEFAULT_HEIGHT,
-}: DonutProps) {
+export function Donut({ data, nameKey, valueKey, centerLabel, colors, height }: DonutProps) {
   const R = recharts();
   const c = chrome();
   const palette = paletteFor(colors);
 
   return h(
     "div",
-    { style: { height, display: "flex", flexDirection: "column" } },
+    { style: { height: height ?? DEFAULT_HEIGHT, display: "flex", flexDirection: "column" } },
     data.length > 1 &&
       legendBar(
         data.map((row) => String(row[nameKey])),
@@ -1535,16 +1515,7 @@ function inferShape(data: Row[], x?: string, y?: string | string[]): InferredSha
  * `series`) and renders it -- see the file header and the per-kind rules in this module.
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: independent fallbacks.
-export function LwqlChart({
-  data,
-  kind,
-  x,
-  y,
-  series,
-  colors,
-  height = DEFAULT_HEIGHT,
-  unpriced,
-}: LwqlChartProps) {
+export function LwqlChart({ data, kind, x, y, series, colors, height, unpriced }: LwqlChartProps) {
   const inferred = inferShape(data, x, y);
   const resolvedKind = kind ?? inferred.kind;
   const resolvedX = x ?? inferred.x;
