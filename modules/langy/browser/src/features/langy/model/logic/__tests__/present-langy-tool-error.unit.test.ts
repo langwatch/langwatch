@@ -509,6 +509,36 @@ describe("presentLangyToolError", () => {
       );
       expect(presentation.message !== code || (presentation.tips ?? []).length > 0).toBe(true);
     });
+  });
+
+  describe("given a failure whose message is only its code", () => {
+    const codeOnly = (error: Record<string, unknown>) =>
+      present(failureDocument({ meta: {}, isHandled: true, ...error }), "Running tool");
+
+    it("uses the registered description when the message is empty", () => {
+      const presentation = codeOnly({ code: "query_timeout", message: "", httpStatus: 504 });
+      expect(presentation.message).toBe("Narrow the time range or add a filter, then try again.");
+    });
+
+    it("drops a tip that repeats the description it now shows", () => {
+      const presentation = codeOnly({
+        code: "query_timeout",
+        message: "query_timeout",
+        httpStatus: 504,
+        suggestions: ["Narrow the time range", "Add filters to reduce the amount of data scanned"],
+      });
+      expect(presentation.tips).toEqual(["Add filters to reduce the amount of data scanned"]);
+    });
+
+    it("humanises a code the registry has no entry for, and still names the code", () => {
+      const presentation = codeOnly({
+        code: "made_up_failure",
+        message: "made_up_failure",
+        httpStatus: 400,
+      });
+      expect(presentation.message).toBe("Made up failure");
+      expect(presentation.code).toBe("made_up_failure");
+    });
 
     it("reads the reason chain, so a refused key is not told to try again", () => {
       const presentation = present(
