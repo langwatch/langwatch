@@ -1274,34 +1274,34 @@ Declared at `src/eventing/experiment-lifecycle.pipeline.ts:30`. Events: `experim
 
 ### Pipeline `experiment_run_processing` (aggregate `experiment_run`)
 
-Declared at `src/eventing/experiment-run-processing.pipeline.ts:149`. Events: `experimentRunStartedEventSchema`, `targetResultEventSchema`, `evaluatorResultEventSchema`, `traceMetricsComputedEventSchema`, `experimentRunCompletedEventSchema`, `workflowEvaluationRequestedEventSchema`, `cellFinishedEventSchema`, `abortRequestedEventSchema`.
+Declared at `src/eventing/experiment-run-processing.pipeline.ts:152`. Events: `experimentRunStartedEventSchema`, `targetResultEventSchema`, `evaluatorResultEventSchema`, `traceMetricsComputedEventSchema`, `experimentRunCompletedEventSchema`, `workflowEvaluationRequestedEventSchema`, `cellFinishedEventSchema`, `abortRequestedEventSchema`.
 
 | Kind                       | Name                                                                                           | Handles                                                          | Declared at                                              |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
-| process manager            | `experimentRunExecution`                                                                       | intents `complete`, `failCell`, `executeCell` (outbox)           | `src/eventing/experiment-run-processing.pipeline.ts:186` |
-| subscriber                 | `workflowEvaluationRequested`                                                                  | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:181` |
-| subscriber                 | `experimentRunActivity`                                                                        | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:185` |
-| peer subscriber            | `traceSpanMetricsSync`                                                                         | `lw.obs.trace.span_received` from [trace](../../trace/README.md) | `src/eventing/experiment-run-processing.pipeline.ts:191` |
-| ClickHouse fold projection | `≈ ExperimentRunStateFoldProjection.create({ store: deps.experimentRunStateFoldStore, })`      | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:165` |
-| ClickHouse fold projection | `≈ ExperimentRunPlanFoldProjection.create({ store: deps.experimentRunPlanFoldStore })`         | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:170` |
-| ClickHouse fold projection | `≈ ExperimentRunProgressFoldProjection.create({ store: deps.experimentRunProgressFoldStore })` | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:173` |
-| ClickHouse map projection  | `≈ ExperimentRunResultStorageMapProjection.create({ store: deps.experimentRunItemAppendStore…` | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:176` |
-| projection subscriber      | `≈ deps.runFrames.name`                                                                        | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:190` |
-| lane aliases               | `≈ MAIN_TRACE_METRICS_LANE_ALIASES`                                                            | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:210` |
-| retention                  | `≈ deps.retention`                                                                             | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:214` |
+| process manager            | `experimentRunExecution`                                                                       | intents `complete`, `failCell`, `executeCell` (outbox)           | `src/eventing/experiment-run-processing.pipeline.ts:192` |
+| subscriber                 | `workflowEvaluationRequested`                                                                  | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:184` |
+| subscriber                 | `experimentRunActivity`                                                                        | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:188` |
+| peer subscriber            | `traceSpanMetricsSync`                                                                         | `lw.obs.trace.span_received` from [trace](../../trace/README.md) | `src/eventing/experiment-run-processing.pipeline.ts:197` |
+| ClickHouse fold projection | `≈ ExperimentRunStateFoldProjection.create({ store: deps.experimentRunStateFoldStore, })`      | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:168` |
+| ClickHouse fold projection | `≈ ExperimentRunPlanFoldProjection.create({ store: deps.experimentRunPlanFoldStore })`         | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:173` |
+| ClickHouse fold projection | `≈ ExperimentRunProgressFoldProjection.create({ store: deps.experimentRunProgressFoldStore })` | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:176` |
+| ClickHouse map projection  | `≈ ExperimentRunResultStorageMapProjection.create({ store: deps.experimentRunItemAppendStore…` | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:179` |
+| projection subscriber      | `≈ deps.runFrames.name`                                                                        | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:196` |
+| lane aliases               | `≈ MAIN_TRACE_METRICS_LANE_ALIASES`                                                            | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:216` |
+| retention                  | `≈ deps.retention`                                                                             | –                                                                | `src/eventing/experiment-run-processing.pipeline.ts:220` |
 
 ## Configuration
 
 | Kind   | Leaf                  | Environment variable               | Declared at                               |
 | ------ | --------------------- | ---------------------------------- | ----------------------------------------- |
-| config | `blockLocalHttpCalls` | `BLOCK_LOCAL_HTTP_CALLS`           | `../contract/src/experiment.config.ts:20` |
-| config | `allowedProxyHosts`   | `ALLOWED_PROXY_HOSTS`              | `../contract/src/experiment.config.ts:21` |
-| config | `runConcurrency`      | `EVAL_V3_CONCURRENCY`              | `../contract/src/experiment.config.ts:23` |
-| config | `projectCellBudget`   | `EVAL_V3_PROJECT_CELL_BUDGET`      | `../contract/src/experiment.config.ts:25` |
-| config | `globalCellBudget`    | `EVAL_V3_GLOBAL_CELL_BUDGET`       | `../contract/src/experiment.config.ts:33` |
-| config | `publicBaseUrl`       | `BASE_HOST`                        | `../contract/src/experiment.config.ts:35` |
-| config | `legacyPublicBaseUrl` | `NEXT_PUBLIC_BASE_URL`             | `../contract/src/experiment.config.ts:37` |
-| config | `foldCacheTtlSeconds` | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/experiment.config.ts:45` |
-| config | `isSaas`              | `IS_SAAS`                          | `../contract/src/experiment.config.ts:46` |
+| config | `blockLocalHttpCalls` | `BLOCK_LOCAL_HTTP_CALLS`           | `../contract/src/experiment.config.ts:18` |
+| config | `allowedProxyHosts`   | `ALLOWED_PROXY_HOSTS`              | `../contract/src/experiment.config.ts:19` |
+| config | `runConcurrency`      | `EVAL_V3_CONCURRENCY`              | `../contract/src/experiment.config.ts:21` |
+| config | `projectCellBudget`   | `EVAL_V3_PROJECT_CELL_BUDGET`      | `../contract/src/experiment.config.ts:23` |
+| config | `globalCellBudget`    | `EVAL_V3_GLOBAL_CELL_BUDGET`       | `../contract/src/experiment.config.ts:28` |
+| config | `publicBaseUrl`       | `BASE_HOST`                        | `../contract/src/experiment.config.ts:33` |
+| config | `legacyPublicBaseUrl` | `NEXT_PUBLIC_BASE_URL`             | `../contract/src/experiment.config.ts:35` |
+| config | `foldCacheTtlSeconds` | `LANGWATCH_FOLD_CACHE_TTL_SECONDS` | `../contract/src/experiment.config.ts:43` |
+| config | `isSaas`              | `IS_SAAS`                          | `../contract/src/experiment.config.ts:44` |
 
 <!-- readme:generated:end -->
