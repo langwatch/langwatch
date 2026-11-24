@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  * Membership comes from the organization read; no refusal before it answers.
- * Spec: specs/identity/identifier-model.feature.
+ * Specs: specs/identity/identifier-model.feature, specs/licensing/billing-only-invite.feature.
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -62,6 +62,21 @@ describe("given the organization read has answered", () => {
 
       expect(screen.getByText(REFUSAL)).toBeInTheDocument();
       expect(screen.queryByText("Private project content")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when a member on no team opens the plan page", () => {
+    /** @scenario "A Billing-only member lands on the plan page and can open it" */
+    it("draws the page, since paying needs no team", () => {
+      renderBody({
+        pathname: "/settings/subscription",
+        isLoading: false,
+        organization,
+        organizationRole: "EXTERNAL",
+      });
+
+      expect(screen.queryByText(REFUSAL)).toBeNull();
+      expect(screen.getByText("Private project content")).toBeInTheDocument();
     });
   });
 

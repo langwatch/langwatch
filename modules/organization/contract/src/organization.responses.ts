@@ -122,6 +122,8 @@ const organizationInviteAcceptedSchemaDefinition = z.object({
     organization: z.object({ id: z.string().min(1), name: z.string() }),
   }),
   project: z.object({ slug: z.string().min(1) }).nullable(),
+  /** Billing only (ADR-205): the browser lands them on the plan page, they open no project. */
+  billingOnly: z.boolean().optional(),
 });
 export interface OrganizationInviteAcceptedSchema extends Named<
   typeof organizationInviteAcceptedSchemaDefinition

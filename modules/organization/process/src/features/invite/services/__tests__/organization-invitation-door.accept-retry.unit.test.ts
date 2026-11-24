@@ -98,8 +98,9 @@ describe("given a pending Billing-only invitation", () => {
     it("admits them and provisions no personal workspace", async () => {
       const { service, apply, ensurePersonalWorkspace } = doorOver({ status: "PENDING" });
 
-      await service.accept({ inviteCode: "code-1" }, FINANCE);
+      const accepted = await service.accept({ inviteCode: "code-1" }, FINANCE);
 
+      expect(accepted).toMatchObject({ billingOnly: true, project: null });
       expect(apply).toHaveBeenCalledOnce();
       expect(ensurePersonalWorkspace).not.toHaveBeenCalled();
     });

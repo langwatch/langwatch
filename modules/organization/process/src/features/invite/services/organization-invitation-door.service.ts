@@ -341,6 +341,7 @@ export class OrganizationInvitationDoorService {
       success: true,
       invite: { organization: { id: invite.organization.id, name: invite.organization.name } },
       project: projectSlug ? { slug: projectSlug } : null,
+      ...(invite.billingOnly ? { billingOnly: true } : {}),
     };
   }
 

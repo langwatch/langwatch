@@ -79,10 +79,20 @@ function readerMayOpenThePage({
   // Administrators created through a role binding alone have no membership row
   // and still have full team access.
   if (organizationRole === ORGANIZATION_ADMIN_ROLE) return true;
+  // The plan pages belong to the organization, not a team: whoever may pay needs no team.
+  if (PLAN_PAGES.some((base) => isPathUnder({ pathname, base }))) return true;
   // The same predicate the host's own ambient team resolution prefers on, so
   // the team the application picks and the one the chrome draws cannot diverge.
   return !!team && !!userId && (team.members ?? []).some((member) => member.userId === userId);
 }
+
+/** Each page refuses a reader without its permission on its own (ADR-205). */
+const PLAN_PAGES = [
+  "/settings/subscription",
+  "/settings/plans",
+  "/settings/usage",
+  "/settings/license",
+];
 
 const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items];
 

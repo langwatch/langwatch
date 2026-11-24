@@ -25,6 +25,12 @@ Feature: Billing-only invite
     Then each is refused with permission_denied
     And subscription:manage, seatRequests:manage and members:view are allowed
 
+  Scenario: A Billing-only member lands on the plan page and can open it
+    Given a Billing-only invite
+    When the person accepts it
+    Then they land on the plan page
+    And the plan page opens for them although they are on no team
+
   Scenario: A Billing-only member is given no team, project or personal workspace
     Given a Billing-only member
     When their invite is accepted, an admin grants them a team or project, or a system write does
