@@ -4,6 +4,7 @@ import { useFilterStore } from "../../../behavior/explorer.store.ts";
 import { usePreviewTracesActive } from "../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { api, type RouterOutputs } from "../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useHasPendingNegatedEval } from "../../instant-eval/behavior/use-has-pending-negated-eval.ts";
 import { useInstantEvalRuns } from "../../instant-eval/behavior/use-instant-eval-runs.ts";
 
 type DiscoverDescriptors = RouterOutputs["traces"]["discover"]["facets"];
@@ -15,6 +16,8 @@ interface FilteredTraceFacetsResult {
   isPlaceholderData: boolean;
   isFetching: boolean;
   isError: boolean;
+  /** The query matches no trace yet (a pending NOT eval chip): every count is zero. */
+  matchesNothing: boolean;
 }
 
 /**
@@ -29,6 +32,8 @@ export function useFilteredTraceFacets(): FilteredTraceFacetsResult {
   const queryText = useFilterStore((s) => s.debouncedQueryText);
   const isSamplePreview = usePreviewTracesActive();
   const { evalRuns } = useInstantEvalRuns();
+  // A pending NOT chip's rows are not results yet, as in the table: count none.
+  const hasPendingNegatedEval = useHasPendingNegatedEval();
 
   const query = api.traces.discover.useQuery(
     {
@@ -42,15 +47,26 @@ export function useFilteredTraceFacets(): FilteredTraceFacetsResult {
       ...(evalRuns ? { evalRuns } : {}),
     },
     {
-      enabled: !!projectId && !isSamplePreview,
+      enabled: !!projectId && !isSamplePreview && !hasPendingNegatedEval,
       placeholderData: keepPreviousData,
     },
   );
 
+  // Settled, as a read matching no trace: the rail shows no counts, not a pending read.
+  if (hasPendingNegatedEval) {
+    return {
+      data: [],
+      isPlaceholderData: false,
+      isFetching: false,
+      isError: false,
+      matchesNothing: true,
+    };
+  }
   return {
     data: query.data?.facets,
     isPlaceholderData: query.isPlaceholderData,
     isFetching: query.isFetching,
     isError: query.isError,
+    matchesNothing: false,
   };
 }

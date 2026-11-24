@@ -128,6 +128,7 @@ import type {
   SpanTreeDeltaInput,
   SpanTreeInput,
   TraceIngestWaitInput,
+  TraceSettleSettings,
   TraceByIdInput,
   TraceDerivedEventsInput,
   TraceSummaryLookupInput,
@@ -246,7 +247,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     traceId: string;
     limit?: number;
   }): Promise<NormalizedSpan[]>;
-  resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number>;
+  /** The project's recommended verdict-time trace wait, measured on its own span arrivals. */
+  resolveTraceSettleSettings(input: TraceIngestWaitInput): Promise<TraceSettleSettings>;
   getEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]>;
   getEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]>;
   /** The canonical trace record, closed under payload-parity review. */
@@ -746,12 +748,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
     groupBy: TraceDailySpendGroup;
     window: TraceModelSpendWindow;
   }): Promise<TraceDailyGroupSpend[]>;
-  /** Matching traces since `sinceMs`, counted per `valueKey` value among `values`. */
+  /**
+   * Matching traces since `sinceMs`, counted per `valueKey` value that equals one of `values` or
+   * starts with one of `valuePrefixes`.
+   */
   countAttributedTracesByValue(input: {
     projectId: string;
     matches: readonly TraceAttributeMatch[];
     valueKey: string;
     values: readonly string[];
+    valuePrefixes?: readonly string[];
     sinceMs: number;
   }): Promise<{ value: string; count: number }[]>;
   /** The newest matching traces before `beforeMs`, at most `limit`, with the asked attributes. */
@@ -812,6 +818,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     filters: Readonly<Record<string, unknown>>;
     window?: { startDate?: number; endDate?: number };
     fenced?: boolean;
+    /** Lets a span-type filter read span_analytics where it is complete. */
+    spanAnalyticsFloor?: SpanAnalyticsFloor | null;
   }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
   /**
    * The Explorer's own filter: the query compiled, hidden origins left out

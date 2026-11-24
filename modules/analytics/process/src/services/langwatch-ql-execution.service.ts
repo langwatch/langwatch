@@ -184,6 +184,7 @@ export class LangWatchQLExecutionService {
       views,
       ...(timeWindow ? { timeWindow } : {}),
       ...(memberWindows ? { memberWindows } : {}),
+      projectIds: projects.map((project) => project.id),
     });
     const request = {
       sql: scoped,

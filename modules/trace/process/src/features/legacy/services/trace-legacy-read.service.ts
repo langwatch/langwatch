@@ -28,64 +28,9 @@ import type { TraceEditOverlayService } from "../../edit-overlay/services/trace-
 import type { TraceBlobStoreService } from "../../media/services/trace-blob-store.service.ts";
 import { TraceReadEnrichmentService } from "../../read/services/trace-read-enrichment.service.ts";
 import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
+import { normaliseTraceLookupId, type TraceByIdRead } from "../rules/trace-id-lookup.rules.ts";
 import type { LegacyTraceMappingService } from "./legacy-trace-mapping.service.ts";
-
-/**
- * Minimum prefix length we will attempt to resolve. Shorter strings fall through to "not found" —
- * this avoids scanning the entire trace_summaries table on a single-character typo.
- */
-const MIN_TRACE_ID_PREFIX_LENGTH = 8;
-
-/**
- * Full length of a trace ID. Inputs shorter than this are treated as
- * potential prefixes; equal-or-longer inputs are treated as literal IDs.
- */
-const FULL_TRACE_ID_LENGTH = 32;
-
-/**
- * How many candidates the resolver asks ClickHouse for when disambiguating
- * a prefix. Matches the cap the error message previews, so API clients see
- * every candidate the resolver considered.
- */
-const TRACE_ID_PREFIX_CANDIDATE_LIMIT = 5;
-
-/**
- * Time window (in days) that prefix resolution scans. Without a partition bound, ClickHouse
- * would scan every partition (incl. cold S3 storage) on a miss. Full 32-char IDs still resolve
- * unbounded via the normal exact-match path.
- */
-const TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS = 90;
-
-/**
- * Thrown when a trace ID prefix matches more than one trace in the project.
- * Callers (route handlers) map this to a 409 response listing the full
- * candidate IDs so the user can disambiguate.
- */
-export class AmbiguousTraceIdPrefixError extends Error {
-  constructor(
-    public readonly prefix: string,
-    public readonly candidateTraceIds: string[],
-  ) {
-    const preview = candidateTraceIds.slice(0, TRACE_ID_PREFIX_CANDIDATE_LIMIT).join(", ");
-    const suffix =
-      candidateTraceIds.length > TRACE_ID_PREFIX_CANDIDATE_LIMIT
-        ? `, …${candidateTraceIds.length - TRACE_ID_PREFIX_CANDIDATE_LIMIT} more`
-        : "";
-    super(
-      `Trace ID prefix "${prefix}" is ambiguous — matches: ${preview}${suffix}. Use a longer prefix.`,
-    );
-    this.name = "AmbiguousTraceIdPrefixError";
-  }
-}
-
-/**
- * Trace IDs per the OpenTelemetry spec are 32 hex characters. We only
- * attempt prefix resolution for hex-only inputs — non-hex typos ("my-id ")
- * short-circuit to 404 without scanning.
- */
-const HEX_ONLY = /^[0-9a-f]+$/i;
-
-import { nowInstant } from "@langwatch/time";
+import { TraceAlternateIdService } from "./trace-alternate-id.service.ts";
 
 /**
  * Optional blob-offload resolution dependencies injected into TraceService
@@ -152,10 +97,15 @@ export class TraceLegacyReadService {
     });
   }
 
+  /**
+   * One trace by any id a caller may hold for it: the exact trace id (any case, padded), a
+   * stored trace whose summary is not written yet, a unique prefix, a scenario run id or a
+   * span id. Undefined only when none of those find it in this project.
+   */
   async findById({
     authorization,
     projectId,
-    traceId,
+    traceId: requestedId,
     protections,
     opts,
   }: {
@@ -164,7 +114,8 @@ export class TraceLegacyReadService {
     traceId: string;
     protections: Protections;
     opts?: { full?: boolean; withEditOverlay?: boolean };
-  }): Promise<Trace | undefined> {
+  }): Promise<TraceByIdRead | undefined> {
+    const traceId = normaliseTraceLookupId(requestedId);
     return this.tracer.withActiveSpan(
       "TraceService.findById",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
@@ -176,58 +127,46 @@ export class TraceLegacyReadService {
             protections,
             withEditOverlay: opts?.withEditOverlay,
           });
-
-        const traces = await this.mapping.findTracesWithSpans({
-          authorization,
-          projectId,
-          traceIds: [traceId],
-          protections,
-          opts: { resolveBlobs: opts?.full },
-        });
-        if (traces[0]) {
-          return finish(traces[0]);
-        }
-
-        // No exact match. If the input looks like a truncated hex prefix, try git-style prefix
-        // resolution scoped to this project and TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS days.
-        if (
-          traceId.length < FULL_TRACE_ID_LENGTH &&
-          traceId.length >= MIN_TRACE_ID_PREFIX_LENGTH &&
-          HEX_ONLY.test(traceId)
-        ) {
-          const now = nowInstant().epochMilliseconds;
-          const candidates = await this.clickHouseService.resolveTraceIdByPrefix({
-            projectId,
-            prefix: traceId,
-            occurredAt: {
-              from: now - TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS * 24 * 60 * 60 * 1000,
-              to: now,
-            },
-            limit: TRACE_ID_PREFIX_CANDIDATE_LIMIT,
-          });
-          if (candidates.length === 0) {
-            return undefined;
-          }
-
-          if (candidates.length > 1) {
-            span.setAttribute("trace.id.prefix.ambiguous", true);
-
-            throw new AmbiguousTraceIdPrefixError(traceId, candidates);
-          }
-
-          span.setAttribute("trace.id.prefix.resolved", candidates[0]!);
-          const resolved = await this.mapping.findTracesWithSpans({
+        const read = (ids: string[]) =>
+          this.mapping.findTracesWithSpans({
             authorization,
             projectId,
-            traceIds: [candidates[0]!],
+            traceIds: ids,
             protections,
             opts: { resolveBlobs: opts?.full },
           });
+        const [exact] = await read([traceId]);
+        if (exact) return finish(exact);
 
-          return resolved[0] ? finish(resolved[0]) : undefined;
+        const [fromSpans] = await this.mapping.findTraceFromStoredSpans({
+          authorization,
+          projectId,
+          traceId,
+          protections,
+          opts: { resolveBlobs: opts?.full },
+        });
+        if (fromSpans) {
+          span.setAttribute("trace.read.still_ingesting", true);
+          return { ...(await finish(fromSpans)), stillIngesting: true as const };
         }
 
-        return undefined;
+        const [alternate] = await TraceAlternateIdService.create({
+          store: this.clickHouseService,
+          mapping: this.mapping,
+        }).find({
+          authorization,
+          projectId,
+          traceId,
+          onAmbiguousPrefix: () => span.setAttribute("trace.id.prefix.ambiguous", true),
+        });
+        if (!alternate) return undefined;
+        span.setAttribute(`trace.id.${alternate.resolvedFrom}.resolved`, alternate.traceId);
+        const [trace] = await read([alternate.traceId]);
+        if (!trace) return undefined;
+        return {
+          ...(await finish(trace)),
+          lookup: { requestedId, resolvedFrom: alternate.resolvedFrom },
+        };
       },
     );
   }

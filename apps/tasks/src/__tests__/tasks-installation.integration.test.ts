@@ -153,6 +153,7 @@ describe("the tasks process installation", () => {
         "customer-io-plan-resync",
         "stripe-prices-sync",
         "retention-storage-report",
+        "retention-drift-check",
         "demo-data",
         "trace-destination-report",
         "insight-daily-run-request",

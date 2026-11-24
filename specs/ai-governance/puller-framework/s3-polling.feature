@@ -69,6 +69,51 @@ Feature: S3PollingPullerAdapter (universal S3-polling adapter)
     And `errorCount` reflects the number of bad lines seen
     And the cursor STILL advances past the file (we don't re-pull broken files indefinitely)
 
+  @unit
+  Scenario: A source without its own key pair is refused before any request is signed
+    Given the hosted product, where the worker's AWS identity belongs to LangWatch
+    And an S3 polling source saved with no access key ID or a blank secret access key
+    And the worker has AWS credentials of its own in its environment
+    When the adapter runs
+    Then the run fails as refused with a message asking for the access keys
+    And no request reaches S3 signed with the worker's credentials
+
+  @unit
+  Scenario: An S3 polling source cannot be saved without a complete key pair
+    Given the hosted product
+    And an admin creating an S3 polling source
+    When the save sends no access key ID or a blank secret access key
+    Then the save is refused naming the missing keys
+
+  @unit
+  Scenario: A self-hosted S3 polling source with no access keys keeps reading as the deployment
+    Given a self-hosted deployment whose worker reads AWS as its own instance or pod role
+    And an S3 polling source saved before access keys were required, with no keys at all
+    When the adapter runs after the upgrade
+    Then the request is signed with the deployment's own AWS identity, as before the upgrade
+    And a new source with no keys at all can still be saved
+
+  @unit
+  Scenario: A keyless S3 polling source is refused when the deployment config is missing
+    Given a process that starts governance without its deployment config
+    And an S3 polling source with no access keys at all
+    When the source is saved or run
+    Then it is refused asking for the access keys, as on the hosted product
+
+  @unit
+  Scenario: A self-hosted S3 polling source with half a key pair is refused
+    Given a self-hosted deployment
+    When an S3 polling source is saved or run with an access key ID and a blank secret access key
+    Then the save is refused naming the missing key
+    And the run fails as refused with a message asking for the access keys
+
+  @unit
+  Scenario: A source's own key pair signs every request
+    Given an S3 polling source with its own access key ID and secret access key
+    And the worker has AWS credentials of its own in its environment
+    When the adapter lists the bucket
+    Then the request is signed with the source's access key ID
+
   Scenario: Credential rotation honored
     Given the credentialRef resolves to NEW credentials on a subsequent run
     When the adapter requests a fresh AWS S3 client

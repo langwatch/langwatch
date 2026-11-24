@@ -7,7 +7,7 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiKeyHostProvider } from "../../../model/api-key-host.ts";
 import { FakeApiKeyHost } from "../../../testing.tsx";
@@ -85,7 +85,15 @@ async function boxLabelled(label: string): Promise<HTMLElement> {
   });
 }
 
-afterEach(cleanup);
+// A copy button resets its label 2 s after a copy; faked so the reset never outlives the test.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"], shouldAdvanceTime: true });
+});
+afterEach(() => {
+  cleanup();
+  vi.clearAllTimers();
+  vi.useRealTimers();
+});
 
 describe("given a token has just been minted", () => {
   describe("when the .env tab renders", () => {

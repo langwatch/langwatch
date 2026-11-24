@@ -9,6 +9,7 @@ import { Badge, EmptyState, HStack, Text, VStack } from "@langwatch/design-syste
 import type { SuiteTemplate, SuiteTemplateKind } from "@langwatch/suite-contract";
 
 import { owaspCategoryLabel, owaspLabelRepeatsName } from "../../../../model/owasp-category.ts";
+import { SuiteTemplateIcon } from "./suite-template-icon.tsx";
 
 export const TAB_LABELS: Record<SuiteTemplateKind, string> = {
   archetype: "Archetypes",
@@ -56,9 +57,10 @@ export function TemplateCards({
         <Card
           key={template.id}
           title={template.title}
+          icon={<SuiteTemplateIcon template={template} />}
           description={withAgentPlaceholder(template.description)}
           badge={
-            <Badge size="sm" flexShrink={0} whiteSpace="nowrap">
+            <Badge size="sm" colorPalette="blue" flexShrink={0} whiteSpace="nowrap">
               {scenarioCount(template)}
             </Badge>
           }

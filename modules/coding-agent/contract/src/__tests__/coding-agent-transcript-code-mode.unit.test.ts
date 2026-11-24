@@ -226,3 +226,93 @@ describe("model replies in the transcript", () => {
     expect(texts).toEqual(["notes.txt has 4 lines."]);
   });
 });
+
+describe("buildCodingAgentTranscript with no user_prompt log record", () => {
+  function modelCall({ spanId, atMs, input }: { spanId: string; atMs: number; input: unknown }) {
+    return span({
+      spanId,
+      name: "claude_code.llm_request",
+      type: "llm",
+      startTimeMs: atMs,
+      endTimeMs: atMs + 100,
+      durationMs: 100,
+      params: { model: "claude-opus-5-5" },
+      input: JSON.stringify({ type: "chat_messages", value: input }),
+    });
+  }
+
+  /** @scenario "A tool-result turn is never shown as the user's prompt" */
+  it("makes no prompt line from a tool message holding a script's result", () => {
+    const { entries } = buildCodingAgentTranscript({
+      spans: [
+        modelCall({
+          spanId: "call-1",
+          atMs: 100,
+          input: [{ role: "user", content: "Check the ACME links" }],
+        }),
+        modelCall({
+          spanId: "call-2",
+          atMs: 2_000,
+          input: [
+            { role: "user", content: "Check the ACME links" },
+            { role: "assistant", content: "[tool_use: Poll]" },
+            { role: "tool", content: '<event kind="repl-eval"><result>ok</result></event>' },
+          ],
+        }),
+      ],
+      logs: [],
+    });
+
+    const prompts = entries.filter((entry) => entry.kind === "user_prompt");
+    expect(prompts.map((entry) => entry.text)).toEqual(["Check the ACME links"]);
+  });
+});
+
+describe("buildCodingAgentTranscript with a result Claude Code delivered itself", () => {
+  const delivered =
+    '<event kind="repl-eval" eval="1" status="settled">\n<result>{ sum: 385 }</result>\n</event>';
+  function requestBody(timestampMs: number, body: string): TranscriptLogRecord {
+    return { timestampMs, attributes: { "event.name": "claude_code.api_request_body", body } };
+  }
+  const body = JSON.stringify({
+    messages: [
+      {
+        role: "assistant",
+        content: [
+          { type: "tool_use", id: "toolu_01ACME", name: "REPL", input: { code: "1" } },
+          { type: "tool_use", id: "poll_57be2cbf", name: "Poll", input: {} },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          { type: "tool_result", tool_use_id: "toolu_01ACME", content: "(dispatched #1)" },
+          { type: "tool_result", tool_use_id: "poll_57be2cbf", content: delivered },
+        ],
+      },
+    ],
+  });
+
+  /** @scenario "A script result Claude Code delivered without a Poll call is listed" */
+  it("lists the delivered result once as a Poll call", () => {
+    const { entries } = buildCodingAgentTranscript({
+      spans: [replSpan],
+      logs: [requestBody(2_000, body), requestBody(3_000, body)],
+    });
+
+    const polls = toolEntries(entries).filter((entry) => entry.name === "Poll");
+    expect(polls).toHaveLength(1);
+    expect(polls[0]).toMatchObject({ atMs: 2_000, output: delivered, failed: false });
+  });
+
+  /** @scenario "A script result Claude Code delivered without a Poll call is listed" */
+  it("adds nothing for a Poll the model called itself or a body cut short", () => {
+    const ownPoll = body.replaceAll("poll_57be2cbf", "toolu_01POLL");
+    const { entries } = buildCodingAgentTranscript({
+      spans: [replSpan],
+      logs: [requestBody(2_000, ownPoll), requestBody(3_000, body.slice(0, 120))],
+    });
+
+    expect(toolEntries(entries).filter((entry) => entry.name === "Poll")).toHaveLength(0);
+  });
+});

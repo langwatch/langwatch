@@ -97,6 +97,10 @@ export class TestObjectStorage implements GovernanceObjectStore {
     };
   }
 
+  async readBytes(input: Parameters<GovernanceObjectStore["readText"]>[0]): Promise<Uint8Array> {
+    return new TextEncoder().encode(await this.readText(input));
+  }
+
   async readText(input: {
     bucket: string;
     key: string;

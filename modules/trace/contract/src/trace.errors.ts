@@ -3,6 +3,9 @@ import { HandledError, NotFoundError, remediation } from "@langwatch/handled-err
 import type { AiActionErrorDetails } from "./features/query/trace-ai-query.ts";
 import { FILTER_TOO_COMPLEX_MESSAGE } from "./features/query/trace-query-analysis.ts";
 
+/** What an unknown filter field most likely meant, or that nothing fits. */
+export type UnknownTraceFilterFieldHint = { kind: "hint"; text: string } | { kind: "none" };
+
 /** The configured model provider did not produce a usable trace query. */
 export class AiQueryProviderError extends HandledError {
   declare readonly code: "ai_query_provider_error";
@@ -17,23 +20,60 @@ export class AiQueryProviderError extends HandledError {
   }
 }
 
+/** What a by-id lookup tried before answering not found, so the caller sees what was searched. */
+export type TraceLookupSearched = Readonly<{
+  /** The id as looked up, after trimming and lower-casing a hex id. */
+  normalisedId: string;
+  /** The project slugs searched, the key's own first. */
+  projectSlugs: readonly string[];
+  /** The id kinds tried, e.g. trace_id, trace_id_prefix, span_id, scenario_run_id. */
+  as: readonly string[];
+}>;
+
+/**
+ * Retryable: no store can tell an id that was never sent from one still being ingested, and
+ * a just-sent trace takes seconds to land.
+ */
 export class TraceNotFoundError extends NotFoundError {
   declare readonly code: "trace_not_found";
 
   constructor(
     readonly traceId: string,
-    options: { reasons?: readonly Error[] } = {},
+    options: { reasons?: readonly Error[]; searched?: TraceLookupSearched } = {},
   ) {
+    const { searched, ...rest } = options;
     super(
       "trace_not_found",
       { resource: "Trace", id: traceId },
       {
-        meta: { traceId },
+        meta: { traceId, ...(searched ? { searched } : {}) },
+        retryable: true,
         ...remediation("trace_not_found"),
-        ...options,
+        ...rest,
       },
     );
     this.name = "TraceNotFoundError";
+  }
+}
+
+/** A scenario run id passed as a trace id, where the run produced more than one trace. */
+export class ScenarioRunHasManyTracesError extends HandledError {
+  declare readonly code: "scenario_run_has_many_traces";
+
+  constructor(
+    readonly scenarioRunId: string,
+    readonly candidateTraceIds: readonly string[],
+  ) {
+    super(
+      "scenario_run_has_many_traces",
+      `"${scenarioRunId}" is a scenario run with ${candidateTraceIds.length} traces; get one of them by its trace id.`,
+      {
+        httpStatus: 409,
+        meta: { scenarioRunId, candidateTraceIds },
+        ...remediation("scenario_run_has_many_traces"),
+      },
+    );
+    this.name = "ScenarioRunHasManyTracesError";
   }
 }
 
@@ -91,10 +131,16 @@ export class FilterTooComplexError extends HandledError {
 export class FilterFieldUnknownError extends HandledError {
   declare readonly code: "filter_field_unknown";
 
-  constructor(field: string, knownFields: string[]) {
-    super("filter_field_unknown", `Unknown field: @${field}`, {
+  /** `found` names the field or the free-text search the caller most likely meant. */
+  constructor(
+    field: string,
+    knownFields: string[],
+    found: UnknownTraceFilterFieldHint = { kind: "none" },
+  ) {
+    const hint = found.kind === "hint" ? found.text : null;
+    super("filter_field_unknown", [`Unknown field: @${field}.`, hint].filter(Boolean).join(" "), {
       httpStatus: 422,
-      meta: { field, knownFields },
+      meta: { field, knownFields, ...(hint ? { hint } : {}) },
       ...remediation("filter_field_unknown"),
     });
     this.name = "FilterFieldUnknownError";

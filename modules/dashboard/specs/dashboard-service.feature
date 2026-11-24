@@ -37,16 +37,34 @@ Feature: Shared Dashboard service
     Then the graph spans four columns and three rows
 
   @unit
-  Scenario: A graph created over REST without a size is 1 by 1, as on main
+  Scenario: A graph created over REST without a size lands at the grid's default of four by three
     When a client posts a graph to /api/graphs without colSpan or rowSpan
-    Then the response gives colSpan 1 and rowSpan 1
+    Then the response gives colSpan 4 and rowSpan 3
     And a size the caller sent is kept
+    And a missing dimension takes the service default, by design: colSpan 2 alone lands two by three
 
   @unit
-  Scenario: A graph created over REST without a size reads back, lists and renames at 1 by 1
+  Scenario: A graph created over REST without a size reads back, lists and renames at four by three
     Given a graph posted to /api/graphs without colSpan or rowSpan
     When the graph is read by id, listed and patched with a new name
-    Then each response gives colSpan 1 and rowSpan 1
+    Then each response gives colSpan 4 and rowSpan 3
+
+  @unit
+  Scenario: A graph created over REST accepts the size it would default to
+    When a client posts a graph to /api/graphs at column 4 with colSpan 4 and rowSpan 3
+    Then the graph is created at that size
+    And a graph spanning all eight columns and twenty rows is accepted too
+
+  @unit
+  Scenario: A graph posted over REST with a size outside the grid is refused
+    When a client posts a graph to /api/graphs with a fractional colSpan, a gridRow above 2000000000, or a gridColumn and colSpan that run past the grid's eight columns
+    Then the request is refused as a validation error
+    And no graph is stored
+
+  @integration
+  Scenario: A dashboard widget created without a size lands four columns by five board rows
+    When a client posts a dashboard widget over the API without a size
+    Then the response gives colSpan 4 and rowSpan 5
 
   @unit
   Scenario: A graph can be resized across the whole eight-column grid

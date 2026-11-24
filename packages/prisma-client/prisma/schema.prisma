@@ -3566,6 +3566,8 @@ model LangyConversationProjection {
   /// Per-conversation HMAC key for worker stream frames; server-side only.
   RunToken             String?                    @map("runToken")
   ArchivedAt           Float?                     @map("archivedAt")
+  /// Messages CI started on a pull request since the person last wrote.
+  CiFollowUpsInARow    Int                        @default(0) @map("ciFollowUpsInARow")
   CreatedAt            Float                      @map("createdAt")
   UpdatedAt            Float                      @map("updatedAt")
   /// Business time of the latest applied event.
@@ -3653,6 +3655,27 @@ model LangyConversationTurnProjection {
 
   @@unique([projectId, ConversationId, TurnId])
   @@index([projectId, ConversationId, UpdatedAt])
+}
+
+/// One pull request Langy opened, from the answer whose `gh pr create` printed it. Finished
+/// checks look it up by repository and number to wake the conversation; the daily pull request
+/// cap counts a person's rows by day. Rebuilt by a projection replay.
+model LangyPullRequest {
+  id                 String @id @default(nanoid())
+  projectId          String
+  /// `owner/repo`, lowercased: GitHub matches repository names without case.
+  RepositoryFullName String @map("repositoryFullName")
+  PrNumber           Int    @map("prNumber")
+  ConversationId     String @map("conversationId")
+  /// The conversation's owner, who opened it through Langy.
+  UserId             String @map("userId")
+  /// When the answer that opened it was recorded (epoch ms).
+  OpenedAt           Float  @map("openedAt")
+  /// The agent_responded event it came from.
+  SourceEventId      String @map("sourceEventId")
+
+  @@unique([RepositoryFullName, PrNumber])
+  @@index([UserId, OpenedAt])
 }
 
 /// Rebuildable operational message fact. One source event produces one row.
@@ -4008,6 +4031,27 @@ model RetentionPolicy {
   @@unique([scopeType, scopeId, category])
   @@index([organizationId])
   @@index([scopeType, scopeId])
+}
+
+// Per retention scope, the latest change saved there and the latest apply to stored data it
+// asked for: data-retention's projection over retention_policy_changed and retention_applied.
+model RetentionApplyStatus {
+  id                String                   @id
+  organizationId    String
+  scopeType         RetentionPolicyScopeType
+  scopeId           String
+  changedAt         Float?
+  appliedAt         Float?
+  raisedAt          Float?
+  shortenedAt       Float?
+  createdAt         Float
+  updatedAt         Float
+  occurredAt        Float
+  acceptedAt        Float
+  lastEventId       String
+  projectionVersion String
+
+  @@unique([organizationId, scopeType, scopeId])
 }
 
 enum DataPrivacyScopeType {
@@ -4586,6 +4630,11 @@ model Scenario {
   // DEFAULT-role models. See specs/scenarios/scenario-model-selection.feature.
   simulatorModel  String?
   judgeModel      String?
+  // The judge's verdict-time trace wait: how long the span set must hold still
+  // and the first wait budget, in ms. Null resolves the project's measured
+  // value. See specs/scenarios/judge-trace-wait-settings.feature.
+  traceQuietPeriodMs Int?
+  traceWaitTimeoutMs Int?
   maxTurns        Int?
   minTurns        Int?
   // The value this scenario carries for each field its test suite declares,
@@ -4686,6 +4735,10 @@ model SimulationSuite {
   // specs/suites/suite-model-selection.feature.
   simulatorModel     String?
   judgeModel         String?
+  // The plan-wide judge trace wait in ms, winning over each scenario's own
+  // the way the models do. See specs/scenarios/judge-trace-wait-settings.feature.
+  traceQuietPeriodMs Int?
+  traceWaitTimeoutMs Int?
   // "test_suite" | "run_plan" (see SUITE_KINDS in server/suites/types.ts). A
   // test suite groups scenarios through Scenario.testSuiteId; a run plan is
   // hand-assembled. String rather than a Prisma enum so a new kind needs no
@@ -5540,6 +5593,9 @@ enum GatewayChangeEventKind {
   CACHE_RULE_DELETED
   ROUTING_POLICY_UPDATED
   ROUTING_POLICY_DELETED
+  A2A_TARGET_CREATED
+  A2A_TARGET_UPDATED
+  A2A_TARGET_DELETED
 }
 
 // Gateway audit action codes - kept as a TypeScript const union in
@@ -6405,6 +6461,30 @@ model IngestionTemplate {
 // fallbackPriorityGlobal, rotationPolicy, health-status / circuit
 // state) live on `ModelProvider` directly; the order-of-providers
 // ("which to try first") lives on `RoutingPolicy.modelProviderIds`.
+
+// An agent the gateway proxies A2A calls to under /a2a/{name}. projectId null makes it org-wide;
+// the upstream headers rest sealed. specs/ai-gateway/a2a-proxy.feature
+model GatewayA2ATarget {
+  id                       String    @id
+  organizationId           String
+  projectId                String?
+  name                     String
+  agentName                String
+  cardUrl                  String
+  upstreamUrl              String
+  encryptedUpstreamHeaders String?
+  restrictToAllowList      Boolean   @default(false)
+  allowedVirtualKeyIds     String[]  @default([])
+  blocked                  Boolean   @default(false)
+  blockReason              String?
+  createdById              String
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  archivedAt               DateTime?
+
+  // Live names are unique per scope: partial index GatewayA2ATarget_live_name_key in its migration.
+  @@index([organizationId, projectId])
+}
 
 // The LangWatch-hosted provider a connected install's gateway adds for one
 // organization (ADR-156 §8): where to call and the token to present. Written

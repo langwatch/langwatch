@@ -16,7 +16,7 @@ func (s *Service) ReadHeldKey(ctx context.Context, held *domain.Bundle, etag str
 	res, err := s.configFetcher.FetchConfig(ctx, held.VirtualKeyID, etag)
 	if err != nil {
 		if classifyRefreshError(err) == classTransportFailure {
-			if d, ok := s.denied.Peek(held.VirtualKeyID); ok {
+			if d, ok := s.denied.Peek(held.VirtualKeyID); ok && !d.pending {
 				s.countRefusal(held.VirtualKeyID, denialReason(d.kind))
 				return domain.HeldKey{Bundle: held, Revoked: true}, nil
 			}

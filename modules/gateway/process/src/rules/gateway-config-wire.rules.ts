@@ -1,4 +1,5 @@
 import {
+  type GatewayA2aTargetWire,
   type GatewayConnectUpstream,
   type parseVirtualKeyConfig,
   type GatewayBudget,
@@ -187,6 +188,8 @@ export type GatewayConfigPayload = {
     resets_at: number;
     on_breach: "block" | "warn";
   }[];
+  /** A2A targets the key may call through `/a2a/{name}`, upstream headers in the clear. */
+  a2a_targets: GatewayA2aTargetWire[];
   cache_rules: {
     id: string;
     priority: number;
