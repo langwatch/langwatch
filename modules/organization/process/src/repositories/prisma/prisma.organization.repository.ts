@@ -5,6 +5,7 @@ import {
   parseOnboardingVariant,
 } from "@langwatch/onboarding-contract";
 import {
+  BillingOnlyNoTeamAccessError,
   organizationJoinSettingSchema,
   type OrganizationJoinSetting,
   OrganizationHasNoTeamError,
@@ -698,6 +699,16 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }): Promise<EnsuredPersonalTeam> {
     try {
       return await this.database.$transaction(async (transaction) => {
+        const membership = await transaction.organizationUser.findUnique({
+          where: {
+            userId_organizationId: {
+              userId: input.workspace.userId,
+              organizationId: input.workspace.organizationId,
+            },
+          },
+          select: { billingOnly: true },
+        });
+        if (membership?.billingOnly) throw new BillingOnlyNoTeamAccessError();
         const existing = await this.tryFindPersonalTeam(transaction, input.workspace);
         if (existing) return existing;
 

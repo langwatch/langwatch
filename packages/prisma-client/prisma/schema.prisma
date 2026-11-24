@@ -1091,6 +1091,10 @@ model OrganizationUser {
   /// id belongs to this org. See departments.feature.
   departmentId String?
 
+  /// A Billing-only member (ADR-205): role EXTERNAL, the Billing grant, no team and
+  /// no seat. Any role change clears it. See billing-only-invite.feature.
+  billingOnly Boolean @default(false)
+
   /// Set when an admin disables this membership to stay within the licensed
   /// seat count. The person loses access to this organization only, keeps
   /// their role, department and everything they did, and frees their seat.
@@ -2256,6 +2260,8 @@ model OrganizationInvite {
   // matched (null for pre-identifier users, who match on User.email).
   acceptedByUserId        String?
   acceptedViaIdentifierId String?
+  /// Invites the person who pays with the Billing grant and no seat (ADR-205).
+  billingOnly             Boolean              @default(false)
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @default(now()) @updatedAt
 

@@ -605,6 +605,7 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt",
     "departmentId",
+    "billingOnly",
     "disabledAt",
     "pendingSsoGrantId",
     "membershipStamp",
@@ -1087,6 +1088,7 @@ export const prismaModelFieldCatalogue = {
     "subscriptionId",
     "acceptedByUserId",
     "acceptedViaIdentifierId",
+    "billingOnly",
     "createdAt",
     "updatedAt"
   ],
