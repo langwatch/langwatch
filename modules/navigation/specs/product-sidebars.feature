@@ -424,3 +424,45 @@ Feature: Product sidebars
   Scenario: The remembered product is the sidebar drawn
     Given I opened a dashboard from LLM Ops
     Then the device remembers "llm-ops" for the organization, not "dashboards"
+
+  # Product owner, 2026-11-24: an organization younger than three weeks never had the old
+  # Analytics, so the LLM Ops sidebar offers no Analytics entry that only leads to Dashboards.
+  # The age is read from the organization's createdAt: 21 days or more shows the entry, any
+  # younger hides it. Where the entry still opens the old Analytics (Dashboards out of reach,
+  # an aggregate project) it stays, as it is the only way there.
+  @integration
+  Scenario: An organization younger than three weeks has no Analytics entry in Observe
+    Given the Analytics entry leads to Dashboards
+    And my organization was created 2 days ago
+    When I am in LLM Ops
+    Then the Observe section shows no Analytics entry
+    And the Trace Explorer entry is still there
+
+  @integration
+  Scenario: An organization three weeks or older keeps the Analytics entry in Observe
+    Given the Analytics entry leads to Dashboards
+    And my organization was created 30 days ago
+    When I am in LLM Ops
+    Then the Observe section shows the Analytics entry
+
+  @integration
+  Scenario: A young organization keeps the Analytics entry where it opens the old Analytics
+    Given my organization was created 2 days ago
+    And Dashboards is out of reach for the project
+    When I am in LLM Ops
+    Then the Analytics entry opens /[project]/analytics
+
+  @unit
+  Scenario: An organization created exactly 21 days ago keeps the Analytics entry
+    Given my organization was created exactly 21 days ago
+    Then the Analytics entry is offered
+
+  @unit
+  Scenario: An organization one millisecond short of 21 days has no Analytics entry
+    Given my organization was created 21 days ago less one millisecond
+    Then the Analytics entry is not offered
+
+  @unit
+  Scenario: An organization whose creation date has not arrived keeps the Analytics entry
+    Given my organization's creation date is not known
+    Then the Analytics entry is offered

@@ -51,13 +51,22 @@ Feature: Dashboards v1
     Then the Analytics entry opens /[project]/analytics
     And it carries no Legacy pill
 
+  # Product owner, 2026-11-24: the banner belongs to the page the Analytics entry lands on,
+  # which is the member's My dashboard (AC160), never to a dashboard someone named.
   @integration
-  Scenario: AC3i The Dashboards pages point back to the old Analytics
+  Scenario: AC3i The page the Analytics entry lands on points back to the old Analytics
     Given the release_dashboards flag is on for the project
     And the member holds analytics:view
-    When the member opens a Dashboards page
+    When the member opens /[project]/dashboards and lands on their My dashboard
     Then an info banner asks "Looking for the old Analytics? It is still here."
     And the banner links to /[project]/analytics
+
+  @integration
+  Scenario: AC3t No other Dashboards page shows the old-Analytics banner
+    Given the release_dashboards flag is on for the project
+    And the member holds analytics:view
+    When the member opens a named board, someone else's My dashboard, a From LangWatch board or the templates finder
+    Then no old-Analytics banner shows
 
   @integration
   Scenario: AC3j The Dashboards pages show no old-Analytics banner when they do not open

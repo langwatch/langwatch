@@ -141,17 +141,12 @@ describe("given a member opens a From LangWatch board", () => {
     expect(server.calls.filter(({ path }) => WRITES.test(path))).toEqual([]);
   });
 
-  /** @scenario "AC3i The Dashboards pages point back to the old Analytics" */
-  it("points back to the old Analytics", async () => {
+  /** @scenario "AC3t No other Dashboards page shows the old-Analytics banner" */
+  it("shows no old-Analytics banner", async () => {
     openCurated({ templateId: "release" });
 
-    expect(await screen.findByTestId("old-analytics-banner")).toHaveTextContent(
-      "Looking for the old Analytics? It is still here.",
-    );
-    expect(screen.getByRole("link", { name: "Open Analytics" })).toHaveAttribute(
-      "href",
-      "/test-project/analytics",
-    );
+    expect(await screen.findByRole("heading", { name: "Release check" })).toBeInTheDocument();
+    expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
   });
 
   describe("when the board is Can I trust my numbers?", () => {

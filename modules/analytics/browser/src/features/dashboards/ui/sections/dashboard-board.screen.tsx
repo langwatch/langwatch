@@ -106,7 +106,13 @@ function dataSourceLabel({
 
 /** Renames from the title, or undefined where the reader may not: asked in the project that
  * owns the board, as the library and sidebar menus ask it. */
-function useBoardTitleRename(board: SavedBoard): ((name: string) => void) | undefined {
+function useBoardTitleRename({
+  board,
+  unsaved,
+}: {
+  board: SavedBoard;
+  unsaved: UnsavedBoard | undefined;
+}): ((name: string) => void) | undefined {
   const host = useAnalyticsHost();
   const edits = useLibraryBoardEdits();
   const mayRename = mayRenameBoard({
@@ -118,6 +124,13 @@ function useBoardTitleRename(board: SavedBoard): ((name: string) => void) | unde
     }),
   });
   if (!mayRename) return void 0;
+  // A draft's new name is its first edit: it stores the board under that name.
+  if (unsaved) {
+    return (name) =>
+      void unsaved.materialise({ name }).catch((error: unknown) => {
+        host.failed({ error, fallbackTitle: "Couldn't save the dashboard" });
+      });
+  }
   return (name) =>
     edits.renameBoard({ board: { ...board, project: { id: board.projectId } }, name });
 }
@@ -200,7 +213,7 @@ function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoa
   };
   const isEmpty = boardWidgets.status === "success" && widgets.length === 0;
   const isMyDashboard = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
-  const renameBoard = useBoardTitleRename(board);
+  const renameBoard = useBoardTitleRename({ board, unsaved });
   const templates = templateLinks({
     projectSlug: saved.projectSlug,
     homeProduct: board.homeProduct,
@@ -209,152 +222,154 @@ function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoa
   return (
     <WidgetReadsEveryProjectContext.Provider value={readsOrganization}>
       <UnsavedBoardProvider value={unsavedLangy(unsaved)}>
-      <BoardPage
-        header={
-          <BoardHeader
-            name={board.name}
-            description={description}
-            scope={
-              <BoardScopeControl
-                scope={board.scope}
-                lock={access.scopeLock}
-                names={names}
-                onPick={pickScope}
-              />
-            }
-            onRename={renameBoard}
-            onDescribe={canEdit && !isMyDashboard ? saveDescription : void 0}
-            {...boardPointer({ board, unsaved, boardWidgets })}
-            action={canEdit ? <AddWidgetButton onClick={openPicker} /> : null}
-            {...dataSourceLabel({ readsOrganization, projectName: host.project()?.name })}
-            periodControl={
-              <BoardPeriodControl
-                range={range}
-                grain={grain}
-                refresh={autoRefresh.option}
-                onRangeChange={setRange}
-                onGrainChange={setGrain}
-                onRefreshChange={autoRefresh.setOption}
-                onRefreshNow={autoRefresh.refreshNow}
-              />
-            }
-          />
-        }
-      >
-        <BoardLangy
-          board={subject}
-          period={period}
-          withSuggestions={isEmpty && canEdit}
-          {...(canEdit ? { onOpenPicker: openPicker } : {})}
-        />
-        {boardWidgets.status === "pending" && <Spinner size="sm" />}
-        {boardWidgets.status === "error" && (
-          <HandledErrorAlert
-            error={boardWidgets.error}
-            fallbackTitle="This dashboard could not load its widgets"
-          />
-        )}
-        {isEmpty && !canEdit && (
-          <Text textStyle="bodySm" color="fg.muted">
-            This dashboard has no widgets yet.
-          </Text>
-        )}
-        {isEmpty && canEdit && templates && (
-          <EmptyBoard
-            boards={CURATED_BOARDS}
-            boardHref={({ templateId }) => templates.curatedHref(templateId)}
-            templatesHref={templates.templatesHref}
-          />
-        )}
-        {boardWidgets.status === "success" && widgets.length > 0 && (
-          <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
-            <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
-              <VStack align="stretch" gap={4}>
-                <EmptyWidgetsBanner
-                  emptyWidgetNames={emptyWidgetNames}
-                  onAskLangy={askLangyToSetUp}
+        <BoardPage
+          header={
+            <BoardHeader
+              name={board.name}
+              description={description}
+              scope={
+                <BoardScopeControl
+                  scope={board.scope}
+                  lock={access.scopeLock}
+                  names={names}
+                  onPick={pickScope}
                 />
-                <LimitFailedWidgetsBanner
-                  failed={limitFailedWidgets.count({ widgets, keyOf: ({ id }) => id })}
-                  total={widgets.length}
+              }
+              onRename={renameBoard}
+              onDescribe={canEdit && !isMyDashboard ? saveDescription : void 0}
+              {...boardPointer({ board, unsaved, boardWidgets })}
+              action={canEdit ? <AddWidgetButton onClick={openPicker} /> : null}
+              {...dataSourceLabel({ readsOrganization, projectName: host.project()?.name })}
+              periodControl={
+                <BoardPeriodControl
+                  range={range}
+                  grain={grain}
+                  refresh={autoRefresh.option}
+                  onRangeChange={setRange}
+                  onGrainChange={setGrain}
+                  onRefreshChange={autoRefresh.setOption}
+                  onRefreshNow={autoRefresh.refreshNow}
                 />
-                <BoardWidgetsGrid
-                  projectId={projectId}
-                  projectSlug={saved.projectSlug}
-                  dashboardId={board.id}
-                  boardName={board.name}
-                  widgets={widgets}
-                  period={period}
-                  periodKey={`${range}:${grain}`}
-                  isWriting={boardWidgets.isWriting}
-                  onEmptyChange={({ widget, empty: showsNoData }) =>
-                    empty.report({ key: widget.id, empty: showsNoData })
-                  }
-                  onLimitFailureChange={({ widget, limited }) =>
-                    limitFailedWidgets.report({ key: widget.id, limited })
-                  }
-                  langyFor={
-                    langy.enabled
-                      ? (widget) => ({
-                          ask: () =>
-                            langy.ask(widgetPromptDraft({ widget, board: subject, period })),
-                          setUp: (setup) =>
-                            langy.ask(widgetSetupDraft({ setup, widget, board: subject, period })),
-                          setUpMissing: (missing) =>
-                            langy.ask(
-                              widgetMissingDataDraft({ missing, widget, board: subject, period }),
-                            ),
-                        })
-                      : undefined
-                  }
-                  {...(canEdit
-                    ? {
-                        onEdit: editor.open,
-                        onDuplicate: (widget) => void boardWidgets.duplicateWidget(widget),
-                        onDelete: (widget) => void boardWidgets.removeWidget(widget),
-                        onPlacementsCommit: (placements) =>
-                          void boardWidgets.commitPlacements(placements),
-                      }
-                    : {})}
-                />
-                {canEdit && <AddBlockCard onClick={() => openPicker()} />}
-              </VStack>
-            </DashboardRefreshedAtContext.Provider>
-          </DashboardRefetchIntervalContext.Provider>
-        )}
-        {canEdit && picker.isOpen && (
-          <BlockPickerDialog
+              }
+            />
+          }
+        >
+          <BoardLangy
             board={subject}
             period={period}
-            onAddWidgets={boardWidgets.addQuestionWidgets}
-            onSkip={() => {
-              editor.open({ widget: null, withLangy: false, closing: [WIDGET_PICKER_QUERY_KEY] });
-            }}
-            onClose={picker.close}
+            withSuggestions={isEmpty && canEdit}
+            {...(canEdit ? { onOpenPicker: openPicker } : {})}
           />
-        )}
-        {canEdit && editor.editing && (
-          <BoardWidgetEditor
-            key={editor.editing.widget?.id ?? "new"}
-            widget={editor.editing.widget}
-            projectId={projectId}
-            projectSlug={saved.projectSlug}
-            dashboardId={board.id}
-            period={period}
-            isSaving={boardWidgets.isSaving}
-            {...(editor.asks ? { asks: editor.asks } : {})}
-            onAsk={editor.ask}
-            onClose={editor.close}
-            onSave={(edited) => void saveEdited(edited)}
+          {boardWidgets.status === "pending" && <Spinner size="sm" />}
+          {boardWidgets.status === "error" && (
+            <HandledErrorAlert
+              error={boardWidgets.error}
+              fallbackTitle="This dashboard could not load its widgets"
+            />
+          )}
+          {isEmpty && !canEdit && (
+            <Text textStyle="bodySm" color="fg.muted">
+              This dashboard has no widgets yet.
+            </Text>
+          )}
+          {isEmpty && canEdit && templates && (
+            <EmptyBoard
+              boards={CURATED_BOARDS}
+              boardHref={({ templateId }) => templates.curatedHref(templateId)}
+              templatesHref={templates.templatesHref}
+            />
+          )}
+          {boardWidgets.status === "success" && widgets.length > 0 && (
+            <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
+              <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
+                <VStack align="stretch" gap={4}>
+                  <EmptyWidgetsBanner
+                    emptyWidgetNames={emptyWidgetNames}
+                    onAskLangy={askLangyToSetUp}
+                  />
+                  <LimitFailedWidgetsBanner
+                    failed={limitFailedWidgets.count({ widgets, keyOf: ({ id }) => id })}
+                    total={widgets.length}
+                  />
+                  <BoardWidgetsGrid
+                    projectId={projectId}
+                    projectSlug={saved.projectSlug}
+                    dashboardId={board.id}
+                    boardName={board.name}
+                    widgets={widgets}
+                    period={period}
+                    periodKey={`${range}:${grain}`}
+                    isWriting={boardWidgets.isWriting}
+                    onEmptyChange={({ widget, empty: showsNoData }) =>
+                      empty.report({ key: widget.id, empty: showsNoData })
+                    }
+                    onLimitFailureChange={({ widget, limited }) =>
+                      limitFailedWidgets.report({ key: widget.id, limited })
+                    }
+                    langyFor={
+                      langy.enabled
+                        ? (widget) => ({
+                            ask: () =>
+                              langy.ask(widgetPromptDraft({ widget, board: subject, period })),
+                            setUp: (setup) =>
+                              langy.ask(
+                                widgetSetupDraft({ setup, widget, board: subject, period }),
+                              ),
+                            setUpMissing: (missing) =>
+                              langy.ask(
+                                widgetMissingDataDraft({ missing, widget, board: subject, period }),
+                              ),
+                          })
+                        : undefined
+                    }
+                    {...(canEdit
+                      ? {
+                          onEdit: editor.open,
+                          onDuplicate: (widget) => void boardWidgets.duplicateWidget(widget),
+                          onDelete: (widget) => void boardWidgets.removeWidget(widget),
+                          onPlacementsCommit: (placements) =>
+                            void boardWidgets.commitPlacements(placements),
+                        }
+                      : {})}
+                  />
+                  {canEdit && <AddBlockCard onClick={() => openPicker()} />}
+                </VStack>
+              </DashboardRefreshedAtContext.Provider>
+            </DashboardRefetchIntervalContext.Provider>
+          )}
+          {canEdit && picker.isOpen && (
+            <BlockPickerDialog
+              board={subject}
+              period={period}
+              onAddWidgets={boardWidgets.addQuestionWidgets}
+              onSkip={() => {
+                editor.open({ widget: null, withLangy: false, closing: [WIDGET_PICKER_QUERY_KEY] });
+              }}
+              onClose={picker.close}
+            />
+          )}
+          {canEdit && editor.editing && (
+            <BoardWidgetEditor
+              key={editor.editing.widget?.id ?? "new"}
+              widget={editor.editing.widget}
+              projectId={projectId}
+              projectSlug={saved.projectSlug}
+              dashboardId={board.id}
+              period={period}
+              isSaving={boardWidgets.isSaving}
+              {...(editor.asks ? { asks: editor.asks } : {})}
+              onAsk={editor.ask}
+              onClose={editor.close}
+              onSave={(edited) => void saveEdited(edited)}
+            />
+          )}
+          <ScopeConfirmDialog
+            words={scope.asking}
+            isChanging={scope.isChanging}
+            onConfirm={scope.confirm}
+            onCancel={scope.cancel}
           />
-        )}
-        <ScopeConfirmDialog
-          words={scope.asking}
-          isChanging={scope.isChanging}
-          onConfirm={scope.confirm}
-          onCancel={scope.cancel}
-        />
-      </BoardPage>
+        </BoardPage>
       </UnsavedBoardProvider>
     </WidgetReadsEveryProjectContext.Provider>
   );
@@ -375,12 +390,7 @@ export function Board() {
   // A member the list refuses sees the page the flag being off shows (AC21).
   if (loadError) return <UiPageNotFound />;
   if (isDraft) {
-    return (
-      <>
-        <OldAnalyticsBanner />
-        <OpenBoard key={draft.key} board={draft.board} unsaved={draft} />
-      </>
-    );
+    return <OpenBoard key={draft.key} board={draft.board} unsaved={draft} />;
   }
   const board = [...boards, ...organizationBoards].find(({ id }) => id === dashboardId);
   // A board made a moment ago is missing from the list held before it; wait for the re-read.
@@ -391,7 +401,8 @@ export function Board() {
   // keeps its key, so the screen stays as it was while its address moves to the board's.
   return (
     <>
-      <OldAnalyticsBanner />
+      {/* Only the board the Analytics entry lands on points back to it (AC3i, AC3t). */}
+      {board.id === myDashboardId({ boards, userId: host.userId() }) && <OldAnalyticsBanner />}
       <OpenBoard key={board.id === draft.savedId ? draft.key : board.id} board={board} />
     </>
   );

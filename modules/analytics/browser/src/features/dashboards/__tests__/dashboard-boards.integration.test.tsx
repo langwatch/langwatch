@@ -1300,6 +1300,7 @@ describe("a member's board", () => {
       expect(callsTo(server, "boards.create")[0]?.input).toEqual({
         projectId: "proj-1",
         name: "Untitled dashboard 3",
+        homeProduct: "llm-ops",
       });
     });
 
@@ -1325,7 +1326,7 @@ describe("a member's board", () => {
 
       await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1));
       expect(callsTo(server, "boards.create").map(({ input }) => input)).toEqual([
-        { projectId: "proj-1", name: "Untitled dashboard 3" },
+        { projectId: "proj-1", name: "Untitled dashboard 3", homeProduct: "llm-ops" },
       ]);
       expect(server.state.widgets.map(({ dashboardId }) => dashboardId)).toEqual(["board-new-3"]);
       expect(host.replacements).toEqual(["/test-project/dashboards/board-new-3?addBlock=open"]);

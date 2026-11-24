@@ -182,8 +182,10 @@ Feature: Organization-wide Dashboards area
   @integration
   Scenario: A board made in the library is made at its scope in one write
     When I press "New dashboard" in the library and create a board with a name and who can see it
+    Then it opens unsaved at "/dashboards/new" and nothing is written (dashboards-v2 AC162)
+    When I make its first edit
     Then it is stored in my store project at that scope, in one write
-    And it opens at "/dashboards/<id>" whatever its scope, a Project board included (owner, 2026-11-23)
+    And the address moves to "/dashboards/<id>" without reloading the board, whatever its scope, a Project board included (owner, 2026-11-23)
     And a seat that may create dashboards there but not update them is refused an Only me or Organization board, and nothing is written
     # Evidence: the quoted boards.create and boards.createAtScope answers, and the refusal
 
@@ -573,8 +575,10 @@ Feature: Organization-wide Dashboards area
     And my store project is my last-used project where I may create, or with none used yet the first such project by name
     And with no project where I may create, no "New dashboard", "+", Duplicate, "Duplicate to edit" or template add is offered
     When I create it
-    Then a toast says "Dashboard created", it opens at "/dashboards/<id>" whatever its scope, it is listed in that product's sidebar and in the library, and its scope is the one I picked
-    # Evidence: screenshots of the dialog per product and of the toast, the quoted create answer, and a screenshot as a member who never opened a project
+    Then it opens unsaved at "/dashboards/new" under the name I typed
+    When I make its first edit
+    Then it is stored homed in that product at the scope I picked, it opens at "/dashboards/<id>", and it is listed in that product's sidebar and in the library
+    # Evidence: screenshots of the dialog per product, the quoted create answer, and a screenshot as a member who never opened a project
 
   @integration
   Scenario: A product's "+" fixes the product and says where the board lives

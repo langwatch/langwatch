@@ -108,17 +108,11 @@ describe("the templates finder", () => {
   });
 
   describe("given the flag is on", () => {
-    /** @scenario "AC3i The Dashboards pages point back to the old Analytics" */
-    it("points back to the old Analytics", () => {
+    /** @scenario "AC3t No other Dashboards page shows the old-Analytics banner" */
+    it("shows no old-Analytics banner", () => {
       openLibrary();
 
-      expect(screen.getByTestId("old-analytics-banner")).toHaveTextContent(
-        "Looking for the old Analytics? It is still here.",
-      );
-      expect(screen.getByRole("link", { name: "Open Analytics" })).toHaveAttribute(
-        "href",
-        "/test-project/analytics",
-      );
+      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
     });
 
     /** @scenario "AC3s The Dashboards pages show no old-Analytics banner to a member without analytics:view" */

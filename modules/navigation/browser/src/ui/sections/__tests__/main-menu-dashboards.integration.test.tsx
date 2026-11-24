@@ -106,6 +106,7 @@ import type {
   NavigationProject,
   NavigationTeam,
 } from "@langwatch/navigation-contract";
+import { nowInstant, Temporal } from "@langwatch/time";
 
 import { WithStubNavigationHost } from "../../../testing.tsx";
 import { ProductSidebar } from "../product-sidebar.tsx";
@@ -130,6 +131,13 @@ const ORGANIZATION: NavigationOrganization = {
   name: "Demo organization",
   teams: [],
 };
+
+/** An organization creation date the given number of days before now, as the wire sends it. */
+function createdDaysAgo(days: number): string {
+  return Temporal.Instant.fromEpochMilliseconds(
+    nowInstant().epochMilliseconds - days * 24 * 60 * 60 * 1000,
+  ).toString();
+}
 
 /** Stands in for analytics' lent list, echoing the address it was told is open. */
 function LentList({ openPath }: SavedDashboardsProps) {
@@ -379,6 +387,49 @@ describe("the LLM Ops sidebar", () => {
       const link = screen.getByRole("link", { name: "Analytics" });
       expect(link).toHaveAttribute("href", "/demo/analytics");
       expect(within(link).queryByText("Legacy")).toBeNull();
+    });
+  });
+
+  describe("given an organization younger than three weeks", () => {
+    const young = { ...ORGANIZATION, createdAt: createdDaysAgo(2) };
+
+    /** @scenario "An organization younger than three weeks has no Analytics entry in Observe" */
+    it("offers no Analytics entry where it leads to Dashboards", () => {
+      renderSidebar({ surface: "llm-ops", pathname: "/demo", organization: young });
+
+      expect(screen.queryByRole("link", { name: "Analytics" })).toBeNull();
+      expect(screen.getByRole("link", { name: "Trace Explorer" })).toBeInTheDocument();
+    });
+
+    /** @scenario "A young organization keeps the Analytics entry where it opens the old Analytics" */
+    it("keeps the entry where it opens the old Analytics", () => {
+      renderSidebar({
+        surface: "llm-ops",
+        pathname: "/demo",
+        organization: young,
+        dashboardsFlag: false,
+      });
+
+      expect(screen.getByRole("link", { name: "Analytics" })).toHaveAttribute(
+        "href",
+        "/demo/analytics",
+      );
+    });
+  });
+
+  describe("given an organization three weeks or older", () => {
+    /** @scenario "An organization three weeks or older keeps the Analytics entry in Observe" */
+    it("offers the Analytics entry, leading to Dashboards", () => {
+      renderSidebar({
+        surface: "llm-ops",
+        pathname: "/demo",
+        organization: { ...ORGANIZATION, createdAt: createdDaysAgo(30) },
+      });
+
+      expect(screen.getByRole("link", { name: "Analytics" })).toHaveAttribute(
+        "href",
+        "/demo/dashboards",
+      );
     });
   });
 });

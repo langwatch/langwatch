@@ -32,7 +32,6 @@ import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
 import { LimitFailedWidgetsBanner } from "../blocks/limit-failed-widgets-banner.tsx";
-import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { CuratedWidgetsGrid } from "./curated-widgets-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
@@ -185,12 +184,7 @@ export function CuratedBoardPage({ atOrganization = false }: { atOrganization?: 
   const templateId = useAnalyticsHost().route().params.templateId ?? "";
   const board = curatedBoardById(templateId);
   if (!board) return <UiPageNotFound />;
-  return (
-    <>
-      <OldAnalyticsBanner />
-      <OpenCuratedBoard key={board.templateId} board={board} atOrganization={atOrganization} />
-    </>
-  );
+  return <OpenCuratedBoard key={board.templateId} board={board} atOrganization={atOrganization} />;
 }
 
 export default function CuratedBoardScreen() {
