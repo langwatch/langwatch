@@ -216,5 +216,35 @@ describe.skipIf(!url)(
         expect(prompt).toBe(300);
       });
     });
+
+    // Runs last: the tied traces it adds would change the other queries' rows.
+    describe("when eleven models tie on traces", () => {
+      /** @scenario "Top models reads the cost of each model it lists" */
+      it("lists the same ten models in the top list and its cost lookup", async () => {
+        const tied = Array.from({ length: 11 }, (_, index) => ({
+          trace: `tie_${index}`,
+          day: 2,
+          origin: "application",
+          models: [`tie-${String(index).padStart(2, "0")}`],
+          cost: 0.25,
+          promptTokens: 1,
+        }));
+        await client.insert({
+          table: `${DATABASE}.trace_metrics`,
+          values: tied.map(traceMetricsRow),
+          format: "JSONEachRow",
+          clickhouse_settings: { input_format_skip_unknown_fields: 1 },
+        });
+
+        const list = ["application"];
+        const listed = await rowsOf({ label: "top-models/models", list });
+        const costed = await rowsOf({ label: "top-models/modelCosts", list });
+        const names = (rows: Record<string, unknown>[]) =>
+          rows.map((row) => String(row.model)).toSorted();
+
+        expect(listed).toHaveLength(10);
+        expect(names(costed)).toEqual(names(listed));
+      });
+    });
   },
 );

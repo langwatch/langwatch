@@ -32,3 +32,9 @@ Feature: Stock widgets that count production read only views that keep an origin
     When the cost by model, traffic and spend, and token trend queries run under the application list
     Then they count only the application traces and name no Langy model
     And a trace that used two models splits its cost evenly between them
+
+  @integration
+  Scenario: Top models reads the cost of each model it lists
+    Given eleven models that tie on trace count
+    When the top models list and its cost lookup run under the application list
+    Then both name the same ten models
