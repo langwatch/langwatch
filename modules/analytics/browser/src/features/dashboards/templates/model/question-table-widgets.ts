@@ -53,26 +53,33 @@ export const MODEL_SPEND_CODE = widgetCode({
   );`,
 });
 
+/**
+ * Each model's share of the requests that call a model, not of every request: a request
+ * calling two models counts for both, so the shares can add up past 100%.
+ */
+export const MODEL_SHARES = `function modelShares(models, modelRequests) {
+  const total = num(modelRequests.data[0]?.traces);
+  return models.data.map((row) => ({ ...row, share: ratio(num(row.traces), total) }));
+}`;
+
 export const TOP_MODELS_CODE = widgetCode({
-  summary: "The ten models most traces use, with their share of all traces and their cost.",
+  summary: "The ten models most requests use, their share of model requests and their cost.",
   subtitle:
     "Models your agent calls most often, where a request that calls two models counts for both.",
   source: "models",
-  parts: [NUMBERS, TABLE, SHARE, MODEL_COST],
-  queries: ["models", "modelCosts", "traffic"],
+  parts: [NUMBERS, TABLE, MODEL_SHARES, MODEL_COST],
+  queries: ["models", "modelCosts", "modelRequests"],
   body: `  if (models.data.length === 0) return <Panel><CallToAction /></Panel>;
-  const traces = num(traffic.data[0]?.traces);
   const costs = new Map(modelCosts.data.map((row) => [row.model, num(row.cost)]));
   const columns = [
     { header: "Model", cell: (row) => mono(row.model) },
     { header: "Requests using it", align: "right", cell: (row) => count(num(row.traces)) },
-    { header: "Share of model requests", align: "right",
-      cell: (row) => share(num(row.traces), traces) },
+    { header: "Share of model requests", align: "right", cell: (row) => pct(row.share, 0) },
     { header: "Cost", align: "right", cell: (row) => <ModelCost cost={costs.get(row.model)} /> },
   ];
   return (
     <Panel>
-      <Table columns={columns} rows={models.data} rowPadding={3}
+      <Table columns={columns} rows={modelShares(models, modelRequests)} rowPadding={3}
         ask={(row) => ({ kind: "model", label: row.model })} />
     </Panel>
   );`,

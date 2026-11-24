@@ -30,6 +30,7 @@ import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
 import { createLangWatchQLExecute } from "../../../behavior/lwql-execute.ts";
 import type { LangWatchQLParameterValue } from "../../../model/lwql-request-state.ts";
+import { runSources } from "../../dashboards/model/widget-sources.ts";
 
 /** The diagnostics that say the server limited a run, shown on the card as one (i) line. */
 const LIMIT_DIAGNOSTIC_CODES: readonly string[] = [
@@ -156,7 +157,7 @@ export function useDashboardWidgetExecutor(
 
   const runValidated = useCallback(
     async (
-      query: Pick<DashboardWidgetQuery, "sql" | "sources" | "projects">,
+      query: Pick<DashboardWidgetQuery, "name" | "sql" | "sources" | "projects">,
       params: Readonly<Record<string, LangWatchQLParameterValue>>,
       signal?: AbortSignal,
     ): Promise<ChartQueryResult> => {
@@ -166,8 +167,7 @@ export function useDashboardWidgetExecutor(
           parameters: params,
           timeWindow: pageWindow,
           granularitySeconds,
-          // What the query stores; null asks the server for the default (dashboards-v2 AC200f).
-          sources: query.sources ?? null,
+          sources: runSources(query),
           ...(query.projects ? { projects: query.projects } : {}),
           telemetry: runTelemetryOf({ dashboardId, widgetId, templateId }),
         },

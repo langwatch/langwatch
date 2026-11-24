@@ -4,15 +4,14 @@
  * @see modules/dashboard/specs/dashboards-v2.feature AC202, AC202b, AC202c, AC202f
  */
 
-import { DEFAULT_WIDGET_SOURCES, TRACE_SOURCES } from "@langwatch/analytics-contract";
+import {
+  DEFAULT_WIDGET_SOURCES,
+  readsSourcesParameter,
+  TRACE_SOURCES,
+} from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
-import {
-  namedViews,
-  PRESENCE_QUERY,
-  readsSourcesParameter,
-  VIEWS_WITH_ORIGIN,
-} from "../../model/sources-parameter.ts";
+import { namedViews, PRESENCE_QUERY, VIEWS_WITH_ORIGIN } from "../../model/sources-parameter.ts";
 import {
   SOURCES_DO_NOT_APPLY_LINE,
   widgetCardSourcesLine,

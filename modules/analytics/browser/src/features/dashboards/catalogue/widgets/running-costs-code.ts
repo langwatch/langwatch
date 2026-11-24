@@ -73,6 +73,15 @@ export const SPEND_CODE = widgetCode({
   );`,
 });
 
+/**
+ * The spend the Production vs testing card calls testing: its automatic checks, simulated tests,
+ * and playground and workflows rows. Your app and the Other row are not tests.
+ */
+export const TESTING_SPEND = `const TESTING = ["evaluations", "simulations", "experiments"];
+function testingSpend(costOf, total) {
+  return known(total) ? (add(...TESTING.map((key) => costOf(key))) ?? 0) : null;
+}`;
+
 /** Production vs testing: test traffic should stay a small share of the bill. */
 export const SPEND_BY_SOURCE_CODE = widgetCode({
   summary: "Spend per bucket split into production, evaluations, simulations and experiments.",
@@ -83,6 +92,7 @@ export const SPEND_BY_SOURCE_CODE = widgetCode({
   recharts: MARKED_CHART_IMPORTS,
   parts: [
     NUMBERS,
+    TESTING_SPEND,
     DATES,
     CHART_STYLE,
     HEADLINE,
@@ -151,13 +161,15 @@ function UnpricedRow({ traces }) {
   const spend = pivot(main.data, "source", (row) => num(row.cost));
   const points = labelled(withBuckets(main,
     series.map((item) => ({ key: item.key, kind: "count" })), spend));
-  const test = known(total) ? total - (costOf("production") ?? 0) : null;
+  const test = testingSpend(costOf, total);
   // A large share: testing takes a quarter of the spend or more.
   signalProblem((ratio(test, total) ?? 0) >= 0.25);
   return (
     <Panel>
       <Headline value={pct(ratio(test, total), 0)} label="of AI spend goes on testing" />
-      <MarkedChart points={points} series={series} format={usd} legendKind="source" />
+      <div style={{ flex: 1, minHeight: 140, display: "flex", flexDirection: "column" }}>
+        <MarkedChart points={points} series={series} format={usd} legendKind="source" />
+      </div>
       <div style={{ marginTop: 8 }}>
         {shown.map(([key, label, colour, origin]) => (
           <SourceRow key={key} label={label} colour={colour} cost={costOf(key)} total={total}

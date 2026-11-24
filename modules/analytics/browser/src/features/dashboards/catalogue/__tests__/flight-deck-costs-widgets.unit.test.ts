@@ -5,8 +5,10 @@
 
 import { describe, expect, it } from "vitest";
 
+import { NUMBERS } from "../../templates/model/widget-code-parts.ts";
 import { OUTCOME_JUDGE } from "../widgets/flight-deck-costs-queries.ts";
 import { FLIGHT_DECK_COSTS_BUILDS } from "../widgets/flight-deck-costs-widgets.ts";
+import { TESTING_SPEND } from "../widgets/running-costs-code.ts";
 
 function build(id: string) {
   const found = FLIGHT_DECK_COSTS_BUILDS[id];
@@ -167,6 +169,39 @@ describe("given the Running costs widgets", () => {
     }
     expect(queries.main).toContain("'evaluations' AS source\n  FROM evaluation_metrics");
     expect(code).toContain('label="of AI spend goes on testing"');
+  });
+
+  /** @scenario "AC29b Running costs: the testing share counts only the rows that are tests" */
+  it("counts checks, simulated tests, playground and workflows as testing, never your app or other", () => {
+    // oxlint-disable-next-line no-implied-eval
+    const testingSpend = new Function(`${NUMBERS}\n${TESTING_SPEND}\nreturn testingSpend;`)() as (
+      costOf: (key: string) => number | null,
+      total: number | null,
+    ) => number | null;
+    const spend: Record<string, number | null> = {
+      production: 96,
+      evaluations: null,
+      simulations: 0,
+      experiments: null,
+      other: 4,
+    };
+    const costOf = (key: string) => spend[key] ?? null;
+
+    expect(testingSpend(costOf, 100)).toBe(0);
+    expect(
+      testingSpend((key) => ({ ...spend, evaluations: 3, experiments: 2 })[key] ?? null, 105),
+    ).toBe(5);
+    expect(testingSpend(costOf, null)).toBeNull();
+    const { code } = build("cost-by-source");
+    expect(code).toContain("const test = testingSpend(costOf, total);");
+    expect(code).not.toContain('total - (costOf("production")');
+  });
+
+  /** @scenario "AC29b Running costs: the testing share counts only the rows that are tests" */
+  it("keeps the chart a readable height above its rows of sources", () => {
+    const { code } = build("cost-by-source");
+    expect(code).toContain("minHeight: 140");
+    expect(FLIGHT_DECK_COSTS_BUILDS["cost-by-source"]?.rows).toBeGreaterThanOrEqual(10);
   });
 
   /** @scenario "AC30 Running costs: Wasted spend counts each production trace once" */

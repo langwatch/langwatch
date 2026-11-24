@@ -6,12 +6,13 @@
 import {
   DEFAULT_WIDGET_SOURCES,
   effectiveSources,
+  readsSourcesParameter,
   TRACE_SOURCES,
   type TraceSource,
 } from "@langwatch/analytics-contract";
 import { type DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
-import { canFollowSources, PRESENCE_QUERY, readsSourcesParameter } from "./sources-parameter.ts";
+import { canFollowSources, PRESENCE_QUERY } from "./sources-parameter.ts";
 
 type Sourced = Pick<DashboardWidgetQuery, "name" | "sources" | "sql">;
 
@@ -48,6 +49,16 @@ export function withStoredSources(
     sources: query.sources ?? null,
     projects: query.projects ?? null,
   }));
+}
+
+/**
+ * The sources a card's run names: what the query stores, null for the default (AC200f). The
+ * presence query and one over views with no origin name none, so a list stored on them raises
+ * no note that the sources were ignored (AC202i).
+ */
+export function runSources(query: Sourced): readonly TraceSource[] | null {
+  if (query.name === PRESENCE_QUERY || !canFollowSources(query.sql)) return null;
+  return query.sources ?? null;
 }
 
 /**

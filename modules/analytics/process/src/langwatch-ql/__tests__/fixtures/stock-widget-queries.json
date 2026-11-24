@@ -76,8 +76,8 @@
   "sql": "SELECT Model AS model, sum(CostSum) AS cost\nFROM model_usage_by_minute\nWHERE BucketStart >= {dashboard_context_period_start:DateTime} AND BucketStart < {dashboard_context_period_end:DateTime}\n  AND Model != ''\nGROUP BY model\nORDER BY cost DESC\nLIMIT 50"
  },
  {
-  "label": "top-models/traffic",
-  "sql": "SELECT uniqExact(TraceId) AS traces\nFROM trace_metrics\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime})"
+  "label": "top-models/modelRequests",
+  "sql": "SELECT uniqExact(TraceId) AS traces\nFROM trace_metrics\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n  AND notEmpty(Models))"
  },
  {
   "label": "top-models/present",

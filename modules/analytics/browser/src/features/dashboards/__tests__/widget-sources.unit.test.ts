@@ -1,6 +1,6 @@
 /**
  * What a widget's card says about its queries' sources, and when it has none to count.
- * @see modules/dashboard/specs/dashboards-v2.feature AC200, AC200m, AC240
+ * @see modules/dashboard/specs/dashboards-v2.feature AC200, AC200m, AC202i, AC240
  */
 
 import { TRACE_SOURCES } from "@langwatch/analytics-contract";
@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   picksNoSources,
+  runSources,
   widgetCardFooter,
   widgetCardSourcesLine,
   widgetSourcesLine,
@@ -122,5 +123,20 @@ describe("widgetCardFooter", () => {
       widgetCardFooter({ sourcesLine: "Sources: application", projectsLine: "", limits: "" }),
     ).toBe("Sources: application");
     expect(message).not.toMatch(/project-|\d/);
+  });
+});
+
+describe("runSources", () => {
+  /** @scenario "AC202i Stock widgets: a query over views with no origin raises no note that sources were ignored" */
+  it("names no sources for a query over views with no origin, or the presence query", () => {
+    expect(runSources(query("modelCosts", ["application"], NO_ORIGIN))).toBeNull();
+    expect(runSources(query("present", ["application"], IGNORES))).toBeNull();
+  });
+
+  /** @scenario "AC202i Stock widgets: a query over views with no origin raises no note that sources were ignored" */
+  it("names what a query over an origin view stores, and null when it stores none", () => {
+    expect(runSources(query("main", ["application", "langy"]))).toEqual(["application", "langy"]);
+    expect(runSources(query("main", ["application"], IGNORES))).toEqual(["application"]);
+    expect(runSources(query("main"))).toBeNull();
   });
 });

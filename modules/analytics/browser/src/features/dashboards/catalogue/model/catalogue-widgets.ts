@@ -221,7 +221,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     origin: "pr",
     question: "Which models does my agent use?",
     title: "Which models does my agent use?",
-    why: "The ten models used most, their share of requests and their cost.",
+    why: "The ten models used most, their share of model requests and their cost.",
     questionId: "spend",
     alsoAnswers: ["less"],
     questionType: "matters",
@@ -234,9 +234,9 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "Which models does my agent use? Query the LangWatchQL view trace_metrics over the " +
       "dashboard period: arrayJoin(Models) and count uniqExact(TraceId) per model. Add each " +
       "model's sum(CostSum) from model_usage_by_minute over the same period. Answer with a " +
-      "top-10 table of models: traces, share of all traces, and cost in USD. Quote the real " +
-      "numbers from the query result. If a query returns no rows, say plainly that there is no " +
-      "data for the dashboard period rather than guessing.",
+      "top-10 table of models: traces, share of the traces that call a model, and cost in " +
+      "USD. Quote the real numbers from the query result. If a query returns no rows, say " +
+      "plainly that there is no data for the dashboard period rather than guessing.",
   },
   {
     id: "lowest-passing-evaluators",

@@ -13,6 +13,8 @@ import * as costs from "./running-costs-code.ts";
 const CHART = 6;
 /** A chart under a row of figures. */
 const FIGURES_AND_CHART = 7;
+/** A headline, a chart and a row per source: the chart keeps its height above the rows. */
+const SOURCE_SPLIT = 10;
 /** A row of figure tiles across the board. */
 const TILES = 3;
 
@@ -81,7 +83,7 @@ export const FLIGHT_DECK_COSTS_BUILDS: Readonly<Record<string, CatalogueWidgetBu
     code: costs.SPEND_BY_SOURCE_CODE,
     queries: { main: sql.SPEND_BY_SOURCE_SQL },
     width: "half",
-    rows: FIGURES_AND_CHART,
+    rows: SOURCE_SPLIT,
   },
   "cost-waste": {
     code: costs.WASTE_CODE,

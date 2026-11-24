@@ -89,6 +89,12 @@ GROUP BY model
 ORDER BY traces DESC
 LIMIT 10`;
 
+/** The requests that call at least one model: the whole a model's share is taken of. */
+export const MODEL_REQUEST_COUNT_SQL = `SELECT uniqExact(TraceId) AS traces
+FROM trace_metrics
+WHERE ${inPeriod("OccurredAt")}
+  AND notEmpty(Models)`;
+
 export const MODEL_COSTS_SQL = `SELECT Model AS model, sum(CostSum) AS cost
 FROM model_usage_by_minute
 WHERE ${inPeriod("BucketStart")}
