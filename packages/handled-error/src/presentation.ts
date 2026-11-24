@@ -95,7 +95,7 @@ export function supplementalTips({
   return forPeople.filter((tip) => {
     const candidate = normaliseProse(tip);
     if (!candidate) return false;
-    return !target.includes(candidate) && !candidate.includes(target);
+    return !target.includes(candidate);
   });
 }
 

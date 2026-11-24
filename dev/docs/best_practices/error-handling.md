@@ -239,11 +239,11 @@ instanceof Error ? e.message : "…"` taints `message`, and so does a second
    must still give a person a next step, a registered description or a tip
    for them; `presentation.caller-tips.unit.test.ts` fails the build otherwise.
 
-   `resolveErrorCopy` (`packages/error-views/src/resolve-error-copy.ts`) applies that comparison
-   once, on a normalised form, and both surfaces render its output:
-   `<HandledErrorAlert>` lists every remaining tip, `showErrorToast` folds in
-   the first. Pinned by `logic/__tests__/showErrorToast.unit.test.ts` and
-   `components/__tests__/HandledErrorAlert.integration.test.tsx`.
+   `supplementalTips` (`packages/handled-error/src/presentation.ts`) is that comparison,
+   on a normalised form: a tip the description already contains is dropped, and a tip
+   that repeats the description and adds a step is kept. The inline alert, the toast and
+   Langy's failure card all call it: `<HandledErrorAlert>` lists every remaining tip,
+   `showErrorToast` folds in the first. Pinned by `presentation.supplemental-tips.unit.test.ts`.
 
 4. **Never render raw `meta` or the reason chain in the UI.** They are for agents
    and logs. A customer sees a title, a description (registry copy, plus any
