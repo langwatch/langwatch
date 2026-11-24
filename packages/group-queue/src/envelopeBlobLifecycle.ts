@@ -171,6 +171,7 @@ export class EnvelopeBlobLifecycle<Destination = unknown> {
     const decoded = await decodeJobEnvelope({
       value,
       tieredBlobs: this.tieredBlobs,
+      blobs: this.blobs,
       parsed,
     });
     // The decode's GETEX refreshed the blob TTL; renew this holder's lease at the

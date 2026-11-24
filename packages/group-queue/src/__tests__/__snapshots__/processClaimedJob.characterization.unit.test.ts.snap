@@ -367,7 +367,7 @@ exports[`given a claimed job > retries a job whose body is transiently unreachab
     "scripts.retryRestage",
     [
       {
-        "attempt": 1,
+        "attempt": 2,
         "attemptTtlSec": 1800,
         "backoffMs": "<time>",
         "claimToken": "claim-1",
@@ -413,11 +413,16 @@ exports[`given a claimed job that coalesces its siblings > bisects a batch that 
     ],
   ],
   [
-    "blob.decode",
+    "scripts.stage",
     [
       {
+        "claimToken": "claim-1",
+        "dedupId": "",
+        "dedupTtlMs": 0,
+        "dispatchAfterMs": "<time>",
         "groupId": "project_1/g1",
-        "value": "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        "jobDataJson": "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
+        "stagedJobId": "job-3",
       },
     ],
   ],
@@ -426,7 +431,7 @@ exports[`given a claimed job that coalesces its siblings > bisects a batch that 
     [
       {
         "groupId": "project_1/g1",
-        "value": "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
+        "value": "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
       },
     ],
   ],
@@ -454,11 +459,6 @@ exports[`given a claimed job that coalesces its siblings > bisects a batch that 
           "id": "job-2",
         },
         {
-          "__jobName": "other",
-          "groupId": "project_1/g1",
-          "id": "job-3",
-        },
-        {
           "__jobName": "job",
           "groupId": "project_1/g1",
           "id": "job-4",
@@ -488,35 +488,6 @@ exports[`given a claimed job that coalesces its siblings > bisects a batch that 
     [
       [
         {
-          "__jobName": "other",
-          "groupId": "project_1/g1",
-          "id": "job-3",
-        },
-        {
-          "__jobName": "job",
-          "groupId": "project_1/g1",
-          "id": "job-4",
-        },
-      ],
-    ],
-  ],
-  [
-    "handler.processBatch",
-    [
-      [
-        {
-          "__jobName": "other",
-          "groupId": "project_1/g1",
-          "id": "job-3",
-        },
-      ],
-    ],
-  ],
-  [
-    "handler.processBatch",
-    [
-      [
-        {
           "__jobName": "job",
           "groupId": "project_1/g1",
           "id": "job-4",
@@ -535,20 +506,6 @@ exports[`given a claimed job that coalesces its siblings > bisects a batch that 
         "groupId": "project_1/g1",
         "jobDataJson": "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
         "stagedJobId": "job-2",
-      },
-    ],
-  ],
-  [
-    "scripts.stage",
-    [
-      {
-        "claimToken": "claim-1",
-        "dedupId": "",
-        "dedupTtlMs": 0,
-        "dispatchAfterMs": "<time>",
-        "groupId": "project_1/g1",
-        "jobDataJson": "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
-        "stagedJobId": "job-3",
       },
     ],
   ],
@@ -646,11 +603,16 @@ exports[`given a claimed job that coalesces its siblings > processes the batch a
     ],
   ],
   [
-    "blob.decode",
+    "scripts.stage",
     [
       {
+        "claimToken": "claim-1",
+        "dedupId": "",
+        "dedupTtlMs": 0,
+        "dispatchAfterMs": "<time>",
         "groupId": "project_1/g1",
-        "value": "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        "jobDataJson": "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
+        "stagedJobId": "job-3",
       },
     ],
   ],
@@ -659,7 +621,7 @@ exports[`given a claimed job that coalesces its siblings > processes the batch a
     [
       {
         "groupId": "project_1/g1",
-        "value": "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
+        "value": "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
       },
     ],
   ],
@@ -685,11 +647,6 @@ exports[`given a claimed job that coalesces its siblings > processes the batch a
           "__jobName": "job",
           "groupId": "project_1/g1",
           "id": "job-2",
-        },
-        {
-          "__jobName": "other",
-          "groupId": "project_1/g1",
-          "id": "job-3",
         },
         {
           "__jobName": "job",
@@ -719,7 +676,6 @@ exports[`given a claimed job that coalesces its siblings > processes the batch a
         "values": [
           "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
           "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
-          "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
           "{"id":"job-4","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
         ],
       },
@@ -759,11 +715,16 @@ exports[`given a claimed job that coalesces its siblings > restages the siblings
     ],
   ],
   [
-    "blob.decode",
+    "scripts.stage",
     [
       {
+        "claimToken": "claim-1",
+        "dedupId": "",
+        "dedupTtlMs": 0,
+        "dispatchAfterMs": "<time>",
         "groupId": "project_1/g1",
-        "value": "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        "jobDataJson": "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
+        "stagedJobId": "job-3",
       },
     ],
   ],
@@ -772,7 +733,7 @@ exports[`given a claimed job that coalesces its siblings > restages the siblings
     [
       {
         "groupId": "project_1/g1",
-        "value": "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
+        "value": "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
       },
     ],
   ],
@@ -808,20 +769,6 @@ exports[`given a claimed job that coalesces its siblings > restages the siblings
         "dedupTtlMs": 0,
         "dispatchAfterMs": "<time>",
         "groupId": "project_1/g1",
-        "jobDataJson": "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
-        "stagedJobId": "job-3",
-      },
-    ],
-  ],
-  [
-    "scripts.stage",
-    [
-      {
-        "claimToken": "claim-1",
-        "dedupId": "",
-        "dedupTtlMs": 0,
-        "dispatchAfterMs": "<time>",
-        "groupId": "project_1/g1",
         "jobDataJson": "{"id":"job-4","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
         "stagedJobId": "job-4",
       },
@@ -837,7 +784,7 @@ exports[`given a claimed job that coalesces its siblings > restages the siblings
     "scripts.retryRestage",
     [
       {
-        "attempt": 1,
+        "attempt": 2,
         "attemptTtlSec": 1800,
         "backoffMs": "<time>",
         "claimToken": "claim-1",
