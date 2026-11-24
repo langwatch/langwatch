@@ -131,12 +131,13 @@ Declared at `src/eventing/nurturing.pipeline.ts:308`. Events: `nurturingSignalRe
 
 ## Configuration
 
-| Kind   | Leaf                | Environment variable   | Declared at                              |
-| ------ | ------------------- | ---------------------- | ---------------------------------------- |
-| secret | `–`                 | `CUSTOMER_IO_API_KEY`  | `src/app/nurturing.app.ts:52`            |
-| config | `customerIoRegion`  | `CUSTOMER_IO_REGION`   | `../contract/src/nurturing.config.ts:8`  |
-| config | `customerIoBaseUrl` | `CUSTOMER_IO_BASE_URL` | `../contract/src/nurturing.config.ts:10` |
-| config | `posthogKey`        | `POSTHOG_KEY`          | `../contract/src/nurturing.config.ts:11` |
-| config | `posthogHost`       | `POSTHOG_HOST`         | `../contract/src/nurturing.config.ts:12` |
+| Kind   | Leaf                      | Environment variable           | Declared at                              |
+| ------ | ------------------------- | ------------------------------ | ---------------------------------------- |
+| secret | `–`                       | `CUSTOMER_IO_API_KEY`          | `src/app/nurturing.app.ts:52`            |
+| config | `customerIoRegion`        | `CUSTOMER_IO_REGION`           | `../contract/src/nurturing.config.ts:8`  |
+| config | `customerIoBaseUrl`       | `CUSTOMER_IO_BASE_URL`         | `../contract/src/nurturing.config.ts:10` |
+| config | `customerIoAppApiBaseUrl` | `CUSTOMER_IO_APP_API_BASE_URL` | `../contract/src/nurturing.config.ts:12` |
+| config | `posthogKey`              | `POSTHOG_KEY`                  | `../contract/src/nurturing.config.ts:13` |
+| config | `posthogHost`             | `POSTHOG_HOST`                 | `../contract/src/nurturing.config.ts:14` |
 
 <!-- readme:generated:end -->

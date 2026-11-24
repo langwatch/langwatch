@@ -30,11 +30,14 @@ export class HttpCustomerIoTransactionalChannel extends CustomerIoTransactionalC
   static create(input: {
     apiKey: string;
     region: "us" | "eu" | undefined;
+    /** Replaces `https://<regional host>`, e.g. a local stub. */
+    baseUrl?: string | undefined;
     fetchFn?: typeof fetch;
   }): HttpCustomerIoTransactionalChannel {
+    const baseUrl = input.baseUrl ?? `https://${API_HOSTS[input.region ?? "eu"]}`;
     return new HttpCustomerIoTransactionalChannel(
       input.apiKey,
-      `https://${API_HOSTS[input.region ?? "eu"]}/v1/send/email`,
+      `${baseUrl}/v1/send/email`,
       input.fetchFn ?? fetch,
     );
   }

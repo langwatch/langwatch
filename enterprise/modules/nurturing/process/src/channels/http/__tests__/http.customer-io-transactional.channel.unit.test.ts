@@ -128,6 +128,51 @@ describe("given the client on the US region", () => {
   });
 });
 
+describe("given the client with an App API base URL", () => {
+  describe("when it sends one message", () => {
+    /** @scenario "CUSTOMER_IO_APP_API_BASE_URL replaces the regional host" */
+    it.each([undefined, "us"] as const)(
+      "posts to the base URL, not the regional host (region %s)",
+      async (region) => {
+        const { posted, fetchFn } = network(accepted);
+        const channel = HttpCustomerIoTransactionalChannel.create({
+          apiKey: API_KEY,
+          region,
+          baseUrl: "http://127.0.0.1:4010",
+          fetchFn,
+        });
+
+        await channel.send(email);
+
+        expect(posted.map((request) => request.url)).toEqual([
+          "http://127.0.0.1:4010/v1/send/email",
+        ]);
+      },
+    );
+  });
+});
+
+describe("given the client with no App API base URL", () => {
+  describe("when it sends one message", () => {
+    /** @scenario "CUSTOMER_IO_APP_API_BASE_URL replaces the regional host" */
+    it("posts to the regional host", async () => {
+      const { posted, fetchFn } = network(accepted);
+      const channel = HttpCustomerIoTransactionalChannel.create({
+        apiKey: API_KEY,
+        region: undefined,
+        baseUrl: undefined,
+        fetchFn,
+      });
+
+      await channel.send(email);
+
+      expect(posted.map((request) => request.url)).toEqual([
+        "https://api-eu.customer.io/v1/send/email",
+      ]);
+    });
+  });
+});
+
 describe("given a subject and body holding user text that reads as Liquid", () => {
   describe("when it is sent", () => {
     /** @scenario "Liquid openers in the subject and body are printed literally" */

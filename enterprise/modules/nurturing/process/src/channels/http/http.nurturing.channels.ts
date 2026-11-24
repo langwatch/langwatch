@@ -35,7 +35,11 @@ export class HttpNurturingChannels {
       nurturingSecrets.customerIoAppApiKey,
       (apiKey) =>
         apiKey
-          ? HttpCustomerIoTransactionalChannel.create({ apiKey, region: config.customerIoRegion })
+          ? HttpCustomerIoTransactionalChannel.create({
+              apiKey,
+              region: config.customerIoRegion,
+              baseUrl: config.customerIoAppApiBaseUrl,
+            })
           : void 0,
     );
     const { posthogKey: key, posthogHost: host } = config;

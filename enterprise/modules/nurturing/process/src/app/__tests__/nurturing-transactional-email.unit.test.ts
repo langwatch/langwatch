@@ -24,6 +24,7 @@ import { NurturingModule } from "../nurturing.app.ts";
 const config: NurturingServerConfig = {
   customerIoRegion: void 0,
   customerIoBaseUrl: void 0,
+  customerIoAppApiBaseUrl: void 0,
   posthogKey: void 0,
   posthogHost: void 0,
 };

@@ -163,6 +163,13 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
     And it gives up after ten seconds
 
   @unit
+  Scenario: CUSTOMER_IO_APP_API_BASE_URL replaces the regional host
+    Given CUSTOMER_IO_APP_API_BASE_URL names a local stub
+    When the client sends one message
+    Then it posts to the stub's /v1/send/email instead of Customer.io's regional host
+    And without it the client posts to the regional host
+
+  @unit
   Scenario: Liquid openers in the subject and body are printed literally
     Given a message whose subject and body hold "{{" and "{%"
     When the client sends it

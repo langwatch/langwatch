@@ -51,7 +51,7 @@ evaluation notice (its top error). Payment recovery mail is not routed. Nurturin
 alone talks to Customer.io, so notification hands each message to `NurturingApi.sendTransactionalEmail`
 through its `customerIoMail` channel (a binding, not a peer) and keeps the routing and the
 fallback. Nurturing holds `CUSTOMER_IO_APP_API_KEY` and posts to `/v1/send/email` (EU unless
-`CUSTOMER_IO_REGION=us`). Behaviour:
+`CUSTOMER_IO_REGION=us`; `CUSTOMER_IO_APP_API_BASE_URL` replaces the host). Behaviour:
 [customer-io-transactional.feature](specs/customer-io-transactional.feature).
 
 - **One message per recipient**, with our own subject and HTML, link tracking off, the person

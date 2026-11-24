@@ -23,6 +23,7 @@ function moduleWith(customerIo: CustomerIoChannel | undefined): Promise<Nurturin
     config: {
       customerIoRegion: void 0,
       customerIoBaseUrl: void 0,
+      customerIoAppApiBaseUrl: void 0,
       posthogKey: void 0,
       posthogHost: void 0,
     },
