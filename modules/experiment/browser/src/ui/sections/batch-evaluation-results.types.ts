@@ -507,8 +507,8 @@ const targetOutputOf = ({
 };
 
 /**
- * A run plans one cell per row and target, so its rows are its cells over its targets. An SDK
- * may count rows instead; rounding down can only hide a coverage warning, never invent one.
+ * A run plans a cell per row and target, plus a cell per row for each comparison evaluator not
+ * hosted by a target column. An SDK may count rows instead; rounding down only hides a warning.
  */
 const plannedRowsOf = ({
   cells,
@@ -517,6 +517,21 @@ const plannedRowsOf = ({
   cells: number | null | undefined;
   targetCount: number;
 }): number | undefined => (cells ? Math.floor(cells / Math.max(targetCount, 1)) : undefined);
+
+/** Comparison evaluators that are not a target column: each adds one planned cell per row. */
+const evaluatorComparisonsOf = ({
+  comparisonColumns,
+  targets,
+  targetColumns,
+}: {
+  comparisonColumns: BatchComparisonColumn[];
+  targets: RunTargets | null | undefined;
+  targetColumns: BatchTargetColumn[];
+}): number => {
+  const targetIds = new Set([...(targets ?? []), ...targetColumns].map((target) => target.id));
+  const evaluatorIds = comparisonColumns.map((column) => column.evaluatorId);
+  return new Set(evaluatorIds.filter((id) => !targetIds.has(id))).size;
+};
 
 export const transformBatchEvaluationData = (data: ExperimentRunWithItems): BatchEvaluationData => {
   const { experimentId, runId, dataset, evaluations, targets, timestamps, progress, total } = data;
@@ -541,6 +556,7 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
     ),
     ...(heldRows.has(row) ? {} : { notInRun: true as const }),
   }));
+  const comparisonColumns = detectComparisonColumns(evaluations, targetColumns, rows);
 
   return {
     runId,
@@ -553,13 +569,15 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
     total,
     plannedRows: plannedRowsOf({
       cells: total || data.completeness?.dataset.expected,
-      targetCount: targets?.length || targetColumns.length,
+      targetCount:
+        (targets?.length || targetColumns.length) +
+        evaluatorComparisonsOf({ comparisonColumns, targets, targetColumns }),
     }),
     datasetColumns: datasetColumnsOf(dataset),
     targetColumns,
     evaluatorIds: Array.from(evaluatorNames.keys()),
     evaluatorNames: Object.fromEntries(evaluatorNames),
-    comparisonColumns: detectComparisonColumns(evaluations, targetColumns, rows),
+    comparisonColumns,
     ...(data.repeat && data.repeat > 1
       ? { repeat: data.repeat, rowPassRates: rowPassRatesOf({ rows, repeat: data.repeat }) }
       : {}),

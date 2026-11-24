@@ -113,6 +113,45 @@ describe("computeBatchTargetAggregates", () => {
     });
   });
 
+  describe("given a finished run of two targets and a comparison evaluator", () => {
+    /** The plan adds one comparison cell per row: 10 rows plan 2 x 10 + 10 = 30 cells. */
+    it("counts each target against the dataset rows, not the comparison cells", () => {
+      const rows = Array.from({ length: 10 }, (_, index) => index);
+      const data = transformBatchEvaluationData({
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "project-1",
+        total: 30,
+        progress: 30,
+        targets: ["a", "b"].map((id) => ({ id, name: id, type: "prompt" })),
+        completeness: WHOLE_RUN_COMPLETENESS,
+        dataset: rows.flatMap((index) =>
+          ["a", "b"].map((targetId) => ({
+            index,
+            targetId,
+            entry: { question: `Q${index}` },
+            predicted: { output: `${targetId} ${index}` },
+          })),
+        ),
+        evaluations: rows.map((index) => ({
+          evaluator: "langevals/select_best_compare",
+          name: "Comparison",
+          status: "processed" as const,
+          index,
+          targetId: "a",
+          label: "a",
+          inputs: { candidates: [{ id: "a" }, { id: "b" }] },
+        })),
+        timestamps: { createdAt: 0, updatedAt: 0, finishedAt: 1 },
+      });
+
+      const aggregates = computeAllBatchAggregates(data);
+
+      expect(aggregates.get("a")).toMatchObject({ completedRows: 10, totalRows: 10 });
+      expect(aggregates.get("b")).toMatchObject({ completedRows: 10, totalRows: 10 });
+    });
+  });
+
   describe("when counting completedRows", () => {
     it("counts rows with output as completed", () => {
       const targetCol = createTargetColumn("gpt-4");
