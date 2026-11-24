@@ -1387,7 +1387,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @integration
   Scenario: Boards: no pin or pencil by the board title
-    Then the board title has no pin and no rename pencil; both live in the sidebar menu
+    Then the board title has no pin and no rename pencil
+    And a board is renamed by clicking its title, or by Rename in a library or sidebar row's menu
 
   # Owner, 2026-11-23: "I want to be able to click to edit the title of the dashboards on the
   # dashboard pages". Rename is offered by the rule the library and sidebar menus use.

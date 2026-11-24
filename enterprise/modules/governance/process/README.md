@@ -2195,13 +2195,13 @@ interface Output {
 
 Contract `../contract/src/features/cost/governance-cost.trpc.ts:15`, router `src/transport/governance-cost.trpc.ts:13`.
 
-| Procedure                        | Kind  | Gate                                                | Input                                    | Output                                     |
-| -------------------------------- | ----- | --------------------------------------------------- | ---------------------------------------- | ------------------------------------------ |
-| `governanceCost.summary`         | query | Permission `governanceCost:view`                    | `governanceCostWindowInputSchema`        | `governanceCostSummarySchema`              |
-| `governanceCost.dailyByProvider` | query | Permission `governanceCost:view`                    | `governanceCostWindowInputSchema`        | `governanceCostProviderDayBreakdownSchema` |
-| `governanceCost.spendByModel`    | query | Permission `governanceCost:view`                    | `governanceCostWindowInputSchema`        | `governanceCostModelBreakdownSchema`       |
-| `governanceCost.periodRecords`   | query | Permission `governanceCost:view`                    | `governanceCostPeriodRecordsInputSchema` | `governanceCostDayRecordsSchema`           |
-| `governanceCost.spenders`        | query | Permission `governanceCost:view or governance:view` | `governanceCostWindowInputSchema`        | `governanceSpenderBreakdownSchema`         |
+| Procedure                        | Kind  | Gate                                                 | Input                                    | Output                                     |
+| -------------------------------- | ----- | ---------------------------------------------------- | ---------------------------------------- | ------------------------------------------ |
+| `governanceCost.summary`         | query | Permission `governanceCost:view`                     | `governanceCostWindowInputSchema`        | `governanceCostSummarySchema`              |
+| `governanceCost.dailyByProvider` | query | Permission `governanceCost:view`                     | `governanceCostWindowInputSchema`        | `governanceCostProviderDayBreakdownSchema` |
+| `governanceCost.spendByModel`    | query | Permission `governanceCost:view`                     | `governanceCostWindowInputSchema`        | `governanceCostModelBreakdownSchema`       |
+| `governanceCost.periodRecords`   | query | Permission `governanceCost:view`                     | `governanceCostPeriodRecordsInputSchema` | `governanceCostDayRecordsSchema`           |
+| `governanceCost.spenders`        | query | Permission `governanceCost:view and governance:view` | `governanceCostWindowInputSchema`        | `governanceSpenderBreakdownSchema`         |
 
 ```typescript
 // governanceCost.summary

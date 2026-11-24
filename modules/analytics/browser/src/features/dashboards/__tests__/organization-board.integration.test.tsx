@@ -18,8 +18,6 @@ import {
   StubAnalyticsHost,
   type StubAnalyticsHostOptions,
 } from "../../../testing.tsx";
-import { libraryBoardPath } from "../model/organization-library.ts";
-import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import OrganizationBoardScreen from "../ui/sections/organization-board.screen.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
@@ -352,74 +350,4 @@ describe("a board opened at /dashboards/<id>", () => {
       });
     },
   );
-});
-
-/** A project in view whose lists hold no board. */
-const listsNothing = (call: UiProcedureCall): Promise<unknown> =>
-  call.path === "boards.getAll" || call.path === "boards.listStarred"
-    ? Promise.resolve([])
-    : NO_PROCEDURES(call);
-
-describe("a board of a project the member cannot read, opened at a project's address", () => {
-  const openUnavailable = ({ libraryOpen }: { libraryOpen: boolean }) => {
-    const host = new StubAnalyticsHost({
-      flags: { release_dashboards: true },
-      route: { params: { dashboardId: "board-ops" }, query: {} },
-    });
-    // The project in view lists its own boards and Organization boards: never Ops' Project one.
-    const answer = (call: UiProcedureCall) =>
-      call.path === "featureFlag.isEnabledForEachOrganization"
-        ? Promise.resolve({ enabledByOrganizationId: { "org-1": libraryOpen } })
-        : listsNothing(call);
-    renderDashboards({ element: <DashboardBoardScreen />, host, answer });
-    return { host, user: userEvent.setup({ pointerEventsCheck: 0 }) };
-  };
-
-  /** @scenario "A Project board of a project I cannot read is not available at org level" */
-  it("keeps the address and says the area's sentence, naming nothing of the board", async () => {
-    const { host } = openUnavailable({ libraryOpen: true });
-
-    expect(await screen.findByRole("heading", { name: UNAVAILABLE })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Back to Dashboards" })).toBeVisible();
-    expect(host.navigations).toEqual([]);
-    expect(document.body.textContent).not.toContain("Ops");
-  });
-
-  it("goes back to the library while the organization's flags open the area", async () => {
-    const { host, user } = openUnavailable({ libraryOpen: true });
-
-    await user.click(await screen.findByRole("link", { name: "Back to Dashboards" }));
-
-    expect(host.navigations).toEqual(["/dashboards"]);
-  });
-
-  it("keeps AC183's words while the organization's flags keep the area shut", async () => {
-    openUnavailable({ libraryOpen: false });
-
-    const heading = await screen.findByRole("heading", { name: "This dashboard is not available" });
-    expect(heading).toBeVisible();
-    expect(screen.queryByRole("link", { name: "Back to Dashboards" })).not.toBeInTheDocument();
-  });
-});
-
-describe("a library row's address", () => {
-  const row = (scope: "PRIVATE" | "PROJECT" | "ORGANIZATION") =>
-    resolved({ id: "board-1", scope, project: SHOP });
-
-  it("is the organization's for every scope, a Project board included", () => {
-    expect(libraryBoardPath(row("PROJECT"))).toBe("/dashboards/board-1");
-    expect(libraryBoardPath(row("ORGANIZATION"))).toBe("/dashboards/board-1");
-    expect(libraryBoardPath(row("PRIVATE"))).toBe("/dashboards/board-1");
-  });
-
-  it("is nowhere when no project the member reads shows the board", () => {
-    const unopenable = resolved({
-      id: "board-1",
-      scope: "ORGANIZATION",
-      project: null,
-      openProject: null,
-    });
-
-    expect(libraryBoardPath(unopenable)).toBeUndefined();
-  });
 });

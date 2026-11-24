@@ -8,7 +8,7 @@ import type { DashboardHomeProduct } from "@langwatch/dashboard-contract";
 
 import { isOwnMyDashboard, type LibraryBoard, libraryBoardPath } from "./organization-library.ts";
 
-/** Boards the section shows before the rest sit behind "Show N more". */
+/** Boards a sidebar section or library group shows before "Show N more". */
 export const PRODUCT_BOARDS_SHOWN_MAX = 8;
 
 /**

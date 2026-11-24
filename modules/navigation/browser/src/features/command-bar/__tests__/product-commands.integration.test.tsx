@@ -218,6 +218,27 @@ describe("Quick Search across products", () => {
       expect(analyticsPath({ dashboards: false })).toBe("/[project]/analytics");
     });
 
+    const labelled = (options: { dashboards: boolean }) =>
+      commandsFor({ query: "analytics", reachable: EVERYTHING, ...options }).map(
+        (command) => command.label,
+      );
+
+    /** @scenario Quick Search replaces Analytics with Dashboards when Dashboards is released */
+    it("shows Dashboards instead of Analytics when Dashboards is reachable", () => {
+      const labels = labelled({ dashboards: true });
+
+      expect(labels).toContain("Dashboards");
+      expect(labels).not.toContain("Analytics");
+    });
+
+    /** @scenario Quick Search keeps Analytics while Dashboards is not reachable */
+    it("keeps Analytics and no Dashboards entry when Dashboards is out of reach", () => {
+      const labels = labelled({ dashboards: false });
+
+      expect(labels).toContain("Analytics");
+      expect(labels).not.toContain("Dashboards");
+    });
+
     /** @scenario "AC3r Quick Search opens the same Analytics destination as the sidebar" */
     it("opens analytics for an aggregate project", () => {
       expect(analyticsPath({ dashboards: true, projectKind: "aggregate" })).toBe(

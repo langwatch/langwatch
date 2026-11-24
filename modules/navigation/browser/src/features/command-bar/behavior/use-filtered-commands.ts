@@ -61,6 +61,29 @@ function filterCategory({
   return isSearchingCategory ? commands : filterCommands(commands, query);
 }
 
+/**
+ * The Analytics command, replaced by Dashboards (same address as the sidebar entry) once
+ * the member's Dashboards is reachable; searches for analytics still find it.
+ */
+function analyticsCommand({
+  command,
+  path,
+  leadsToDashboards,
+}: {
+  command: Command;
+  path: ReturnType<typeof useAnalyticsEntry>["path"];
+  leadsToDashboards: ReturnType<typeof useAnalyticsEntry>["leadsToDashboards"];
+}): Command {
+  if (!leadsToDashboards) return { ...command, path };
+  return {
+    ...command,
+    label: "Dashboards",
+    description: "Dashboards and charts",
+    keywords: [...(command.keywords ?? []), "analytics", "dashboard", "dashboards"],
+    path,
+  };
+}
+
 /** "Open Chat" only on SaaS; the plans command links where plans are managed. */
 function availableSupportCommands(isSaas: boolean | undefined): Command[] {
   return supportCommands
@@ -89,6 +112,7 @@ export function useFilteredCommands({
   const projectNavigation = useCommandProjectNavigation();
   const productCommands = useProductCommands();
   const analyticsEntry = useAnalyticsEntry();
+  const { path: analyticsPath, leadsToDashboards, isSettled: analyticsSettled } = analyticsEntry;
 
   const availableNavCommands = useMemo(() => {
     const commands = (
@@ -97,8 +121,12 @@ export function useFilteredCommands({
         : navigationCommands.filter((cmd) => !cmd.id.startsWith("nav-ops"))
     )
       // Same destination as the sidebar entry, and withheld while that entry waits.
-      .filter((cmd) => cmd.id !== "nav-analytics" || analyticsEntry.isSettled)
-      .map((cmd) => (cmd.id === "nav-analytics" ? { ...cmd, path: analyticsEntry.path } : cmd));
+      .filter((cmd) => cmd.id !== "nav-analytics" || analyticsSettled)
+      .map((cmd) =>
+        cmd.id === "nav-analytics"
+          ? analyticsCommand({ command: cmd, path: analyticsPath, leadsToDashboards })
+          : cmd,
+      );
     return [
       ...withLlmOpsProductLabel(
         filterCommandsByProjectNavigation({
@@ -113,8 +141,9 @@ export function useFilteredCommands({
     commandFeatureFlags,
     projectNavigation,
     productCommands,
-    analyticsEntry.path,
-    analyticsEntry.isSettled,
+    analyticsPath,
+    leadsToDashboards,
+    analyticsSettled,
   ]);
 
   const filteredNavigation = useMemo(

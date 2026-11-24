@@ -45,20 +45,6 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
   const { duplicateBoard } = useLibraryDuplicate();
   if (!isLoaded) return null;
   const projectSlug = host.project()?.slug;
-  const openId = host.route().params.dashboardId;
-  const hiddenCount = boards.length - PRODUCT_BOARDS_SHOWN_MAX;
-  const shownRows = isShowingAll ? boards : boards.slice(0, PRODUCT_BOARDS_SHOWN_MAX);
-  const boardRow = (board: LibraryBoard) => (
-    <BoardRow
-      key={board.id}
-      board={board}
-      isOpen={board.id === openId}
-      // A copy goes to the store project, so with none nothing is copied.
-      onDuplicate={store.storeProject ? () => duplicateBoard(board) : void 0}
-      onMove={() => setPendingMove(board)}
-      onDelete={() => setPendingDelete(board)}
-    />
-  );
 
   return (
     <VStack as="section" aria-label={LABEL} align="stretch" gap={0.5} width="full">
@@ -68,23 +54,16 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           <NewDashboardButton isCreating={false} onCreate={() => setIsNewDialogOpen(true)} />
         )}
       </HStack>
-      {boards.length === 0 && (
-        <Text textStyle="bodySm" color="fg.subtle" paddingX={2} paddingY="4px">
-          No dashboards yet
-        </Text>
-      )}
-      {boards.length > 0 && (
-        <RowList label={LABEL}>
-          {shownRows.map(boardRow)}
-          {hiddenCount > 0 && (
-            <Box as="li" listStyleType="none">
-              <ToggleRow onClick={() => setIsShowingAll(!isShowingAll)}>
-                {isShowingAll ? "Show less" : `Show ${hiddenCount} more`}
-              </ToggleRow>
-            </Box>
-          )}
-        </RowList>
-      )}
+      <BoardRows
+        boards={boards}
+        openId={host.route().params.dashboardId}
+        isShowingAll={isShowingAll}
+        onToggleShowAll={() => setIsShowingAll(!isShowingAll)}
+        // A copy goes to the store project, so with none nothing is copied.
+        onDuplicate={store.storeProject ? duplicateBoard : void 0}
+        onMove={setPendingMove}
+        onDelete={setPendingDelete}
+      />
       {projectSlug && product === "llm-ops" && (
         <RowList label="Templates">
           <SidebarLinkRow
@@ -109,6 +88,56 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
         onSettleDelete={() => setPendingDelete(void 0)}
       />
     </VStack>
+  );
+}
+
+/** The section's boards, the first few then "Show N more", or "No dashboards yet". */
+function BoardRows({
+  boards,
+  openId,
+  isShowingAll,
+  onToggleShowAll,
+  onDuplicate,
+  onMove,
+  onDelete,
+}: {
+  boards: readonly LibraryBoard[];
+  openId: string | undefined;
+  isShowingAll: boolean;
+  onToggleShowAll: () => void;
+  onDuplicate: ((board: LibraryBoard) => void) | undefined;
+  onMove: (board: LibraryBoard) => void;
+  onDelete: (board: LibraryBoard) => void;
+}) {
+  if (boards.length === 0) {
+    return (
+      <Text textStyle="bodySm" color="fg.subtle" paddingX={2} paddingY="4px">
+        No dashboards yet
+      </Text>
+    );
+  }
+  const hiddenCount = boards.length - PRODUCT_BOARDS_SHOWN_MAX;
+  const shownRows = isShowingAll ? boards : boards.slice(0, PRODUCT_BOARDS_SHOWN_MAX);
+  return (
+    <RowList label={LABEL}>
+      {shownRows.map((board) => (
+        <BoardRow
+          key={board.id}
+          board={board}
+          isOpen={board.id === openId}
+          onDuplicate={onDuplicate ? () => onDuplicate(board) : void 0}
+          onMove={() => onMove(board)}
+          onDelete={() => onDelete(board)}
+        />
+      ))}
+      {hiddenCount > 0 && (
+        <Box as="li" listStyleType="none">
+          <ToggleRow onClick={onToggleShowAll}>
+            {isShowingAll ? "Show less" : `Show ${hiddenCount} more`}
+          </ToggleRow>
+        </Box>
+      )}
+    </RowList>
   );
 }
 

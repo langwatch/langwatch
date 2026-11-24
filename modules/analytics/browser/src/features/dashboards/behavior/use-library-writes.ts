@@ -87,7 +87,7 @@ export function useLibraryDelete() {
   const host = useAnalyticsHost();
   const analytics = useUiAnalytics();
   const utils = analyticsApi.useUtils();
-  const refresh = useLibraryRefresh();
+  const organizationId = host.organizationId() ?? "";
   const remove = analyticsApi.boards.delete.useMutation();
 
   const deleteBoard = ({ board, onDeleted }: { board: LibraryBoard; onDeleted: () => void }) => {
@@ -96,10 +96,15 @@ export function useLibraryDelete() {
     remove.mutate(
       { projectId, dashboardId: board.id },
       {
-        onSuccess: () => {
+        onSuccess: (deleted) => {
+          utils.boards.listInOrganization.setData({ organizationId }, (rows) =>
+            rows?.filter((row) => row.id !== deleted.id),
+          );
           analytics.track(dashboardDeleted());
           host.succeeded({ title: `"${board.name}" deleted` });
-          void refresh({ projectId });
+          // Keyed per project, with or without the Organization boards, so these are re-read.
+          void utils.boards.getAll.invalidate({ projectId });
+          void utils.boards.listStarred.invalidate({ projectId });
           // The plan limit counts dashboards, so a delete frees an allowance.
           void utils.licenseEnforcement.checkLimit.invalidate();
           onDeleted();
@@ -131,18 +136,17 @@ export function useLibraryMove() {
   }) => {
     // Asked in the owning project, as a rename is; the row offers no Move without one.
     if (!board.project) return false;
-    try {
-      await move.mutateAsync({ projectId: board.project.id, dashboardId: board.id, homeProduct });
-    } catch (error) {
+    const input = { projectId: board.project.id, dashboardId: board.id, homeProduct };
+    const moved = await move.mutateAsync(input).catch((error: unknown) => {
       host.failed({ error, fallbackTitle: "Couldn't move the dashboard" });
-      return false;
-    }
-    // Every project's lists too, so each product's sidebar shows the move without a reload.
-    void Promise.all([
-      utils.boards.listInOrganization.invalidate({ organizationId }),
-      utils.boards.getAll.invalidate(),
-      utils.boards.listStarred.invalidate(),
-    ]);
+      return void 0;
+    });
+    if (!moved) return false;
+    // The answer is the library's row; every project's lists are re-read for each sidebar.
+    utils.boards.listInOrganization.setData({ organizationId }, (rows) =>
+      rows?.map((row) => (row.id === moved.id ? moved : row)),
+    );
+    void Promise.all([utils.boards.getAll.invalidate(), utils.boards.listStarred.invalidate()]);
     const href = organizationBoardPath({ dashboardId: board.id });
     toaster.create({
       title: `Moved "${board.name}" to ${HOME_PRODUCT_LABELS[homeProduct]}`,

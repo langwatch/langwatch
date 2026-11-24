@@ -23,12 +23,10 @@ import {
   libraryGroups,
   namesInProduct,
 } from "../../model/organization-library.ts";
+import { PRODUCT_BOARDS_SHOWN_MAX } from "../../model/product-dashboards.ts";
 import { BoardMenuDialogs } from "./board-menu-dialogs.tsx";
 import { LibraryBoardRow } from "./library-board-rows.tsx";
 import { NewDashboardDialog } from "./new-dashboard-dialog.tsx";
-
-/** How many boards a group lists before "Show N more". */
-const GROUP_MAX = 8;
 
 export default function DashboardsLibraryScreen() {
   const library = useOrganizationLibrary();
@@ -95,14 +93,18 @@ function LibraryBody({
   handlers: BoardHandlers;
 }) {
   if (loadError && !hasList) return <>{loadError}</>;
+  // An empty list beside a failed store read still says the failure, or creation vanishes unsaid.
   if (groups.length === 0) {
     return (
-      <NoDataInfoBlock
-        icon={<LayoutDashboard size={20} />}
-        title="No dashboards yet"
-        description="Make one for any product. It shows in that product's sidebar."
-        primaryAction={newButton}
-      />
+      <VStack align="stretch" gap={6}>
+        {loadError}
+        <NoDataInfoBlock
+          icon={<LayoutDashboard size={20} />}
+          title="No dashboards yet"
+          description="Make one for any product. It shows in that product's sidebar."
+          primaryAction={newButton}
+        />
+      </VStack>
     );
   }
   return (
@@ -199,7 +201,7 @@ function ProductGroup({
   onDelete,
 }: BoardHandlers & { group: LibraryGroup }) {
   const { showsAll, toggle } = useLibraryShowMore(group.product);
-  const shown = showsAll ? group.boards : group.boards.slice(0, GROUP_MAX);
+  const shown = showsAll ? group.boards : group.boards.slice(0, PRODUCT_BOARDS_SHOWN_MAX);
   const hidden = group.boards.length - shown.length;
   return (
     <VStack as="section" aria-label={group.label} align="stretch" gap={2}>
@@ -226,7 +228,7 @@ function ProductGroup({
             onDelete={() => onDelete(board)}
           />
         ))}
-        {group.boards.length > GROUP_MAX && (
+        {group.boards.length > PRODUCT_BOARDS_SHOWN_MAX && (
           <Box as="li" listStyleType="none">
             <Button
               variant="plain"

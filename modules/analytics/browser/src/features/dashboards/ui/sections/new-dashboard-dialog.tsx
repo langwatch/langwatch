@@ -228,6 +228,62 @@ export function NewDashboardDialog({
   }) => Promise<boolean>;
   onClose: () => void;
 }) {
+  const form = useNewDashboardForm({
+    fixedProduct,
+    takenNamesIn,
+    projectName,
+    organizationName,
+    mayShare,
+  });
+  const { home, name, scope } = form;
+
+  const submit = async () => {
+    if (isCreating || !form.canCreate) return;
+    if (await onCreate({ name: name.trim(), scope, homeProduct: home })) onClose();
+  };
+
+  return (
+    <Dialog
+      open
+      size="sm"
+      onClose={onClose}
+      title="New dashboard"
+      busy={isCreating}
+      showCloseButton={false}
+      onSubmit={() => void submit()}
+      footerContent={
+        <CreateFooter isCreating={isCreating} canCreate={form.canCreate} onCancel={onClose} />
+      }
+    >
+      <VStack align="stretch" gap={4}>
+        <NameField name={name} onName={form.setName} />
+        {fixedProduct === void 0 && (
+          <ProductField product={home} products={form.products} onProduct={form.pickProduct} />
+        )}
+        <SharingFieldset scope={scope} onScope={form.setScope} choices={form.choices} />
+        <PlacementNote product={home} scope={scope} projectName={projectName} />
+      </VStack>
+    </Dialog>
+  );
+}
+
+/**
+ * The dialog's name, product and scope: a product change resets the scope to that product's
+ * default, and a name left as suggested follows the product's own numbering.
+ */
+function useNewDashboardForm({
+  fixedProduct,
+  takenNamesIn,
+  projectName,
+  organizationName,
+  mayShare,
+}: {
+  fixedProduct: DashboardHomeProduct | undefined;
+  takenNamesIn: (product: DashboardHomeProduct) => readonly string[];
+  projectName: string;
+  organizationName: string;
+  mayShare: boolean;
+}) {
   const choicesIn = (product: DashboardHomeProduct) =>
     sharingChoices({ product, projectName, organizationName, mayShare });
   const products = DASHBOARD_HOME_PRODUCTS.filter((product) =>
@@ -242,7 +298,6 @@ export function NewDashboardDialog({
   const canCreate = name.trim() !== "" && choices.some((choice) => choice.scope === scope);
 
   const pickProduct = (next: DashboardHomeProduct) => {
-    // A name the member left as suggested follows the product's own numbering.
     if (name === firstUntitledName(takenNamesIn(home))) {
       setName(firstUntitledName(takenNamesIn(next)));
     }
@@ -250,46 +305,33 @@ export function NewDashboardDialog({
     setScope(defaultScope({ choices: choicesIn(next), product: next }));
   };
 
-  const submit = async () => {
-    if (isCreating || !canCreate) return;
-    if (await onCreate({ name: name.trim(), scope, homeProduct: home })) onClose();
-  };
+  return { home, name, setName, scope, setScope, choices, products, canCreate, pickProduct };
+}
 
+/** The approved design's teal Create, which the frame's accent primary cannot paint. */
+function CreateFooter({
+  isCreating,
+  canCreate,
+  onCancel,
+}: {
+  isCreating: boolean;
+  canCreate: boolean;
+  onCancel: () => void;
+}) {
   return (
-    <Dialog
-      open
-      size="sm"
-      onClose={onClose}
-      title="New dashboard"
-      busy={isCreating}
-      showCloseButton={false}
-      onSubmit={() => void submit()}
-      // The approved design's teal Create, which the frame's accent primary cannot paint.
-      footerContent={
-        <HStack justify="flex-end" gap={2} width="full">
-          <Button size="sm" variant="ghost" disabled={isCreating} onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            type="submit"
-            colorPalette="teal"
-            disabled={!canCreate}
-            loading={isCreating}
-          >
-            Create
-          </Button>
-        </HStack>
-      }
-    >
-      <VStack align="stretch" gap={4}>
-        <NameField name={name} onName={setName} />
-        {fixedProduct === void 0 && (
-          <ProductField product={home} products={products} onProduct={pickProduct} />
-        )}
-        <SharingFieldset scope={scope} onScope={setScope} choices={choices} />
-        <PlacementNote product={home} scope={scope} projectName={projectName} />
-      </VStack>
-    </Dialog>
+    <HStack justify="flex-end" gap={2} width="full">
+      <Button size="sm" variant="ghost" disabled={isCreating} onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button
+        size="sm"
+        type="submit"
+        colorPalette="teal"
+        disabled={!canCreate}
+        loading={isCreating}
+      >
+        Create
+      </Button>
+    </HStack>
   );
 }

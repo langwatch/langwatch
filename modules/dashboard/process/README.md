@@ -1167,25 +1167,25 @@ type Response = unknown;
 
 Contract `../contract/src/board.trpc.ts:31`, router `src/transport/board.trpc.ts:10`.
 
-| Procedure                   | Kind     | Gate                                              | Input                     | Output                           |
-| --------------------------- | -------- | ------------------------------------------------- | ------------------------- | -------------------------------- |
-| `boards.getAll`             | query    | Permission `analytics:view`                       | inline                    | inline                           |
-| `boards.listInOrganization` | query    | Permission `organization:view`                    | `organizationScopeSchema` | inline                           |
-| `boards.resolve`            | query    | Permission `organization:view`                    | inline                    | `organizationBoardSchema`        |
-| `boards.storeProjects`      | query    | Permission `organization:view`                    | `organizationScopeSchema` | inline                           |
-| `boards.getById`            | query    | Permission `analytics:view`                       | `boardRefSchema`          | `boardTrpcRowSchema`             |
-| `boards.create`             | mutation | Permission `analytics:create`                     | inline                    | `boardTrpcRowSchema`             |
-| `boards.createAtScope`      | mutation | Permission `analytics:create or analytics:update` | inline                    | `boardTrpcRowSchema`             |
-| `boards.update`             | mutation | Permission `analytics:update`                     | inline                    | `boardTrpcRowSchema`             |
-| `boards.move`               | mutation | Permission `analytics:update`                     | inline                    | `organizationBoardSchema`        |
-| `boards.delete`             | mutation | Permission `analytics:delete`                     | `boardRefSchema`          | `boardTrpcRowSchema`             |
-| `boards.setScope`           | mutation | Permission `analytics:update`                     | inline                    | `boardTrpcRowSchema`             |
-| `boards.scopeImpact`        | query    | Permission `analytics:view`                       | `boardRefSchema`          | `dashboardScopeImpactSchema`     |
-| `boards.scopeProjects`      | query    | Permission `analytics:view`                       | `boardRefSchema`          | `dashboardScopeProjectsSchema`   |
-| `boards.listStarred`        | query    | Permission `analytics:view`                       | `projectScopeSchema`      | inline                           |
-| `boards.star`               | mutation | Permission `analytics:view`                       | inline                    | `dashboardReorderResponseSchema` |
-| `boards.unstar`             | mutation | Permission `analytics:view`                       | inline                    | `dashboardReorderResponseSchema` |
-| `boards.reorderStars`       | mutation | Permission `analytics:view`                       | inline                    | `dashboardReorderResponseSchema` |
+| Procedure                   | Kind     | Gate                                               | Input                     | Output                           |
+| --------------------------- | -------- | -------------------------------------------------- | ------------------------- | -------------------------------- |
+| `boards.getAll`             | query    | Permission `analytics:view`                        | inline                    | inline                           |
+| `boards.listInOrganization` | query    | Permission `organization:view`                     | `organizationScopeSchema` | inline                           |
+| `boards.resolve`            | query    | Permission `organization:view`                     | inline                    | `organizationBoardSchema`        |
+| `boards.storeProjects`      | query    | Permission `organization:view`                     | `organizationScopeSchema` | inline                           |
+| `boards.getById`            | query    | Permission `analytics:view`                        | `boardRefSchema`          | `boardTrpcRowSchema`             |
+| `boards.create`             | mutation | Permission `analytics:create`                      | inline                    | `boardTrpcRowSchema`             |
+| `boards.createAtScope`      | mutation | Permission `analytics:create and analytics:update` | inline                    | `boardTrpcRowSchema`             |
+| `boards.update`             | mutation | Permission `analytics:update`                      | inline                    | `boardTrpcRowSchema`             |
+| `boards.move`               | mutation | Permission `analytics:update`                      | inline                    | `organizationBoardSchema`        |
+| `boards.delete`             | mutation | Permission `analytics:delete`                      | `boardRefSchema`          | `boardTrpcRowSchema`             |
+| `boards.setScope`           | mutation | Permission `analytics:update`                      | inline                    | `boardTrpcRowSchema`             |
+| `boards.scopeImpact`        | query    | Permission `analytics:view`                        | `boardRefSchema`          | `dashboardScopeImpactSchema`     |
+| `boards.scopeProjects`      | query    | Permission `analytics:view`                        | `boardRefSchema`          | `dashboardScopeProjectsSchema`   |
+| `boards.listStarred`        | query    | Permission `analytics:view`                        | `projectScopeSchema`      | inline                           |
+| `boards.star`               | mutation | Permission `analytics:view`                        | inline                    | `dashboardReorderResponseSchema` |
+| `boards.unstar`             | mutation | Permission `analytics:view`                        | inline                    | `dashboardReorderResponseSchema` |
+| `boards.reorderStars`       | mutation | Permission `analytics:view`                        | inline                    | `dashboardReorderResponseSchema` |
 
 ```typescript
 // boards.getAll

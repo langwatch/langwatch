@@ -927,7 +927,7 @@ type Response = z.infer<typeof abortExperimentRunResponseSchema>; // ../contract
 
 Trigger an evaluation run of a workflow's committed version through the evaluations pipeline. Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as constant entry inputs on every row. A saved dataset is read at `dataset_version` when given, else its current content is saved as a new version. Returns a run id and a results URL to poll or open in the browser.
 
-Permission `workflows:create or evaluations:view`. Declared at `src/transport/experiment-workflow-evaluation.rest.ts:36`.
+Permission `workflows:create and evaluations:view`. Declared at `src/transport/experiment-workflow-evaluation.rest.ts:36`.
 
 Answers at `/api/workflows/:id/evaluate`, `/api/v1/workflows/:id/evaluate`; also, undocumented, `/api/workflows/2026-08-07/:id/evaluate`, `/api/v1/workflows/2026-08-07/:id/evaluate`, `/api/workflows/latest/:id/evaluate`, `/api/v1/workflows/latest/:id/evaluate`.
 

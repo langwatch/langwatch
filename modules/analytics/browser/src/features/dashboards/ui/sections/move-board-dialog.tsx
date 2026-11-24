@@ -76,53 +76,16 @@ export function MoveBoardDialog({
       showCloseButton={false}
       onSubmit={() => void submit()}
       footerContent={
-        <HStack justify="flex-end" gap={2} width="full">
-          <Button size="sm" variant="ghost" disabled={isMoving} onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            type="submit"
-            colorPalette="teal"
-            disabled={target === current}
-            loading={isMoving}
-          >
-            Move
-          </Button>
-        </HStack>
+        <MoveFooter isMoving={isMoving} isUnchanged={target === current} onCancel={onClose} />
       }
     >
       <VStack align="stretch" gap={3}>
-        <RadioGroup
-          aria-label="Product"
-          value={target}
-          onValueChange={(details: { value: string | null }) => {
-            const picked = LIBRARY_PRODUCT_ORDER.find((product) => product === details.value);
-            if (picked) setTarget(picked);
-          }}
-        >
-          <VStack align="stretch" gap={2}>
-            {LIBRARY_PRODUCT_ORDER.map((product) => (
-              <Radio
-                key={product}
-                value={product}
-                disabled={refusedFor(product)}
-                title={refusedFor(product) ? AUTHOR_ONLY : void 0}
-              >
-                <HStack gap={2}>
-                  <Text textStyle="bodySm" fontWeight="medium">
-                    {HOME_PRODUCT_LABELS[product]}
-                  </Text>
-                  {product === current && (
-                    <Text textStyle="caption" color="fg.subtle">
-                      Current
-                    </Text>
-                  )}
-                </HStack>
-              </Radio>
-            ))}
-          </VStack>
-        </RadioGroup>
+        <DestinationRadios
+          current={current}
+          target={target}
+          refusedFor={refusedFor}
+          onPick={setTarget}
+        />
         {isLocked && (
           <Text textStyle="caption" color="fg.muted">
             {AUTHOR_ONLY}
@@ -142,5 +105,72 @@ export function MoveBoardDialog({
         )}
       </VStack>
     </Dialog>
+  );
+}
+
+/** Every product as a destination, the current one marked; a refused one disabled, saying why. */
+function DestinationRadios({
+  current,
+  target,
+  refusedFor,
+  onPick,
+}: {
+  current: DashboardHomeProduct;
+  target: DashboardHomeProduct;
+  refusedFor: (product: DashboardHomeProduct) => boolean;
+  onPick: (product: DashboardHomeProduct) => void;
+}) {
+  return (
+    <RadioGroup
+      aria-label="Product"
+      value={target}
+      onValueChange={(details: { value: string | null }) => {
+        const picked = LIBRARY_PRODUCT_ORDER.find((product) => product === details.value);
+        if (picked) onPick(picked);
+      }}
+    >
+      <VStack align="stretch" gap={2}>
+        {LIBRARY_PRODUCT_ORDER.map((product) => (
+          <Radio
+            key={product}
+            value={product}
+            disabled={refusedFor(product)}
+            title={refusedFor(product) ? AUTHOR_ONLY : void 0}
+          >
+            <HStack gap={2}>
+              <Text textStyle="bodySm" fontWeight="medium">
+                {HOME_PRODUCT_LABELS[product]}
+              </Text>
+              {product === current && (
+                <Text textStyle="caption" color="fg.subtle">
+                  Current
+                </Text>
+              )}
+            </HStack>
+          </Radio>
+        ))}
+      </VStack>
+    </RadioGroup>
+  );
+}
+
+function MoveFooter({
+  isMoving,
+  isUnchanged,
+  onCancel,
+}: {
+  isMoving: boolean;
+  isUnchanged: boolean;
+  onCancel: () => void;
+}) {
+  return (
+    <HStack justify="flex-end" gap={2} width="full">
+      <Button size="sm" variant="ghost" disabled={isMoving} onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button size="sm" type="submit" colorPalette="teal" disabled={isUnchanged} loading={isMoving}>
+        Move
+      </Button>
+    </HStack>
   );
 }

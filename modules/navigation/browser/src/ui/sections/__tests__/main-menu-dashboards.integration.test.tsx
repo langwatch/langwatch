@@ -278,6 +278,7 @@ describe("the Dashboards sidebar in the organization's library", () => {
      * @scenario "No sidebar has a Starred dashboards group"
      */
     it("lists All dashboards as current, with no Templates and no starred group", async () => {
+      organizationLibrary.open = true;
       renderSidebar({ surface: "dashboards", pathname: "/dashboards", everyProductFlag: true });
 
       expect(screen.getByRole("button", { name: "Quick Search" })).toBeInTheDocument();

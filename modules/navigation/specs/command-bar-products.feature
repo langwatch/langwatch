@@ -61,3 +61,16 @@ Feature: Quick Search reaches every product
     When I type "sessions" in Quick Search
     Then I see "Sessions" with "LLM Ops"
     And project pages such as "Analytics" carry "LLM Ops"
+
+  @integration
+  Scenario: Quick Search replaces Analytics with Dashboards when Dashboards is released
+    Given Dashboards is reachable for me
+    When I type "analytics" in Quick Search
+    Then I see "Dashboards" and no entry named "Analytics"
+    And "Dashboards" opens where the sidebar entry opens
+
+  @integration
+  Scenario: Quick Search keeps Analytics while Dashboards is not reachable
+    Given Dashboards is not reachable for me
+    When I type "analytics" in Quick Search
+    Then I see "Analytics" and no entry named "Dashboards"

@@ -22,13 +22,10 @@ export function useLibraryBoardEdits() {
   const organizationId = host.organizationId() ?? "";
   const rename = analyticsApi.boards.update.useMutation();
 
-  // Every project's lists too, so the sidebars and an open board show the name without a reload.
+  // The library's row takes the saved name from the answer. Every project's lists are keyed by
+  // project, an Organization board sits in each, so those are re-read for the sidebars.
   const refresh = () =>
-    Promise.all([
-      utils.boards.listInOrganization.invalidate({ organizationId }),
-      utils.boards.getAll.invalidate(),
-      utils.boards.listStarred.invalidate(),
-    ]);
+    Promise.all([utils.boards.getAll.invalidate(), utils.boards.listStarred.invalidate()]);
 
   /** Saves a new name in the board's own project; a blank or unchanged one saves nothing. */
   const renameBoard = ({ board, name }: { board: RenamedBoard; name: string }) => {
@@ -37,7 +34,12 @@ export function useLibraryBoardEdits() {
     rename.mutate(
       { projectId: board.project.id, dashboardId: board.id, name: trimmed },
       {
-        onSuccess: () => {
+        onSuccess: (saved) => {
+          utils.boards.listInOrganization.setData({ organizationId }, (rows) =>
+            rows?.map((row) =>
+              row.id === saved.id ? { ...row, name: saved.name, updatedAt: saved.updatedAt } : row,
+            ),
+          );
           analytics.track(dashboardEdited({ change: "rename" }));
           host.succeeded({ title: "Dashboard renamed" });
           void refresh();
