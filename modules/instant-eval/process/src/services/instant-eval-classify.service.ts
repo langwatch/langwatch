@@ -10,11 +10,7 @@ import type {
   InstantEvalJudgement,
   InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
-import {
-  instantEvalCostUsd,
-  instantEvalPriceUsd,
-  instantEvalTierOf,
-} from "@langwatch/instant-eval-judge-contract";
+import { instantEvalCostUsd, instantEvalPriceUsd } from "@langwatch/instant-eval-judge-contract";
 
 import type { InstantEvalJudgeChannel } from "../channels/instant-eval-judging.channel.ts";
 
@@ -47,14 +43,7 @@ export class InstantEvalClassifyService {
   priceOf({ inputTokens }: { inputTokens: number }): { costUsd: number; priceUsd: number } {
     const costUsd = instantEvalCostUsd({ inputTokens, pricing: this.judge.pricing });
 
-    const priceUsd = instantEvalPriceUsd({
-      costUsd,
-      inputTokens,
-      tier: instantEvalTierOf({ caller: "instant_eval", routed: undefined }),
-      pricing: this.judge.pricing,
-    });
-
-    return { costUsd, priceUsd };
+    return { costUsd, priceUsd: instantEvalPriceUsd({ costUsd, pricing: this.judge.pricing }) };
   }
 
   /** The limits this judge publishes, which a query judged through it is trimmed to. */

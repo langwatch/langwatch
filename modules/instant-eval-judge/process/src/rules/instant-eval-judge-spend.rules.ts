@@ -12,11 +12,12 @@ import {
   instantEvalPriceUsd,
   instantEvalRateVersion,
   instantEvalSpentCostUsd,
+  pickInstantEvalRatedSpend,
   NANO_USD_PER_USD,
   type InstantEvalJudgeRoutePricing,
   type InstantEvalJudgeSpendPricedEventData,
   type InstantEvalPricing,
-  type InstantEvalTier,
+  type InstantEvalSpendCaller,
 } from "@langwatch/instant-eval-judge-contract";
 
 /** The prefix a keyed judge call's request id carries, so the id is the evaluation's own. */
@@ -45,7 +46,7 @@ export function instantEvalJudgeSpendPricedOf({
   occurredAt,
   requests,
   runId,
-  tier,
+  caller,
   pricing = INSTANT_EVAL_PRICING,
   routed,
 }: {
@@ -57,8 +58,8 @@ export function instantEvalJudgeSpendPricedOf({
   /** A run's or query's classifications; a judge call is one and leaves it out. */
   requests?: number | undefined;
   runId?: string | undefined;
-  /** The model's tier, from `instantEvalTierOf`: Evals only for an LLM judge's routed call. */
-  tier: InstantEvalTier;
+  /** Who asked: with rated tokens, it picks the published rate (`pickInstantEvalRatedSpend`). */
+  caller: InstantEvalSpendCaller;
   pricing?: InstantEvalPricing;
   /**
    * A routed spend: its summed cost for the routed tokens plus any other tokens at the published
@@ -68,6 +69,8 @@ export function instantEvalJudgeSpendPricedOf({
     | Readonly<{
         costNanoUsd: number;
         routedInputTokens: number;
+        /** The row's tokens a backend past Jev answered, once; absent, no published rate. */
+        ratedInputTokens?: number | undefined;
         pricing: InstantEvalJudgeRoutePricing;
       }>
     | undefined;
@@ -78,7 +81,8 @@ export function instantEvalJudgeSpendPricedOf({
     routedInputTokens: routed?.routedInputTokens,
     pricing,
   });
-  const priceUsd = instantEvalPriceUsd({ costUsd, inputTokens, tier, pricing });
+  const rated = pickInstantEvalRatedSpend({ caller, ratedInputTokens: routed?.ratedInputTokens });
+  const priceUsd = instantEvalPriceUsd({ costUsd, rated, pricing });
   return {
     priceUsd,
     fact: {
@@ -89,8 +93,12 @@ export function instantEvalJudgeSpendPricedOf({
       requestId,
       model: routed ? INSTANT_EVAL_JUDGE_ROUTED_SPEND_MODEL : INSTANT_EVAL_SPEND_MODEL,
       rateVersion: routed
-        ? instantEvalJudgeRouteRateVersion({ routePricing: routed.pricing, tier, pricing })
-        : instantEvalRateVersion({ tier, pricing }),
+        ? instantEvalJudgeRouteRateVersion({
+            routePricing: routed.pricing,
+            tier: rated?.tier,
+            pricing,
+          })
+        : instantEvalRateVersion(pricing),
       inputTokens,
       priceNanoUsd: Math.round(priceUsd * NANO_USD_PER_USD),
       costNanoUsd: Math.round(costUsd * NANO_USD_PER_USD),

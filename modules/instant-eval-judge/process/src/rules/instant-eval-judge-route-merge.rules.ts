@@ -126,7 +126,14 @@ export function instantEvalMergedJudgementOf({
     limiterWaitMs: Math.max(0, ...parts.map((part) => part.judgement.limiterWaitMs ?? 0)),
     costNanoUsd: parts.reduce((sum, part) => sum + (part.judgement.costNanoUsd ?? 0), 0),
     ...routingOf(parts),
+    ...ratedOf(parts),
   };
+}
+
+/** The row is read once however many parts judged it, so the largest part's rated tokens. */
+function ratedOf(parts: readonly InstantEvalJudgeKindPart[]): { ratedInputTokens?: number } {
+  const rated = parts.flatMap((part) => part.judgement.ratedInputTokens ?? []);
+  return rated.length === 0 ? {} : { ratedInputTokens: Math.max(...rated) };
 }
 
 function routingOf(parts: readonly InstantEvalJudgeKindPart[]): {

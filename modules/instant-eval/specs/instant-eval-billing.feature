@@ -405,8 +405,10 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
   Rule: The price on the docs page is the price in the code
 
     @unit
-    Scenario: The pricing page states the published rates before VAT
-      Given the Instant tier's and the Evals tier's published rates
+    Scenario: The pricing page states today's Instant Evals price and the judge router's rate, before VAT
+      Given the classifier's rate and markup, and the Evals tier's published rate
       When the pricing page and the Instant Evals cost page are read
-      Then each states 0.30 USD per million input tokens for Instant Preview and 0.60 USD for Evals Preview, the LLM judge router
-      And each says the rates exclude VAT and our cost times 1.3 is the floor
+      Then each states the Instant Evals price per million input tokens the rate and markup produce, 0.0546 USD
+      And each states 0.60 USD per million input tokens for LangWatch Evals (preview), the LLM judge router, on a call a decision model or an LLM answers, with our cost times 1.3 as the floor
+      And neither states the Instant tier's 0.30 USD, since Instant Evals sends no route today
+      And each says prices exclude VAT

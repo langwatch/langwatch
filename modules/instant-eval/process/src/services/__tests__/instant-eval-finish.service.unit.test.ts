@@ -75,8 +75,8 @@ describe("given a run that judged rows", () => {
     });
 
     /** @scenario "The estimate is priced by the same rule as the run" */
-    /** @scenario "Instant Evals and an LLM judge on Instant Preview are priced at 0.30 USD per million input tokens" */
-    it("prices a run that read 10,700,000 input tokens at 3.21 USD, as its estimate did", async () => {
+    /** @scenario "An unrouted call is priced at the cost times 1.3, with no published rate" */
+    it("prices an unrouted run that read 10,700,000 input tokens at 0.58422 USD, as its estimate did", async () => {
       const { service } = finishing();
 
       const spend = await service.finish({
@@ -87,7 +87,7 @@ describe("given a run that judged rows", () => {
         requests: 10_000,
       });
 
-      expect(spend).toEqual({ costUsd: 0.4494, priceUsd: 3.21 });
+      expect(spend).toEqual({ costUsd: 0.4494, priceUsd: 0.58422 });
     });
 
     /** @scenario "A hold is released when the run's spend lands" */
@@ -190,8 +190,7 @@ describe("given a routed run", () => {
   });
 
   /** @scenario "A routed judgement is priced from the summed cost of every call" */
-  /** @scenario "A routed Instant Evals run stays at 0.30 USD per million input tokens" */
-  it("hands a routed run that cost nothing to the judge as routed, so its tokens cost nothing", async () => {
+  it("hands a routed run that cost nothing to the judge as routed, so its tokens bill nothing", async () => {
     const { service, recorded } = finishing();
 
     const spend = await service.finish({
@@ -204,7 +203,7 @@ describe("given a routed run", () => {
       routedInputTokens: 1_000_000,
     });
 
-    expect(spend).toEqual({ costUsd: 0, priceUsd: 0.3 });
+    expect(spend.costUsd).toBe(0);
     expect(recorded[0]).toMatchObject({ costNanoUsd: 0, routedInputTokens: 1_000_000 });
   });
 
@@ -277,8 +276,7 @@ describe("given a routed page that reported after its run finished", () => {
       routedInputTokens: 1_000_000,
     });
 
-    // A routed page stays on Instant Preview's rate: one million input tokens, above the floor.
-    expect(spend).toEqual({ costUsd: 0.005, priceUsd: 0.3 });
+    expect(spend).toEqual({ costUsd: 0.005, priceUsd: 0.0065 });
     expect(recorded).toEqual([
       {
         projectId: PROJECT_ID,

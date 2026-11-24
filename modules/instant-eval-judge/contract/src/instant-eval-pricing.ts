@@ -1,7 +1,7 @@
 /**
  * What an Instant Eval costs us and what the customer pays. Our cost is the input tokens at the
- * classifier's rate, or a routed call's summed cost. The price is the input tokens at the tier's
- * published rate, never below that cost times the markup (ADR-174 decision 25).
+ * classifier's rate, or a routed call's summed cost. The price is that cost times the markup, or
+ * the rated tokens at a published rate when higher, only past Jev (ADR-174 decision 25).
  * @see dev/docs/adr/190-instant-evals-routed-judgement-is-priced-from-summed-call-cost.md
  * @see modules/instant-eval-judge/specs/instant-eval-judge-pricing.feature
  */
@@ -28,51 +28,47 @@ export const INSTANT_EVAL_SPEND_MODEL = "langwatch-instant-preview";
 export const INSTANT_EVAL_REQUEST_TYPE = "instant_eval";
 
 /**
- * The tier is the product model. Instant: Instant Preview, so Instant Evals runs, pages and judged
- * queries, routed or not, and an LLM judge on Instant Preview. Evals: Evals Preview, the judge
- * router, so an LLM judge's routed call.
+ * A published rate's tier. Instant: Instant Evals spend a backend past Jev answered. Evals: an
+ * LLM judge's call through Evals Preview, the judge router, answered past Jev.
  */
 export const INSTANT_EVAL_TIERS = ["instant", "evals"] as const;
 export type InstantEvalTier = (typeof INSTANT_EVAL_TIERS)[number];
 
-/** Who asked for the judgement: Instant Evals itself, or an LLM-judge evaluator. */
-export type InstantEvalSpendCaller = "instant_eval" | "llm_judge";
-
-/** The one rule for a spend's tier: Evals only for an LLM judge's routed call, else Instant. */
-export function instantEvalTierOf({
-  caller,
-  routed,
-}: {
-  caller: InstantEvalSpendCaller;
-  routed: InstantEvalRoutedSpend | undefined;
-}): InstantEvalTier {
-  return caller === "llm_judge" && routed ? "evals" : "instant";
-}
-
-/** The published customer rates, USD per million input tokens before VAT; output is free. */
+/** The published rates, USD per million rated input tokens before VAT; output is free. */
 export const INSTANT_EVAL_PUBLISHED_RATES: Readonly<Record<InstantEvalTier, number>> = {
   instant: 0.3,
   evals: 0.6,
 };
 
-/** The tier's published rate and the floor's numbers, so a price change changes every stamp. */
-function publishedRateStamp({ tier }: { tier: InstantEvalTier }): string {
-  return `${tier}${INSTANT_EVAL_PUBLISHED_RATES[tier]}`;
+/** Who asked for the judgement: Instant Evals itself, or an LLM-judge evaluator. */
+export type InstantEvalSpendCaller = "instant_eval" | "llm_judge";
+
+/** The published rate a spend is charged at, and the input tokens it applies to. */
+export type InstantEvalRatedSpend = Readonly<{ tier: InstantEvalTier; inputTokens: number }>;
+
+/**
+ * The one rule for a published rate. Only rated tokens take one: a row's input tokens, once, when
+ * a backend past Jev answered it. With none, the spend is its cost times the markup, as before.
+ * @see dev/docs/adr/190-instant-evals-routed-judgement-is-priced-from-summed-call-cost.md
+ */
+export function pickInstantEvalRatedSpend({
+  caller,
+  ratedInputTokens,
+}: {
+  caller: InstantEvalSpendCaller;
+  ratedInputTokens: number | undefined;
+}): InstantEvalRatedSpend | undefined {
+  if (ratedInputTokens === undefined || ratedInputTokens <= 0) return undefined;
+  return { tier: caller === "llm_judge" ? "evals" : "instant", inputTokens: ratedInputTokens };
 }
 
 /**
- * The rate identity stamped on an unrouted outcome: the tier's published rate, then the
- * classifier's rate and markup that set the floor. Rows stamped `instant_eval@<rate>x<markup>`
- * were priced at the cost times the markup alone, before ADR-174 decision 25.
+ * The rate identity stamped on an outcome. A judgement has no model registry,
+ * so it stamps the two published numbers it was priced with: a price change
+ * changes the stamp, which tells a replay from a re-rating.
  */
-export function instantEvalRateVersion({
-  tier,
-  pricing = INSTANT_EVAL_PRICING,
-}: {
-  tier: InstantEvalTier;
-  pricing?: InstantEvalPricing;
-}): string {
-  return `instant_eval@${publishedRateStamp({ tier })}+${pricing.usdPerMillionInputTokens}x${pricing.markup}`;
+export function instantEvalRateVersion(pricing: InstantEvalPricing = INSTANT_EVAL_PRICING): string {
+  return `instant_eval@${pricing.usdPerMillionInputTokens}x${pricing.markup}`;
 }
 
 const TOKENS_PER_MILLION = 1_000_000;
@@ -97,35 +93,25 @@ export function instantEvalCostUsd({
   return toNanoUsdPrecision((inputTokens / TOKENS_PER_MILLION) * pricing.usdPerMillionInputTokens);
 }
 
-/** Our cost times the markup: the floor of every price, and what a query hold is priced at. */
-export function instantEvalFloorPriceUsd({
-  costUsd,
-  pricing = INSTANT_EVAL_PRICING,
-}: {
-  costUsd: number;
-  pricing?: InstantEvalPricing;
-}): number {
-  return toNanoUsdPrecision(costUsd * pricing.markup);
-}
-
 /**
- * What the customer is charged: the input tokens at the tier's published rate, output free, or
- * our cost times the markup when that is higher, so no call loses money (ADR-174 decision 25).
+ * What the customer is charged: our cost times the markup, or, for a rated spend, its rated
+ * tokens at the tier's published rate when that is higher; output is free (ADR-174 decision 25).
  */
 export function instantEvalPriceUsd({
   costUsd,
-  inputTokens,
-  tier,
+  rated,
   pricing = INSTANT_EVAL_PRICING,
 }: {
   costUsd: number;
-  inputTokens: number;
-  tier: InstantEvalTier;
+  /** From `pickInstantEvalRatedSpend`; absent, the spend has no published rate. */
+  rated?: InstantEvalRatedSpend | undefined;
   pricing?: InstantEvalPricing;
 }): number {
+  const atCostUsd = toNanoUsdPrecision(costUsd * pricing.markup);
+  if (!rated) return atCostUsd;
   const atRateUsd =
-    (Math.max(inputTokens, 0) / TOKENS_PER_MILLION) * INSTANT_EVAL_PUBLISHED_RATES[tier];
-  return Math.max(toNanoUsdPrecision(atRateUsd), instantEvalFloorPriceUsd({ costUsd, pricing }));
+    (rated.inputTokens / TOKENS_PER_MILLION) * INSTANT_EVAL_PUBLISHED_RATES[rated.tier];
+  return Math.max(toNanoUsdPrecision(atRateUsd), atCostUsd);
 }
 
 /**
@@ -149,9 +135,9 @@ export const INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING: InstantEvalJudgeRoutePric
 export const INSTANT_EVAL_JUDGE_ROUTED_SPEND_MODEL = "langwatch-judge";
 
 /**
- * The rate identity a routed judgement's priced fact carries: the tier's published rate, then the
- * route prices and the markup that set the floor. `instant_eval_judge_router@<version>x<markup>`
- * rows were priced at the summed cost times the markup alone, before ADR-174 decision 25.
+ * The rate identity a routed judgement's priced fact carries: the route prices and the markup, so
+ * `instant_eval_judge_router@<version>x<markup>` is the summed cost times the markup. A rated
+ * spend puts its tier's rate first: `instant_eval_judge_router@<tier><rate>+<version>x<markup>`.
  */
 export function instantEvalJudgeRouteRateVersion({
   routePricing,
@@ -159,10 +145,11 @@ export function instantEvalJudgeRouteRateVersion({
   pricing = INSTANT_EVAL_PRICING,
 }: {
   routePricing: InstantEvalJudgeRoutePricing;
-  tier: InstantEvalTier;
+  tier?: InstantEvalTier | undefined;
   pricing?: InstantEvalPricing;
 }): string {
-  return `instant_eval_judge_router@${publishedRateStamp({ tier })}+${routePricing.version}x${pricing.markup}`;
+  const rate = tier ? `${tier}${INSTANT_EVAL_PUBLISHED_RATES[tier]}+` : "";
+  return `instant_eval_judge_router@${rate}${routePricing.version}x${pricing.markup}`;
 }
 
 /**
@@ -185,8 +172,15 @@ export function instantEvalSpentCostUsd({
   return toNanoUsdPrecision(costNanoUsd / NANO_USD_PER_USD + unroutedUsd);
 }
 
-/** The routed part of a spend: the summed routed cost and the input tokens it covers. */
-export type InstantEvalRoutedSpend = Readonly<{ costNanoUsd: number; routedInputTokens: number }>;
+/**
+ * The routed part of a spend: the summed routed cost, the input tokens it covers, and the rated
+ * tokens a backend past Jev answered, which only a single judgement carries today.
+ */
+export type InstantEvalRoutedSpend = Readonly<{
+  costNanoUsd: number;
+  routedInputTokens: number;
+  ratedInputTokens?: number | undefined;
+}>;
 
 /**
  * The routed part of a page's, run's or query's spend, or undefined when nothing was routed. Routed
@@ -226,12 +220,16 @@ export function isInstantEvalSpendBillable({
 export function pickInstantEvalJudgementRoutedSpend({
   inputTokens,
   costNanoUsd,
+  ratedInputTokens,
 }: {
   inputTokens: number;
   costNanoUsd?: number | undefined;
+  ratedInputTokens?: number | undefined;
 }): InstantEvalRoutedSpend | undefined {
   if (costNanoUsd === undefined) return undefined;
-  return pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens: inputTokens });
+  const routed = pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens: inputTokens });
+  if (!routed || ratedInputTokens === undefined) return routed;
+  return { ...routed, ratedInputTokens };
 }
 
 /** What the customer is charged for a judgement, page or run: its tokens and spent cost, priced. */
@@ -239,15 +237,15 @@ export function instantEvalSpentPriceUsd({
   inputTokens,
   costNanoUsd,
   routedInputTokens,
-  tier,
+  rated,
   pricing = INSTANT_EVAL_PRICING,
 }: {
   inputTokens: number;
   costNanoUsd?: number | undefined;
   routedInputTokens?: number | undefined;
-  tier: InstantEvalTier;
+  rated?: InstantEvalRatedSpend | undefined;
   pricing?: InstantEvalPricing;
 }): number {
   const costUsd = instantEvalSpentCostUsd({ inputTokens, costNanoUsd, routedInputTokens, pricing });
-  return instantEvalPriceUsd({ costUsd, inputTokens, tier, pricing });
+  return instantEvalPriceUsd({ costUsd, rated, pricing });
 }

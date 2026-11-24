@@ -12,7 +12,6 @@ import {
   pickInstantEvalJudgementRoutedSpend,
   pickInstantEvalRoutedSpend,
   instantEvalSkipped,
-  instantEvalTierOf,
   type InstantEvalClassification,
   type InstantEvalJudgeAnswer,
   type InstantEvalJudgeCall,
@@ -209,8 +208,13 @@ export class InstantEvalJudgeService {
     if (!isInstantEvalSpendBillable(judgement))
       return { outcome: "judged", judgement, priceUsd: 0 };
 
-    const { inputTokens, costNanoUsd } = judgement;
-    const priceUsd = await this.priceAndRecord({ ...spend, inputTokens, costNanoUsd });
+    const { inputTokens, costNanoUsd, ratedInputTokens } = judgement;
+    const priceUsd = await this.priceAndRecord({
+      ...spend,
+      inputTokens,
+      costNanoUsd,
+      ratedInputTokens,
+    });
     return { outcome: "judged", judgement, priceUsd };
   }
 
@@ -245,21 +249,25 @@ export class InstantEvalJudgeService {
     }
   }
 
-  /** One paid call, priced and recorded. The router prices all it returns: a cost marks routed. */
+  /**
+   * One paid call, priced and recorded. The router prices all it returns: a cost marks routed.
+   * Rated tokens, there only when a backend past Jev answered, take Evals Preview's rate.
+   */
   private async priceAndRecord({
     organizationId,
     projectId,
     requestKey,
     inputTokens,
     costNanoUsd,
+    ratedInputTokens,
   }: {
     organizationId: string;
     projectId: string;
     requestKey?: string | undefined;
     inputTokens: number;
     costNanoUsd: number | undefined;
+    ratedInputTokens?: number | undefined;
   }): Promise<number> {
-    const routed = pickInstantEvalJudgementRoutedSpend({ inputTokens, costNanoUsd });
     const { priceUsd, fact } = instantEvalJudgeSpendPricedOf({
       organizationId,
       projectId,
@@ -269,10 +277,11 @@ export class InstantEvalJudgeService {
       }),
       inputTokens,
       occurredAt: this.deps.now().epochMilliseconds,
-      // An LLM judge's call: Evals Preview's rate when routed, Instant Preview's when not.
-      tier: instantEvalTierOf({ caller: "llm_judge", routed }),
       ...this.pricing(),
-      routed: this.priced(routed),
+      caller: "llm_judge",
+      routed: this.priced(
+        pickInstantEvalJudgementRoutedSpend({ inputTokens, costNanoUsd, ratedInputTokens }),
+      ),
     });
     await this.record({ fact });
     return priceUsd;
@@ -295,7 +304,6 @@ export class InstantEvalJudgeService {
     occurredAt,
   }: InstantEvalJudgeSpendRecord): Promise<void> {
     if (!isInstantEvalSpendBillable({ inputTokens, costNanoUsd })) return;
-    const routed = pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens });
     const { fact } = instantEvalJudgeSpendPricedOf({
       organizationId,
       projectId,
@@ -304,10 +312,9 @@ export class InstantEvalJudgeService {
       occurredAt,
       requests,
       runId,
-      // Instant Evals stays on Instant Preview's rate, routed or not.
-      tier: instantEvalTierOf({ caller: "instant_eval", routed }),
       ...this.pricing(),
-      routed: this.priced(routed),
+      caller: "instant_eval",
+      routed: this.priced(pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens })),
     });
     await this.deps.recordSpendPriced(fact);
   }

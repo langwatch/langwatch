@@ -110,11 +110,13 @@ rate, under the model `langwatch-instant-preview` (older rows carry `langwatch-e
 `jev`). A routed judgement is
 priced from the summed cost of its calls at the same markup, under the model `langwatch-judge`
 and the rate version
-`instant_eval_judge_router@<tier><rate>+<version>x<markup>`. Either cost is the floor of the price, the input tokens at
-the tier's published rate (ADR-174 decision 25). The tier is the product model: Instant Preview (0.30
-USD per million) for Instant Evals runs, pages and judged queries, routed or not, and an unrouted
-LLM-judge call; Evals Preview, the judge router (0.60), for an LLM-judge call it routes
-(`instantEvalTierOf`). A judgement that carries a cost, including 0, is a
+`instant_eval_judge_router@<version>x<markup>`. Published rates apply to rated tokens only
+(ADR-174 decision 25): the row's input tokens read once, its largest paid call, which a routed
+judgement carries when a backend past Jev answered it. Those are priced at the tier's rate (Evals
+Preview, the judge router, 0.60 USD per million for an LLM judge; 0.30 for Instant Evals spend)
+or the cost times the markup when higher, stamped `instant_eval_judge_router@<tier><rate>+...`;
+all other spend stays at the cost times the markup (`pickInstantEvalRatedSpend`). A judgement that
+carries a cost, including 0, is a
 routed one. It also carries `routedInputTokens`, the input tokens its cost covers; a page or run
 costs its routed cost plus its other input tokens at the classifier's rate, so a run that mixes
 routed and unrouted calls is billed correctly. The flag `release_instant_evals_judge_router` gates routing per organization.

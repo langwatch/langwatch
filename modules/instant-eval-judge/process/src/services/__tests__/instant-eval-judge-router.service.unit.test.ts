@@ -1066,3 +1066,65 @@ describe("InstantEvalJudgeRouterService", () => {
     });
   });
 });
+
+describe("given a routed call's rated input tokens (ADR-174 decision 25)", () => {
+  const R = yesNo("r", "did the agent apologise");
+
+  /** @scenario "A routed call no backend past Jev answered is priced at the cost times 1.3" */
+  it("rates nothing when only a Jev backend answered, though the call carries a cost", async () => {
+    // The made-up table sends a scenario judge's short call to decision-b, a Jev backend, alone.
+    const { classify, hostedDecisions } = harness({ jev: () => judged(0.05, 2000) });
+
+    const judgement = await classify({ job: "scenario_judge", tokens: 500 });
+
+    expect(hostedDecisions.requests).toHaveLength(0);
+    expect(judgement.routing).toMatchObject({ answeredBy: { "decision-b": 1 } });
+    expect(judgement.costNanoUsd).toBe(100_000);
+    expect(judgement.ratedInputTokens).toBeUndefined();
+  });
+
+  /** @scenario "A routed call no backend past Jev answered is priced at the cost times 1.3" */
+  it("rates nothing on a kind the table does not route, which only the classifier answers", async () => {
+    const { classify } = harness({ jev: () => judged(0.5, 2000) });
+    const score = rating("s", "how polite");
+
+    const judgement = await classify(SHORT, [score]);
+
+    expect(judgement.costNanoUsd).toBe(100_000);
+    expect(judgement.ratedInputTokens).toBeUndefined();
+  });
+
+  /** @scenario "Only spend a backend past Jev answered has a published rate" */
+  it("rates the row's tokens when a decision model answered", async () => {
+    const { classify } = harness({ decisions: () => judged(0.05, 1000) });
+
+    const judgement = await classify(SHORT);
+
+    expect(judgement.routing).toMatchObject({ answeredBy: { "decision-a": 1 }, escalated: 0 });
+    expect(judgement.ratedInputTokens).toBe(1000);
+  });
+
+  /** @scenario "The published rate applies to the row's input tokens once" */
+  it("rates the row's 2,000 tokens once when two questions escalate, while the legs sum 3,260", async () => {
+    const { classify, llmJudge } = harness({
+      decisions: () => ({
+        verdicts: [
+          { questionId: Q.id, probability: 0.4 },
+          { questionId: R.id, probability: 0.4 },
+        ],
+        inputTokens: 2000,
+        isTextTruncated: false,
+      }),
+      llm: () => ({ outcome: "answered", verdict: true, inputTokens: 630, outputTokens: 100 }),
+    });
+
+    const judgement = await classify(SHORT, [Q, R]);
+
+    expect(llmJudge.requests).toHaveLength(2);
+    expect(judgement.routing).toMatchObject({ escalated: 2 });
+    expect(judgement.inputTokens).toBe(3260);
+    expect(judgement.ratedInputTokens).toBe(2000);
+    // decision-a 2000 x 0.1, then two llm-b calls of 630 x 1 + 100 x 5: every leg is in the cost.
+    expect(judgement.costNanoUsd).toBe(200_000 + 2 * (630_000 + 500_000));
+  });
+});

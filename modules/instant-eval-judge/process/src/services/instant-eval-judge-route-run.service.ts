@@ -58,6 +58,8 @@ export class InstantEvalJudgeRouteRunService {
   private readonly flags: string[] = [];
   private inputTokens = 0;
   private costNanoUsd = 0;
+  /** The most input tokens one paid call read: the row read once, for its published rate. */
+  private largestCallInputTokens = 0;
 
   private constructor(input: {
     deps: InstantEvalJudgeRouteRunDeps;
@@ -417,6 +419,7 @@ export class InstantEvalJudgeRouteRunService {
   }): void {
     if (inputTokens <= 0 && outputTokens <= 0) return;
     this.inputTokens += inputTokens;
+    this.largestCallInputTokens = Math.max(this.largestCallInputTokens, inputTokens);
     const cost = instantEvalJudgeCallCostOf({
       backend,
       inputTokens,
@@ -464,7 +467,19 @@ export class InstantEvalJudgeRouteRunService {
       limiterWaitMs: pick ? Math.max(0, ...waits) : waits.reduce((sum, ms) => sum + ms, 0),
       ...this.spent(),
       routing: this.routing({ answeredBy, escalated }),
+      ...this.rated(answeredBy),
     };
+  }
+
+  /** The row's tokens, read once, when a backend past Jev answered; Jev alone rates nothing. */
+  private rated(answeredBy: Readonly<Record<string, number>>): { ratedInputTokens?: number } {
+    const { backends } = this.deps.table;
+    const isPastJev = Object.keys(answeredBy).some((name) => {
+      const kind = backends[name]?.kind;
+      return kind !== undefined && kind !== "jev";
+    });
+    if (!isPastJev || this.largestCallInputTokens <= 0) return {};
+    return { ratedInputTokens: this.largestCallInputTokens };
   }
 
   private spent() {

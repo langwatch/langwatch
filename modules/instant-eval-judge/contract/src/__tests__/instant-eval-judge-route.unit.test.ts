@@ -265,8 +265,9 @@ describe("spent cost", () => {
     const spent = { inputTokens: 5_000, costNanoUsd: 3_000_000, routedInputTokens: 5_000 };
 
     expect(instantEvalSpentCostUsd(spent)).toBe(0.003);
-    // $0.003 at the 1.3 markup, above 5,000 tokens at Evals Preview's $0.60 per million.
-    expect(instantEvalSpentPriceUsd({ ...spent, tier: "evals" })).toBe(0.0039);
+    // $0.003 at the 1.3 markup, above 5,000 rated tokens at Evals Preview's $0.60 per million.
+    const rated = { tier: "evals", inputTokens: 5_000 } as const;
+    expect(instantEvalSpentPriceUsd({ ...spent, rated })).toBe(0.0039);
   });
 
   /** @scenario "Routed and unrouted tokens are billed separately" */
@@ -287,14 +288,11 @@ describe("spent cost", () => {
       routedInputTokens: 20_000,
     });
     expect(costUsd).toBe(0);
-    expect(
-      instantEvalSpentPriceUsd({
-        inputTokens: 20_000,
-        costNanoUsd: 0,
-        routedInputTokens: 20_000,
-        tier: "instant",
-      }),
-    ).toBe(0.006);
+    const spent = { inputTokens: 20_000, costNanoUsd: 0, routedInputTokens: 20_000 };
+    // Nothing past Jev answered: the cost times 1.3. Something did: its rated tokens at the rate.
+    expect(instantEvalSpentPriceUsd(spent)).toBe(0);
+    const rated = { tier: "instant", inputTokens: 20_000 } as const;
+    expect(instantEvalSpentPriceUsd({ ...spent, rated })).toBe(0.006);
   });
 });
 

@@ -315,6 +315,11 @@ export interface InstantEvalJudgement {
   readonly costNanoUsd?: number;
   /** How a routed judgement was answered; absent when the call was not routed. */
   readonly routing?: InstantEvalJudgeRouting;
+  /**
+   * The row's input tokens, once (its largest paid call), when a backend past Jev answered it: what
+   * a published rate applies to (ADR-174 decision 25). Absent when Jev alone answered.
+   */
+  readonly ratedInputTokens?: number;
 }
 
 /** What the classifier charges, and what the customer is charged. */

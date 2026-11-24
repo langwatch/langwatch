@@ -143,7 +143,7 @@ describe("given a statement a run was accepted for", () => {
     });
 
     /** @scenario "The estimate is priced by the same rule as the run" */
-    it("prices 10,000 rows of 1,070 input tokens at the Instant tier's 0.30 USD per million", async () => {
+    it("prices 10,000 rows of 1,070 input tokens at the cost times 1.3, as an unrouted run", async () => {
       const text = estimateJudgedTextTokens({
         text: "x".repeat(400),
         limits: INSTANT_EVAL_CLASSIFIER_LIMITS,
@@ -164,7 +164,7 @@ describe("given a statement a run was accepted for", () => {
 
       expect(estimate).toMatchObject({ avgTokens: 1070, totalTokens: 10_700_000 });
       expect(estimate.costUsd).toBe(0.4494);
-      expect(estimate.priceUsd).toBe(3.21);
+      expect(estimate.priceUsd).toBe(0.58422);
     });
 
     /** @scenario "The average token count comes from a sample rather than from every row" */

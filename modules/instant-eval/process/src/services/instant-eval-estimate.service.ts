@@ -20,7 +20,6 @@ import {
   type InstantEvalPricing,
   instantEvalCostUsd,
   instantEvalPriceUsd,
-  instantEvalTierOf,
 } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 
@@ -205,12 +204,7 @@ export class InstantEvalEstimateService {
       totalTokens,
       requests: rows,
       costUsd,
-      priceUsd: instantEvalPriceUsd({
-        costUsd,
-        inputTokens: totalTokens,
-        tier: instantEvalTierOf({ caller: "instant_eval", routed: undefined }),
-        pricing: this.judge.pricing,
-      }),
+      priceUsd: instantEvalPriceUsd({ costUsd, pricing: this.judge.pricing }),
     };
   }
 }

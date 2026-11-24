@@ -15,16 +15,18 @@ import {
   INSTANT_EVAL_PRICING,
   InstantEvalJudgeStoppedError,
   instantEvalCostUsd,
-  instantEvalFloorPriceUsd,
+  instantEvalPriceUsd,
+  instantEvalSpentPriceUsd,
 } from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type {
   InstantEvalClassifyRequest,
   InstantEvalJudgeChannel,
 } from "../../channels/instant-eval-judging.channel.ts";
 import { MemoryInstantEvalBudgetReservationsRepository } from "../../repositories/memory/memory.instant-eval-budget-reservations.repository.ts";
+import { InstantEvalCloudJudgeService } from "../instant-eval-cloud-judge.service.ts";
 import { InstantEvalFreeBudgetService } from "../instant-eval-free-budget.service.ts";
 import { InstantEvalJudgeRowsService } from "../instant-eval-judge-rows.service.ts";
 import {
@@ -616,9 +618,7 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
         rows: [{ annoyed: "one" }],
       });
 
-      const ceiling = instantEvalFloorPriceUsd({
-        costUsd: instantEvalCostUsd({ inputTokens: 1_000 }),
-      });
+      const ceiling = instantEvalPriceUsd({ costUsd: instantEvalCostUsd({ inputTokens: 1_000 }) });
       expect(events).toEqual([`reserve ${ceiling} with 0 judged`, "release after 1 recorded"]);
     });
 
@@ -633,11 +633,53 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
         rows: [{ annoyed: "one" }],
       });
 
-      const ceiling = instantEvalFloorPriceUsd({
+      const ceiling = instantEvalPriceUsd({
         costUsd: instantEvalCostUsd({ inputTokens: 1_000, pricing: holdPricing }),
         pricing: holdPricing,
       });
       expect(events[0]).toBe(`reserve ${ceiling} with 0 judged`);
+    });
+
+    /** @scenario "A judged query is held at the dearest rate a route can reach" */
+    it("asks the cloud judge with no route, so a query is never routed", async () => {
+      const judges = {
+        classify: vi.fn(async () => ({ verdicts: [], inputTokens: 0, isTextTruncated: false })),
+      };
+      const cloud = InstantEvalCloudJudgeService.create({ judges });
+
+      await cloud.classify({ projectId: "project-1", text: "user: late again", questions: [] });
+
+      expect(judges.classify).toHaveBeenCalledWith({
+        projectId: "project-1",
+        text: "user: late again",
+        questions: [],
+      });
+    });
+
+    /** @scenario "A judged query is held at the dearest rate a route can reach" */
+    it("never holds less than the query is charged for its whole token budget", async () => {
+      const judge = new ScriptedJudge(async ({ request }) => ({
+        verdicts: request.questions.map((question) => ({
+          questionId: question.id,
+          probability: 1,
+        })),
+        inputTokens: 1_000,
+        isTextTruncated: false,
+      }));
+      const { service, events, priced } = harness({ judge, queryTokenBudget: 1_000 });
+
+      await service.judgeQuery({
+        projectId: "project-1",
+        judgements: [booleanCall("annoyed")],
+        rows: [{ annoyed: "one" }],
+      });
+
+      // The record carries no rated tokens, so the judge charges it the cost times 1.3.
+      expect(priced[0]).not.toHaveProperty("ratedInputTokens");
+      const charged = instantEvalSpentPriceUsd({ ...priced[0]! });
+      const held = Number(events[0]!.split(" ")[1]);
+      expect(charged).toBe(0.0000546);
+      expect(held).toBeGreaterThanOrEqual(charged);
     });
 
     it("keeps the hold when the spend could not be recorded, still answering", async () => {
