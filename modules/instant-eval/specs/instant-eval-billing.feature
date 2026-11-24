@@ -240,6 +240,13 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       And then an alarm is logged and no further report is scheduled
 
     @unit
+    Scenario: A price read that works again clears the failed reads
+      Given an organization whose subscription read failed four times
+      When the next read works and there is nothing to send, held or priced
+      Then the meter's checkpoint counts no failures
+      And a later failed read starts the count from one
+
+    @unit
     Scenario: A pending total is replayed even while the price is missing
       Given a meter event whose send was cut off before it was confirmed
       And a subscription that no longer carries the Instant Evals price

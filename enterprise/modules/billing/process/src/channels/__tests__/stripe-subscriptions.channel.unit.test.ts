@@ -360,6 +360,37 @@ describe("Billing's subscription shapes over the provider", () => {
     ]);
   });
 
+  /** @scenario "A re-priced Instant Evals line is still recognised" */
+  it("reads the langwatchKey metadata spelling the price sync also accepts", async () => {
+    const stripe = stripeDouble({
+      subscriptions: {
+        retrieve: async () => ({
+          ...ACTIVE,
+          items: {
+            data: [
+              {
+                id: "si_instant",
+                price: {
+                  id: "price_instant_v3",
+                  unit_amount: null,
+                  recurring: { interval: "month" },
+                  lookup_key: null,
+                  metadata: { langwatchKey: "GROWTH_INSTANT_EVAL_USD" },
+                },
+              },
+            ],
+          },
+        }),
+      },
+    });
+
+    const subscription = await HttpStripeSubscriptionsChannel.create({ stripe }).getSubscription({
+      subscriptionId: "sub_1",
+    });
+
+    expect(subscription.items[0]).toMatchObject({ langwatchKey: "GROWTH_INSTANT_EVAL_USD" });
+  });
+
   it("sends a seat change and a billing threshold as Stripe's update parameters and timeout", async () => {
     const { calls, subscriptions } = recordingProvider();
 

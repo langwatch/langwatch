@@ -871,6 +871,39 @@ describe("ReportUsageForMonthCommand", () => {
     });
   });
 
+  describe("given four failed price reads and then a read that succeeds", () => {
+    /** @scenario "A price read that works again clears the failed reads" */
+    it.each([
+      { case: "priced with nothing new to send", priced: true },
+      { case: "held without a line", priced: false },
+    ])("clears the failures when the read is $case", async ({ priced }) => {
+      const store = MemoryBillingStore.create();
+      const checkpoints = MemoryBillingCheckpointRepository.create(store);
+      let instantReads = 0;
+      mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
+        if (price !== "GROWTH_INSTANT_EVAL_USD") return true;
+        instantReads += 1;
+        if (instantReads <= 4) throw new Error("Stripe unavailable");
+        return priced;
+      });
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "counted", total: 0 });
+      const handler = await createHandler({ billingCheckpoints: checkpoints });
+
+      for (let run = 0; run < 5; run++) await handler.handle(makeCommand());
+
+      expect(instantReads).toBe(5);
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(
+        await checkpoints.findCheckpoint({
+          organizationId: "org-1",
+          billingMonth: "2026-02",
+          meter: "langwatch_instant_eval_usd",
+        }),
+      ).toMatchObject({ lastReportedTotal: 0, pendingReportedTotal: null, consecutiveFailures: 0 });
+    });
+  });
+
   describe("given the Instant Eval checkpoint reported 1.0000 dollars and the month is now 1.5000", () => {
     /** @scenario "A second report sends only the delta since the checkpoint" */
     it("sends 0.5000 under an identifier naming the meter, the month and both totals", async () => {

@@ -193,9 +193,7 @@ function subscriptionOf(subscription: Stripe.Subscription): BillingSubscription 
       interval: item.price.recurring?.interval ?? null,
       quantity: item.quantity ?? null,
       ...(item.price.lookup_key ? { lookupKey: item.price.lookup_key } : {}),
-      ...(item.price.metadata?.langwatch_key
-        ? { langwatchKey: item.price.metadata.langwatch_key }
-        : {}),
+      ...langwatchKeyOf(item.price.metadata),
     })),
     currentPeriodEnd: subscription.current_period_end,
     currency: subscription.currency,
@@ -238,4 +236,10 @@ function updateParamsOf(change: BillingSubscriptionChange): Stripe.SubscriptionU
     };
   }
   return params;
+}
+
+/** Both metadata spellings the price sync accepts (stripe-prices-sync.task.ts). */
+function langwatchKeyOf(metadata: Stripe.Metadata | null | undefined): { langwatchKey?: string } {
+  const key = metadata?.langwatch_key ?? metadata?.langwatchKey;
+  return key ? { langwatchKey: key } : {};
 }

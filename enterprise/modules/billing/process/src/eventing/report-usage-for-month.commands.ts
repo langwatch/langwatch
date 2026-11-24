@@ -452,7 +452,31 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
     } else {
       logger.debug(fields, "subscription has no price for this meter and nothing to hold");
     }
+    await this.clearReadFailures(input);
     return "held";
+  }
+
+  /** A read that worked and sent nothing ends a run of failed reads, so they stay consecutive. */
+  private async clearReadFailures({
+    meter,
+    organizationId,
+    billingMonth,
+    lastReportedTotal,
+    consecutiveFailures,
+  }: {
+    meter: BillingMeter;
+    organizationId: string;
+    billingMonth: string;
+    lastReportedTotal: number;
+    consecutiveFailures: number;
+  }): Promise<void> {
+    if (consecutiveFailures === 0) return;
+    await this.deps.billingCheckpoints.confirm({
+      organizationId,
+      billingMonth,
+      meter: meter.eventName,
+      lastReportedTotal,
+    });
   }
 
   private async recordPriceReadFailure({
@@ -771,6 +795,13 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         },
         "no change in billable events, skipping",
       );
+      await this.clearReadFailures({
+        meter,
+        organizationId,
+        billingMonth,
+        lastReportedTotal,
+        consecutiveFailures: checkpoint?.consecutiveFailures ?? 0,
+      });
       if (cursor !== undefined) {
         await this.deps.billingCheckpoints.recordCountedEvent({
           organizationId,
