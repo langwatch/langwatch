@@ -36,7 +36,7 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
 import { LLMModelDisplay } from "../llm-model-display.tsx";
 import { ModelSelector } from "../model-selector.tsx";
 
-const BUILT_IN = { value: "langwatch/instant-preview", label: "Instant Preview" };
+const BUILT_IN = { value: "langwatch/instant-preview", label: "LangWatch Instant (preview)" };
 const OWN_DECISION_BUILT_IN = {
   value: "openai/decisions:gpt-6-luna",
   label: "gpt-6-luna",
@@ -78,7 +78,7 @@ describe("<ModelSelector/>", () => {
         );
 
         const listbox = screen.getByRole("listbox", { hidden: true });
-        expect(within(listbox).getByText("Instant Preview")).toBeInTheDocument();
+        expect(within(listbox).getByText("LangWatch Instant (preview)")).toBeInTheDocument();
         expect(screen.queryByTestId("no-models-configured-callout")).not.toBeInTheDocument();
       });
     });
@@ -221,7 +221,7 @@ describe("<LLMModelDisplay/>", () => {
         <LLMModelDisplay model="langwatch/instant-preview" builtInModels={[BUILT_IN]} />,
       );
 
-      expect(await screen.findByText("Instant Preview")).toBeInTheDocument();
+      expect(await screen.findByText("LangWatch Instant (preview)")).toBeInTheDocument();
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
     });
   });
@@ -232,47 +232,47 @@ describe("<LLMModelDisplay/>", () => {
         <LLMModelDisplay model="langwatch/instant-evals" builtInModels={[BUILT_IN]} />,
       );
 
-      expect(await screen.findByText("Instant Preview")).toBeInTheDocument();
+      expect(await screen.findByText("LangWatch Instant (preview)")).toBeInTheDocument();
       expect(screen.queryByText("langwatch/instant-evals")).not.toBeInTheDocument();
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
     });
   });
 
   describe("given the judge picker's one hosted model on the written id", () => {
-    const ROUTER_OFF = [{ value: "langwatch/instant-evals", label: "Instant Preview" }];
+    const ROUTER_OFF = [{ value: "langwatch/instant-evals", label: "LangWatch Instant (preview)" }];
     const ROUTER_ON = [
-      { value: "langwatch/instant-evals", label: "Evals Preview" },
-      { value: "langwatch/instant-preview", label: "Instant Preview" },
+      { value: "langwatch/instant-evals", label: "LangWatch Evals (preview)" },
+      { value: "langwatch/instant-preview", label: "LangWatch Instant (preview)" },
     ];
 
-    /** @scenario "A judge stored with the earlier id shows as Instant Preview where routing is off" */
-    it("names a judge on langwatch/instant-evals Instant Preview with the router flag off", async () => {
+    /** @scenario "A judge stored with the earlier id shows as LangWatch Instant (preview) where routing is off" */
+    it("names a judge on langwatch/instant-evals LangWatch Instant (preview) with the router flag off", async () => {
       renderWithDesignSystem(
         <LLMModelDisplay model="langwatch/instant-evals" builtInModels={ROUTER_OFF} />,
       );
 
-      expect(await screen.findByText("Instant Preview")).toBeInTheDocument();
+      expect(await screen.findByText("LangWatch Instant (preview)")).toBeInTheDocument();
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
     });
 
-    /** @scenario "A judge saved on the old id shows Evals Preview where routing is on" */
-    it("names a judge on langwatch/instant-evals Evals Preview with the router flag on", async () => {
+    /** @scenario "A judge saved on the old id shows LangWatch Evals (preview) where routing is on" */
+    it("names a judge on langwatch/instant-evals LangWatch Evals (preview) with the router flag on", async () => {
       renderWithDesignSystem(
         <LLMModelDisplay model="langwatch/instant-evals" builtInModels={ROUTER_ON} />,
       );
 
-      expect(await screen.findByText("Evals Preview")).toBeInTheDocument();
+      expect(await screen.findByText("LangWatch Evals (preview)")).toBeInTheDocument();
       expect(screen.queryByText(/Update needed/i)).not.toBeInTheDocument();
     });
 
-    /** @scenario "A judge on Instant Preview's id keeps its name where routing is on" */
-    it("names a judge on langwatch/instant-preview Instant Preview with the router flag on", async () => {
+    /** @scenario "A judge on the LangWatch Instant (preview) id keeps its name where routing is on" */
+    it("names a judge on langwatch/instant-preview LangWatch Instant (preview) with the router flag on", async () => {
       renderWithDesignSystem(
         <LLMModelDisplay model="langwatch/instant-preview" builtInModels={ROUTER_ON} />,
       );
 
-      expect(await screen.findByText("Instant Preview")).toBeInTheDocument();
-      expect(screen.queryByText("Evals Preview")).not.toBeInTheDocument();
+      expect(await screen.findByText("LangWatch Instant (preview)")).toBeInTheDocument();
+      expect(screen.queryByText("LangWatch Evals (preview)")).not.toBeInTheDocument();
     });
   });
 

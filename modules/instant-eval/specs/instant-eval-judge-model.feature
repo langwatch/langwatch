@@ -545,8 +545,8 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
   Rule: The picker offers Instant Evals only when the server releases the project
 
     # "Instant Evals" in the picker is LangWatch's hosted model, saved as langwatch/instant-evals
-    # and named by the judge router flag, which the picker reads: "Evals Preview" where it is on,
-    # "Instant Preview" where it is off. Only Boolean, Score and Category judges are offered it.
+    # and named by the judge router flag, which the picker reads: "LangWatch Evals (preview)" where it is on,
+    # "LangWatch Instant (preview)" where it is off. Only Boolean, Score and Category judges are offered it.
     # Naming scenarios: specs/model-providers/instant-evals-decision-model.feature.
 
     @integration

@@ -85,7 +85,8 @@ export const EvaluatorLLMConfigField = ({
   // Any hosted id shows as the one the picker offers; the stored value changes only on a pick.
   const judgeModel = judgeShownModelIdOf({ id: llmConfig.model, isJudgeRouted });
   const shownConfig: LLMConfig = { ...llmConfig, model: judgeModel };
-  // A judge that holds Instant Preview's own id where the flag is on finds its row in the picker.
+  // A judge that holds the LangWatch Instant (preview) id where the flag is on finds its row in the
+  // picker.
   const popoverModels = judgeModel === LANGWATCH_DECISION_MODEL_ID ? shownModels : builtInModels;
   // Handle changes from LLMConfigPopover — write all keys back to form.
   // We iterate over LLM_CONFIG_KEYS (not just newConfig entries) so that

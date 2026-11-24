@@ -25,8 +25,8 @@ export const DECISION_MODEL_DISPLAY_NAMES: Readonly<Record<string, string>> = Ob
 const HOSTED_ONE_SWITCH_AWAY: ReadonlySet<string> = new Set(["enable", "ask_admin"]);
 
 /**
- * Whether the column may offer Instant Preview: released, or one switch away. Not answered yet
- * counts as offered, so a released organization never sees it flicker to "Not set".
+ * Whether the column may offer LangWatch Instant (preview): released, or one switch away. Not
+ * answered yet counts as offered, so a released organization never sees it flicker to "Not set".
  */
 export function isHostedDecisionModelOffered(
   access: { hostedReleased: boolean; offer: string } | undefined,
@@ -45,8 +45,8 @@ const COMING_SOON_HINT = "Coming soon";
 
 /**
  * LangWatch's decision models in the Instant Evals picker: pickable where they fill the column,
- * else coming soon, shown only with the judge router flag (ADR-190). Never Evals Preview: only an
- * LLM judge picks it, and nothing the column feeds is routed.
+ * else coming soon, shown only with the judge router flag (ADR-190). Never LangWatch Evals
+ * (preview): only an LLM judge picks it, and nothing the column feeds is routed.
  */
 function langwatchDecisionOptions({
   isJudgeRouted,

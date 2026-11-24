@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- * The Instant Evals column lists decision models in one flat list, Instant Preview first; only the
- * ones the server says would run from the picked scopes can be picked (ADR-182).
+ * The Instant Evals column lists decision models in one flat list, LangWatch Instant (preview)
+ * first; only the ones the server says would run from the picked scopes can be picked (ADR-182).
  * Binds specs/model-providers/instant-evals-decision-model.feature.
  */
 import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
@@ -94,7 +94,7 @@ const PAYLOAD = {
 
 const OWN_MODEL_FLAG = "release_instant_evals_own_decision_model";
 const JUDGE_ROUTER_FLAG = "release_instant_evals_judge_router";
-const HOSTED = { value: "langwatch/instant-preview", label: "Instant Preview" };
+const HOSTED = { value: "langwatch/instant-preview", label: "LangWatch Instant (preview)" };
 const OPENAI_DECISIONS = {
   value: "openai/decisions:gpt-6-luna",
   label: "OpenAI Decisions",
@@ -152,28 +152,28 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
 
   describe("given own decision models are off for the organization", () => {
     /** @scenario "The drawer offers only decision models for the Instant Evals column" */
-    it("offers only Instant Preview, never a chat model, an own model or an add-a-key hint", () => {
+    it("offers only LangWatch Instant (preview), never a chat model, an own model or an add-a-key hint", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const options = pickable(instantEvalsOptions());
       expect(options).toHaveLength(1);
-      expect(options[0]).toHaveTextContent("Instant Preview");
+      expect(options[0]).toHaveTextContent("LangWatch Instant (preview)");
       const listbox = instantEvalsListbox();
       expect(within(listbox).queryByText(/gpt-5\.5/)).not.toBeInTheDocument();
       expect(within(listbox).queryByText("Inception Mercury Decide")).not.toBeInTheDocument();
       expect(within(listbox).queryByText(/key in Model Providers/)).not.toBeInTheDocument();
     });
 
-    it("reads Instant Preview as the value when nothing is set", () => {
+    it("reads LangWatch Instant (preview) as the value when nothing is set", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
-      expect(trigger).toHaveTextContent("Instant Preview");
+      expect(trigger).toHaveTextContent("LangWatch Instant (preview)");
       expect(trigger).not.toHaveTextContent("Not configured");
     });
   });
 
-  describe("given Instant Preview is neither released nor one switch away", () => {
+  describe("given LangWatch Instant (preview) is neither released nor one switch away", () => {
     beforeEach(() => {
       flagsOn.add(OWN_MODEL_FLAG);
       mockInstantEvalAccess.mockReturnValue({
@@ -186,28 +186,28 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       });
     });
 
-    /** @scenario "Without Instant Preview, the drawer offers only the project's own decision models" */
-    it("never lists Instant Preview and offers the own decision model that would run", () => {
+    /** @scenario "Without LangWatch Instant (preview), the drawer offers only the project's own decision models" */
+    it("never lists LangWatch Instant (preview) and offers the own decision model that would run", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const listbox = instantEvalsListbox();
-      expect(within(listbox).queryByText("Instant Preview")).not.toBeInTheDocument();
+      expect(within(listbox).queryByText("LangWatch Instant (preview)")).not.toBeInTheDocument();
       expect(pickable(instantEvalsOptions()).map((option) => option.textContent)).toEqual([
         expect.stringContaining("Decisions API"),
       ]);
     });
 
-    /** @scenario "Without Instant Preview, the drawer offers only the project's own decision models" */
+    /** @scenario "Without LangWatch Instant (preview), the drawer offers only the project's own decision models" */
     it("reads Not set as the value when nothing is set", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
       expect(trigger).toHaveTextContent("Not set");
-      expect(trigger).not.toHaveTextContent("Instant Preview");
+      expect(trigger).not.toHaveTextContent("LangWatch Instant (preview)");
     });
 
-    /** @scenario "Without Instant Preview, a config that pinned it reads Not set in the drawer" */
-    it("reads Not set when the config row pinned Instant Preview before", () => {
+    /** @scenario "Without LangWatch Instant (preview), a config that pinned it reads Not set in the drawer" */
+    it("reads Not set when the config row pinned LangWatch Instant (preview) before", () => {
       const pinned = { ...CONFIG_ROW, config: { INSTANT_EVALS: HOSTED.value } };
       mockGetDefaultModels.mockReturnValue({
         data: { ...PAYLOAD, configs: [pinned] },
@@ -217,7 +217,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
 
       const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
       expect(trigger).toHaveTextContent("Not set");
-      expect(trigger).not.toHaveTextContent("Instant Preview");
+      expect(trigger).not.toHaveTextContent("LangWatch Instant (preview)");
     });
   });
 
@@ -236,13 +236,13 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
 
       const titles = pickable(instantEvalsOptions()).map((option) => option.textContent ?? "");
       expect(titles).toHaveLength(2);
-      expect(titles[0]).toContain("Instant Preview");
+      expect(titles[0]).toContain("LangWatch Instant (preview)");
       expect(titles[1]).toContain("Decisions API");
       expect(optionTitled("Inception Mercury Decide")).toHaveAttribute("aria-disabled", "true");
     });
 
     /** @scenario "The decision model picker is one flat list with LangWatch's models first" */
-    it("lists Instant Preview first and checked, with no heading or Default row, every row described", () => {
+    it("lists LangWatch Instant (preview) first and checked, with no heading or Default row, every row described", () => {
       flagsOn.add(JUDGE_ROUTER_FLAG);
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
@@ -252,10 +252,12 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
         within(listbox).queryByTestId("provider-model-selector-inherit"),
       ).not.toBeInTheDocument();
       const options = instantEvalsOptions();
-      expect(options[0]).toHaveTextContent("Instant Preview");
+      expect(options[0]).toHaveTextContent("LangWatch Instant (preview)");
       expect(options[0]).toHaveAttribute("aria-selected", "true");
-      expect(options[1]).toHaveTextContent("Judge Preview");
-      expect(options.some((option) => option.textContent?.includes("Evals Preview"))).toBe(false);
+      expect(options[1]).toHaveTextContent("LangWatch Judge (preview)");
+      expect(
+        options.some((option) => option.textContent?.includes("LangWatch Evals (preview)")),
+      ).toBe(false);
       expect(options[1]).toHaveAttribute("aria-disabled", "true");
       expect(options[1]).toHaveTextContent("Coming soon");
       expect(options[0]).toHaveTextContent("Optimized for search and quick classification");
@@ -269,9 +271,9 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const listbox = instantEvalsListbox();
-      expect(within(listbox).getByText("Instant Preview")).toBeInTheDocument();
-      expect(within(listbox).queryByText("Judge Preview")).not.toBeInTheDocument();
-      expect(within(listbox).queryByText("Evals Preview")).not.toBeInTheDocument();
+      expect(within(listbox).getByText("LangWatch Instant (preview)")).toBeInTheDocument();
+      expect(within(listbox).queryByText("LangWatch Judge (preview)")).not.toBeInTheDocument();
+      expect(within(listbox).queryByText("LangWatch Evals (preview)")).not.toBeInTheDocument();
     });
 
     it("asks the own decision model flag of the organization, never the project", () => {
@@ -304,13 +306,13 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       mockSave.mockResolvedValue({ id: "cfg_1" });
     });
 
-    /** @scenario "Picking Instant Preview stores it, so a wider scope cannot take the column over" */
-    it("stores Instant Preview when it is picked, as the config's only value", async () => {
+    /** @scenario "Picking LangWatch Instant (preview) stores it, so a wider scope cannot take the column over" */
+    it("stores LangWatch Instant (preview) when it is picked, as the config's only value", async () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
       await userEvent.setup().click(trigger);
-      await userEvent.setup().click(optionTitled("Instant Preview"));
+      await userEvent.setup().click(optionTitled("LangWatch Instant (preview)"));
       fireEvent.click(screen.getByTestId("config-save"));
 
       await vi.waitFor(() => expect(mockSave).toHaveBeenCalled());
@@ -319,7 +321,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
     });
   });
 
-  describe("given a config row that pins Instant Preview", () => {
+  describe("given a config row that pins LangWatch Instant (preview)", () => {
     beforeEach(() => {
       mockGetDefaultModels.mockReturnValue({
         data: { ...PAYLOAD, configs: [{ ...CONFIG_ROW, config: { INSTANT_EVALS: HOSTED.value } }] },
@@ -363,33 +365,33 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       });
     });
 
-    /** @scenario "Default models names the written id Instant Preview" */
-    it("reads Instant Preview, checked, in the role row", () => {
+    /** @scenario "Default models names the written id LangWatch Instant (preview)" */
+    it("reads LangWatch Instant (preview), checked, in the role row", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
       const trigger = within(screen.getByTestId("role-row-instant_evals")).getByRole("combobox");
-      expect(trigger).toHaveTextContent("Instant Preview");
+      expect(trigger).toHaveTextContent("LangWatch Instant (preview)");
       expect(trigger).not.toHaveTextContent("instant-evals");
-      expect(optionTitled("Instant Preview")).toHaveAttribute("aria-selected", "true");
+      expect(optionTitled("LangWatch Instant (preview)")).toHaveAttribute("aria-selected", "true");
     });
 
-    /** @scenario "Default models names the written id Instant Preview" */
-    it("reads Instant Preview, checked, in the instant_eval.judge feature row", () => {
+    /** @scenario "Default models names the written id LangWatch Instant (preview)" */
+    it("reads LangWatch Instant (preview), checked, in the instant_eval.judge feature row", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
       fireEvent.click(screen.getByTestId("role-row-instant_evals-expand"));
 
       const trigger = within(screen.getByTestId("feature-row-instant_eval.judge")).getByRole(
         "combobox",
       );
-      expect(trigger).toHaveTextContent("Instant Preview");
+      expect(trigger).toHaveTextContent("LangWatch Instant (preview)");
       expect(trigger).not.toHaveTextContent("instant-evals");
       const listbox = document.getElementById(trigger.getAttribute("aria-controls") ?? "");
       if (!listbox) throw new Error("no listbox for the Instant Evals feature row");
-      // The inherit entry beside it names the role's value, Instant Preview too.
+      // The inherit entry beside it names the role's value, LangWatch Instant (preview) too.
       const hosted = within(listbox)
         .getAllByRole("option", { hidden: true })
         .filter((option) => option.dataset.testid !== "provider-model-selector-inherit")
-        .filter((option) => within(option).queryByText("Instant Preview"));
+        .filter((option) => within(option).queryByText("LangWatch Instant (preview)"));
       expect(hosted).toHaveLength(1);
       expect(hosted[0]).toHaveAttribute("aria-selected", "true");
       expect(listbox).not.toHaveTextContent("instant-evals");
@@ -414,15 +416,15 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       });
     });
 
-    /** @scenario "The Instant Evals feature picker lists Instant Preview once, with no Default row" */
-    it("shows Instant Preview checked, with no Default row beside it", () => {
+    /** @scenario "The Instant Evals feature picker lists LangWatch Instant (preview) once, with no Default row" */
+    it("shows LangWatch Instant (preview) checked, with no Default row beside it", () => {
       renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
       fireEvent.click(screen.getByTestId("role-row-instant_evals-expand"));
 
       const trigger = within(screen.getByTestId("feature-row-instant_eval.judge")).getByRole(
         "combobox",
       );
-      expect(trigger).toHaveTextContent("Instant Preview");
+      expect(trigger).toHaveTextContent("LangWatch Instant (preview)");
       const listbox = document.getElementById(trigger.getAttribute("aria-controls") ?? "");
       if (!listbox) throw new Error("no listbox for the Instant Evals feature row");
       expect(
@@ -430,7 +432,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       ).not.toBeInTheDocument();
       const hosted = within(listbox)
         .getAllByRole("option", { hidden: true })
-        .filter((option) => within(option).queryByText("Instant Preview"));
+        .filter((option) => within(option).queryByText("LangWatch Instant (preview)"));
       expect(hosted).toHaveLength(1);
       expect(hosted[0]).toHaveAttribute("aria-selected", "true");
     });
@@ -476,7 +478,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       expect(options).toMatchObject({ enabled: true });
     });
 
-    it("asks nothing and offers only Instant Preview with no scope picked", () => {
+    it("asks nothing and offers only LangWatch Instant (preview) with no scope picked", () => {
       mockListDecisionModels.mockReturnValue({ data: undefined, isLoading: false });
       renderWithModelProviderHost(<DefaultModelOverrideDrawer />);
 
@@ -485,7 +487,7 @@ describe("<DefaultModelOverrideDrawer/> Instant Evals column", () => {
       expect(options).toMatchObject({ enabled: false });
       const offered = pickable(instantEvalsOptions());
       expect(offered).toHaveLength(1);
-      expect(offered[0]).toHaveTextContent("Instant Preview");
+      expect(offered[0]).toHaveTextContent("LangWatch Instant (preview)");
     });
   });
 });

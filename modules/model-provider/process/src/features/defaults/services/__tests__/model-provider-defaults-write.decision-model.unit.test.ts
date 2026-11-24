@@ -182,7 +182,7 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
     );
 
     /** @scenario "Saving a config stores LangWatch's model under the id the previous release reads" */
-    it("stores Instant Preview set as one default under the earlier id", async () => {
+    it("stores LangWatch Instant (preview) set as one default under the earlier id", async () => {
       const { defaults } = MemoryModelProviderRepositories.create();
       const writer = await writerOver({ isFlagOn: false, defaults });
 
@@ -197,8 +197,8 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
       expect(stored?.config).toEqual({ INSTANT_EVALS: "langwatch/instant-evals" });
     });
 
-    /** @scenario "The Instant Evals column refuses Evals Preview" */
-    it("refuses Evals Preview in the column on a save and on a single set", async () => {
+    /** @scenario "The Instant Evals column refuses LangWatch Evals (preview)" */
+    it("refuses LangWatch Evals (preview) in the column on a save and on a single set", async () => {
       const writer = await writerOver({ isFlagOn: false });
 
       await expect(

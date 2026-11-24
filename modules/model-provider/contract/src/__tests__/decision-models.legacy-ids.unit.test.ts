@@ -24,23 +24,23 @@ import {
 } from "../catalog/decision-models.ts";
 
 describe("LangWatch model ids", () => {
-  /** @scenario "Picking Instant Preview by its id finds the hosted model" */
-  it("finds the hosted Instant Preview by langwatch/instant-preview", () => {
+  /** @scenario "Picking LangWatch Instant (preview) by its id finds the hosted model" */
+  it("finds the hosted LangWatch Instant (preview) by langwatch/instant-preview", () => {
     expect(LANGWATCH_DECISION_MODEL_ID).toBe("langwatch/instant-preview");
     expect(findDecisionModel("langwatch/instant-preview")).toMatchObject({
       id: "langwatch/instant-preview",
-      label: "Instant Preview",
+      label: "LangWatch Instant (preview)",
       provider: "langwatch",
     });
     expect(isOwnDecisionModelId("langwatch/instant-preview")).toBe(false);
   });
 
-  /** @scenario "Picking Evals Preview by its id finds the hosted judge router" */
-  it("finds the hosted Evals Preview by langwatch/evals-preview", () => {
+  /** @scenario "Picking LangWatch Evals (preview) by its id finds the hosted judge router" */
+  it("finds the hosted LangWatch Evals (preview) by langwatch/evals-preview", () => {
     expect(LANGWATCH_EVALS_MODEL_ID).toBe("langwatch/evals-preview");
     expect(findDecisionModel("langwatch/evals-preview")).toMatchObject({
       id: "langwatch/evals-preview",
-      label: "Evals Preview",
+      label: "LangWatch Evals (preview)",
       description: "Optimized for evals",
       provider: "langwatch",
     });
@@ -82,14 +82,14 @@ describe("LangWatch model ids", () => {
     expect(writtenModelId("openai/gpt-5.4-mini")).toBe("openai/gpt-5.4-mini");
   });
 
-  /** @scenario "A judge saved on the old id shows Evals Preview where routing is on" */
-  it("shows a routed judge on either routed id as the written id the picker names Evals Preview", () => {
+  /** @scenario "A judge saved on the old id shows LangWatch Evals (preview) where routing is on" */
+  it("shows a routed judge on either routed id as the written id the picker names LangWatch Evals (preview)", () => {
     for (const id of ["langwatch/instant-evals", "langwatch/evals-preview"]) {
       expect(judgeShownModelIdOf({ id, isJudgeRouted: true })).toBe("langwatch/instant-evals");
     }
   });
 
-  /** @scenario "A judge on Evals Preview's id shows as Instant Preview where routing is off" */
+  /** @scenario "A judge on the LangWatch Evals (preview) id shows as LangWatch Instant (preview) where routing is off" */
   it("shows every hosted id as the written id where routing is off", () => {
     for (const id of [
       "langwatch/instant-evals",
@@ -100,8 +100,8 @@ describe("LangWatch model ids", () => {
     }
   });
 
-  /** @scenario "A judge on Instant Preview's id keeps its name where routing is on" */
-  it("keeps Instant Preview's own id where routing is on, and leaves own models as they are", () => {
+  /** @scenario "A judge on the LangWatch Instant (preview) id keeps its name where routing is on" */
+  it("keeps the LangWatch Instant (preview) id where routing is on, and leaves own models as they are", () => {
     expect(judgeShownModelIdOf({ id: "langwatch/instant-preview", isJudgeRouted: true })).toBe(
       "langwatch/instant-preview",
     );
@@ -110,8 +110,8 @@ describe("LangWatch model ids", () => {
     );
   });
 
-  /** @scenario "The Instant Evals column refuses Evals Preview" */
-  it("refuses Evals Preview for the column and its feature, allows the rest", () => {
+  /** @scenario "The Instant Evals column refuses LangWatch Evals (preview)" */
+  it("refuses LangWatch Evals (preview) for the column and its feature, allows the rest", () => {
     expect(isModelAllowedAsRoleDefault("langwatch/evals-preview", "INSTANT_EVALS")).toBe(false);
     expect(
       isModelAllowedForFeature({
@@ -147,9 +147,9 @@ describe("LangWatch model ids", () => {
     ]);
     expect(ids.filter((id) => Object.hasOwn(LEGACY_LANGWATCH_MODEL_IDS, id))).toEqual([]);
     expect(LANGWATCH_DECISION_PREVIEWS.map((preview) => preview.label)).toEqual([
-      "Instant Preview",
-      "Evals Preview",
-      "Judge Preview",
+      "LangWatch Instant (preview)",
+      "LangWatch Evals (preview)",
+      "LangWatch Judge (preview)",
     ]);
   });
 });

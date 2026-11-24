@@ -64,7 +64,7 @@ const ROLE_BLURB: Record<ModelRole, string> = {
   LANGY: "The model Langy chats and works with.",
   EMBEDDINGS: "Semantic vectors used by topic clustering and similar features.",
   INSTANT_EVALS:
-    "The decision model Instant Evals answer with. LangWatch Instant Preview unless you pick your own.",
+    "The decision model Instant Evals answer with. LangWatch Instant (preview) unless you pick your own.",
   JUDGE: "The model scenario runs judge with. Uses the Default model unless you pick one.",
 };
 
@@ -809,7 +809,7 @@ function FeatureRow({
 export type InheritOptionShape = {
   model?: string;
   label: string;
-  /** The model an unset role runs on; the picker lists it (Instant Evals: Instant Preview). */
+  /** The model an unset role runs on, listed by the picker (Instant Evals: LangWatch Instant). */
   isUnsetDefault?: boolean;
 };
 
@@ -850,7 +850,7 @@ export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | un
 /**
  * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With no cascade hit it
  * reads "Not configured" with no model attached, so an edit can clear a pinned key back to
- * inherit; Instant Evals falls back to Instant Preview, or "Not set" where it is not offered.
+ * inherit; Instant Evals falls back to LangWatch Instant (preview), or "Not set" if not offered.
  */
 export function buildInheritOption(
   entry: InheritedEntry,
@@ -879,7 +879,7 @@ export function roleInheritOption({
   role: ModelRole;
   inherited: Record<string, InheritedEntry>;
   config: Record<string, string>;
-  /** Whether Instant Preview may be offered; if not, the unset column reads "Not set". */
+  /** Whether LangWatch Instant (preview) may be offered; if not, unset reads "Not set". */
   isHostedOffered?: boolean;
 }): InheritOptionShape {
   const own = inheritHitOption(inherited[role] ?? null);

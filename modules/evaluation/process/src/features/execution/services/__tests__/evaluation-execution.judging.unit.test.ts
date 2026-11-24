@@ -488,8 +488,8 @@ describe("EvaluationExecutionService with the judge router", () => {
       mappings: null,
     });
 
-  describe("given the router flag is on and the judge runs on LangWatch Evals Preview", () => {
-    /** @scenario "An LLM judge on LangWatch Evals Preview is routed when the flag is on" */
+  describe("given the router flag is on and the judge runs on LangWatch Evals (preview)", () => {
+    /** @scenario "An LLM judge on LangWatch Evals (preview) is routed when the flag is on" */
     it("sends the llm_judge route with the judge call", async () => {
       const { service, calls, isRouted } = buildService({ isRouted: true });
 
@@ -501,8 +501,8 @@ describe("EvaluationExecutionService with the judge router", () => {
     });
   });
 
-  describe("given the router flag is on and the judge runs on LangWatch Instant Preview", () => {
-    /** @scenario "An LLM judge on LangWatch Instant Preview is never routed" */
+  describe("given the router flag is on and the judge runs on LangWatch Instant (preview)", () => {
+    /** @scenario "An LLM judge on LangWatch Instant (preview) is never routed" */
     it("sends no route and never reads the flag", async () => {
       const { service, calls, isRouted } = buildService({ isRouted: true });
 
@@ -561,8 +561,8 @@ describe("EvaluationExecutionService with the judge router", () => {
 });
 
 describe("EvaluationExecutionService for an organization LangWatch switched its hosted model off for", () => {
-  describe("given a judge on Instant Evals in a project whose column is Instant Preview", () => {
-    /** @scenario "An LLM judge on Instant Preview is an error for an organization with hosted switched off" */
+  describe("given a judge on Instant Evals in a project whose column is LangWatch Instant (preview)", () => {
+    /** @scenario "An LLM judge on LangWatch Instant (preview) is an error for an organization with hosted switched off" */
     it("is an error saying no decision model is set up, and the judge is never called", async () => {
       const { service, judge, isRouted, isHostedOff } = buildService({
         isHostedOff: true,

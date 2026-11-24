@@ -80,7 +80,10 @@ export function instantEvalJudgeOf({
   }
 }
 
-/** An own model is carried for the resolver; Evals Preview only marks the judge as routable. */
+/**
+ * An own model is carried for the resolver; LangWatch Evals (preview) only marks the judge as
+ * routable.
+ */
 function pickOf(model: string): { decisionModel?: string; isRoutable?: true } {
   if (isOwnDecisionModelId(model)) return { decisionModel: model };
   if (isJudgeRoutedModelId(model)) return { isRoutable: true };

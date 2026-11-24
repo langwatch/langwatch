@@ -23,20 +23,23 @@ import { evaluatorApi } from "./evaluator-api.ts";
 /** LangWatch's hosted judge where the router flag is off: the decision model alone. */
 export const INSTANT_EVALS_BUILT_IN_MODEL: BuiltInModel = {
   value: INSTANT_EVAL_JUDGE_MODEL_ID,
-  label: "Instant Preview",
+  label: "LangWatch Instant (preview)",
 };
 
 /** The same saved id where the router flag is on: the judge router answers it (ADR-190). */
 export const EVALS_PREVIEW_BUILT_IN_MODEL: BuiltInModel = {
   value: INSTANT_EVAL_JUDGE_MODEL_ID,
-  label: "Evals Preview",
+  label: "LangWatch Evals (preview)",
   description: findDecisionModel(LANGWATCH_EVALS_MODEL_ID)?.description,
 };
 
-/** A judge saved on Instant Preview's own id where the flag is on is never routed; named only. */
+/**
+ * A judge saved on the LangWatch Instant (preview) id where the flag is on is never routed; named
+ * only.
+ */
 const INSTANT_PREVIEW_SHOWN: BuiltInModel = {
   value: LANGWATCH_DECISION_MODEL_ID,
-  label: "Instant Preview",
+  label: "LangWatch Instant (preview)",
 };
 
 const NONE: readonly BuiltInModel[] = [];

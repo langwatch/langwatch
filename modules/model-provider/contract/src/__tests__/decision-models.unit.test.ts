@@ -54,7 +54,7 @@ describe("DECISION_MODELS", () => {
   it("names LangWatch's hosted model for what it is optimized for", () => {
     const hosted = DECISION_MODELS.find((entry) => entry.id === LANGWATCH_DECISION_MODEL_ID);
     expect(hosted).toMatchObject({
-      label: "Instant Preview",
+      label: "LangWatch Instant (preview)",
       description: "Optimized for search and quick classification",
     });
   });

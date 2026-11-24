@@ -18,7 +18,7 @@ const OWN_DECISION_MODEL = {
 };
 const HOSTED_DECISION_MODEL = {
   value: "langwatch/instant-preview",
-  label: "Instant Preview",
+  label: "LangWatch Instant (preview)",
 };
 
 const state = vi.hoisted(() => ({
@@ -149,7 +149,7 @@ function shownName(): string {
 }
 
 function offersInstantEvals(): boolean {
-  return offeredLabels().includes("Instant Preview");
+  return offeredLabels().includes("LangWatch Instant (preview)");
 }
 
 function offeredLabels(): string[] {
@@ -207,7 +207,7 @@ describe("EvaluatorLLMConfigField", () => {
       it("offers Instant Evals first, then the own decision model", () => {
         renderField();
 
-        expect(offeredLabels()).toEqual(["Instant Preview", OWN_DECISION_MODEL.label]);
+        expect(offeredLabels()).toEqual(["LangWatch Instant (preview)", OWN_DECISION_MODEL.label]);
       });
     });
 
@@ -218,7 +218,7 @@ describe("EvaluatorLLMConfigField", () => {
         state.decisionModels = [HOSTED_DECISION_MODEL];
         renderField();
 
-        expect(offeredLabels()).toEqual(["Instant Preview"]);
+        expect(offeredLabels()).toEqual(["LangWatch Instant (preview)"]);
       });
     });
 
@@ -229,52 +229,52 @@ describe("EvaluatorLLMConfigField", () => {
       });
 
       /** @scenario "An LLM judge is offered one LangWatch model, named by the judge router flag" */
-      it("offers only Evals Preview, saved as langwatch/instant-evals, with the router flag on", () => {
+      it("offers only LangWatch Evals (preview), saved as langwatch/instant-evals, with the router flag on", () => {
         state.judgeRouted = true;
         renderField();
 
-        expect(offeredLabels()).toEqual(["Evals Preview"]);
+        expect(offeredLabels()).toEqual(["LangWatch Evals (preview)"]);
       });
 
       /** @scenario "An LLM judge is offered one LangWatch model, named by the judge router flag" */
-      it("offers only Instant Preview with the router flag off", () => {
+      it("offers only LangWatch Instant (preview) with the router flag off", () => {
         renderField();
 
-        expect(offeredLabels()).toEqual(["Instant Preview"]);
+        expect(offeredLabels()).toEqual(["LangWatch Instant (preview)"]);
       });
 
-      /** @scenario "A judge saved on the old id shows Evals Preview where routing is on" */
-      it("shows a judge on langwatch/instant-evals as Evals Preview and leaves it stored", () => {
+      /** @scenario "A judge saved on the old id shows LangWatch Evals (preview) where routing is on" */
+      it("shows a judge on langwatch/instant-evals as LangWatch Evals (preview) and leaves it stored", () => {
         state.judgeRouted = true;
         renderField({ model: "langwatch/instant-evals" });
 
-        expect(shownName()).toBe("Evals Preview");
+        expect(shownName()).toBe("LangWatch Evals (preview)");
         expect(screen.getByLabelText("form model")).toHaveTextContent("langwatch/instant-evals");
       });
 
-      /** @scenario "A judge stored with the earlier id shows as Instant Preview where routing is off" */
-      it("shows a judge on langwatch/instant-evals as Instant Preview and leaves it stored", () => {
+      /** @scenario "A judge stored with the earlier id shows as LangWatch Instant (preview) where routing is off" */
+      it("shows a judge on langwatch/instant-evals as LangWatch Instant (preview) and leaves it stored", () => {
         renderField({ model: "langwatch/instant-evals" });
 
-        expect(shownName()).toBe("Instant Preview");
+        expect(shownName()).toBe("LangWatch Instant (preview)");
         expect(screen.getByLabelText("form model")).toHaveTextContent("langwatch/instant-evals");
       });
 
-      /** @scenario "A judge on Evals Preview's id shows as Instant Preview where routing is off" */
-      it("shows a judge on langwatch/evals-preview as Instant Preview, never Update needed", () => {
+      /** @scenario "A judge on the LangWatch Evals (preview) id shows as LangWatch Instant (preview) where routing is off" */
+      it("shows a judge on langwatch/evals-preview as LangWatch Instant (preview), never Update needed", () => {
         renderField({ model: "langwatch/evals-preview" });
 
-        expect(shownName()).toBe("Instant Preview");
+        expect(shownName()).toBe("LangWatch Instant (preview)");
         expect(screen.getByLabelText("form model")).toHaveTextContent("langwatch/evals-preview");
       });
 
-      /** @scenario "A judge on Instant Preview's id keeps its name where routing is on" */
-      it("shows a judge on langwatch/instant-preview as Instant Preview with the router flag on", () => {
+      /** @scenario "A judge on the LangWatch Instant (preview) id keeps its name where routing is on" */
+      it("shows a judge on langwatch/instant-preview as LangWatch Instant (preview) with the router flag on", () => {
         state.judgeRouted = true;
         renderField({ model: "langwatch/instant-preview" });
 
         expect(shownModel()).toBe("langwatch/instant-preview");
-        expect(shownName()).toBe("Instant Preview");
+        expect(shownName()).toBe("LangWatch Instant (preview)");
       });
 
       /** @scenario "Editing a judge's parameters keeps its stored model id" */
@@ -297,19 +297,22 @@ describe("EvaluatorLLMConfigField", () => {
         },
       );
 
-      /** @scenario "A judge on Instant Preview's id keeps its name where routing is on" */
-      it("lists Instant Preview in the open picker for a judge that holds its id, router flag on", () => {
+      /** @scenario "A judge on the LangWatch Instant (preview) id keeps its name where routing is on" */
+      it("lists LangWatch Instant (preview) in the open picker for a judge that holds its id, router flag on", () => {
         state.judgeRouted = true;
         renderField({ model: "langwatch/instant-preview" });
 
-        expect(offeredLabels()).toEqual(["Evals Preview", "Instant Preview"]);
+        expect(offeredLabels()).toEqual([
+          "LangWatch Evals (preview)",
+          "LangWatch Instant (preview)",
+        ]);
       });
 
-      it("lists only Evals Preview in the open picker for any other judge, router flag on", () => {
+      it("lists only LangWatch Evals (preview) in the open picker for any other judge, router flag on", () => {
         state.judgeRouted = true;
         renderField({ model: "langwatch/instant-evals" });
 
-        expect(offeredLabels()).toEqual(["Evals Preview"]);
+        expect(offeredLabels()).toEqual(["LangWatch Evals (preview)"]);
       });
 
       /** @scenario "The judge picker waits for the judge router flag before naming a model" */

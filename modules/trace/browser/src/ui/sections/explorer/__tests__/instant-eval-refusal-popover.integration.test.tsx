@@ -116,7 +116,7 @@ describe("given the Instant Evals flag is off for the project", () => {
     expect(screen.getByText("Instant Evals run on a decision model of your own.")).toBeTruthy();
     expect(screen.getByTestId("decision-model-picker")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Contact us" })).toBeNull();
-    expect(screen.queryByText(/Instant Preview/)).toBeNull();
+    expect(screen.queryByText(/LangWatch Instant \(preview\)/)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Not now" }));
 
@@ -137,7 +137,7 @@ describe("given the Instant Evals flag is off for the project", () => {
         offersOwnModel
         canPickDecisionModel
         decisionModels={[
-          { value: "langwatch/instant-preview", label: "Instant Preview" },
+          { value: "langwatch/instant-preview", label: "LangWatch Instant (preview)" },
           { value: "azure/decisions:microsoft-decision-1", label: "Azure Microsoft Decision 1" },
         ]}
         onPickDecisionModel={onPickDecisionModel}
@@ -191,7 +191,7 @@ describe("given the Instant Evals flag is off for the project", () => {
     expect(link.getAttribute("href")).toBe(MODEL_PROVIDERS_HREF);
     expect(link.getAttribute("target")).toBe("_blank");
     expect(screen.queryByRole("link", { name: "Contact us" })).toBeNull();
-    expect(screen.queryByText(/Instant Preview/)).toBeNull();
+    expect(screen.queryByText(/LangWatch Instant \(preview\)/)).toBeNull();
   });
 
   /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
@@ -200,7 +200,7 @@ describe("given the Instant Evals flag is off for the project", () => {
 
     expect(copy).toMatchObject({
       title: "Instant Evals aren't enabled for this project yet",
-      body: "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate Instant Preview, our hosted model, for you.",
+      body: "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate LangWatch Instant (preview), our hosted model, for you.",
       action: { label: "Contact us", href: CONTACT_US_HREF },
     });
     expect(copy.ownModel).toBeUndefined();

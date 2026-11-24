@@ -228,18 +228,18 @@ describe("given the Default Models table", () => {
   });
 
   describe("given the Instant Evals column", () => {
-    /** @scenario "The Default models table shows an Instant Evals column defaulting to LangWatch Instant Preview" */
-    it("reads Instant Preview where nothing is set, never Not configured", () => {
+    /** @scenario "The Default models table shows an Instant Evals column defaulting to LangWatch Instant (preview)" */
+    it("reads LangWatch Instant (preview) where nothing is set, never Not configured", () => {
       renderSection();
 
       expect(screen.getByRole("columnheader", { name: "Instant Evals" })).toBeInTheDocument();
       const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
-      expect(cell.textContent).toBe("Instant Preview");
+      expect(cell.textContent).toBe("LangWatch Instant (preview)");
       expect(cell.textContent).not.toMatch(/Not configured/);
     });
 
-    /** @scenario "Default models names the written id Instant Preview" */
-    it("reads Instant Preview where the row stores the written id", () => {
+    /** @scenario "Default models names the written id LangWatch Instant (preview)" */
+    it("reads LangWatch Instant (preview) where the row stores the written id", () => {
       mockGetDefaultModels.mockReturnValue({
         data: {
           ...FAKE_PAYLOAD,
@@ -252,12 +252,12 @@ describe("given the Default Models table", () => {
       renderSection();
 
       expect(screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals").textContent).toBe(
-        "Instant Preview",
+        "LangWatch Instant (preview)",
       );
     });
 
-    /** @scenario "Default models names the written id Instant Preview" */
-    it("reads Instant Preview on an instant_eval.judge feature chip that stores the written id", () => {
+    /** @scenario "Default models names the written id LangWatch Instant (preview)" */
+    it("reads LangWatch Instant (preview) on an instant_eval.judge feature chip that stores the written id", () => {
       mockGetDefaultModels.mockReturnValue({
         data: {
           ...FAKE_PAYLOAD,
@@ -285,11 +285,11 @@ describe("given the Default Models table", () => {
       renderSection();
 
       const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
-      expect(cell.textContent).toContain("Instant Preview");
+      expect(cell.textContent).toContain("LangWatch Instant (preview)");
       expect(cell.textContent).not.toContain("instant-evals");
     });
 
-    describe("when Instant Preview is neither released nor one switch away", () => {
+    describe("when LangWatch Instant (preview) is neither released nor one switch away", () => {
       beforeEach(() => {
         mockInstantEvalAccess.mockReturnValue({
           data: { hostedReleased: false, offer: "contact_us" },
@@ -297,16 +297,16 @@ describe("given the Default Models table", () => {
         });
       });
 
-      /** @scenario "Without Instant Preview, the Instant Evals column reads Not set" */
-      it("reads Not set where nothing is set, never Instant Preview", () => {
+      /** @scenario "Without LangWatch Instant (preview), the Instant Evals column reads Not set" */
+      it("reads Not set where nothing is set, never LangWatch Instant (preview)", () => {
         renderSection();
 
         const cell = screen.getByTestId("config-row-cfg_acme_org-cell-instant_evals");
         expect(cell.textContent).toBe("Not set");
       });
 
-      /** @scenario "Without Instant Preview, the Instant Evals column reads Not set" */
-      it("reads Not set where the row pins Instant Preview", () => {
+      /** @scenario "Without LangWatch Instant (preview), the Instant Evals column reads Not set" */
+      it("reads Not set where the row pins LangWatch Instant (preview)", () => {
         mockGetDefaultModels.mockReturnValue({
           data: {
             ...FAKE_PAYLOAD,

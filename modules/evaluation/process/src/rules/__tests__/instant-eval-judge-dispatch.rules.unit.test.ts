@@ -13,7 +13,7 @@ import {
 const OWN_DECISION_MODEL = "openai/decisions:gpt-6-luna";
 
 describe("instantEvalJudgeOf", () => {
-  describe("given a boolean judge whose model is Instant Preview", () => {
+  describe("given a boolean judge whose model is LangWatch Instant (preview)", () => {
     it("answers the judge with its prompt", () => {
       expect(
         instantEvalJudgeOf({
@@ -42,7 +42,7 @@ describe("instantEvalJudgeOf", () => {
     });
   });
 
-  describe("given a boolean judge whose model is Evals Preview, or the id the picker writes", () => {
+  describe("given a boolean judge whose model is LangWatch Evals (preview), or the id the picker writes", () => {
     it.each(["langwatch/evals-preview", "langwatch/instant-evals"])(
       "marks %s as one the judge router may answer",
       (model) => {
