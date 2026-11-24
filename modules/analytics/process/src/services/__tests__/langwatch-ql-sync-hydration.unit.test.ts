@@ -47,13 +47,17 @@ function trace({ id, threadId }: { id: string; threadId: string }): Trace {
   };
 }
 
-const renderer: LangWatchQLTraceRenderer = {
-  renderThreadTranscript: async () => TRANSCRIPT,
-  renderReadableTrace: async () => "the digest",
-  renderTraceMessages: async () => "{}",
-  renderSpanMessages: async () => ({ isSpanPresent: true, json: "{}" }),
-  renderTraceJson: async () => "{}",
-};
+function rendererOf(transcript: string): LangWatchQLTraceRenderer {
+  return {
+    renderThreadTranscript: async () => transcript,
+    renderReadableTrace: async () => "the digest",
+    renderTraceMessages: async () => "{}",
+    renderSpanMessages: async () => ({ isSpanPresent: true, json: "{}" }),
+    renderTraceJson: async () => "{}",
+  };
+}
+
+const renderer = rendererOf(TRANSCRIPT);
 
 /** Holds one conversation, `thread-a`; every other key matches nothing. */
 const traceSource: LangWatchQLTraceSource = {
@@ -88,13 +92,18 @@ class KeyAnsweringExecutor extends LangWatchQLExecutorRepository {
 function serviceOver({
   keys,
   maxHydratedValueBytes = DEFAULT_LWQL_HYDRATION_LIMITS.maxHydratedValueBytes,
+  transcript,
 }: {
   keys: readonly string[];
   maxHydratedValueBytes?: number;
+  /** Replaces the short transcript every recorded thread renders to. */
+  transcript?: string;
 }): LangWatchQLService {
   const hydration = LangWatchQLHydrationService.create({
     reads: LangWatchQLHydrationReadService.create({ traces: traceSource }),
-    compute: LangWatchQLHydrationComputeService.create({ renderer }),
+    compute: LangWatchQLHydrationComputeService.create({
+      renderer: transcript === undefined ? renderer : rendererOf(transcript),
+    }),
     runner: {
       executeLangWatchQLPass: () => Promise.reject(new Error("the sync path reads no pass")),
     },
@@ -163,6 +172,31 @@ describe("LangWatchQLService.executeForProjects with an extraction function", ()
 
       expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
         "APP_FUNCTION_VALUE_TRUNCATED",
+      );
+    });
+  });
+
+  describe("when the hydrated rows together pass the response ceiling", () => {
+    /** @scenario "A hydrated result past the byte ceiling drops trailing rows and says so" */
+    it("drops the trailing rows and reports APP_FUNCTION_RESULT_TRUNCATED with the ceiling and the rows kept", async () => {
+      // Nine rows of one value each at the per-value ceiling: eight of them already pass the
+      // response ceiling, so seven are kept. Left at the shipped limits, so the ceiling the
+      // diagnostic names is the one a caller meets.
+      const { maxHydratedBytes, maxHydratedValueBytes } = DEFAULT_LWQL_HYDRATION_LIMITS;
+      const result = await query({
+        service: serviceOver({
+          keys: Array.from({ length: 9 }, () => "thread-a"),
+          transcript: "x".repeat(maxHydratedValueBytes),
+        }),
+        sql: CONVERSATION_QUERY,
+      });
+
+      expect(result.rows).toHaveLength(7);
+      expect(result.diagnostics).toContainEqual(
+        expect.objectContaining({
+          code: "APP_FUNCTION_RESULT_TRUNCATED",
+          meta: { maxHydratedBytes, rowsReturned: 7 },
+        }),
       );
     });
   });

@@ -61,7 +61,6 @@ export const DEFAULT_VIOLATION_HINTS: Readonly<Record<LangWatchQLViolationCode, 
     "Give the call an alias, for example conversation(ConversationId) AS transcript.",
   APP_FUNCTION_ARGUMENT:
     "Match the signature listed for this function by GET /api/v1/query/schema.",
-  APP_FUNCTION_GATED:
-    "Remove the call, or use a key that holds the permissions this function names.",
+  APP_FUNCTION_GATED: "Remove the call, or meet the requirement the message names.",
   APP_FUNCTION_NAME_CASE: "Write the function name exactly as GET /api/v1/query/schema spells it.",
 };
