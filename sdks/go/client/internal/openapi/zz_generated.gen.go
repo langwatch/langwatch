@@ -30752,6 +30752,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1ExperimentsUpdate             GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "experiments:update"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1ExperimentsView               GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "experiments:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1FeatureFlagsManageExperiments GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "featureFlags:manageExperiments"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1GatewayA2aTargetsManage       GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "gatewayA2aTargets:manage"
+	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1GatewayA2aTargetsView         GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "gatewayA2aTargets:view"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1GatewayBudgetsCreate          GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "gatewayBudgets:create"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1GatewayBudgetsDelete          GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "gatewayBudgets:delete"
 	GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1GatewayBudgetsManage          GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1 = "gatewayBudgets:manage"
@@ -30939,6 +30941,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1) Valid()
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1ExperimentsView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1FeatureFlagsManageExperiments:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1GatewayA2aTargetsManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1GatewayA2aTargetsView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyExamplesRequiresGates1GatewayBudgetsCreate:
 		return true
@@ -31226,6 +31232,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1ExperimentsUpdate             GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "experiments:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1ExperimentsView               GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "experiments:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1FeatureFlagsManageExperiments GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "featureFlags:manageExperiments"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1GatewayA2aTargetsManage       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "gatewayA2aTargets:manage"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1GatewayA2aTargetsView         GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "gatewayA2aTargets:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1GatewayBudgetsCreate          GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "gatewayBudgets:create"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1GatewayBudgetsDelete          GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "gatewayBudgets:delete"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1GatewayBudgetsManage          GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1 = "gatewayBudgets:manage"
@@ -31413,6 +31421,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1ExperimentsView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1FeatureFlagsManageExperiments:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1GatewayA2aTargetsManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1GatewayA2aTargetsView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaAppFunctionsGates1GatewayBudgetsCreate:
 		return true
@@ -31700,6 +31712,8 @@ const (
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1ExperimentsUpdate             GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "experiments:update"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1ExperimentsView               GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "experiments:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1FeatureFlagsManageExperiments GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "featureFlags:manageExperiments"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1GatewayA2aTargetsManage       GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "gatewayA2aTargets:manage"
+	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1GatewayA2aTargetsView         GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "gatewayA2aTargets:view"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1GatewayBudgetsCreate          GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "gatewayBudgets:create"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1GatewayBudgetsDelete          GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "gatewayBudgets:delete"
 	GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1GatewayBudgetsManage          GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1 = "gatewayBudgets:manage"
@@ -31887,6 +31901,10 @@ func (e GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1) V
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1ExperimentsView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1FeatureFlagsManageExperiments:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1GatewayA2aTargetsManage:
+		return true
+	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1GatewayA2aTargetsView:
 		return true
 	case GetApiV1QueryReference200JSONResponseBodyLwqlSchemaViewsColumnsGates1GatewayBudgetsCreate:
 		return true
@@ -32294,6 +32312,8 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1ExperimentsUpdate             GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "experiments:update"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1ExperimentsView               GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "experiments:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1FeatureFlagsManageExperiments GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "featureFlags:manageExperiments"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1GatewayA2aTargetsManage       GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "gatewayA2aTargets:manage"
+	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1GatewayA2aTargetsView         GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "gatewayA2aTargets:view"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1GatewayBudgetsCreate          GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "gatewayBudgets:create"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1GatewayBudgetsDelete          GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "gatewayBudgets:delete"
 	GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1GatewayBudgetsManage          GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1 = "gatewayBudgets:manage"
@@ -32481,6 +32501,10 @@ func (e GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1ExperimentsView:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1FeatureFlagsManageExperiments:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1GatewayA2aTargetsManage:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1GatewayA2aTargetsView:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyAppFunctionsGates1GatewayBudgetsCreate:
 		return true
@@ -32768,6 +32792,8 @@ const (
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1ExperimentsUpdate             GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "experiments:update"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1ExperimentsView               GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "experiments:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1FeatureFlagsManageExperiments GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "featureFlags:manageExperiments"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1GatewayA2aTargetsManage       GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "gatewayA2aTargets:manage"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1GatewayA2aTargetsView         GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "gatewayA2aTargets:view"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1GatewayBudgetsCreate          GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "gatewayBudgets:create"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1GatewayBudgetsDelete          GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "gatewayBudgets:delete"
 	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1GatewayBudgetsManage          GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1 = "gatewayBudgets:manage"
@@ -32955,6 +32981,10 @@ func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1) Valid() bool {
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1ExperimentsView:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1FeatureFlagsManageExperiments:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1GatewayA2aTargetsManage:
+		return true
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1GatewayA2aTargetsView:
 		return true
 	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates1GatewayBudgetsCreate:
 		return true
@@ -35699,6 +35729,7 @@ const (
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceDatasetsView          ConfirmStoredObjectUpload200JSONResponseBodyAudience = "datasets:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceEvaluationsView       ConfirmStoredObjectUpload200JSONResponseBodyAudience = "evaluations:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceExperimentsView       ConfirmStoredObjectUpload200JSONResponseBodyAudience = "experiments:view"
+	ConfirmStoredObjectUpload200JSONResponseBodyAudienceGatewayA2aTargetsView ConfirmStoredObjectUpload200JSONResponseBodyAudience = "gatewayA2aTargets:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceGatewayBudgetsView    ConfirmStoredObjectUpload200JSONResponseBodyAudience = "gatewayBudgets:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceGatewayCacheRulesView ConfirmStoredObjectUpload200JSONResponseBodyAudience = "gatewayCacheRules:view"
 	ConfirmStoredObjectUpload200JSONResponseBodyAudienceGatewayGuardrailsView ConfirmStoredObjectUpload200JSONResponseBodyAudience = "gatewayGuardrails:view"
@@ -35755,6 +35786,8 @@ func (e ConfirmStoredObjectUpload200JSONResponseBodyAudience) Valid() bool {
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceEvaluationsView:
 		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceExperimentsView:
+		return true
+	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceGatewayA2aTargetsView:
 		return true
 	case ConfirmStoredObjectUpload200JSONResponseBodyAudienceGatewayBudgetsView:
 		return true
@@ -35831,6 +35864,7 @@ const (
 	GetStoredObjectParamsAudienceDatasetsView          GetStoredObjectParamsAudience = "datasets:view"
 	GetStoredObjectParamsAudienceEvaluationsView       GetStoredObjectParamsAudience = "evaluations:view"
 	GetStoredObjectParamsAudienceExperimentsView       GetStoredObjectParamsAudience = "experiments:view"
+	GetStoredObjectParamsAudienceGatewayA2aTargetsView GetStoredObjectParamsAudience = "gatewayA2aTargets:view"
 	GetStoredObjectParamsAudienceGatewayBudgetsView    GetStoredObjectParamsAudience = "gatewayBudgets:view"
 	GetStoredObjectParamsAudienceGatewayCacheRulesView GetStoredObjectParamsAudience = "gatewayCacheRules:view"
 	GetStoredObjectParamsAudienceGatewayGuardrailsView GetStoredObjectParamsAudience = "gatewayGuardrails:view"
@@ -35887,6 +35921,8 @@ func (e GetStoredObjectParamsAudience) Valid() bool {
 	case GetStoredObjectParamsAudienceEvaluationsView:
 		return true
 	case GetStoredObjectParamsAudienceExperimentsView:
+		return true
+	case GetStoredObjectParamsAudienceGatewayA2aTargetsView:
 		return true
 	case GetStoredObjectParamsAudienceGatewayBudgetsView:
 		return true
@@ -35963,6 +35999,7 @@ const (
 	GetStoredObject200JSONResponseBodyCapabilityAudienceDatasetsView          GetStoredObject200JSONResponseBodyCapabilityAudience = "datasets:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceEvaluationsView       GetStoredObject200JSONResponseBodyCapabilityAudience = "evaluations:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceExperimentsView       GetStoredObject200JSONResponseBodyCapabilityAudience = "experiments:view"
+	GetStoredObject200JSONResponseBodyCapabilityAudienceGatewayA2aTargetsView GetStoredObject200JSONResponseBodyCapabilityAudience = "gatewayA2aTargets:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceGatewayBudgetsView    GetStoredObject200JSONResponseBodyCapabilityAudience = "gatewayBudgets:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceGatewayCacheRulesView GetStoredObject200JSONResponseBodyCapabilityAudience = "gatewayCacheRules:view"
 	GetStoredObject200JSONResponseBodyCapabilityAudienceGatewayGuardrailsView GetStoredObject200JSONResponseBodyCapabilityAudience = "gatewayGuardrails:view"
@@ -36019,6 +36056,8 @@ func (e GetStoredObject200JSONResponseBodyCapabilityAudience) Valid() bool {
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceEvaluationsView:
 		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceExperimentsView:
+		return true
+	case GetStoredObject200JSONResponseBodyCapabilityAudienceGatewayA2aTargetsView:
 		return true
 	case GetStoredObject200JSONResponseBodyCapabilityAudienceGatewayBudgetsView:
 		return true
@@ -36113,6 +36152,7 @@ const (
 	DatasetsView          GetStoredObject200JSONResponseBodyMetadataAudiences = "datasets:view"
 	EvaluationsView       GetStoredObject200JSONResponseBodyMetadataAudiences = "evaluations:view"
 	ExperimentsView       GetStoredObject200JSONResponseBodyMetadataAudiences = "experiments:view"
+	GatewayA2aTargetsView GetStoredObject200JSONResponseBodyMetadataAudiences = "gatewayA2aTargets:view"
 	GatewayBudgetsView    GetStoredObject200JSONResponseBodyMetadataAudiences = "gatewayBudgets:view"
 	GatewayCacheRulesView GetStoredObject200JSONResponseBodyMetadataAudiences = "gatewayCacheRules:view"
 	GatewayGuardrailsView GetStoredObject200JSONResponseBodyMetadataAudiences = "gatewayGuardrails:view"
@@ -36169,6 +36209,8 @@ func (e GetStoredObject200JSONResponseBodyMetadataAudiences) Valid() bool {
 	case EvaluationsView:
 		return true
 	case ExperimentsView:
+		return true
+	case GatewayA2aTargetsView:
 		return true
 	case GatewayBudgetsView:
 		return true

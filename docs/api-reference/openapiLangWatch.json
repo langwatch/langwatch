@@ -17094,7 +17094,9 @@
                                           "seatRequests:manage",
                                           "members:view",
                                           "braids:manage",
-                                          "spans:braided"
+                                          "spans:braided",
+                                          "gatewayA2aTargets:view",
+                                          "gatewayA2aTargets:manage"
                                         ]
                                       }
                                     ]
@@ -17324,7 +17326,9 @@
                                     "seatRequests:manage",
                                     "members:view",
                                     "braids:manage",
-                                    "spans:braided"
+                                    "spans:braided",
+                                    "gatewayA2aTargets:view",
+                                    "gatewayA2aTargets:manage"
                                   ]
                                 }
                               ]
@@ -17954,7 +17958,9 @@
                                                   "seatRequests:manage",
                                                   "members:view",
                                                   "braids:manage",
-                                                  "spans:braided"
+                                                  "spans:braided",
+                                                  "gatewayA2aTargets:view",
+                                                  "gatewayA2aTargets:manage"
                                                 ]
                                               }
                                             ]
@@ -18184,7 +18190,9 @@
                                             "seatRequests:manage",
                                             "members:view",
                                             "braids:manage",
-                                            "spans:braided"
+                                            "spans:braided",
+                                            "gatewayA2aTargets:view",
+                                            "gatewayA2aTargets:manage"
                                           ]
                                         }
                                       ]
@@ -18635,7 +18643,9 @@
                                         "seatRequests:manage",
                                         "members:view",
                                         "braids:manage",
-                                        "spans:braided"
+                                        "spans:braided",
+                                        "gatewayA2aTargets:view",
+                                        "gatewayA2aTargets:manage"
                                       ]
                                     }
                                   ]
@@ -128809,7 +128819,8 @@
                         "governanceCost:view",
                         "sso:view",
                         "seatRequests:view",
-                        "members:view"
+                        "members:view",
+                        "gatewayA2aTargets:view"
                       ]
                     }
                   },
@@ -128981,7 +128992,8 @@
                               "governanceCost:view",
                               "sso:view",
                               "seatRequests:view",
-                              "members:view"
+                              "members:view",
+                              "gatewayA2aTargets:view"
                             ]
                           }
                         },
@@ -129113,7 +129125,8 @@
                             "governanceCost:view",
                             "sso:view",
                             "seatRequests:view",
-                            "members:view"
+                            "members:view",
+                            "gatewayA2aTargets:view"
                           ]
                         },
                         "generation": {
@@ -129228,7 +129241,8 @@
                 "governanceCost:view",
                 "sso:view",
                 "seatRequests:view",
-                "members:view"
+                "members:view",
+                "gatewayA2aTargets:view"
               ]
             },
             "required": true
