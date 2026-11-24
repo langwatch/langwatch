@@ -160,6 +160,33 @@ describe("given a routed message to two recipients", () => {
   });
 });
 
+describe("given a routed message to one recipient with an idempotency key", () => {
+  describe("when Customer.io refuses the send", () => {
+    /** @scenario "A single-recipient fallback keeps the caller's key" */
+    it("has the own mailer send with the caller's key unchanged", async () => {
+      const { customerIo, ownMailer, mail } = compose();
+      customerIo.refuse({ outcome: "refused", reason: "status", status: 503 }, "ada@acme.test");
+
+      await mail.sendEmail({
+        to: "ada@acme.test",
+        subject: "Usage limit reached",
+        html: "<p>limit</p>",
+        template: "usage-limit",
+        idempotencyKey: "usage:org-1",
+      });
+
+      expect(ownMailer.sent).toEqual([
+        {
+          to: "ada@acme.test",
+          subject: "Usage limit reached",
+          html: "<p>limit</p>",
+          idempotencyKey: "usage:org-1",
+        },
+      ]);
+    });
+  });
+});
+
 describe("given nurturing answers off, as it does without the App API key", () => {
   describe("when a routed message to two recipients is sent", () => {
     /** @scenario "Without IS_SAAS or the key nothing reaches Customer.io" */

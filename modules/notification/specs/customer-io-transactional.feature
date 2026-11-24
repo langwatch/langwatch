@@ -81,6 +81,13 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
     Then the own mailer sends to that recipient only
 
   @unit
+  Scenario: A single-recipient fallback keeps the caller's key
+    Given a routed message to one recipient with an idempotency key
+    And Customer.io refuses the send to that recipient
+    When the message is sent
+    Then the own mailer sends with the caller's key unchanged
+
+  @unit
   Scenario: A replyless routed message reaches the real recipient and answers to no-reply
     Given a replyless routed message
     When it is sent through Customer.io
