@@ -15,7 +15,7 @@ A target is an A2A agent registered for a project. It holds the agent's upstream
 
 ## Register a target
 
-Call the procedures from a TypeScript client that already has a session, in the same way as the other gateway procedures. Creating, editing, blocking and archiving need `virtualKeys:manage`; listing needs `virtualKeys:view`.
+Call the procedures from a TypeScript client that already has a session, in the same way as the other gateway procedures. Creating, editing, blocking and archiving need `gatewayA2aTargets:manage`; listing needs `gatewayA2aTargets:view`. Managing virtual keys does not reach targets. See [RBAC](/ai-gateway/rbac).
 
 ```ts
 await trpc.gatewayA2aTargets.create.mutate({

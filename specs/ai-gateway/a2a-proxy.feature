@@ -23,10 +23,24 @@ Feature: A2A proxy on the gateway
 
   @unit
   Scenario: a project admin manages the project's own targets
-    Given a user who may manage virtual keys of project "p1" only
+    Given a user who may manage A2A targets of project "p1" only
     When they list, edit, block or delete A2A targets of project "p1"
     Then the permission is checked on project "p1"
     And a target of another project or an org-wide target is not found
+
+  @unit
+  Scenario: A2A targets have their own permission, apart from virtual keys
+    Given a user whose role manages every virtual key but holds no gatewayA2aTargets permission
+    When they list, register, edit, block or archive an A2A target
+    Then they are refused, at the project and at the organization
+    And a user holding gatewayA2aTargets:manage may do all of it
+    And a user holding gatewayA2aTargets:view may list targets and change none
+
+  @unit
+  Scenario: The built-in roles hold the A2A target permissions they hold on cache rules
+    Then team viewers and members may list a project's targets and change none
+    And team admins may manage a project's targets
+    And organization admins may manage every target of the organization
 
   @unit
   Scenario: a key reaches a project's targets through its own scopes, never its trace destination
