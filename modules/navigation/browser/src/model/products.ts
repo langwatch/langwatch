@@ -126,12 +126,15 @@ function withoutTrailingSlashes(pathname: string): string {
 }
 
 /**
- * Whether the address is in the organization's Dashboards area: the library and the org-level
- * board, template and From LangWatch pages under it. "dashboards" is a reserved project slug.
+ * Whether the address is in the organization's Dashboards area: only the shapes its routes match
+ * (the library, `/<id>`, `/templates`, `/curated/<id>`). A deeper page stays the page of a project
+ * still holding the slug "dashboards" until `project:reslug-reserved-dashboards` moves it.
  */
 export function isOrganizationDashboardsPath(pathname: string): boolean {
   const trimmed = withoutTrailingSlashes(pathname);
-  return isPathUnder({ pathname: trimmed, base: ORGANIZATION_DASHBOARDS_PATH });
+  if (!isPathUnder({ pathname: trimmed, base: ORGANIZATION_DASHBOARDS_PATH })) return false;
+  const [, page, ...deeper] = trimmed.split("/").filter((segment) => segment !== "");
+  return deeper.length === 0 || (page === "curated" && deeper.length === 1);
 }
 
 /** Whether the address is the organization's library itself, not a page under it. */

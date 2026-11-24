@@ -178,6 +178,36 @@ describe("the organization's Dashboards addresses", () => {
       }).toEqual({ library: false, inArea: false });
     });
   });
+
+  describe("given a project that still holds the slug dashboards", () => {
+    /** @scenario A project still holding the dashboards slug keeps its deeper pages */
+    it("reads an address below the area's own as that project's page", () => {
+      expect({
+        inArea: isOrganizationDashboardsPath("/dashboards/messages/trace_1"),
+        product: productFromPathname("/dashboards/messages/trace_1"),
+      }).toEqual({ inArea: false, product: "llm-ops" });
+    });
+
+    /** @scenario A project still holding the dashboards slug keeps its deeper pages */
+    it("reads a board of that project as its own Dashboards area, not the organization's", () => {
+      expect({
+        inArea: isOrganizationDashboardsPath("/dashboards/dashboards/board_1"),
+        product: productFromPathname("/dashboards/dashboards/board_1"),
+      }).toEqual({ inArea: false, product: "dashboards" });
+    });
+
+    it("keeps the area's own addresses the organization's", () => {
+      const areaAddresses = [
+        "/dashboards",
+        "/dashboards/board_1",
+        "/dashboards/templates",
+        "/dashboards/curated/agent-flight-deck",
+      ];
+      expect(areaAddresses.filter((pathname) => !isOrganizationDashboardsPath(pathname))).toEqual(
+        [],
+      );
+    });
+  });
 });
 
 describe("detour addresses that name an entity", () => {

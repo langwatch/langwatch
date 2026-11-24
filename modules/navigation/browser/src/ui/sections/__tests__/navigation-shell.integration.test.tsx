@@ -1394,6 +1394,53 @@ describe("the organization's Dashboards library at /dashboards", () => {
   });
 });
 
+describe("a page of a project still holding the slug dashboards", () => {
+  const dashboardsSlugProject = {
+    id: "project_dashboards",
+    slug: "dashboards",
+    name: "Old Dashboards",
+    isPersonal: false,
+  };
+  const team = { ...teamA, projects: [...teamA.projects, dashboardsSlugProject] };
+  const organization = { ...orgA, teams: [team, personalTeam] };
+  const projectPageReadings: Partial<StubNavigationReadings> = {
+    organizations: [organization],
+    organization,
+    team,
+    openableTeams: [team, personalTeam],
+    project: dashboardsSlugProject,
+    projectParam: "dashboards",
+    pathname: "/dashboards/messages/trace_1",
+    permissions: [...(BASE_READINGS.permissions ?? []), "analytics:view"],
+    flags: { ...BASE_READINGS.flags, release_dashboards: { enabled: true, isLoading: false } },
+    notFound: <div data-testid="not-found" />,
+  };
+
+  describe.each([
+    { state: "off", isAreaOn: false },
+    { state: "on", isAreaOn: true },
+  ])("when the organization's area flag is $state", ({ isAreaOn }) => {
+    /** @scenario A project still holding the dashboards slug keeps its deeper pages */
+    it("draws the project's page in LLM Ops with its project chip, not a not-found page", () => {
+      replaceMock.mockReset();
+      orgFlags = {
+        ...orgFlags,
+        release_dashboards: { org_1: true },
+        release_dashboards_organization_area: { org_1: isAreaOn },
+      };
+      renderShell({ readings: projectPageReadings });
+
+      expect(screen.queryByTestId("not-found")).toBeNull();
+      expect(screen.getByTestId("page-body")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Switch product" })).toHaveTextContent("LLM Ops");
+      expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent(
+        "Old Dashboards",
+      );
+      expect(replaceMock).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe("a board with the organization's library released", () => {
   const releasedReadings: Partial<StubNavigationReadings> = {
     permissions: [...(BASE_READINGS.permissions ?? []), "analytics:view"],
