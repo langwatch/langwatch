@@ -75,6 +75,9 @@ function Tile({ label, value, current, previous, rising }) {
   const success = 1 - num(row.errors) / requests;
   const successPrev = requestsPrev > 0 ? 1 - num(row.errors_prev) / requestsPrev : null;
   const columns = "repeat(auto-fit, minmax(140px, 1fr))";
+  // Worse than the period before: a point more requests with errors, or a fifth slower.
+  const slower = num(row.p95_ms_prev) > 0 && num(row.p95_ms) > num(row.p95_ms_prev) * 1.2;
+  signalProblem((known(successPrev) && success < successPrev - 0.01) || slower);
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: columns, gap: 12 }}>
@@ -115,7 +118,7 @@ export const THROUGHPUT_CODE = widgetCode({
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
   const rows = withBuckets(main, [{ key: "throughput", kind: "count" }, "p95_ms", "error_rate"]);
   const points = rows.map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     throughput: num(row.throughput),
     p95: num(row.p95_ms),
     errorRate: num(row.error_rate),
@@ -123,13 +126,21 @@ export const THROUGHPUT_CODE = widgetCode({
   const maxRate = Math.max(0.01, ...points.map((point) => point.errorRate ?? 0));
   const formats = { Requests: count, "Slowest 1 in 20": ms, "Share with an error": pct };
   const tip = (value, name) => [known(value) ? formats[name](value) : "No data", name];
+  const rose = (key, by) => known(earliest(points, key)) &&
+    latest(points, key) > by(earliest(points, key));
+  signalProblem(rose("errorRate", (first) => first + 0.01) || rose("p95", (first) => first * 1.2));
+  const onDay = (state) => {
+    const point = points[Number(state?.activeTooltipIndex)];
+    if (point) askLangy({ kind: "day", label: String(point.x), at: point.at });
+  };
   return (
     <Panel>
       <Legend items={[[C.orange, "Requests"], [C.teal, "Slowest 1 in 20"],
         [C.red, "Share with an error"]]} />
       <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={points} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
+          <ComposedChart data={points} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}
+            onClick={canAskLangy() ? onDay : undefined} style={askCursor()}>
             <CartesianGrid vertical={false} stroke={C.border} />
             <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
               dy={4} />
@@ -175,10 +186,11 @@ export const QUALITY_CODE = widgetCode({
   body: `  if (passRate.data.length === 0) return <Panel><CallToAction /></Panel>;
   const errors = new Map(errorRate.data.map((row) => [row.bucket, num(row.error_rate)]));
   const points = withBuckets(passRate, ["pass_rate"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     passRate: num(row.pass_rate),
     errorRate: errors.get(row.bucket) ?? null,
   }));
+  signalProblem(latest(points, "passRate") < earliest(points, "passRate"));
   return (
     <Panel>
       <Legend items={[[C.teal, "Checks passed"], [C.red, "Requests with an error", true]]} />
@@ -215,9 +227,10 @@ export const FEEDBACK_CODE = widgetCode({
   const down = num(summary.data[0]?.thumbs_down);
   if (!add(up, down)) return <Panel><CallToAction /></Panel>;
   const points = withBuckets(rate, ["positive_rate"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     positive: num(row.positive_rate),
   }));
+  signalProblem(latest(points, "positive") < earliest(points, "positive"));
   const tally = (color) => ({ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color });
   return (
     <Panel>

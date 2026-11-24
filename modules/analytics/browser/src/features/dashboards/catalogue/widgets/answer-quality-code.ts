@@ -44,7 +44,7 @@ export const OUTCOMES_CODE = widgetCode({
   const previous = num(totals.data[0]?.closed_previous);
   const keys = ["closed", ...FAILURES.map(([key]) => key)];
   const points = withBuckets(trend, keys).map((row) => {
-    const point = { x: bucketLabel(row.bucket) };
+    const point = { x: bucketLabel(row.bucket), at: bucketStart(row.bucket) };
     for (const [key] of FAILURES) {
       point[key] = ratio(row[key], row.closed);
     }
@@ -52,6 +52,9 @@ export const OUTCOMES_CODE = widgetCode({
   });
   const series = FAILURES.map(([key, label, colour]) => ({ key, label, colour }));
   const label = "of " + count(closed) + " finished conversations were resolved";
+  // A bad ending grew: its share in the last bucket is a point or more above the first.
+  signalProblem(FAILURES.some(([key]) =>
+    num(latest(points, key)) > num(earliest(points, key)) + 0.01));
   return (
     <Panel>
       <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "1fr 16rem",
@@ -103,6 +106,7 @@ export const UNANSWERED_CODE = widgetCode({
   const widest = Math.max(...topics.data.map(shareOf), Number.MIN_VALUE);
   const rows = topics.data.map((row) => ({
     label: topicName(row.topic),
+    key: row.topic,
     value: shareOf(row) / widest,
     figure: pct(shareOf(row), 0),
     colour: shareOf(row) > average * 1.3 ? C.red : C.orange,
@@ -110,11 +114,12 @@ export const UNANSWERED_CODE = widgetCode({
       " conversations: your agent said it could not help",
   }));
   const daily = trend.data.map(shareOf);
+  signalProblem(topics.data.some((row) => shareOf(row) > average * 1.3));
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 14rem", gap: 20 }}>
         {rows.length > 0
-          ? <ShareRows rows={rows} />
+          ? <ShareRows rows={rows} kind="topic" />
           : <Note>These conversations have no topic yet. LangWatch groups them once it has a few hundred.</Note>}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <Stat label="Refused to answer" value={pct(average, 1)} />
@@ -153,6 +158,7 @@ export const JUDGE_AGREEMENT_CODE = widgetCode({
     const index = judges.indexOf(row.evaluator);
     if (index < 0) continue;
     const week = (weeks[row.week] = weeks[row.week] || { x: bucketLabel(row.week),
+      at: bucketStart(row.week),
       target: ${KAPPA_TARGET} });
     week["j" + index] = num(row.kappa);
   }
@@ -161,9 +167,12 @@ export const JUDGE_AGREEMENT_CODE = widgetCode({
     ...judges.map((name, index) => ({ key: "j" + index, label: name, colour: colours[index] })),
     { key: "target", label: "Aim (${KAPPA_TARGET})", colour: C.red, dashed: true },
   ];
+  signalProblem(judges.some((_, index) => known(latest(points, "j" + index)) &&
+    latest(points, "j" + index) < ${KAPPA_TARGET}));
   return (
     <Panel>
-      <SeriesChart points={points} series={series} format={kappa} domain={["auto", 1]} />
+      <SeriesChart points={points} series={series} format={kappa} domain={["auto", 1]}
+        legendKind="check" />
     </Panel>
   );`,
 });
@@ -202,7 +211,8 @@ export const REVIEW_QUEUE_CODE = widgetCode({
   return (
     <Panel>
       <Headline value={count(total)} label="answers failed a check in the last 3 days" />
-      <Table columns={columns} rows={rows} rowPadding={3} />
+      <Table columns={columns} rows={rows} rowPadding={3}
+        ask={(row) => ({ kind: "conversation", label: row.trace_id, value: row.trace_id })} />
     </Panel>
   );`,
 });
@@ -223,7 +233,7 @@ export const FAILURE_SOURCE_CODE = widgetCode({
   const ofFailed = (value) => count(value) + " · " + pct(ratio(value, failures), 0);
   const counts = ["retrieval", "generation", "errors"].map((key) => ({ key, kind: "count" }));
   const points = withBuckets(trend, counts).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     retrieval: num(row.retrieval),
     generation: num(row.generation),
     errors: num(row.errors),
@@ -233,6 +243,7 @@ export const FAILURE_SOURCE_CODE = widgetCode({
     { key: "generation", label: "Found it, answered wrong", colour: C.pink, bars: true },
     { key: "errors", label: "Error", colour: C.red, bars: true },
   ];
+  signalProblem(failures > 0);
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8,
@@ -261,11 +272,12 @@ export const EMPTY_RETRIEVAL_CODE = widgetCode({
   const questions = sum("questions");
   const empty = sum("empty_searches");
   const points = withBuckets(trend, ["empty_searches", "questions"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     rate: ratio(row.empty_searches, row.questions),
   }));
   const label = "of " + count(questions) + " searches found nothing. " +
     count(sum("empty_errored")) + " of those also ended in an error";
+  signalProblem(num(latest(points, "rate")) > num(earliest(points, "rate")));
   return (
     <Panel>
       <Headline value={pct(ratio(empty, questions), 1)} label={label} />

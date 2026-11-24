@@ -121,21 +121,36 @@ export const PIVOT = `function pivot(rows, key, value) {
   return [...byBucket.values()];
 }
 // Every point named by its bucket, the empty buckets the report added included.
-const labelled = (points) => points.map((point) => ({ ...point, x: bucketLabel(point.bucket) }));`;
+const labelled = (points) => points.map((point) => ({ ...point, x: bucketLabel(point.bucket),
+  at: bucketStart(point.bucket) }));`;
 
 /** A time series of bars and lines with change markers; reads `CHART_STYLE` and `GAP_BRIDGE`. */
 export const MARKED_CHART = `// series: { key, label, colour, dashed?, bars?, stack?, right? }; markers: { x, label }.
-function MarkedChart({ points, series, format, rightFormat, markers = [], domain }) {
+// legendKind names what a legend entry is ("model", "language"); a click asks about the bucket.
+function MarkedChart({ points, series, format, rightFormat, markers = [], domain, legendKind }) {
   const right = series.some((item) => item.right);
   const shown = markers.filter((marker) => points.some((point) => point.x === marker.x));
   const formatOf = (name) => (series.find((item) => item.label === name)?.right ? rightFormat : format);
   const tip = (value, name) => tipValue(formatOf(name))(value, name);
+  const drawn = series.filter((item) => !item.dashed);
+  let pointed = null;
+  const point = (item) => () => { pointed = item.label; };
+  const onClick = (state) => {
+    const at = points[Number(state?.activeTooltipIndex)];
+    const hit = pointed ?? (drawn.length === 1 ? drawn[0].label : null);
+    pointed = null;
+    if (!at) return;
+    askLangy({ kind: "day", label: String(at.x), ...(at.at ? { at: at.at } : {}),
+      ...(hit ? { series: hit } : {}) });
+  };
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-      <Legend items={series.map((item) => [item.colour, item.label, item.dashed])} />
+      <Legend items={series.map((item) => [item.colour, item.label, item.dashed])}
+        kind={legendKind} />
       <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={points} margin={{ top: 14, right: 4, bottom: 0, left: 0 }}>
+          <ComposedChart data={points} margin={{ top: 14, right: 4, bottom: 0, left: 0 }}
+            onClick={canAskLangy() && points.length > 0 ? onClick : undefined} style={askCursor()}>
             <CartesianGrid vertical={false} stroke={C.border} />
             <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
               dy={4} />
@@ -156,12 +171,12 @@ function MarkedChart({ points, series, format, rightFormat, markers = [], domain
             {series.map((item) => item.bars ? (
               <Bar key={item.key} yAxisId={item.right ? "right" : "left"} dataKey={item.key}
                 name={item.label} fill={item.colour} stackId={item.stack}
-                isAnimationActive={false} />
+                isAnimationActive={false} onClick={point(item)} />
             ) : (
               <Line key={item.key} yAxisId={item.right ? "right" : "left"} type="monotone"
                 dataKey={item.key} name={item.label} stroke={item.colour} strokeWidth={2}
                 strokeDasharray={item.dashed ? "4 3" : undefined} dot={false}
-                isAnimationActive={false} />
+                activeDot={{ r: 4, onClick: point(item) }} isAnimationActive={false} />
             ))}
           </ComposedChart>
         </ResponsiveContainer>
@@ -173,7 +188,7 @@ function MarkedChart({ points, series, format, rightFormat, markers = [], domain
 // A model or prompt version first seen in the period, as a marker on its bucket. \`names\` maps a
 // managed version id to "handle vN", so a marker never shows the id.
 const markerOf = (row, names) => ({
-  x: bucketLabel(row.bucket),
+  x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
   label: row.kind === "prompt"
     ? "Prompt " + ((names instanceof Map && names.get(row.name)) || row.name)
     : "Model: " + row.name,

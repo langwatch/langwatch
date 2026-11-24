@@ -48,6 +48,14 @@ export const KPIS_CODE = widgetCode({
   const perSuccessPrev = ratio(num(s.cost_prev), resolvedPrev);
   const addJudge = () => LW.navigate("onlineEvaluations", {});
   const percent = (value) => pct(value, 0);
+  // Worse: moved the wrong way by more than the half a percent Change reads as flat.
+  const worse = (now, before, better) => known(now) && num(before) > 0 &&
+    ((now - before) / before) * (better === "up" ? -1 : 1) > 0.005;
+  signalProblem(
+    worse(ratio(resolved, num(o.closed)), ratio(resolvedPrev, num(o.closed_prev)), "up") ||
+    worse(ratio(num(k.passed), num(k.judged)), ratio(num(k.passed_prev), num(k.judged_prev)),
+      "up") ||
+    (resolved > 0 && worse(perSuccess, perSuccessPrev, "down")));
   return (
     <Panel>
       <Figures>
@@ -282,7 +290,7 @@ export const RESOLVED_TREND_CODE = widgetCode({
   const names = new Map(versions.data.map((row) => [row.id, row.name]));
   const counts = [{ key: "resolved", kind: "count" }, { key: "closed", kind: "count" }];
   const points = withBuckets(trend, counts).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     resolved: num(row.resolved),
     share: num(row.closed) > 0 ? num(row.resolved) / num(row.closed) : null,
   }));
@@ -292,6 +300,8 @@ export const RESOLVED_TREND_CODE = widgetCode({
     { key: "resolved", label: "Resolved conversations", colour: C.teal, bars: true },
     { key: "share", label: "Share resolved", colour: C.orange, right: true },
   ];
+  const shares = points.map((point) => point.share).filter(known);
+  signalProblem(shares.length > 1 && shares[shares.length - 1] < shares[0]);
   return (
     <Panel>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
@@ -354,6 +364,9 @@ export const TASK_SUCCESS_CODE = widgetCode({
     label: languageName(row.language),
     colour: colourFor(row.language, index),
   }));
+  // Clearly behind: a language 10 points or more under the best one.
+  const rates = languages.map((row) => ratio(row.done, row.calls)).filter(known);
+  signalProblem(rates.length > 1 && Math.max(...rates) - Math.min(...rates) >= 0.1);
   return (
     <Panel>
       <Figures>
@@ -366,7 +379,7 @@ export const TASK_SUCCESS_CODE = widgetCode({
       </Figures>
       <div style={{ height: 8 }} />
       <MarkedChart points={points} series={series} format={(value) => pct(value, 0)}
-        domain={[0, 1]} />
+        domain={[0, 1]} legendKind="language" />
     </Panel>
   );`,
 });
@@ -418,6 +431,8 @@ export const ACCEPTANCE_CODE = widgetCode({
     { key: "regenerated", label: "Asked again", colour: C.orange, bars: true, stack: "a" },
     { key: "dropped", label: "Dropped", colour: C.strong, bars: true, stack: "a" },
   ];
+  const kept = points.map((point) => point.accepted).filter(known);
+  signalProblem(kept.length > 1 && kept[kept.length - 1] < kept[0]);
   return (
     <Panel>
       <Figures>
@@ -429,7 +444,7 @@ export const ACCEPTANCE_CODE = widgetCode({
       </Figures>
       <div style={{ height: 8 }} />
       <MarkedChart points={points} series={series} format={(value) => pct(value, 0)}
-        domain={[0, 1]} />
+        domain={[0, 1]} legendKind="action" />
     </Panel>
   );`,
 });

@@ -46,6 +46,8 @@ export const SPEND_CODE = widgetCode({
   const pace = ratio(m.last_7_days, m.days_with_data);
   const forecast = add(m.month_to_date, known(pace) ? pace * daysLeft : null);
   const monthName = new Date().toLocaleString("en-US", { month: "long", timeZone: "UTC" });
+  // No budget is known here: the pace counts as a problem when spend rose 10% or more.
+  signalProblem(num(s.cost_prev) > 0 && cost >= num(s.cost_prev) * 1.1);
   return (
     <Panel>
       <Figures>
@@ -150,10 +152,12 @@ function UnpricedRow({ traces }) {
   const points = labelled(withBuckets(main,
     series.map((item) => ({ key: item.key, kind: "count" })), spend));
   const test = known(total) ? total - (costOf("production") ?? 0) : null;
+  // A large share: testing takes a quarter of the spend or more.
+  signalProblem((ratio(test, total) ?? 0) >= 0.25);
   return (
     <Panel>
       <Headline value={pct(ratio(test, total), 0)} label="of AI spend goes on testing" />
-      <MarkedChart points={points} series={series} format={usd} />
+      <MarkedChart points={points} series={series} format={usd} legendKind="source" />
       <div style={{ marginTop: 8 }}>
         {shown.map(([key, label, colour, origin]) => (
           <SourceRow key={key} label={label} colour={colour} cost={costOf(key)} total={total}
@@ -185,24 +189,30 @@ export const WASTE_CODE = widgetCode({
     { label: "Going in circles", traces: num(w.loop_traces), cost: num(w.loop_cost) },
   ].toSorted((a, b) => b.cost - a.cost);
   const total = add(...lines.map((line) => line.cost));
-  if (!total) return <Panel><Note>No spend was wasted in this period.</Note></Panel>;
+  if (!total) {
+    signalProblem(false);
+    return <Panel><Note>No spend was wasted in this period.</Note></Panel>;
+  }
   const columns = [
     {
       header: "Wasted on",
       cell: (row) => (
-        <span onClick={() => openTraces(row.filter)} style={{ cursor: "pointer" }}>{row.label}</span>
+        <span onClick={(event) => { event.stopPropagation(); openTraces(row.filter); }}
+          style={{ cursor: "pointer" }}>{row.label}</span>
       ),
     },
     { header: "Requests", align: "right", cell: (row) => count(row.traces) },
     { header: "Share", align: "right", cell: (row) => pct(ratio(row.cost, total), 0) },
     { header: "Cost", align: "right", cell: (row) => <b>{usd(row.cost)}</b> },
   ];
+  signalProblem(total > 0);
   return (
     <Panel>
       <Headline value={usd(total) + plus(main)}
         label={"spent on requests that bought nothing, " + pct(total / spend, 0) +
           " of what your agent cost"} />
-      <Table columns={columns} rows={lines} />
+      <Table columns={columns} rows={lines}
+        ask={(row) => (row.cost > 0 ? { kind: "line", label: row.label } : null)} />
     </Panel>
   );`,
 });
@@ -222,7 +232,7 @@ export const COST_PER_CALL_CODE = widgetCode({
   const calls = num(t.calls);
   if (!calls) return <Panel><CallToAction /></Panel>;
   const points = withBuckets(trend, ["cost", "calls"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     llm: ratio(num(row.cost), num(row.calls)),
   }));
   return (
@@ -236,7 +246,7 @@ export const COST_PER_CALL_CODE = widgetCode({
         </Figure>
       </Figures>
       <div style={{ height: 8 }} />
-      <MarkedChart points={points} format={usd}
+      <MarkedChart points={points} format={usd} legendKind="part"
         series={[{ key: "llm", label: "Model cost per call", colour: C.teal }]} />
     </Panel>
   );`,
@@ -271,7 +281,7 @@ export const COST_PER_DOCUMENT_CODE = widgetCode({
     all: ratio(point.cost, point.documents),
   }));
   const points = withBuckets(trend, ["all", ...models.keys()], perBucket)
-    .map((point) => ({ ...point, x: bucketLabel(point.bucket) }));
+    .map((point) => ({ ...point, x: bucketLabel(point.bucket), at: bucketStart(point.bucket) }));
   const rows = [...models.entries()].map(([model, value]) => ({ model, ...value }));
   const cost = add(...rows.map((row) => row.cost));
   const documents = rows.reduce((sum, row) => sum + row.documents, 0);
@@ -288,6 +298,7 @@ export const COST_PER_DOCUMENT_CODE = widgetCode({
     { key: "all", label: "All documents", colour: C.text },
   ];
   const markers = changes.data.filter((row) => row.kind === "model").map(markerOf);
+  signalProblem(first > 0 && known(second) && second > first * 1.05);
   return (
     <Panel>
       <Figures>
@@ -304,7 +315,8 @@ export const COST_PER_DOCUMENT_CODE = widgetCode({
         </Figure>
       </Figures>
       <div style={{ height: 8 }} />
-      <MarkedChart points={points} series={series} format={usd} markers={markers} />
+      <MarkedChart points={points} series={series} format={usd} markers={markers}
+        legendKind="model" />
     </Panel>
   );`,
 });

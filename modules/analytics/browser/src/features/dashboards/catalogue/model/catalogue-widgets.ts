@@ -3,7 +3,6 @@
  * Generated from the dashboards library draft on 2026-10-06; edit here from now on.
  */
 
-import type { WidgetAction } from "../../langy/model/board-langy.ts";
 import type { AgentKind, CatalogueScope, Persona, QuestionType } from "./catalogue-labels.ts";
 
 /** built: code exists; ready: today's data; logic: new query code; feature: waits for LangWatch. */
@@ -27,8 +26,6 @@ export interface CatalogueWidget {
   readonly scope: CatalogueScope;
   /** What Langy is asked when the widget is added; the member can edit it first. */
   readonly prompt: string;
-  /** The buttons under the card's chart, each drafting Langy about the widget (AC125). */
-  readonly actions?: readonly WidgetAction[];
 }
 
 /** Made for coding agents, or reads their traces: those widgets live with coding agents. */
@@ -173,7 +170,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "rate series, the first and last bucket's rate, and a top-five table of error types. Quote " +
       "the real numbers from the query result. If a query returns no rows, say plainly that " +
       "there is no data for the dashboard period rather than guessing.",
-    actions: ["investigate", "propose-fix"],
   },
   {
     id: "latency-spread",
@@ -262,7 +258,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "It needs: evaluator results. Quote the real numbers from the query result and name the " +
       "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
       "dashboard period.",
-    actions: ["investigate", "propose-fix"],
   },
   {
     id: "scenarios",
@@ -286,7 +281,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "for the period, its series per bucket, and a top-five table of suites by runs. Quote the " +
       "real numbers from the query result. If a query returns no rows, say plainly that there is " +
       "no data for the dashboard period rather than guessing.",
-    actions: ["investigate", "propose-fix"],
   },
   {
     id: "topics",
@@ -373,7 +367,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "trace. It needs: evaluator results. Quote the real numbers from the query result and name " +
       "the traces behind them. If a query returns no rows, say plainly that there is no data for " +
       "the dashboard period.",
-    actions: ["investigate", "propose-fix"],
   },
   {
     id: "evaluation-coverage",
@@ -395,7 +388,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "of traces evaluated at all. It needs: evaluator results. Quote the real numbers from the " +
       "query result and name the traces behind them. If a query returns no rows, say plainly " +
       "that there is no data for the dashboard period.",
-    actions: ["investigate", "fill-gaps"],
   },
   {
     id: "fd-throughput",
@@ -459,7 +451,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "first. The same query backs the “Top error types” widget. It needs: error status on " +
       "spans. Quote the real numbers from the query result and name the traces behind them. If a " +
       "query returns no rows, say plainly that there is no data for the dashboard period.",
-    actions: ["investigate", "propose-fix"],
   },
   {
     id: "fd-quality",
@@ -681,7 +672,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "that change. It needs: error status on spans. Quote the real numbers from the query " +
       "result and name the traces behind them. If a query returns no rows, say plainly that " +
       "there is no data for the dashboard period.",
-    actions: ["investigate", "propose-fix"],
   },
   {
     id: "up-where-fails",
@@ -704,7 +694,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "failures. It needs: tool and step spans; error status on spans. Quote the real numbers " +
       "from the query result and name the traces behind them. If a query returns no rows, say " +
       "plainly that there is no data for the dashboard period.",
-    actions: ["investigate", "propose-fix"],
   },
   {
     id: "up-failing-traces",
@@ -726,7 +715,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "opens to the step that broke. It needs: traces. Quote the real numbers from the query " +
       "result and name the traces behind them. If a query returns no rows, say plainly that " +
       "there is no data for the dashboard period.",
-    actions: ["investigate", "propose-fix"],
   },
   {
     id: "up-step-latency",
@@ -823,7 +811,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "table of the five evaluators with the lowest pass rate and their run counts. Quote the " +
       "real numbers from the query result. If a query returns no rows, say plainly that there is " +
       "no data for the dashboard period rather than guessing.",
-    actions: ["investigate", "propose-fix"],
   },
   {
     id: "ans-topics",
@@ -1029,7 +1016,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "suite whose CI line drops needs a look. It needs: scenario runs. Quote the real numbers " +
       "from the query result and name the traces behind them. If a query returns no rows, say " +
       "plainly that there is no data for the dashboard period.",
-    actions: ["investigate", "propose-fix"],
   },
   {
     id: "ship-flaky",
@@ -1052,7 +1038,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "needs: scenario runs. Quote the real numbers from the query result and name the traces " +
       "behind them. If a query returns no rows, say plainly that there is no data for the " +
       "dashboard period.",
-    actions: ["investigate", "propose-fix"],
   },
   {
     id: "ship-rollout",
@@ -1344,7 +1329,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "It needs: evaluator results. Quote the real numbers from the query result and name the " +
       "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
       "dashboard period.",
-    actions: ["investigate", "propose-fix"],
   },
   {
     id: "so-queue",
@@ -1683,7 +1667,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "errors a later step fixed. It needs: tool and step spans; error status on spans. Quote " +
       "the real numbers from the query result and name the traces behind them. If a query " +
       "returns no rows, say plainly that there is no data for the dashboard period.",
-    actions: ["investigate", "propose-fix"],
   },
   {
     id: "tools-wrong-tool",
@@ -2046,7 +2029,6 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
       "record, so they count as priced. It needs: model name. Quote the real numbers from the " +
       "query result and name the traces behind them. If a query returns no rows, say plainly " +
       "that there is no data for the dashboard period.",
-    actions: ["investigate", "fill-gaps"],
   },
   {
     id: "inventory",

@@ -15,13 +15,14 @@ function buildOf(id: string) {
   return { code: build.code.tsx, queries: build.queries };
 }
 
-type Marker = { x: string; label: string };
+type Marker = { x: string; at: string; label: string };
 type MarkerOf = (row: Record<string, unknown>, names?: unknown) => Marker;
 
 // The stored snippet is what the frame runs; evaluating it is the test.
 const markerSource = MARKED_CHART.slice(MARKED_CHART.indexOf("const markerOf"));
 // oxlint-disable-next-line no-implied-eval
-const markerOf = new Function("bucketLabel", `${markerSource}\nreturn markerOf;`)(
+const markerOf = new Function("bucketLabel", "bucketStart", `${markerSource}\nreturn markerOf;`)(
+  (bucket: string) => bucket,
   (bucket: string) => bucket,
 ) as MarkerOf;
 
@@ -49,6 +50,7 @@ describe("given a widget that names managed prompt versions", () => {
   it("marks a managed version by its handle and number, and a sent one by its value", () => {
     expect(markerOf({ kind: "prompt", name: "prompt_version_9", bucket: "Mon" }, names)).toEqual({
       x: "Mon",
+      at: "Mon",
       label: "Prompt support-agent v4",
     });
     expect(markerOf({ kind: "prompt", name: "v2-beta", bucket: "Tue" }, names).label).toBe(

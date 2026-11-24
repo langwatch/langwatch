@@ -52,6 +52,7 @@ function attach(
     onHeightChange: (px) => events.push({ height: px }),
     onNavigate: (args) => events.push({ navigate: args }),
     onAskLangy: (subject) => events.push({ askLangy: subject }),
+    onSignal: (signal) => events.push({ signal }),
     onTeardown: () => events.push("teardown"),
     onIdleChange: (idle) => events.push({ idle }),
   });
@@ -108,16 +109,40 @@ describe("the frame bridge session", () => {
     bridge.dispose();
   });
 
-  /** @scenario "AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period" */
-  it("forwards a clicked mark's ask with its label and bucket, cut to length", async () => {
+  /**
+   * @scenario "AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period"
+   * @scenario "AC245 Chart asks: a click says what kind of value was clicked, its raw value and the bucket it starts"
+   */
+  it("forwards a clicked mark's kind, label, value, bucket and series, cut to length", async () => {
     const { events, load, send, bridge } = attach();
     load();
-    await send({ type: "lw:ask-langy", subject: { label: " gpt-5 ", at: "Nov 3" } });
-    await send({ type: "lw:ask-langy", subject: { label: "x".repeat(300), extra: "dropped" } });
+    const at = "2026-11-03T00:00:00.000Z";
+    await send({
+      type: "lw:ask-langy",
+      subject: { kind: "day", label: " Nov 3 ", at, series: "Errors", extra: "dropped" },
+    });
+    await send({
+      type: "lw:ask-langy",
+      subject: { kind: "model", label: "gpt-5", value: "openai/gpt-5" },
+    });
+    await send({ type: "lw:ask-langy", subject: { label: "x".repeat(300), at: "Nov 3" } });
     expect(events).toEqual([
-      { askLangy: { label: "gpt-5", at: "Nov 3" } },
+      { askLangy: { kind: "day", label: "Nov 3", at, series: "Errors" } },
+      { askLangy: { kind: "model", label: "gpt-5", value: "openai/gpt-5" } },
       { askLangy: { label: "x".repeat(200) } },
     ]);
+    bridge.dispose();
+  });
+
+  /** @scenario "AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem" */
+  it("forwards a widget's problem signal and drops one of any other shape", async () => {
+    const { events, load, send, bridge } = attach();
+    load();
+    await send({ type: "lw:signal", signal: { problem: true } });
+    await send({ type: "lw:signal", signal: { problem: "yes" } });
+    await send({ type: "lw:signal" });
+    await send({ type: "lw:signal", signal: { problem: false } });
+    expect(events).toEqual([{ signal: { problem: true } }, { signal: { problem: false } }]);
     bridge.dispose();
   });
 

@@ -44,12 +44,24 @@ function MarkedChart({ points, bars, line, marks, barFormat, lineFormat }) {
     ...(marks.length > 0 ? [[C.faint, "prompt or model change", true]] : []),
   ];
   const lineAxis = bars.length > 0 ? "line" : "bars";
+  // A click asks about the bucket under the pointer and the bar hit; with one series, that one.
+  const drawn = [...bars, ...(line ? [line] : [])];
+  let pointed = null;
+  const onClick = (state) => {
+    const at = points[Number(state?.activeTooltipIndex)];
+    const hit = pointed ?? (drawn.length === 1 ? drawn[0].label : null);
+    pointed = null;
+    if (!at) return;
+    askLangy({ kind: "day", label: String(at.x), ...(at.at ? { at: at.at } : {}),
+      ...(hit ? { series: hit } : {}) });
+  };
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
       <Legend items={legend} />
       <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={points} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
+          <ComposedChart data={points} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}
+            onClick={canAskLangy() && points.length > 0 ? onClick : undefined} style={askCursor()}>
             <CartesianGrid vertical={false} stroke={C.border} />
             <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
               dy={4} />
@@ -63,7 +75,8 @@ function MarkedChart({ points, bars, line, marks, barFormat, lineFormat }) {
               tipValue(name === line?.label ? lineFormat : barFormat)(value, name)} />
             {bars.map((item) => (
               <Bar key={item.key} yAxisId="bars" dataKey={item.key} name={item.label}
-                stackId="bars" fill={item.colour} isAnimationActive={false} />
+                stackId="bars" fill={item.colour} isAnimationActive={false}
+                onClick={() => { pointed = item.label; }} />
             ))}
             {line && bridge({ ...line, yAxisId: lineAxis })}
             {line && (
@@ -110,7 +123,7 @@ const COLOURS = [C.red, C.orange, C.pink, "#9f7aea", C.faint];`,
     byBucket[bucketLabel(row.bucket)] = point;
   });
   const points = withBuckets(rate, ["error_rate"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     rate: num(row.error_rate),
     ...byBucket[bucketLabel(row.bucket)],
   }));
@@ -118,6 +131,10 @@ const COLOURS = [C.red, C.orange, C.pink, "#9f7aea", C.faint];`,
   const bars = keys.map((key, index) => ({ key, label: key, colour: COLOURS[index] }));
   const line = { key: "rate", label: "Share with an error", colour: C.teal };
   const label = "requests failed" + (ranked.length > 0 ? ". Most common: " + ranked[0] : "");
+  // A spike: a bucket's error rate at least twice the typical bucket's.
+  const rates = points.map((point) => point.rate).filter(known).toSorted((a, b) => a - b);
+  const typical = rates[Math.floor(rates.length / 2)] ?? 0;
+  signalProblem(errored > 0 && (rates[rates.length - 1] ?? 0) > 2 * typical);
   return (
     <Panel>
       <Headline value={count(errored)} label={label} />
@@ -134,7 +151,7 @@ const FAILURE_ROWS = `function FailureRows({ rows }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {rows.map((row) => (
-        <div key={row.step}>
+        <div key={row.step} {...askable({ kind: "step", label: row.step })} style={askCursor()}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 11.5 }}>
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis",
               whiteSpace: "nowrap" }}>"{row.step}"</span>
@@ -185,6 +202,7 @@ export const FAILING_STEPS_CODE = widgetCode({
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
   const rows = main.data.map(failureRow).filter((row) => row.failures > 0);
+  signalProblem(rows.some((row) => row.failures > row.recovered));
   if (rows.length === 0) return <Panel><Note>No step failed in this period.</Note></Panel>;
   return (
     <Panel>
@@ -216,8 +234,10 @@ export const TOOL_ERROR_RATE_CODE = widgetCode({
     count(worst.failures - worst.recovered);
   const bars = ranked.slice(0, 5).map((tool) => ({
     label: tool.step,
+    key: tool.step,
     value: tool.failures / tool.calls,
   }));
+  signalProblem(failures > recovered);
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
@@ -228,7 +248,7 @@ export const TOOL_ERROR_RATE_CODE = widgetCode({
         <Stat label="Fails most" value={failures > 0 ? worst.step : "No tool failed"} />
       </div>
       <div style={{ margin: "8px 0 4px", fontSize: 11, color: C.subtle }}>{worstLine}</div>
-      <Bars rows={bars} format={(value) => pct(value)} />
+      <Bars rows={bars} format={(value) => pct(value)} kind="tool" />
     </Panel>
   );`,
 });
@@ -244,12 +264,13 @@ export const LOOPS_AND_RETRIES_CODE = widgetCode({
   queries: ["daily", "steps", "totals"],
   body: `  const traffic = num(totals.data[0]?.traces);
   if (!traffic) return <Panel><CallToAction /></Panel>;
+  signalProblem(daily.data.length > 0);
   if (daily.data.length === 0) {
     return <Panel><Note>Your agent did not go in circles in this period.</Note></Panel>;
   }
   const counts = ["looped_traces", "retried_traces"].map((key) => ({ key, kind: "count" }));
   const points = withBuckets(daily, counts).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     looped: num(row.looped_traces),
     retried: num(row.retried_traces),
   }));
@@ -317,9 +338,11 @@ export const WRONG_TOOL_CODE = widgetCode({
   const secondJudged = judged - firstJudged;
   const second = ratio(num(totals.wrong) - num(totals.wrong_first), secondJudged);
   const points = withBuckets(trend, ["wrong_rate"])
-    .map((row) => ({ x: bucketLabel(row.bucket), wrong: num(row.wrong_rate) }));
+    .map((row) => ({ x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
+      wrong: num(row.wrong_rate) }));
   const label = "of tasks started with the wrong tool, " + pct(first) +
     " earlier in this period, " + pct(second) + " lately";
+  signalProblem(known(first) && known(second) && second > first);
   return (
     <Panel>
       <Headline value={pct(ratio(totals.wrong, judged))} label={label} />

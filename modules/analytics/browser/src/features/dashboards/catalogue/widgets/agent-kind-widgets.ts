@@ -59,9 +59,11 @@ function worse(before, after) {
 
 /** Figure tiles: a label, the number, one line of context, red when it calls for action. */
 const FIGURES = `const TONES = { act: C.red, watch: C.orange, good: C.green };
-function Figure({ label, value, sub, tone }) {
+// subject, when set, makes the tile a button that asks Langy about it.
+function Figure({ label, value, sub, tone, subject }) {
   return (
-    <div style={{ minWidth: 0, borderRadius: 6, background: C.muted, padding: "6px 8px" }}>
+    <div {...(subject ? askable(subject) : {})} style={{ minWidth: 0, borderRadius: 6,
+      background: C.muted, padding: "6px 8px", ...(subject ? askCursor() : {}) }}>
       <div style={{ fontSize: 10, color: C.faint }}>{label}</div>
       <div style={{ fontSize: 15, fontWeight: 600, color: TONES[tone] || C.text,
         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
@@ -109,7 +111,8 @@ function ShareRows({ rows, total, unit }) {
         <span style={{ textAlign: "right" }}>Share</span>
       </div>
       {rows.map((row) => (
-        <div key={row.label} style={{ ...SHARE_GRID, fontSize: 12 }}>
+        <div key={row.label} {...askable({ kind: "customer", label: row.label, value: row.key })}
+          style={{ ...SHARE_GRID, fontSize: 12, ...askCursor() }}>
           <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis",
             whiteSpace: "nowrap" }}>{row.label}</span>
           <span style={{ height: 6, borderRadius: 3, background: C.muted }}>
@@ -134,6 +137,7 @@ function ShareRows({ rows, total, unit }) {
   const more = num(totals.data[0]?.units) - Math.min(units.data.length, 6);
   const rows = units.data.slice(0, 6).map((row) => ({
     label: unitName(row.unit, key),
+    key: row.unit,
     value: num(row.conversations),
   }));
   return (
@@ -187,9 +191,11 @@ const ATT_TABLE_CODE = widgetCode({
     { header: "AI cost", align: "right", cell: (row) => usd(num(row.cost)) },
     { header: "Per " + unit.things.slice(0, -1), align: "right", cell: perConversation },
   ];
+  const ask = (row) => ({ kind: "customer", label: unitName(row.unit, key), value: row.unit });
+  signalProblem(units.data.some((row) => worse(sides(row).before, sides(row).now)));
   return (
     <Panel>
-      <Table columns={columns} rows={units.data} rowPadding={3} />
+      <Table columns={columns} rows={units.data} rowPadding={3} ask={ask} />
     </Panel>
   );`,
 });
@@ -201,14 +207,15 @@ const ATT_CHANGE_CODE = widgetCode({
     "ones that got worse.",
   source: "evaluations",
   parts: [NUMBERS, DATES, UNITS, PASS_RATES],
-  components: `function ChangeRow({ label, before, after, fell, low }) {
+  components: `function ChangeRow({ label, unit, before, after, fell, low }) {
   const at = (value) => ((value - low) / (1 - low)) * 100 + "%";
   const dot = (value, size, colour) => ({ position: "absolute", top: "50%", left: at(value),
     width: size, height: size, borderRadius: size, background: colour,
     transform: "translate(-50%, -50%)" });
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 10rem) 1fr 7rem", gap: 12,
-      alignItems: "center", fontSize: 12, padding: "3px 0" }}>
+    <div {...askable({ kind: "customer", label, value: unit })} style={{ display: "grid",
+      gridTemplateColumns: "minmax(0, 10rem) 1fr 7rem", gap: 12, alignItems: "center",
+      fontSize: 12, padding: "3px 0", ...askCursor() }}>
       <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis",
         whiteSpace: "nowrap" }}>{label}</span>
       <span style={{ position: "relative", height: 12 }}>
@@ -246,6 +253,7 @@ const ATT_CHANGE_CODE = widgetCode({
     .filter(([, { before, after }]) => before.judged >= MIN_JUDGED && after.judged >= MIN_JUDGED)
     .map(([unit, { before, after }]) => ({
       label: unitName(unit, key),
+      unit,
       before: rate(before.passed, before.judged),
       after: rate(after.passed, after.judged),
       fell: worse(before, after),
@@ -255,6 +263,7 @@ const ATT_CHANGE_CODE = widgetCode({
   const low = Math.max(0, Math.min(...shown.flatMap((row) => [row.before, row.after]), 1) - 0.03);
   const day = utc(last.changed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   const unit = unitOf(key);
+  signalProblem(fell.length > 0);
   return (
     <Panel>
       <div style={{ display: "flex", gap: 8, alignItems: "baseline", marginBottom: 6, fontSize: 12 }}>
@@ -287,12 +296,13 @@ const COST_BY_SEGMENT_CODE = widgetCode({
   if (units.data.length === 0 || !total) return <Panel><CallToAction /></Panel>;
   const key = units.data[0].unit_key;
   if (!key) return <Panel><Note>{NO_UNIT}</Note></Panel>;
-  const ranked = units.data.map((row) => ({ label: unitName(row.unit, key), value: num(row.cost) }));
+  const ranked = units.data.map((row) => ({ label: unitName(row.unit, key), key: row.unit,
+    value: num(row.cost) }));
   const rest = Math.max(0, total - (add(...ranked.map((row) => row.value)) ?? 0));
   const more = num(totals.data[0]?.units) - ranked.length;
   return (
     <Panel>
-      <Bars rows={ranked} format={usd} />
+      <Bars rows={ranked} format={usd} kind="customer or team" />
       {more > 0 ? (
         <div style={{ marginTop: 6, fontSize: 10.5, color: C.faint }}>
           and {more} more, {usd(rest)}
@@ -329,9 +339,10 @@ const VOICE_TURN_LATENCY_CODE = widgetCode({
   const largest = stages.reduce((top, stage) => (stage.p95 > top.p95 ? stage : top));
   const grew = stages.reduce((top, stage) => (stage.change > top.change ? stage : top));
   const points = withBuckets(trend, STAGES.map((stage) => stage.key + "_p95")).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     ...Object.fromEntries(STAGES.map((stage) => [stage.key, num(row[stage.key + "_p95"])])),
   }));
+  signalProblem(grew.change > 0.15);
   return (
     <Panel>
       <Figures columns={3}>
@@ -367,12 +378,15 @@ const perKLabel = (value) => (known(value) ? value.toFixed(1) : GAP);`,
   const second = perK(num(totals.dropped_second), num(totals.calls_second));
   const change = drift(first, second);
   const points = withBuckets(trend, ["dropped", "repeating", "calls"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     dropped: perK(num(row.dropped), num(row.calls)),
     repeating: perK(num(row.repeating), num(row.calls)),
   }));
   const series = [{ key: "dropped", label: "Dropped calls", colour: C.red }];
   if (checked) series.push({ key: "repeating", label: "Agent repeated itself", colour: C.orange });
+  const repeatsRose = checked && num(latest(points, "repeating")) >
+    num(earliest(points, "repeating")) * 1.25;
+  signalProblem(change > 0.25 || repeatsRose);
   return (
     <Panel>
       <Figures columns={3}>
@@ -438,12 +452,21 @@ function Accuracy({ wrong, checked }) {
     .sort((a, b) => total(b[1]) - total(a[1]))
     .slice(0, 6)
     .map(([field, byUnit]) => ({ field, byUnit }));
+  const askField = (row, unit) => askable({ kind: "field", label: fieldName(row.field),
+    value: row.field, ...(unit === undefined ? {} : { series: unitName(unit, key) }) });
   const columns = [
-    { header: "Field", cell: (row) => <b>{fieldName(row.field)}</b> },
+    {
+      header: "Field",
+      cell: (row) => <b {...askField(row)} style={askCursor()}>{fieldName(row.field)}</b>,
+    },
     ...units.map((unit) => ({
       header: unitName(unit, key),
       align: "right",
-      cell: (row) => <Accuracy wrong={row.byUnit.get(unit) || 0} checked={checkedIn.get(unit) || 0} />,
+      cell: (row) => (
+        <span {...askField(row, unit)} style={askCursor()}>
+          <Accuracy wrong={row.byUnit.get(unit) || 0} checked={checkedIn.get(unit) || 0} />
+        </span>
+      ),
     })),
     {
       header: "All",
@@ -451,6 +474,9 @@ function Accuracy({ wrong, checked }) {
       cell: (row) => <Accuracy wrong={total(row.byUnit)} checked={allChecked} />,
     },
   ];
+  const under = (wrongCount, checked) => checked >= MIN_CHECKED && 1 - wrongCount / checked < FLOOR;
+  signalProblem(fields.some((row) => under(total(row.byUnit), allChecked) ||
+    units.some((unit) => under(row.byUnit.get(unit) || 0, checkedIn.get(unit) || 0))));
   return (
     <Panel>
       <Table columns={columns} rows={fields} rowPadding={3} />
@@ -485,9 +511,11 @@ const EXT_HUMAN_REVIEW_CODE = widgetCode({
   const top = byUnit.data[0];
   const unit = top ? unitOf(top.unit_key) : unitOf("");
   const points = withBuckets(trend, ["sent", "documents"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     share: ratio(row.sent, row.documents),
   }));
+  const secondShare = ratio(sent - num(totals.sent_first), documents - num(totals.documents_first));
+  signalProblem(known(firstShare) && known(secondShare) && secondShare > firstShare);
   return (
     <Panel>
       <Figures columns={3}>
@@ -513,8 +541,9 @@ const GEN_DROPOFF_CODE = widgetCode({
   parts: [NUMBERS, HEADLINE],
   components: `function Step({ label, value, of, drop }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "8rem 1fr 4rem", gap: 8,
-      alignItems: "center", fontSize: 12 }}>
+    <div {...askable({ kind: "step", label })} style={{ display: "grid",
+      gridTemplateColumns: "8rem 1fr 4rem", gap: 8, alignItems: "center", fontSize: 12,
+      ...askCursor() }}>
       <span style={{ fontWeight: 500 }}>{label}</span>
       <span style={{ height: 14, borderRadius: 4, background: C.muted }}>
         <span style={{ display: "block", height: "100%", borderRadius: 4, background: C.teal,
@@ -585,6 +614,7 @@ const SO_VERDICT_CODE = widgetCode({
       value: pct(lowest, 0),
       sub: weakest.control + " checked the fewest requests",
       tone: traces >= 30 ? zone(lowest < 0.9, lowest < 0.99) : undefined,
+      subject: { kind: "control", label: weakest.control },
     },
     {
       label: "Risky answers users saw",
@@ -599,6 +629,7 @@ const SO_VERDICT_CODE = widgetCode({
       tone: zone(pending > pendingBefore * 1.5 + 20, pending > pendingBefore * 1.1 + 5),
     },
   ];
+  signalProblem(figures.some((figure) => figure.tone === "act"));
   return (
     <Panel>
       <Figures columns={3}>
@@ -637,8 +668,9 @@ function Criterion({ name, passed, judged }) {
   else if (high < FLOOR) colour = C.red;
   else if (share < FLOOR) colour = C.orange;
   return (
-    <div title={"Passed " + pct(share, 0) + " of " + count(judged) + " answers. With this many " +
-      "answers the true rate could be as low as " + pct(low, 0) + "."}>
+    <div {...askable({ kind: "check", label: name || "Unnamed", value: name })}
+      style={askCursor()} title={"Passed " + pct(share, 0) + " of " + count(judged) +
+      " answers. With this many answers the true rate could be as low as " + pct(low, 0) + "."}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12 }}>
         <span style={{ flex: 1, minWidth: 0, fontWeight: 500, overflow: "hidden",
           textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name || "Unnamed"}</span>
@@ -661,6 +693,8 @@ function Criterion({ name, passed, judged }) {
 }`,
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
+  signalProblem(main.data.some((row) => num(row.judged) >= MIN_JUDGED &&
+    num(row.passed) / num(row.judged) < FLOOR));
   return (
     <Panel>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -690,12 +724,13 @@ const SO_QUEUE_CODE = widgetCode({
   const counts = ["came_in", "reviewed"].map((key) => ({ key, kind: "count" }));
   const points = withBuckets(flow, counts).map((row) => {
     backlog += num(row.came_in) - num(row.reviewed);
-    return { x: bucketLabel(row.bucket), pending: backlog };
+    return { x: bucketLabel(row.bucket), at: bucketStart(row.bucket), pending: backlog };
   });
   const wait = known(totals.wait_seconds) ? Math.round(num(totals.wait_seconds) / 3600) + "h" : GAP;
   let tone;
   if (grew > cameIn * 0.1) tone = "act";
   else if (grew > 0) tone = "watch";
+  signalProblem(grew > 0);
   return (
     <Panel>
       <Figures columns={4}>
@@ -731,9 +766,11 @@ const SO_CHANGES_CODE = widgetCode({
     { header: "What changed", cell: (row) => row.kind },
     { header: "Name", cell: (row) => <b>{row.name || "Unnamed"}</b> },
   ];
+  const ask = (row) => ({ kind: "change",
+    label: row.kind + " " + (row.name || "Unnamed") + " on " + day(row.at), value: row.name });
   return (
     <Panel>
-      <Table columns={columns} rows={main.data} rowPadding={3} />
+      <Table columns={columns} rows={main.data} rowPadding={3} ask={ask} />
     </Panel>
   );`,
 });

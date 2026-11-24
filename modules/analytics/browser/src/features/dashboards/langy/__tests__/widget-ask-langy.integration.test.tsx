@@ -126,11 +126,12 @@ describe("Ask Langy on a widget card", () => {
         expect(host.langyAsks).toHaveLength(1);
         const [request] = host.langyAsks;
         expect(request?.question).toBeUndefined();
-        expect(request?.draft?.startsWith(PROMPT)).toBe(true);
-        expect(request?.draft).toContain("Name: Traffic");
-        expect(request?.draft).toContain("Description: Traces per bucket");
-        expect(request?.draft).toContain(`- series:\n${SQL}`);
-        expect(request?.draft).toContain("Dashboard period:");
+        expect(request?.draft).toMatch(/^What does "Traffic" show over the last 30 days\?/);
+        expect(request?.draft).not.toContain(SQL);
+        const widgetRef = request?.context[1]?.ref ?? "";
+        expect(widgetRef).toContain(`how to answer it: ${PROMPT}`);
+        expect(widgetRef).toContain("description: Traces per bucket");
+        expect(widgetRef).toContain(`series: ${SQL}`);
         expect(request?.context[0]).toMatchObject({ kind: "dashboard", label: "Weekly review" });
       });
     });
@@ -179,7 +180,8 @@ describe("Ask Langy on a widget card", () => {
       const [request] = host.langyAsks;
       expect(request?.question).toBeUndefined();
       expect(request?.draft?.startsWith(opening)).toBe(true);
-      expect(request?.draft).toContain(`- series:\n${SQL}`);
+      expect(request?.draft).not.toContain(SQL);
+      expect(request?.context[1]?.ref).toContain(`series: ${SQL}`);
       expect(request?.context[0]).toMatchObject({ kind: "dashboard", label: "Weekly review" });
     });
   });

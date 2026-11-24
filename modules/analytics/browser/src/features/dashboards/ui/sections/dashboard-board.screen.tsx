@@ -304,10 +304,11 @@ function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoa
                               langy.ask(
                                 widgetMissingDataDraft({ missing, widget, board: subject, period }),
                               ),
-                            askAbout: (about) =>
+                            askAbout: (about, click) =>
                               langy.ask(
                                 widgetChartDraft({
                                   subject: about,
+                                  click,
                                   widget,
                                   board: subject,
                                   period,

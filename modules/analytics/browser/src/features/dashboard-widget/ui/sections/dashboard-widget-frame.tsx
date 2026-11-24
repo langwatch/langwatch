@@ -10,6 +10,7 @@ import type {
 } from "@langwatch/analytics-contract";
 import type {
   ChartAskSubject,
+  ChartSignal,
   ChartFrameDashboardContext,
   NavigableTarget,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
@@ -119,6 +120,8 @@ type DashboardWidgetFrameOverWindowProps = DashboardWidgetFrameProps & {
   readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
   /** Drafts Langy about a bar, point or legend entry clicked; absent, none is clickable. */
   readonly onAskLangyAbout?: (subject: ChartAskSubject) => void;
+  /** Told whether the widget's code reports the problem it watches for (`LW.signal`). */
+  readonly onSignal?: (signal: ChartSignal) => void;
   /** Who reads the card; with it, a memory or time limit failure gets its own words and actions. */
   readonly limitAudience?: WidgetLimitAudience;
   /** Told which face the frame draws, so the card offers only what that face allows. */
@@ -162,6 +165,7 @@ function WidgetFrameOverWindow({
   granularitySeconds,
   onAskLangyToSetUp,
   onAskLangyAbout,
+  onSignal,
   limitAudience,
   onFaceChange,
   onLimitFailureChange,
@@ -296,6 +300,7 @@ function WidgetFrameOverWindow({
           onLog={onLog}
           onNavigate={onNavigate}
           onAskLangy={onAskLangyAbout}
+          onSignal={onSignal}
           maxHeight={maxHeight}
           cover={loading && !cover ? <WidgetLoadingFace slow={slow} /> : undefined}
           onIdleChange={setFrameIdle}

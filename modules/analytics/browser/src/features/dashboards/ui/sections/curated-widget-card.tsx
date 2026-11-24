@@ -12,6 +12,7 @@ import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sec
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import { useWidgetViewed } from "../../behavior/use-widget-viewed.ts";
 import { catalogueWidgetActions } from "../../catalogue/index.ts";
+import { shownWidgetButtons } from "../../langy/model/board-langy.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import { widgetCardSourcesLine } from "../../model/widget-sources.ts";
 import type { BoardTemplateWidget } from "../../templates/index.ts";
@@ -21,7 +22,7 @@ import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell
 import { WidgetExportMenu } from "../blocks/widget-export-menu.tsx";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
 import { WidgetDragHandle } from "../elements/widget-drag-handle.tsx";
-import type { WidgetCardLangy } from "./board-widget-card.tsx";
+import { chartAsks, type WidgetCardLangy } from "./board-widget-card.tsx";
 
 export function CuratedWidgetCard({
   widget,
@@ -67,7 +68,10 @@ export function CuratedWidgetCard({
   const { name, definition } = widget;
   const [face, setFace] = useState<WidgetFace["kind"]>("chart");
   const langyOnData = face === "no_access" ? undefined : langy;
-  const actions = langyOnData ? catalogueWidgetActions(widget.key) : [];
+  const declared = langyOnData ? catalogueWidgetActions(widget.key) : [];
+  // The widget's code says whether its problem is on the card; a face over the chart hides it.
+  const [problem, setProblem] = useState(false);
+  const actions = shownWidgetButtons({ actions: declared, problem: problem && face === "chart" });
   const csvExport = useWidgetCsvExport({ board: boardName, widget: name });
   const viewRef = useWidgetViewed({ widgetSource: "curated" });
   const isEditable = onEdit !== undefined || onDelete !== undefined;
@@ -122,7 +126,8 @@ export function CuratedWidgetCard({
         onExportChange={csvExport.onExportChange}
         onEmptyChange={onEmptyChange}
         onLimitFailureChange={onLimitFailureChange}
-        {...(langyOnData ? { onAskLangyAbout: langyOnData.askAbout } : {})}
+        onSignal={({ problem: shows }) => setProblem(shows)}
+        {...chartAsks({ langy: langyOnData, declared })}
       />
     </WidgetCardShell>
   );

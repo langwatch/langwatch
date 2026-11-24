@@ -20,20 +20,31 @@ import {
 
 const SERIES_PARTS = [NUMBERS, DATES, CHART_STYLE, HEADLINE, BUCKETS, GAP_BRIDGE, SERIES_CHART];
 
+/** The median of the known values: the usual level a far-off bucket is read against. */
+const MIDDLE = `function middle(values) {
+  const sorted = values.filter(known).toSorted((a, b) => a - b);
+  return sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)] : null;
+}`;
+
 export const TRAFFIC_CODE = widgetCode({
   summary: "Traces per bucket, with the period total and the busiest and quietest buckets.",
   subtitle: "Your agent's requests over time, leaving out tests and playground runs.",
   source: "requests",
   recharts: SERIES_CHART_IMPORTS,
-  parts: SERIES_PARTS,
+  parts: [...SERIES_PARTS, MIDDLE],
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
   const points = withBuckets(main, [{ key: "traces", kind: "count" }])
-    .map((row) => ({ x: bucketLabel(row.bucket), traces: num(row.traces) }));
+    .map((row) => ({ x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
+      traces: num(row.traces) }));
   const total = points.reduce((sum, point) => sum + point.traces, 0);
   const busiest = points.toSorted((a, b) => b.traces - a.traces)[0];
   const label = "requests. Busiest " + bucketUnit() + ": " + busiest.x + ", " +
     count(busiest.traces) + " requests";
+  // One bucket over twice the usual (the median one), or under a third of it.
+  const usual = middle(points.map((point) => point.traces));
+  const quietest = points.toSorted((a, b) => a.traces - b.traces)[0];
+  signalProblem(usual > 0 && (usual * 2 < busiest.traces || quietest.traces * 3 < usual));
   return (
     <Panel>
       <Headline value={count(total)} label={label} />
@@ -65,7 +76,7 @@ export const SATISFACTION_CODE = widgetCode({
   const now = num(comparison.data[0]?.satisfaction);
   const previous = num(comparison.data[0]?.satisfaction_prev);
   const points = withBuckets(trend, ["satisfaction"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     satisfaction: num(row.satisfaction),
   }));
   let moved;
@@ -82,6 +93,7 @@ export const SATISFACTION_CODE = widgetCode({
       " in the previous period";
   }
   if (moved) label += ". Biggest move: " + moved.x;
+  signalProblem(known(now) && known(previous) && now < previous);
   return (
     <Panel>
       <Headline value={known(now) ? mood(now) + " (" + score(now) + ")" : GAP} label={label} />
@@ -102,7 +114,7 @@ export const TOKEN_DRIFT_CODE = widgetCode({
   queries: ["main"],
   body: `  const series = [{ key: "prompt_tokens", kind: "count" }, { key: "completion_tokens", kind: "count" }];
   const points = withBuckets(main, series).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     prompt: num(row.prompt_tokens),
     completion: num(row.completion_tokens),
   }));
@@ -111,6 +123,7 @@ export const TOKEN_DRIFT_CODE = widgetCode({
     .filter((total) => total > 0);
   if (totals.length === 0) return <Panel><CallToAction /></Panel>;
   const change = drift(totals[0], totals[totals.length - 1]);
+  signalProblem(change > 0.1);
   const lines = [
     { key: "prompt", label: "Tokens sent", colour: C.teal },
     { key: "completion", label: "Tokens received", colour: C.orange },
@@ -142,11 +155,13 @@ export const CONVERSATION_LENGTH_CODE = widgetCode({
   }
   const turns = (value) => (known(value) ? num(value).toFixed(1) : GAP);
   const points = withBuckets(main, ["turns"])
-    .map((row) => ({ x: bucketLabel(row.bucket), turns: num(row.turns) }));
+    .map((row) => ({ x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
+      turns: num(row.turns) }));
   const first = earliest(points, "turns");
   const last = latest(points, "turns");
   const label = "messages per conversation, " + signed(drift(first, last)) +
     " since the start of this period";
+  signalProblem(drift(first, last) > 0.1);
   return (
     <Panel>
       <Headline value={turns(last)} label={label} />
@@ -168,11 +183,12 @@ export const P95_LATENCY_CODE = widgetCode({
   body: `  if (trend.data.length === 0) return <Panel><CallToAction /></Panel>;
   const p95 = num(period.data[0]?.p95_ms);
   const points = withBuckets(trend, ["p95_ms"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     p95: num(row.p95_ms),
     period: p95,
   }));
   const label = "lately, when 1 in 20 replies took longer. Usual for this period: " + ms(p95);
+  signalProblem(p95 > 0 && points.some((point) => point.p95 > p95 * 1.5));
   const series = [
     { key: "p95", label: "Slowest 1 in 20 replies", colour: C.teal },
     { key: "period", label: "Usual for this period", colour: C.red, dashed: true },
@@ -194,9 +210,10 @@ export const ERROR_RATE_CODE = widgetCode({
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
   const points = withBuckets(main, ["error_rate"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     rate: num(row.error_rate),
   }));
+  signalProblem(latest(points, "rate") > earliest(points, "rate"));
   return (
     <Panel>
       <Headline value={pct(latest(points, "rate"))}
@@ -222,12 +239,13 @@ export const LATENCY_SPREAD_CODE = widgetCode({
   const p50 = num(spread.p50_ms);
   const p99 = num(spread.p99_ms);
   const points = withBuckets(trend, ["p50_ms", "p90_ms", "p99_ms"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     p50: num(row.p50_ms),
     p90: num(row.p90_ms),
     p99: num(row.p99_ms),
   }));
   const tailRatio = known(ratio(p99, p50)) ? ratio(p99, p50).toFixed(1) + " times" : GAP;
+  signalProblem(ratio(p99, p50) >= 5);
   const series = [
     { key: "p50", label: "Typical", colour: C.teal },
     { key: "p90", label: "1 in 10 slower", colour: C.orange },
@@ -254,10 +272,10 @@ export const SPEND_CODE = widgetCode({
     "model with no price add nothing, so the total reads low.",
   source: "models",
   recharts: SERIES_CHART_IMPORTS,
-  parts: [...SERIES_PARTS, COMPLETENESS],
+  parts: [...SERIES_PARTS, COMPLETENESS, MIDDLE],
   queries: ["main"],
   body: `  const points = withBuckets(main, [{ key: "cost", kind: "count" }]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     cost: num(row.cost),
   }));
   const total = add(...points.map((point) => point.cost));
@@ -266,6 +284,8 @@ export const SPEND_CODE = widgetCode({
   const priciest = priced.reduce((top, point) => (point.cost > top.cost ? point : top));
   const label = "spent. Most expensive " + bucketUnit() + ": " + priciest.x + ", " +
     usd(priciest.cost);
+  const usual = middle(priced.map((point) => point.cost));
+  signalProblem(usual > 0 && priciest.cost > usual * 2);
   return (
     <Panel>
       <Headline value={usd(total) + plus(main)} label={label} />
@@ -285,12 +305,15 @@ function passRateCode({
   source,
   noun,
   legend,
+  problem,
 }: {
   summary: string;
   subtitle: string;
   source: WidgetSource;
   noun: string;
   legend: string;
+  /** The problem the card watches for, over `passed`, `runs` and the trend's `points`. */
+  problem: string;
 }) {
   return widgetCode({
     summary,
@@ -303,10 +326,11 @@ function passRateCode({
   if (!runs) return <Panel><CallToAction /></Panel>;
   const passed = num(totals.data[0]?.passed);
   const points = withBuckets(trend, ["pass_rate"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     rate: num(row.pass_rate),
   }));
   const label = "of ${noun} passed (" + count(passed) + " of " + count(runs) + ")";
+  signalProblem(${problem});
   return (
     <Panel>
       <Headline value={pct(passed / runs, 0)} label={label} />
@@ -323,6 +347,7 @@ export const EVALUATION_PASS_RATE_CODE = passRateCode({
   source: "evaluations",
   noun: "automatic checks",
   legend: "Checks passed",
+  problem: "passed / runs < 0.8",
 });
 
 export const SCENARIO_PASS_RATE_CODE = passRateCode({
@@ -331,4 +356,5 @@ export const SCENARIO_PASS_RATE_CODE = passRateCode({
   source: "scenarios",
   noun: "test runs",
   legend: "Tests passed",
+  problem: 'latest(points, "rate") < earliest(points, "rate")',
 });

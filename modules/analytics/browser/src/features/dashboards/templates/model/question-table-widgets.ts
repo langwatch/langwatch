@@ -48,7 +48,7 @@ export const MODEL_SPEND_CODE = widgetCode({
   ];
   return (
     <Panel>
-      <Table columns={columns} rows={rows} />
+      <Table columns={columns} rows={rows} ask={(row) => ({ kind: "model", label: row.model })} />
     </Panel>
   );`,
 });
@@ -72,7 +72,8 @@ export const TOP_MODELS_CODE = widgetCode({
   ];
   return (
     <Panel>
-      <Table columns={columns} rows={models.data} rowPadding={3} />
+      <Table columns={columns} rows={models.data} rowPadding={3}
+        ask={(row) => ({ kind: "model", label: row.model })} />
     </Panel>
   );`,
 });
@@ -111,7 +112,8 @@ export const TOPICS_CODE = widgetCode({
       <Headline value={name(topics.data[0])}
         label={share(num(topics.data[0].traces), total) + " of requests with a topic. " +
           "Growing fastest: " + name(grew)} />
-      <Table columns={columns} rows={topics.data} rowPadding={3} />
+      <Table columns={columns} rows={topics.data} rowPadding={3}
+        ask={(row) => ({ kind: "topic", label: name(row) })} />
     </Panel>
   );`,
 });
@@ -137,7 +139,8 @@ export const SLOWEST_OPERATIONS_CODE = widgetCode({
         <Stat label="Typical reply" value={ms(num(spread.p50_ms))} />
         <Stat label="Slowest 1 in 100" value={ms(num(spread.p99_ms))} />
       </div>
-      <Table columns={columns} rows={operations.data} />
+      <Table columns={columns} rows={operations.data}
+        ask={(row) => ({ kind: "step", label: row.operation })} />
     </Panel>
   );`,
 });
@@ -152,11 +155,14 @@ export const SLOWEST_MODELS_CODE = widgetCode({
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
   const ranked = main.data.map((row) => ({ label: row.model, value: num(row.p95_ms) }));
+  // The slowest model takes over twice as long as the next one.
+  signalProblem(ranked.length > 1 && num(ranked[1].value) > 0 &&
+    ranked[0].value > ranked[1].value * 2);
   return (
     <Panel>
       <Headline value={ms(ranked[0].value)}
         label={"for 1 in 20 replies of " + ranked[0].label + ", the slowest model"} />
-      <Bars rows={ranked} format={ms} />
+      <Bars rows={ranked} format={ms} kind="model" />
     </Panel>
   );`,
 });
@@ -171,6 +177,7 @@ export const THUMBS_DOWN_CODE = widgetCode({
   const down = num(summary.data[0]?.thumbs_down);
   if (!add(up, down)) return <Panel><CallToAction /></Panel>;
   const label = count(down) + " of " + count(add(up, down)) + " reviewer votes were thumbs down";
+  signalProblem(down > 0);
   if (traces.data.length === 0) {
     return (
       <Panel>
@@ -194,7 +201,8 @@ export const THUMBS_DOWN_CODE = widgetCode({
   return (
     <Panel>
       <Headline value={pct(ratio(down, add(up, down)), 0)} label={label} />
-      <Table columns={columns} rows={traces.data} rowPadding={3} />
+      <Table columns={columns} rows={traces.data} rowPadding={3}
+        ask={(row) => ({ kind: "answer", label: row.trace_id })} />
     </Panel>
   );`,
 });
@@ -223,7 +231,8 @@ export const LOWEST_SCORES_CODE = widgetCode({
   ];
   return (
     <Panel>
-      <Table columns={columns} rows={main.data} rowPadding={3} />
+      <Table columns={columns} rows={main.data} rowPadding={3}
+        ask={(row) => ({ kind: "answer", label: row.trace_id })} />
     </Panel>
   );`,
 });
@@ -236,6 +245,7 @@ export const LOWEST_PASSING_EVALUATORS_CODE = widgetCode({
   parts: [NUMBERS, TABLE],
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
+  signalProblem(main.data.some((row) => known(row.pass_rate) && num(row.pass_rate) < 0.8));
   const columns = [
     { header: "Check", cell: (row) => row.evaluator || "Unnamed check" },
     { header: "Answers passed", align: "right", cell: (row) => <b>{pct(num(row.pass_rate), 0)}</b> },
@@ -243,7 +253,8 @@ export const LOWEST_PASSING_EVALUATORS_CODE = widgetCode({
   ];
   return (
     <Panel>
-      <Table columns={columns} rows={main.data} />
+      <Table columns={columns} rows={main.data}
+        ask={(row) => ({ kind: "check", label: row.evaluator || "Unnamed check" })} />
     </Panel>
   );`,
 });
@@ -258,6 +269,8 @@ export const EVALUATION_COVERAGE_CODE = widgetCode({
   const traces = num(traffic.data[0]?.traces);
   const evaluatedTraces = num(evaluated.data[0]?.traces);
   const passRate = (row) => pct(num(row.pass_rate), 0);
+  const coverage = ratio(evaluatedTraces, traces);
+  signalProblem(known(coverage) && coverage < 0.5);
   const columns = [
     { header: "Check", cell: (row) => row.evaluator || "Unnamed check" },
     { header: "Requests checked", align: "right", cell: (row) => count(num(row.runs)) },

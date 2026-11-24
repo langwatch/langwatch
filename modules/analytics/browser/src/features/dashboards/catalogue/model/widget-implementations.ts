@@ -8,6 +8,7 @@ import { BOARD_LWQL_VIEWS } from "../../model/board-lwql-views.ts";
 import type { BoardTemplateWidget } from "../../templates/model/board-template.ts";
 import { definition, full, half } from "../../templates/model/template-widget.ts";
 import { CATALOGUE_WIDGET_BUILDS } from "../widgets/index.ts";
+import { CATALOGUE_WIDGET_ACTIONS } from "./catalogue-widget-actions.ts";
 import { CATALOGUE_WIDGETS, type CatalogueWidget } from "./catalogue-widgets.ts";
 import { stockWidgetSources } from "./stock-widget-sources.ts";
 
@@ -64,8 +65,8 @@ export const IMPLEMENTED_WIDGET_IDS: readonly string[] = CATALOGUE_WIDGETS.map(
   ({ id }) => id,
 ).filter((id) => implementedWidget(id) !== void 0);
 
-/** The actions a catalogue widget declares for its card (AC125); none for any other widget. */
+/** What a catalogue widget declares for its card (AC243 to AC245); none for any other widget. */
 export function catalogueWidgetActions(catalogueId: string | undefined): readonly WidgetAction[] {
   if (catalogueId === void 0) return [];
-  return widgetById.get(catalogueId)?.actions ?? [];
+  return CATALOGUE_WIDGET_ACTIONS[catalogueId] ?? [];
 }

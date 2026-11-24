@@ -6,6 +6,7 @@
 
 import type {
   ChartAskSubject,
+  ChartSignal,
   ChartFrameDashboardContext,
   ChartFrameParamsSnapshot,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
@@ -71,6 +72,8 @@ export interface SandboxedChartFrameProps {
   onNavigate?: (args: { target: string; params: Readonly<Record<string, unknown>> }) => void;
   /** `LW.askLangy(subject)` from the frame; omitted, the frame's asks are dropped. */
   onAskLangy?: (subject: ChartAskSubject) => void;
+  /** `LW.signal(state)` from the frame: whether the widget shows its problem now. */
+  onSignal?: (signal: ChartSignal) => void;
   /**
    * Upper bound on the frame's rendered height, in px. Defaults to the
    * protocol ceiling. A widget passes its card's row-span height so a taller
@@ -93,6 +96,7 @@ export function SandboxedChartFrame({
   onLog,
   onNavigate,
   onAskLangy,
+  onSignal,
   maxHeight = CHART_FRAME_MAX_HEIGHT_PX,
   cover,
   onIdleChange,
@@ -135,6 +139,8 @@ export function SandboxedChartFrame({
   onNavigateRef.current = onNavigate;
   const onAskLangyRef = useRef(onAskLangy);
   onAskLangyRef.current = onAskLangy;
+  const onSignalRef = useRef(onSignal);
+  onSignalRef.current = onSignal;
   const onIdleChangeRef = useRef(onIdleChange);
   onIdleChangeRef.current = onIdleChange;
   const dashboardContextRef = useRef(dashboardContext);
@@ -160,6 +166,7 @@ export function SandboxedChartFrame({
       onHeightChange: setHeight,
       onNavigate: (args) => onNavigateRef.current?.(args),
       onAskLangy: (subject) => onAskLangyRef.current?.(subject),
+      onSignal: (signal) => onSignalRef.current?.(signal),
       onTeardown: noteTornDown,
       onIdleChange: (idle) => onIdleChangeRef.current?.(idle),
     });

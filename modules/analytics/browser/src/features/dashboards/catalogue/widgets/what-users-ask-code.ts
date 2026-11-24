@@ -34,6 +34,7 @@ export const CANNOT_SERVE_CODE = widgetCode({
   const widest = Math.max(...topics.data.map((row) => num(row.requests)), 1);
   const rows = topics.data.map((row) => ({
     label: topicName(row.topic),
+    key: row.topic,
     value: num(row.requests) / widest,
     figure: count(num(row.requests)),
     note: row.reason ? "Most asked: " + row.reason : undefined,
@@ -43,7 +44,7 @@ export const CANNOT_SERVE_CODE = widgetCode({
   return (
     <Panel>
       <Headline value={count(cannot)} label={label} />
-      <ShareRows rows={rows} />
+      <ShareRows rows={rows} kind="topic" />
     </Panel>
   );`,
 });
@@ -100,7 +101,9 @@ export const RISING_TOPICS_CODE = widgetCode({
     <Panel>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {rows.map((row) => (
-          <div key={row.topic} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div key={row.topic}
+            {...askable({ kind: "topic", label: topicName(row.topic), value: row.topic })}
+            style={{ display: "flex", alignItems: "center", gap: 8, ...askCursor() }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12, fontWeight: 500 }}>
                 {topicName(row.topic)}
@@ -162,9 +165,11 @@ export const TOPIC_QUALITY_CODE = widgetCode({
       cell: (row) => <span style={{ color: C.subtle }}>{count(num(row.cannot))}</span>,
     },
   ];
+  signalProblem(known.some((value) => value < average - 0.03));
   return (
     <Panel>
-      <Table columns={columns} rows={topics.data} rowPadding={3} />
+      <Table columns={columns} rows={topics.data} rowPadding={3}
+        ask={(row) => ({ kind: "topic", label: topicName(row.topic), value: row.topic })} />
     </Panel>
   );`,
 });
@@ -182,9 +187,10 @@ export const ASKED_AGAIN_CODE = widgetCode({
   const returning = num(users.data[0]?.returning);
   const misread = trend.data.reduce((sum, row) => sum + num(row.misunderstood), 0);
   const points = withBuckets(trend, ["misunderstood", "closed"]).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     misread: ratio(row.misunderstood, row.closed),
   }));
+  signalProblem(num(latest(points, "misread")) > num(earliest(points, "misread")));
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8,

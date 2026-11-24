@@ -14,7 +14,14 @@ import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import { useWidgetViewed } from "../../behavior/use-widget-viewed.ts";
 import { catalogueWidgetActions } from "../../catalogue/index.ts";
-import type { WidgetAction, WidgetSetup } from "../../langy/model/board-langy.ts";
+import {
+  shownWidgetButtons,
+  type WidgetAction,
+  type WidgetButtonAction,
+  type WidgetClickAction,
+  type WidgetSetup,
+  widgetClickFor,
+} from "../../langy/model/board-langy.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
@@ -39,10 +46,25 @@ export interface WidgetCardLangy {
   readonly setUp: (setup: WidgetSetup) => void;
   /** Drafts how to start sending the field this widget's traces lack. */
   readonly setUpMissing: (missing: { field: string; label: string }) => void;
-  /** Drafts an investigation of the bar, point or legend entry clicked on its chart. */
-  readonly askAbout: (subject: ChartAskSubject) => void;
-  /** Drafts one of the actions its catalogue widget declares. */
-  readonly act: (action: WidgetAction) => void;
+  /** Drafts Langy about the value clicked, with the click prompt its widget declares for it. */
+  readonly askAbout: (subject: ChartAskSubject, click?: WidgetClickAction) => void;
+  /** Drafts one of the buttons its catalogue widget declares. */
+  readonly act: (action: WidgetButtonAction) => void;
+}
+
+/** A click on the chart drafts Langy with the click prompt its widget declares for that value. */
+export function chartAsks({
+  langy,
+  declared,
+}: {
+  langy: Pick<WidgetCardLangy, "askAbout"> | undefined;
+  declared: readonly WidgetAction[];
+}): { onAskLangyAbout?: (subject: ChartAskSubject) => void } {
+  if (!langy) return {};
+  return {
+    onAskLangyAbout: (subject) =>
+      langy.askAbout(subject, widgetClickFor({ actions: declared, subject })),
+  };
 }
 
 export function BoardWidgetCard({
@@ -95,9 +117,12 @@ export function BoardWidgetCard({
   const langyOnData = face === "no_access" ? undefined : langy;
   const canEditCode = face !== "no_access" || host.hasPermission(WIDGET_EDIT_PERMISSION);
   const source = widget.definition.source;
-  const actions = langyOnData
+  const declared = langyOnData
     ? catalogueWidgetActions(source?.kind === "catalogue" ? source.catalogueId : undefined)
     : [];
+  // The widget's code says whether its problem is on the card; a face over the chart hides it.
+  const [problem, setProblem] = useState(false);
+  const actions = shownWidgetButtons({ actions: declared, problem: problem && face === "chart" });
   const { periodStart, periodEnd, granularitySeconds } = period;
   const timeWindow = useMemo(
     () => ({ start: periodStart, end: periodEnd }),
@@ -174,7 +199,8 @@ export function BoardWidgetCard({
           onEmptyChange={onEmptyChange}
           onLimitFailureChange={onLimitFailureChange}
           {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
-          {...(langyOnData ? { onAskLangyAbout: langyOnData.askAbout } : {})}
+          onSignal={({ problem: shows }) => setProblem(shows)}
+          {...chartAsks({ langy: langyOnData, declared })}
         />
       )}
     </WidgetCardShell>

@@ -93,6 +93,7 @@ function fieldRow(field, value) {
     body: `  const traces = Object.fromEntries(fields.data.map((row) => [row.field, num(row.traces)]));
   const rows = FIELDS.map((field) => fieldRow(field, ratio(traces[field.key], traces.all)));
   const complete = rows.filter((row) => !row.note).length;
+  signalProblem(complete < FIELDS.length);
   if (complete === FIELDS.length) {
     return (
       <Panel>
@@ -105,7 +106,7 @@ function fieldRow(field, value) {
     <Panel>
       <Headline value={complete + " of " + FIELDS.length}
         label="fields are on every request in this period" />
-      <ShareRows rows={rows} />
+      <ShareRows rows={rows} kind="field" />
     </Panel>
   );`,
   });
@@ -132,6 +133,7 @@ export const COST_ACCURACY_CODE = widgetCode({
   queries: ["trend", "models"],
   body: `  const withModel = add(...trend.data.map((row) => row.with_model));
   const unpriced = add(...trend.data.map((row) => row.unpriced));
+  signalProblem(withModel > 0 && unpriced > 0);
   if (!(withModel > 0)) {
     return (
       <Panel>
@@ -151,7 +153,7 @@ export const COST_ACCURACY_CODE = widgetCode({
   }
   const counts = [{ key: "unpriced", kind: "count" }];
   const points = withBuckets(trend, counts).map((row) => ({
-    x: bucketLabel(row.bucket),
+    x: bucketLabel(row.bucket), at: bucketStart(row.bucket),
     unpriced: num(row.unpriced),
   }));
   const series = [{ key: "unpriced", label: "Requests with no price", colour: C.orange, bars: true }];
@@ -164,7 +166,8 @@ export const COST_ACCURACY_CODE = widgetCode({
       <div style={{ margin: "8px 0 4px", fontSize: 10.5, color: C.faint }}>
         Models with no price (add one to fix)
       </div>
-      <Bars rows={unpricedModels} format={count} height={unpricedModels.length * 22} />
+      <Bars rows={unpricedModels} format={count} height={unpricedModels.length * 22}
+        kind="model" />
     </Panel>
   );`,
 });
@@ -187,6 +190,8 @@ const sourceName = (source) => ORIGIN_NAMES[source] ||
   body: `  const traffic = add(...sources.data.map((row) => row.traces));
   const spend = add(...sources.data.map((row) => row.cost));
   const noise = sources.data.filter((row) => row.source);
+  // Tests and staging make a tenth of the requests or more.
+  signalProblem(ratio(add(...noise.map((row) => row.traces)), traffic) >= 0.1);
   if (noise.length === 0) {
     return (
       <Panel>
@@ -208,7 +213,8 @@ const sourceName = (source) => ORIGIN_NAMES[source] ||
     <Panel>
       <Headline value={share(ratio(add(...noise.map((row) => row.traces)), traffic))}
         label={label} />
-      <Table columns={columns} rows={noise.slice(0, 4)} rowPadding={3} />
+      <Table columns={columns} rows={noise.slice(0, 4)} rowPadding={3}
+        ask={(row) => ({ kind: "source", label: sourceName(row.source), value: row.source })} />
     </Panel>
   );`,
 });

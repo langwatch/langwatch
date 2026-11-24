@@ -264,11 +264,25 @@ interface LwApi {
   ) => void;
 
   /**
-   * Opens Langy with a draft about a clicked mark: \`label\` is the category
-   * or series, \`at\` the bucket it sits on. Fire-and-forget; dropped unless
-   * \`LW.dashboardContext.canAskLangy\`.
+   * Opens Langy with a draft about a clicked mark: \`kind\` says what it is
+   * ("day", "model", "topic"), \`label\` the value as shown, \`value\` the raw
+   * value, \`at\` the ISO start of the bucket and \`series\` the series under
+   * the pointer. Fire-and-forget; dropped unless \`LW.dashboardContext.canAskLangy\`.
    */
-  askLangy: (subject: { label: string; at?: string }) => void;
+  askLangy: (subject: {
+    kind?: string;
+    label: string;
+    value?: string;
+    at?: string;
+    series?: string;
+  }) => void;
+
+  /**
+   * Tells the host whether the problem this widget watches for is on the card
+   * now. Call it on every render; only a change is sent. The card shows its
+   * Investigate and Propose a fix buttons only while \`problem\` is true.
+   */
+  signal: (state: { problem: boolean }) => void;
 }
 
 declare const LW: LwApi;

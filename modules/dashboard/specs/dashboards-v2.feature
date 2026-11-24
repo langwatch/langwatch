@@ -1684,19 +1684,19 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a widget with a stored prompt, a description and named queries
     When the member clicks its "Ask Langy" button
     Then Langy opens with a draft to send, not a sent question
-    And the draft starts with the widget's prompt
-    And then names the widget, its description and each query with its LangWatchQL
-    And ends with the dashboard period and grain
-    And the open board is attached as the context
-    And long LangWatchQL is cut with a marker so the draft stays within 6000 characters
-    # Decision: Langy has no widget context kind; the widget rides in the draft text
+    And the draft asks what the widget shows over the board's period in words, such as "the last 30 days"
+    And the open board and the widget are attached as context, the widget's carrying its stored
+      prompt, its description, each query with its LangWatchQL and the period as instants
+    And long LangWatchQL is cut with a marker so the widget's context stays within its bound
+    # Changed (2026-11-24): the queries and the period's instants moved out of the draft into
+    # the widget's context (AC247)
 
   @unit
   Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback
     Given a widget saved before prompts existed, or made by Langy
     When the member asks Langy about it
-    Then the draft starts with a prompt asking Langy to answer the widget's name over the
-      dashboard period and quote the real numbers
+    Then the draft asks what the widget's name shows over the board's period and to quote the
+      real numbers, as for any widget, and its context carries no stored prompt
 
   @unit @integration
   Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate
@@ -1710,9 +1710,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a widget whose chart draws a breakdown bar list or a time series, with Langy available
     When the member clicks a category's bar, or a series' bar or point at one bucket
     Then Langy opens with a draft to send, not a sent question
-    And the draft asks Langy to investigate that category, or that series at that bucket, in the widget
-    And it names the widget and its queries and ends with the dashboard period and grain
-    And the open board is attached as the context
+    And the draft asks Langy about that category, or that series on that day, in the widget
+    And the widget's own click prompt for that kind of value is used when it declares one (AC245)
+    And the open board and the widget, with its queries, are attached as context
 
   @unit
   Scenario: AC124b Chart asks: a clickable bar is a keyboard-reachable button with a name
@@ -1731,15 +1731,17 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC125 Widget actions: a problem widget offers its declared actions under the chart
     Given a widget built from a catalogue widget whose definition declares actions
     When Langy is available
-    Then the card shows one outline button per declared action under its chart, always visible
+    Then the card shows one outline button per declared action under its chart while it shows
     And failures, test suite and evaluator widgets offer "Investigate" and "Propose a fix"
-    And widgets about missing data offer "Investigate" and "Fill the gaps"
+    And a widget whose fix is one thing names it, as "Fill the gaps" or "Add prices"
     # Decision: the actions are data on the catalogue widget, not code in the card
+    # Changed (2026-11-24): a problem action shows only while the widget reports the problem (AC244)
 
   @unit @integration
   Scenario: AC125b Widget actions: each action drafts its own prompt about the widget
     When the member clicks an action button on a widget card
-    Then Langy opens with that action's prompt as a draft to send, followed by the widget and the period
+    Then Langy opens with that widget's own prompt for that action as a draft to send, with the
+      widget attached as context
     And "Propose a fix" asks Langy to change nothing until the member agrees
 
   @integration
@@ -2533,6 +2535,56 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And those terms may still appear in the widget's queries, keys and setup code
 
   # ---------------------------------------------------------------------------
+  # Why: one fixed prompt per action read the same on every card, the buttons showed whether or
+  # not anything was wrong, a click did not say what was clicked, and the draft showed the
+  # widget's raw queries to the person sending it (owner, 2026-11-24).
+  # How: each catalogue widget declares its own prompts; the widget's code reports whether its
+  # problem shows; a click names its kind and raw value; the queries ride in the context.
+
+  @unit
+  Scenario: AC243 Widget actions: each catalogue widget asks Langy its own question for each action and each kind of value
+    Given a catalogue widget that declares buttons and click prompts
+    When the member clicks one of its buttons, or a value of a kind it declares a prompt for
+    Then the draft is that widget's own prompt, naming the card's title and the board's period in words
+    And a clicked value fills its place in the prompt, a day in words such as "3 November 2026"
+    And a click on a kind the widget declares no prompt for drafts a general question about that value
+    And every widget's prompts are free of em dashes and query language
+
+  @unit @integration
+  Scenario: AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem
+    Given a catalogue widget whose Investigate or Propose a fix shows "when the problem is on the card"
+    When its code reports the problem, such as the error rate rising or a failure in the period
+    Then the card shows those buttons under its chart
+    And when the code reports no problem, never reports, or a face such as no data covers the
+      chart, the card shows none of them
+    And a button the widget declares for always, because the widget exists to name a problem, always shows
+    # Decision: the frame posts `lw:signal` with `{ problem }` only when it changes; the host reads it with Zod
+
+  @unit @integration
+  Scenario: AC245 Chart asks: a click says what kind of value was clicked, its raw value and the bucket it starts
+    Given a widget whose chart, bar list, legend or table offers clicks, with Langy available
+    When the member clicks a value
+    Then the frame sends the value's kind, such as day, model or topic, its label and its raw value
+    And a click on a point in time sends only the series under the pointer and the bucket's start
+      as an ISO instant
+    And the host drops a bucket that is no instant and cuts every text to length
+
+  @unit
+  Scenario: AC246 Chart asks: a table row is a button that asks Langy about that row
+    Given a table widget that declares a click prompt for its rows, such as models, topics or errors
+    When Langy is available
+    Then each row is a keyboard-reachable button named "Ask Langy about" and its label
+    And clicking it, or pressing Enter or Space on it, asks about that row with its kind and value
+    And a link inside the row opens its target without asking
+
+  @unit @integration
+  Scenario: AC247 Langy drafts: the visible draft is in the reader's words, the queries ride in the context
+    Given any draft about a widget: Ask Langy, a button, a chart click or a menu action
+    Then the draft the member reads names no query, view or function and no ISO instant
+    And the widget is attached as a context the member sees by its name, carrying its
+      description, stored prompt, clicked value, the period as instants and its LangWatchQL
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -2593,4 +2645,5 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 120-126: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate; Scenario: AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period; Scenario: AC124b Chart asks: a clickable bar is a keyboard-reachable button with a name; Scenario: AC124c Chart asks: a chart with nothing to investigate offers no click; Scenario: AC125 Widget actions: a problem widget offers its declared actions under the chart; Scenario: AC125b Widget actions: each action drafts its own prompt about the widget; Scenario: AC125c Widget actions: a widget that declares no actions shows no action row; Scenario: AC126 Widget asks on a new board store the board first
   # AC 130-139: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: a category lists its branches as sections, the best-ranked first; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for; Scenario: AC139 Picker copy: a widget is named by its question in plain words; Scenario: AC139b Picker copy: a retired widget is not offered, and saved boards still draw it
   # AC 240-241: "What a card says: names, not internal ids, and a sources line only when it informs" (owner, 2026-11-24) → Scenario: AC240 Card sources line: a widget counting only the default application source shows no sources line; Scenario: AC240b Card sources line: a widget whose views keep no origin shows no sources line; Scenario: AC240c Card sources line: a widget counting more or other sources than the default names them; Scenario: AC241 Widget labels: the test pass rate widget names each suite by its own name; Scenario: AC241b Widget labels: a managed prompt version reads as its prompt handle and number; Scenario: AC241c Widget labels: a scenario or a topic with no name reads as unnamed, never as its id; Scenario: AC242 Widget cards speak the reader's words: no request-internal terms on any card face
+  # AC 243-247: "Per-widget Langy actions, problem-only Investigate, clicks that say what was clicked" (owner, 2026-11-24) → Scenario: AC243 Widget actions: each catalogue widget asks Langy its own question for each action and each kind of value; Scenario: AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem; Scenario: AC245 Chart asks: a click says what kind of value was clicked, its raw value and the bucket it starts; Scenario: AC246 Chart asks: a table row is a button that asks Langy about that row; Scenario: AC247 Langy drafts: the visible draft is in the reader's words, the queries ride in the context
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board; Scenario: AC145b Template card: a board made under a template's former name still counts as added

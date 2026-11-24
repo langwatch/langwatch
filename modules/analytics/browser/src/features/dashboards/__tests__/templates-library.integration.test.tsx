@@ -26,7 +26,6 @@ import {
   TEMPLATE_LIBRARY,
   TEMPLATE_PREVIEW_IDS,
   templatePreviewSrc,
-  templateSections,
 } from "../model/template-library.ts";
 import { TemplatePreview } from "../ui/blocks/template-preview.tsx";
 import TemplatesLibraryScreen from "../ui/sections/templates-library.screen.tsx";
@@ -293,8 +292,8 @@ describe("the templates finder", () => {
       await waitFor(() => expect(host.langyAsks).toHaveLength(1));
       const [ask] = host.langyAsks;
       expect(ask?.question).toBeUndefined();
-      expect(ask?.draft?.startsWith(READY.reportPrompt!)).toBe(true);
-      expect(ask?.draft).toContain("Dashboard period:");
+      expect(ask?.draft).toBe(READY.reportPrompt);
+      expect(ask?.context[0]?.ref).toContain("period: ");
       expect(ask?.context[0]?.ref).toContain(`dashboard "${READY.name}" (id board-1)`);
       expect(ask?.context[0]?.ref).toContain(READY.widgets[0]!.name);
     });

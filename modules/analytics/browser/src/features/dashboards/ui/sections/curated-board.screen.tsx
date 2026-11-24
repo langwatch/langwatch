@@ -198,9 +198,15 @@ function OpenCuratedBoard({
                 langy.enabled
                   ? (widget) => ({
                       ask: () => langy.ask(widgetPromptDraft({ widget, board: subject, period })),
-                      askAbout: (about) =>
+                      askAbout: (about, click) =>
                         langy.ask(
-                          widgetChartDraft({ subject: about, widget, board: subject, period }),
+                          widgetChartDraft({
+                            subject: about,
+                            click,
+                            widget,
+                            board: subject,
+                            period,
+                          }),
                         ),
                       act: (action) =>
                         langy.ask(widgetActionDraft({ action, widget, board: subject, period })),

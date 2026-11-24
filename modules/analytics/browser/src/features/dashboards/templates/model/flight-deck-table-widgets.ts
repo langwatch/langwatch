@@ -40,7 +40,7 @@ export const COST_EFFICIENCY_CODE = widgetCode({
       <div style={{ margin: "12px 0 4px", fontSize: 11, fontWeight: 500, color: C.subtle }}>
         Models that cost most
       </div>
-      <Bars rows={ranked} format={usd} height={128} />
+      <Bars rows={ranked} format={usd} height={128} kind="model" />
     </Panel>
   );`,
 });
@@ -72,9 +72,11 @@ function firstSeen(value) {
       cell: (row) => <b>{count(num(row.failures))}</b>,
     },
   ];
+  signalProblem(main.data.some((row) => num(row.failures) > 0));
   return (
     <Panel>
-      <Table columns={columns} rows={main.data} />
+      <Table columns={columns} rows={main.data}
+        ask={(row) => ({ kind: "error", label: row.category })} />
     </Panel>
   );`,
 });
@@ -88,7 +90,8 @@ export const SCENARIOS_CODE = widgetCode({
   body: `  const runs = num(summary.data[0]?.runs);
   const passed = num(summary.data[0]?.passed);
   if (!runs) return <Panel><CallToAction /></Panel>;
-  const ranked = suites.data.map((row) => ({ label: row.suite, value: ratio(row.passed, row.runs) }));
+  const ranked = suites.data.map((row) => ({ label: row.suite, key: row.suite_id,
+    value: ratio(row.passed, row.runs) }));
   return (
     <Panel>
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
@@ -97,7 +100,7 @@ export const SCENARIOS_CODE = widgetCode({
           of test runs passed ({count(passed)} of {count(runs)})
         </span>
       </div>
-      <Bars rows={ranked} format={pct} />
+      <Bars rows={ranked} format={pct} kind="suite" />
     </Panel>
   );`,
 });
@@ -112,7 +115,7 @@ export const GATEWAY_CODE = widgetCode({
   const ranked = main.data.map((row) => ({ label: row.virtual_key, value: num(row.cost) }));
   return (
     <Panel>
-      <Bars rows={ranked} format={usd} />
+      <Bars rows={ranked} format={usd} kind="key" />
     </Panel>
   );`,
 });
@@ -149,8 +152,9 @@ function Sparkline({ points }) {
   body: `  if (agents.data.length === 0) return <Panel><CallToAction /></Panel>;
   const trendOf = (agent) =>
     trend.data.filter((row) => row.agent === agent).map((row) => num(row.sessions));
+  const name = (row) => AGENTS[String(row.agent).toLowerCase()] || row.agent;
   const columns = [
-    { header: "Agent", cell: (row) => AGENTS[String(row.agent).toLowerCase()] || row.agent },
+    { header: "Agent", cell: name },
     { header: "Sessions", align: "right", cell: (row) => count(num(row.sessions)) },
     { header: "Tokens", align: "right", cell: (row) => count(num(row.tokens)) },
     { header: "Cost", align: "right", cell: (row) => <b>{usd(num(row.cost))}</b> },
@@ -159,7 +163,8 @@ function Sparkline({ points }) {
   ];
   return (
     <Panel>
-      <Table columns={columns} rows={agents.data} />
+      <Table columns={columns} rows={agents.data}
+        ask={(row) => ({ kind: "agent", label: name(row), value: row.agent })} />
     </Panel>
   );`,
 });
@@ -203,9 +208,11 @@ function Feedback({ value }) {
     { header: "Cost", align: "right", cell: (row) => usd(num(row.cost)) },
     { header: "Feedback", align: "center", cell: (row) => <Feedback value={row.feedback} /> },
   ];
+  signalProblem(main.data.some((row) => num(row.has_error) > 0));
   return (
     <Panel>
-      <Table columns={columns} rows={main.data} rowPadding={3} />
+      <Table columns={columns} rows={main.data} rowPadding={3}
+        ask={(row) => ({ kind: "request", label: row.trace_id })} />
     </Panel>
   );`,
 });

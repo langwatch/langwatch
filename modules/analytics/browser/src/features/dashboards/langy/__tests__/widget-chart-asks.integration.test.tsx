@@ -117,6 +117,16 @@ async function chartAsks({
   await act(async () => onAskLangy(subject));
 }
 
+/** The chart's code calls `LW.signal({ problem })`, as a widget does on each render. */
+async function chartSignals({ widgetName, problem }: { widgetName: string; problem: boolean }) {
+  const { onSignal } = frameOf(widgetName);
+  if (!onSignal) throw new Error(`${widgetName} hears no signal`);
+  await act(async () => onSignal({ problem }));
+}
+
+const actionRow = (name: string) =>
+  screen.queryByRole("group", { name: `Langy actions for ${name}` });
+
 beforeEach(() => frameProps.mockClear());
 afterEach(cleanup);
 
@@ -136,46 +146,84 @@ describe("asking Langy from a widget card", () => {
       expect(menu.parentElement?.contains(ask)).toBe(false);
     });
 
-    describe("when the chart reports a clicked bar at one bucket", () => {
-      /** @scenario "AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period" */
-      it("drafts an investigation of that series at that bucket, with the widget and the board", async () => {
+    describe("when the chart reports a series clicked on one day", () => {
+      /**
+       * @scenario "AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period"
+       * @scenario "AC247 Langy drafts: the visible draft is in the reader's words, the queries ride in the context"
+       */
+      it("drafts a question about that series on that day, with the widget and the board", async () => {
         const host = openBoard();
         await screen.findByRole("button", { name: "Ask Langy about Top errors" });
 
         expect(frameOf("Top errors").dashboardContext.canAskLangy).toBe(true);
-        await chartAsks({ widgetName: "Top errors", subject: { label: "Errors", at: "Sep 3" } });
+        await chartAsks({
+          widgetName: "Top errors",
+          subject: { kind: "day", label: "Sep 3", at: "2026-09-03T00:00:00Z", series: "Errors" },
+        });
 
         expect(host.langyAsks).toHaveLength(1);
         const [request] = host.langyAsks;
         expect(request?.question).toBeUndefined();
-        expect(
-          request?.draft?.startsWith(
-            'Investigate "Errors" at Sep 3 in my "Top errors" dashboard widget.',
-          ),
-        ).toBe(true);
-        expect(request?.draft).toContain(`- series:\n${SQL}`);
-        expect(request?.draft).toContain("Dashboard period:");
+        expect(request?.draft).toMatch(
+          /^On "Top errors", what stands out about Errors on 3 September 2026\?/,
+        );
+        expect(request?.draft).not.toContain(SQL);
         expect(request?.context[0]).toMatchObject({ kind: "dashboard", label: "Weekly review" });
+        expect(request?.context[1]).toMatchObject({ label: "widget: Top errors" });
+        expect(request?.context[1]?.ref).toContain(SQL);
+      });
+    });
+
+    describe("when the chart reports a value of a kind its widget declares a prompt for", () => {
+      /**
+       * @scenario "AC243 Widget actions: each catalogue widget asks Langy its own question for each action and each kind of value"
+       * @scenario "AC245 Chart asks: a click says what kind of value was clicked, its raw value and the bucket it starts"
+       */
+      it("drafts the widget's own click prompt with the value, and hands Langy the raw value", async () => {
+        const host = openBoard();
+        await screen.findByRole("button", { name: "Ask Langy about Top errors" });
+
+        await chartAsks({
+          widgetName: "Top errors",
+          subject: { kind: "error", label: "Timeout", value: "TimeoutError" },
+        });
+
+        const [request] = host.langyAsks;
+        expect(request?.draft).toMatch(/^On "Top errors", explain the error "Timeout": where it/);
+        expect(request?.context[1]?.ref).toContain(
+          'clicked: error "Timeout", raw value TimeoutError',
+        );
       });
     });
 
     describe("when the widget's catalogue widget declares actions", () => {
-      /** @scenario "AC125 Widget actions: a problem widget offers its declared actions under the chart" */
-      it("shows Investigate and Propose a fix under the chart", async () => {
+      /**
+       * @scenario "AC125 Widget actions: a problem widget offers its declared actions under the chart"
+       * @scenario "AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem"
+       */
+      it("shows Investigate and Propose a fix only while the widget reports its problem", async () => {
         openBoard();
+        await screen.findByRole("button", { name: "Ask Langy about Top errors" });
+        expect(actionRow("Top errors")).toBeNull();
 
+        await chartSignals({ widgetName: "Top errors", problem: true });
         const row = await screen.findByRole("group", { name: "Langy actions for Top errors" });
         expect(
           within(row)
             .getAllByRole("button")
             .map((button) => button.textContent),
         ).toEqual(["Investigate", "Propose a fix"]);
+
+        await chartSignals({ widgetName: "Top errors", problem: false });
+        expect(actionRow("Top errors")).toBeNull();
       });
 
       /** @scenario "AC125b Widget actions: each action drafts its own prompt about the widget" */
       it("drafts the action's own prompt about the widget when one is clicked", async () => {
         const user = userEvent.setup({ pointerEventsCheck: 0 });
         const host = openBoard();
+        await screen.findByRole("button", { name: "Ask Langy about Top errors" });
+        await chartSignals({ widgetName: "Top errors", problem: true });
 
         const row = await screen.findByRole("group", { name: "Langy actions for Top errors" });
         await user.click(within(row).getByRole("button", { name: "Propose a fix" }));
@@ -183,13 +231,11 @@ describe("asking Langy from a widget card", () => {
         expect(host.langyAsks).toHaveLength(1);
         const [request] = host.langyAsks;
         expect(request?.question).toBeUndefined();
-        expect(
-          request?.draft?.startsWith(
-            'Propose a fix for the worst problem my "Top errors" dashboard widget shows',
-          ),
-        ).toBe(true);
-        expect(request?.draft).toContain("change nothing until I agree");
-        expect(request?.draft).toContain(`- series:\n${SQL}`);
+        expect(request?.draft).toBe(
+          'For the most frequent error on "Top errors", propose a code change through a pull ' +
+            "request that stops it or handles it; change nothing until I agree.",
+        );
+        expect(request?.context[1]?.ref).toContain(SQL);
       });
     });
 
@@ -199,7 +245,8 @@ describe("asking Langy from a widget card", () => {
         openBoard();
 
         await screen.findByRole("button", { name: "Ask Langy about My chart" });
-        expect(screen.queryByRole("group", { name: "Langy actions for My chart" })).toBeNull();
+        await chartSignals({ widgetName: "My chart", problem: true });
+        expect(actionRow("My chart")).toBeNull();
       });
     });
   });
@@ -275,6 +322,8 @@ describe("given a new board that is not stored yet", () => {
       answer: NO_PROCEDURES,
     });
 
+    await screen.findByTestId("sandboxed-frame");
+    await chartSignals({ widgetName: "Top errors", problem: true });
     const row = await screen.findByRole("group", { name: "Langy actions for Top errors" });
     await user.click(within(row).getByRole("button", { name: "Investigate" }));
 

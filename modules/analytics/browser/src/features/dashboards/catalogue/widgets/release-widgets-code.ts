@@ -79,6 +79,7 @@ const TONE = { Worse: "bad", "Needs more runs": "warn", Better: "good" };`,
   const next = side(true);
   const current = side(false);
   const listed = rows.filter((row) => row.verdict !== "Same").slice(0, 4);
+  signalProblem(worse.length > 0);
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
@@ -94,8 +95,11 @@ const TONE = { Worse: "bad", "Needs more runs": "warn", Better: "good" };`,
       </div>
       <div style={{ marginTop: 8, fontSize: 11.5 }}>
         {listed.map((row) => (
-          <div key={row.scenario} style={{ display: "flex", alignItems: "center", gap: 8,
-            padding: "3px 0", borderTop: "1px solid " + C.border }}>
+          <div key={row.scenario}
+            {...askable({ kind: "scenario", label: row.name || "Unnamed scenario",
+              value: row.scenario })}
+            style={{ display: "flex", alignItems: "center", gap: 8,
+              padding: "3px 0", borderTop: "1px solid " + C.border, ...askCursor() }}>
             <Tag tone={TONE[row.verdict]}>{row.verdict}</Tag>
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis",
               whiteSpace: "nowrap" }}>{row.name || "Unnamed scenario"}</span>
@@ -156,12 +160,17 @@ function Strip({ strip }) {
   const line = flaky > 0
     ? flaky + " of " + rows.length + " tests pass some runs and fail others"
     : "All " + rows.length + " tests give the same result run after run";
+  signalProblem(flaky > 0);
   return (
     <Panel>
       <div style={{ fontSize: 11.5, color: C.subtle, marginBottom: 6 }}>{line}</div>
       {rows.slice(0, ${FLAKY_SHOWN}).map((row) => (
-        <div key={row.scenario} style={{ display: "flex", alignItems: "center", gap: 8,
-          padding: "4px 0", borderTop: "1px solid " + C.border, fontSize: 11.5 }}>
+        <div key={row.scenario}
+          {...askable({ kind: "scenario", label: row.name || "Unnamed scenario",
+            value: row.scenario })}
+          style={{ display: "flex", alignItems: "center", gap: 8,
+            padding: "4px 0", borderTop: "1px solid " + C.border, fontSize: 11.5,
+            ...askCursor() }}>
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis",
             whiteSpace: "nowrap" }}>{row.name || "Unnamed scenario"}</span>
           <Strip strip={String(row.strip)} />
@@ -234,12 +243,17 @@ export const ROLLOUT_CODE = widgetCode({
   components: `${RUN_DAY}
 
 // better: which way is good; a relative change under 5% (1 point for rates) is no change.
-function verdict({ before, after, better, rate }) {
-  if (!known(before) || !known(after)) return <span style={{ color: C.faint }}>{GAP}</span>;
+// 1 better, -1 worse, 0 the same or unknown.
+function moved({ before, after, better, rate }) {
+  if (!known(before) || !known(after)) return 0;
   const change = rate ? after - before : before > 0 ? (after - before) / before : 0;
   const limit = rate ? 0.01 : 0.05;
-  if (change * better > limit) return <span style={{ color: C.green }}>better</span>;
-  if (change * better < -limit) return <span style={{ color: C.red }}>worse</span>;
+  return change * better > limit ? 1 : change * better < -limit ? -1 : 0;
+}
+function verdict(row) {
+  if (!known(row.before) || !known(row.after)) return <span style={{ color: C.faint }}>{GAP}</span>;
+  if (moved(row) > 0) return <span style={{ color: C.green }}>better</span>;
+  if (moved(row) < 0) return <span style={{ color: C.red }}>worse</span>;
   return <span style={{ color: C.faint }}>same</span>;
 }`,
   queries: ["changes", "traffic", "checks"],
@@ -276,6 +290,7 @@ function verdict({ before, after, better, rate }) {
     { header: "After", align: "right", cell: (row) => <b>{row.format(row.after)}</b> },
     { header: "Change", align: "right", cell: (row) => verdict(row) },
   ];
+  signalProblem(rows.some((row) => moved(row) < 0));
   return (
     <Panel>
       <div style={{ fontSize: 11.5, color: C.subtle, marginBottom: 6 }}>
@@ -321,9 +336,14 @@ ${experimentFace("Run the same tests on two or more models to compare them here.
     { header: "Cost per test", align: "right", cell: (row) => usd(num(row.cost_per_row)) },
     { header: "Slowest 1 in 20", align: "right", cell: (row) => ms(num(row.p95_ms)) },
   ];
+  const bestCost = num(main.data[0].cost_per_row);
+  signalProblem(known(bestCost) && main.data.some((row) => row !== main.data[0] &&
+    best - num(row.pass_rate) <= EQUAL_MARGIN && known(row.cost_per_row) &&
+    num(row.cost_per_row) < bestCost));
   return (
     <Panel>
-      <Table columns={columns} rows={main.data} />
+      <Table columns={columns} rows={main.data}
+        ask={(row) => ({ kind: "model", label: row.setup })} />
     </Panel>
   );`,
 });
@@ -354,6 +374,8 @@ ${experimentFace("No test run in this period. Run your test set and this compare
     { key: "raw", label: "Test set as run", colour: C.teal, bars: true },
     { key: "weighted", label: "With real traffic's topics", colour: C.orange, bars: true },
   ];
+  // Far apart: 10 points or more between the two rates.
+  signalProblem(known(raw) && known(weighted) && Math.abs(raw - weighted) >= 0.1);
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8,
@@ -395,6 +417,9 @@ ${experimentFace(`Not run yet. Run your test documents with the checks "${FIELD_
   const recallLabel = previous
     ? "Fields found (" + pct(num(previous.recall_score), 0) + " the run before)"
     : "Fields found";
+  const fell = (key) => previous !== undefined && known(last[key]) && known(previous[key]) &&
+    num(last[key]) < num(previous[key]);
+  signalProblem(fell("recall_score") || fell("precision_score"));
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8,

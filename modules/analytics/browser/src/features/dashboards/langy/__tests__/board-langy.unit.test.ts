@@ -155,7 +155,8 @@ describe("a board whose widgets show no data", () => {
         'These widgets on my "Agent health" dashboard show no data: "Cost per trace", "Who uses it".',
       );
       expect(request.draft).toContain("the LangWatch SDK call, the setting or the integration");
-      expect(request.draft).toContain("Dashboard period: 2026-09-01T00:00:00Z to");
+      expect(request.draft).not.toContain("2026-09-01T00:00:00Z");
+      expect(request.context[0]?.ref).toContain("2026-09-01T00:00:00Z to");
       expect(request.about).toEqual({ ref: "board-3" });
       expect(request.context[0]?.label).toBe("Agent health");
     });

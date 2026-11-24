@@ -1,11 +1,11 @@
 /**
- * The buttons a widget's catalogue definition declares under its chart (AC125), such as
- * Investigate and Propose a fix. Each drafts its own prompt about the widget in Langy.
+ * The buttons a widget's catalogue definition declares under its chart (AC125, AC243), such as
+ * Investigate and Propose a fix. Each drafts the widget's own prompt for it in Langy.
  */
 
 import { Button, HStack } from "@langwatch/design-system/primitives";
 
-import { type WidgetAction, widgetActionLabel } from "../../langy/model/board-langy.ts";
+import { type WidgetButtonAction, widgetActionLabel } from "../../langy/model/board-langy.ts";
 
 /** The row's height: one extra-small button and the space under it. */
 export const WIDGET_ACTION_ROW_HEIGHT_PX = 32;
@@ -16,8 +16,8 @@ export function WidgetActionRow({
   onAction,
 }: {
   name: string;
-  actions: readonly WidgetAction[];
-  onAction: (action: WidgetAction) => void;
+  actions: readonly WidgetButtonAction[];
+  onAction: (action: WidgetButtonAction) => void;
 }) {
   return (
     <HStack
@@ -35,7 +35,7 @@ export function WidgetActionRow({
     >
       {actions.map((action) => (
         <Button
-          key={action}
+          key={action.kind}
           variant="outline"
           size="xs"
           fontWeight="normal"
