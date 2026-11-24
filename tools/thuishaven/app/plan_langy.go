@@ -169,6 +169,11 @@ const langyCLIRestoreBundleCommand = "LANGWATCH_SKILLS_RENDER=cli node sdks/type
 // langyCLIRender is what a successful native build stamps beside the CLI.
 const langyCLIRender = "render=native\n"
 
+// langyCLIManualBuildCommand is what the failed-build hint tells a developer to
+// run by hand. It ends with the bundle restore, so following it leaves no native
+// bundle in the checkout.
+const langyCLIManualBuildCommand = langyCLIBuildCommand + "; " + langyCLIRestoreBundleCommand
+
 // langyCLIBuildShell restores the default bundle even when the build fails
 // (its prebuild may already have written the native one) and keeps the
 // build's exit status.
@@ -217,7 +222,7 @@ func (o *Orchestrator) ensureLangyCLI(ctx context.Context, st domain.Stack, opts
 		fmt.Printf("  langyagent: building this checkout's langwatch CLI (output in %s)…\n", logPath)
 		job := onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "langwatch-cli-build", Dir: opts.RepoRoot, Shell: langyCLIBuildShell(logPath)}
 		if err := o.runOnceJob(ctx, job); err != nil {
-			fmt.Printf("  langyagent: the CLI build failed, so Langy uses the langwatch on PATH.\n  Build it with `%s`; log: %s\n", langyCLIBuildCommand, logPath)
+			fmt.Printf("  langyagent: the CLI build failed, so Langy uses the langwatch on PATH.\n  Build it with `%s`; log: %s\n", langyCLIManualBuildCommand, logPath)
 			o.log.Warn("langwatch CLI build failed — Langy uses the CLI on PATH", zap.String("log", logPath), zap.Error(err))
 			return
 		}

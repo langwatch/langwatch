@@ -346,6 +346,19 @@ func TestEnsureLangyCLI(t *testing.T) {
 			t.Fatalf("container tier built or wrote shims: %v", sup.shells)
 		}
 	})
+
+	// The failure hint is the only place a developer learns the manual build
+	// command, so it must be the plain command, not the log-redirected shell.
+	t.Run("failed build prints a plain manual build hint", func(t *testing.T) {
+		sup := &fakeSupervisor{err: errors.New("build boom")}
+		out := captureStdout(t, func() { run(t, sup, missing, domain.LangyTierHostUnsafe) })
+		if !strings.Contains(out, langyCLIBuildCommand) || !strings.Contains(out, langyCLIRestoreBundleCommand) {
+			t.Fatalf("the hint must name the native build and the bundle restore, got %q", out)
+		}
+		if strings.Contains(out, "rc=$?") || strings.Contains(out, "exit $rc") || strings.Contains(out, "2>&1") {
+			t.Fatalf("the hint must be a plain command with no exit capture, got %q", out)
+		}
+	})
 }
 
 // @scenario "A Langy that cannot start leaves the app no dead agent address"
