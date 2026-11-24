@@ -460,14 +460,59 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And its failure counts as reaching the user
     # Fix 2026-10-08: traces with no child spans made the widget say "No spans in this period"
 
+  # ---------------------------------------------------------------------------
+  # Why: "Missing on 31%: 31% of what? Not all traces are LLM traces", and the card gave no action
+  # (owner, 2026-11-24). How: each field counts against the requests it applies to, chat fields
+  # show only for chat agents, and each gap carries its own Langy ask and links.
+
   @unit
   Scenario: AC166 Can I trust my numbers?: data health names each missing field and what it unlocks
     Given the "data-health" widget
-    Then it shows the share of traces in the period that carry a model, cost, user, conversation, labels and an outcome
+    Then it shows how many requests in the period carry a model name, cost, conversation id, user id, customer or labels and an outcome
     And each field it reads is a filter, so a missing field shows as a gap on the card, never as a setup view
-    And each field missing on some traces says what to send and how many built widgets read it
-    And its hover lists those widgets by their question
+    And its hover on a field lists the cards that read it, by their question
     And when every field is on every request it says "Your agent sends everything the dashboards need" with a check, filling the card
+
+  @unit
+  Scenario: AC166b Data health: model name and cost count only the requests that call a model
+    Given the "data-health" widget
+    Then the model name row divides by the requests that call a model: a step LangWatch types as a model call, or a model name on the request
+    And the cost row divides by the requests that name a model, and counts cost present only when the request has a cost and no step without a price
+    And a missing cost is split into requests that sent no token counts and requests on a model with no price
+    And requests that made no model call are left out of both rows, and the card says how many
+    # Decision: no per-call model check, as span_metrics keeps no model; a request counts as named when its Models list is not empty
+
+  @unit
+  Scenario: AC166c Data health: conversation id and user id rows show only for chat agents
+    Given the "data-health" widget
+    When 5% or more of the period's requests carry a conversation id or a user id
+    Then the conversation id and user id rows show under "Chat agents" and are scored
+    And otherwise they show under the optional rows, never red, with a line on when to send them
+    And customer or labels and how it ended are always optional, with no bar and never red
+    And a required row is red under 90%, orange from 90% and green from 99%
+    # Decision: a board does not know its agent kind, so the 5% presence rule alone decides
+
+  @unit
+  Scenario: AC166d Data health: the headline names what is missing
+    Given the "data-health" widget
+    When one required row has a gap
+    Then the headline names that field and its share, such as "Your agent does not send a conversation id on 31% of requests."
+    When two or three required rows have gaps
+    Then the headline names them, such as "Conversation id and user id are missing on 31% of requests"
+    When more than three do
+    Then it reads "Your agent's data is missing 4 things"
+    When no required row has a gap but an optional one does
+    Then it reads "Your agent sends everything the dashboards need" and "Sending 2 optional extras would add more answers."
+    And when the same requests carry neither a conversation id nor a user id, one line says so above the rows
+    And the widget reports its problem while any required row is red or orange
+
+  @unit
+  Scenario: AC166e Data health: each gap asks Langy its own question and links to the fix
+    Given the "data-health" widget with a field missing on some requests, with Langy available
+    Then the field's row offers "Ask Langy to add it", which drafts that field's own ask with the counts and the period
+    And a conversation id, user id, customer or outcome row offers "Show me how", opening the metadata and labels docs page
+    And a cost row with a model that has no price offers "Add a price for" that model, opening Settings, Model costs
+    And a required row offers "Open an example", opening one request that misses the field
 
   @unit
   Scenario: AC167 Can I trust my numbers?: cost accuracy counts traces with a model but no price
@@ -2645,5 +2690,6 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 120-126: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate; Scenario: AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period; Scenario: AC124b Chart asks: a clickable bar is a keyboard-reachable button with a name; Scenario: AC124c Chart asks: a chart with nothing to investigate offers no click; Scenario: AC125 Widget actions: a problem widget offers its declared actions under the chart; Scenario: AC125b Widget actions: each action drafts its own prompt about the widget; Scenario: AC125c Widget actions: a widget that declares no actions shows no action row; Scenario: AC126 Widget asks on a new board store the board first
   # AC 130-139: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: a category lists its branches as sections, the best-ranked first; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for; Scenario: AC139 Picker copy: a widget is named by its question in plain words; Scenario: AC139b Picker copy: a retired widget is not offered, and saved boards still draw it
   # AC 240-241: "What a card says: names, not internal ids, and a sources line only when it informs" (owner, 2026-11-24) → Scenario: AC240 Card sources line: a widget counting only the default application source shows no sources line; Scenario: AC240b Card sources line: a widget whose views keep no origin shows no sources line; Scenario: AC240c Card sources line: a widget counting more or other sources than the default names them; Scenario: AC241 Widget labels: the test pass rate widget names each suite by its own name; Scenario: AC241b Widget labels: a managed prompt version reads as its prompt handle and number; Scenario: AC241c Widget labels: a scenario or a topic with no name reads as unnamed, never as its id; Scenario: AC242 Widget cards speak the reader's words: no request-internal terms on any card face
+  # AC 166b-166e: "The data completeness card counts each field against the requests it applies to" (owner, 2026-11-24) → Scenario: AC166b Data health: model name and cost count only the requests that call a model; Scenario: AC166c Data health: conversation id and user id rows show only for chat agents; Scenario: AC166d Data health: the headline names what is missing; Scenario: AC166e Data health: each gap asks Langy its own question and links to the fix
   # AC 243-247: "Per-widget Langy actions, problem-only Investigate, clicks that say what was clicked" (owner, 2026-11-24) → Scenario: AC243 Widget actions: each catalogue widget asks Langy its own question for each action and each kind of value; Scenario: AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem; Scenario: AC245 Chart asks: a click says what kind of value was clicked, its raw value and the bucket it starts; Scenario: AC246 Chart asks: a table row is a button that asks Langy about that row; Scenario: AC247 Langy drafts: the visible draft is in the reader's words, the queries ride in the context
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board; Scenario: AC145b Template card: a board made under a template's former name still counts as added

@@ -1371,9 +1371,60 @@ export const CATALOGUE_WIDGET_ACTIONS: Readonly<Record<string, readonly WidgetAc
     {
       kind: "click",
       on: "field",
+      value: "model",
       prompt:
-        'On "{question}", {field} is missing on some of my requests. Show me 3 requests ' +
-        "without it, tell me why it is missing, and how to start sending it from my agent.",
+        'On "{question}", {field} in {period} reach LangWatch without the model\'s name. Find ' +
+        "where my code calls the model and change the LangWatch setup so every model call " +
+        "records which model it used. Propose the code change.",
+    },
+    {
+      kind: "click",
+      on: "field",
+      value: "cost",
+      prompt:
+        'On "{question}", {field} in {period} reach LangWatch with no token counts, so ' +
+        "LangWatch can't work out their cost. Find where my code calls the model and record " +
+        "the token usage from the model's response on each call. Propose the code change.",
+    },
+    {
+      kind: "click",
+      on: "field",
+      value: "conversation",
+      prompt:
+        'On "{question}", my agent\'s requests reach LangWatch without a conversation id, so ' +
+        "every message counts as its own conversation. Find where my code handles an incoming " +
+        "message, take the id my app already uses for that chat (session, thread or " +
+        "conversation id) and send it to LangWatch as the conversation id (thread_id) on " +
+        "every request. Propose the code change.",
+    },
+    {
+      kind: "click",
+      on: "field",
+      value: "user",
+      prompt:
+        "On \"{question}\", my agent's requests reach LangWatch without a user id, so I can't " +
+        "see who uses my agent or who comes back. Find where my code knows the signed-in user " +
+        "and send their id to LangWatch as the user id (user_id) on every request. Send an id " +
+        "only, never a name or an email. Propose the code change.",
+    },
+    {
+      kind: "click",
+      on: "field",
+      value: "labels",
+      prompt:
+        'On "{question}", I want to split my LangWatch dashboards by customer and by feature. ' +
+        "Find where my code knows which customer a request belongs to and send that id as the " +
+        "customer id (customer_id), and add labels for the feature or flow the request came " +
+        "from. Propose the code change.",
+    },
+    {
+      kind: "click",
+      on: "field",
+      value: "outcome",
+      prompt:
+        'On "{question}", find the place in my code where a conversation or task finishes, and ' +
+        "send how it ended (resolved, handed to a person, could not do it, refused) to " +
+        "LangWatch as the outcome on that conversation's last request. Propose the code change.",
     },
   ],
   noise: [

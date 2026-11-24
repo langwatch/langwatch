@@ -145,7 +145,9 @@ type LwNavigableTarget =
   | "onlineEvaluations"
   | "annotations"
   | "gatewayVirtualKeys"
-  | "codingSessions";
+  | "codingSessions"
+  | "modelCosts"
+  | "metadataDocs";
 
 /** Return shape of \`LW.useChartQuery\`, matching TanStack Query's \`useQuery\` naming. */
 interface LwChartQueryState<Row = Record<string, unknown>> {

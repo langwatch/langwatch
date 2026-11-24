@@ -1981,8 +1981,9 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "What is my agent not sending yet? Answer it with LangWatchQL over the dashboard period. " +
-      "What the answer shows: Share of traces that carry model, cost, user, conversation, labels " +
-      "and outcome. Each gap names what to send and the widgets it unlocks. It needs: traces. " +
+      "What the answer shows: Share of requests that carry each field, model name and cost over " +
+      "the requests that call a model, conversation id and user id for chat agents, customer " +
+      "or labels and outcome as optional extras. Each gap names what to send. It needs: traces. " +
       "Quote the real numbers from the query result and name the traces behind them. If a query " +
       "returns no rows, say plainly that there is no data for the dashboard period.",
   },

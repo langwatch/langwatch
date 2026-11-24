@@ -369,6 +369,8 @@ export interface WidgetClickAction {
   readonly kind: "click";
   /** The kind of value the click names, as the widget's code sends it: "day", "model". */
   readonly on: string;
+  /** Set when one kind has a prompt per raw value, as a field per field: the value it is for. */
+  readonly value?: string;
   /** The placeholder the series under the pointer fills, as "outcome" in "{outcome} on {day}". */
   readonly series?: string;
   /** With `{question}`, `{period}`, `{<on>}` and `{<series>}` to fill. */
@@ -402,7 +404,7 @@ export function shownWidgetButtons({
   );
 }
 
-/** The click prompt a widget declares for the kind of value clicked, if any. */
+/** The click prompt a widget declares for the kind of value clicked (and its value), if any. */
 export function widgetClickFor({
   actions,
   subject,
@@ -412,9 +414,12 @@ export function widgetClickFor({
 }): WidgetClickAction | undefined {
   const kind = subject.kind?.toLowerCase();
   if (kind === void 0) return void 0;
+  const value = subject.value ?? subject.label;
   return actions.find(
     (action): action is WidgetClickAction =>
-      action.kind === "click" && action.on.toLowerCase() === kind,
+      action.kind === "click" &&
+      action.on.toLowerCase() === kind &&
+      (action.value === void 0 || action.value === value),
   );
 }
 

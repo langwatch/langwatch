@@ -273,7 +273,9 @@ describe("the actions catalogue widgets declare", () => {
   it("declares one prompt per kind of value clicked", () => {
     for (const [id, actions] of Object.entries(CATALOGUE_WIDGET_ACTIONS)) {
       const kinds = actions.flatMap((action) =>
-        action.kind === "click" ? [`${action.on}/${action.series ?? ""}`] : [action.kind],
+        action.kind === "click"
+          ? [`${action.on}/${action.series ?? ""}/${action.value ?? ""}`]
+          : [action.kind],
       );
       expect(new Set(kinds).size, id).toBe(kinds.length);
     }

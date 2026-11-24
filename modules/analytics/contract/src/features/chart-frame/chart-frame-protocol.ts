@@ -168,6 +168,8 @@ export const NAVIGABLE_TARGETS = [
   "annotations",
   "gatewayVirtualKeys",
   "codingSessions",
+  "modelCosts",
+  "metadataDocs",
 ] as const;
 export type NavigableTarget = (typeof NAVIGABLE_TARGETS)[number];
 
