@@ -32,6 +32,7 @@ import { MemoryNurturingEvaluationDayRepository } from "../../memory/memory.nurt
 import { MemoryNurturingMilestonesRepository } from "../../memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingOrganizationMemberRepository } from "../../memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../memory/memory.nurturing-project-usage.repository.ts";
+import { MemoryNurturingClaimRepository } from "../../memory/memory.nurturing.repositories.ts";
 import { NURTURING_TRACE_DAY_PROJECTION_VERSION } from "../../nurturing-trace-day.repository.ts";
 import { PrismaNurturingOrganizationCreatedRepository } from "../prisma.nurturing-organization-created.repository.ts";
 import { PrismaNurturingProjectPlacementRepository } from "../prisma.nurturing-project-placement.repository.ts";
@@ -177,6 +178,7 @@ describe.skipIf(!databaseUrl)("given nurturing's trace-day rows in Postgres", ()
         milestones,
         members: MemoryNurturingOrganizationMemberRepository.create(),
         erasedUsers: MemoryNurturingErasedUserRepository.create(),
+        claims: MemoryNurturingClaimRepository.create(),
         sendBatch: async (calls) => void sent.push(...calls),
         clock: { nowMs: () => NOON + 60_000 },
         logger: createTestLogger().logger,

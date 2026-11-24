@@ -24,6 +24,7 @@ import { MemoryNurturingOrganizationCreatedRepository } from "../../repositories
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
+import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { PrismaNurturingErasedUserRepository } from "../../repositories/prisma/prisma.nurturing-erased-user.repository.ts";
 import { PrismaNurturingOrganizationMemberRepository } from "../../repositories/prisma/prisma.nurturing-organization-member.repository.ts";
 import { erasedUserHashOf } from "../../rules/nurturing-virtual-key.rules.ts";
@@ -91,6 +92,7 @@ describe.skipIf(!databaseUrl)("given a member row in Postgres naming a person si
         milestones,
         members,
         erasedUsers: PrismaNurturingErasedUserRepository.create({ prisma: connection.client }),
+        claims: MemoryNurturingClaimRepository.create(),
         sendBatch: async (calls) => void sent.push(...calls),
         clock: { nowMs: () => NOW },
         logger: createTestLogger().logger,

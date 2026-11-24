@@ -48,7 +48,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
   The usage mirror reads the marks too, so such a row, or one from before the marks, gets no
   identify.
   On a usage sync a failed identify is reported and swallowed, as the
-  other sinks' failures are; the group call stands. At a window's end it fails the sweep, which retries. A project's first trace syncs as later ones do. The
+  other sinks' failures are; the group call stands. A failed read of the members fails the sync, which retries. At a window's end it fails the sweep, which retries. A project's first trace syncs as later ones do. The
   signup day comes from its own copy of
   lw.organization.created. It reads no other module's table and calls no other module's API for
   a usage fact. Its placement, organization-creation and admin copies are peer maps over project's
@@ -338,6 +338,7 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     And a sync skipped for want of an admin, a placement or a counting window logs its reason at debug
     And a counter records each sync attempt's outcome, never an id
     And a refused group call counts as send_failed and the sync still rejects, so the job retries
+    And a failed trace_active_day claim or batch counts as events_failed and the sync still rejects
     And any other failure of a sync counts once as error and the sync still rejects
     And the hourly trace-window sweep logs one info line with how many ended, synced and had no admin
     And the run lines and the counter carry no organization, user or project id
@@ -363,6 +364,43 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     When the traits are built
     Then active_day_0 and active_day_1 are left out, so Customer.io keeps their last values
     And active_day_12 and active_day_13 are sent
+
+  @unit
+  Scenario: Each member gets trace_active_day once per UTC day their organization traced
+    Given an organization inside its counting window that traced today and yesterday
+    When its usage syncs
+    Then each member the traits are mirrored onto is tracked trace_active_day once for each of those days, after the identifies
+    And each event carries the day as date and its days_since_signup, the n of the active_day_<n> trait the same day sets
+    And the four active_day traits are still sent, as live campaigns branch on them
+
+  @unit
+  Scenario: A sync sends trace_active_day for today and yesterday only
+    Given an organization's traced days within the window
+    When its usage syncs
+    Then trace_active_day goes for today's and yesterday's traced days only, so a sync just past midnight still sends the day before
+    And no older day is sent again once its claim has lapsed
+    And a traced day before the signup day is not sent
+
+  @unit
+  Scenario: trace_active_day is never sent twice for a member and day
+    Given a member already tracked trace_active_day for a day
+    When the organization syncs again, its sync job is redelivered or retried
+    Then no second trace_active_day goes for that member and day: each is claimed per member and day for 7 days
+    And its message id is stable per member and day, so Customer.io drops a repeat too
+
+  @unit
+  Scenario: A failed trace_active_day send fails the sync, and its retry sends the events once
+    Given Customer.io refuses a batch of trace_active_day events, or a claim fails midway
+    When the sync runs
+    Then the batch's claims are given back, the sync counts as events_failed and rejects, so the job retries
+    And the retried job sends each event once
+
+  @unit
+  Scenario: A refused identify does not hold back trace_active_day
+    Given Customer.io refuses the members' identify
+    When an organization that traced today syncs
+    Then the identify failure is reported and swallowed
+    And each member the traits are mirrored onto is still tracked trace_active_day, in its own step after the mirror
 
   @unit
   Scenario: A habit is activity on 3 or more days at least 7 days apart, or in 3 ISO weeks
@@ -440,10 +478,16 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
 
   @unit
   Scenario: A failed identify is reported and swallowed
-    Given Customer.io refuses the members' identify, or nurturing's member copy cannot be read
+    Given Customer.io refuses the members' identify
     When a project of the organization changes its usage, not at a window's end
     Then the failure is reported as a warning and the sync does not fail
     And the group call has already been sent
+
+  @unit
+  Scenario: A failed member read fails the sync
+    Given nurturing's member copy cannot be read
+    When a project of the organization changes its usage, not at a window's end
+    Then the sync rejects, so the job retries and no trace_active_day event is lost
 
   @unit
   Scenario: A project nurturing never saw created sends nothing

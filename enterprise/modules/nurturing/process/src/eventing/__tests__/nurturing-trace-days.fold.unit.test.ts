@@ -27,6 +27,7 @@ import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
+import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { traceCountsOf } from "../../rules/nurturing-trace-day.rules.ts";
 import { NurturingCopiedProjectsService } from "../../services/nurturing-copied-projects.service.ts";
 import { NurturingOrganizationUsageService } from "../../services/nurturing-organization-usage.service.ts";
@@ -157,6 +158,7 @@ describe("given the trace-day folds on a live worker", () => {
       milestones,
       members: MemoryNurturingOrganizationMemberRepository.create(),
       erasedUsers: MemoryNurturingErasedUserRepository.create(),
+      claims: MemoryNurturingClaimRepository.create(),
       sendBatch: async (calls) => {
         sent.push(...calls);
       },

@@ -97,7 +97,10 @@ export function windowStartDayOf(now: number): string {
   return utcDayOf(now - PROJECT_USAGE_WINDOW_MS);
 }
 
-/** The days after signup whose activity is a trait, `active_day_<n>`. */
+/**
+ * The days after signup whose activity is a trait, `active_day_<n>`: kept until the campaigns
+ * read trace_active_day.
+ */
 const TRACKED_SIGNUP_DAYS = [0, 1, 12, 13] as const;
 type SignupDayTraits = Pick<
   CioOrganizationUsageTraits,

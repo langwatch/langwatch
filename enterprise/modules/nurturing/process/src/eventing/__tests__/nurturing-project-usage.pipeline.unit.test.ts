@@ -46,7 +46,10 @@ import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
-import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
+import {
+  MemoryNurturingClaimRepository,
+  MemoryNurturingRepositories,
+} from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingProjectUsageOwner } from "../../repositories/nurturing-project-usage.repository.ts";
 import type { NurturingMembership } from "../../rules/nurturing-organization-member.rules.ts";
 import { NurturingCopiedProjectsService } from "../../services/nurturing-copied-projects.service.ts";
@@ -358,6 +361,7 @@ describe("the trace syncs", () => {
       milestones,
       members,
       erasedUsers: MemoryNurturingErasedUserRepository.create(),
+      claims: MemoryNurturingClaimRepository.create(),
       sendBatch: async (calls) => {
         sent.push(...calls);
       },
@@ -436,6 +440,72 @@ describe("the trace syncs", () => {
 
     const days = await traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" });
     expect(days.map((day) => day.traceCount)).toEqual([1]);
+  });
+
+  /** @scenario "trace_active_day is never sent twice for a member and day" */
+  it("tracks trace_active_day once on the member for the counted day, however often the sync job runs", async () => {
+    const traceDays = MemoryNurturingTraceDayRepository.create();
+    const placements = MemoryNurturingProjectPlacementRepository.create({
+      placed: new Map([["project-1", "org-1"]]),
+    });
+    const organizationsCreated = MemoryNurturingOrganizationCreatedRepository.create({
+      createdAt: new Map([["org-1", OCCURRED_AT]]),
+    });
+    const members = MemoryNurturingOrganizationMemberRepository.create();
+    await members.recordMembershipChange({
+      organizationId: "org-1",
+      userId: "member-1",
+      change: "joined",
+      at: OCCURRED_AT,
+    });
+    const milestones = MemoryNurturingMilestonesRepository.create();
+    await milestones.recordOrganization({
+      organizationId: "org-1",
+      adminUserId: "admin-1",
+      seeded: false,
+    });
+    const sent: CioBatchCall[] = [];
+    const usage = NurturingOrganizationUsageService.create({
+      projectUsage: MemoryNurturingProjectUsageRepository.create(),
+      traceDays,
+      evaluationDays: MemoryNurturingEvaluationDayRepository.create(),
+      copiedProjects: NurturingCopiedProjectsService.create({ placements, organizationsCreated }),
+      placements,
+      organizationsCreated,
+      milestones,
+      members,
+      erasedUsers: MemoryNurturingErasedUserRepository.create(),
+      claims: MemoryNurturingClaimRepository.create(),
+      sendBatch: async (calls) => {
+        sent.push(...calls);
+      },
+      clock: { nowMs: () => OCCURRED_AT + 60_000 },
+      logger: createTestLogger().logger,
+      syncs: { inc: () => {} },
+    });
+    const { firstTrace } = nurturingTraceUsageSyncSubscribers((input) =>
+      usage.tracesChanged(input),
+    );
+
+    await foldLive({
+      spans: traceDays.forSource("spans"),
+      failures: traceDays.forSource("failures"),
+      facts: [spanReceived({ id: "trace-1", createdAt: context.createdAt })],
+    });
+    if (!firstTrace.handle) throw new Error("the first-trace sync handles one fact at a time");
+    // A redelivered sync job runs the same handler again.
+    await firstTrace.handle(firstTrace.data.parse(firstTraceData), context);
+    await firstTrace.handle(firstTrace.data.parse(firstTraceData), context);
+
+    expect(sent.filter((call) => call.type === "track")).toEqual([
+      {
+        type: "track",
+        userId: "member-1",
+        event: "trace_active_day",
+        messageId: "trace_active_day:member-1:1970-01-01",
+        properties: { date: "1970-01-01", days_since_signup: 0 },
+      },
+    ]);
   });
 });
 
