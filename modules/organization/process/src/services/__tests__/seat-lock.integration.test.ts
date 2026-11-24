@@ -232,7 +232,11 @@ describe.skipIf(!DB_URL)("two seat-taking writes for the last free full seat", (
           seatRequests: requests,
         }),
         seats,
-        seatNotices: { memberDisabled: async () => {}, memberEnabled: async () => {} },
+        seatNotices: {
+          memberDisabled: async () => {},
+          memberEnabled: async () => {},
+          memberRoleChanged: () => {},
+        },
         grantCache: { invalidateOrganization: async () => {} },
         ceiling: { assertWithinCaller: async () => {} },
         creations: createApiFixture<Dependencies["creations"]>({}),

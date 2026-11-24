@@ -12,6 +12,7 @@ import type {
   RecordMemberDisabledCommandData,
   RecordMemberEnabledCommandData,
   RecordMemberDepartmentChangedCommandData,
+  RecordMemberRoleChangedCommandData,
   RecordMemberRemovedCommandData,
   RecordMembersInvitedCommandData,
   RecordPersonalWorkspaceProvisionedCommandData,
@@ -48,6 +49,7 @@ export type OrganizationLifecycleSenders = Readonly<{
   recordMemberEnabled: Sender<RecordMemberEnabledCommandData>;
   recordMemberRemoved: Sender<RecordMemberRemovedCommandData>;
   recordMemberDepartmentChanged: Sender<RecordMemberDepartmentChangedCommandData>;
+  recordMemberRoleChanged: Sender<RecordMemberRoleChangedCommandData>;
   recordCreated: Sender<RecordCreatedCommandData>;
 }>;
 
@@ -208,6 +210,14 @@ export class OrganizationLifecycleNoticeService {
     const sender = this.#senders?.recordMemberDepartmentChanged;
     if (!sender) throw new Error("organization_lifecycle is not registered in this process");
     await sender.send({ ...this.#envelope(input.organizationId), ...input });
+  }
+
+  /** A member's role changed; fire-and-forget, since the change is committed and must stand. */
+  memberRoleChanged(input: Recorded<RecordMemberRoleChangedCommandData>): void {
+    this.#send(this.#senders?.recordMemberRoleChanged, {
+      ...this.#envelope(input.organizationId),
+      ...input,
+    });
   }
 
   /** An organization now exists; awaited and loud, since prompt seeds tags only on this record. */

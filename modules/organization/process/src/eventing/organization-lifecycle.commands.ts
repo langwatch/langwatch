@@ -18,6 +18,8 @@ import {
   ORGANIZATION_MEMBER_REMOVED_EVENT_VERSION,
   ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_TYPE,
   ORGANIZATION_MEMBER_DEPARTMENT_CHANGED_EVENT_VERSION,
+  ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_VERSION,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION,
   ORGANIZATION_DOCS_PLAYGROUND_SESSIONS_DISABLED_EVENT_TYPE,
@@ -39,6 +41,7 @@ import {
   type OrganizationMemberEnabledEvent,
   type OrganizationMemberRemovedEvent,
   type OrganizationMemberDepartmentChangedEvent,
+  type OrganizationMemberRoleChangedEvent,
   type OrganizationPresenceSettingChangedEvent,
   type OrganizationSignedUpEvent,
   type OrganizationTraceSharingDisabledEvent,
@@ -54,6 +57,7 @@ import {
   RECORD_MEMBER_ENABLED_COMMAND_TYPE,
   RECORD_MEMBER_REMOVED_COMMAND_TYPE,
   RECORD_MEMBER_DEPARTMENT_CHANGED_COMMAND_TYPE,
+  RECORD_MEMBER_ROLE_CHANGED_COMMAND_TYPE,
   RECORD_INVITE_ACCEPTED_COMMAND_TYPE,
   RECORD_MEMBERS_INVITED_COMMAND_TYPE,
   RECORD_PERSONAL_WORKSPACE_PROVISIONED_COMMAND_TYPE,
@@ -80,6 +84,8 @@ import {
   recordMemberRemovedCommandDataSchema,
   type RecordMemberDepartmentChangedCommandData,
   recordMemberDepartmentChangedCommandDataSchema,
+  type RecordMemberRoleChangedCommandData,
+  recordMemberRoleChangedCommandDataSchema,
   recordInviteAcceptedCommandDataSchema,
   type RecordMembersInvitedCommandData,
   recordMembersInvitedCommandDataSchema,
@@ -634,6 +640,40 @@ export class RecordMemberDepartmentChangedCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordMemberDepartmentChangedCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records a member's organization role change; nurturing reacts to it from its own side. */
+export class RecordMemberRoleChangedCommand implements CommandHandler<
+  Command<RecordMemberRoleChangedCommandData>,
+  OrganizationMemberRoleChangedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_MEMBER_ROLE_CHANGED_COMMAND_TYPE,
+    recordMemberRoleChangedCommandDataSchema,
+    "Record that a member's organization role was changed",
+  );
+
+  handle(
+    command: Command<RecordMemberRoleChangedCommandData>,
+  ): OrganizationMemberRoleChangedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<OrganizationMemberRoleChangedEvent>({
+        aggregateType: ORGANIZATION_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
+        version: ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_VERSION,
+        data,
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:member_role_changed:${data.userId}:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordMemberRoleChangedCommandData): string {
     return payload.organizationId;
   }
 }

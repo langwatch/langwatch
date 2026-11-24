@@ -36,6 +36,7 @@ function installed() {
   const seatNotices: OrganizationSeatRevocationNotice = {
     memberDisabled: refuse("a seat revocation record"),
     memberEnabled: refuse("a seat restoration record"),
+    memberRoleChanged: refuse("a role change record"),
   };
   const grantCache: OrganizationGrantCache = { invalidateOrganization: refuse("a grant cache") };
   const service = OrganizationMembershipService.create({

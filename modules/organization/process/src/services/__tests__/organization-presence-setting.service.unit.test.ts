@@ -140,6 +140,7 @@ describe("given two organizations whose presence settings were stored before the
         recordMemberEnabled: idle,
         recordMemberRemoved: idle,
         recordMemberDepartmentChanged: idle,
+        recordMemberRoleChanged: idle,
         recordPresenceSettingChanged: {
           send: async () => undefined,
           sendBatch: async (batch) => {
