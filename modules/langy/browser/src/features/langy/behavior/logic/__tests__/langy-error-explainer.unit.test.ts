@@ -276,6 +276,30 @@ describe("explainLangyError", () => {
         });
       });
 
+      /** @scenario A missing model behind the gateway's generic provider error still reads as a missing model */
+      it("reads the gateway's generic provider error on a 404 as a model to check", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { http_status: 404, provider: "openai-url", body_kind: "json" },
+                reasons: [{ kind: "provider_error" }, { kind: "upstream_not_found" }],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.description).toBe(
+          "The model provider does not serve this model to this key. Check the model name, or pick a different model.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+
       /** @scenario Any failure filed under the proxy's upstream code reads as the provider's */
       it("reads an unclassified provider code under the proxy's upstream code as the provider card", () => {
         const presentation = explainLangyError(

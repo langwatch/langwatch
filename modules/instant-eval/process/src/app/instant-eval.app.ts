@@ -386,6 +386,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
         peers: {
           compileFilter: (input) => traces.compileLangWatchQLTraceFilter(input),
           selectTraceIds: (input) => traces.findTraceIdsForFilter(input),
+          spanAnalyticsFloor: () => traces.getSpanAnalyticsFloor(),
           isEnabled: (input) => access.isEnabled(input),
           isReleased: (input) => access.isReleased(input),
           isQueryIdentityAvailable: () => analytics.isLangWatchQLAvailable(),

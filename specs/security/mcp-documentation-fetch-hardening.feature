@@ -73,6 +73,25 @@ Feature: MCP outbound request and browser capability hardening
       And it carries the production policy as Content-Security-Policy-Report-Only
       And a directive that would break production is visible as a console violation locally
 
+  Rule: Responses force HTTPS only where the deployment is served over HTTPS
+
+    @unit @regression
+    Scenario: An HTTPS production install forces HTTPS on the browser
+      Given LangWatch is running in production mode
+      And its public address is an https URL
+      When a client requests the application root
+      Then the Content-Security-Policy carries upgrade-insecure-requests
+      And the response carries Strict-Transport-Security
+
+    @unit @regression
+    Scenario: A self-hosted install over plain HTTP is not forced onto HTTPS
+      Given LangWatch is running in production mode
+      And its public address is an http URL on a host other than localhost
+      When a client requests the application root
+      Then the Content-Security-Policy is enforced without upgrade-insecure-requests
+      And no response carries Strict-Transport-Security
+      And the browser loads the page and its assets over plain HTTP
+
   Rule: Other MCP HTTP tools cannot reach non-public destinations
 
     @integration @regression
