@@ -30,6 +30,7 @@ import {
 import { assertColumnsCurrent, type CheckedColumn } from "../rules/dataset-columns.rules.ts";
 import { DatasetChunkDeleteService } from "./dataset-chunk-delete.service.ts";
 import { DatasetChunkMaintenanceService } from "./dataset-chunk-maintenance.service.ts";
+import { DatasetChunkReadService } from "./dataset-chunk-read.service.ts";
 import { DatasetChunkRowEditService } from "./dataset-chunk-row-edit.service.ts";
 
 const logger = createLogger("langwatch:datasets:mutations");
@@ -45,6 +46,8 @@ export class DatasetChunkService {
   private readonly maintenance: DatasetChunkMaintenanceService;
 
   private readonly rowEdits = DatasetChunkRowEditService.create();
+
+  private readonly reads = DatasetChunkReadService.create();
 
   private constructor(private readonly datasets: DatasetContentRepository) {
     this.deletes = DatasetChunkDeleteService.create({
@@ -159,8 +162,13 @@ export class DatasetChunkService {
       assertColumnsCurrent({ columns, columnTypes: current.columnTypes });
       if (newIds && newIds.length > 0) {
         const wanted = new Set(newIds);
-        for (let index = 0; index < (current.chunkCount ?? 0); index++) {
-          const rows = await datasetStorage.readChunk({ projectId, datasetId: dataset.id, index });
+        for await (const rows of this.reads.chunksInOrder({
+          storage: datasetStorage,
+          projectId,
+          datasetId: dataset.id,
+          chunkCount: current.chunkCount ?? 0,
+          offsets: readOffsets(current),
+        })) {
           const taken = rows.find((line) => isChunkLine(line) && wanted.has(line.id));
           if (isChunkLine(taken)) throw new DuplicateRecordIdError(taken.id);
         }
@@ -211,6 +219,7 @@ export class DatasetChunkService {
             datasetId: dataset.id,
             ids: new Set([recordId]),
             chunkCount: dataset.chunkCount ?? 0,
+            offsets: readOffsets(dataset),
           })
         : null;
 
@@ -349,39 +358,47 @@ export class DatasetChunkService {
     datasetId,
     ids,
     chunkCount,
+    offsets = [],
   }: {
     storage: DatasetChunkRepository;
     projectId: string;
     datasetId: string;
     ids: Set<string>;
     chunkCount: number;
+    offsets?: readonly ChunkOffset[] | undefined;
   }): Promise<{ affectedIndices: number[]; locatedIds: Set<string> } | null> {
     const affected = new Set<number>();
     const locatedIds = new Set<string>();
     const remaining = new Set(ids);
-    for (let index = 0; index < chunkCount && remaining.size > 0; index++) {
-      let rows: unknown[];
-      try {
-        rows = await storage.readChunk({ projectId, datasetId, index });
-      } catch {
-        // Couldn't read this chunk off the lock (e.g. racing a rewrite). Abandon
-        // the hint so the caller uses the proven full in-lock scan instead of
-        // acting on a partial locate.
-        logger.warn(
-          { projectId, datasetId, index },
-          "off-lock chunk read failed during id locate; abandoning fast-path hint, falling back to full in-lock scan",
-        );
-
-        return null;
-      }
-
-      for (const line of rows) {
-        if (isChunkLine(line) && remaining.has(line.id)) {
-          affected.add(index);
-          locatedIds.add(line.id);
-          remaining.delete(line.id);
+    let index = 0;
+    try {
+      const chunks = this.reads.chunksInOrder({
+        storage,
+        projectId,
+        datasetId,
+        chunkCount,
+        offsets,
+      });
+      for await (const rows of chunks) {
+        for (const line of rows) {
+          if (isChunkLine(line) && remaining.has(line.id)) {
+            affected.add(index);
+            locatedIds.add(line.id);
+            remaining.delete(line.id);
+          }
         }
+        if (remaining.size === 0) break;
+        index += 1;
       }
+    } catch {
+      // Couldn't read a chunk off the lock (e.g. racing a rewrite). Abandon the
+      // hint so the caller uses the proven full in-lock scan instead.
+      logger.warn(
+        { projectId, datasetId, index },
+        "off-lock chunk read failed during id locate; abandoning fast-path hint, falling back to full in-lock scan",
+      );
+
+      return null;
     }
 
     return { affectedIndices: [...affected].toSorted((a, b) => a - b), locatedIds };

@@ -256,3 +256,24 @@ Feature: Shared Dataset service
     When its records are read, listed or copied
     Then it reads as an empty dataset
     And only a dataset with no chunk count recorded is refused as drift
+
+  # ADR-032 v21: a dataset built by many single-row appends holds one chunk per append, and a
+  # read waited for each chunk in turn. Reads now fetch ahead, within a byte budget.
+  @unit
+  Scenario: A dataset of many small chunks reads several chunks at once, in row order
+    Given a ready dataset of 40 chunks of one row each, each read taking a moment
+    When its records are read in full
+    Then more than one chunk is fetched at a time, and never more than the cap
+    And the rows come back in the order they were appended
+
+  @unit
+  Scenario: A read of full-size chunks holds at most one chunk ahead of the reader
+    Given a ready dataset of chunks at the chunk size limit
+    When its records are read in full
+    Then no more than one chunk is fetched ahead of the one being read
+
+  @unit
+  Scenario: A read that stops early or meets a failed chunk leaves no unhandled failure
+    Given a ready dataset whose later chunk fails to read
+    When a reader stops before that chunk, or reads up to it
+    Then stopping early ends quietly, and reading up to it fails with that chunk's error

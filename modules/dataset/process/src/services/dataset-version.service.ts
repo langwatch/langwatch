@@ -39,6 +39,7 @@ import {
   versionChunksOfPage,
   versionRowOf,
 } from "../rules/dataset-version.rules.ts";
+import { DatasetChunkReadService } from "./dataset-chunk-read.service.ts";
 import { DatasetContentHasherService } from "./dataset-content-hasher.service.ts";
 import { DatasetRestoreContentService } from "./dataset-restore-content.service.ts";
 
@@ -464,12 +465,8 @@ export class DatasetVersionService {
   async *#currentRows(dataset: Dataset): AsyncGenerator<DatasetVersionRow> {
     if (dataset.contentLayout === "s3_jsonl") {
       let position = 0;
-      for (let index = 0; index < (dataset.chunkCount ?? 0); index++) {
-        const lines = await this.deps.chunks.readChunk({
-          projectId: dataset.projectId,
-          datasetId: dataset.id,
-          index,
-        });
+      const reads = DatasetChunkReadService.create();
+      for await (const lines of reads.chunksOf({ storage: this.deps.chunks, dataset })) {
         for (const line of lines) yield versionRowOf(line, position++);
       }
       return;

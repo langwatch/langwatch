@@ -82,8 +82,8 @@ describe("DatasetContentService at its size limits", () => {
         expect(read.truncated).toBe(true);
         expect(read.records.map((record) => record.id)).toEqual(["r1", "r2", "r3"]);
         expect(read.totalRows).toBe(6);
-        // The third chunk is never read, and the dataset is never held whole.
-        expect(readChunk).toHaveBeenCalledTimes(2);
+        // Only the one chunk fetched ahead is read past the stop (ADR-032 v21), never the whole.
+        expect(readChunk).toHaveBeenCalledTimes(3);
         expect(readChunks).not.toHaveBeenCalled();
       });
 

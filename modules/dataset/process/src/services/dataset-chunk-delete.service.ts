@@ -26,6 +26,8 @@ type LocateIds = (input: {
   datasetId: string;
   ids: Set<string>;
   chunkCount: number;
+  /** The offset index, so the scan can fetch small chunks ahead (ADR-032 v21). */
+  offsets?: readonly ChunkOffset[];
 }) => Promise<{ affectedIndices: number[]; locatedIds: Set<string> } | null>;
 
 type DatasetChunkDeleteServiceOptions = {
@@ -76,6 +78,7 @@ export class DatasetChunkDeleteService {
             datasetId: dataset.id,
             ids: removeSet,
             chunkCount: dataset.chunkCount ?? 0,
+            offsets: readOffsets(dataset),
           })
         : null;
 
