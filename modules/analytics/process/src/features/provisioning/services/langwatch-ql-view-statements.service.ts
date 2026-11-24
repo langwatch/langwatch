@@ -4,17 +4,9 @@
  * @see specs/lwql/api.feature
  */
 
-import { LWQL_FLOOR_PARAMETER } from "../../../rules/lwql-dedup-floor.rules.ts";
-import {
-  hasTraceIdsTwin,
-  LWQL_TRACE_IDS_PARAMETER,
-  twinViewName,
-} from "../../../rules/lwql-dedup-trace-ids.rules.ts";
+import { twinViewName } from "../../../rules/lwql-dedup-trace-ids.rules.ts";
 import { TENANT_COLUMN } from "../../../rules/lwql-view-catalog.rules.ts";
-import {
-  FLOORED_DEDUP_STRATEGIES,
-  type LangWatchQLDedupStrategy,
-} from "../../../rules/lwql-view-dedup-shape.rules.ts";
+import { type LangWatchQLDedupStrategy } from "../../../rules/lwql-view-dedup-shape.rules.ts";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
@@ -403,58 +395,6 @@ export class LangWatchQLViewStatementsService {
       `AS SELECT\n${projection}\n` +
       `FROM ${from}${joinClause}${where}${preFilter}${grouping}${collapse}`
     );
-  }
-
-  /**
-   * `CREATE OR REPLACE VIEW` for a view's floored twin (analytics ADR-005): a parameterised view
-   * the executor reads in place of the view when the statement bounds the floor column below.
-   * None for a view whose dedup declares no floor column.
-   */
-  flooredViewStatements({
-    names,
-    sourceDatabase,
-    view,
-    dedup,
-  }: {
-    names: LangWatchQLNames;
-    sourceDatabase: string;
-    view: LangWatchQLViewDefinition;
-    dedup: LangWatchQLDedupStrategy;
-  }): string[] {
-    const { floorColumn } = view.dedup;
-    const columns = view.columns.filter((column) => column.name === floorColumn);
-    if (!FLOORED_DEDUP_STRATEGIES.has(viewDedup.strategyFor({ view, dedup }))) return [];
-    // The twin reads its bound from a parameter typed like the floor column.
-    return columns.map((column) =>
-      this.viewStatement({
-        names,
-        sourceDatabase,
-        view,
-        dedup,
-        floor: `{${LWQL_FLOOR_PARAMETER}:${column.type}}`,
-      }),
-    );
-  }
-
-  /**
-   * `CREATE OR REPLACE VIEW` for a view's trace-ids twin (analytics ADR-006, amendment
-   * 2026-11-24): a parameterised view a pass reads in place of the view, cut by the traces it
-   * holds before `LIMIT 1 BY`. None for a view that is not `latest-in-order` by trace.
-   */
-  traceIdsViewStatements({
-    names,
-    sourceDatabase,
-    view,
-    dedup,
-  }: {
-    names: LangWatchQLNames;
-    sourceDatabase: string;
-    view: LangWatchQLViewDefinition;
-    dedup: LangWatchQLDedupStrategy;
-  }): string[] {
-    if (!hasTraceIdsTwin(view)) return [];
-    const traceIds = `{${LWQL_TRACE_IDS_PARAMETER}:Array(String)}`;
-    return [this.viewStatement({ names, sourceDatabase, view, dedup, traceIds })];
   }
 
   /**

@@ -11,6 +11,7 @@ import {
   LangWatchQLViewStatementsService,
   SHIPPED_LWQL_DEDUP,
 } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import { LangWatchQLViewTwinStatementsService } from "../../features/provisioning/services/langwatch-ql-view-twin-statements.service.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../services/langwatch-ql-access-model-definition.service.ts";
 import type { LangWatchQLNames } from "../../services/langwatch-ql-access-model.service.ts";
 import {
@@ -36,6 +37,7 @@ const send = (sql: string) =>
     .sql;
 
 const viewStatements = LangWatchQLViewStatementsService.create();
+const twinStatements = LangWatchQLViewTwinStatementsService.create();
 
 function render(name: string) {
   const view = pickLwqlViewByName(name);
@@ -43,7 +45,7 @@ function render(name: string) {
   const statement = { names: NAMES, sourceDatabase: "app", view, dedup: SHIPPED_LWQL_DEDUP };
   return {
     view: viewStatements.viewStatement(statement),
-    twins: viewStatements.traceIdsViewStatements(statement),
+    twins: twinStatements.traceIdsViewStatements(statement),
   };
 }
 
