@@ -98,6 +98,13 @@ Feature: Batch Evaluation Results Visualization
     Then it shows three rows
     And they keep their dataset positions, so a comparison lines them up row for row
 
+  @integration
+  Scenario: A comparison of runs of some rows shows only the rows some run holds
+    Given two runs that hold only dataset rows 3 and 4 between them
+    When I compare them
+    Then the comparison shows two rows, numbered 4 and 5
+    And each row shows the answers of the runs that hold it
+
   @unit
   Scenario: CSV holds only the rows a run holds
     Given a run that holds rows 1 to 5 of the dataset
