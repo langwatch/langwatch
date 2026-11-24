@@ -312,8 +312,9 @@ Scenario: Editing one Security Lake setting keeps the other stored settings
     @unit
     Scenario: A Security Lake read refuses a row of the wrong shape
       Given the event store answers the callers or the written count read
-      When a row's counts arrive as text they are read as numbers
-      And a row of the wrong shape is refused rather than shown
+      When a row's counts arrive as text and another row has the wrong shape
+      Then the counts are read as numbers
+      And the row of the wrong shape is refused rather than shown
 
   Rule: the settings in the governance sources surface
 
