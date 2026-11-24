@@ -510,6 +510,27 @@ describe("presentLangyToolError", () => {
       expect(presentation.message !== code || (presentation.tips ?? []).length > 0).toBe(true);
     });
 
+    it("reads the reason chain, so a refused key is not told to try again", () => {
+      const presentation = present(
+        failureDocument({
+          code: "llm_upstream_error",
+          message: "llm_upstream_error",
+          httpStatus: 502,
+          meta: {},
+          isHandled: true,
+          reasons: [
+            {
+              kind: "provider_error",
+              retryable: false,
+              reasons: [{ kind: "invalid_api_key", retryable: false }],
+            },
+          ],
+        }),
+        "Running tool",
+      );
+      expect(presentation.message).toMatch(/refused this key/);
+    });
+
     it("falls back to the registered title when the code has no description", () => {
       const presentation = present(
         failureDocument({

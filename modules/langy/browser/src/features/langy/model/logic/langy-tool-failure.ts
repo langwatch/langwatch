@@ -3,8 +3,10 @@
  * @see specs/langy/langy-cli-tool-envelope.feature
  *      "A failure keeps its structure all the way to the card"
  */
+import type { SerializedReason } from "@langwatch/handled-error";
 import {
   type CliErrorDocumentRead,
+  type LangWatchHandledErrorReason,
   type LangWatchHandledErrorShape,
   isTerminalFailure,
   readCliErrorDocument,
@@ -387,10 +389,23 @@ function platformSentence(domain: LangWatchHandledErrorShape): string {
     tips: [],
     docsUrl: undefined,
     traceId: undefined,
-    reasons: [],
+    reasons: serializedReasons(domain.reasons),
   });
   if (!copy.isRegistered) return domain.message;
   return copy.description !== "" ? copy.description : copy.title;
+}
+
+/** The CLI's reason chain in the registry's shape: `kind` is the reason's code. */
+function serializedReasons(
+  reasons: readonly LangWatchHandledErrorReason[] = [],
+): SerializedReason[] {
+  return reasons.map((reason) => ({
+    code: reason.kind,
+    kind: reason.kind,
+    retryable: reason.retryable,
+    ...(reason.meta ? { meta: reason.meta } : {}),
+    reasons: serializedReasons(reason.reasons),
+  }));
 }
 
 /**
