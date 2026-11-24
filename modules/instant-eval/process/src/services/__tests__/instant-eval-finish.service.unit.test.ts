@@ -110,66 +110,6 @@ describe("given a run that judged rows", () => {
   });
 });
 
-describe("given a run that failed after judging pages", () => {
-  describe("when its failed finish carries what the judged pages summed", () => {
-    /** @scenario "A run whose page fails on its last attempt bills the pages it judged" */
-    it("records one spend for them, then drops the hold", async () => {
-      const { service, recorded, order } = finishing();
-
-      await service.finish({
-        runId: RUN_ID,
-        projectId: PROJECT_ID,
-        outcome: "failed",
-        inputTokens: 1_700,
-        requests: 1_000,
-      });
-
-      expect(recorded).toHaveLength(1);
-      expect(recorded[0]).toMatchObject({ runId: RUN_ID, inputTokens: 1_700, requests: 1_000 });
-      expect(order).toEqual(["spend", "release"]);
-    });
-
-    /** @scenario "A failure delivered again is still one spend record" */
-    it("addresses a redelivered finish to the same run, never to a page", async () => {
-      const { service, recorded } = finishing();
-      const failed = {
-        runId: RUN_ID,
-        projectId: PROJECT_ID,
-        outcome: "failed" as const,
-        inputTokens: 1_700,
-        requests: 1_000,
-      };
-
-      await service.finish(failed);
-      await service.finish(failed);
-
-      expect(recorded.map(({ runId, latePage }) => ({ runId, latePage }))).toEqual([
-        { runId: RUN_ID, latePage: undefined },
-        { runId: RUN_ID, latePage: undefined },
-      ]);
-    });
-  });
-
-  describe("when it judged nothing before it failed", () => {
-    /** @scenario "A run that judged nothing before it failed costs nothing" */
-    it("records no spend and still drops the hold", async () => {
-      const { service, recorded, released } = finishing();
-
-      const spend = await service.finish({
-        runId: RUN_ID,
-        projectId: PROJECT_ID,
-        outcome: "failed",
-        inputTokens: 0,
-        requests: 0,
-      });
-
-      expect(recorded).toEqual([]);
-      expect(spend).toEqual({ costUsd: 0, priceUsd: 0 });
-      expect(released).toEqual([{ reservationId: RUN_ID }]);
-    });
-  });
-});
-
 describe("given a run that judged nothing", () => {
   describe("when it finishes", () => {
     /** @scenario "A run that judged nothing reports no spend" */

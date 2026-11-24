@@ -11,11 +11,16 @@ import {
   INSTANT_EVAL_PROCESSING_EVENT_TYPES,
   instantEvalRequestedEventSchema,
 } from "@langwatch/instant-eval-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { MemoryInstantEvalRunRepository } from "../../repositories/memory/memory.instant-eval-run.repository.ts";
 import { INSTANT_EVAL_PROCESS_NAME } from "../instant-eval-processing-data.process.ts";
+import type {
+  InstantEvalOutcomeCommands,
+  InstantEvalRunExecutor,
+} from "../instant-eval-processing.intent.ts";
 import {
   InstantEvalProcessingPipelineAdapter,
   type InstantEvalProcessingPipelineDefinition,
@@ -32,14 +37,8 @@ function pipeline(): InstantEvalProcessingPipelineDefinition {
       runs: MemoryInstantEvalRunRepository.create(() => AT),
     }),
     dispatch: {
-      executor: { plan: vi.fn(), judgePage: vi.fn(), finish: vi.fn(), billLatePage: vi.fn() },
-      commands: () => ({
-        recordPlanned: vi.fn(),
-        recordPageJudged: vi.fn(),
-        recordFinished: vi.fn(),
-        recordLatePageBilled: vi.fn(),
-        recordPageFailed: vi.fn(),
-      }),
+      executor: createApiFixture<InstantEvalRunExecutor>({}, "executor"),
+      commands: () => createApiFixture<InstantEvalOutcomeCommands>({}, "commands"),
     },
   });
 }
