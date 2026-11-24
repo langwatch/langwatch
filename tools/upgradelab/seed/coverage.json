@@ -266,6 +266,16 @@
       "seed": "unplanned",
       "note": "needs evaluation lifecycle_completed facts since 2026-10-19 in the event log; no seed records one yet"
     },
+    "nurturing:replay-trace-day-spans": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "projection replay from the owner's event log; no seed door written yet"
+    },
+    "nurturing:replay-trace-day-failures": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "projection replay from the owner's event log; no seed door written yet"
+    },
     "nurturing:replay-organization-plans": {
       "status": "pending",
       "seed": "unplanned",
