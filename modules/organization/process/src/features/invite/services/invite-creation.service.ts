@@ -33,7 +33,7 @@ import { buildInviteAcceptUrl } from "../../../rules/invite-link.rules.ts";
 import {
   assertAssignmentsWithinInvitedSeat,
   classifyInvitesByMemberType,
-  prepareBillingOnlyInvite,
+  billingOnlyInviteOf,
 } from "../../../rules/invite-memberships.rules.ts";
 import { assertAdditionsNotHeldForPayment } from "../../../rules/payment-hold.rules.ts";
 import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
@@ -464,7 +464,10 @@ export class InviteCreationService {
     invite: CreateInvitesInviteInput;
     isStrict: boolean;
   }): Promise<CreateAdminInviteInput | null> {
-    if (invite.billingOnly) return prepareBillingOnlyInvite({ organizationId, invite });
+    if (invite.billingOnly) {
+      const email = invite.email.trim();
+      return email ? billingOnlyInviteOf({ organizationId, email, invite }) : null;
+    }
     const resolvedTeams = await this.teams.resolveInviteTeams({
       organizationId,
       invite,

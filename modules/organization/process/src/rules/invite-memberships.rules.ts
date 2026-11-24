@@ -153,18 +153,18 @@ export function assertAssignmentsWithinInvitedSeat({
 }
 
 /** Billing only: role EXTERNAL, no team, no seat (ADR-205). A team asked for is refused. */
-export function prepareBillingOnlyInvite({
+export function billingOnlyInviteOf({
   organizationId,
+  email,
   invite,
 }: {
   organizationId: string;
+  email: string;
   invite: CreateInvitesInviteInput;
-}): CreateAdminInviteInput | null {
+}): CreateAdminInviteInput {
   if ((invite.teams?.length ?? 0) > 0 || invite.teamIds?.trim()) {
     throw new BillingOnlyNoTeamAccessError();
   }
-  const email = invite.email.trim();
-  if (!email) return null;
   return {
     email,
     role: OrganizationUserRole.EXTERNAL,
