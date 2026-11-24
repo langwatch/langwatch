@@ -150,7 +150,6 @@ async function composedRelay() {
       organizationId: "org_1",
     },
     runToken: RUN_TOKEN,
-    permitReserved: false,
   });
   const relay = app.openRelayConnection();
   const buffer = repositories.tokenBuffer.open();

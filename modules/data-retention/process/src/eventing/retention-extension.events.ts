@@ -17,6 +17,11 @@ export const RECORD_RETENTION_EXTENSION_COMMAND_TYPE =
 export const APPLY_RETENTION_EXTENSION_COMMAND_TYPE =
   "lw.data_retention.apply_retention_extension" as const;
 
+export const RETENTION_POLICY_CHANGED_EVENT_TYPE =
+  "lw.data_retention.retention_policy_changed" as const;
+export const RECORD_RETENTION_POLICY_CHANGE_COMMAND_TYPE =
+  "lw.data_retention.record_retention_policy_change" as const;
+
 export const STORED_RETENTION_APPLY_REQUESTED_EVENT_TYPE =
   "lw.data_retention.stored_retention_apply_requested" as const;
 export const REQUEST_STORED_RETENTION_APPLY_COMMAND_TYPE =
@@ -59,9 +64,28 @@ export const retentionAppliedEventDataSchema = z
     mode: storedRetentionModeSchema.default("raise"),
     tables: z.array(z.string()),
     appliedAt: z.number().int().nonnegative(),
+    /** The scope whose change or apply reached this project; absent before it was recorded. */
+    scope: reachedScopeSchema.optional(),
   })
   .strict();
 export type RetentionAppliedEventData = z.infer<typeof retentionAppliedEventDataSchema>;
+
+/** A retention period saved at one scope, whether or not it reaches stored data yet. */
+export const retentionPolicyChangedEventDataSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    /** The save's identity: one change each, however often delivered. */
+    changeId: z.string().min(1),
+    scope: reachedScopeSchema,
+    category: retentionCategorySchema,
+    /** The period saved; 0 keeps forever. */
+    retentionDays: z.number().int().nonnegative(),
+    /** Whether the save kept fewer days than the rule it replaced, so a raise cannot cover it. */
+    shortens: z.boolean(),
+    changedAt: z.number().int().nonnegative(),
+  })
+  .strict();
+export type RetentionPolicyChangedEventData = z.infer<typeof retentionPolicyChangedEventDataSchema>;
 
 /** An admin asked to rewrite the scope's stored rows to the periods its projects resolve to. */
 export const storedRetentionApplyRequestedEventDataSchema = z
@@ -95,6 +119,13 @@ export const storedRetentionApplyRequestedEventSchema = z.object({
   version: z.literal(RETENTION_EXTENSION_EVENT_VERSION),
   data: storedRetentionApplyRequestedEventDataSchema,
 });
+export const retentionPolicyChangedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(RETENTION_POLICY_CHANGED_EVENT_TYPE),
+  version: z.literal(RETENTION_EXTENSION_EVENT_VERSION),
+  data: retentionPolicyChangedEventDataSchema,
+});
+export type RetentionPolicyChangedEvent = z.infer<typeof retentionPolicyChangedEventSchema>;
 export type RetentionExtendedEvent = z.infer<typeof retentionExtendedEventSchema>;
 export type RetentionAppliedEvent = z.infer<typeof retentionAppliedEventSchema>;
 export type StoredRetentionApplyRequestedEvent = z.infer<
@@ -103,7 +134,16 @@ export type StoredRetentionApplyRequestedEvent = z.infer<
 export type RetentionExtensionEvent =
   | RetentionExtendedEvent
   | RetentionAppliedEvent
-  | StoredRetentionApplyRequestedEvent;
+  | StoredRetentionApplyRequestedEvent
+  | RetentionPolicyChangedEvent;
+
+export const recordRetentionPolicyChangeCommandDataSchema = z.object({
+  tenantId: z.string().min(1),
+  ...retentionPolicyChangedEventDataSchema.shape,
+});
+export type RecordRetentionPolicyChangeCommandData = z.infer<
+  typeof recordRetentionPolicyChangeCommandDataSchema
+>;
 
 export const requestStoredRetentionApplyCommandDataSchema = z.object({
   tenantId: z.string().min(1),
@@ -130,6 +170,7 @@ export const applyRetentionExtensionCommandDataSchema = z.object({
   category: retentionCategorySchema,
   mode: storedRetentionModeSchema.default("raise"),
   occurredAt: z.number().int().nonnegative(),
+  scope: reachedScopeSchema.optional(),
 });
 export type ApplyRetentionExtensionCommandData = z.infer<
   typeof applyRetentionExtensionCommandDataSchema

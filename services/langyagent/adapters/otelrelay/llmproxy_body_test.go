@@ -756,3 +756,34 @@ func TestDecodeProviderErrorBody_RefusedCredentialAlsoCarriesTheStatusReason(t *
 		})
 	}
 }
+
+// @scenario "A missing model behind the gateway's generic provider error still reads as a missing model"
+func TestDecodeProviderErrorBody_GatewayGenericEnvelopeKeepsStatusReason(t *testing.T) {
+	body := []byte(`{"error":{"type":"provider_error","code":"provider_error","message":"upstream failed"}}`)
+
+	t.Run("when the provider answered 404", func(t *testing.T) {
+		e := decodeProviderErrorBody(body, http.StatusNotFound, "application/json")
+		got := reasonCodes(e)
+		want := []herr.Code{"provider_error", "upstream_not_found"}
+		if !slices.Equal(got, want) {
+			t.Fatalf("reasons = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("when the provider answered 401", func(t *testing.T) {
+		e := decodeProviderErrorBody(body, http.StatusUnauthorized, "application/json")
+		got := reasonCodes(e)
+		want := []herr.Code{"provider_error", "upstream_unauthorized"}
+		if !slices.Equal(got, want) {
+			t.Fatalf("reasons = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("when a provider's own code rides the body", func(t *testing.T) {
+		quota := []byte(`{"error":{"type":"insufficient_quota","code":"insufficient_quota"}}`)
+		e := decodeProviderErrorBody(quota, http.StatusNotFound, "application/json")
+		if got := reasonCodes(e); len(got) == 0 || got[0] != "insufficient_quota" || slices.Contains(got, "upstream_not_found") {
+			t.Fatalf("reasons = %v, want insufficient_quota without a status reason", got)
+		}
+	})
+}

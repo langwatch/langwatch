@@ -14,7 +14,9 @@ describe("the session link", () => {
     expect(findSessionLink({ session: "s1", sessionName: "Scout" })).toEqual({
       kind: "id",
       sessionId: "s1",
+      sessionName: "Scout",
     });
+    expect(findSessionLink({ session: "s1" })).toEqual({ kind: "id", sessionId: "s1" });
     expect(findSessionLink({ sessionName: " Scout " })).toEqual({
       kind: "name",
       sessionName: "Scout",
@@ -32,6 +34,19 @@ describe("the session link", () => {
       "other",
     );
     expect(sessionOfLink({ link: { kind: "name", sessionName: "Ghost" }, rows })).toBeNull();
+  });
+
+  /** @scenario "A link with a session id and a name falls back to the name" */
+  it("falls back to the newest session with the name when the id is not listed", () => {
+    const rows = [row("old", "Scout", 1), row("new", "Scout", 5)];
+    const link = findSessionLink({ session: "agent-1", sessionName: "Scout" });
+
+    expect(link && sessionOfLink({ link, rows })?.sessionId).toBe("new");
+    expect(sessionOfLink({ link: { kind: "id", sessionId: "agent-1" }, rows })).toBeNull();
+    expect(
+      sessionOfLink({ link: { kind: "id", sessionId: "old", sessionName: "Scout" }, rows })
+        ?.sessionId,
+    ).toBe("old");
   });
 
   /** @scenario "A session link keeps the Langy question beside it" */

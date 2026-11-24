@@ -18,11 +18,21 @@ import {
   ocsfIngestRequestSchema,
   ocsfIngestResponseSchema,
   ocsfTracesQuerySchema,
+  securityLakeConnectionTestInputSchema,
+  securityLakeConnectionTestSchema,
+  securityLakeSourceCreateInputSchema,
+  securityLakeSourceHealthSchema,
+  securityLakeSourceSchema,
+  securityLakeSourceUpdateInputSchema,
 } from "@langwatch/enterprise-governance-contract";
 import { resolveRequestBound } from "@langwatch/plans";
+import { z } from "zod";
 
 const TAGS = ["Governance / OCSF SIEM"];
+const LAKE_TAGS = ["Governance / Security Lake"];
+const sourceParams = z.object({ sourceId: z.string().min(1) });
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
+const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
 
 const PAGING =
   "Pass `next_cursor` back as `cursor` to read on; it is always set, so a puller stores it between runs. `has_more` is true when more events are already waiting. `since` (ISO 8601) starts the first read and a cursor carries its own position. `until` (ISO 8601) is not in the cursor: send it with every page.";
@@ -120,4 +130,108 @@ export const ocsfSiemRest = defineRestRouter(GovernanceRestApi)
     responses: { ...canonicalBaseResponses, ...canonicalUnprocessableResponses },
   })
   .handle(({ app, input, scope }) => app.ingestOcsfEvents({ ...input, organizationId: scope.id }))
+
+  .post("/api/governance/security-lake/sources", "createSecurityLakeSource")
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
+  .keepsRecords()
+  .withAudit("ingestionSources.create")
+  .withInput(securityLakeSourceCreateInputSchema)
+  .withPermission("ingestionSources:manage")
+  .withEntitlement("enterprise", { feature: "OCSF_EXPORT" })
+  .withOutput(securityLakeSourceSchema)
+  .withDocs({
+    operationId: "postApiGovernanceSecurityLakeSources",
+    summary: "Add an AWS Security Lake source",
+    tags: LAKE_TAGS,
+    description:
+      "Adds a Security Lake subscriber as an ingestion source. LangWatch reads the subscriber's SQS queue on `config.schedule` (every 5 minutes by default), decodes each Parquet object, keeps the AI activity (Bedrock, SageMaker endpoints, Bedrock agents) and stores it as OCSF events with `source_type` `security_lake`. The access keys are stored sealed and never returned. LangWatch generates the source's `externalId` and returns it; the subscriber role's trust policy must require it as the `sts:ExternalId` condition.",
+    responses: { ...canonicalBaseResponses, ...canonicalUnprocessableResponses },
+  })
+  .handle(({ app, input, scope, actor }) =>
+    app.securityLakeSourceCreate({
+      ...input,
+      organizationId: scope.id,
+      actorUserId: actor?.type === "user" ? actor.id : null,
+    }),
+  )
+
+  .patch("/api/governance/security-lake/sources/:sourceId", "updateSecurityLakeSource")
+  .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES })
+  .keepsRecords()
+  .withAudit("ingestionSources.update")
+  .withParams(sourceParams)
+  .withInput(securityLakeSourceUpdateInputSchema)
+  .withPermission("ingestionSources:manage")
+  .withEntitlement("enterprise", { feature: "OCSF_EXPORT" })
+  .withOutput(securityLakeSourceSchema)
+  .withDocs({
+    operationId: "patchApiGovernanceSecurityLakeSourcesById",
+    summary: "Edit an AWS Security Lake source",
+    tags: LAKE_TAGS,
+    description:
+      "Changes the name, queue settings, sources, schedule, access keys or status of a Security Lake source. Fields left out keep their stored value. The external id stays as LangWatch generated it.",
+    responses: { ...canonicalBaseResponses, ...canonicalUnprocessableResponses },
+  })
+  .handle(({ app, input, scope }) =>
+    app.securityLakeSourceUpdate({ ...input, id: input.sourceId, organizationId: scope.id }),
+  )
+
+  .post("/api/governance/security-lake/sources/:sourceId/test", "testSecurityLakeSource")
+  .withoutAudit("reads the queue backlog and changes nothing")
+  .withoutConfirmation("reads the queue backlog and changes nothing")
+  .withParams(sourceParams)
+  .withInput(securityLakeConnectionTestInputSchema)
+  .withPermission("ingestionSources:manage")
+  .withEntitlement("enterprise", { feature: "OCSF_EXPORT" })
+  .withOutput(securityLakeConnectionTestSchema)
+  .withDocs({
+    operationId: "postApiGovernanceSecurityLakeSourcesByIdTest",
+    summary: "Test a Security Lake source's connection",
+    tags: LAKE_TAGS,
+    description:
+      "Reads the subscriber queue's backlog without taking a message. Settings and keys in the body are tested over the stored ones and not saved; an empty body tests the stored source. `ok` is false with the AWS error code when the queue refused or could not be reached.",
+    responses: { ...canonicalBaseResponses },
+  })
+  .handle(({ app, input, scope }) =>
+    app.securityLakeSourceTest({
+      ...(input.config === undefined ? {} : { config: input.config }),
+      ...(input.credentials === undefined ? {} : { credentials: input.credentials }),
+      id: input.sourceId,
+      organizationId: scope.id,
+    }),
+  )
+
+  .get("/api/governance/security-lake/sources/:sourceId", "getSecurityLakeSource")
+  .withParams(sourceParams)
+  .withPermission("ingestionSources:manage")
+  .withEntitlement("enterprise", { feature: "OCSF_EXPORT" })
+  .withOutput(securityLakeSourceSchema)
+  .withDocs({
+    operationId: "getApiGovernanceSecurityLakeSourcesById",
+    summary: "Read a Security Lake source",
+    tags: LAKE_TAGS,
+    description:
+      "The source's settings and the external id LangWatch generated for it. The subscriber role's trust policy must require this external id as the `sts:ExternalId` condition.",
+    responses: { ...canonicalBaseResponses },
+  })
+  .handle(({ app, input, scope }) =>
+    app.securityLakeSourceGet({ id: input.sourceId, organizationId: scope.id }),
+  )
+
+  .get("/api/governance/security-lake/sources/:sourceId/health", "getSecurityLakeSourceHealth")
+  .withParams(sourceParams)
+  .withPermission("ingestionSources:view")
+  .withEntitlement("enterprise", { feature: "OCSF_EXPORT" })
+  .withOutput(securityLakeSourceHealthSchema)
+  .withDocs({
+    operationId: "getApiGovernanceSecurityLakeSourcesByIdHealth",
+    summary: "Read a Security Lake source's health",
+    tags: LAKE_TAGS,
+    description:
+      "The source's last read time, lag (from the oldest event written in the last run to that run), running counts of messages, objects, rows, events written and dropped, the last run's error, and the latest poison objects the reader gave up on.",
+    responses: { ...canonicalBaseResponses },
+  })
+  .handle(({ app, input, scope }) =>
+    app.securityLakeSourceHealth({ id: input.sourceId, organizationId: scope.id }),
+  )
   .build();

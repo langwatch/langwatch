@@ -30,6 +30,7 @@ import {
   DataPrivacyHostProvider,
   type PrivacyFailureNotice,
   type PrivacyHostScope,
+  type PrivacyLicence,
   type PrivacyRouteReading,
   type PrivacySuccessNotice,
 } from "../../../model/data-privacy-host.ts";
@@ -119,8 +120,22 @@ export class TestPrivacyHost extends DataPrivacyHostApi {
   readonly successes: PrivacySuccessNotice[] = [];
   readonly failures: PrivacyFailureNotice[] = [];
 
-  constructor(private query: Readonly<Record<string, string | undefined>> = {}) {
+  constructor(
+    private query: Readonly<Record<string, string | undefined>> = {},
+    private readonly plan: { licence: PrivacyLicence; mayManageLicence: boolean } = {
+      licence: "enterprise",
+      mayManageLicence: true,
+    },
+  ) {
     super();
+  }
+
+  licence(): PrivacyLicence {
+    return this.plan.licence;
+  }
+
+  mayManageLicence(): boolean {
+    return this.plan.mayManageLicence;
   }
 
   scope(): PrivacyHostScope {
@@ -150,15 +165,19 @@ export function renderScreen({
   flagOn,
   free = false,
   isSaaS = true,
+  licence = "enterprise",
+  mayManageLicence = true,
   query = {},
 }: {
   screenElement: ReactElement;
   flagOn: boolean;
   free?: boolean;
   isSaaS?: boolean;
+  licence?: PrivacyLicence;
+  mayManageLicence?: boolean;
   query?: Record<string, string>;
 }) {
-  const host = new TestPrivacyHost(query);
+  const host = new TestPrivacyHost(query, { licence, mayManageLicence });
   const answers: Record<string, boolean> = {
     release_pii_redaction_model_enabled: flagOn,
     release_pii_redaction_model_free: free,

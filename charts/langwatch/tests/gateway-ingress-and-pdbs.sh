@@ -130,9 +130,9 @@ test_gateway_host_on_the_app_ingress() {
   else
     ok "gateway no nginx" "no ingress-nginx annotations on an envoy class"
   fi
-  if [ "$(printf '%s\n' "$doc" | grep -A2 'service:$' | grep -c 'name: lw-gateway$')" = "2" ] && printf '%s\n' "$doc" | grep -q 'path: /v1$' \
-      && printf '%s\n' "$doc" | grep -q 'path: /health$'; then
-    ok "gateway backend" "/v1 and /health route to the lw-gateway Service"
+  if [ "$(printf '%s\n' "$doc" | grep -A2 'service:$' | grep -c 'name: lw-gateway$')" = "3" ] && printf '%s\n' "$doc" | grep -q 'path: /v1$' \
+      && printf '%s\n' "$doc" | grep -q 'path: /a2a$' && printf '%s\n' "$doc" | grep -q 'path: /health$'; then
+    ok "gateway backend" "/v1, /a2a and /health route to the lw-gateway Service"
   else
     fail "gateway backend" "the gateway paths do not route to lw-gateway"
   fi

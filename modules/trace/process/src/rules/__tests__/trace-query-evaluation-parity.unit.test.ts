@@ -1,4 +1,4 @@
-import { tenantScope } from "@langwatch/clickhouse-client";
+import { checkTenantScope, tenantScope } from "@langwatch/clickhouse-client";
 import {
   FilterFieldUnknownError,
   type DerivedTraceEvent,
@@ -9,6 +9,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { expandStatementForProject } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import type {
   ExpressionCategoricalDef,
   RangeFacetDef,
@@ -927,5 +928,116 @@ describe("free text compiled to ClickHouse", () => {
     expect(sql).toContain(
       "(TenantId, TraceId) NOT IN (SELECT DISTINCT TenantId, TraceId FROM stored_spans",
     );
+  });
+});
+
+describe("given a NOT over a bracketed group", () => {
+  const errorOnMini = makeTrace({ containsErrorStatus: true, models: ["gpt-5-mini"] });
+  const errorOnOther = makeTrace({ containsErrorStatus: true, models: ["gpt-5"] });
+  const okOnMini = makeTrace({ models: ["gpt-5-mini"] });
+  const okOnOther = makeTrace({ models: ["gpt-5"] });
+  const traces = [errorOnMini, errorOnOther, okOnMini, okOnOther];
+
+  function compile(query: string) {
+    const compiled = traceQueryTranslation.translateFilter({
+      queryText: query,
+      timeRange: { from: 1000, to: 2000 },
+    });
+    expect(compiled).not.toBeNull();
+    return compiled!;
+  }
+
+  /** The tenant guard's verdict on the statement the list would run, fenced to one project. */
+  function guardOf(query: string) {
+    const { sql, params } = compile(query);
+    const statement = expandStatementForProject({
+      query: `SELECT TraceId FROM trace_summaries ts WHERE ${tenantScope("OccurredAt")} AND ${sql}`,
+      queryParams: params,
+      projectId: "project-1",
+    });
+    return checkTenantScope({
+      sql: statement.query,
+      params: statement.queryParams,
+      tenantId: "project-1",
+      tenantIds: ["project-1"],
+    });
+  }
+
+  describe("when it is evaluated against one trace in memory", () => {
+    /** @scenario "NOT over a bracketed group negates the whole group" */
+    it.each([
+      ["NOT (status:error AND model:gpt-5-mini)", [false, true, true, true]],
+      ["NOT (status:error OR model:gpt-5-mini)", [false, false, false, true]],
+      ["NOT (status:error model:gpt-5-mini)", [false, true, true, true]],
+      ["NOT (NOT status:error AND model:gpt-5-mini)", [true, true, false, true]],
+      ["model:gpt-5-mini AND NOT (status:error OR model:gpt-5)", [false, false, true, false]],
+      ["NOT ((status:error AND model:gpt-5-mini) OR model:gpt-5)", [false, false, true, false]],
+      ["NOT (NOT (status:error AND model:gpt-5-mini))", [true, false, false, false]],
+      ["status:error AND model:gpt-5-mini", [true, false, false, false]],
+      ["NOT status:error", [false, false, true, true]],
+    ])("%s keeps the traces its group leaves out", (query, expected) => {
+      expect(traces.map((trace) => evaluateQueryInMemory(query, trace))).toEqual(expected);
+    });
+  });
+
+  describe("when it is compiled to ClickHouse", () => {
+    /** @scenario "NOT over a bracketed group negates the whole group" */
+    it("joins the negated terms of an AND group with OR", () => {
+      const negated = compile("NOT (status:error AND model:gpt-5-mini)").sql;
+      const left = compile("NOT status:error").sql;
+      const right = compile("NOT model:gpt-5-mini").sql;
+
+      expect(negated).toContain(" OR ");
+      expect(negated).not.toContain(" AND (NOT");
+      expect(negated.replace(/\d+/g, "")).toContain(
+        `${left.replace(/\d+/g, "")} OR ${right.replace(/\d+/g, "")}`,
+      );
+    });
+
+    /** @scenario "NOT over a bracketed group negates the whole group" */
+    it("joins the negated terms of an OR group with AND", () => {
+      const negated = compile("NOT (status:error OR model:gpt-5-mini)").sql;
+      const left = compile("NOT status:error").sql;
+      const right = compile("NOT model:gpt-5-mini").sql;
+
+      expect(negated.replace(/\d+/g, "")).toContain(
+        `${left.replace(/\d+/g, "")} AND ${right.replace(/\d+/g, "")}`,
+      );
+    });
+  });
+
+  describe("when the group binds an evaluator to its own results", () => {
+    const xLowYHigh = makeTrace(
+      {},
+      {
+        evaluations: [
+          makeEval({ evaluatorId: "x", score: 0.3 }),
+          makeEval({ evaluatorId: "y", score: 0.9 }),
+        ],
+      },
+    );
+
+    /** @scenario "NOT over an evaluator group keeps the evaluator's own results together" */
+    it("keeps a trace whose bound evaluator did not score above the bar", () => {
+      expect(evaluateQueryInMemory("evaluator:x AND evaluatorScore:>0.5", xLowYHigh)).toBe(false);
+      expect(evaluateQueryInMemory("NOT (evaluator:x AND evaluatorScore:>0.5)", xLowYHigh)).toBe(
+        true,
+      );
+    });
+
+    /** @scenario "NOT over an evaluator group keeps the evaluator's own results together" */
+    it("reads a chain naming two evaluators once from its top, unbound", () => {
+      const query = "evaluator:x AND evaluatorScore:>0.5 AND evaluator:y";
+      expect(evaluateQueryInMemory(query, xLowYHigh)).toBe(true);
+      expect(evaluateQueryInMemory(`NOT (${query})`, xLowYHigh)).toBe(false);
+    });
+
+    /** @scenario "NOT over an evaluator group keeps the evaluator's own results together" */
+    it("compiles to a NOT IN membership, never a NOT the tenant guard refuses", () => {
+      expect(guardOf("evaluator:x AND evaluatorScore:>0.5")).toBeNull();
+      expect(guardOf("NOT (evaluator:x AND evaluatorScore:>0.5)")).toBeNull();
+      expect(guardOf("NOT (evaluator:x AND NOT evaluatorScore:>0.5)")).toBeNull();
+      expect(compile("NOT (evaluator:x AND evaluatorScore:>0.5)").sql).toContain(") NOT IN (");
+    });
   });
 });

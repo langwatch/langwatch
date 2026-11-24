@@ -59,13 +59,23 @@ const SSE_ACCESS = handlerManagedAuth({
 });
 
 export class SseLane {
-  static create(options: { members: SseSubscriptionMembers; logger?: Logged }): SseLane {
-    return new SseLane(options.members, options.logger ?? createLogger("langwatch:api:sse"));
+  /** `plainHttp`: the deployment is served without TLS (`BrowserOriginGuard.isOwnEventStream`). */
+  static create(options: {
+    members: SseSubscriptionMembers;
+    logger?: Logged;
+    plainHttp?: boolean;
+  }): SseLane {
+    return new SseLane(
+      options.members,
+      options.logger ?? createLogger("langwatch:api:sse"),
+      options.plainHttp === true,
+    );
   }
 
   private constructor(
     private readonly members: SseSubscriptionMembers,
     private readonly logger: Logged,
+    private readonly plainHttp: boolean,
   ) {
     // The one statement of this lane's access, so the authorization audit and
     // the document generator read the same policy a declared family publishes.
@@ -88,7 +98,7 @@ export class SseLane {
     // cross-site top-level GET as well.
     const header = (name: string) => raw.headers.get(name) ?? undefined;
 
-    if (!BrowserOriginGuard.isFromOwnOrigin({ req: { header } })) {
+    if (!BrowserOriginGuard.isOwnEventStream({ req: { header } }, { plainHttp: this.plainHttp })) {
       throw new LiveStreamCrossSiteBlockedError();
     }
 

@@ -536,7 +536,7 @@ Public: the device flow authenticates the caller inside its own handlers (the CL
 Answers at `/api/auth/cli/lookup`, `/api/v1/auth/cli/lookup`.
 
 ```typescript
-// Query: lookupQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:78
+// Query: lookupQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:83
 interface Query {
   user_code?: string;
 }
@@ -587,7 +587,7 @@ Public: the device flow authenticates the caller inside its own handlers (the CL
 Answers at `/api/auth/cli/device-approval`, `/api/v1/auth/cli/device-approval`.
 
 ```typescript
-// Query: deviceApprovalQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:86
+// Query: deviceApprovalQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:91
 interface Query {
   device_code: string;
 }

@@ -53,6 +53,20 @@ describe("ClaudeCodeCanonicaliserService.applyLog", () => {
     expect(ctx.out["langwatch.input"]).toBe("hi");
   });
 
+  /** @scenario a launcher's declared session groups every harness session it runs */
+  it("threads the record on a launcher's declared session over the run's session id", () => {
+    const ctx = createLogExtractorContext(SCOPE, {
+      "event.name": "user_prompt",
+      prompt: "hi",
+      "session.id": "sess_run",
+      "langwatch.session.id": "agent_scout",
+    });
+
+    ClaudeCodeCanonicaliserService.create().applyLog(ctx);
+
+    expect(ctx.out["langwatch.thread.id"]).toBe("agent_scout");
+  });
+
   /** @scenario A user prompt's declared input replaces the wrapped prompt */
   it("keeps a launcher's declared input over the wrapped prompt", () => {
     const ctx = createLogExtractorContext(SCOPE, {
@@ -353,6 +367,70 @@ describe("buildInputMessagesFromRequestBody (exported helper)", () => {
         JSON.stringify({ messages: [{ role: "user", content: [] }] }),
       ),
     ).toBeNull();
+  });
+});
+
+describe("buildInputMessagesFromRequestBody tool-result turns", () => {
+  const toolResultTurn = {
+    role: "user",
+    content: [
+      { type: "tool_result", tool_use_id: "toolu_1", content: "(dispatched #1)" },
+      {
+        type: "tool_result",
+        tool_use_id: "toolu_2",
+        content: [{ type: "text", text: "404 https://acme.example.com/old" }],
+      },
+    ],
+  };
+
+  /** @scenario "A user turn holding only tool results reads as the tools answering" */
+  it("reads a user turn of only tool results as a tool message with their text", () => {
+    const body = JSON.stringify({
+      messages: [
+        { role: "user", content: "Check the ACME links" },
+        { role: "assistant", content: [{ type: "tool_use", name: "REPL", input: {} }] },
+        toolResultTurn,
+      ],
+    });
+
+    expect(claudeCodeRequestService.buildInputMessagesFromRequestBody(body)).toEqual([
+      { role: "user", content: "Check the ACME links" },
+      { role: "assistant", content: "[tool_use: REPL]" },
+      { role: "tool", content: "(dispatched #1)\n\n404 https://acme.example.com/old" },
+    ]);
+  });
+
+  /** @scenario "A user turn holding only tool results reads as the tools answering" */
+  it("keeps a turn that mixes typed text with tool results as the user's", () => {
+    const body = JSON.stringify({
+      messages: [
+        {
+          role: "user",
+          content: [...toolResultTurn.content, { type: "text", text: "now fix it" }],
+        },
+      ],
+    });
+
+    expect(claudeCodeRequestService.buildInputMessagesFromRequestBody(body)?.[0]?.role).toBe(
+      "user",
+    );
+  });
+
+  /** @scenario "A user turn holding only tool results reads as the tools answering" */
+  it("reads a truncated body's tool-result turns the same way", () => {
+    const full = JSON.stringify({
+      messages: [
+        { role: "user", content: "Check the ACME links" },
+        toolResultTurn,
+        { role: "user", content: "x".repeat(200) },
+      ],
+    });
+    const cut = full.slice(0, full.length - 120);
+
+    const roles = claudeCodeRequestService
+      .buildInputMessagesFromRequestBody(cut)
+      ?.map((message) => message.role);
+    expect(roles?.slice(0, 2)).toEqual(["user", "tool"]);
   });
 });
 

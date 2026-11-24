@@ -1,3 +1,5 @@
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
+
 import { type ProductId, productById } from "./products.ts";
 
 export interface LandingDestinationInput {
@@ -37,6 +39,6 @@ export function resolveLandingDestination({
   if (serverHomeDestination) return serverHomeDestination;
 
   if (projectSlug) return `/${projectSlug}`;
-  if (reachableProducts.includes("me")) return "/me";
+  if (reachableProducts.includes("me")) return CODING_AGENTS_PATH;
   return null;
 }
