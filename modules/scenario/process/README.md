@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The scenario application: what every scenario door calls, and what peer features such as Suite reach it by.
 
-Peers call these through the token, declared at `../contract/src/scenario.api.ts:251`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/scenario.api.ts:254`; nothing else in this package is public.
 
 #### `generateScenario`
 
@@ -512,13 +512,13 @@ Permission `scenarios:create`. Declared at `src/transport/scenario-agent-test.re
 Answers at `/api/v1/agents/:id/test`.
 
 ```typescript
-// Params: agentTestRestParamsSchema, ../contract/src/scenario-rest.schemas.ts:287
+// Params: agentTestRestParamsSchema, ../contract/src/scenario-rest.schemas.ts:315
 interface Params {
   id: string;
 }
-// Body: testAgentBodySchema, ../contract/src/scenario-rest.schemas.ts:292
+// Body: testAgentBodySchema, ../contract/src/scenario-rest.schemas.ts:320
 type Body = Record<string, unknown>;
-// Response: agentTestRunResponseSchema, ../contract/src/scenario-rest.schemas.ts:303
+// Response: agentTestRunResponseSchema, ../contract/src/scenario-rest.schemas.ts:331
 interface Response {
   scenarioRunId: string;
   batchRunId: string;
@@ -774,7 +774,7 @@ type Response = unknown;
 
 |             |                                            |
 | ----------- | ------------------------------------------ |
-| Declared at | `src/transport/scenario.rest.ts:130`       |
+| Declared at | `src/transport/scenario.rest.ts:134`       |
 | Base URL    | `/api/scenarios`, twin `/api/v1/scenarios` |
 | Addressing  | dated                                      |
 | Credential  | project                                    |
@@ -784,82 +784,82 @@ type Response = unknown;
 
 Get all scenarios for a project
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:135`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:139`.
 
 Answers at `/api/scenarios`, `/api/v1/scenarios`; also, undocumented, `/api/scenarios/2026-08-07`, `/api/v1/scenarios/2026-08-07`, `/api/scenarios/latest`, `/api/v1/scenarios/latest`.
 
 ```typescript
-// Response: z.array(scenarioRestResponseWithPlatformUrlSchema) (inline, src/transport/scenario.rest.ts:137)
+// Response: z.array(scenarioRestResponseWithPlatformUrlSchema) (inline, src/transport/scenario.rest.ts:141)
 ```
 
 #### `GET /:id` · `getApiScenariosById`
 
 Get a specific scenario by ID
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:156`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:160`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
 ```typescript
-// Params: scenarioRestIdParamsSchema, ../contract/src/scenario-rest.schemas.ts:262
+// Params: scenarioRestIdParamsSchema, ../contract/src/scenario-rest.schemas.ts:290
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:94
+type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:114
 ```
 
 #### `POST /` · `postApiScenarios`
 
 Create a new scenario
 
-Permission `scenarios:create`. Declared at `src/transport/scenario.rest.ts:180`.
+Permission `scenarios:create`. Declared at `src/transport/scenario.rest.ts:184`.
 
 Answers at `/api/scenarios`, `/api/v1/scenarios`; also, undocumented, `/api/scenarios/2026-08-07`, `/api/v1/scenarios/2026-08-07`, `/api/scenarios/latest`, `/api/v1/scenarios/latest`.
 
 ```typescript
-type Body = z.infer<typeof scenarioRestCreateSchema>; // ../contract/src/scenario-rest.schemas.ts:225
-type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:94
+type Body = z.infer<typeof scenarioRestCreateSchema>; // ../contract/src/scenario-rest.schemas.ts:251
+type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:114
 ```
 
 #### `PUT /:id` · `putApiScenariosById`
 
 Update an existing scenario
 
-Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:230`.
+Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:240`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:262
-type Body = z.infer<typeof scenarioRestUpdateSchema>; // ../contract/src/scenario-rest.schemas.ts:255
-type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:94
+type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:290
+type Body = z.infer<typeof scenarioRestUpdateSchema>; // ../contract/src/scenario-rest.schemas.ts:283
+type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:114
 ```
 
 #### `PATCH /:id` · `patchApiScenariosById`
 
 Update an existing scenario
 
-Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:262`.
+Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:272`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:262
-type Body = z.infer<typeof scenarioRestUpdateSchema>; // ../contract/src/scenario-rest.schemas.ts:255
-type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:94
+type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:290
+type Body = z.infer<typeof scenarioRestUpdateSchema>; // ../contract/src/scenario-rest.schemas.ts:283
+type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ../contract/src/scenario-rest.schemas.ts:114
 ```
 
 #### `DELETE /:id` · `deleteApiScenariosById`
 
 Archive (soft-delete) a scenario
 
-Permission `scenarios:manage`. Declared at `src/transport/scenario.rest.ts:297`.
+Permission `scenarios:manage`. Declared at `src/transport/scenario.rest.ts:307`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:262
-// Response: scenarioRestArchivedSchema, ../contract/src/scenario-rest.schemas.ts:277
+type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:290
+// Response: scenarioRestArchivedSchema, ../contract/src/scenario-rest.schemas.ts:305
 interface Response {
   id: string;
   archived: boolean;
@@ -870,18 +870,18 @@ interface Response {
 
 List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry.
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:323`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:333`.
 
 Answers at `/api/scenarios/:id/versions`, `/api/v1/scenarios/:id/versions`; also, undocumented, `/api/scenarios/2026-08-07/:id/versions`, `/api/v1/scenarios/2026-08-07/:id/versions`, `/api/scenarios/latest/:id/versions`, `/api/v1/scenarios/latest/:id/versions`.
 
 ```typescript
-type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:262
-// Query: scenarioRestListVersionsQuerySchema, ../contract/src/scenario-rest.schemas.ts:178
+type Params = z.infer<typeof scenarioRestIdParamsSchema>; // ../contract/src/scenario-rest.schemas.ts:290
+// Query: scenarioRestListVersionsQuerySchema, ../contract/src/scenario-rest.schemas.ts:198
 interface Query {
   limit?: number;
   cursor?: number;
 }
-// Response: scenarioRestVersionListResponseSchema, ../contract/src/scenario-rest.schemas.ts:135
+// Response: scenarioRestVersionListResponseSchema, ../contract/src/scenario-rest.schemas.ts:155
 interface Response {
   versions: {
     version: number;
@@ -900,17 +900,17 @@ interface Response {
 
 Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them.
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:361`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:371`.
 
 Answers at `/api/scenarios/:id/versions/:version`, `/api/v1/scenarios/:id/versions/:version`; also, undocumented, `/api/scenarios/2026-08-07/:id/versions/:version`, `/api/v1/scenarios/2026-08-07/:id/versions/:version`, `/api/scenarios/latest/:id/versions/:version`, `/api/v1/scenarios/latest/:id/versions/:version`.
 
 ```typescript
-// Params: scenarioRestIdVersionParamsSchema, ../contract/src/scenario-rest.schemas.ts:271
+// Params: scenarioRestIdVersionParamsSchema, ../contract/src/scenario-rest.schemas.ts:299
 interface Params {
   id: string;
   version: number;
 }
-type Response = z.infer<typeof scenarioRestVersionDetailResponseSchema>; // ../contract/src/scenario-rest.schemas.ts:163
+type Response = z.infer<typeof scenarioRestVersionDetailResponseSchema>; // ../contract/src/scenario-rest.schemas.ts:183
 ```
 
 ### `createSimulationRunsRest`
@@ -997,7 +997,7 @@ type Response = z.infer<typeof simulationBatchSummaryRestSchema>; // ../contract
 
 ### `scenarios`
 
-Contract `../contract/src/scenario.trpc.ts:194`, router `src/transport/scenario.trpc.ts:40`.
+Contract `../contract/src/scenario.trpc.ts:203`, router `src/transport/scenario.trpc.ts:40`.
 
 | Procedure                               | Kind         | Gate                                                                                                                                                                                                                                | Input                               | Output                               |
 | --------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ------------------------------------ |
@@ -1042,55 +1042,55 @@ Contract `../contract/src/scenario.trpc.ts:194`, router `src/transport/scenario.
 
 ```typescript
 // scenarios.create
-type Input = z.infer<typeof scenarioTrpcCreateSchema>; // ../contract/src/scenario.trpc.ts:114
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
+type Input = z.infer<typeof scenarioTrpcCreateSchema>; // ../contract/src/scenario.trpc.ts:121
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:199
 
 // scenarios.getAll
-// Input: projectSchema, ../contract/src/scenario.trpc.ts:72
+// Input: projectSchema, ../contract/src/scenario.trpc.ts:76
 interface Input {
   projectId: string;
 }
-// Output: scenarioSchema.array() (inline, ../contract/src/scenario.trpc.ts:202)
+// Output: scenarioSchema.array() (inline, ../contract/src/scenario.trpc.ts:211)
 
 // scenarios.getById
-// Input: scenarioIdSchema, ../contract/src/scenario.trpc.ts:80
+// Input: scenarioIdSchema, ../contract/src/scenario.trpc.ts:84
 interface Input {
   projectId: string;
   id: string;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:199
 
 // scenarios.getByIdIncludingArchived
-type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:80
-// Output: scenarioSchema.nullable() (inline, ../contract/src/scenario.trpc.ts:210)
+type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:84
+// Output: scenarioSchema.nullable() (inline, ../contract/src/scenario.trpc.ts:219)
 
 // scenarios.update
-type Input = z.infer<typeof scenarioTrpcUpdateSchema>; // ../contract/src/scenario.trpc.ts:145
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
+type Input = z.infer<typeof scenarioTrpcUpdateSchema>; // ../contract/src/scenario.trpc.ts:154
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:199
 
 // scenarios.archive
-type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:80
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
+type Input = z.infer<typeof scenarioIdSchema>; // ../contract/src/scenario.trpc.ts:84
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:199
 
 // scenarios.moveToTestSuite
-// Input: inline, ../contract/src/scenario.trpc.ts:223
+// Input: inline, ../contract/src/scenario.trpc.ts:232
 interface Input {
   projectId: string;
   scenarioId: string;
   testSuiteId: string | null;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:199
 
 // scenarios.duplicate
-// Input: inline, ../contract/src/scenario.trpc.ts:232
+// Input: inline, ../contract/src/scenario.trpc.ts:241
 interface Input {
   projectId: string;
   scenarioId: string;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:199
 
 // scenarios.batchArchive
-// Input: inline, ../contract/src/scenario.trpc.ts:236
+// Input: inline, ../contract/src/scenario.trpc.ts:245
 interface Input {
   projectId: string;
   ids: string[];
@@ -1105,7 +1105,7 @@ interface Output {
 }
 
 // scenarios.listVersions
-// Input: inline, ../contract/src/scenario.trpc.ts:242
+// Input: inline, ../contract/src/scenario.trpc.ts:251
 interface Input {
   projectId: string;
   scenarioId: string;
@@ -1115,7 +1115,7 @@ interface Input {
 type Output = z.infer<typeof scenarioVersionPageSchema>; // ../contract/src/scenario.responses.ts:35
 
 // scenarios.getVersion
-// Input: inline, ../contract/src/scenario.trpc.ts:253
+// Input: inline, ../contract/src/scenario.trpc.ts:262
 interface Input {
   projectId: string;
   scenarioId: string;
@@ -1124,16 +1124,16 @@ interface Input {
 type Output = z.infer<typeof scenarioVersionDetailSchema>; // ../contract/src/scenario.version.ts:153
 
 // scenarios.restoreVersion
-// Input: inline, ../contract/src/scenario.trpc.ts:259
+// Input: inline, ../contract/src/scenario.trpc.ts:268
 interface Input {
   projectId: string;
   scenarioId: string;
   version: number;
 }
-type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:191
+type Output = z.infer<typeof scenarioSchema>; // ../contract/src/scenario.ts:199
 
 // scenarios.run
-type Input = z.infer<typeof scenarioTrpcRunSchema>; // ../contract/src/scenario.trpc.ts:166
+type Input = z.infer<typeof scenarioTrpcRunSchema>; // ../contract/src/scenario.trpc.ts:175
 // Output: scenarioRunScheduledSchema, ../contract/src/scenario.responses.ts:76
 interface Output {
   scheduled: true;
@@ -1143,7 +1143,7 @@ interface Output {
 }
 
 // scenarios.cancelJob
-// Input: inline, ../contract/src/scenario.trpc.ts:274
+// Input: inline, ../contract/src/scenario.trpc.ts:283
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1157,7 +1157,7 @@ interface Output {
 }
 
 // scenarios.cancelBatchRun
-// Input: inline, ../contract/src/scenario.trpc.ts:286
+// Input: inline, ../contract/src/scenario.trpc.ts:295
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1170,13 +1170,13 @@ interface Output {
 }
 
 // scenarios.getScenarioSetsData
-// Input: inline, ../contract/src/scenario.trpc.ts:292
+// Input: inline, ../contract/src/scenario.trpc.ts:301
 interface Input {
   projectId: string;
   startDate?: number;
   endDate?: number;
 }
-// Output: inline, ../contract/src/scenario.trpc.ts:293
+// Output: inline, ../contract/src/scenario.trpc.ts:302
 type Output = {
   scenarioSetId: string;
   scenarioCount: number;
@@ -1184,7 +1184,7 @@ type Output = {
 }[];
 
 // scenarios.getSuiteRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:298
+// Input: inline, ../contract/src/scenario.trpc.ts:307
 interface Input {
   projectId: string;
   scenarioSetId?: string;
@@ -1197,17 +1197,17 @@ interface Input {
 type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:342
 
 // scenarios.getLastResultSummaries
-// Input: inline, ../contract/src/scenario.trpc.ts:316
+// Input: inline, ../contract/src/scenario.trpc.ts:325
 interface Input {
   projectId: string;
   scenarioIds?: string[];
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationLastResultSummarySchema.array() (inline, ../contract/src/scenario.trpc.ts:322)
+// Output: simulationLastResultSummarySchema.array() (inline, ../contract/src/scenario.trpc.ts:331)
 
 // scenarios.getSuiteRunFreshness
-// Input: inline, ../contract/src/scenario.trpc.ts:339
+// Input: inline, ../contract/src/scenario.trpc.ts:348
 interface Input {
   projectId: string;
   scenarioSetId?: string;
@@ -1220,7 +1220,7 @@ interface Output {
 }
 
 // scenarios.getScenarioSetRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:345
+// Input: inline, ../contract/src/scenario.trpc.ts:354
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1232,17 +1232,17 @@ interface Input {
 type Output = z.infer<typeof simulationScenarioSetRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:369
 
 // scenarios.getAllScenarioSetRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:357
+// Input: inline, ../contract/src/scenario.trpc.ts:366
 interface Input {
   projectId: string;
   scenarioSetId: string;
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationRunDataSchema.array() (inline, ../contract/src/scenario.trpc.ts:358)
+// Output: simulationRunDataSchema.array() (inline, ../contract/src/scenario.trpc.ts:367)
 
 // scenarios.getRunState
-// Input: inline, ../contract/src/scenario.trpc.ts:361
+// Input: inline, ../contract/src/scenario.trpc.ts:370
 interface Input {
   projectId: string;
   scenarioRunId: string;
@@ -1250,7 +1250,7 @@ interface Input {
 type Output = z.infer<typeof simulationRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:208
 
 // scenarios.getScenarioSetBatchRunCount
-// Input: inline, ../contract/src/scenario.trpc.ts:365
+// Input: inline, ../contract/src/scenario.trpc.ts:374
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1263,7 +1263,7 @@ interface Output {
 }
 
 // scenarios.getScenarioSetBatchHistory
-// Input: inline, ../contract/src/scenario.trpc.ts:370
+// Input: inline, ../contract/src/scenario.trpc.ts:379
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1275,7 +1275,7 @@ interface Input {
 type Output = z.infer<typeof simulationBatchHistorySchema>; // ../contract/src/features/simulation/simulation.ts:308
 
 // scenarios.getBatchRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:384
+// Input: inline, ../contract/src/scenario.trpc.ts:393
 interface Input {
   projectId: string;
   scenarioSetId: string;
@@ -1286,13 +1286,13 @@ interface Input {
 type Output = z.infer<typeof simulationBatchRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:323
 
 // scenarios.getExternalSetSummaries
-// Input: inline, ../contract/src/scenario.trpc.ts:402
+// Input: inline, ../contract/src/scenario.trpc.ts:411
 interface Input {
   projectId: string;
   startDate?: number;
   endDate?: number;
 }
-// Output: inline, ../contract/src/scenario.trpc.ts:403
+// Output: inline, ../contract/src/scenario.trpc.ts:412
 type Output = {
   scenarioSetId: string;
   passedCount: number;
@@ -1302,7 +1302,7 @@ type Output = {
 }[];
 
 // scenarios.getAllSuiteRunData
-// Input: inline, ../contract/src/scenario.trpc.ts:408
+// Input: inline, ../contract/src/scenario.trpc.ts:417
 interface Input {
   projectId: string;
   limit?: number;
@@ -1313,7 +1313,7 @@ interface Input {
 type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:342
 
 // scenarios.onSimulationUpdate
-// Input: inline, ../contract/src/scenario.trpc.ts:424
+// Input: inline, ../contract/src/scenario.trpc.ts:433
 interface Input {
   projectId: string;
   tabKey?: string;
@@ -1326,21 +1326,21 @@ interface Output {
 }
 
 // scenarios.getCodeScenarios
-// Input: windowSchema, ../contract/src/scenario.trpc.ts:188
+// Input: windowSchema, ../contract/src/scenario.trpc.ts:197
 interface Input {
   projectId: string;
   startDate?: number;
   endDate?: number;
 }
-// Output: inline, ../contract/src/scenario.trpc.ts:439
+// Output: inline, ../contract/src/scenario.trpc.ts:448
 type Output = {
   key: string;
   name: string;
 }[];
 
 // scenarios.getRunTargets
-type Input = z.infer<typeof windowSchema>; // ../contract/src/scenario.trpc.ts:188
-// Output: inline, ../contract/src/scenario.trpc.ts:447
+type Input = z.infer<typeof windowSchema>; // ../contract/src/scenario.trpc.ts:197
+// Output: inline, ../contract/src/scenario.trpc.ts:456
 type Output = {
   key: string;
   referenceId: string | null;
@@ -1349,7 +1349,7 @@ type Output = {
 }[];
 
 // scenarios.getResultsOverview
-// Input: inline, ../contract/src/scenario.trpc.ts:458
+// Input: inline, ../contract/src/scenario.trpc.ts:467
 interface Input {
   projectId: string;
   startDate?: number;
@@ -1365,18 +1365,18 @@ interface Input {
 type Output = z.infer<typeof resultsOverviewSchema>; // ../contract/src/scenario.responses.ts:194
 
 // scenarios.getResultAtoms
-// Input: z.object({ ...resultsFilterSchema.shape, limit: z.number().int().min(1).max(MAX_ATOM_PAGE… (inline, ../contract/src/scenario.trpc.ts:475)
+// Input: z.object({ ...resultsFilterSchema.shape, limit: z.number().int().min(1).max(MAX_ATOM_PAGE… (inline, ../contract/src/scenario.trpc.ts:484)
 type Output = z.infer<typeof resultAtomsPageSchema>; // ../contract/src/scenario.responses.ts:145
 
 // scenarios.getRunConfigurations
-// Input: inline, ../contract/src/scenario.trpc.ts:489
+// Input: inline, ../contract/src/scenario.trpc.ts:498
 interface Input {
   projectId: string;
   startDate?: number;
   endDate?: number;
   limit?: number;
 }
-// Output: runConfigurationEntrySchema.array() (inline, ../contract/src/scenario.trpc.ts:496)
+// Output: runConfigurationEntrySchema.array() (inline, ../contract/src/scenario.trpc.ts:505)
 
 // scenarios.mintVoiceSession
 type Input = z.infer<typeof voiceSessionMintInputSchema>; // ../contract/src/voice/voice-session.schemas.ts:18

@@ -126,7 +126,7 @@ describe("the icon-rail shell", () => {
       renderWithDesignSystem(
         <ProductScope product="me">
           <WithStubNavigationHost
-            readings={{ ...BASE_READINGS, pathname: "/me" }}
+            readings={{ ...BASE_READINGS, pathname: "/coding-agents" }}
             actions={{ navigate: navigateMock }}
           >
             <NavigationShell mode="icon-rail">
@@ -136,7 +136,9 @@ describe("the icon-rail shell", () => {
         </ProductScope>,
       );
 
-      expect(railTile("Me")).toHaveStyle({ backgroundColor: "var(--chakra-colors-bg-selected)" });
+      expect(railTile("Coding agents")).toHaveStyle({
+        backgroundColor: "var(--chakra-colors-bg-selected)",
+      });
       const css = Array.from(document.querySelectorAll("style"))
         .map((style) => style.textContent ?? "")
         .join("\n");
@@ -167,7 +169,7 @@ describe("the icon-rail shell", () => {
     it("shows one tile per product and marks the active one", () => {
       renderShell();
 
-      expect(railTile("Me")).toBeInTheDocument();
+      expect(railTile("Coding agents")).toBeInTheDocument();
       expect(railTile("LLM Ops")).toBeInTheDocument();
       expect(railTile("Gateway")).toBeInTheDocument();
       expect(railTile("Governance")).toBeInTheDocument();

@@ -8,6 +8,7 @@ import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { EMPTY_JUDGE_TRACE_WAIT_INPUT } from "../../../../model/judge-trace-wait.ts";
 import { ScenarioRunModelDialog } from "../scenario-run-model-dialog.tsx";
 
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
@@ -50,6 +51,8 @@ describe("<ScenarioRunModelDialog/>", () => {
             judgeModel={null}
             onSimulatorChange={vi.fn()}
             onJudgeChange={vi.fn()}
+            traceWait={EMPTY_JUDGE_TRACE_WAIT_INPUT}
+            onTraceWaitChange={vi.fn()}
             onConfirm={onConfirm}
             isRunning={false}
           />,
@@ -75,6 +78,8 @@ describe("<ScenarioRunModelDialog/>", () => {
           judgeModel={null}
           onSimulatorChange={vi.fn()}
           onJudgeChange={vi.fn()}
+          traceWait={EMPTY_JUDGE_TRACE_WAIT_INPUT}
+          onTraceWaitChange={vi.fn()}
           onConfirm={vi.fn()}
           isRunning={false}
         />,

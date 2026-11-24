@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The ingestion-template operations the governance REST family calls.
 
-Peers call these through the token, declared at `../contract/src/governance.api.ts:202`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/governance.api.ts:211`; nothing else in this package is public.
 
 #### `registerMcpTools`
 
@@ -882,6 +882,44 @@ Stores OCSF events another source sent; one row per (source, metadata.uid).
 ingestOcsfEvents(input: OcsfIngestRequest & { organizationId: string }): Promise<OcsfIngestResponse>;
 ```
 
+#### `securityLakeSourceCreate`
+
+```typescript
+securityLakeSourceCreate(input: SecurityLakeSourceCreateInput & { organizationId: string; actorUserId: string | null }): Promise<SecurityLakeSource>;
+```
+
+#### `securityLakeSourceUpdate`
+
+```typescript
+securityLakeSourceUpdate(input: SecurityLakeSourceUpdateInput & { id: string; organizationId: string }): Promise<SecurityLakeSource>;
+```
+
+#### `securityLakeSourceGet`
+
+The source with the external id LangWatch generated, for the trust policy.
+
+```typescript
+securityLakeSourceGet(input: { id: string; organizationId: string }): Promise<SecurityLakeSource>;
+```
+
+#### `securityLakeSourceTest`
+
+```typescript
+securityLakeSourceTest(input: SecurityLakeConnectionTestInput & { id: string; organizationId: string }): Promise<SecurityLakeConnectionTest>;
+```
+
+#### `securityLakeSourceHealth`
+
+```typescript
+securityLakeSourceHealth(input: { id: string; organizationId: string; }): Promise<SecurityLakeSourceHealth>;
+```
+
+#### `securityLakeCallersWithoutTraces`
+
+```typescript
+securityLakeCallersWithoutTraces(input: { organizationId: string }): Promise<SecurityLakeCallers>;
+```
+
 ## REST transport
 
 ### `agentKillSwitchRest`
@@ -1507,7 +1545,7 @@ type Response = z.infer<typeof meUsageResponseSchema>; // ../contract/src/featur
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/ocsf-siem.rest.ts:30`   |
+| Declared at | `src/transport/ocsf-siem.rest.ts:40`   |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | organization                           |
@@ -1516,7 +1554,7 @@ type Response = z.infer<typeof meUsageResponseSchema>; // ../contract/src/featur
 
 Export governance events as OCSF 1.9.0
 
-Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:37`.
+Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:47`.
 
 Answers at `/api/governance/ocsf/events`, `/api/v1/governance/ocsf/events`.
 
@@ -1543,7 +1581,7 @@ interface Response {
 
 Export project traces as OCSF 1.9.0
 
-Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:61`.
+Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:71`.
 
 Answers at `/api/governance/ocsf/traces`, `/api/v1/governance/ocsf/traces`.
 
@@ -1563,7 +1601,7 @@ type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/feature
 
 Export the audit log as OCSF 1.9.0
 
-Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:84`.
+Permission `complianceExport:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:94`.
 
 Answers at `/api/governance/ocsf/audit`, `/api/v1/governance/ocsf/audit`.
 
@@ -1582,7 +1620,7 @@ type Response = z.infer<typeof ocsfEventsPageSchema>; // ../contract/src/feature
 
 Push OCSF events in from another source
 
-Permission `governance:manage`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:106`.
+Permission `governance:manage`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:116`.
 
 Answers at `/api/governance/ocsf/ingest`, `/api/v1/governance/ocsf/ingest`.
 
@@ -1592,6 +1630,93 @@ type Body = z.infer<typeof ocsfIngestRequestSchema>; // ../contract/src/features
 interface Response {
   accepted: number;
 }
+```
+
+#### `POST /api/governance/security-lake/sources` · `createSecurityLakeSource`
+
+Add an AWS Security Lake source
+
+Permission `ingestionSources:manage`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:134`.
+
+Answers at `/api/governance/security-lake/sources`, `/api/v1/governance/security-lake/sources`.
+
+```typescript
+type Body = z.infer<typeof securityLakeSourceCreateInputSchema>; // ../contract/src/features/ocsf/security-lake.ts:116
+// Response: securityLakeSourceSchema, ../contract/src/features/ocsf/security-lake.ts:154
+interface Response {
+  id: string;
+  name: string;
+  status: string;
+  region: string;
+  queueUrl: string;
+  subscriberRoleArn: string;
+  externalId: string;
+  sources: ("CLOUD_TRAIL_MGMT" | "S3_DATA" | "LAMBDA_EXECUTION")[];
+  schedule: string | null;
+}
+```
+
+#### `PATCH /api/governance/security-lake/sources/:sourceId` · `updateSecurityLakeSource`
+
+Edit an AWS Security Lake source
+
+Permission `ingestionSources:manage`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:158`.
+
+Answers at `/api/governance/security-lake/sources/:sourceId`, `/api/v1/governance/security-lake/sources/:sourceId`.
+
+```typescript
+// Params: sourceParams, src/transport/ocsf-siem.rest.ts:33
+interface Params {
+  sourceId: string;
+}
+type Body = z.infer<typeof securityLakeSourceUpdateInputSchema>; // ../contract/src/features/ocsf/security-lake.ts:133
+type Response = z.infer<typeof securityLakeSourceSchema>; // ../contract/src/features/ocsf/security-lake.ts:154
+```
+
+#### `POST /api/governance/security-lake/sources/:sourceId/test` · `testSecurityLakeSource`
+
+Test a Security Lake source's connection
+
+Permission `ingestionSources:manage`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:179`.
+
+Answers at `/api/governance/security-lake/sources/:sourceId/test`, `/api/v1/governance/security-lake/sources/:sourceId/test`.
+
+```typescript
+type Params = z.infer<typeof sourceParams>; // src/transport/ocsf-siem.rest.ts:33
+type Body = z.infer<typeof securityLakeConnectionTestInputSchema>; // ../contract/src/features/ocsf/security-lake.ts:199
+// Response: securityLakeConnectionTestSchema, ../contract/src/features/ocsf/security-lake.ts:168
+interface Response {
+  ok: boolean;
+  waiting: number | null;
+  inFlight: number | null;
+  error: string | null;
+}
+```
+
+#### `GET /api/governance/security-lake/sources/:sourceId` · `getSecurityLakeSource`
+
+Read a Security Lake source
+
+Permission `ingestionSources:manage`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:204`.
+
+Answers at `/api/governance/security-lake/sources/:sourceId`, `/api/v1/governance/security-lake/sources/:sourceId`.
+
+```typescript
+type Params = z.infer<typeof sourceParams>; // src/transport/ocsf-siem.rest.ts:33
+type Response = z.infer<typeof securityLakeSourceSchema>; // ../contract/src/features/ocsf/security-lake.ts:154
+```
+
+#### `GET /api/governance/security-lake/sources/:sourceId/health` · `getSecurityLakeSourceHealth`
+
+Read a Security Lake source's health
+
+Permission `ingestionSources:view`. Entitlement `enterprise` (feature `OCSF_EXPORT`). Declared at `src/transport/ocsf-siem.rest.ts:221`.
+
+Answers at `/api/governance/security-lake/sources/:sourceId/health`, `/api/v1/governance/security-lake/sources/:sourceId/health`.
+
+```typescript
+type Params = z.infer<typeof sourceParams>; // src/transport/ocsf-siem.rest.ts:33
+type Response = z.infer<typeof securityLakeSourceHealthSchema>; // ../contract/src/features/ocsf/security-lake.ts:182
 ```
 
 ## tRPC transport
@@ -2370,7 +2495,7 @@ type Output = {
 interface Input {
   organizationId: string;
 }
-// Output: personaResolutionSchema, ../contract/src/features/personal/persona-home.ts:53
+// Output: personaResolutionSchema, ../contract/src/features/personal/persona-home.ts:54
 interface Output {
   persona: "personal_only" | "mixed" | "project_only" | "governance_admin";
   destination: string;
@@ -2530,29 +2655,35 @@ interface Output {
 
 ### `ingestionSources`
 
-Contract `../contract/src/features/ingestion/ingestion-sources.trpc.ts:62`, router `src/transport/ingestion-sources.trpc.ts:12`.
+Contract `../contract/src/features/ingestion/ingestion-sources.trpc.ts:75`, router `src/transport/ingestion-sources.trpc.ts:12`.
 
-| Procedure                       | Kind     | Gate                                 | Input                              | Output                            |
-| ------------------------------- | -------- | ------------------------------------ | ---------------------------------- | --------------------------------- |
-| `ingestionSources.list`         | query    | Permission `ingestionSources:view`   | `organizationScope`                | inline                            |
-| `ingestionSources.get`          | query    | Permission `ingestionSources:view`   | `sourceInOrganization`             | `ingestionSourceDtoSchema`        |
-| `ingestionSources.create`       | mutation | Permission `ingestionSources:manage` | `ingestionSourceCreateInputSchema` | `createdIngestionSourceSchema`    |
-| `ingestionSources.update`       | mutation | Permission `ingestionSources:manage` | `ingestionSourceUpdateInputSchema` | `ingestionSourceDtoSchema`        |
-| `ingestionSources.rotateSecret` | mutation | Permission `ingestionSources:manage` | `sourceInOrganization`             | `ingestionSourceWithSecretSchema` |
-| `ingestionSources.archive`      | mutation | Permission `ingestionSources:manage` | `sourceInOrganization`             | `ingestionSourceDtoSchema`        |
-| `ingestionSources.validateOttl` | mutation | Permission `ingestionSources:manage` | inline                             | `ottlValidationResultSchema`      |
-| `ingestionSources.ottlStarter`  | query    | Permission `ingestionSources:view`   | inline                             | `ottlStarterTemplateSchema`       |
+| Procedure                                           | Kind     | Gate                                                                                   | Input                              | Output                             |
+| --------------------------------------------------- | -------- | -------------------------------------------------------------------------------------- | ---------------------------------- | ---------------------------------- |
+| `ingestionSources.list`                             | query    | Permission `ingestionSources:view`                                                     | `organizationScope`                | inline                             |
+| `ingestionSources.get`                              | query    | Permission `ingestionSources:view`                                                     | `sourceInOrganization`             | `ingestionSourceDtoSchema`         |
+| `ingestionSources.create`                           | mutation | Permission `ingestionSources:manage`                                                   | `ingestionSourceCreateInputSchema` | `createdIngestionSourceSchema`     |
+| `ingestionSources.update`                           | mutation | Permission `ingestionSources:manage`                                                   | `ingestionSourceUpdateInputSchema` | `ingestionSourceDtoSchema`         |
+| `ingestionSources.securityLakeCreate`               | mutation | Permission `ingestionSources:manage`; Entitlement `enterprise` (feature `OCSF_EXPORT`) | inline                             | `securityLakeSourceSchema`         |
+| `ingestionSources.securityLakeUpdate`               | mutation | Permission `ingestionSources:manage`; Entitlement `enterprise` (feature `OCSF_EXPORT`) | inline                             | `securityLakeSourceSchema`         |
+| `ingestionSources.securityLakeGet`                  | query    | Permission `ingestionSources:manage`; Entitlement `enterprise` (feature `OCSF_EXPORT`) | `sourceInOrganization`             | `securityLakeSourceSchema`         |
+| `ingestionSources.securityLakeTestConnection`       | mutation | Permission `ingestionSources:manage`; Entitlement `enterprise` (feature `OCSF_EXPORT`) | inline                             | `securityLakeConnectionTestSchema` |
+| `ingestionSources.securityLakeHealth`               | query    | Permission `ingestionSources:view`; Entitlement `enterprise` (feature `OCSF_EXPORT`)   | `sourceInOrganization`             | `securityLakeSourceHealthSchema`   |
+| `ingestionSources.securityLakeCallersWithoutTraces` | query    | Permission `ingestionSources:view`; Entitlement `enterprise` (feature `OCSF_EXPORT`)   | `organizationScope`                | `securityLakeCallersSchema`        |
+| `ingestionSources.rotateSecret`                     | mutation | Permission `ingestionSources:manage`                                                   | `sourceInOrganization`             | `ingestionSourceWithSecretSchema`  |
+| `ingestionSources.archive`                          | mutation | Permission `ingestionSources:manage`                                                   | `sourceInOrganization`             | `ingestionSourceDtoSchema`         |
+| `ingestionSources.validateOttl`                     | mutation | Permission `ingestionSources:manage`                                                   | inline                             | `ottlValidationResultSchema`       |
+| `ingestionSources.ottlStarter`                      | query    | Permission `ingestionSources:view`                                                     | inline                             | `ottlStarterTemplateSchema`        |
 
 ```typescript
 // ingestionSources.list
-// Input: organizationScope, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:14
+// Input: organizationScope, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:27
 interface Input {
   organizationId: string;
 }
-// Output: ingestionSourceDtoSchema.array() (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:65)
+// Output: ingestionSourceDtoSchema.array() (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:78)
 
 // ingestionSources.get
-// Input: sourceInOrganization, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:15
+// Input: sourceInOrganization, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:28
 interface Input {
   organizationId: string;
   id: string;
@@ -2560,11 +2691,11 @@ interface Input {
 type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
 // ingestionSources.create
-type Input = z.infer<typeof ingestionSourceCreateInputSchema>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:32
-type Output = z.infer<typeof createdIngestionSourceSchema>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:60
+type Input = z.infer<typeof ingestionSourceCreateInputSchema>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:45
+type Output = z.infer<typeof createdIngestionSourceSchema>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:73
 
 // ingestionSources.update
-// Input: ingestionSourceUpdateInputSchema, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:49
+// Input: ingestionSourceUpdateInputSchema, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:62
 interface Input {
   organizationId: string;
   id: string;
@@ -2578,16 +2709,49 @@ interface Input {
 }
 type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
+// ingestionSources.securityLakeCreate
+// Input: z.object({ ...organizationScope.shape, ...securityLakeSourceCreateInputSchema.shape }) (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:93)
+type Output = z.infer<typeof securityLakeSourceSchema>; // ../contract/src/features/ocsf/security-lake.ts:154
+
+// ingestionSources.securityLakeUpdate
+// Input: z.object({ ...sourceInOrganization.shape, ...securityLakeSourceUpdateInputSchema.shape }) (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:98)
+type Output = z.infer<typeof securityLakeSourceSchema>; // ../contract/src/features/ocsf/security-lake.ts:154
+
+// ingestionSources.securityLakeGet
+type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:28
+type Output = z.infer<typeof securityLakeSourceSchema>; // ../contract/src/features/ocsf/security-lake.ts:154
+
+// ingestionSources.securityLakeTestConnection
+// Input: z.object({ ...sourceInOrganization.shape, ...securityLakeConnectionTestInputSchema.shape … (inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:108)
+type Output = z.infer<typeof securityLakeConnectionTestSchema>; // ../contract/src/features/ocsf/security-lake.ts:168
+
+// ingestionSources.securityLakeHealth
+type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:28
+type Output = z.infer<typeof securityLakeSourceHealthSchema>; // ../contract/src/features/ocsf/security-lake.ts:182
+
+// ingestionSources.securityLakeCallersWithoutTraces
+type Input = z.infer<typeof organizationScope>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:27
+// Output: securityLakeCallersSchema, ../contract/src/features/ocsf/security-lake.ts:227
+interface Output {
+  callers: {
+    principalArn: string;
+    models: string[];
+    regions: string[];
+    lastCallMs: number;
+    callCount: number;
+  }[];
+}
+
 // ingestionSources.rotateSecret
-type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:15
+type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:28
 type Output = z.infer<typeof ingestionSourceWithSecretSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:95
 
 // ingestionSources.archive
-type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:15
+type Input = z.infer<typeof sourceInOrganization>; // ../contract/src/features/ingestion/ingestion-sources.trpc.ts:28
 type Output = z.infer<typeof ingestionSourceDtoSchema>; // ../contract/src/features/ingestion/ingestion-source.ts:81
 
 // ingestionSources.validateOttl
-// Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:89
+// Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:130
 interface Input {
   organizationId: string;
   statements: string[];
@@ -2595,7 +2759,7 @@ interface Input {
 type Output = z.infer<typeof ottlValidationResultSchema>; // ../contract/src/features/ingestion/ottl.ts:45
 
 // ingestionSources.ottlStarter
-// Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:94
+// Input: inline, ../contract/src/features/ingestion/ingestion-sources.trpc.ts:135
 interface Input {
   organizationId: string;
   sourceType: string;
@@ -2905,7 +3069,7 @@ Declared at `src/features/registry/eventing/agent-registry.pipeline.ts:89`.
 
 | Kind   | Leaf                       | Environment variable                  | Declared at                               |
 | ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:577`           |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:589`           |
 | config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
 | config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
 | config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |

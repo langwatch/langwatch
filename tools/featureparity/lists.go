@@ -70,6 +70,7 @@ var (
 		"tools/docsdeploy",
 		"tools/chartheap",
 		"tools/charts3region",
+		"tools/newestimage",
 		"tools/suiteweights",
 		"tools/matrixseed",
 		"cmd/matrixseed",
@@ -101,6 +102,7 @@ var (
 		"modules/authz/specs/access-reviews.feature",
 		"modules/authz/specs/agent-principals.feature",
 		"modules/authz/specs/authz-passports.feature",
+		"modules/dashboard/specs/dashboards-organization-area.feature",
 		"specs/agents/create-workflow-agent.feature",
 		"specs/agents/workflow-agent-editor.feature",
 		"specs/ai-gateway/budgets-principal-cascade.feature",
@@ -254,7 +256,6 @@ var (
 		"specs/langy/langy-empty-state-suggestions.feature",
 		"specs/langy/langy-panel-fold-motion.feature",
 		"specs/langy/langy-selfhost-install.feature",
-		"specs/langy/langy-session-key-lifecycle.feature",
 		"specs/langy/langy-shutdown-handoff.feature",
 		"specs/langy/langy-workbench-sidebar.feature",
 		"specs/langy/langy-worker-isolation.feature",
@@ -272,7 +273,6 @@ var (
 		"specs/model-config/anthropic-empty-content.feature",
 		"specs/model-config/litellm-reasoning-params.feature",
 		"specs/model-config/model-parameter-display.feature",
-		"specs/model-config/model-selector-ux.feature",
 		"specs/model-config/unified-reasoning-ui.feature",
 		"specs/model-providers/custom-model-max-tokens.feature",
 		"specs/model-providers/default-provider.feature",
@@ -407,6 +407,10 @@ var (
 		"specs/langy/langy-peek-dock.feature",
 		"specs/traces-v2/grouping-engine.feature",
 		"specs/traces-v2/metrics.feature",
+		// Reason: left legacyInert when the blank-key refusal and the worker age
+		// cap were bound to Go tests. The older mint and revoke scenarios describe
+		// what the control plane does and stay untagged.
+		"specs/langy/langy-session-key-lifecycle.feature",
 		"specs/features/analytics-cli.feature",
 		"specs/traces-v2/trace-drawer-shell.feature",
 		"sdks/typescript/specs/cli/daemon.feature",

@@ -18,6 +18,10 @@ import { z } from "zod";
 
 import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
 import { idIndexCategories } from "../../rules/id-index-categories.rules.ts";
+import type {
+  RetentionDriftWindow,
+  StoredRetentionStamp,
+} from "../../rules/retention-drift.rules.ts";
 import {
   keepForeverRewriteSchema,
   type ClickHouseTarget,
@@ -63,6 +67,10 @@ const tenantFilterSql = "position(command, {tenantFilterNeedle:String}) > 0";
 const tableNameRowsSchema = z.array(z.object({ name: z.string() }));
 // `uniqExact` is UInt64, which ClickHouse's JSON output sends as a string.
 const countRowsSchema = z.array(z.object({ total: z.coerce.number() }));
+// `count()` is UInt64, sent as a string; `_retention_days` is UInt16, sent as a number.
+const stampRowsSchema = z.array(
+  z.object({ retentionDays: z.coerce.number(), rows: z.coerce.number() }),
+);
 const DAY_MS = 86_400_000;
 
 /** Each category's main table, the id one stored item is counted by, and its TTL time column. */
@@ -241,6 +249,42 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
       },
     });
     return countRowsSchema.parse(rows)[0]?.total ?? 0;
+  }
+
+  async sampleStoredRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    windows: readonly RetentionDriftWindow[];
+  }): Promise<StoredRetentionStamp[]> {
+    if (input.windows.length === 0) return [];
+    const { table, time } = PAST_RETENTION_COUNT_SOURCE[input.category];
+    const params: Record<string, string | number> = { tenantId: input.projectId };
+    // Bounded windows on the partition column: only the partitions they touch are opened, and
+    // TenantId leads the sorting key, so each reads the tenant's granules in them alone.
+    const windowSql = input.windows
+      .map(({ fromMs, toMs }, index) => {
+        params[`from${index}`] = fromMs;
+        params[`to${index}`] = toMs;
+        return (
+          `(${time} >= fromUnixTimestamp64Milli({from${index}:Int64}) ` +
+          `AND ${time} < fromUnixTimestamp64Milli({to${index}:Int64}))`
+        );
+      })
+      .join(" OR ");
+    const { rows } = await this.clickhouse.query<unknown>({
+      tenantId: input.projectId,
+      table,
+      kind: "read",
+      sql: `
+        SELECT _retention_days AS retentionDays, count() AS rows
+        FROM ${table}
+        WHERE TenantId = {tenantId:String}
+          AND (${windowSql})
+        GROUP BY _retention_days
+      `,
+      params,
+    });
+    return stampRowsSchema.parse(rows);
   }
 
   async findMutationProgress(input: { projectId: string }): Promise<RetroactiveMutationProgress[]> {

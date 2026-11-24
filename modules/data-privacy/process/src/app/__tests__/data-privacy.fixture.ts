@@ -100,6 +100,7 @@ export async function createDataPrivacyTestApp({
     googleDlpDisabled: undefined,
     enforcement,
     nodeEnvironment: undefined,
+    isSaas: true,
     langevalsEndpoint: undefined,
     piiRedactionModelEndpoint: undefined,
     ...settings,

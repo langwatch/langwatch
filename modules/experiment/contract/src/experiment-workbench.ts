@@ -828,6 +828,8 @@ export const createInitialResults = (): EvaluationResults => ({
 export const DEFAULT_CONCURRENCY = 10;
 /** The most cells a run may hold in flight at once. */
 export const MAX_CONCURRENCY = 24;
+/** The most times a run may repeat every dataset row. */
+export const MAX_RUN_REPEAT = 5;
 
 export const createInitialUIState = (): UIState => ({
   selectedRows: new Set(),

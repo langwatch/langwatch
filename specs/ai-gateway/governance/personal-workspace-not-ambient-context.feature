@@ -218,13 +218,13 @@ Feature: A personal workspace is never the ambient context for organization work
       Then the ambient project is still his personal project
 
   # ============================================================================
-  # /me is the one exception: it means the personal workspace on purpose
+  # /coding-agents is the one exception: it means the personal workspace on purpose
   # ============================================================================
 
   Rule: the personal-workspace page itself resolves to the personal team, never the shared one
 
     A page with no project in its address bar is normally organization-scoped
-    work, which is exactly why the ambient context prefers a shared team. `/me`
+    work, which is exactly why the ambient context prefers a shared team. `/coding-agents`
     and its sub-routes are the one page family where that assumption is
     backwards: they ARE the personal workspace, so resolving them to the
     organization's shared team instead hands every personal-scope feature
@@ -234,7 +234,7 @@ Feature: A personal workspace is never the ambient context for organization work
 
     The personal workspace is held apart from organization-scoped work on both
     sides. Work carried in from an earlier organization-scoped page never
-    decides `/me`, and a visit to `/me` never becomes the organization-scoped
+    decides `/coding-agents`, and a visit to `/coding-agents` never becomes the organization-scoped
     work the reader returns to. When it did, the reader came back to another
     team's project on the app root, and LLM Ops was greyed out in the product
     switcher, which had no project to open while the private one was the last
@@ -255,7 +255,7 @@ Feature: A personal workspace is never the ambient context for organization work
       Then the ambient team is still her personal team
       And the ambient project is still her personal project
       # The organization-scoped equivalent of this fixture correctly leaves
-      # the page without a project; /me must not inherit that outcome just
+      # the page without a project; /coding-agents must not inherit that outcome just
       # because the same project-less shared team exists in the organization.
 
     @integration
@@ -284,7 +284,7 @@ Feature: A personal workspace is never the ambient context for organization work
       Then the ambient team is her personal team
       And the ambient project is her personal project
       # The remembered project resolved before any personal-workspace
-      # preference could apply, so /me ran every personal feature against the
+      # preference could apply, so /coding-agents ran every personal feature against the
       # shared project.
 
     @integration
@@ -309,6 +309,6 @@ Feature: A personal workspace is never the ambient context for organization work
       Given an external member belongs only to the shared team
       When that member opens the personal-workspace page
       Then the ambient team is the shared team
-      # The /me preference only ever adds a resolution, never a requirement:
+      # The /coding-agents preference only ever adds a resolution, never a requirement:
       # someone with no personal team gets the same ambient fallback as
       # every organization-scoped page already does.

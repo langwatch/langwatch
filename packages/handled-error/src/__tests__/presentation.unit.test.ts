@@ -74,6 +74,17 @@ describe("explainHandledError", () => {
       expect(description).toBe('There\'s no field called "trace.durationn".');
     });
 
+    it("adds the hint the trace filter gave for an unknown field", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "filter_field_unknown",
+          meta: { field: "metadata.labels", hint: "Did you mean @label?" },
+        }),
+      );
+
+      expect(description).toBe('There\'s no field called "metadata.labels". Did you mean @label?');
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("titles a refused test fire as not sent, its reason naming the fix", () => {
       const { title, description } = explainHandledError(

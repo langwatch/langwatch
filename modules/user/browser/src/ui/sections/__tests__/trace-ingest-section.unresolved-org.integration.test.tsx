@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * /me renders before the organisation resolves; no read may go out with a
+ * /coding-agents renders before the organisation resolves; no read may go out with a
  * placeholder organisation id, which the server answers with FORBIDDEN.
  * @see modules/user/specs/user.feature
  */
@@ -48,7 +48,7 @@ const ingestionReads = () =>
     (call) => call.path === "ingestionTemplates.list" || call.path === "ingestionKey.list",
   );
 
-describe("given the trace ingest section on /me", () => {
+describe("given the trace ingest section on /coding-agents", () => {
   afterEach(() => {
     cleanup();
     queryCalls.length = 0;

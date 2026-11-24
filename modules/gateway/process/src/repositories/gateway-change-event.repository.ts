@@ -1,6 +1,9 @@
 import type { GatewayPersistenceTransaction } from "./gateway-transaction.repository.ts";
 
 export type GatewayChangeEventKind =
+  | "A2A_TARGET_CREATED"
+  | "A2A_TARGET_UPDATED"
+  | "A2A_TARGET_DELETED"
   | "BUDGET_CREATED"
   | "BUDGET_UPDATED"
   | "BUDGET_DELETED"
