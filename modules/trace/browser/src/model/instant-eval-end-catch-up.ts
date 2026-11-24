@@ -21,7 +21,7 @@ export function isAwaitingInstantEvalEnd({
 }): boolean {
   if (!isExplorerInstantEvalRunActive(run.status)) return false;
   if (isStopRequested) return true;
-  return run.total !== null && run.total > 0 && run.progress >= run.total;
+  return run.total !== null && run.progress >= run.total;
 }
 
 /** How long after the last read the next one is due, or null once the window is spent. */

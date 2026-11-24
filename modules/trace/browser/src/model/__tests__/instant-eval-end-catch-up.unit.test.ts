@@ -29,6 +29,9 @@ describe("isAwaitingInstantEvalEnd", () => {
     expect(isAwaitingInstantEvalEnd({ run: run("running", 0, null), isStopRequested: false })).toBe(
       false,
     );
+    expect(isAwaitingInstantEvalEnd({ run: run("running", 0, 0), isStopRequested: false })).toBe(
+      true,
+    );
     expect(isAwaitingInstantEvalEnd({ run: run("finished", 100), isStopRequested: true })).toBe(
       false,
     );

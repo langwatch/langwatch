@@ -393,6 +393,13 @@ export class TraceSearchRouterService {
         failure: modelFailureOf(error),
       });
     }
+    if (built.kind === "filter" && built.query.trim() === "") {
+      return this.instantEval({
+        context,
+        question: { instructions: context.sentence },
+        decidedBy: "fallback",
+      });
+    }
     if (built.kind === "filter") {
       return this.finishFilter({
         context,

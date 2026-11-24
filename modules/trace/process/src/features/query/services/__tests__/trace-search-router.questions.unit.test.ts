@@ -40,6 +40,23 @@ describe("given a question and Instant Evals available", () => {
     });
   });
 
+  describe("when the question builder answers a blank filter", () => {
+    it("judges the question as typed instead of searching nothing", async () => {
+      const d = deps({
+        buildQuestion: vi.fn(async () => ({ kind: "filter" as const, query: "   ", reason: "" })),
+      });
+      const result = await TraceSearchRouterService.create(d).route(
+        input({ text: QUESTION, classified: "free_text", isInstantEvalAvailable: true }),
+      );
+
+      expect(result).toMatchObject({
+        kind: "instant_eval",
+        question: { instructions: QUESTION },
+        decidedBy: "fallback",
+      });
+    });
+  });
+
   describe("when the model routes it as free_text without a classifier", () => {
     it("routes it to an Instant Eval on the Conversations lens as threads", async () => {
       const d = deps({ routeWithModel: vi.fn(async () => ({ route: "free_text" as const })) });
