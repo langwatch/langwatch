@@ -1,3 +1,4 @@
+import { datasetRecordSchema } from "@langwatch/dataset-contract";
 import { memoryObjectStorage } from "@langwatch/process-stores";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectIdPageInput } from "@langwatch/project-contract";
 import type { MigrationStepReport } from "@langwatch/upgrade/step";
@@ -8,6 +9,7 @@ import type {
   DatasetMigrationRepository,
 } from "../../repositories/dataset-migration.repository.ts";
 import { MemoryDatasetMigrationRepository } from "../../repositories/memory/memory.dataset-migration.repository.ts";
+import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
 import { ObjectStorageDatasetChunkRepository } from "../../repositories/object-storage/object-storage.dataset-chunk.repository.ts";
 import { DatasetMigrationService } from "../dataset-migration.service.ts";
 
@@ -20,7 +22,9 @@ const PAGES: Record<string, { ids: string[]; next: string | null }> = {
 function subject(
   listAllIds: (input?: ProjectIdPageInput) => Promise<{ ids: string[]; next: string | null }>,
 ) {
-  const repository: DatasetMigrationRepository = MemoryDatasetMigrationRepository.create();
+  const repository: DatasetMigrationRepository = MemoryDatasetMigrationRepository.create({
+    database: MemoryDatasetDatabase.create(),
+  });
   const findPostgresDatasetIds = vi.spyOn(repository, "findPostgresDatasetIds");
   const projects = { listAllIds: vi.fn(listAllIds) };
   const migration = DatasetMigrationService.create({
@@ -96,7 +100,8 @@ function step(
     findPostgresDatasetIds: async ({ projectId, afterId }) =>
       afterId ? [] : [`dataset_of_${projectId}`],
     isPostgresLayout: async () => true,
-    getFingerprint: async () => ({ count: 1, maxUpdatedAt: null }),
+    findMoveNotes: async () => ({ archived: false, rowsUnderOtherProject: 0 }),
+    getFingerprint: async () => ({ count: 1, maxUpdatedAt: null, digest: "" }),
     findRecordPage: async ({ afterId }) => (afterId ? [] : [{ id: "record_1", entry: { a: 1 } }]),
     commit,
     isSchemaPending: () => false,
@@ -111,8 +116,9 @@ function step(
     },
   });
   const saved: string[] = [];
-  const onProjectDone = async ({ afterProjectId }: { afterProjectId: string }) => {
-    saved.push(afterProjectId);
+  /** The cursor each progress save names: the last project finished. */
+  const onProgress = async ({ afterProjectId }: { afterProjectId: string | undefined }) => {
+    saved.push(afterProjectId ?? "none");
   };
   const reports: MigrationStepReport[] = [];
   const checkpoint = (resumeFrom: MigrationStepReport | null) => ({
@@ -126,7 +132,7 @@ function step(
     commit,
     write,
     saved,
-    onProjectDone,
+    onProgress,
     signal: controller.signal,
     reports,
     checkpoint,
@@ -137,9 +143,9 @@ describe("DatasetMigrationService as an upgrade step", () => {
   describe("given a checkpoint saved after project_b", () => {
     /** @scenario "The content move resumes after the last project it finished" */
     it("moves only the datasets of the projects after it", async () => {
-      const { migration, commit, saved, onProjectDone } = step();
+      const { migration, commit, saved, onProgress } = step();
 
-      await migration.run({ afterProjectId: "project_b", onProjectDone });
+      await migration.run({ afterProjectId: "project_b", onProgress });
 
       expect(commit.mock.calls.map(([call]) => call.projectId)).toEqual([
         "project_c",
@@ -153,14 +159,14 @@ describe("DatasetMigrationService as an upgrade step", () => {
   describe("given the run is aborted while moving project_c", () => {
     /** @scenario "An aborted content move keeps the last finished project as its cursor" */
     it("stops there without reporting project_c finished", async () => {
-      const { migration, commit, saved, onProjectDone, signal } = step({
+      const { migration, commit, saved, onProgress, signal } = step({
         abortAfterProject: "project_c",
       });
 
-      await migration.run({ signal, onProjectDone });
+      await migration.run({ signal, onProgress });
 
       expect(commit).toHaveBeenCalledTimes(3);
-      expect(saved).toEqual(["project_a", "project_b"]);
+      expect(saved).toEqual(["project_a", "project_b", "project_b"]);
     });
   });
 
@@ -191,7 +197,13 @@ describe("DatasetMigrationService as an upgrade step", () => {
           signal: new AbortController().signal,
         }),
       ).rejects.toThrow("1 datasets failed");
-      expect(reports).toEqual([{ afterProjectId: "project_a" }, { afterProjectId: "project_b" }]);
+      expect(reports.map((report) => report.afterProjectId)).toEqual([
+        "project_a",
+        "project_b",
+        "project_b",
+        "project_b",
+        "project_b",
+      ]);
     });
 
     /** @scenario "A retry of an unfinished content move completes it" */
@@ -221,20 +233,167 @@ describe("DatasetMigrationService as an upgrade step", () => {
         "project_d",
         "project_e",
       ]);
-      expect(reports.at(-1)).toEqual({ afterProjectId: "project_e" });
+      expect(reports.at(-1)).toMatchObject({ afterProjectId: "project_e" });
     });
   });
 
   describe("given a dataset in project_c changed while it moved", () => {
     /** @scenario "A dataset skipped for a concurrent write keeps the content move unfinished" */
     it("reports the run incomplete and never checkpoints past project_b", async () => {
-      const { migration, saved, onProjectDone } = step({ changedOnceProject: "project_c" });
+      const { migration, saved, onProgress } = step({ changedOnceProject: "project_c" });
 
-      await expect(migration.run({ onProjectDone })).resolves.toMatchObject({
+      await expect(migration.run({ onProgress })).resolves.toMatchObject({
         status: "incomplete",
         summary: { skippedConcurrentWrite: 1 },
       });
-      expect(saved).toEqual(["project_a", "project_b"]);
+      expect(saved).toEqual(["project_a", "project_b", "project_b", "project_b", "project_b"]);
+    });
+  });
+});
+
+/** Two postgres-layout datasets per project; one commit, or one later page read, fails once. */
+function memoryStep({
+  failCommitOf = "dataset_project_b_2",
+  failNextPageOf,
+}: { failCommitOf?: string; failNextPageOf?: string } = {}) {
+  const database = MemoryDatasetDatabase.create();
+  const repository = MemoryDatasetMigrationRepository.create({ database });
+  const now = new Date(Date.UTC(2026, 0, 1));
+  for (const projectId of ["project_a", "project_b", "project_c"]) {
+    for (const n of [1, 2]) {
+      const id = `dataset_${projectId}_${n}`;
+      database.putDataset({
+        id,
+        projectId,
+        name: id,
+        slug: id,
+        columnTypes: [{ name: "question", type: "string" }],
+        mapping: null,
+        useS3: false,
+        s3RecordCount: null,
+        contentLayout: "postgres",
+        status: "ready",
+        statusError: null,
+        stagingKey: null,
+        uploadFilename: null,
+        sourceStoredObjectId: null,
+        rowCount: null,
+        sizeBytes: null,
+        chunkCount: null,
+        chunkOffsets: null,
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
+      });
+      database.putRecord(
+        datasetRecordSchema.parse({
+          id: `record_${id}`,
+          datasetId: id,
+          projectId,
+          entry: { question: id },
+          createdAt: now,
+          updatedAt: now,
+        }),
+      );
+    }
+  }
+  const commit = repository.commit.bind(repository);
+  let failedOnce = false;
+  vi.spyOn(repository, "commit").mockImplementation(async (input) => {
+    if (input.datasetId === failCommitOf && !failedOnce) {
+      failedOnce = true;
+      throw new Error("row unreadable");
+    }
+    return commit(input);
+  });
+  const findIds = repository.findPostgresDatasetIds.bind(repository);
+  const pageFailure = new Error("page read failed");
+  let pageFailedOnce = false;
+  vi.spyOn(repository, "findPostgresDatasetIds").mockImplementation(async (input) => {
+    if (input.projectId === failNextPageOf && input.afterId && !pageFailedOnce) {
+      pageFailedOnce = true;
+      throw pageFailure;
+    }
+    return findIds(input);
+  });
+  const migration = DatasetMigrationService.create({
+    repository,
+    storage: ObjectStorageDatasetChunkRepository.create({ objectStorage: memoryObjectStorage() }),
+    projects: {
+      listAllIds: async (page) => ({
+        ids: ["project_a", "project_b", "project_c"].filter(
+          (id) => !page?.after || id > page.after,
+        ),
+        next: null,
+      }),
+    },
+  });
+  /** The ledger row's report: what the last attempt saved is what the next one resumes from. */
+  const ledger: { report: MigrationStepReport | null } = { report: null };
+  const attempt = () =>
+    migration.runStep({
+      log: { info: () => undefined, warn: () => undefined },
+      checkpoint: {
+        resumeFrom: ledger.report,
+        save: async ({ report }) => {
+          ledger.report = report;
+        },
+      },
+      dryRun: false,
+      signal: new AbortController().signal,
+    });
+  return { migration, ledger, attempt, pageFailure };
+}
+
+describe("DatasetMigrationService report across attempts", () => {
+  describe("given a dataset in project_b fails on the first attempt", () => {
+    /** @scenario "A move that retried reports every dataset it moved across its attempts" */
+    it("reports all six datasets moved once the retry completes", async () => {
+      const { ledger, attempt } = memoryStep();
+
+      await expect(attempt()).rejects.toThrow("1 datasets failed");
+      expect(ledger.report).toMatchObject({ afterProjectId: "project_a", migrated: 5 });
+
+      await expect(attempt()).resolves.toMatchObject({
+        migrated: 6,
+        failed: 0,
+        skippedConcurrentWrite: 0,
+      });
+    });
+  });
+
+  describe("given project_b's next page read fails after both its datasets moved", () => {
+    /** @scenario "A move that retried reports every dataset it moved across its attempts" */
+    it("saves the two moved datasets before the error, so the retry reports all six", async () => {
+      const { ledger, attempt, pageFailure } = memoryStep({
+        failCommitOf: "none",
+        failNextPageOf: "project_b",
+      });
+
+      await expect(attempt()).rejects.toBe(pageFailure);
+      expect(ledger.report).toMatchObject({ afterProjectId: "project_a", migrated: 4 });
+
+      await expect(attempt()).resolves.toMatchObject({ migrated: 6, failed: 0 });
+    });
+  });
+
+  describe("given a checkpoint an older release saved, holding only its cursor", () => {
+    /** @scenario "A move that retried reports every dataset it moved across its attempts" */
+    it("resumes after it and counts from zero", async () => {
+      const { ledger, attempt } = memoryStep();
+      ledger.report = { afterProjectId: "project_b" };
+
+      await expect(attempt()).resolves.toMatchObject({ migrated: 2, failed: 0 });
+    });
+  });
+
+  describe("given a checkpoint whose counts are malformed", () => {
+    /** @scenario "A move that retried reports every dataset it moved across its attempts" */
+    it("still resumes after its cursor and counts the malformed totals from zero", async () => {
+      const { ledger, attempt } = memoryStep();
+      ledger.report = { afterProjectId: "project_b", migrated: "many", archived: -3 };
+
+      await expect(attempt()).resolves.toMatchObject({ migrated: 2, archived: 0 });
     });
   });
 });

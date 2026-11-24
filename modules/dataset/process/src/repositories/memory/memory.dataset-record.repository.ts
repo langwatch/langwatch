@@ -9,6 +9,7 @@ import {
 import { toDate } from "@langwatch/time";
 
 import { lockedView } from "../../rules/dataset-record-lock.rules.ts";
+import { assertRecordsTableHolds } from "../../rules/dataset-records-table.rules.ts";
 import type {
   DatasetRecordRepository,
   LockedDatasetRecords,
@@ -55,6 +56,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
             database.getDataset(input.projectId, input.datasetId).columnTypes,
           ),
         setColumnTypes: async (columnTypes: DatasetColumns): Promise<void> => {
+          this.#refuseUnheldDataset({ key: input, write: "store" });
           const row = database.getDataset(input.projectId, input.datasetId);
           database.putDataset({ ...row, columnTypes });
         },
@@ -138,6 +140,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
   }): Promise<DatasetRecord[]> {
+    this.#refuseUnheldDataset({ key: input, write: "store" });
     const now = toDate(this.#database.now());
 
     for (const { id, ...entry } of input.entries) {
@@ -167,6 +170,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     projectId: string;
     entry: Record<string, unknown>;
   }): Promise<DatasetRecord> {
+    this.#refuseUnheldDataset({ key: input, write: "store" });
     const record = this.#of(input).find((candidate) => candidate.id === input.id);
     if (!record) throw new DatasetRecordNotFoundError();
 
@@ -186,6 +190,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     projectId: string;
     recordIds: string[];
   }): Promise<number> {
+    this.#refuseUnheldDataset({ key: input, write: "remove" });
     return this.#database.removeRecords(input);
   }
 
@@ -194,6 +199,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
   }): Promise<void> {
+    this.#refuseUnheldDataset({ key: input, write: "store" });
     const previous = this.#of(input);
     this.#database.removeRecords({ ...input, recordIds: previous.map((record) => record.id) });
     try {
@@ -221,6 +227,19 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
       for (const record of previous) this.#database.putRecord(record);
       throw error;
     }
+  }
+
+  #refuseUnheldDataset({
+    key,
+    write,
+  }: {
+    key: { datasetId: string; projectId: string };
+    write: "store" | "remove";
+  }): void {
+    const dataset = this.#database
+      .datasets()
+      .find((row) => row.projectId === key.projectId && row.id === key.datasetId);
+    assertRecordsTableHolds({ dataset: dataset ?? null, write });
   }
 
   #of(input: { datasetId: string; projectId: string }): DatasetRecord[] {

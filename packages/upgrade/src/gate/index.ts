@@ -43,7 +43,10 @@ export {
   parseImageCodeSteps,
   readImageCodeSteps,
 } from "./image-code-steps.ts";
-export { SERVING_ROSTER_TIMING } from "./serving-roster-timing.ts";
+export {
+  SERVING_ROSTER_PRE_ROSTER_GRACE_MS,
+  SERVING_ROSTER_TIMING,
+} from "./serving-roster-timing.ts";
 export {
   type ServingGateWarn,
   servingImageTree,

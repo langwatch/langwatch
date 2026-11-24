@@ -100,6 +100,8 @@ export const upgradeStepViewSchema = z.object({
   logTail: z.array(z.string()),
   progress: upgradeStepProgressSchema.nullable(),
   waitingOn: z.array(upgradeWaitingWriterSchema),
+  /** When the grace for writers before the roster ends, while it holds this step (ADR-173). */
+  oldWritersGraceEndsAt: isoInstant.nullable(),
   runId: z.string().nullable(),
   startedAt: isoInstant.nullable(),
   finishedAt: isoInstant.nullable(),

@@ -100,6 +100,7 @@ import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 import { versionAuthorUserIds, withAuthorNames } from "../rules/dataset-version-author.rules.ts";
 import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
 import { DatasetAttachmentUploadService } from "../services/dataset-attachment-upload.service.ts";
+import { DatasetContentEraseService } from "../services/dataset-content-erase.service.ts";
 import { DatasetContentService } from "../services/dataset-content.service.ts";
 import { DatasetInlineAttachmentService } from "../services/dataset-inline-attachment.service.ts";
 import { DatasetNormalizeService } from "../services/dataset-normalize.service.ts";
@@ -211,6 +212,7 @@ export class DatasetModule implements DatasetApi {
   #versions: DatasetVersionService;
   #versionRetention: DatasetVersionRetentionService;
   #versionBackfill: DatasetVersionBackfillService;
+  #contentErase: DatasetContentEraseService;
   #recordContentEdit: DatasetVersionCommands["recordContentEdit"] | null = null;
   #recordVersionRestored: DatasetVersionCommands["recordVersionRestored"] | null = null;
   readonly #users: UserApi;
@@ -247,10 +249,20 @@ export class DatasetModule implements DatasetApi {
       inlineAttachments,
     });
 
+    const content = DatasetContentService.create({
+      datasets: repositories.content,
+      storage: chunks,
+    });
     const singleFile = DatasetSingleFileService.create({
       files: repositories.singleFiles,
       datasets: repositories.content,
       generateId: () => generate(DATASET_RECORD_KSUID_RESOURCE).toString(),
+      // A write that waited behind the conversion step finds the dataset on chunks.
+      converted: {
+        content,
+        reload: (key) =>
+          this.#datasets.getBySlugOrId({ slugOrId: key.datasetId, projectId: key.projectId }),
+      },
     });
 
     this.#datasets = DatasetService.create({
@@ -258,7 +270,7 @@ export class DatasetModule implements DatasetApi {
       records: repositories.records,
       uploads: DatasetUploadService.create({
         datasets: repositories.content,
-        records: repositories.recordContent,
+        records: repositories.records,
         chunks,
         storedObjects: dependencies.storedObjects,
         requestBounds: this.#requestBounds,
@@ -266,7 +278,7 @@ export class DatasetModule implements DatasetApi {
         singleFile,
       }),
       queue: this.#normalization,
-      content: DatasetContentService.create({ datasets: repositories.content, storage: chunks }),
+      content,
       singleFile,
       // The identifier format a new entry is written under is this module's
       // own business, not something a composing process supplies: every real
@@ -317,6 +329,14 @@ export class DatasetModule implements DatasetApi {
       versions: repositories.versions,
       service: this.#versions,
       projects: dependencies.projects,
+    });
+
+    this.#contentErase = DatasetContentEraseService.create({
+      datasets: repositories.datasets,
+      chunks,
+      versions: repositories.versions,
+      versionContent: repositories.versionContent,
+      singleFiles: repositories.singleFiles,
     });
 
     this.#batchEvaluations = repositories.batchEvaluations;
@@ -667,6 +687,11 @@ export class DatasetModule implements DatasetApi {
    */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<DatasetUsageCount> {
     return this.#count.countUsage(input);
+  }
+
+  /** Every object the projects' datasets keep, removed ahead of an erasure deleting their rows. */
+  eraseStoredContent(input: { projectIds: readonly string[] }): Promise<{ datasets: number }> {
+    return this.#contentErase.eraseStoredContent(input);
   }
 
   platformUrl(input: { projectSlug: string; path: string }): string {
@@ -1055,6 +1080,8 @@ export abstract class DatasetContent {
   abstract batchCreateRecords(input: {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
+    /** The columns the entries were checked against; the append is refused when one is gone. */
+    columns?: readonly string[] | undefined;
   }): Promise<DatasetRecord[]>;
   abstract deleteRecords(input: {
     dataset: Dataset;
@@ -1081,6 +1108,8 @@ export abstract class DatasetContent {
     slug: string;
     columnTypes: Dataset["columnTypes"];
     columnRenames?: DatasetColumnRenames;
+    /** The columns the edit was prepared against, when not the given dataset's own. */
+    previousColumns?: Dataset["columnTypes"];
   }): Promise<Dataset>;
 }
 

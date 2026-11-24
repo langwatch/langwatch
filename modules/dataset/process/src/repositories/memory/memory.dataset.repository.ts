@@ -187,7 +187,7 @@ export class MemoryDatasetRepository implements DatasetRepository {
       mapping: null,
       useS3: false,
       s3RecordCount: null,
-      contentLayout: "postgres",
+      contentLayout: input.contentLayout,
       status: "ready",
       statusError: null,
       stagingKey: null,

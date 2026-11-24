@@ -16,4 +16,6 @@ export type DatasetSingleFile =
 export interface DatasetSingleFileRepository {
   getSingleFile(input: DatasetSingleFileRead): Promise<DatasetSingleFile>;
   putSingleFile(input: DatasetKey & { text: string }): Promise<void>;
+  /** Removes the file; an absent one is already removed. */
+  removeSingleFile(input: DatasetKey): Promise<void>;
 }

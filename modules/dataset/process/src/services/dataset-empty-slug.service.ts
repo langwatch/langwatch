@@ -6,9 +6,15 @@
 import { createLogger } from "@langwatch/observability";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import type { MigrationStepReport, MigrationStepRun } from "@langwatch/upgrade/step";
+import { z } from "zod";
 
 import type { DatasetRepository } from "../repositories/dataset.repository.ts";
 import { datasetSlugCandidate } from "../rules/dataset-selection.rules.ts";
+import {
+  carriedCount,
+  resumedStepProgress,
+  stepProgressReport,
+} from "../rules/dataset-step-progress.rules.ts";
 
 const logger = createLogger("langwatch:dataset:empty-slugs");
 
@@ -16,6 +22,8 @@ const DATASET_PAGE_SIZE = 100;
 const MAX_SLUG_ATTEMPTS = 10_000;
 
 type EmptySlugSummary = { filled: number; wouldFill: number; failed: number };
+/** The slugs filled that a retried step carries; `failed` counts the last attempt only. */
+const carriedFillSchema = z.object({ filled: carriedCount });
 
 export class DatasetEmptySlugService {
   private constructor(
@@ -37,18 +45,31 @@ export class DatasetEmptySlugService {
     dryRun,
     signal,
   }: Parameters<MigrationStepRun>[0]): Promise<MigrationStepReport> {
-    const resumed = checkpoint.resumeFrom?.afterProjectId;
-    const summary: EmptySlugSummary = { filled: 0, wouldFill: 0, failed: 0 };
-    let after = typeof resumed === "string" ? resumed : undefined;
+    const resumed = resumedStepProgress({
+      resumeFrom: checkpoint.resumeFrom,
+      totals: carriedFillSchema,
+    });
+    const filled = dryRun ? 0 : resumed.totals.filled;
+    const summary: EmptySlugSummary = { filled, wouldFill: 0, failed: 0 };
+    let after = resumed.afterProjectId;
+    let finished = resumed.afterProjectId;
     do {
       const projects = await this.deps.projects.listAllIds({ after, limit: PROJECT_ID_PAGE_LIMIT });
       for (const projectId of projects.ids) {
         if (signal.aborted) return { ...summary, dryRun };
-        await this.fillProject({ projectId, dryRun, summary, signal });
+        // A throw outside the per-dataset catch still saves the totals so far; its error wins.
+        await this.fillProject({ projectId, dryRun, summary, signal }).catch(
+          async (error: unknown) => {
+            await saveProgress({ checkpoint, dryRun, afterProjectId: finished, summary }).catch(
+              () => undefined,
+            );
+            throw error;
+          },
+        );
+        // After any failure the cursor stays before it; the totals are saved regardless.
+        if (!signal.aborted && summary.failed === 0) finished = projectId;
+        await saveProgress({ checkpoint, dryRun, afterProjectId: finished, summary });
         if (signal.aborted) return { ...summary, dryRun };
-        if (!dryRun && summary.failed === 0) {
-          await checkpoint.save({ report: { ...summary, afterProjectId: projectId } });
-        }
       }
       after = projects.next ?? undefined;
     } while (after !== undefined);
@@ -108,4 +129,18 @@ export class DatasetEmptySlugService {
       "A dataset with an empty slug found no free slug; the step retries it",
     );
   }
+}
+
+/** Saves the slugs filled so far and the last finished project; a dry run saves nothing. */
+async function saveProgress({
+  checkpoint,
+  dryRun,
+  afterProjectId,
+  summary,
+}: Pick<Parameters<MigrationStepRun>[0], "checkpoint" | "dryRun"> & {
+  afterProjectId: string | undefined;
+  summary: EmptySlugSummary;
+}): Promise<void> {
+  if (dryRun) return;
+  await checkpoint.save({ report: stepProgressReport({ afterProjectId, totals: summary }) });
 }

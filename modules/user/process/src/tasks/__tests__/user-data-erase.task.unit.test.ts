@@ -28,12 +28,22 @@ function emptyRepository(overrides: Partial<GdprUserDataEraseRepository> = {}) {
   return { double, mocks: { ...base, ...overrides } };
 }
 
+/** The dataset peer for a user who owns no projects: nothing to erase. */
+function noDatasetContent() {
+  return { eraseStoredContent: vi.fn(async () => ({ datasets: 0 })) };
+}
+
 describe("runGdprUserDataErase", () => {
   describe("given no user with that email", () => {
     it("throws rather than running any deletion", async () => {
       const { double: repository } = emptyRepository({ findUserByEmail: vi.fn(async () => null) });
       await expect(
-        runGdprUserDataErase({ repository, email: "missing@example.com", execute: true }),
+        runGdprUserDataErase({
+          repository,
+          datasetContent: noDatasetContent(),
+          email: "missing@example.com",
+          execute: true,
+        }),
       ).rejects.toThrow("No user found with email");
     });
   });
@@ -48,7 +58,12 @@ describe("runGdprUserDataErase", () => {
       });
 
       await expect(
-        runGdprUserDataErase({ repository, email: "ada@example.com", execute: true }),
+        runGdprUserDataErase({
+          repository,
+          datasetContent: noDatasetContent(),
+          email: "ada@example.com",
+          execute: true,
+        }),
       ).rejects.toThrow("sole ADMIN");
       expect(mocks.eraseUserAndOwnedResources).not.toHaveBeenCalled();
     });
@@ -59,6 +74,7 @@ describe("runGdprUserDataErase", () => {
       const { double: repository, mocks } = emptyRepository();
       const outcome = await runGdprUserDataErase({
         repository,
+        datasetContent: noDatasetContent(),
         email: "ada@example.com",
         execute: false,
       });
@@ -75,6 +91,7 @@ describe("runGdprUserDataErase", () => {
       const { double: repository, mocks } = emptyRepository();
       const outcome = await runGdprUserDataErase({
         repository,
+        datasetContent: noDatasetContent(),
         email: "ada@example.com",
         execute: true,
       });
@@ -99,7 +116,12 @@ describe("runGdprUserDataErase", () => {
     it("commits the erased fact with the erase", async () => {
       const { processStore, repository, id } = await storedUser();
 
-      await runGdprUserDataErase({ repository, email: "ada@example.com", execute: true });
+      await runGdprUserDataErase({
+        repository,
+        datasetContent: noDatasetContent(),
+        email: "ada@example.com",
+        execute: true,
+      });
 
       expect(
         (await userFactsIn({ processStore, userIds: [id] })).filter(
@@ -117,13 +139,92 @@ describe("runGdprUserDataErase", () => {
     it("records no erased fact on a dry run", async () => {
       const { processStore, repository, id } = await storedUser();
 
-      await runGdprUserDataErase({ repository, email: "ada@example.com", execute: false });
+      await runGdprUserDataErase({
+        repository,
+        datasetContent: noDatasetContent(),
+        email: "ada@example.com",
+        execute: false,
+      });
 
       expect(
         (await userFactsIn({ processStore, userIds: [id] })).filter(
           ({ type }) => type === "recordErased",
         ),
       ).toEqual([]);
+    });
+  });
+
+  describe("given a sole-owned organization whose projects hold datasets", () => {
+    const owned = (overrides: Partial<GdprUserDataEraseRepository> = {}) =>
+      emptyRepository({
+        findSoleOwnedOrganizations: vi.fn(async () => [{ id: "org_1", name: "Solo Org" }]),
+        findSoleOwnedTeams: vi.fn(async () => [{ id: "team_1", name: "Solo Team" }]),
+        findProjectsUnderTeams: vi.fn(async () => [
+          { id: "project_1", name: "One", slug: "one", teamId: "team_1" },
+          { id: "project_2", name: "Two", slug: "two", teamId: "team_1" },
+        ]),
+        ...overrides,
+      });
+
+    /** @scenario "Erasing an organization removes its dataset chunks, version chunks and single files" */
+    it("erases the projects' dataset objects before the rows that name them", async () => {
+      const order: string[] = [];
+      const { double: repository } = owned({
+        eraseUserAndOwnedResources: vi.fn(async () => {
+          order.push("rows");
+        }),
+      });
+      const datasetContent = {
+        eraseStoredContent: vi.fn(async () => {
+          order.push("objects");
+          return { datasets: 3 };
+        }),
+      };
+
+      await runGdprUserDataErase({
+        repository,
+        datasetContent,
+        email: "ada@example.com",
+        execute: true,
+      });
+
+      expect(datasetContent.eraseStoredContent).toHaveBeenCalledWith({
+        projectIds: ["project_1", "project_2"],
+      });
+      expect(order).toEqual(["objects", "rows"]);
+    });
+
+    it("keeps the rows when erasing the objects fails, so a re-run finds them again", async () => {
+      const { double: repository, mocks } = owned();
+      const datasetContent = {
+        eraseStoredContent: vi.fn(async () => {
+          throw new Error("object storage is unavailable");
+        }),
+      };
+
+      await expect(
+        runGdprUserDataErase({
+          repository,
+          datasetContent,
+          email: "ada@example.com",
+          execute: true,
+        }),
+      ).rejects.toThrow("object storage is unavailable");
+      expect(mocks.eraseUserAndOwnedResources).not.toHaveBeenCalled();
+    });
+
+    it("erases no object on a dry run", async () => {
+      const { double: repository } = owned();
+      const datasetContent = noDatasetContent();
+
+      await runGdprUserDataErase({
+        repository,
+        datasetContent,
+        email: "ada@example.com",
+        execute: false,
+      });
+
+      expect(datasetContent.eraseStoredContent).not.toHaveBeenCalled();
     });
   });
 
@@ -138,7 +239,12 @@ describe("runGdprUserDataErase", () => {
       });
 
       await expect(
-        runGdprUserDataErase({ repository, email: "ada@example.com", execute: true }),
+        runGdprUserDataErase({
+          repository,
+          datasetContent: noDatasetContent(),
+          email: "ada@example.com",
+          execute: true,
+        }),
       ).rejects.toThrow("Deletion verification failed");
     });
   });
@@ -147,7 +253,10 @@ describe("runGdprUserDataErase", () => {
 describe("UserDataEraseTask", () => {
   it("is named user-data-erase and reads the email and --execute from args", async () => {
     const { double: repository, mocks } = emptyRepository();
-    const task = UserDataEraseTask.create({ repository: () => repository });
+    const task = UserDataEraseTask.create({
+      repository: () => repository,
+      datasetContent: noDatasetContent(),
+    });
     expect(task.name).toBe("user-data-erase");
 
     const controller = new AbortController();
@@ -160,7 +269,10 @@ describe("UserDataEraseTask", () => {
 
   it("refuses to run without an email argument", async () => {
     const { double: repository } = emptyRepository();
-    const task = UserDataEraseTask.create({ repository: () => repository });
+    const task = UserDataEraseTask.create({
+      repository: () => repository,
+      datasetContent: noDatasetContent(),
+    });
     const controller = new AbortController();
 
     await expect(task.run({ args: ["--execute"], signal: controller.signal })).rejects.toThrow(

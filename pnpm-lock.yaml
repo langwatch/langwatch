@@ -1688,6 +1688,9 @@ importers:
       '@langwatch/data-retention-process':
         specifier: workspace:*
         version: link:../../modules/data-retention/process
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../modules/dataset/contract
       '@langwatch/dataset-process':
         specifier: workspace:*
         version: link:../../modules/dataset/process
@@ -1899,15 +1902,27 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../modules/entitlement/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../modules/project/contract
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../modules/prompt/contract
+      '@langwatch/stored-object-contract':
+        specifier: workspace:*
+        version: link:../../modules/stored-object/contract
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../modules/user/contract
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../packages/vitest-config
@@ -16476,6 +16491,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/contract

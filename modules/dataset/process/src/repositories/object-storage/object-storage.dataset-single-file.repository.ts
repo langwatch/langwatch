@@ -51,6 +51,12 @@ export class ObjectStorageDatasetSingleFileRepository implements DatasetSingleFi
       contentType: JSON_MEDIA_TYPE,
     });
   }
+
+  /** A filesystem store keeps a dataset's chunks in a folder at this key: only a file goes. */
+  async removeSingleFile(input: { datasetId: string; projectId: string }): Promise<void> {
+    if (!(await this.objects.exists(addressOf(input)))) return;
+    await this.objects.remove(addressOf(input));
+  }
 }
 
 function addressOf(input: { datasetId: string; projectId: string }): StoredObjectAddress {

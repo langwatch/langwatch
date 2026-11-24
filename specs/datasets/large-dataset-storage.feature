@@ -86,6 +86,13 @@ Feature: Large dataset storage
     When I add rows without choosing their ids
     Then each row I get back carries the id it was stored under
 
+  @unit
+  Scenario: A row added to a dataset in object storage with an id it already holds is refused
+    Given a dataset whose rows are kept in object storage, holding a row with the id "rec_1"
+    When I add a row choosing the id "rec_1"
+    Then it is refused as "dataset_duplicate_record_id"
+    And the dataset still holds one row with the id "rec_1"
+
   @integration
   Scenario: A dataset still being prepared is not used as data
     Given a dataset that is still processing

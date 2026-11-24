@@ -62,6 +62,7 @@ async function setup(
     name: "Legacy Questions",
     slug: "legacy-questions",
     columnTypes,
+    contentLayout: "postgres",
     useS3: true,
     s3RecordCount: file === "none" ? 0 : file.length,
   });

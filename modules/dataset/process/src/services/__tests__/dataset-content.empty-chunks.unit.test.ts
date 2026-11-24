@@ -36,15 +36,11 @@ const emptyDataset = (chunkCount: number | null) =>
 
 function content() {
   const readChunk = vi.fn(async (): Promise<unknown[]> => []);
-  const readChunks = vi.fn(async (): Promise<unknown[]> => []);
   return {
     readChunk,
     service: DatasetContentService.create({
       datasets: createApiFixture<DatasetContentRepository>({}, "dataset content"),
-      storage: createApiFixture<DatasetChunkRepository>(
-        { readChunk, readChunks },
-        "dataset chunks",
-      ),
+      storage: createApiFixture<DatasetChunkRepository>({ readChunk }, "dataset chunks"),
     }),
   };
 }

@@ -20,9 +20,9 @@ import type {
   CreateDatasetInput,
   UpdateDatasetInput,
 } from "../../repositories/dataset-content.repository.ts";
-import type { DatasetRecordContentRepository } from "../../repositories/dataset-record-content.repository.ts";
 import type { DatasetRow } from "../../repositories/dataset.repository.ts";
 import { MemoryDatasetContentRepository } from "../../repositories/memory/memory.dataset-content.repository.ts";
+import { MemoryDatasetRecordRepository } from "../../repositories/memory/memory.dataset-record.repository.ts";
 import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
 import { DatasetUploadService } from "../dataset-upload.service.ts";
 
@@ -141,6 +141,8 @@ function harness({
 
   const updated: UpdateDatasetInput[] = [];
   const database = MemoryDatasetDatabase.create();
+  // The locked append reads the columns again from the store, so the dataset lives there too.
+  if (row) database.putDataset(row);
   const stored = MemoryDatasetContentRepository.create({ database });
   const datasets = Object.assign(MemoryDatasetContentRepository.create({ database }), {
     findOne: async ({ id }: { id: string; projectId: string }) =>
@@ -157,10 +159,14 @@ function harness({
     },
   });
 
-  const records: DatasetRecordContentRepository = {
-    createMany: async ({ records: written, datasetId, projectId }) => {
-      inlineRecords.push(...written);
-      return written.map(({ id }) => ({
+  const records = Object.assign(MemoryDatasetRecordRepository.create({ database }), {
+    createMany: async ({
+      entries,
+      datasetId,
+      projectId,
+    }: Parameters<MemoryDatasetRecordRepository["createMany"]>[0]) => {
+      inlineRecords.push(...entries.map(({ id, ...entry }) => ({ id, entry })));
+      return entries.map(({ id }) => ({
         id,
         datasetId,
         projectId,
@@ -169,7 +175,7 @@ function harness({
         updatedAt: new Date(0),
       }));
     },
-  };
+  });
 
   const storageError = new Error("object storage is unavailable");
   const storage: DatasetChunkRepository = {
@@ -188,7 +194,6 @@ function harness({
       ];
     },
     deleteChunksFrom: async () => undefined,
-    readChunks: unwired("readChunks"),
     readChunk: unwired("readChunk"),
     readMeasuredChunk: unwired("readMeasuredChunk"),
     rewriteChunk: unwired("rewriteChunk"),
@@ -266,6 +271,20 @@ describe("DatasetUploadService", () => {
           { input: "hello", output: "Hi there!" },
           { input: "goodbye", output: "See you later!" },
         ]);
+      });
+
+      /** @scenario "Upload a CSV file to an existing dataset" */
+      it("gives every uploaded row its own record id, across uploads too", async () => {
+        const { adapter, inlineRecords } = harness({ row: datasetRow() });
+        const content = "input,output\nhello,Hi there!\n";
+
+        await upload(adapter, { slugOrId: "user-feedback", filename: "a.csv", content });
+        await upload(adapter, { slugOrId: "user-feedback", filename: "b.csv", content });
+
+        const ids = inlineRecords.map((record) => record.id);
+        expect(new Set(ids).size).toBe(2);
+        // A KSUID, not the upload's clock time: two uploads in one millisecond never share one.
+        for (const id of ids) expect(id).not.toMatch(/^\d+-\d+$/);
       });
 
       /** @scenario "Upload a JSONL file to an existing dataset" */

@@ -7,6 +7,7 @@ import { SummaryList, SummaryListItem } from "@langwatch/design-system/summary-l
 
 import { modeLabel, releaseName, statusTone } from "../../model/upgrade-labels.ts";
 import type { UpgradeStepDetailView, UpgradeTargetView } from "../../model/upgrade-view.ts";
+import { OldWritersGraceNote } from "../elements/old-writers-grace-note.tsx";
 import { UpgradeStatusBadge } from "../elements/upgrade-status-badge.tsx";
 
 function TargetsTable({ targets }: { targets: readonly UpgradeTargetView[] }) {
@@ -52,6 +53,17 @@ export function UpgradeStepDetail({ step }: { step: UpgradeStepDetailView }) {
         </Text>
       </HStack>
       {step.description && <Text textStyle="sm">{step.description}</Text>}
+      {step.oldWritersGraceEndsAt && (
+        <Alert.Root status="info" data-testid="upgrade-step-grace">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Waiting for the older release to stop</Alert.Title>
+            <Alert.Description>
+              <OldWritersGraceNote endsAt={step.oldWritersGraceEndsAt} />
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      )}
       <SummaryList>
         <SummaryListItem label="Step">
           <InlineCode>{step.id}</InlineCode>

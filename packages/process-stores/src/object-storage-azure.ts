@@ -33,6 +33,7 @@ import {
   secondsUntil,
   StorageCredentialsRefusedError,
   StoragePermissionDeniedError,
+  StorageUnavailableError,
   StoredObjectNotFoundError,
   type ObjectBackend,
   uploadRouteOf,
@@ -187,6 +188,12 @@ async function textOf(response: IncomingMessage): Promise<string> {
 /** Azure's codes for a key or token it did not accept (learn.microsoft.com, Blob error codes). */
 const CREDENTIAL_REFUSALS = new Set(["AuthenticationFailed", "InvalidAuthenticationInfo"]);
 
+/** A server fault (5xx but 501, which no retry changes) or a throttle (429; 503 ServerBusy). */
+function retryableStatus(statusCode: number | undefined): boolean {
+  if (statusCode === undefined || statusCode === 501) return false;
+  return statusCode === 429 || statusCode >= 500;
+}
+
 async function refusal(response: IncomingMessage, operation: string): Promise<Error> {
   const header = response.headers["x-ms-error-code"];
   const body = await textOf(response).catch(() => "");
@@ -197,6 +204,8 @@ async function refusal(response: IncomingMessage, operation: string): Promise<Er
     return new StorageCredentialsRefusedError({ operation, status });
   }
   if (response.statusCode === 403) return new StoragePermissionDeniedError({ operation, status });
+  if (retryableStatus(response.statusCode))
+    return new StorageUnavailableError({ operation, status });
   return new Error(`Azure Blob ${operation} failed: ${status}.`);
 }
 

@@ -56,3 +56,13 @@ Feature: The dataset content migration scans projects through their owner
       Then the run reports itself incomplete
       And its checkpoint stays before that project
 
+
+    # An attempt stopped by a lost lease or its deadline cannot save its last project's totals (the
+    # ledger refuses the checkpoint), so the report may undercount what that project moved.
+    @unit
+    Scenario: A move that retried reports every dataset it moved across its attempts
+      Given the content move moved some datasets and failed on one, so it retried
+      When the retry moves the dataset left behind and is recorded done
+      Then its report counts every dataset moved across both attempts
+      And its failed and changed counts are the last attempt's only
+      And a checkpoint an older release saved with only its cursor still resumes, counting from zero

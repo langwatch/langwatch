@@ -5,7 +5,7 @@
  */
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { MigrationStepReport } from "@langwatch/upgrade/step";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryDatasetDatabase } from "../../repositories/memory/memory.dataset.database.ts";
 import { MemoryDatasetRepository } from "../../repositories/memory/memory.dataset.repository.ts";
@@ -59,8 +59,12 @@ const slugOf = (id: string, projectId = PROJECT) =>
 function run({
   resumeFrom = null,
   dryRun = false,
-}: { resumeFrom?: MigrationStepReport | null; dryRun?: boolean } = {}) {
-  const saved: MigrationStepReport[] = [];
+  saved = [],
+}: {
+  resumeFrom?: MigrationStepReport | null;
+  dryRun?: boolean;
+  saved?: MigrationStepReport[];
+} = {}) {
   return DatasetEmptySlugService.create({ datasets, projects })
     .runStep({
       checkpoint: { resumeFrom, save: async ({ report }) => void saved.push(report) },
@@ -171,5 +175,54 @@ describe("when datasets are stored with an empty slug", () => {
     expect(slugOf("a")).toBe("");
     expect(slugOf("b", OTHER)).toBe("after");
     expect(saved.map((report) => report.afterProjectId)).toEqual([OTHER]);
+  });
+});
+
+describe("when a dataset finds no free slug on the first attempt", () => {
+  /** @scenario "A dataset stored with an empty slug gets a slug from its name" */
+  it("reports every slug filled across the attempts once the retry completes", async () => {
+    stored({ id: "a", name: "First", slug: "" });
+    stored({ id: "stuck", name: "Stuck", slug: "" });
+    stored({ id: "b", name: "Other", slug: "", projectId: OTHER });
+    const fill = datasets.fillEmptySlug.bind(datasets);
+    let stuck = true;
+    vi.spyOn(datasets, "fillEmptySlug").mockImplementation(async (input) =>
+      input.id === "stuck" && stuck ? "taken" : fill(input),
+    );
+
+    const saved: MigrationStepReport[] = [];
+    await expect(run({ saved })).rejects.toThrow("1 datasets with an empty slug got none");
+    const ledger = saved.at(-1) ?? null;
+    expect(ledger).toMatchObject({ filled: 2 });
+    expect(ledger?.afterProjectId).toBeUndefined();
+
+    stuck = false;
+    const { report } = await run({ resumeFrom: ledger });
+
+    expect(report).toMatchObject({ filled: 3, failed: 0 });
+  });
+});
+
+describe("when a slug write throws partway through a project", () => {
+  /** @scenario "A dataset stored with an empty slug gets a slug from its name" */
+  it("saves the slugs already filled before the error, so the retry counts them", async () => {
+    stored({ id: "a", name: "First", slug: "" });
+    stored({ id: "boom", name: "Boom", slug: "" });
+    const fill = datasets.fillEmptySlug.bind(datasets);
+    const failure = new Error("slug write failed");
+    let broken = true;
+    vi.spyOn(datasets, "fillEmptySlug").mockImplementation(async (input) => {
+      if (input.id === "boom" && broken) throw failure;
+      return fill(input);
+    });
+
+    const saved: MigrationStepReport[] = [];
+    await expect(run({ saved })).rejects.toBe(failure);
+    expect(saved.at(-1)).toMatchObject({ filled: 1 });
+
+    broken = false;
+    const { report } = await run({ resumeFrom: saved.at(-1) ?? null });
+
+    expect(report).toMatchObject({ filled: 2, failed: 0 });
   });
 });

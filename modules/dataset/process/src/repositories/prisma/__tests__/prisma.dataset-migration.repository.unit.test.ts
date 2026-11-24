@@ -1,4 +1,5 @@
 import { memoryObjectStorage } from "@langwatch/process-stores";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -13,7 +14,7 @@ import { ObjectStorageDatasetChunkRepository } from "../../object-storage/object
 import { PrismaDatasetMigrationRepository } from "../prisma.dataset-migration.repository.ts";
 
 type DatasetLayout = { contentLayout: string; useS3: boolean };
-type Fingerprint = { count: number; maxUpdatedAt: Date | null };
+type Fingerprint = { count: number; maxUpdatedAt: Date | null; digest?: string };
 
 class FixtureStorage implements DatasetChunkRepository {
   readonly writeChunks = vi.fn(
@@ -25,9 +26,6 @@ class FixtureStorage implements DatasetChunkRepository {
   );
   readonly deleteChunksFrom = vi.fn(async () => {});
 
-  readChunks(): Promise<unknown[]> {
-    throw new Error("unused");
-  }
   readChunk(): Promise<unknown[]> {
     throw new Error("unused");
   }
@@ -46,10 +44,17 @@ class FixtureStorage implements DatasetChunkRepository {
 }
 
 function fingerprintRow(input: Fingerprint) {
-  return {
-    _count: { _all: input.count },
-    _max: { updatedAt: input.maxUpdatedAt },
-  };
+  return [{ count: input.count, maxUpdatedAt: input.maxUpdatedAt, digest: input.digest ?? "0" }];
+}
+
+type RawQuery = TemplateStringsArray | { readonly strings: readonly string[] };
+
+function sqlText(query: RawQuery): string {
+  return ("strings" in query ? query.strings : query).join("?");
+}
+
+function isFingerprintQuery(query: RawQuery): boolean {
+  return sqlText(query).includes('AS "digest"');
 }
 
 function fixture(input: {
@@ -72,38 +77,40 @@ function fixture(input: {
   for (const page of input.recordPages ?? [[]]) {
     recordPageQuery.mockResolvedValueOnce(page);
   }
-  const recordAggregate = vi.fn(async () => fingerprintRow({ count: 0, maxUpdatedAt: null }));
+  const misfiledCount = vi.fn(async () => [{ count: 0n }]);
+  const fingerprintQuery = vi.fn(async (_query: RawQuery, ..._values: unknown[]) =>
+    fingerprintRow({ count: 0, maxUpdatedAt: null }),
+  );
   const update = vi.fn(async () => {});
   const executeRaw = vi.fn(async () => 1);
-  const transaction = {
+  // No `datasetRecord` delegate: the fingerprint is one aggregate in SQL, never a row read.
+  const transaction = prismaDouble({
     $executeRaw: executeRaw,
+    $queryRaw: (query: RawQuery, ...values: unknown[]) => {
+      if (isFingerprintQuery(query)) return fingerprintQuery(query, ...values);
+      throw new Error(`unexpected raw query in the move's transaction: ${sqlText(query)}`);
+    },
     dataset: { findFirst: lockedDatasetFindFirst, update },
-    datasetRecord: { aggregate: recordAggregate },
-  };
-  async function runTransaction<TResult>(
-    operation: (database: typeof transaction) => Promise<TResult>,
-  ): Promise<TResult> {
-    return operation(transaction);
-  }
+  });
 
-  const database = {
+  const database = prismaDouble({
     dataset: {
       findFirst: datasetFindFirst,
       findMany: datasetFindMany,
       update,
     },
-    datasetRecord: {
-      aggregate: recordAggregate,
+    // The move's raw reads: the fingerprint, rows filed under another project, and record pages.
+    $queryRaw: (query: RawQuery, ...values: unknown[]) => {
+      if (isFingerprintQuery(query)) return fingerprintQuery(query, ...values);
+      return sqlText(query).includes('"projectId" <>')
+        ? misfiledCount()
+        : recordPageQuery(query, ...values);
     },
-    $queryRaw: recordPageQuery,
-    $transaction: runTransaction,
-  };
+    $transaction: async (work) => work(transaction),
+  });
   const storage = new FixtureStorage();
-  // Prisma's delegates derive their return types from the arguments each call
-  // was made with, so no hand-written stand-in can be declared to satisfy one.
-  // The fake records what it was asked, which is what every claim below reads.
   const migration = DatasetMigrationService.create({
-    repository: PrismaDatasetMigrationRepository.create({ database: database as never }),
+    repository: PrismaDatasetMigrationRepository.create({ database }),
     storage: input.storage ?? storage,
     projects: { listAllIds },
   });
@@ -113,9 +120,9 @@ function fixture(input: {
     datasetFindFirst,
     datasetFindMany,
     executeRaw,
+    fingerprintQuery,
     lockedDatasetFindFirst,
     migration,
-    recordAggregate,
     recordPageQuery,
     storage,
     update,
@@ -131,7 +138,7 @@ describe("given a deployment whose dataset destination is its object storage", (
         recordPages: [[{ id: "record_1", entry: { value: 1 } }], []],
         storage: ObjectStorageDatasetChunkRepository.create({ objectStorage }),
       });
-      subject.recordAggregate.mockResolvedValue(
+      subject.fingerprintQuery.mockResolvedValue(
         fingerprintRow({ count: 1, maxUpdatedAt: new Date("2026-01-01T00:00:00.000Z") }),
       );
 
@@ -165,7 +172,7 @@ describe("PrismaDatasetMigrationRepository", () => {
         [],
       ],
     });
-    subject.recordAggregate.mockResolvedValue(
+    subject.fingerprintQuery.mockResolvedValue(
       fingerprintRow({
         count: 3,
         maxUpdatedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -231,7 +238,7 @@ describe("PrismaDatasetMigrationRepository", () => {
     const subject = fixture({
       recordPages: [[{ id: "record_1", entry: { value: 1 } }], []],
     });
-    subject.recordAggregate
+    subject.fingerprintQuery
       .mockResolvedValueOnce(fingerprintRow(baseline))
       .mockResolvedValueOnce(fingerprintRow(recheck));
 
@@ -242,6 +249,40 @@ describe("PrismaDatasetMigrationRepository", () => {
       }),
     ).resolves.toBe("skipped-concurrent-write");
     expect(subject.update).not.toHaveBeenCalled();
+  });
+
+  it("leaves Postgres live when a record is edited without moving the count or the newest time", async () => {
+    const subject = fixture({
+      recordPages: [[{ id: "record_1", entry: { value: 1 } }], []],
+    });
+    // record_1 is edited by a writer whose clock runs behind record_2's stored time.
+    subject.fingerprintQuery
+      .mockResolvedValueOnce(fingerprintRow({ count: 2, maxUpdatedAt: new Date(9), digest: "11" }))
+      .mockResolvedValueOnce(fingerprintRow({ count: 2, maxUpdatedAt: new Date(9), digest: "12" }));
+
+    await expect(
+      subject.migration.migrateDataset({ datasetId: "dataset_1", projectId: "project_1" }),
+    ).resolves.toBe("skipped-concurrent-write");
+    expect(subject.update).not.toHaveBeenCalled();
+  });
+
+  it("fingerprints in one tenant-scoped aggregate, before the copy and again under the lock", async () => {
+    const subject = fixture({
+      recordPages: [[{ id: "record_1", entry: { value: 1 } }], []],
+    });
+    subject.fingerprintQuery.mockResolvedValue(
+      fingerprintRow({ count: 1, maxUpdatedAt: new Date(9), digest: "11" }),
+    );
+
+    await expect(
+      subject.migration.migrateDataset({ datasetId: "dataset_1", projectId: "project_1" }),
+    ).resolves.toBe("migrated");
+
+    expect(subject.fingerprintQuery).toHaveBeenCalledTimes(2);
+    for (const [sql, ...values] of subject.fingerprintQuery.mock.calls) {
+      expect(sqlText(sql)).toMatch(/"datasetId"\s*=\s*\?\s+AND\s+"projectId"\s*=\s*\?/);
+      expect(values).toEqual(["dataset_1", "project_1"]);
+    }
   });
 
   /**
@@ -289,7 +330,7 @@ describe("PrismaDatasetMigrationRepository", () => {
       .mockResolvedValueOnce({ contentLayout: "s3_jsonl", useS3: false })
       .mockResolvedValueOnce({ contentLayout: "postgres", useS3: false })
       .mockResolvedValueOnce({ contentLayout: "postgres", useS3: false });
-    subject.recordAggregate
+    subject.fingerprintQuery
       .mockResolvedValueOnce(fingerprintRow({ count: 0, maxUpdatedAt: null }))
       .mockResolvedValueOnce(fingerprintRow({ count: 1, maxUpdatedAt: null }))
       .mockResolvedValueOnce(fingerprintRow({ count: 0, maxUpdatedAt: null }))
@@ -303,6 +344,9 @@ describe("PrismaDatasetMigrationRepository", () => {
         alreadyMigrated: 1,
         skippedConcurrentWrite: 1,
         failed: 1,
+        archived: 0,
+        empty: 1,
+        rowsUnderOtherProject: [],
       },
     });
   });
@@ -320,6 +364,9 @@ describe("PrismaDatasetMigrationRepository", () => {
         alreadyMigrated: 0,
         skippedConcurrentWrite: 0,
         failed: 0,
+        archived: 0,
+        empty: 0,
+        rowsUnderOtherProject: [],
       },
     });
     expect(subject.datasetFindMany).toHaveBeenNthCalledWith(

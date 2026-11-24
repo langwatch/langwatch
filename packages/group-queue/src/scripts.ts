@@ -445,12 +445,11 @@ end
 `;
 
 // Reads routing metadata (pipelineName, jobType, jobName) from a stored job
-// value. The canonical envelope exposes it in the tiny header so the payload
-// body is never decoded on Redis's thread.
+// value's header. A 3.20.x GQ1 header or bare-JSON body still routes (#9840).
 export const ROUTING_META_HELPER_LUA = `
 local function gqRoutingMeta(jobDataJson)
   local prefix = string.sub(jobDataJson, 1, 4)
-  if prefix == "GQ2|" then
+  if prefix == "GQ1|" or prefix == "GQ2|" then
     local barIdx = string.find(jobDataJson, "|", 5, true)
     if barIdx then
       local headerLen = tonumber(string.sub(jobDataJson, 5, barIdx - 1))
@@ -463,6 +462,12 @@ local function gqRoutingMeta(jobDataJson)
     end
     return nil, nil, nil
   end
+  if string.sub(jobDataJson, 1, 1) == "{" then
+    local ok, data = pcall(cjson.decode, jobDataJson)
+    if ok and type(data) == "table" then
+      return data["__pipelineName"], data["__jobType"], data["__jobName"]
+    end
+  end
   return nil, nil, nil
 end
 `;
@@ -471,7 +476,7 @@ end
 const PAYLOAD_SIZE_HELPER_LUA = `
 local function gqPayloadSize(value)
   local prefix = string.sub(value, 1, 4)
-  if prefix == "GQ2|" then
+  if prefix == "GQ1|" or prefix == "GQ2|" then
     local barIdx = string.find(value, "|", 5, true)
     if barIdx then
       local headerLen = tonumber(string.sub(value, 5, barIdx - 1))

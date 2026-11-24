@@ -30,7 +30,13 @@ function setup() {
     inlineAttachments: createDatasetTestInlineAttachments(),
   });
   const seed = ({ name, slug }: { name: string; slug: string }) =>
-    repository.create({ projectId: PROJECT_ID, name, slug, columnTypes: COLUMNS });
+    repository.create({
+      projectId: PROJECT_ID,
+      name,
+      slug,
+      columnTypes: COLUMNS,
+      contentLayout: "postgres",
+    });
   const read = async (id: string) => {
     const row = await repository.findById({ id, projectId: PROJECT_ID, includeArchived: true });
     if (!row) throw new Error(`dataset ${id} vanished`);

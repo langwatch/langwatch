@@ -218,7 +218,10 @@ export function createUserTestApp(
     repositories:
       input.repositories ??
       MemoryUserRepositories.create({ processStore: InMemoryProcessStore.createForTesting() }),
-    channels: { authReads: auth },
+    channels: {
+      authReads: auth,
+      datasetContent: { eraseStoredContent: async () => ({ datasets: 0 }) },
+    },
     facts: { ...TEST_USER_CONFIG, ...input.facts },
     budgetRequests: input.budgetRequests ?? MemoryUserBudgetRequestMailChannel.create(),
     passwords: new TestPasswordHasher(),

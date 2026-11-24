@@ -104,6 +104,7 @@ function stepOf(step: UpgradeStepView): OpsUpgradeStep {
     report: step.report,
     progress: step.progress,
     waitingOn: step.waitingOn.map((writer) => ({ ...writer })),
+    oldWritersGraceEndsAt: step.oldWritersGraceEndsAt,
     runId: step.runId,
     startedAt: step.startedAt,
     finishedAt: step.finishedAt,

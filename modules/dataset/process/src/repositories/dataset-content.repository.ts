@@ -1,3 +1,4 @@
+import type { DatasetContentLayout } from "@langwatch/dataset-contract";
 import type { Instant, TimeInput } from "@langwatch/time";
 
 import type { DatasetRow } from "./dataset.repository.ts";
@@ -36,6 +37,8 @@ export type CreateDatasetInput = DatasetWriteFields & {
   slug: string;
   columnTypes: DatasetJsonValue;
   projectId: string;
+  /** Named on every create: the column's database default is the records table. */
+  contentLayout: DatasetContentLayout;
 };
 
 export type UpdateDatasetInput = {

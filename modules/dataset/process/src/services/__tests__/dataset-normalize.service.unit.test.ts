@@ -55,7 +55,6 @@ const makeStorage = (overrides: Record<string, unknown> = {}) => {
       removeStagedUpload,
       deleteChunksFrom,
       readStagedUpload: vi.fn(),
-      readChunks: vi.fn(),
       ...overrides,
     },
     writeChunks,
