@@ -11,7 +11,9 @@
 -- version, with no applied event ids. A source with nothing counted gets no row, as the folds never
 -- store an empty state. No event is counted twice:
 --   * A queued job is consumed once, by an old pod (into the old table, so in the seed if it ran
---     before this migration) or by a new pod (into this table, on top of the seed); never both.
+--     before this migration) or by a new pod (into this table, on top of the seed); never both,
+--     except an old-pod batch that counted and failed before its ack, which is retried on a new
+--     pod and counts twice until the replay rebuilds that day.
 --   * The deploy replay refolds each day with an event in the window from trace's log and
 --     overwrites the row whole, appliedEventIds included, so the seed's counts are replaced, not
 --     added to. Days the replay does not reach are older than the counting window and pruned.
