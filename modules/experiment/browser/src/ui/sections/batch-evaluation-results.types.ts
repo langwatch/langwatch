@@ -243,6 +243,8 @@ export type BatchEvaluationData = {
   repeat?: number;
   /** A repeated run's pass rate per dataset row and target, keyed `${datasetRow}:${targetId}`. */
   rowPassRates?: Map<string, RowPassRate>;
+  /** The rows the run planned per target, from its cell count; absent when it recorded none. */
+  plannedRows?: number;
   /** Row data */
   rows: BatchResultRow[];
 };
@@ -504,6 +506,18 @@ const targetOutputOf = ({
   };
 };
 
+/**
+ * A run plans one cell per row and target, so its rows are its cells over its targets. An SDK
+ * may count rows instead; rounding down can only hide a coverage warning, never invent one.
+ */
+const plannedRowsOf = ({
+  cells,
+  targetCount,
+}: {
+  cells: number | null | undefined;
+  targetCount: number;
+}): number | undefined => (cells ? Math.floor(cells / Math.max(targetCount, 1)) : undefined);
+
 export const transformBatchEvaluationData = (data: ExperimentRunWithItems): BatchEvaluationData => {
   const { experimentId, runId, dataset, evaluations, targets, timestamps, progress, total } = data;
   const isV3 = !!targets && targets.length > 0;
@@ -537,6 +551,10 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
     stoppedAt: timestamps.stoppedAt,
     progress,
     total,
+    plannedRows: plannedRowsOf({
+      cells: total || data.completeness?.dataset.expected,
+      targetCount: targets?.length || targetColumns.length,
+    }),
     datasetColumns: datasetColumnsOf(dataset),
     targetColumns,
     evaluatorIds: Array.from(evaluatorNames.keys()),

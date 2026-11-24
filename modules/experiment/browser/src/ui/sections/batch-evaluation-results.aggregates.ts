@@ -92,6 +92,7 @@ const batchEvaluatorAggregate = (results: BatchEvaluatorResult[]): BatchEvaluato
 export const computeBatchTargetAggregates = (
   targetColumn: BatchTargetColumn,
   rows: BatchResultRow[],
+  plannedRows?: number,
 ): BatchTargetAggregate => {
   const targetId = targetColumn.id;
   const outputs = rows
@@ -125,7 +126,8 @@ export const computeBatchTargetAggregates = (
   return {
     targetId,
     completedRows,
-    totalRows: rowsInRun(rows).length,
+    // The plan counts rows that never answered; the held rows cover carried cells beyond it.
+    totalRows: Math.max(rowsInRun(rows).length, plannedRows ?? 0),
     errorRows: outputs.filter((o) => !!o.error).length,
     evaluators: evaluatorAggregates,
     overallPassRate: totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null,
@@ -149,7 +151,10 @@ export const computeAllBatchAggregates = (
   const aggregates = new Map<string, BatchTargetAggregate>();
 
   for (const targetCol of data.targetColumns) {
-    aggregates.set(targetCol.id, computeBatchTargetAggregates(targetCol, data.rows));
+    aggregates.set(
+      targetCol.id,
+      computeBatchTargetAggregates(targetCol, data.rows, data.plannedRows),
+    );
   }
 
   return aggregates;
