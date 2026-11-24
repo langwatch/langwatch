@@ -1,5 +1,5 @@
 /**
- * Reads a session's newest trace mapping through real ClickHouse SQL.
+ * Reads a session's newest trace mappings through real ClickHouse SQL.
  * @see specs/coding-agent/sessions-screen.feature
  */
 import { randomUUID } from "node:crypto";
@@ -56,40 +56,37 @@ afterAll(async () => {
   await ch.close();
 });
 
-describe.skipIf(clickHouseUrl === null)("coding_agent_trace_sessions latest by session", () => {
-  /** @scenario "The session's latest stored trace is found through its own trace map" */
-  it("answers the session's newest mapped trace inside the window", async () => {
+describe.skipIf(clickHouseUrl === null)("coding_agent_trace_sessions recent by session", () => {
+  /**
+   * @scenario "The session's latest stored trace is found through its own trace map"
+   * @scenario "The repository answers a session's newest mapped traces, newest first"
+   */
+  it("answers the session's traces newest first, up to the limit", async () => {
+    const window = { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 };
     await expect(
-      traceSessions.findLatestBySessionId({
-        tenantId,
-        sessionId,
-        fromMs: baseMs - 60_000,
-        toMs: baseMs + 60_000,
-      }),
-    ).resolves.toEqual({
-      tenantId,
-      traceId: "trace-late",
-      sessionId,
-      occurredAtMs: baseMs + 5_000,
-    });
+      traceSessions.findRecentBySessionId({ tenantId, sessionId, ...window, limit: 10 }),
+    ).resolves.toEqual([
+      { tenantId, traceId: "trace-late", sessionId, occurredAtMs: baseMs + 5_000 },
+      { tenantId, traceId: "trace-early", sessionId, occurredAtMs: baseMs },
+    ]);
+    await expect(
+      traceSessions.findRecentBySessionId({ tenantId, sessionId, ...window, limit: 1 }),
+    ).resolves.toEqual([
+      { tenantId, traceId: "trace-late", sessionId, occurredAtMs: baseMs + 5_000 },
+    ]);
   });
 
   it("answers nothing for a session with no mapping in the window", async () => {
+    const window = { fromMs: baseMs - 60_000, toMs: baseMs + 60_000, limit: 10 };
     await expect(
-      traceSessions.findLatestBySessionId({
-        tenantId,
-        sessionId: "never-mapped",
-        fromMs: baseMs - 60_000,
-        toMs: baseMs + 60_000,
-      }),
-    ).resolves.toBeNull();
+      traceSessions.findRecentBySessionId({ tenantId, sessionId: "never-mapped", ...window }),
+    ).resolves.toEqual([]);
     await expect(
-      traceSessions.findLatestBySessionId({
+      traceSessions.findRecentBySessionId({
         tenantId: `${tenantId}-elsewhere`,
         sessionId,
-        fromMs: baseMs - 60_000,
-        toMs: baseMs + 60_000,
+        ...window,
       }),
-    ).resolves.toBeNull();
+    ).resolves.toEqual([]);
   });
 });

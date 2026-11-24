@@ -127,19 +127,86 @@ describe("given the Data Privacy page", () => {
     });
   });
 
-  describe("when the deployment is self-hosted", () => {
-    /** @scenario A self-hosted deployment says Strict there is rule-based */
-    it("shows no picker or price, and the drawer says Strict is rule-based", async () => {
+  describe("when the deployment is self-hosted and the organization has no Enterprise licence", () => {
+    /** @scenario A self-hosted deployment without an Enterprise license advertises the license */
+    it("shows no picker or price, and the drawer advertises the licence", async () => {
       api.snapshot = snapshotWith({ rules: [projectRuleWith({ pii: { level: "strict" } })] });
-      page({ flagOn: false, isSaaS: false, query: { rule: "PROJECT:proj-1:false" } });
+      page({
+        flagOn: true,
+        isSaaS: false,
+        licence: "none",
+        query: { rule: "PROJECT:proj-1:false" },
+      });
 
       noPickerOrPrice();
       expect(effectivePii()).toBe("PII redactionEssential");
+      const advert = await screen.findByTestId("pii-redaction-model-licence-advert");
+      expect(advert.textContent).toContain("Strict here uses the rule-based detector.");
+      expect(advert.textContent).toContain(
+        "The LangWatch PII Redaction Model is part of LangWatch Enterprise.",
+      );
+      expect(within(advert).getByRole("link", { name: "Activate a license" })).toHaveAttribute(
+        "href",
+        "/settings/license",
+      );
+      expect(document.body.textContent).not.toMatch(/LangWatch Cloud/);
+    });
+
+    it("tells a reader who cannot manage the licence to ask an admin, with no link", async () => {
+      api.snapshot = snapshotWith({ rules: [projectRuleWith({ pii: { level: "strict" } })] });
+      page({
+        flagOn: true,
+        isSaaS: false,
+        licence: "none",
+        mayManageLicence: false,
+        query: { rule: "PROJECT:proj-1:false" },
+      });
+
+      const advert = await screen.findByTestId("pii-redaction-model-licence-advert");
+      expect(advert.textContent).toContain("Ask an organization admin to activate a license.");
+      expect(within(advert).queryByRole("link")).toBeNull();
+    });
+  });
+
+  describe("when the deployment is self-hosted, licensed, and runs the model", () => {
+    /** @scenario A licensed self-hosted deployment that runs the model offers Strict on it, included */
+    it("shows the picker with Strict included and no rule-based note", async () => {
+      api.snapshot = snapshotWith({ rules: [projectRuleWith({ pii: { level: "strict" } })] });
+      page({
+        flagOn: true,
+        isSaaS: false,
+        licence: "enterprise",
+        query: { rule: "PROJECT:proj-1:false" },
+      });
+
+      expect(screen.getAllByTestId("pii-redaction-model-price")[0]?.textContent).toBe(
+        "Includedwith your Enterprise license",
+      );
+      expect(screen.queryByText(/\$0\.50/)).toBeNull();
+      // The drawer is open on the Strict rule, where a rule-based note would show.
+      expect(await screen.findByTestId("pii-example-strict")).toBeInTheDocument();
+      expect(screen.queryByText(/Strict here uses the rule-based detector/)).toBeNull();
+    });
+  });
+
+  describe("when the deployment is self-hosted and licensed, without the model", () => {
+    /** @scenario A licensed self-hosted deployment without the model says how to turn it on */
+    it("shows no picker, and the drawer says how to turn the model on", async () => {
+      api.snapshot = snapshotWith({ rules: [projectRuleWith({ pii: { level: "strict" } })] });
+      page({
+        flagOn: false,
+        isSaaS: false,
+        licence: "enterprise",
+        query: { rule: "PROJECT:proj-1:false" },
+      });
+
+      noPickerOrPrice();
       expect(
         await screen.findByText(
-          "Strict here uses the rule-based detector. The LangWatch PII Redaction Model is available on LangWatch Cloud.",
+          "Strict here uses the rule-based detector. Your Enterprise license includes the LangWatch PII Redaction Model: ask whoever runs your deployment to turn it on.",
         ),
       ).toBeInTheDocument();
+      expect(screen.queryByTestId("pii-redaction-model-licence-advert")).toBeNull();
     });
   });
 

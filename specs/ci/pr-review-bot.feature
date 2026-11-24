@@ -93,6 +93,21 @@ Feature: PR Review Bot workflow
     And the review is not blocked by the cancelled run
 
   @unit
+  Scenario: A cancelled check that a newer run of its workflow renamed does not block the review
+    Given a workflow run on the head commit was cancelled before its matrix job expanded, leaving a check named "app / test-unit"
+    And a newer run of the same workflow passed with the expanded checks "app / test-unit (worker)" and "app / test-unit (ui)"
+    When the wait step reads the check runs
+    Then the cancelled "app / test-unit" check does not count
+    And the review is not blocked by it
+
+  @unit
+  Scenario: A failed check from an older run of the workflow still blocks the review
+    Given a check failed in an older run of a workflow
+    And a newer run of the same workflow does not run a check of that name
+    When the wait step reads the check runs
+    Then the wait step names that check as failed
+
+  @unit
   Scenario: Same-named checks from different workflows are counted separately
     Given two workflows each have a check named "test" on the head commit
     And one passed and the other failed

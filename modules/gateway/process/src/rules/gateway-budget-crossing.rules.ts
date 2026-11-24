@@ -34,7 +34,7 @@ export function computePeriodEndsAtMs({
   budget,
   now,
 }: {
-  budget: { window: GatewayBudgetWindow; cycleAnchorAt: Instant | null };
+  budget: { window: GatewayBudgetWindow; cycleAnchorAt: Instant | null; timezone: string | null };
   now: Instant;
 }): number | null {
   if (!GatewayWindow.isCyclicWindow(budget.window)) return null;

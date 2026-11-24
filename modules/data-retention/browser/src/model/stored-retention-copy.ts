@@ -5,6 +5,7 @@
 import {
   retentionCategories,
   type RetentionCategory,
+  type StoredApplyStatus,
   type StoredPastRetention,
 } from "@langwatch/data-retention-contract";
 
@@ -64,4 +65,18 @@ export function storedRetentionNote({ counted }: { counted: StoredPastRetention 
     .map((category) => itemsOf({ category, rows: counted[category].rows }));
   const total = storedPastRetentionTotal(counted);
   return `${listed(parts)} still use${total === 1 ? "s" : ""} the old period`;
+}
+
+const appliedDate = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/** "Applied on 22 Nov 2026", or the note a change not applied yet gets. */
+export function storedApplyLabel({ status, at }: Pick<StoredApplyStatus, "status" | "at">): string {
+  return status === "applied"
+    ? `Applied on ${appliedDate.format(at)}`
+    : "Not applied to stored data yet";
 }

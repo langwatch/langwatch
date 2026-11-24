@@ -34,7 +34,7 @@ func TestAllowsDialAddressHonoursOnlyExactAllowlistEntries(t *testing.T) {
 		{name: "public IP", address: "8.8.8.8:443", dialHost: "dns.google"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			err := policy.allowsDialAddress(test.address, test.dialHost)
+			err := policy.egress.CheckDial(test.address, test.dialHost)
 			if test.wantError {
 				require.Error(t, err)
 			} else {

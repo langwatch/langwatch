@@ -50,6 +50,21 @@ export const retentionScopeAvailableSchema: RetentionScopeAvailableSchema =
   retentionScopeAvailableSchemaDefinition;
 export type RetentionScopeAvailable = z.infer<typeof retentionScopeAvailableSchema>;
 
+/**
+ * Whether a scope's last saved change reached its stored data: `applied` at the covering apply,
+ * or `pending` since the change. Spec: modules/data-retention/specs/retention-apply-record.feature
+ */
+const storedApplyStatusSchemaDefinition = z.object({
+  scopeType: retentionScopeSchema,
+  scopeId: z.string(),
+  status: z.enum(["applied", "pending"]),
+  /** Epoch milliseconds: the covering apply when applied, the last change when pending. */
+  at: z.number(),
+});
+export interface StoredApplyStatusSchema extends Named<typeof storedApplyStatusSchemaDefinition> {}
+export const storedApplyStatusSchema: StoredApplyStatusSchema = storedApplyStatusSchemaDefinition;
+export type StoredApplyStatus = z.infer<typeof storedApplyStatusSchema>;
+
 /** Everything one render of the retention settings page is built from. */
 const retentionPolicySnapshotSchemaDefinition = z.object({
   projectId: z.string(),
@@ -60,6 +75,8 @@ const retentionPolicySnapshotSchemaDefinition = z.object({
   effective: resolvedRetentionSchema,
   /** Override rows the caller can read, one per (scope, category). */
   rules: z.array(retentionRuleSchema),
+  /** Per readable rule scope with a recorded change, whether that change reached stored data. */
+  storedApply: z.array(storedApplyStatusSchema),
   /** Scopes the caller can write to (RBAC-filtered), for the chip picker. */
   available: retentionScopeAvailableSchema,
   /**

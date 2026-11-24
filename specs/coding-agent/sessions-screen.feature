@@ -141,7 +141,7 @@ Rule: A session is named by its generated title, else by its first prompt
   @unit
   Scenario: A session with no generated title is named by the first thing the user asked
     Given a session whose agent never generated a title
-    When its first prompt event arrives
+    When its first prompt event arrives with the user's own words on its first line
     Then the session is named by the prompt's first line
     And a later prompt does not rename it
 
@@ -158,27 +158,47 @@ Rule: A session is named by its generated title, else by its first prompt
     Then the session stays unnamed
 
   @unit
+  Scenario: A first prompt that opens with a markdown heading does not name the session
+    Given a session whose first prompt opens with a markdown heading like "## Your skills"
+    When the prompt event arrives
+    Then the session stays unnamed
+    And the next prompt that opens with the user's own words names it
+
+  @unit
+  Scenario: A stored name that reads as a markdown heading or a tag is not shown
+    Given a session stored before this rule with the name "## Your skills"
+    When the user reads its row
+    Then the row does not show that name
+
+  @unit
   Scenario: A viewer who may not read captured content gets no session title
     Given a viewer who may not read the project's captured content
     When the sessions list is read
     Then no row carries a title
     And the rest of the row is intact
 
+  @unit
+  Scenario: A viewer who may not read captured content gets no title on a trace's session
+    Given a viewer who may not read the project's captured content
+    When the session a trace belongs to is read for its terminal view
+    Then the session carries no title
+    And the rest of the session is intact
+
   @integration
-  Scenario: A session with no title reads as untitled
-    Given a session whose agent never generated a title or received a prompt
+  Scenario: A session with no title is named by its agent and the day it started
+    Given a Claude Code session whose agent never generated a title or received a prompt
     When the user reads its row
-    Then the row names it as an untitled session
+    Then the row names it "Claude Code session" with the day it started
 
   # A pi run carries its prompt only with content capture on, so a session sent
   # without it reaches this fallback. The risk is a fallback that reaches for the
   # nearest string it can find and prints a span name or a session id at a human.
 
   @integration
-  Scenario: A pi session falls back to untitled rather than to a span name
+  Scenario: A pi session falls back to its agent's name rather than to a span name
     Given a pi session folded from pi's own spans
     When the user reads its row
-    Then the row names it as an untitled session
+    Then the row names it as a pi session with the day it started
     And it is not named after a span name or pi's session id
 
 Rule: The session's own name outranks every derived title
@@ -356,6 +376,26 @@ Rule: Clicking a session replays it in the terminal
     Then the newest mapped trace is answered with the time it occurred
     And a session with no mapped trace answers nothing
 
+  @unit
+  Scenario: A trace the session's telemetry only named is skipped for one that was stored
+    Given a session whose newest mapped trace came from a log record whose trace was never stored
+    And an older mapped trace of the session that was stored
+    When the latest turn of the session is asked for
+    Then the older stored trace is answered
+    And the reader never opens a trace that is not found
+
+  @integration
+  Scenario: The repository answers a session's newest mapped traces, newest first
+    Given a session with more mapped traces than one read asks for
+    When the session's recent traces are read with a limit
+    Then the newest traces are answered newest first, up to the limit
+
+  @unit
+  Scenario: The replay opens on the session's newest stored turn, not the first page of its history
+    Given a session whose conversation holds more traces than one page of turns
+    When the user chooses its row
+    Then the replay opens on the session's newest stored trace
+
   @integration
   Scenario: Leaving the replay returns to the table as it was
     Given an open terminal replay reached from the table
@@ -411,8 +451,9 @@ Rule: A session can be replayed from wherever it is listed
 Rule: A link can open a session's replay on the Sessions page
 
   Another tool (Laze's Investigate button) links straight to one session. The
-  link adds `session=<id>`, or `sessionName=<name>` for the newest session with
-  that name, to `/<project>/sessions`. It combines with `langy=open` and
+  link adds `session=<id>`, `sessionName=<name>` for the newest session with
+  that name, or both (the id first, the name when the id is not listed), to
+  `/<project>/sessions`. It combines with `langy=open` and
   `langyPrompt=<text>` to have Langy ready with a question about the session.
 
   @integration
@@ -427,6 +468,14 @@ Rule: A link can open a session's replay on the Sessions page
     Given two listed sessions named "Scout", the newer one updated last
     When the user opens the Sessions page with "sessionName=Scout"
     Then the newer session's terminal replay opens
+
+  @unit
+  Scenario: A link with a session id and a name falls back to the name
+    Given a link with "session=agent-1" and "sessionName=Scout"
+    And no listed session has the id "agent-1"
+    And a listed session is named "Scout"
+    When the session link is applied
+    Then the newest session named "Scout" is the one opened
 
   @integration
   Scenario: A link to a session that is not listed says so

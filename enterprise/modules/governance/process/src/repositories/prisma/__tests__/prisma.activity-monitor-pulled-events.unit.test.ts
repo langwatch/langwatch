@@ -273,6 +273,25 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
     });
   });
 
+  it("counts a row with no trace id only when Security Lake wrote it, not a pushed event", async () => {
+    const prisma = {
+      project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },
+    };
+    await activityMonitor(prisma).sourceHealthMetrics({
+      organizationId: "org",
+      sourceId: "source",
+    });
+
+    const ocsfQueries = query.mock.calls
+      .map((call) => String((call[0] as { query: string }).query))
+      .filter((sql) => sql.includes("governance_ocsf_events"));
+    expect(ocsfQueries.length).toBeGreaterThan(0);
+    for (const sql of ocsfQueries) {
+      expect(sql).toContain("(TraceId = '' AND SourceType = 'security_lake')");
+      expect(sql).not.toMatch(/OR TraceId = ''\)/);
+    }
+  });
+
   it("includes pulled OCSF events in source health counts and last event", async () => {
     const prisma = {
       project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },

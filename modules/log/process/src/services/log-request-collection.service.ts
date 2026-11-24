@@ -232,6 +232,7 @@ function makeTraceContribution({
     scopeName: legacyView.scopeName,
     body: legacyView.body,
     attributes: legacyView.attributes,
+    resourceAttributes: legacyView.resourceAttributes,
   }).attributes;
   const liftedAttributes: LogTraceContribution["liftedAttributes"] = {};
   for (const [key, value] of Object.entries(lifted)) {

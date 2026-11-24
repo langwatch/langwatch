@@ -208,6 +208,14 @@ const runtimeParametersSchemaDefinition = z.record(z.string(), jsonValue).defaul
 export interface RuntimeParametersSchema extends Named<typeof runtimeParametersSchemaDefinition> {}
 export const runtimeParametersSchema: RuntimeParametersSchema = runtimeParametersSchemaDefinition;
 
+/** Runtime parameters with no default: an update that omits them keeps the stored ones. */
+const runtimeParametersUpdateSchemaDefinition = z.record(z.string(), jsonValue);
+export interface RuntimeParametersUpdateSchema extends Named<
+  typeof runtimeParametersUpdateSchemaDefinition
+> {}
+export const runtimeParametersUpdateSchema: RuntimeParametersUpdateSchema =
+  runtimeParametersUpdateSchemaDefinition;
+
 /**
  * Extended runtime input schema including a value for execution time.
  * Single Responsibility: Add value-carrying variant of inputs for runtime usage.

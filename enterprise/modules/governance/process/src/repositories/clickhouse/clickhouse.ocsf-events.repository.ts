@@ -3,6 +3,7 @@
 import {
   type GovernanceOcsfExportRow,
   OCSF_PUSHED_SOURCE_TYPE,
+  SECURITY_LAKE_SOURCE_TYPE,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
@@ -15,6 +16,10 @@ import type {
   GovernanceOcsfEventWriter,
   GovernanceClickHouseTenantResolver,
 } from "../governance.repositories.ts";
+import type {
+  SecurityLakeCallerRepository,
+  SecurityLakeCallerRow,
+} from "../security-lake-caller.repository.ts";
 
 /**
  * ClickHouseOcsfEventsRepository — read and write side of the
@@ -176,7 +181,8 @@ export class ClickHouseOcsfEventsRepository
     GovernanceOcsfEventWriter,
     OcsfEventBatchWriter,
     OcsfSeatReportReader,
-    OcsfIngestOrderedReader
+    OcsfIngestOrderedReader,
+    SecurityLakeCallerRepository
 {
   private constructor(private readonly resolveClient: GovernanceClickHouseTenantResolver) {}
 
@@ -413,7 +419,7 @@ export class ClickHouseOcsfEventsRepository
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND ActionName = {actionName:String}
-          AND SourceType != {pushedSourceType:String}
+          AND SourceType NOT IN ({pushedSourceType:String}, {securityLakeSourceType:String})
         GROUP BY SourceId, TargetName
         ORDER BY SourceId, TargetName
       `,
@@ -421,6 +427,7 @@ export class ClickHouseOcsfEventsRepository
         tenantId: input.tenantId,
         actionName: input.actionName,
         pushedSourceType: OCSF_PUSHED_SOURCE_TYPE,
+        securityLakeSourceType: SECURITY_LAKE_SOURCE_TYPE,
       },
       format: "JSONEachRow",
     });
@@ -439,5 +446,86 @@ export class ClickHouseOcsfEventsRepository
         rawOcsfJson: String(row.LatestRawOcsfJson ?? ""),
       }),
     );
+  }
+
+  /** Security Lake callers grouped by role ARN (the session issuer), else the user uid. */
+  async findSecurityLakeCallers(input: {
+    tenantId: string;
+    sinceMs: number;
+    limit: number;
+  }): Promise<SecurityLakeCallerRow[]> {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          Principal,
+          arrayFilter(x -> x != '', groupUniqArray(16)(TargetName)) AS Models,
+          arrayFilter(x -> x != '', groupUniqArray(16)(Region))     AS Regions,
+          max(toUnixTimestamp64Milli(EventTime))                     AS LastCallMs,
+          uniqExact(EventId)                                         AS CallCount
+        FROM (
+          SELECT
+            EventId,
+            EventTime,
+            TargetName,
+            if(
+              JSONExtractString(RawOcsfJson, 'actor', 'session', 'issuer') != '',
+              JSONExtractString(RawOcsfJson, 'actor', 'session', 'issuer'),
+              JSONExtractString(RawOcsfJson, 'actor', 'user', 'uid')
+            ) AS Principal,
+            JSONExtractString(RawOcsfJson, 'cloud', 'region') AS Region
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND SourceType = {sourceType:String}
+            AND EventTime >= fromUnixTimestamp64Milli({sinceMs:UInt64})
+        )
+        WHERE Principal != ''
+        GROUP BY Principal
+        ORDER BY LastCallMs DESC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: {
+        tenantId: input.tenantId,
+        sourceType: SECURITY_LAKE_SOURCE_TYPE,
+        sinceMs: input.sinceMs,
+        limit: input.limit,
+      },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as {
+      Principal: string;
+      Models: string[];
+      Regions: string[];
+      LastCallMs: number | string;
+      CallCount: number | string;
+    }[];
+    return rows.map((row) => ({
+      principalArn: row.Principal,
+      models: row.Models,
+      regions: row.Regions,
+      lastCallMs: Number(row.LastCallMs),
+      callCount: Number(row.CallCount),
+    }));
+  }
+
+  async countSecurityLakeEvents(input: { tenantId: string; sourceId: string }): Promise<number> {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT uniqExact(EventId) AS Events
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND SourceType = {sourceType:String}
+          AND SourceId = {sourceId:String}
+      `,
+      query_params: {
+        tenantId: input.tenantId,
+        sourceType: SECURITY_LAKE_SOURCE_TYPE,
+        sourceId: input.sourceId,
+      },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as { Events: number | string }[];
+    return Number(rows[0]?.Events ?? 0);
   }
 }

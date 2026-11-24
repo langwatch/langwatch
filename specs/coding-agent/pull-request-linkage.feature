@@ -778,7 +778,7 @@ Rule: The pull request detail answers with facts, and names its sessions
     Given a pull request whose sessions include one with a title and one without
     When the detail is read
     Then the titled session is named by its title
-    And the untitled one is named as an untitled session
+    And the untitled one is named by its agent and the day it started
 
   # A reader knows their assistants by the names their makers gave them, not by
   # the spelling that happened to arrive on the wire.

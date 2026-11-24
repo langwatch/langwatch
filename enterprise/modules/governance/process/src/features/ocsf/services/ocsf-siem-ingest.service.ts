@@ -7,12 +7,9 @@ import {
   type OcsfIngestResponse,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
-import { Temporal } from "@langwatch/time";
 
-import type {
-  GovernanceOcsfEvent,
-  GovernanceOcsfEventSink,
-} from "../../../repositories/governance.repositories.ts";
+import type { GovernanceOcsfEventSink } from "../../../repositories/governance.repositories.ts";
+import { ocsfEventToGovernanceRow } from "../rules/ocsf-ingest-row.rules.ts";
 
 type OcsfSiemIngestDependencies = {
   events: GovernanceOcsfEventSink;
@@ -42,33 +39,14 @@ export class OcsfSiemIngestService {
       throw new GovernanceValidationError(complaint, { formErrors: [complaint] });
     }
     const byUid = new Map(input.events.map((event) => [event.metadata.uid, event]));
-    const rows = [...byUid.values()].map((event): GovernanceOcsfEvent => {
-      const actor = (event.actor ?? {}) as { user?: { uid?: unknown; email_addr?: unknown } };
-      const api = (event.api ?? {}) as { operation?: unknown };
-      const target = (event.dst_endpoint ?? {}) as { name?: unknown; hostname?: unknown };
-      const text = (value: unknown) => (typeof value === "string" ? value.slice(0, 512) : "");
-      const activityId = event.activity_id ?? 0;
-      return {
+    const rows = [...byUid.values()].map((event) =>
+      ocsfEventToGovernanceRow({
         tenantId: tenant.id,
-        eventId: `${OCSF_PUSHED_SOURCE_TYPE}:${input.source}:${event.metadata.uid}`,
-        classUid: event.class_uid,
-        categoryUid: event.category_uid ?? Math.floor(event.class_uid / 1000),
-        typeUid: event.type_uid ?? event.class_uid * 100 + activityId,
-        traceId: "",
-        sourceId: input.source,
         sourceType: OCSF_PUSHED_SOURCE_TYPE,
-        activityId,
-        severityId: event.severity_id,
-        eventTime: Temporal.Instant.fromEpochMilliseconds(event.time),
-        actorUserId: text(actor.user?.uid),
-        actorEmail: text(actor.user?.email_addr),
-        actorEnduserId: "",
-        actionName: text(api.operation) || text(event.class_name) || `class_${event.class_uid}`,
-        targetName: text(target.name) || text(target.hostname),
-        anomalyAlertId: "",
-        rawOcsfJson: JSON.stringify(event),
-      };
-    });
+        sourceId: input.source,
+        event,
+      }),
+    );
     await this.deps.events.insertEvents(rows);
     return { accepted: rows.length };
   }

@@ -109,6 +109,7 @@ function harness(existing: PolicyWrite[] = []) {
   extensions.connect({
     record: async () => undefined,
     request: async () => undefined,
+    change: async () => undefined,
     apply: async () => undefined,
   });
   eventing.register(buildDataRetentionSeatPolicyPipeline({ extensions }));

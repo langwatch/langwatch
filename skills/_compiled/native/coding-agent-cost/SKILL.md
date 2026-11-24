@@ -14,8 +14,6 @@ This skill reads the user's own Claude Code sessions from LangWatch, runs one ch
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on every read command except `query run` when the sessions live in a team project instead. `query run` takes the projects to read from `--projects <id,id>` (Step 3), and refuses `--project` beside it.
-
 ## Step 2: Find Out How the User Pays
 
 The same tokens mean different things to different users, so settle this before any number goes in the report.
@@ -193,7 +191,7 @@ Write a single self-contained `coding-agent-cost-report.html` in the project roo
 - The window used, the price list link with its fetch date, and the formula behind each estimate.
 - A note that savings overlap (checks 1 and 4 price the same Opus sub-agent calls; checks 2, 3 and 7 touch the same long threads), so the rows do not add up to a total.
 
-State the top recommendation directly in the conversation too. To check the effect later, run the same queries on a window that starts after the change: the session list at `/me/sessions` shows peak context, compactions and cost per session.
+State the top recommendation directly in the conversation too. To check the effect later, run the same queries on a window that starts after the change: the session list at `/coding-agents/sessions` shows peak context, compactions and cost per session.
 
 ## Common Mistakes
 

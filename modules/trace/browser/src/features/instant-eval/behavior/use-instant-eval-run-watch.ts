@@ -15,6 +15,7 @@ import { useOrganizationTeamProject } from "../../../behavior/use-organization-t
 import { dueInstantEvalRefetches } from "../../../model/instant-eval-refetch-pacing.ts";
 import { useInstantEvalRunStore } from "./instant-eval-run.store.ts";
 import { useInstantEvalRuns } from "./use-instant-eval-runs.ts";
+import { useMarkRegisteredChipsTyped } from "./use-mark-registered-chips-typed.ts";
 
 export function useInstantEvalRunWatch(): void {
   const { project } = useOrganizationTeamProject();
@@ -54,6 +55,7 @@ export function useInstantEvalRunWatch(): void {
     storeNewAnswers({ answers, lastAnswer: lastAnswer.current, setRun });
   });
 
+  useMarkRegisteredChipsTyped();
   useRefetchOnRunProgress(runs);
   useConfirmEndedRuns({ projectId, runs });
   useSettleQuietRuns();
