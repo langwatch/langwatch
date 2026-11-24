@@ -144,7 +144,7 @@ describe("given a statement that projects a span id", () => {
         sql: SPAN_SQL,
       });
 
-      expect(pass.sql).toContain(`WHERE q.TraceId > {${LWQL_PASS_AFTER_TRACE_PARAMETER}:String}`);
+      expect(pass.sql).toContain(`WHERE k.TraceId > {${LWQL_PASS_AFTER_TRACE_PARAMETER}:String}`);
       expect(pass.sql).not.toContain(LWQL_PASS_AFTER_SPAN_PARAMETER);
       expect(pass.parameters).toEqual({ [LWQL_PASS_AFTER_TRACE_PARAMETER]: "t0" });
     });
@@ -171,7 +171,7 @@ describe("given a selection to sample", () => {
       const pass = sampleKeys(["ThreadId"]);
 
       expect(pass.sql).toContain(
-        `WHERE cityHash64(q.TraceId) % {${LWQL_PASS_SAMPLE_BUCKET_PARAMETER}:UInt64} = 0`,
+        `WHERE cityHash64(k.TraceId) % {${LWQL_PASS_SAMPLE_BUCKET_PARAMETER}:UInt64} = 0`,
       );
       expect(pass.sql).toContain("LIMIT 50");
       expect(pass.sql).toContain(SQL);
@@ -189,8 +189,61 @@ describe("given a selection to sample", () => {
     it("hashes the trace and span pair when the rows are spans", () => {
       const { sql } = sampleKeys(["SpanId", "OccurredAt"]);
 
-      expect(sql).toContain("cityHash64(q.TraceId, q.SpanId) %");
-      expect(sql).not.toContain("cityHash64(q.TraceId) %");
+      expect(sql).toContain("cityHash64(k.TraceId, k.SpanId) %");
+      expect(sql).not.toContain("cityHash64(k.TraceId) %");
+    });
+  });
+});
+
+describe("given a statement projecting the thread id", () => {
+  describe("when the sample pass is composed", () => {
+    /** @scenario "A key or sample pass reads the other key columns only for the page's row ids" */
+    it("picks the sampled trace ids alone, then reads the thread id only for them", () => {
+      const { sql } = sampleKeys(["ThreadId", "OccurredAt"]);
+
+      expect(sql).toBe(
+        `SELECT q.TraceId AS TraceId, q.ThreadId AS ThreadId, q.OccurredAt AS OccurredAt\n` +
+          `FROM (\n${SQL}\n) AS q\nWHERE q.TraceId IN (\n` +
+          `SELECT k.TraceId\nFROM (\n${SQL}\n) AS k\n` +
+          `WHERE cityHash64(k.TraceId) % {${LWQL_PASS_SAMPLE_BUCKET_PARAMETER}:UInt64} = 0\n` +
+          `ORDER BY k.TraceId\nLIMIT 50\n)\nORDER BY q.TraceId\nLIMIT 50`,
+      );
+    });
+
+    /** @scenario "A key or sample pass reads the other key columns only for the page's row ids" */
+    it("restricts by the trace and span pair when the rows are spans", () => {
+      const { sql } = sampleKeys(["SpanId", "OccurredAt"]);
+
+      expect(sql).toContain("WHERE (q.TraceId, q.SpanId) IN (\nSELECT k.TraceId, k.SpanId\n");
+      expect(sql).toContain("ORDER BY (k.TraceId, k.SpanId)\nLIMIT 50\n)");
+    });
+  });
+
+  describe("when a later page's key pass is composed", () => {
+    /** @scenario "A key or sample pass reads the other key columns only for the page's row ids" */
+    it("pages on the trace ids alone, then reads the thread id only for that page", () => {
+      const { sql } = keyPass({
+        keyColumns: ["ThreadId"],
+        after: { traceId: "t0", spanId: null },
+      });
+
+      expect(sql).toBe(
+        `SELECT q.TraceId AS TraceId, q.ThreadId AS ThreadId\n` +
+          `FROM (\n${SQL}\n) AS q\nWHERE q.TraceId IN (\n` +
+          `SELECT k.TraceId\nFROM (\n${SQL}\n) AS k\n` +
+          `WHERE k.TraceId > {${LWQL_PASS_AFTER_TRACE_PARAMETER}:String}\n` +
+          `ORDER BY k.TraceId\nLIMIT 501\n)\nORDER BY q.TraceId\nLIMIT 501`,
+      );
+    });
+  });
+
+  describe("when the pass projects no key column beyond the ids", () => {
+    /** @scenario "A key or sample pass reads the other key columns only for the page's row ids" */
+    it("reads the statement once", () => {
+      const { sql } = keyPass({ keyColumns: ["SpanId"], sql: SPAN_SQL });
+
+      expect(sql.split(SPAN_SQL)).toHaveLength(2);
+      expect(sql).not.toContain(" IN (");
     });
   });
 });
