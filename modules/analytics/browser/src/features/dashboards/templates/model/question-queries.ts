@@ -87,7 +87,7 @@ export const TOP_MODELS_SQL = `SELECT arrayJoin(Models) AS model, uniqExact(Trac
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
 GROUP BY model
-ORDER BY traces DESC
+ORDER BY traces DESC, model
 LIMIT 10`;
 
 export const MODEL_COSTS_SQL = costByModelSql({ limit: 10, among: TOP_MODELS_SQL });
