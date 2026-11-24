@@ -302,6 +302,14 @@ Feature: Ops shows an installation's release upgrades, read-only
     And the waiting step names the processes it waits on by role, image and last seen
 
   @integration
+  Scenario: A step held by the grace for writers before the roster says why and how long it waits
+    Given an upgrade from a release that kept no serving roster finished 7 minutes ago
+    And a background step that needs old writers gone, waiting out the grace
+    When an operator opens "Finishing in background" on the Steps tab
+    Then the waiting step says it waits for processes of the older release to stop, about 23 minutes more
+    And it names `pnpm task upgrade old-writers-gone` as the way to end the wait sooner
+
+  @integration
   Scenario: A failed background step offers Retry to a manager
     Given a background step that failed
     When an operator holding ops:manage opens the list

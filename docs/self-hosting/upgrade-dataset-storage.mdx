@@ -160,6 +160,8 @@ New datasets created after the upgrade go straight to the new storage backend. E
 
 You do not start the migration. Once every old-version pod is gone, the workers run the `dataset:move-content-to-object-storage` upgrade step in the background. Run the upgrade off-peak if you can. Its progress and report show on **Ops > Upgrades**.
 
+Upgrading from 3.20.x or older, the step waits 30 minutes after the upgrade before it starts, because those versions cannot report when their pods have stopped. See [Steps that wait for older versions to stop](/self-hosting/upgrade#steps-that-wait-for-older-versions-to-stop) to end the wait sooner.
+
 The migration is resilient by design:
 
 - **Resumes where it stopped**: an interrupted or partial run carries on from its last checkpoint

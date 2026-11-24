@@ -21,6 +21,11 @@ import {
   imageNameOf,
   type InstallationFacts,
 } from "./installation-state.ts";
+import {
+  findOldWritersGraceEnd,
+  preRosterHistoryOver,
+  type PreRosterHistoryReader,
+} from "./old-writers-grace.ts";
 import { preflightFrom, type UpgradePreflightRow } from "./preflight.ts";
 import { previewUpgradeTo, type UpgradePreview } from "./preview.ts";
 import {
@@ -163,6 +168,7 @@ function pickStepView({
   id,
   roster,
   needsOldWritersGone,
+  graceEndsAt,
 }: {
   row: LedgerStepRow | undefined;
   declared: UpgradeImageStep | undefined;
@@ -170,11 +176,11 @@ function pickStepView({
   id: string;
   roster: readonly LedgerRosterRow[];
   needsOldWritersGone: ReadonlySet<string>;
+  graceEndsAt: string | null;
 }): UpgradeStepView {
-  if (row) return viewRecordedStep({ row, declared, roster, needsOldWritersGone });
-  if (declared) {
-    return viewDeclaredStep({ step: declared, imageRelease, roster, needsOldWritersGone });
-  }
+  const writers = { roster, needsOldWritersGone, graceEndsAt };
+  if (row) return viewRecordedStep({ row, declared, ...writers });
+  if (declared) return viewDeclaredStep({ step: declared, imageRelease, ...writers });
   throw new UpgradeReadError("upgrade_not_found", `No upgrade step "${id}" in the ledger.`);
 }
 
@@ -298,17 +304,21 @@ export function createUpgradeReader({
   image,
   needsOldWritersGone = new Set(),
   planning,
+  preRoster = preRosterHistoryOver({ postgres }),
 }: {
   postgres: UpgradePostgres;
   image: UpgradeImage;
   needsOldWritersGone?: ReadonlySet<string>;
   /** The manifests `preview` plans with; ClickHouse seeds goose history into an empty ledger. */
   planning?: UpgradePlanning & { clickhouse?: UpgradeClickHouse };
+  preRoster?: PreRosterHistoryReader;
 }) {
   const repository = UpgradeReaderRepository.create({ postgres });
   const declaredById = new Map(image.steps.map((step) => [step.id, step]));
   const findRoster = ({ tables }: { tables: LedgerTables }) =>
     repository.findLiveRoster({ tables, staleAfterMs: SERVING_ROSTER_TIMING.staleAfterMs });
+  const findGrace = ({ tables }: { tables: LedgerTables }) =>
+    findOldWritersGraceEnd({ tables, preRoster });
 
   async function readStatusFacts({ tables }: { tables: LedgerTables }) {
     const [stepFacts, latestRun, succeededRun, leases, unfinishedRun, anyRun, failed] =
@@ -354,11 +364,12 @@ export function createUpgradeReader({
   }
 
   async function listAllSteps({ tables }: { tables: LedgerTables }): Promise<UpgradeStepView[]> {
-    const [rows, roster] = await Promise.all([
+    const [rows, roster, graceEndsAt] = await Promise.all([
       repository.findSteps({ tables }),
       findRoster({ tables }),
+      findGrace({ tables }),
     ]);
-    return mergeSteps({ rows, image, roster, needsOldWritersGone });
+    return mergeSteps({ rows, image, roster, needsOldWritersGone, graceEndsAt });
   }
 
   async function listSteps(filter: ListStepsFilter = {}): Promise<UpgradeStepPage> {
@@ -378,9 +389,10 @@ export function createUpgradeReader({
 
   async function getStep({ id }: { id: string }): Promise<UpgradeStepDetail> {
     const tables = await repository.findTables();
-    const [[row], roster] = await Promise.all([
+    const [[row], roster, graceEndsAt] = await Promise.all([
       repository.findStepById({ tables, id }),
       findRoster({ tables }),
+      findGrace({ tables }),
     ]);
     const declared = declaredById.get(id);
     const view = pickStepView({
@@ -390,6 +402,7 @@ export function createUpgradeReader({
       id,
       roster,
       needsOldWritersGone,
+      graceEndsAt,
     });
     const targets = await repository.findTargets({ tables, stepId: id });
     return {
@@ -421,9 +434,10 @@ export function createUpgradeReader({
     if (!run) {
       throw new UpgradeReadError("upgrade_not_found", `No upgrade run "${id}" in the ledger.`);
     }
-    const [rows, roster] = await Promise.all([
+    const [rows, roster, graceEndsAt] = await Promise.all([
       repository.findSteps({ tables, runId: id }),
       findRoster({ tables }),
+      findGrace({ tables }),
     ]);
     return {
       ...summariseRun(run),
@@ -436,6 +450,7 @@ export function createUpgradeReader({
           declared: declaredById.get(row.id),
           roster,
           needsOldWritersGone,
+          graceEndsAt,
         }),
       ),
     };

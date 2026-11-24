@@ -6,7 +6,7 @@
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
   UpgradeRunDetailView,
@@ -65,6 +65,7 @@ function stepWith(overrides: Partial<UpgradeStepView>): UpgradeStepView {
     report: null,
     progress: null,
     waitingOn: [],
+    oldWritersGraceEndsAt: null,
     runId: null,
     startedAt: "2026-10-06T10:00:00.000Z",
     finishedAt: "2026-10-06T10:00:02.000Z",
@@ -440,6 +441,33 @@ describe("UpgradeStepsTab", () => {
 
       const row = screen.getByTestId("upgrade-background-step-ops:backfill-names");
       expect(row).toHaveTextContent("63%");
+    });
+
+    describe("when the grace for writers before the roster holds the step", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      /** @scenario "A step held by the grace for writers before the roster says why and how long it waits" */
+      it("says it waits for the older release's processes, how long, and the command that ends it", () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-11-24T10:00:00.000Z"));
+        const held = stepWith({
+          id: "dataset:move-content-to-object-storage",
+          mode: "background",
+          status: "pending",
+          statusLabel: "Waiting",
+          oldWritersGraceEndsAt: "2026-11-24T10:23:00.000Z",
+        });
+        renderStepsTab({ backgroundSteps: [held] });
+
+        const row = screen.getByTestId(
+          "upgrade-background-step-dataset:move-content-to-object-storage",
+        );
+        expect(row).toHaveTextContent("processes of the older release");
+        expect(row).toHaveTextContent("about 23 more minutes");
+        expect(row).toHaveTextContent("pnpm task upgrade old-writers-gone");
+      });
     });
 
     it("names the old serving processes a step waits on", () => {

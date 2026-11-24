@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { progressOf, viewDeclaredStep, viewRecordedStep, waitingOnOf } from "../step-view.ts";
+import {
+  oldWritersGraceOf,
+  progressOf,
+  viewDeclaredStep,
+  viewRecordedStep,
+  waitingOnOf,
+} from "../step-view.ts";
 
 describe("progressOf", () => {
   describe("when the report carries done and total", () => {
@@ -183,6 +189,32 @@ describe("logTail", () => {
           roster: [],
         }).logTail,
       ).toEqual([]);
+    });
+  });
+});
+
+describe("oldWritersGraceOf", () => {
+  const declared = { id: "ops:fill", kind: "data", mode: "background", needsOldWritersGone: true };
+  const graceEndsAt = "2026-11-24T10:23:00.000Z";
+
+  describe("when an unsettled step needs old writers gone and the grace holds", () => {
+    it("carries the end of the grace", () => {
+      expect(oldWritersGraceOf({ id: "ops:fill", status: "pending", declared, graceEndsAt })).toBe(
+        graceEndsAt,
+      );
+    });
+  });
+
+  describe("when the step does not wait, has settled, or no grace holds", () => {
+    it.each([
+      { status: "pending", declared: { ...declared, needsOldWritersGone: false }, graceEndsAt },
+      { status: "done", declared, graceEndsAt },
+      { status: "not-needed", declared, graceEndsAt },
+      { status: "pending", declared, graceEndsAt: null },
+    ])("carries none for %o", ({ status, declared: step, graceEndsAt: ends }) => {
+      expect(
+        oldWritersGraceOf({ id: "ops:fill", status, declared: step, graceEndsAt: ends }),
+      ).toBeNull();
     });
   });
 });

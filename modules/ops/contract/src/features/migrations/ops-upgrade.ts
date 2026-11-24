@@ -194,6 +194,8 @@ const opsUpgradeStepSchemaDefinition = z.object({
   report: reportSchema,
   progress: opsUpgradeStepProgressSchema.nullable(),
   waitingOn: z.array(opsUpgradeWaitingWriterSchema),
+  /** When the grace for writers before the roster ends, while it holds the step (ADR-173). */
+  oldWritersGraceEndsAt: isoInstant.nullable(),
   runId: z.string().nullable(),
   startedAt: isoInstant.nullable(),
   finishedAt: isoInstant.nullable(),

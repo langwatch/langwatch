@@ -1,7 +1,7 @@
 import { Stack, Text } from "@langwatch/design-system/primitives";
-import { readableDate } from "@langwatch/time";
+import { nowEpochMs, readableDate } from "@langwatch/time";
 
-import { statusTone } from "../../model/upgrade-labels.ts";
+import { oldWritersGraceLine, statusTone } from "../../model/upgrade-labels.ts";
 import type { UpgradeStepView } from "../../model/upgrade-view.ts";
 import { UpgradeStatusBadge } from "./upgrade-status-badge.tsx";
 
@@ -12,27 +12,32 @@ function waitingWriterLabel(writer: UpgradeStepView["waitingOn"][number]): strin
   return `${writer.role} (${name}, last seen ${readableDate(writer.lastSeenAt).toLocaleString()})`;
 }
 
-/** Progress from the checkpoint, else the old processes the step waits on, else nothing. */
-function stepDetail(step: UpgradeStepView): string | null {
+/** Progress from the checkpoint, else the old processes and the grace the step waits on. */
+function stepDetails(step: UpgradeStepView): string[] {
   if (step.progress) {
     const { done, total } = step.progress;
-    return `${Math.floor((done / total) * 100)}% · ${done} of ${total}`;
+    return [`${Math.floor((done / total) * 100)}% · ${done} of ${total}`];
   }
-  if (step.waitingOn.length === 0) return null;
-  return `Waiting on ${step.waitingOn.map(waitingWriterLabel).join(", ")}`;
+  const details: string[] = [];
+  if (step.waitingOn.length > 0) {
+    details.push(`Waiting on ${step.waitingOn.map(waitingWriterLabel).join(", ")}`);
+  }
+  if (step.oldWritersGraceEndsAt) {
+    details.push(oldWritersGraceLine({ endsAt: step.oldWritersGraceEndsAt, nowMs: nowEpochMs() }));
+  }
+  return details;
 }
 
-/** The status badge, with progress or what the step waits on as one muted line under it. */
+/** The status badge, with progress or what the step waits on as muted lines under it. */
 export function UpgradeStepState({ step }: { step: UpgradeStepView }) {
-  const detail = stepDetail(step);
   return (
     <Stack gap={1} align="start">
       <UpgradeStatusBadge label={{ label: step.statusLabel, tone: statusTone(step.status) }} />
-      {detail && (
-        <Text textStyle="xs" color="fg.muted">
+      {stepDetails(step).map((detail) => (
+        <Text key={detail} textStyle="xs" color="fg.muted">
           {detail}
         </Text>
-      )}
+      ))}
     </Stack>
   );
 }

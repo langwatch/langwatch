@@ -34,6 +34,7 @@ function stepDetail(overrides: Partial<UpgradeStepDetail> = {}): UpgradeStepDeta
     logTail: ["starting", "failed at row 12"],
     progress: null,
     waitingOn: [],
+    oldWritersGraceEndsAt: null,
     runId: null,
     startedAt: "2026-10-20T09:00:00.000Z",
     finishedAt: "2026-10-20T09:05:00.000Z",

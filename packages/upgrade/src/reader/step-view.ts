@@ -63,8 +63,7 @@ export function waitingOnOf({
   roster: readonly LedgerRosterRow[];
   needsOldWritersGone?: ReadonlySet<string>;
 }): UpgradeWaitingWriter[] {
-  const needs = declared?.needsOldWritersGone || needsOldWritersGone.has(id);
-  if (!needs || SETTLED.has(status)) return [];
+  if (!waitsForOldWriters({ id, status, declared, needsOldWritersGone })) return [];
   return roster
     .filter((entry) => !entry.steps.includes(id))
     .map((entry) => ({
@@ -75,16 +74,52 @@ export function waitingOnOf({
     }));
 }
 
+/** An unsettled step that needs old writers gone, declared so or named by the code step lookup. */
+function waitsForOldWriters({
+  id,
+  status,
+  declared,
+  needsOldWritersGone = NO_STEPS,
+}: {
+  id: string;
+  status: string;
+  declared: UpgradeImageStep | undefined;
+  needsOldWritersGone?: ReadonlySet<string>;
+}): boolean {
+  const needs = declared?.needsOldWritersGone || needsOldWritersGone.has(id);
+  return Boolean(needs) && !SETTLED.has(status);
+}
+
+/** The grace's end for a step it holds: writers before the roster cannot say they are gone. */
+export function oldWritersGraceOf({
+  id,
+  status,
+  declared,
+  needsOldWritersGone,
+  graceEndsAt,
+}: {
+  id: string;
+  status: string;
+  declared: UpgradeImageStep | undefined;
+  needsOldWritersGone?: ReadonlySet<string>;
+  graceEndsAt: string | null;
+}): string | null {
+  if (graceEndsAt === null) return null;
+  return waitsForOldWriters({ id, status, declared, needsOldWritersGone }) ? graceEndsAt : null;
+}
+
 function viewRecorded({
   row,
   declared,
   roster,
   needsOldWritersGone,
+  graceEndsAt = null,
 }: {
   row: LedgerStepRow;
   declared: UpgradeImageStep | undefined;
   roster: readonly LedgerRosterRow[];
   needsOldWritersGone?: ReadonlySet<string>;
+  graceEndsAt?: string | null;
 }): UpgradeStepView {
   return {
     id: row.id,
@@ -110,6 +145,13 @@ function viewRecorded({
       roster,
       needsOldWritersGone,
     }),
+    oldWritersGraceEndsAt: oldWritersGraceOf({
+      id: row.id,
+      status: row.status,
+      declared,
+      needsOldWritersGone,
+      graceEndsAt,
+    }),
     runId: row.run_id,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
@@ -122,11 +164,13 @@ function viewDeclared({
   imageRelease,
   roster,
   needsOldWritersGone,
+  graceEndsAt = null,
 }: {
   step: UpgradeImageStep;
   imageRelease: string;
   roster: readonly LedgerRosterRow[];
   needsOldWritersGone?: ReadonlySet<string>;
+  graceEndsAt?: string | null;
 }): UpgradeStepView {
   return {
     id: step.id,
@@ -152,6 +196,13 @@ function viewDeclared({
       roster,
       needsOldWritersGone,
     }),
+    oldWritersGraceEndsAt: oldWritersGraceOf({
+      id: step.id,
+      status: "pending",
+      declared: step,
+      needsOldWritersGone,
+      graceEndsAt,
+    }),
     runId: null,
     startedAt: null,
     finishedAt: null,
@@ -165,22 +216,36 @@ export function mergeSteps({
   image,
   roster,
   needsOldWritersGone,
+  graceEndsAt = null,
 }: {
   rows: readonly LedgerStepRow[];
   image: UpgradeImage;
   roster: readonly LedgerRosterRow[];
   needsOldWritersGone?: ReadonlySet<string>;
+  graceEndsAt?: string | null;
 }): UpgradeStepView[] {
   const declaredById = new Map(image.steps.map((step) => [step.id, step]));
   const recorded = new Set(rows.map((row) => row.id));
   const views = [
     ...rows.map((row) =>
-      viewRecorded({ row, declared: declaredById.get(row.id), roster, needsOldWritersGone }),
+      viewRecorded({
+        row,
+        declared: declaredById.get(row.id),
+        roster,
+        needsOldWritersGone,
+        graceEndsAt,
+      }),
     ),
     ...image.steps
       .filter((step) => !recorded.has(step.id))
       .map((step) =>
-        viewDeclared({ step, imageRelease: image.release, roster, needsOldWritersGone }),
+        viewDeclared({
+          step,
+          imageRelease: image.release,
+          roster,
+          needsOldWritersGone,
+          graceEndsAt,
+        }),
       ),
   ];
   return views.toSorted((left, right) => {
