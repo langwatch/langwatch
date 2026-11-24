@@ -200,6 +200,14 @@ node there is no ensemble to point at. The cloud's own rendered config
 (`langwatch-saas`, `config/lwql-server.xml`) needs the same element and the
 same path, and lands as its own change.
 
+The app cannot read the setting back: ClickHouse takes it straight from config,
+so `system.server_settings` does not list it and `getServerSetting` refuses it
+as unknown. A server whose store is in Keeper creates the store's node at boot,
+so on a replicated server the app looks for that node instead
+(`system.zookeeper`, path `/clickhouse/user_defined`) before it creates a
+function. A self-hosted server that names another path is treated as having no
+shared store, and its app functions stay out until it uses this one.
+
 ## 5. Caps are refusals, and truncation is never silent
 
 A cap breach is `lwql_app_function_key_cap` (422), naming the cap, the key kind
