@@ -111,6 +111,32 @@ function ibanValid(raw: string): boolean {
   return remainder === 1;
 }
 
+/**
+ * An AWS ARN; its `::` empty fields (region, account) look like IPv6 to the IP recognizer. A `=`
+ * or `,` stays in the ARN unless it starts a `key=` pair, so a value after the ARN is still read.
+ */
+const AWS_ARN =
+  /\b(arn:aws[a-z-]*:[a-z0-9-]+:[a-z0-9-]*:\d{0,12}:)(?:[\w+.@:/-]|[=,](?![\w.-]*=))+/g;
+
+/** Each ARN, with where its structural fields end and its resource (it may hold an IP) starts. */
+type AwsArnRange = ProtectedRange & { headerEnd: number };
+
+function findAwsArnRanges(text: string): AwsArnRange[] {
+  if (!text.includes("arn:aws")) return [];
+  return [...text.matchAll(AWS_ARN)].map((m) => ({
+    start: m.index,
+    headerEnd: m.index + (m[1]?.length ?? 0),
+    end: m.index + m[0].length,
+  }));
+}
+
+/** A false IP match starts in an ARN's empty `::` fields; one in the resource path is real. */
+function isArnFieldMatch(span: Span, arnRanges: readonly AwsArnRange[]): boolean {
+  return arnRanges.some(
+    (arn) => span.start >= arn.start && span.start < arn.headerEnd && span.end <= arn.end,
+  );
+}
+
 function ipv6Plausible(raw: string): boolean {
   if (raw.includes("::")) return true;
   if (/[a-fA-F]/.test(raw)) return true;
@@ -697,13 +723,17 @@ export function redactEssentialPiiInText({
     isIdentifierShaped:
       isAttributeValue && (shouldTreatAsIdentifier || isIdentifierShapedValue(text)),
   });
-  if (spans.length === 0) return { text, redactedCount: 0 };
+  const arnRanges = findAwsArnRanges(text);
+  const scannable = spans.filter(
+    (span) => span.entity !== "IP_ADDRESS" || !isArnFieldMatch(span, arnRanges),
+  );
+  if (scannable.length === 0) return { text, redactedCount: 0 };
 
   // Merge overlaps, preferring earlier-and-longer spans.
-  spans.sort((a, b) => a.start - b.start || b.end - a.end);
+  scannable.sort((a, b) => a.start - b.start || b.end - a.end);
   const kept: Span[] = [];
   let lastEnd = -1;
-  for (const span of spans) {
+  for (const span of scannable) {
     if (span.start >= lastEnd) {
       kept.push(span);
       lastEnd = span.end;
