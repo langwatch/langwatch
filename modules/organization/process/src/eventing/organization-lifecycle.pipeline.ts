@@ -51,6 +51,7 @@ import {
   RecordMemberRemovedCommand,
   RecordMemberDepartmentChangedCommand,
   RecordMemberRoleChangedCommand,
+  RecordMemberAdmittedCommand,
   RecordPersonalWorkspaceProvisionedCommand,
   RecordPersonalTeamCreatedCommand,
   RecordPersonalWorkspaceArchivedCommand,
@@ -72,6 +73,7 @@ import {
   organizationMemberRemovedEventSchema,
   organizationMemberDepartmentChangedEventSchema,
   organizationMemberRoleChangedEventSchema,
+  organizationMemberAdmittedEventSchema,
   organizationPresenceSettingChangedEventSchema,
   organizationSignedUpEventSchema,
   organizationTraceSharingDisabledEventSchema,
@@ -141,6 +143,7 @@ function lifecycleCommands() {
       organizationMemberRemovedEventSchema,
       organizationMemberDepartmentChangedEventSchema,
       organizationMemberRoleChangedEventSchema,
+      organizationMemberAdmittedEventSchema,
       organizationCreatedEventSchema,
     ])
     .withCommand("recordSignedUp", RecordSignedUpCommand)
@@ -166,6 +169,7 @@ function lifecycleCommands() {
     .withCommand("recordMemberRemoved", RecordMemberRemovedCommand)
     .withCommand("recordMemberDepartmentChanged", RecordMemberDepartmentChangedCommand)
     .withCommand("recordMemberRoleChanged", RecordMemberRoleChangedCommand)
+    .withCommand("recordMemberAdmitted", RecordMemberAdmittedCommand)
     .withCommand("recordCreated", RecordCreatedCommand);
 }
 

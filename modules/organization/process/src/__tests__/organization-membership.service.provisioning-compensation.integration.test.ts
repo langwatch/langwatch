@@ -46,6 +46,7 @@ const seatNotices: OrganizationSeatRevocationNotice = {
   memberDisabled: vi.fn(),
   memberEnabled: vi.fn(),
   memberRoleChanged: vi.fn(),
+  memberAdmitted: vi.fn(),
 };
 const grantCache: OrganizationGrantCache = {
   invalidateOrganization: vi.fn(),

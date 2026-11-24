@@ -128,7 +128,19 @@ export function fireInviteAccepted({
 export function fireMemberRoleChanged(
   signal: NurturingSignalOf<"member_role_changed">,
 ): CioBatchCall[] {
-  const { userId, organizationId, role } = signal;
+  return seatAndCompanyCalls(signal);
+}
+
+/** A person admitted by a path that sends no join: the same seat and Company link. */
+export function fireMemberAdmitted(signal: NurturingSignalOf<"member_admitted">): CioBatchCall[] {
+  return seatAndCompanyCalls(signal);
+}
+
+function seatAndCompanyCalls({
+  userId,
+  organizationId,
+  role,
+}: Readonly<{ userId: string; organizationId: string; role: string }>): CioBatchCall[] {
   const traits = seatTraitOf(role);
   return [
     ...(traits.seat ? [{ type: "identify" as const, userId, traits }] : []),

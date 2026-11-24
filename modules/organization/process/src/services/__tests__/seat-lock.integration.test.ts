@@ -236,6 +236,7 @@ describe.skipIf(!DB_URL)("two seat-taking writes for the last free full seat", (
           memberDisabled: async () => {},
           memberEnabled: async () => {},
           memberRoleChanged: () => {},
+          memberAdmitted: () => {},
         },
         grantCache: { invalidateOrganization: async () => {} },
         ceiling: { assertWithinCaller: async () => {} },

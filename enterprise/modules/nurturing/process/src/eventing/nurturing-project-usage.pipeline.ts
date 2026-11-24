@@ -42,11 +42,13 @@ import {
   INVITE_ACCEPTED_EVENT_TYPE,
   inviteAcceptedEventDataSchema,
   ORGANIZATION_CREATED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
   ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
   ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
   ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   organizationCreatedEventDataSchema,
+  organizationMemberAdmittedEventDataSchema,
   organizationMemberDisabledEventDataSchema,
   organizationMemberEnabledEventDataSchema,
   organizationMemberRemovedEventDataSchema,
@@ -538,6 +540,15 @@ function nurturingProjectUsageHost({
       nurturingMembershipSubscriber({
         eventType: SSO_AUTO_ADDED_EVENT_TYPE,
         data: ssoAutoAddedEventDataSchema,
+        change: "joined",
+        members,
+      }),
+    )
+    .withPeerSubscriber(
+      "memberAdmitted",
+      nurturingMembershipSubscriber({
+        eventType: ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+        data: organizationMemberAdmittedEventDataSchema,
         change: "joined",
         members,
       }),

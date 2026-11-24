@@ -13,6 +13,7 @@ import type {
   RecordMemberEnabledCommandData,
   RecordMemberDepartmentChangedCommandData,
   RecordMemberRoleChangedCommandData,
+  RecordMemberAdmittedCommandData,
   RecordMemberRemovedCommandData,
   RecordMembersInvitedCommandData,
   RecordPersonalWorkspaceProvisionedCommandData,
@@ -50,6 +51,7 @@ export type OrganizationLifecycleSenders = Readonly<{
   recordMemberRemoved: Sender<RecordMemberRemovedCommandData>;
   recordMemberDepartmentChanged: Sender<RecordMemberDepartmentChangedCommandData>;
   recordMemberRoleChanged: Sender<RecordMemberRoleChangedCommandData>;
+  recordMemberAdmitted: Sender<RecordMemberAdmittedCommandData>;
   recordCreated: Sender<RecordCreatedCommandData>;
 }>;
 
@@ -215,6 +217,14 @@ export class OrganizationLifecycleNoticeService {
   /** A member's role changed; fire-and-forget, since the change is committed and must stand. */
   memberRoleChanged(input: Recorded<RecordMemberRoleChangedCommandData>): void {
     this.#send(this.#senders?.recordMemberRoleChanged, {
+      ...this.#envelope(input.organizationId),
+      ...input,
+    });
+  }
+
+  /** A person was admitted; fire-and-forget, since the membership is committed and must stand. */
+  memberAdmitted(input: Recorded<RecordMemberAdmittedCommandData>): void {
+    this.#send(this.#senders?.recordMemberAdmitted, {
       ...this.#envelope(input.organizationId),
       ...input,
     });

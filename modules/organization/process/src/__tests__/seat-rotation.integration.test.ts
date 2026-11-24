@@ -102,6 +102,7 @@ describe.skipIf(!DB_URL)("Seat rotation", () => {
       memberDisabled: async () => {},
       memberEnabled: async () => {},
       memberRoleChanged: () => {},
+      memberAdmitted: () => {},
     },
     grantCache: { invalidateOrganization: async () => {} },
     testArrivals: { standingFor: async () => ({ testing: false }) as const },

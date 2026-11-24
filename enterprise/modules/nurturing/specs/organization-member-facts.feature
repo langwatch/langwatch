@@ -260,6 +260,19 @@ Feature: An organization's session facts reach every active member in Customer.i
     Then Customer.io receives one identify and one group call
 
   @unit
+  Scenario: An admitted member is sent their seat and linked to the organization
+    Given a member_admitted signal for user-1 of org-1 holding the role MEMBER, EXTERNAL or DEVELOPER
+    When the signal is delivered
+    Then Customer.io identifies the person once with seat member, lite_member or developer
+    And Customer.io groups user-1 into org-1
+
+  @unit
+  Scenario: A redelivered admission is sent once
+    Given the organization recorded a member_admitted fact for user-1
+    When the same fact is delivered twice
+    Then Customer.io receives one identify and one group call
+
+  @unit
   Scenario: A large organization's members go out in batches of one hundred
     Given org-1 has 250 active members
     When a trace_received signal of project-1 is delivered

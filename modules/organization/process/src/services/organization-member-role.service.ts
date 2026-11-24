@@ -62,6 +62,13 @@ export interface OrganizationSeatRevocationNotice {
     previousRole: string;
     changedByUserId: string | null;
   }): void;
+  /** Fire-and-forget: the membership is already committed, so a failed record must not fail it. */
+  memberAdmitted(input: {
+    organizationId: string;
+    userId: string;
+    role: string;
+    via: string;
+  }): void;
 }
 
 /**

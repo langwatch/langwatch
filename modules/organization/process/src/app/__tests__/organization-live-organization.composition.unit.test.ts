@@ -51,6 +51,7 @@ describe("given an organization that was deleted", () => {
         recordMemberRemoved: accepts,
         recordMemberDepartmentChanged: accepts,
         recordMemberRoleChanged: accepts,
+        recordMemberAdmitted: accepts,
       });
       await app.deleteProvisionedOrganization({ organizationId: ORGANIZATION_ID });
 

@@ -30,6 +30,7 @@ const COPY_LANES = [
   "memberSignedUp",
   "memberInviteAccepted",
   "memberSsoAutoAdded",
+  "memberAdmitted",
   "memberRemoved",
   "memberDisabled",
   "memberEnabled",

@@ -27,6 +27,7 @@ const mockHoldsFullSeat = vi.fn(async () => true);
 const mockMemberDisabled = vi.fn();
 const mockMemberEnabled = vi.fn();
 const mockMemberRoleChanged = vi.fn();
+const mockMemberAdmitted = vi.fn();
 const mockCreateAndAssign = vi.fn();
 const mockGetProvisioningSummaryById = vi.fn();
 const mockStandingFor = vi.fn<OrganizationTestArrivals["standingFor"]>(async () => ({
@@ -101,6 +102,7 @@ describe("OrganizationMembershipService", () => {
     memberDisabled: mockMemberDisabled,
     memberEnabled: mockMemberEnabled,
     memberRoleChanged: mockMemberRoleChanged,
+    memberAdmitted: mockMemberAdmitted,
   };
   const grantCache: OrganizationGrantCache = {
     invalidateOrganization: mockInvalidateOrganization,
@@ -911,6 +913,7 @@ describe("OrganizationMembershipService", () => {
               Promise.reject(new Error("organization_lifecycle is not registered in this process")),
             memberEnabled: async () => {},
             memberRoleChanged: () => {},
+            memberAdmitted: () => {},
           },
           grantCache,
           testArrivals,
@@ -1147,6 +1150,38 @@ describe("OrganizationMembershipService", () => {
           seat: { kind: "unchanged" },
           actorUserId: "admin-789",
         });
+      });
+    });
+  });
+
+  describe("when a waiting member is given a seat", () => {
+    /** @scenario "A waiting member given a seat is recorded as admitted" */
+    it("records them as admitted on the seat admission path", async () => {
+      vi.mocked(mockRepo.getMembership).mockResolvedValue({
+        userId: "user-456",
+        organizationId: "org-123",
+        role: OrganizationUserRole.EXTERNAL,
+        disabledAt: nowInstant(),
+        createdAt: nowInstant(),
+        updatedAt: nowInstant(),
+        user: { id: "user-456", name: null, email: null },
+      });
+      vi.mocked(mockRepo.findWaitingMembers).mockResolvedValue([{ userId: "user-456" }] as never);
+      vi.mocked(mockRepo.admitWaitingMember).mockResolvedValue(true);
+      mockCheckLimit.mockResolvedValue({ allowed: true, limitType: "members", current: 1, max: 5 });
+
+      await service.setMemberDisabled({
+        organizationId: "org-123",
+        userId: "user-456",
+        disabled: false,
+        actingUser: { id: "admin-789" },
+      });
+
+      expect(mockMemberAdmitted).toHaveBeenCalledWith({
+        organizationId: "org-123",
+        userId: "user-456",
+        role: "MEMBER",
+        via: "seat_admission",
       });
     });
   });

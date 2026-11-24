@@ -22,6 +22,8 @@ import {
   type OnboardingVariantAssignedEventData,
 } from "@langwatch/onboarding-contract";
 import {
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_VERSION,
   ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
   ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_VERSION,
 } from "@langwatch/organization-contract";
@@ -258,6 +260,56 @@ describe("nurturing's memberRoleChanged peer subscriber", () => {
       expect(sent).toContainEqual({
         path: "/identify",
         body: expect.objectContaining({ userId: "user-1", traits: { seat: "admin" } }),
+      });
+      expect(sent).toContainEqual({
+        path: "/group",
+        body: expect.objectContaining({ userId: "user-1", groupId: "org-1" }),
+      });
+    });
+  });
+});
+
+/** Organization's fact that user-1 was admitted to org-1 as a MEMBER. */
+function memberAdmittedFact(): Event {
+  return {
+    id: "evt-admitted",
+    aggregateId: "org-1",
+    aggregateType: "organization",
+    tenantId: createTenantId("org-1"),
+    createdAt: 1_000,
+    occurredAt: 1_000,
+    type: ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+    version: ORGANIZATION_MEMBER_ADMITTED_EVENT_VERSION,
+    data: {
+      tenantId: "org-1",
+      organizationId: "org-1",
+      userId: "user-1",
+      occurredAt: 1_000,
+      role: "MEMBER",
+      via: "create_membership",
+    },
+    idempotencyKey: "org-1:member_admitted:user-1:1000",
+  } as Event;
+}
+
+describe("nurturing's memberAdmitted peer subscriber", () => {
+  describe("when organization records an admission, delivered twice", () => {
+    /** @scenario A redelivered admission is sent once */
+    it("sends one identify with the seat and one group to Customer.io", async () => {
+      const { customerIoFetch, deliverFact } = nurturingOverMemoryPostHog();
+
+      await deliverFact(memberAdmittedFact());
+      await deliverFact(memberAdmittedFact());
+      await settle();
+
+      expect(customerIoFetch).toHaveBeenCalledTimes(2);
+      const sent = customerIoFetch.mock.calls.map(([url, init]) => ({
+        path: String(url).replace(/^.*(?=\/(identify|group)$)/, ""),
+        body: typeof init?.body === "string" ? JSON.parse(init.body) : init?.body,
+      }));
+      expect(sent).toContainEqual({
+        path: "/identify",
+        body: expect.objectContaining({ userId: "user-1", traits: { seat: "member" } }),
       });
       expect(sent).toContainEqual({
         path: "/group",

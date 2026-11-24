@@ -19,6 +19,7 @@ import type {
 import type {
   IntegrationMethodChosenEventData,
   InviteAcceptedEventData,
+  OrganizationMemberAdmittedEventData,
   OrganizationMemberRoleChangedEventData,
   MembersInvitedEventData,
   OrganizationSignedUpEventData,
@@ -356,6 +357,24 @@ export function memberRoleChangedSignal({
     organizationId,
     role,
     previousRole,
+  };
+}
+
+/** A person's admission by a path with no joined fact, once per person and moment. */
+export function memberAdmittedSignal({
+  data,
+  aggregateId,
+}: OwnerEvent<OrganizationMemberAdmittedEventData>): NurturingSignal {
+  const { tenantId, occurredAt, userId, organizationId, role } = data;
+  const sourceEventId = `${aggregateId}:admitted:${userId}:${occurredAt}`;
+  return {
+    kind: "member_admitted",
+    sourceEventId,
+    tenantId,
+    occurredAt,
+    userId,
+    organizationId,
+    role,
   };
 }
 

@@ -10,6 +10,7 @@ import {
   firstTraceRecordedSignal,
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
+  memberAdmittedSignal,
   memberRoleChangedSignal,
   membersInvitedSignal,
   promptCreatedSignal,
@@ -143,6 +144,19 @@ describe("organization's lifecycle events", () => {
       organizationId: "org_acme",
       role: "ADMIN",
       previousRole: "MEMBER",
+    });
+  });
+
+  it("raise an admission with the role admitted, once per person and moment", () => {
+    const data = { ...org, userId: "user_new", role: "MEMBER", via: "create_membership" };
+    expect(memberAdmittedSignal({ data, aggregateId: "org_acme" })).toEqual({
+      kind: "member_admitted",
+      sourceEventId: `org_acme:admitted:user_new:${AT}`,
+      tenantId: "org_acme",
+      occurredAt: AT,
+      userId: "user_new",
+      organizationId: "org_acme",
+      role: "MEMBER",
     });
   });
 

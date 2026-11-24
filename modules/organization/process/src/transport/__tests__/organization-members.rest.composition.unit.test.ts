@@ -137,6 +137,7 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
     recordMemberRemoved: accepts,
     recordMemberDepartmentChanged: accepts,
     recordMemberRoleChanged: accepts,
+    recordMemberAdmitted: accepts,
   });
 
   const runtime = createRestRuntime({

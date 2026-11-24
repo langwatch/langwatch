@@ -29,6 +29,7 @@ import { z } from "zod";
 import {
   RecordIntegrationMethodChosenCommand,
   RecordInviteAcceptedCommand,
+  RecordMemberAdmittedCommand,
   RecordMemberRoleChangedCommand,
   RecordMembersInvitedCommand,
   RecordPresenceSettingChangedCommand,
@@ -125,6 +126,18 @@ describe("organization's lifecycle pipeline", () => {
     expect(roleChanged.type).toBe("lw.organization.member_role_changed");
     expect(roleChanged.aggregateId).toBe("org_acme");
     expect(roleChanged.idempotencyKey).toBe(`org_acme:member_role_changed:user_ben:${AT}`);
+  });
+
+  it("records an admission on the organization, keyed on the member and its moment", () => {
+    const admitted = only(
+      new RecordMemberAdmittedCommand().handle(
+        command({ ...envelope, userId: "user_ben", role: "MEMBER", via: "create_membership" }),
+      ),
+    );
+
+    expect(admitted.type).toBe("lw.organization.member_admitted");
+    expect(admitted.aggregateId).toBe("org_acme");
+    expect(admitted.idempotencyKey).toBe(`org_acme:member_admitted:user_ben:${AT}`);
   });
 
   it("keys an integration method by the person who chose it", () => {

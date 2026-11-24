@@ -28,6 +28,9 @@ import {
   ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
   ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_VERSION,
   organizationMemberRoleChangedEventDataSchema,
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_VERSION,
+  organizationMemberAdmittedEventDataSchema,
   organizationMemberDepartmentChangedEventDataSchema,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_TYPE,
   ORGANIZATION_TRACE_SHARING_DISABLED_EVENT_VERSION,
@@ -84,6 +87,8 @@ export const RECORD_MEMBER_DEPARTMENT_CHANGED_COMMAND_TYPE =
   "lw.organization.record_member_department_changed" as const;
 export const RECORD_MEMBER_ROLE_CHANGED_COMMAND_TYPE =
   "lw.organization.record_member_role_changed" as const;
+export const RECORD_MEMBER_ADMITTED_COMMAND_TYPE =
+  "lw.organization.record_member_admitted" as const;
 
 /** Somebody finished onboarding by creating this organization. */
 export const recordSignedUpCommandDataSchema = organizationSignedUpEventDataSchema;
@@ -311,6 +316,18 @@ export const organizationMemberRoleChangedEventSchema = z.object({
 export type OrganizationMemberRoleChangedEvent = z.infer<
   typeof organizationMemberRoleChangedEventSchema
 >;
+
+/** A person was admitted by a path that raises no joined fact of its own. */
+export const recordMemberAdmittedCommandDataSchema = organizationMemberAdmittedEventDataSchema;
+export type RecordMemberAdmittedCommandData = z.infer<typeof recordMemberAdmittedCommandDataSchema>;
+
+export const organizationMemberAdmittedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE),
+  version: z.literal(ORGANIZATION_MEMBER_ADMITTED_EVENT_VERSION),
+  data: organizationMemberAdmittedEventDataSchema,
+});
+export type OrganizationMemberAdmittedEvent = z.infer<typeof organizationMemberAdmittedEventSchema>;
 
 /** An organization now exists; versioned on its own, born after the lifecycle's first facts. */
 export const recordCreatedCommandDataSchema = organizationCreatedEventDataSchema;

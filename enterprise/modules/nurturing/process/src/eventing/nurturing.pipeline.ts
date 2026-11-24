@@ -77,6 +77,8 @@ import {
   inviteAcceptedEventDataSchema,
   MEMBERS_INVITED_EVENT_TYPE,
   membersInvitedEventDataSchema,
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+  organizationMemberAdmittedEventDataSchema,
   ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
   organizationMemberRoleChangedEventDataSchema,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
@@ -145,6 +147,7 @@ import {
   guidedOnboardingSignal,
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
+  memberAdmittedSignal,
   memberRoleChangedSignal,
   membersInvitedSignal,
   onboardingVariantAssignedSignal,
@@ -472,6 +475,14 @@ export function buildNurturingPipeline(deps: {
         data: organizationMemberRoleChangedEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = memberRoleChangedSignal({ data, aggregateId });
+          return deliverSignal(signal);
+        },
+      })
+      .withPeerSubscriber("memberAdmitted", {
+        eventType: ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+        data: organizationMemberAdmittedEventDataSchema,
+        handle: (data, { aggregateId }) => {
+          const signal = memberAdmittedSignal({ data, aggregateId });
           return deliverSignal(signal);
         },
       })

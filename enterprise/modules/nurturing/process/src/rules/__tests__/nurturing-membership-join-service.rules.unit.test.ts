@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fireInviteAccepted,
   fireJoinedOrganization,
+  fireMemberAdmitted,
   fireMemberRoleChanged,
   fireSsoAutoAdded,
   seatTraitOf,
@@ -188,6 +189,19 @@ describe("a member whose role changed", () => {
   /** @scenario "A role change to a role with no seat sends no seat" */
   it("is not identified for a role we cannot name, and is still grouped", () => {
     expect(changed("OWNER")).toEqual([{ type: "group", userId: "user-1", groupId: "org-1" }]);
+  });
+});
+
+describe("a member admitted without a join event", () => {
+  const admitted = (role: string) =>
+    fireMemberAdmitted({ kind: "member_admitted", ...joinSource, role });
+
+  /** @scenario "An admitted member is sent their seat and linked to the organization" */
+  it("is identified with their seat and grouped into the organization", () => {
+    expect(admitted("EXTERNAL")).toEqual([
+      { type: "identify", userId: "user-1", traits: { seat: "lite_member" } },
+      { type: "group", userId: "user-1", groupId: "org-1" },
+    ]);
   });
 });
 

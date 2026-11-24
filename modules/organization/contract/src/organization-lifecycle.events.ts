@@ -216,6 +216,27 @@ export type OrganizationMemberRoleChangedEventData = z.infer<
   typeof organizationMemberRoleChangedEventDataSchema
 >;
 
+export const ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE = "lw.organization.member_admitted" as const;
+export const ORGANIZATION_MEMBER_ADMITTED_EVENT_VERSION = "2026-11-24" as const;
+
+/**
+ * A person now holds a membership by a path that raises no joined fact of its own; `via` names the
+ * path and roles stay strings so unknown ones parse.
+ */
+const organizationMemberAdmittedEventDataSchemaDefinition = z.object({
+  ...envelope,
+  role: z.string(),
+  via: z.string(),
+});
+export interface OrganizationMemberAdmittedEventDataSchema extends Named<
+  typeof organizationMemberAdmittedEventDataSchemaDefinition
+> {}
+export const organizationMemberAdmittedEventDataSchema: OrganizationMemberAdmittedEventDataSchema =
+  organizationMemberAdmittedEventDataSchemaDefinition;
+export type OrganizationMemberAdmittedEventData = z.infer<
+  typeof organizationMemberAdmittedEventDataSchema
+>;
+
 /** An organization now exists, on every creation path; peers seed their own defaults (§9). */
 const organizationCreatedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),

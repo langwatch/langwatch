@@ -442,3 +442,16 @@ Feature: Shared organization service
     Given a member's role change has committed
     When organization cannot record the member_role_changed fact
     Then the failure is reported and the role change is not undone or raised
+
+  @unit
+  Scenario: A membership created outside an invite records the member as admitted
+    Given a person is given a membership by the SSO domain join, a join request or a provisioning door
+    When organization creates the membership
+    Then organization records the member_admitted fact with their seat and the path
+    And a membership that already existed, or one still waiting for a seat, records nothing
+
+  @unit
+  Scenario: A waiting member given a seat is recorded as admitted
+    Given a person admission left waiting for a seat
+    When a full seat is given to them
+    Then organization records the member_admitted fact for them as a member
