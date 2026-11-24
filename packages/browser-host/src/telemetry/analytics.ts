@@ -34,7 +34,7 @@ export type UiAnalyticsEvent = {
  * exception, not a product event; `properties` say where, never a secret or any SQL.
  */
 export type UiExceptionReport = Readonly<{
-  error: unknown;
+  error: Error | string;
   properties?: Readonly<Record<string, unknown>>;
 }>;
 

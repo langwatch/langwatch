@@ -483,7 +483,7 @@
             }
           ],
           "refId": "A",
-          "expression": "fields @timestamp, projectIds, outcome, level, dashboardId, widgetId, queryHash\n| filter msg = \"LangWatchQL failed\" and caller = \"dashboard_widget\" and outcome != \"aborted\"\n| sort @timestamp desc\n| limit 100"
+          "expression": "fields @timestamp, projectId, projectIds, outcome, level, dashboardId, widgetId, queryHash\n| filter msg = \"LangWatchQL failed\" and caller = \"dashboard_widget\" and outcome != \"aborted\"\n| sort @timestamp desc\n| limit 100"
         }
       ],
       "title": "Failed widget queries",
@@ -519,7 +519,7 @@
             }
           ],
           "refId": "A",
-          "expression": "fields projectIds, outcome\n| filter msg = \"LangWatchQL failed\" and caller = \"dashboard_widget\" and outcome != \"aborted\"\n| stats count(*) as failures, max(@timestamp) as lastFailedAt by projectIds, outcome\n| sort failures desc\n| limit 50"
+          "expression": "fields projectId, outcome\n| filter msg = \"LangWatchQL failed\" and caller = \"dashboard_widget\" and outcome != \"aborted\"\n| stats count(*) as failures, max(@timestamp) as lastFailedAt by projectId, outcome\n| sort failures desc\n| limit 50"
         }
       ],
       "title": "Failed widget queries by project",

@@ -4,6 +4,7 @@
  * payload below is what react-contextual-analytics sent before it was evicted.
  */
 
+import { isSpanContextValid, trace } from "@opentelemetry/api";
 import type { PostHog } from "posthog-js";
 
 import {
@@ -13,6 +14,7 @@ import {
   type UiAnalyticsReader,
   type UiExceptionReport,
 } from "./analytics.ts";
+import { redactCrashError } from "./crash-redaction.ts";
 
 declare global {
   interface Window {
@@ -98,9 +100,20 @@ function postHogDestination(client: PostHog): AnalyticsDestination {
     register: (properties) => client.register({ ...properties }),
     unregister: (property) => client.unregister(property),
     captureException: ({ error, properties }) => {
-      client.captureException(error, { ...properties });
+      // Trace ids last, so a colliding property cannot rewrite where the crash happened.
+      client.captureException(redactCrashError(error), { ...properties, ...activeTraceContext() });
     },
   };
+}
+
+/**
+ * The span active where the crash was caught, so a PostHog exception can be followed back to
+ * its trace, and from there into Tempo.
+ */
+function activeTraceContext(): { trace_id: string; span_id: string } | undefined {
+  const spanContext = trace.getActiveSpan()?.spanContext();
+  if (!spanContext || !isSpanContextValid(spanContext)) return void 0;
+  return { trace_id: spanContext.traceId, span_id: spanContext.spanId };
 }
 
 class BrowserUiAnalytics extends UiAnalytics {

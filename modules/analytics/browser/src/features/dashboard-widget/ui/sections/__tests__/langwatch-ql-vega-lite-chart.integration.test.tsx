@@ -14,6 +14,11 @@ import {
 } from "@langwatch/analytics-contract/visualization";
 import "@testing-library/jest-dom/vitest";
 import type * as visualizationModule from "@langwatch/analytics-contract/visualization";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import {
+  createUiHostServicesFromHost,
+  RecordingUiAnalytics,
+} from "@langwatch/browser-host/testing";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import type { ReactElement } from "react";
@@ -566,6 +571,42 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       expect(screen.getByTestId("lwql-chart-failure").textContent).toContain("Spec build gave out");
       // The failure has to come instead of the embed, not alongside it.
       expect(vega.state.calls).toHaveLength(0);
+    });
+
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports a rejected embed once as an exception naming the board and the widget", async () => {
+      const failure = new Error("Unrecognized signal name: bogus");
+      vega.state.failWith = failure;
+      const analytics = new RecordingUiAnalytics();
+      withChakra(
+        <UiHostServicesContextProvider
+          value={{
+            ...createUiHostServicesFromHost({
+              route: () => ({ params: {}, query: {} }),
+              navigate: () => void 0,
+            }),
+            analytics,
+          }}
+        >
+          <LangWatchQLVegaLiteChart
+            spec={barOverQueryResult}
+            datasets={{ query_result: ROWS }}
+            columnsByDataset={{ query_result: COLUMNS }}
+            themeConfig={THEME_CONFIGS.light}
+            pinnedConfig={PINNED_CONFIG}
+            colorMode="light"
+            crashContext={{ dashboardId: "board-1", widgetId: "widget-1" }}
+          />
+        </UiHostServicesContextProvider>,
+      );
+
+      await screen.findByTestId("lwql-chart-failure");
+      expect(analytics.exceptions).toEqual([
+        {
+          error: failure,
+          properties: { surface: "lwql_chart_embed", dashboardId: "board-1", widgetId: "widget-1" },
+        },
+      ]);
     });
 
     /** @scenario "Chart failures are explicit and do not discard the table" */

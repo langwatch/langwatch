@@ -9,7 +9,10 @@ import {
   CHART_FRAME_BUILTIN_MODULES,
   resolveImportSpecifier,
 } from "./chart-frame-import-specifier.ts";
-import { CHART_FRAME_CRASH_TITLES } from "./chart-frame-protocol.ts";
+import {
+  CHART_FRAME_CRASH_TITLES,
+  CHART_FRAME_LOAD_FAILURE_TITLES,
+} from "./chart-frame-protocol.ts";
 
 export function buildAuthorRuntimeScript(): string {
   return `
@@ -123,14 +126,14 @@ export function buildAuthorRuntimeScript(): string {
 
     if (!window.React || !window.ReactDOM || !window.Recharts) {
       showError(
-        ${JSON.stringify(CHART_FRAME_CRASH_TITLES.librariesUnavailable)},
+        ${JSON.stringify(CHART_FRAME_LOAD_FAILURE_TITLES.librariesUnavailable)},
         "React, ReactDOM or Recharts did not load from the CDN. Check your connection and reload."
       );
       return;
     }
     if (!window.Babel) {
       showError(
-        ${JSON.stringify(CHART_FRAME_CRASH_TITLES.compilerUnavailable)},
+        ${JSON.stringify(CHART_FRAME_LOAD_FAILURE_TITLES.compilerUnavailable)},
         "Babel did not load from the CDN. Check your connection and reload."
       );
       return;

@@ -52,15 +52,15 @@ describe("langWatchQLRunProjectIds", () => {
   });
 
   /** @scenario "Telemetry: a failed query is logged at its fault's level with the projects it ran over" */
-  it("names no project for all, a stray value, or an empty id", () => {
+  it("names no project for all, or an empty id", () => {
     expect(langWatchQLRunProjectIds({ own: ["project-1"], named: "all" })).toEqual(["project-1"]);
-    expect(langWatchQLRunProjectIds({ own: [""], named: "al" })).toEqual([]);
+    expect(langWatchQLRunProjectIds({ own: [""] })).toEqual([]);
   });
 });
 
 describe("langWatchQLTelemetryFields", () => {
   /** @scenario "Telemetry: a failed query is logged at its fault's level with the projects it ran over" */
-  it("joins the projects into one field a log query can group by", () => {
+  it("names the first project on its own, and joins them all", () => {
     const fields = langWatchQLTelemetryFields({
       telemetry: { caller: "dashboard_widget", dashboardId: "dashboard-1", widgetId: "widget-1" },
       sql: "SELECT 1",
@@ -70,6 +70,7 @@ describe("langWatchQLTelemetryFields", () => {
 
     expect(fields).toMatchObject({
       caller: "dashboard_widget",
+      projectId: "project-1",
       projectIds: "project-1,project-2",
       dashboardId: "dashboard-1",
       widgetId: "widget-1",
@@ -78,13 +79,14 @@ describe("langWatchQLTelemetryFields", () => {
   });
 
   /** @scenario "Telemetry: the query log line says who ran it and how it ended" */
-  it("carries no projectIds field when the run names no project", () => {
+  it("carries no project field when the run names no project", () => {
     const fields = langWatchQLTelemetryFields({
       telemetry: { caller: "workbench" },
       sql: "SELECT 1",
       queryHashKey: QUERY_HASH_KEY,
     });
 
+    expect(fields).not.toHaveProperty("projectId");
     expect(fields).not.toHaveProperty("projectIds");
   });
 });

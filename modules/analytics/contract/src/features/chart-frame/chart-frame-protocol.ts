@@ -173,12 +173,16 @@ export interface LwNavigateMessage {
 }
 
 /**
- * The frame's error-panel titles for a crash while drawing or its own libraries failing to load,
- * as its "lw.error" line starts; a compile error, no default export or failed import is not one.
+ * The frame's error-panel titles for a crash while drawing, as its "lw.error" line starts; a
+ * compile error, no default export or failed import is the widget source's own, not one of these.
  */
 export const CHART_FRAME_CRASH_TITLES = {
   renderCrash: "Widget crashed while rendering",
   renderError: "Render error",
+} as const;
+
+/** The frame's error-panel titles for its own libraries (React, Recharts, Babel) not loading. */
+export const CHART_FRAME_LOAD_FAILURE_TITLES = {
   librariesUnavailable: "Chart libraries failed to load",
   compilerUnavailable: "Compiler failed to load",
 } as const;

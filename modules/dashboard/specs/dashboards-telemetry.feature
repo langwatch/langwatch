@@ -206,10 +206,15 @@ Feature: Dashboards telemetry: product events and query telemetry
   @integration
   Scenario: Telemetry: a chart or a board header action that crashes while drawing is reported as an exception
     Given a chart, an action a peer lends the board header, or a widget's sandboxed frame, throws while drawing
-    When its error boundary or the frame's error panel catches the crash
+    And a chart's runtime may instead reject its embed, fail a run, or throw while its specification is built
+    When its error boundary, the frame's error panel or the chart's failed state catches the crash
     Then the crash goes to PostHog once as an exception, not as a product event
-    And it carries the surface "lwql_chart" or "dashboard_widget_frame" with the board's and widget's ids where it has them, or "board_header_action" with the lender and the board
-    And a frame that says the same crash again in one widget mount reports it once
+    And it carries the surface "lwql_chart", "lwql_chart_embed" or "dashboard_widget_frame" with the board's and widget's ids where it has them, or "board_header_action" with the lender and the board
+    And a frame whose own libraries (React, Recharts or the compiler) did not load reports under "dashboard_widget_frame_load", with the board's and widget's ids
+    And the exception carries the trace and span ids active where it was caught, when there is one
+    And its message and stack have tokens, emails and long encoded runs masked, and are cut short past a limit
+    And a frame or a chart that hits the same failure again while mounted reports it once
+    And a chart whose specification asked to load a resource reports nothing, since the loader refusing it is the specification's own doing
     And a frame refusing the widget's own source (a compile error, no default export, a failed import) or the widget's own console error reports nothing
     And it carries no query text and no SQL
     And a widget query the server refused is not reported here, since its "LangWatchQL failed" line already counts it

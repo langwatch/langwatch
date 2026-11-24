@@ -31,11 +31,19 @@ widget queries" tables list failed widget runs by project, newest first.
 
 A "failed" line logs at `warn` when the customer's query is at fault (a memory
 or scan limit, a refused statement), at `error` for ours (timeout, database
-down, unhandled), at `info` when aborted. It carries `projectIds`, comma-joined.
+down, unhandled), at `info` when aborted. It carries `projectId` (the board's
+project, or the key's own) to group by, and every project in `projectIds`,
+comma-joined.
 
 A chart, a board header action or a widget's sandboxed frame that crashes while
 drawing goes to PostHog as an exception (`surface`, board and widget ids), not
-as a product event. A frame's compile error or missing export is not reported.
+as a product event; so does a chart whose Vega embed or run fails
+(`lwql_chart_embed`), and so does a frame whose React, Recharts or Babel did not
+load from the CDN (`dashboard_widget_frame_load`, usually the reader's network or
+a CDN outage rather than the widget). Each carries the active `trace_id` and
+`span_id` when there is one. A frame's compile error or missing export, and a chart's
+blocked resource load, are not reported. Tokens, emails and long encoded runs
+are masked in the message and stack before they leave the browser.
 
 ### What people do (PostHog)
 

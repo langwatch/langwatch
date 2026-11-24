@@ -1,11 +1,14 @@
 /**
- * Keeps the latest error a sandboxed chart frame reported. It keeps
- * running after an error — the widget's own code is the cause, so a
- * restart would only reproduce it. A crash while drawing is reported as an exception.
+ * Keeps the latest error a sandboxed chart frame reported, and keeps running: the widget's own
+ * code is the cause, so a restart would only reproduce it. A crash while drawing, or the
+ * frame's own libraries not loading, is reported as an exception.
  * @see specs/analytics/dashboard-widget-resilience.feature
  */
 
-import { CHART_FRAME_CRASH_TITLES } from "@langwatch/analytics-contract/chart-frame-protocol";
+import {
+  CHART_FRAME_CRASH_TITLES,
+  CHART_FRAME_LOAD_FAILURE_TITLES,
+} from "@langwatch/analytics-contract/chart-frame-protocol";
 import type { LangWatchQLChartCrashContext } from "@langwatch/analytics-contract/visualization";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -19,12 +22,21 @@ import type { ChartFrameLogEntry } from "./frame-bridge.ts";
 const isFatal = (entry: ChartFrameLogEntry) =>
   entry.level === "error" && entry.source === "lw.error";
 
-/** A fatal line whose title is a crash, not a refusal of the widget's own source. */
-const isCrash = (entry: ChartFrameLogEntry) =>
-  isFatal(entry) &&
-  Object.values(CHART_FRAME_CRASH_TITLES).some(
-    (title) => entry.text === title || entry.text.startsWith(`${title}: `),
-  );
+const startsWithTitle = (text: string, titles: Readonly<Record<string, string>>) =>
+  Object.values(titles).some((title) => text === title || text.startsWith(`${title}: `));
+
+/**
+ * The surface a fatal line is reported under: a crash while drawing, or the frame's libraries
+ * not loading. A refusal of the widget's own source (compile, no export, import) is neither.
+ */
+const reportedSurface = (entry: ChartFrameLogEntry) => {
+  if (!isFatal(entry)) return undefined;
+  if (startsWithTitle(entry.text, CHART_FRAME_CRASH_TITLES)) return "dashboard_widget_frame";
+  if (startsWithTitle(entry.text, CHART_FRAME_LOAD_FAILURE_TITLES)) {
+    return "dashboard_widget_frame_load";
+  }
+  return undefined;
+};
 
 export function useFrameDiagnostic({
   /** Identifies one run of the code (code and retry attempt); a change clears the last error. */
@@ -56,13 +68,13 @@ export function useFrameDiagnostic({
     if (entry.level !== "error") return;
     setDiagnostic(entry);
     if (isFatal(entry)) setFatal(true);
-    if (isCrash(entry) && !reported.current.has(entry.text)) {
-      reported.current.add(entry.text);
-      reporting.current.analytics.captureException({
-        error: new Error(entry.text),
-        properties: { surface: "dashboard_widget_frame", ...reporting.current.crashContext },
-      });
-    }
+    const surface = reportedSurface(entry);
+    if (surface === undefined || reported.current.has(entry.text)) return;
+    reported.current.add(entry.text);
+    reporting.current.analytics.captureException({
+      error: new Error(entry.text),
+      properties: { surface, ...reporting.current.crashContext },
+    });
   }, []);
 
   return { diagnostic, fatal, onLog };

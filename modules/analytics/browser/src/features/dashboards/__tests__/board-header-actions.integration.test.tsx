@@ -6,10 +6,13 @@
  */
 
 import { type BoardHeaderActionProps, BoardHeaderActionToken } from "@langwatch/analytics-client";
-import { UiAnalytics, type UiExceptionReport } from "@langwatch/browser-host/analytics";
+import type { UiAnalytics } from "@langwatch/browser-host/analytics";
 import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
 import { type UiLend, uiDeclarations } from "@langwatch/browser-host/declarations";
-import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
+import {
+  createUiHostServicesFromHost,
+  RecordingUiAnalytics,
+} from "@langwatch/browser-host/testing";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { cleanup, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
@@ -72,18 +75,6 @@ const CRASHING: UiLend = {
   token: BoardHeaderActionToken,
   load: () => Promise.resolve({ default: CrashingAction }),
 };
-
-/** Keeps the exceptions the screen reports; product events are not this test's subject. */
-class ExceptionRecorder extends UiAnalytics {
-  readonly exceptions: UiExceptionReport[] = [];
-  track(): void {}
-  identify(): void {}
-  group(): void {}
-  reset(): void {}
-  override captureException(report: UiExceptionReport): void {
-    this.exceptions.push(report);
-  }
-}
 
 function openScreen({
   element,
@@ -180,7 +171,7 @@ describe("given a module lends an action to the board header that crashes while 
     /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
     it("reports the crash once as an exception naming the lender and the board", async () => {
       const silenced = vi.spyOn(console, "error").mockImplementation(() => void 0);
-      const analytics = new ExceptionRecorder();
+      const analytics = new RecordingUiAnalytics();
       openScreen({
         element: <DashboardBoardScreen />,
         params: { dashboardId: "board-1" },

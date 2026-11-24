@@ -10,6 +10,7 @@ import type {
   VegaValidationWarning,
 } from "@langwatch/analytics-contract/visualization";
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { toError } from "@langwatch/browser-host/errors";
 import { Box, Stack, Text, VisuallyHidden, VStack } from "@langwatch/design-system/primitives";
 import { type RefObject, useId } from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -43,6 +44,7 @@ export function LangWatchQLVegaLiteChart({
     themeConfig,
     pinnedConfig,
     colorMode,
+    crashContext,
   });
 
   return (
@@ -52,7 +54,7 @@ export function LangWatchQLVegaLiteChart({
       <ErrorBoundary
         onError={(error) =>
           analytics.captureException({
-            error,
+            error: toError(error),
             properties: { surface: "lwql_chart", ...crashContext },
           })
         }
