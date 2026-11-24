@@ -125,6 +125,11 @@ export function buildShimScript(): string {
     // frameBridge.ts's "lw:navigate" case and useDashboardWidgetChartNavigate.
     navigate: function (target, params) {
       post({ type: "lw:navigate", target: String(target), params: params || {} });
+    },
+    // Fire-and-forget: the host drafts Langy about a clicked mark. It drops the ask
+    // unless LW.dashboardContext.canAskLangy, and checks the subject itself.
+    askLangy: function (subject) {
+      post({ type: "lw:ask-langy", subject: subject || {} });
     }
   };
   window.LW = LW;

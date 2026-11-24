@@ -13,7 +13,11 @@ import {
   readsSourcesParameter,
   VIEWS_WITH_ORIGIN,
 } from "../../model/sources-parameter.ts";
-import { SOURCES_DO_NOT_APPLY_LINE, widgetSourcesLine } from "../../model/widget-sources.ts";
+import {
+  SOURCES_DO_NOT_APPLY_LINE,
+  widgetCardSourcesLine,
+  widgetSourcesLine,
+} from "../../model/widget-sources.ts";
 import { IMPLEMENTED_WIDGET_IDS, implementedWidget } from "../index.ts";
 
 const widgets = IMPLEMENTED_WIDGET_IDS.flatMap((id) => implementedWidget(id) ?? []);
@@ -91,7 +95,7 @@ describe("given the stock widgets of the catalogue", () => {
     }
   });
 
-  /** @scenario "AC202f Stock widgets: a widget that reads a view with no origin says that sources do not apply" */
+  /** @scenario "AC202f Stock widgets: a widget that reads a view with no origin stores no sources and its editor says they do not apply" */
   it("says sources do not apply on a widget none of whose queries reads them", () => {
     const none = widgets.filter(({ definition }) =>
       definition.queries.every(
@@ -102,6 +106,19 @@ describe("given the stock widgets of the catalogue", () => {
     expect(none.length).toBeGreaterThan(0);
     for (const { key, definition } of none) {
       expect(widgetSourcesLine(definition.queries), key).toBe(SOURCES_DO_NOT_APPLY_LINE);
+    }
+  });
+
+  /** @scenario "AC240b Card sources line: a widget whose views keep no origin shows no sources line" */
+  it("shows no sources line on the card of a widget none of whose queries reads them", () => {
+    const none = widgets.filter(({ definition }) =>
+      definition.queries.every(
+        ({ name, sql }) => name === PRESENCE_QUERY || !readsSourcesParameter(sql),
+      ),
+    );
+
+    for (const { key, definition } of none) {
+      expect(widgetCardSourcesLine(definition.queries), key).toBe("");
     }
   });
 

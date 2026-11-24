@@ -20,6 +20,7 @@ import {
   widgetCode,
 } from "../../templates/model/widget-code-parts.ts";
 import * as sql from "./agent-kind-queries.ts";
+import { PROMPT_VERSION_NAMES_SQL } from "./change-queries.ts";
 import type { CatalogueWidgetBuild } from "./index.ts";
 
 const UNIT_WORDS = Object.fromEntries(
@@ -221,8 +222,10 @@ const ATT_CHANGE_CODE = widgetCode({
     </div>
   );
 }`,
-  queries: ["change", "units"],
+  queries: ["change", "units", "versions"],
   body: `  const last = change.data[0];
+  const names = new Map(versions.data.map((row) => [row.id, row.name]));
+  const versionName = (version) => names.get(version) || version;
   if (!last) {
     return <Panel><Note>No new prompt version started in this period.</Note></Panel>;
   }
@@ -253,7 +256,7 @@ const ATT_CHANGE_CODE = widgetCode({
   return (
     <Panel>
       <div style={{ display: "flex", gap: 8, alignItems: "baseline", marginBottom: 6, fontSize: 12 }}>
-        <b>{last.previous} to {last.version}, from {day}</b>
+        <b>{versionName(last.previous)} to {versionName(last.version)}, from {day}</b>
         {compared.length > 0 ? (
           <span style={{ color: fell.length > 0 ? C.red : C.subtle }}>
             {fell.length > 0
@@ -738,7 +741,11 @@ export const AGENT_KIND_WIDGET_BUILDS: Readonly<Record<string, CatalogueWidgetBu
   },
   "att-change": {
     code: ATT_CHANGE_CODE,
-    queries: { change: sql.LAST_CHANGE_SQL, units: sql.VERSION_PASS_RATES_SQL },
+    queries: {
+      change: sql.LAST_CHANGE_SQL,
+      units: sql.VERSION_PASS_RATES_SQL,
+      versions: PROMPT_VERSION_NAMES_SQL,
+    },
     width: "full",
     rows: 5,
   },

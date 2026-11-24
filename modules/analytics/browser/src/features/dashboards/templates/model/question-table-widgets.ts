@@ -84,7 +84,7 @@ export const TOPICS_CODE = widgetCode({
     return <Panel><Note>No traces with a topic in this period.</Note></Panel>;
   }
   const total = num(topicTraffic.data[0]?.traces);
-  const name = (row) => row.topic || row.topic_id;
+  const name = (row) => row.topic || "Unnamed topic";
   const grew = topics.data.reduce((top, row) => (num(row.growth) > num(top.growth) ? row : top));
   const change = (value) => (value > 0 ? "+" : "") + count(value);
   const columns = [

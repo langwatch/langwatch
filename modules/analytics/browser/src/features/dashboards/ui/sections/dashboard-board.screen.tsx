@@ -45,6 +45,8 @@ import {
   boardContextChip,
   boardSetupDraft,
   boardSubject,
+  widgetActionDraft,
+  widgetChartDraft,
   widgetMissingDataDraft,
   widgetPromptDraft,
   widgetSetupDraft,
@@ -318,6 +320,19 @@ function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoa
                             setUpMissing: (missing) =>
                               langy.ask(
                                 widgetMissingDataDraft({ missing, widget, board: subject, period }),
+                              ),
+                            askAbout: (about) =>
+                              langy.ask(
+                                widgetChartDraft({
+                                  subject: about,
+                                  widget,
+                                  board: subject,
+                                  period,
+                                }),
+                              ),
+                            act: (action) =>
+                              langy.ask(
+                                widgetActionDraft({ action, widget, board: subject, period }),
                               ),
                           })
                         : undefined

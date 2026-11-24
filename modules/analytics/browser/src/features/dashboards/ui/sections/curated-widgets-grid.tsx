@@ -1,7 +1,7 @@
 /**
  * A From LangWatch board's widgets on the board grid, read-only: no drag or resize, only Ask
- * Langy and Export CSV, which change nothing. Each widget runs its own queries over the
- * board's period.
+ * Langy, its actions and Export CSV, which change nothing. Each widget runs its own queries over
+ * the board's period.
  */
 
 import { useMemo } from "react";
@@ -14,6 +14,7 @@ import {
 } from "../../model/board-grid.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardTemplateWidget } from "../../templates/index.ts";
+import type { WidgetCardLangy } from "./board-widget-card.tsx";
 import { CuratedWidgetCard } from "./curated-widget-card.tsx";
 
 export function CuratedWidgetsGrid({
@@ -24,7 +25,7 @@ export function CuratedWidgetsGrid({
   widgets,
   period,
   periodKey,
-  onAskLangy,
+  langyFor,
   onEmptyChange,
   onLimitFailureChange,
 }: {
@@ -36,8 +37,8 @@ export function CuratedWidgetsGrid({
   period: BoardPeriod;
   /** The reader's chosen period, such as "1h:auto"; only a new choice restarts the widget. */
   periodKey: string;
-  /** Drafts a prompt about the widget in Langy; absent when Langy is not available. */
-  onAskLangy?: (widget: BoardTemplateWidget) => void;
+  /** What each card asks of Langy; absent when Langy is not available. */
+  langyFor?: (widget: BoardTemplateWidget) => Pick<WidgetCardLangy, "ask" | "askAbout" | "act">;
   /** Told whether each widget shows none of its data. */
   onEmptyChange?: (input: { widget: BoardTemplateWidget; empty: boolean }) => void;
   /** Told whether each widget's final failure is a resource limit. */
@@ -73,7 +74,7 @@ export function CuratedWidgetsGrid({
             timeWindow={timeWindow}
             granularitySeconds={granularitySeconds}
             periodKey={periodKey}
-            onAskLangy={onAskLangy && (() => onAskLangy(widget))}
+            {...(langyFor ? { langy: langyFor(widget) } : {})}
             onEmptyChange={onEmptyChange && ((empty) => onEmptyChange({ widget, empty }))}
             onLimitFailureChange={
               onLimitFailureChange && ((limited) => onLimitFailureChange({ widget, limited }))

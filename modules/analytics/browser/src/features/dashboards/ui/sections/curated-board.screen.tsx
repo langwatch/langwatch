@@ -23,7 +23,13 @@ import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.t
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useStoreProject } from "../../behavior/use-store-project.ts";
 import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
-import { boardSetupDraft, boardSubject, widgetPromptDraft } from "../../langy/model/board-langy.ts";
+import {
+  boardSetupDraft,
+  boardSubject,
+  widgetActionDraft,
+  widgetChartDraft,
+  widgetPromptDraft,
+} from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
 import { CURATED_SEGMENT } from "../../model/boards.ts";
 import { type CuratedBoard, curatedBoardById } from "../../model/curated-boards.ts";
@@ -143,9 +149,17 @@ function OpenCuratedBoard({
               widgets={board.widgets}
               period={period}
               periodKey={`${range}:${grain}`}
-              onAskLangy={
+              langyFor={
                 langy.enabled
-                  ? (widget) => langy.ask(widgetPromptDraft({ widget, board: subject, period }))
+                  ? (widget) => ({
+                      ask: () => langy.ask(widgetPromptDraft({ widget, board: subject, period })),
+                      askAbout: (about) =>
+                        langy.ask(
+                          widgetChartDraft({ subject: about, widget, board: subject, period }),
+                        ),
+                      act: (action) =>
+                        langy.ask(widgetActionDraft({ action, widget, board: subject, period })),
+                    })
                   : undefined
               }
               onEmptyChange={({ widget, empty: isEmpty }) =>

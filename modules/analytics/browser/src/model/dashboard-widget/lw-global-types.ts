@@ -39,6 +39,11 @@ interface LwDashboardContext {
    * widget on \`useChartQuery\` re-runs its queries without doing anything.
    */
   readonly refreshedAt?: number;
+  /**
+   * Whether the reader may ask Langy from this chart. Only when it is true
+   * should a bar, point or legend entry call \`LW.askLangy\` and look clickable.
+   */
+  readonly canAskLangy?: boolean;
 }
 
 /** A bound value for one of a query's declared parameters. */
@@ -257,6 +262,13 @@ interface LwApi {
     target: LwNavigableTarget,
     params?: Readonly<Record<string, unknown>>,
   ) => void;
+
+  /**
+   * Opens Langy with a draft about a clicked mark: \`label\` is the category
+   * or series, \`at\` the bucket it sits on. Fire-and-forget; dropped unless
+   * \`LW.dashboardContext.canAskLangy\`.
+   */
+  askLangy: (subject: { label: string; at?: string }) => void;
 }
 
 declare const LW: LwApi;

@@ -97,7 +97,7 @@ const TONE = { Worse: "bad", Unclear: "warn", Better: "good" };`,
             padding: "3px 0", borderTop: "1px solid " + C.border }}>
             <Tag tone={TONE[row.verdict]}>{row.verdict}</Tag>
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis",
-              whiteSpace: "nowrap" }}>{row.name || row.scenario}</span>
+              whiteSpace: "nowrap" }}>{row.name || "Unnamed scenario"}</span>
             <span style={{ color: C.subtle }}>
               {pct(num(row.current_passed) / num(row.current_runs), 0)} to{" "}
               {pct(num(row.new_passed) / num(row.new_runs), 0)}
@@ -162,7 +162,7 @@ function Strip({ strip }) {
         <div key={row.scenario} style={{ display: "flex", alignItems: "center", gap: 8,
           padding: "4px 0", borderTop: "1px solid " + C.border, fontSize: 11.5 }}>
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis",
-            whiteSpace: "nowrap" }}>{row.name || row.scenario}</span>
+            whiteSpace: "nowrap" }}>{row.name || "Unnamed scenario"}</span>
           <Strip strip={String(row.strip)} />
           <span style={{ width: 36, textAlign: "right", fontSize: 10.5, color: C.faint }}>
             {num(row.passed)}/{num(row.runs)}

@@ -63,12 +63,33 @@ WHERE ${inPeriod("StartedAt")}
   AND ArchivedAt IS NULL
   AND Verdict IS NOT NULL`;
 
-export const SCENARIO_SUITES_SQL = `SELECT ScenarioSetId AS suite, countIf(Verdict = 'success') AS passed, count() AS runs
-FROM simulations
-WHERE ${inPeriod("StartedAt")}
-  AND ArchivedAt IS NULL
-  AND Verdict IS NOT NULL
-GROUP BY suite
+/** A suite's runs carry the set id `__internal__<suite id>__suite`; the suite id, else ''. */
+const SUITE_ID_OF_SET = `if(startsWith(ScenarioSetId, '__internal__') AND endsWith(ScenarioSetId, '__suite'),
+      substring(ScenarioSetId, 13, length(ScenarioSetId) - 19), '')`;
+
+/**
+ * The five busiest sets by the name a person knows them by: a suite's own name, "Manual Run"
+ * for runs started from the platform, and the set id an SDK run sent, which its author chose.
+ */
+export const SCENARIO_SUITES_SQL = `SELECT r.ScenarioSetId AS suite_id,
+  multiIf(ifNull(any(n.Name), '') != '', any(n.Name),
+    endsWith(r.ScenarioSetId, '__on-platform-scenarios'), 'Manual Run',
+    startsWith(r.ScenarioSetId, '__internal__'), 'Unnamed suite',
+    r.ScenarioSetId = '', 'default',
+    r.ScenarioSetId) AS suite,
+  countIf(r.Verdict = 'success') AS passed,
+  count() AS runs
+FROM (
+  SELECT ScenarioSetId, Verdict, ${SUITE_ID_OF_SET} AS suite_key
+  FROM simulations
+  WHERE ${inPeriod("StartedAt")}
+    AND ArchivedAt IS NULL
+    AND Verdict IS NOT NULL
+) AS r
+LEFT JOIN (
+  SELECT SimulationSuiteId, any(Name) AS Name FROM simulation_suites GROUP BY SimulationSuiteId
+) AS n ON n.SimulationSuiteId = r.suite_key
+GROUP BY suite_id
 ORDER BY runs DESC
 LIMIT 5`;
 

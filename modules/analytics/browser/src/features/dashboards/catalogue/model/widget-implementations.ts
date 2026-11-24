@@ -3,6 +3,7 @@
  * without one is "Coming soon" wherever it is listed.
  */
 
+import type { WidgetAction } from "../../langy/model/board-langy.ts";
 import { BOARD_LWQL_VIEWS } from "../../model/board-lwql-views.ts";
 import type { BoardTemplateWidget } from "../../templates/model/board-template.ts";
 import { definition, full, half } from "../../templates/model/template-widget.ts";
@@ -62,3 +63,9 @@ export function implementedWidget(id: string): BoardTemplateWidget | undefined {
 export const IMPLEMENTED_WIDGET_IDS: readonly string[] = CATALOGUE_WIDGETS.map(
   ({ id }) => id,
 ).filter((id) => implementedWidget(id) !== void 0);
+
+/** The actions a catalogue widget declares for its card (AC125); none for any other widget. */
+export function catalogueWidgetActions(catalogueId: string | undefined): readonly WidgetAction[] {
+  if (catalogueId === void 0) return [];
+  return widgetById.get(catalogueId)?.actions ?? [];
+}

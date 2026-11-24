@@ -4,6 +4,7 @@
  */
 
 import { TABLE_ROWS } from "../../templates/model/template-widget.ts";
+import { PROMPT_VERSION_NAMES_SQL } from "./change-queries.ts";
 import * as deck from "./flight-deck-code.ts";
 import * as sql from "./flight-deck-costs-queries.ts";
 import type { CatalogueWidgetBuild } from "./index.ts";
@@ -48,6 +49,7 @@ export const FLIGHT_DECK_COSTS_BUILDS: Readonly<Record<string, CatalogueWidgetBu
     queries: {
       trend: sql.RESOLVED_TREND_SQL,
       changes: sql.CHANGES_SQL,
+      versions: PROMPT_VERSION_NAMES_SQL,
       seen: sql.OUTCOMES_SEEN_SQL,
     },
     width: "half",

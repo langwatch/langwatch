@@ -43,6 +43,8 @@ export interface ChartFrameDashboardContext {
    * what makes a refresh tick a distinct context change for `useChartQuery`.
    */
   readonly refreshedAt?: number;
+  /** Set when the host takes `LW.askLangy`: only then may a chart make its marks clickable. */
+  readonly canAskLangy?: boolean;
 }
 
 /**
@@ -172,6 +174,47 @@ export interface LwNavigateMessage {
   readonly params: Readonly<Record<string, unknown>>;
 }
 
+/** What a clicked bar, point or legend entry asks Langy about: a category or series. */
+export interface ChartAskSubject {
+  readonly label: string;
+  /** The bucket the click landed on, as the chart labels it. */
+  readonly at?: string;
+}
+
+/** The longest label or bucket the host keeps from a frame's ask; the rest is cut. */
+export const CHART_ASK_TEXT_MAX_LENGTH = 200;
+
+/**
+ * `LW.askLangy(subject)`: the host drafts a Langy prompt about it. Author code is semi-trusted,
+ * so the host reads the subject through `readChartAsk` and drops anything else.
+ */
+export interface LwAskLangyMessage {
+  readonly type: "lw:ask-langy";
+  readonly subject: unknown;
+}
+
+/** A frame's ask as the host reads it: a subject, or nameless when it names no label. */
+export type ChartAskReading =
+  | { readonly kind: "subject"; readonly subject: ChartAskSubject }
+  | { readonly kind: "nameless" };
+
+const NAMELESS_ASK: ChartAskReading = { kind: "nameless" };
+
+/** Reads what a frame's ask names, cut to length. */
+export function readChartAsk(raw: unknown): ChartAskReading {
+  if (typeof raw !== "object" || raw === null) return NAMELESS_ASK;
+  const text = (value: unknown) =>
+    typeof value === "string" || typeof value === "number"
+      ? String(value).trim().slice(0, CHART_ASK_TEXT_MAX_LENGTH)
+      : "";
+  const { label, at } = raw as { label?: unknown; at?: unknown };
+  const named = text(label);
+  if (named.length === 0) return NAMELESS_ASK;
+  const bucket = text(at);
+  const subject = bucket.length > 0 ? { label: named, at: bucket } : { label: named };
+  return { kind: "subject", subject };
+}
+
 /** Where a forwarded log/error line originated inside the frame. */
 export type ChartFrameLogSource = "console" | "error" | "unhandledrejection" | "lw.error";
 
@@ -199,6 +242,7 @@ export type FrameToParentMessage =
   | LwQueryMessage
   | LwSetHeightMessage
   | LwNavigateMessage
+  | LwAskLangyMessage
   | LwLogMessage
   | LwErrorMessage
   | LwHeartbeatMessage;

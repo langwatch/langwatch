@@ -3,7 +3,7 @@
  * counts nothing at all (dashboards-v2 AC200, AC200m).
  */
 
-import { effectiveSources } from "@langwatch/analytics-contract";
+import { DEFAULT_WIDGET_SOURCES, effectiveSources } from "@langwatch/analytics-contract";
 import { type DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
 import { canFollowSources, PRESENCE_QUERY, readsSourcesParameter } from "./sources-parameter.ts";
@@ -66,6 +66,19 @@ export function widgetSourcesLine(allQueries: readonly Sourced[]): string {
   const lists = new Set(named.map(({ list }) => list));
   if (lists.size === 1) return `Sources: ${named[0]?.list}`;
   return `Sources: ${named.map(({ name, list }) => `${name}: ${list}`).join(" · ")}`;
+}
+
+/** The line of a widget that counts only what every widget counts unless told otherwise. */
+const DEFAULT_SOURCES_LINE = `Sources: ${DEFAULT_WIDGET_SOURCES.join(", ")}`;
+
+/**
+ * The sources line a card shows: only one that changes how the figures read. A widget counting
+ * just the default sources, or reading only views that keep no origin, shows none (AC240,
+ * AC240b); the editor keeps the full line from {@link widgetSourcesLine}.
+ */
+export function widgetCardSourcesLine(queries: readonly Sourced[]): string {
+  const line = widgetSourcesLine(queries);
+  return line === DEFAULT_SOURCES_LINE || line === SOURCES_DO_NOT_APPLY_LINE ? "" : line;
 }
 
 /**

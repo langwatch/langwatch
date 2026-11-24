@@ -3,6 +3,7 @@
  * Generated from the dashboards library draft on 2026-10-06; edit here from now on.
  */
 
+import type { WidgetAction } from "../../langy/model/board-langy.ts";
 import type { AgentKind, CatalogueScope, Persona, QuestionType } from "./catalogue-labels.ts";
 
 /** built: code exists; ready: today's data; logic: new query code; feature: waits for LangWatch. */
@@ -26,6 +27,8 @@ export interface CatalogueWidget {
   readonly scope: CatalogueScope;
   /** What Langy is asked when the widget is added; the member can edit it first. */
   readonly prompt: string;
+  /** The buttons under the card's chart, each drafting Langy about the widget (AC125). */
+  readonly actions?: readonly WidgetAction[];
 }
 
 /** Made for coding agents, or reads their traces: those widgets live with coding agents. */
@@ -135,6 +138,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Are more of my agent's traces ending in an error? Query the LangWatchQL view trace_metrics over the dashboard period, bucketed at the dashboard grain: countIf(HasError) / count() per bucket of OccurredAt. Then query spans where StatusCode = 2 for the top five error types from SpanAttributes['exception.type'] with their SpanName and count. Answer with the error rate series, the first and last bucket's rate, and a top-five table of error types. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+    actions: ["investigate", "propose-fix"],
   },
   {
     id: "latency-spread",
@@ -203,6 +207,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Which evaluators fail most? Answer it with LangWatchQL over the dashboard period. What the answer shows: The five evaluators with the lowest pass rate, with their run counts. It needs: evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+    actions: ["investigate", "propose-fix"],
   },
   {
     id: "scenarios",
@@ -220,6 +225,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Does my agent keep passing its test scenarios? Query the LangWatchQL view simulations over the dashboard period, bucketed at the dashboard grain: rows where ArchivedAt is null and Verdict is not null, by bucket of StartedAt, with countIf(Verdict = 'success') / count() as the pass rate, and the same per ScenarioSetId. Answer with the pass rate and run count for the period, its series per bucket, and a top-five table of suites by runs. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+    actions: ["investigate", "propose-fix"],
   },
   {
     id: "topics",
@@ -288,6 +294,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Which of my agent's answers scored worst? Answer it with LangWatchQL over the dashboard period. What the answer shows: The eight evaluation results with the lowest score, each linked to its trace. It needs: evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+    actions: ["investigate", "propose-fix"],
   },
   {
     id: "evaluation-coverage",
@@ -305,6 +312,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "How much of my traffic is evaluated? Answer it with LangWatchQL over the dashboard period. What the answer shows: What each evaluator runs on, its pass rate, and the share of traces evaluated at all. It needs: evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+    actions: ["investigate", "fill-gaps"],
   },
   {
     id: "fd-throughput",
@@ -356,6 +364,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Which errors does my agent hit most, and where? Answer it with LangWatchQL over the dashboard period. What the answer shows: Error spans grouped by exception or error type and operation, most frequent first. The same query backs the “Top error types” widget. It needs: error status on spans. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+    actions: ["investigate", "propose-fix"],
   },
   {
     id: "fd-quality",
@@ -526,6 +535,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Which errors does my agent hit each day, and did a change start them? Answer it with LangWatchQL over the dashboard period. What the answer shows: Failed traces per day split by error type, the error rate as a line, and prompt, model and deploy changes marked. A spike that starts at a change points to that change. It needs: error status on spans. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+    actions: ["investigate", "propose-fix"],
   },
   {
     id: "up-where-fails",
@@ -543,6 +553,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Which step or tool in my agent fails most? Answer it with LangWatchQL over the dashboard period. What the answer shows: Each step and tool call: how often it fails, and how often my agent did not recover (no later retry or fallback fixed it). Fix the one with the most unrecovered failures. It needs: tool and step spans; error status on spans. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+    actions: ["investigate", "propose-fix"],
   },
   {
     id: "up-failing-traces",
@@ -560,6 +571,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Which of my agent's traces failed or ran slowest? Answer it with LangWatchQL over the dashboard period. What the answer shows: The traces that failed or ran slowest in this period. Each opens to the step that broke. It needs: traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+    actions: ["investigate", "propose-fix"],
   },
   {
     id: "up-step-latency",
@@ -636,6 +648,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Are my agent's checks passing? Query the LangWatchQL view evaluation_metrics over the dashboard period, bucketed at the dashboard grain: countIf(Passed = 1) / count() per bucket of OccurredAt, skipping rows where Passed is null, and the same pass rate per EvaluatorName. Answer with the pass rate for the period, its series per bucket, and a table of the five evaluators with the lowest pass rate and their run counts. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+    actions: ["investigate", "propose-fix"],
   },
   {
     id: "ans-topics",
@@ -797,6 +810,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Do my test suites keep passing? Answer it with LangWatchQL over the dashboard period. What the answer shows: Each suite's pass rate over time, CI runs apart from local runs. A suite whose CI line drops needs a look. It needs: scenario runs. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+    actions: ["investigate", "propose-fix"],
   },
   {
     id: "ship-flaky",
@@ -814,6 +828,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Which of my tests flip between pass and fail? Answer it with LangWatchQL over the dashboard period. What the answer shows: The last ten runs of each test scenario as a strip of passes and fails. A scenario that flips cannot be trusted: fix it or set it aside. It needs: scenario runs. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+    actions: ["investigate", "propose-fix"],
   },
   {
     id: "ship-rollout",
@@ -1045,6 +1060,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Does my agent pass each policy check? Answer it with LangWatchQL over the dashboard period. What the answer shows: Pass rate per policy criterion (accuracy, completeness, made-up facts, inappropriate content), with an error margin, against the minimum I set. It needs: evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+    actions: ["investigate", "propose-fix"],
   },
   {
     id: "so-queue",
@@ -1316,6 +1332,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Which of my agent's tools fail, and does my agent recover? Answer it with LangWatchQL over the dashboard period. What the answer shows: Error rate per tool, and the share of those errors a later step fixed. It needs: tool and step spans; error status on spans. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+    actions: ["investigate", "propose-fix"],
   },
   {
     id: "tools-wrong-tool",
@@ -1605,6 +1622,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     scope: "project",
     prompt:
       "Are my cost figures complete? Answer it with LangWatchQL over the dashboard period. What the answer shows: Traces with a model but no price, and the models with no known price. Missing cost understates spend. Traces stored before 7 October 2026 have no unpriced record, so they count as priced. It needs: model name. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+    actions: ["investigate", "fill-gaps"],
   },
   {
     id: "inventory",

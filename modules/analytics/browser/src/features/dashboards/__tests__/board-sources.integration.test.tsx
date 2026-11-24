@@ -408,7 +408,8 @@ describe("given a stored widget whose query stores no sources", () => {
   });
 
   /** @scenario "AC200 Sources: each query shows its sources as pills, and the card names them" */
-  it("shows the sources row under Parameters with a built-in badge, and the card's line", async () => {
+  /** @scenario "AC240 Card sources line: a widget counting only the default application source shows no sources line" */
+  it("shows the sources row under Parameters with a built-in badge, and no default line on the card", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     openBoard();
     await screen.findByTestId("sandboxed-frame");
@@ -417,7 +418,7 @@ describe("given a stored widget whose query stores no sources", () => {
     const drawer = await openEditor(user);
     const row = within(drawer).getByTestId("query-sources");
 
-    expect(footer.textContent).toBe("Sources: application · Project: Test Project");
+    expect(footer.textContent).toBe("Project: Test Project");
     expect(within(drawer).getByText("Parameters")).toBeTruthy();
     expect(within(drawer).queryByText(/declared by you/)).toBeNull();
     expect(within(drawer).queryByText("No parameters declared yet.")).toBeNull();
@@ -509,6 +510,7 @@ describe("given a member changes a query's sources in the editor", () => {
 
 describe("given a member saves only a query's sources and presses Undo", () => {
   /** @scenario "AC200k Sources: Undo puts a query's sources back, including back to none" */
+  /** @scenario "AC240c Card sources line: a widget counting more or other sources than the default names them" */
   it("clears a list the query did not store, so it counts application again", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     const server = openBoard();
@@ -517,15 +519,18 @@ describe("given a member saves only a query's sources and presses Undo", () => {
     await addSource(user, drawer, "langy");
     await save(user, drawer);
     await vi.waitFor(() => expect(server.updates()).toHaveLength(1));
+    await vi.waitFor(() =>
+      expect(screen.getByTestId("widget-card-footer").textContent).toBe(
+        "Sources: application, langy · Project: Test Project",
+      ),
+    );
 
     await user.click(await screen.findByRole("button", { name: "Undo" }));
     await vi.waitFor(() => expect(server.updates()).toHaveLength(2));
 
     expect(server.updates()[1]?.queries[0]?.sources).toBeNull();
     await vi.waitFor(() =>
-      expect(screen.getByTestId("widget-card-footer").textContent).toBe(
-        "Sources: application · Project: Test Project",
-      ),
+      expect(screen.getByTestId("widget-card-footer").textContent).toBe("Project: Test Project"),
     );
   });
 
@@ -549,7 +554,7 @@ describe("given a member saves only a query's sources and presses Undo", () => {
 
 describe("given a member who may not edit the board", () => {
   /** @scenario "AC200d Sources: only a member who can edit the board changes them" */
-  it("shows the card's sources line and no way into the editor", async () => {
+  it("shows the card's footer and no way into the editor", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     openBoard({ permissions: MEMBER.filter((grant) => grant !== "analytics:update") });
     await screen.findByTestId("sandboxed-frame");
@@ -557,9 +562,7 @@ describe("given a member who may not edit the board", () => {
     await user.click(await screen.findByRole("button", { name: "Actions for Traces" }));
     await screen.findByRole("menuitem", { name: "Copy widget id" });
 
-    expect(screen.getByTestId("widget-card-footer").textContent).toBe(
-      "Sources: application · Project: Test Project",
-    );
+    expect(screen.getByTestId("widget-card-footer").textContent).toBe("Project: Test Project");
     expect(screen.queryByRole("menuitem", { name: "Edit code" })).toBeNull();
   });
 });

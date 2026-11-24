@@ -261,10 +261,11 @@ export const RESOLVED_TREND_CODE = widgetCode({
     SEEN_OR_SETUP,
     OUTCOME_EMPTY,
   ],
-  queries: ["trend", "changes"],
+  queries: ["trend", "changes", "versions"],
   body: `  if (trend.data.length === 0) {
     return <Panel><OutcomeEmpty quiet="No conversation outcomes in this period." /></Panel>;
   }
+  const names = new Map(versions.data.map((row) => [row.id, row.name]));
   const counts = [{ key: "resolved", kind: "count" }, { key: "closed", kind: "count" }];
   const points = withBuckets(trend, counts).map((row) => ({
     x: bucketLabel(row.bucket),
@@ -286,7 +287,7 @@ export const RESOLVED_TREND_CODE = widgetCode({
         </span>
       </div>
       <MarkedChart points={points} series={series} format={count}
-        rightFormat={(value) => pct(value, 0)} markers={changes.data.map(markerOf)} />
+        rightFormat={(value) => pct(value, 0)} markers={changes.data.map((row) => markerOf(row, names))} />
     </Panel>
   );`,
 });

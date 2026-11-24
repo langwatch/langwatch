@@ -76,7 +76,8 @@ function Legend({ items }) {
   return (
     <div style={{ display: "flex", gap: 12, marginBottom: 4, fontSize: 10.5, color: C.subtle }}>
       {items.map(([color, label, dashed]) => (
-        <span key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span key={label} {...askable({ label })}
+          style={{ display: "flex", alignItems: "center", gap: 6, ...askCursor() }}>
           <span style={dashed ? { width: 12, borderTop: "2px dashed " + color } : dot(color)} />
           {label}
         </span>
@@ -106,7 +107,7 @@ const bar = (colour) => ({
 });
 
 // height fixes the list's box, else it fills what the panel leaves. A row with no value (a model
-// with no price) shows its note where the bar goes and a dash, never a $0.00 bar.
+// with no price) shows its note where the bar goes and a dash, never a $0.00 bar, and asks nothing.
 function Bars({ rows, format, height }) {
   const max = Math.max(...rows.filter((row) => known(row.value)).map((row) => row.value),
     Number.MIN_VALUE);
@@ -116,7 +117,9 @@ function Bars({ rows, format, height }) {
       gap: 6 }}>
       {rows.map((row, index) => (
         <div key={row.label} title={row.title}
-          style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5 }}>
+          {...(known(row.value) ? askable({ label: row.label || "Unknown" }) : {})}
+          style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5,
+            ...(known(row.value) ? askCursor() : {}) }}>
           <span style={{ width: 128, flexShrink: 0, color: C.subtle, ...ELLIPSIS }}>
             {row.label || "Unknown"}
           </span>
@@ -273,12 +276,18 @@ const tipValue = (format) => (value, name) => [known(value) ? format(value) : "N
 export const SERIES_CHART = `// series: { key, label, colour, dashed?, bars? }; format labels the axis and the tooltip.
 function SeriesChart({ points, series, format, domain }) {
   const legend = series.map((item) => [item.colour, item.label, item.dashed]);
+  // A click asks about the series at the bucket under the pointer; the legend asks by keyboard.
+  const named = series.filter((item) => !item.dashed).map((item) => item.label).join(" and ");
+  const onClick = (state) => {
+    if (state?.activeLabel !== undefined) askLangy({ label: named, at: String(state.activeLabel) });
+  };
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
       <Legend items={legend} />
       <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={points} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
+          <ComposedChart data={points} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}
+            onClick={canAskLangy() && points.length > 0 ? onClick : undefined} style={askCursor()}>
             <CartesianGrid vertical={false} stroke={C.border} />
             <XAxis dataKey="x" tick={AXIS} tickLine={false} axisLine={false} minTickGap={28}
               dy={4} />
@@ -341,6 +350,8 @@ export const FACE_FULL_MIN_HEIGHT_PX = 180;
  * the full face is 208px with a two-line line, 164px without its icon; the row is 75px.
  */
 const FIT_CSS = `.lw-row { display: none; }
+[data-lw-ask]:hover { background: rgba(127, 127, 127, 0.1); border-radius: 4px; }
+[data-lw-ask]:focus-visible { outline: 2px solid #0d9488; outline-offset: 1px; border-radius: 4px; }
 @media (max-height: ${FACE_ICON_MIN_HEIGHT_PX - 1}px) { .lw-icon { display: none !important; } }
 @media (max-height: ${FACE_FULL_MIN_HEIGHT_PX - 1}px) {
   .lw-full { display: none !important; }
@@ -475,6 +486,25 @@ export interface WidgetCodeSpec {
   readonly compactCallToAction?: boolean;
 }
 
+/**
+ * Asking Langy about a mark (dashboards-v2 AC124): a bar, point or legend entry the reader
+ * clicks. Only while the host takes asks is a mark a named, focusable button with a pointer.
+ */
+export const ASK_CODE = `const canAskLangy = () => LW.dashboardContext?.canAskLangy === true;
+const askLangy = (subject) => { if (canAskLangy()) LW.askLangy(subject); };
+const askCursor = () => (canAskLangy() ? { cursor: "pointer" } : {});
+function askable(subject) {
+  if (!canAskLangy()) return {};
+  const name = "Ask Langy about " + subject.label;
+  return { role: "button", tabIndex: 0, "aria-label": name, title: name, "data-lw-ask": "",
+    onClick: () => askLangy(subject),
+    onKeyDown: (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      askLangy(subject);
+    } };
+}`;
+
 /** The chart kit helpers a widget may call; each is imported only by the code that calls it. */
 const CHART_KIT_HELPERS = ["isLowerBound", "mergeBuckets"] as const;
 
@@ -500,8 +530,12 @@ export function widgetCode({
   body,
   compactCallToAction = false,
 }: WidgetCodeSpec): WidgetCode {
+  const asks = [...parts, components ?? "", body].some((text) =>
+    /\bask(able|Cursor|Langy)\(/.test(text),
+  );
   const sections = [
     PALETTE,
+    ...(asks ? [ASK_CODE] : []),
     ...parts,
     panelCode(),
     ...(source ? [callToActionCode({ source, compact: compactCallToAction })] : []),

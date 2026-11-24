@@ -13,7 +13,11 @@ export {
   pickerWidgets,
 } from "./model/catalogue-picker.ts";
 export { CATALOGUE_WIDGET_BUILDS, type CatalogueWidgetBuild } from "./widgets/index.ts";
-export { IMPLEMENTED_WIDGET_IDS, implementedWidget } from "./model/widget-implementations.ts";
+export {
+  catalogueWidgetActions,
+  IMPLEMENTED_WIDGET_IDS,
+  implementedWidget,
+} from "./model/widget-implementations.ts";
 export {
   AGENT_KIND_CHIP_LABELS,
   AGENT_KIND_FOCUS_LABELS,

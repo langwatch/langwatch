@@ -51,6 +51,7 @@ function attach(
     onLog: (entry) => events.push({ log: entry }),
     onHeightChange: (px) => events.push({ height: px }),
     onNavigate: (args) => events.push({ navigate: args }),
+    onAskLangy: (subject) => events.push({ askLangy: subject }),
     onTeardown: () => events.push("teardown"),
     onIdleChange: (idle) => events.push({ idle }),
   });
@@ -104,6 +105,30 @@ describe("the frame bridge session", () => {
       { log: { level: "warn", source: "console", text: "a b" } },
       { log: { level: "error", source: "render", text: "boom" } },
     ]);
+    bridge.dispose();
+  });
+
+  /** @scenario "AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period" */
+  it("forwards a clicked mark's ask with its label and bucket, cut to length", async () => {
+    const { events, load, send, bridge } = attach();
+    load();
+    await send({ type: "lw:ask-langy", subject: { label: " gpt-5 ", at: "Nov 3" } });
+    await send({ type: "lw:ask-langy", subject: { label: "x".repeat(300), extra: "dropped" } });
+    expect(events).toEqual([
+      { askLangy: { label: "gpt-5", at: "Nov 3" } },
+      { askLangy: { label: "x".repeat(200) } },
+    ]);
+    bridge.dispose();
+  });
+
+  /** @scenario "AC124c Chart asks: a chart with nothing to investigate offers no click" */
+  it("drops an ask that names no label", async () => {
+    const { events, load, send, bridge } = attach();
+    load();
+    await send({ type: "lw:ask-langy", subject: { label: "  " } });
+    await send({ type: "lw:ask-langy", subject: "gpt-5" });
+    await send({ type: "lw:ask-langy" });
+    expect(events).toEqual([]);
     bridge.dispose();
   });
 

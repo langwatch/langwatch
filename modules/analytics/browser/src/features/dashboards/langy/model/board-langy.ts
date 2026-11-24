@@ -4,6 +4,7 @@
  * widget on it (AC120, AC140, AC142), and the editor's starting prompt. Pure.
  */
 
+import type { ChartAskSubject } from "@langwatch/analytics-contract/chart-frame-protocol";
 import type { LangyContextChip } from "@langwatch/langy-contract";
 import { Temporal } from "@langwatch/time";
 
@@ -329,6 +330,81 @@ export function widgetMissingDataDraft({
     `${missing.field} field), and my traces do not have it yet. Explain in plain words what ` +
     "it is, how I start sending it from my agent, and what the widget will show once it arrives.";
   return widgetDraft({ prompt, widget, board, period });
+}
+
+/**
+ * A bar, a point or a legend entry clicked on a widget's chart, as a composer draft (AC124):
+ * investigate exactly that category or series, then the widget and the board's window.
+ */
+export function widgetChartDraft({
+  subject,
+  widget,
+  board,
+  period,
+}: {
+  subject: ChartAskSubject;
+  widget: WidgetSubject;
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
+  const when = subject.at ? ` at ${subject.at}` : " over the dashboard period";
+  const prompt =
+    `Investigate "${subject.label}"${when} in my "${widget.name}" dashboard widget. Find the traces ` +
+    "behind it, tell me what stands out and what most likely causes it, and quote the real " +
+    "numbers. If there is no data for it, say so plainly rather than guessing.";
+  return widgetDraft({ prompt, widget, board, period });
+}
+
+/** The actions a catalogue widget may declare for its card's action row (AC125). */
+export const WIDGET_ACTIONS = ["investigate", "propose-fix", "fill-gaps"] as const;
+export type WidgetAction = (typeof WIDGET_ACTIONS)[number];
+
+/** Each action's button label and the prompt it drafts about a widget. */
+const ACTION_ASKS: Readonly<
+  Record<WidgetAction, { label: string; prompt: (name: string) => string }>
+> = {
+  investigate: {
+    label: "Investigate",
+    prompt: (name) =>
+      `Investigate what my "${name}" dashboard widget shows over the dashboard period. Find ` +
+      "the traces behind it, tell me what stands out, what most likely causes it and which " +
+      "traces show it best. Quote the real numbers.",
+  },
+  "propose-fix": {
+    label: "Propose a fix",
+    prompt: (name) =>
+      `Propose a fix for the worst problem my "${name}" dashboard widget shows over the ` +
+      "dashboard period. Find the traces behind it, work out the most likely cause, and " +
+      "propose one concrete change to my agent: its prompt, model, tools or code. Quote the " +
+      "real numbers, and change nothing until I agree.",
+  },
+  "fill-gaps": {
+    label: "Fill the gaps",
+    prompt: (name) =>
+      `My "${name}" dashboard widget shows gaps in what LangWatch receives. Find what is ` +
+      "missing over the dashboard period and on which traces, then tell me in plain words " +
+      "how to fill each gap, from my agent or in LangWatch.",
+  },
+};
+
+/** An action's button label. */
+export function widgetActionLabel(action: WidgetAction): string {
+  return ACTION_ASKS[action].label;
+}
+
+/** A widget action button as a composer draft (AC125b): the action's prompt, then the widget. */
+export function widgetActionDraft({
+  action,
+  widget,
+  board,
+  period,
+}: {
+  action: WidgetAction;
+  widget: WidgetSubject;
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
+  return widgetDraft({ prompt: ACTION_ASKS[action].prompt(widget.name), widget, board, period });
 }
 
 /** How many widgets on a board must show no data before the board offers Langy to set them up. */

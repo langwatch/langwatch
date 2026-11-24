@@ -1,9 +1,9 @@
 /**
- * One stored widget on a board, in the card chrome, with the drag handle, Ask Langy and menu
- * as its controls, and its queries' sources underneath (AC200). Drawn over the board's period
- * and grain; the menu opens the editor, copies its id or API call, and drafts Langy actions.
+ * One stored widget on a board, in the card chrome: Ask Langy, the drag handle and menu, its
+ * declared Langy actions and its queries' sources (AC200), over the board's period and grain.
  */
 
+import type { ChartAskSubject } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { Box } from "@langwatch/design-system/primitives";
 import { GripVertical } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -16,18 +16,20 @@ import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sec
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
 import { useWidgetViewed } from "../../behavior/use-widget-viewed.ts";
-import type { WidgetSetup } from "../../langy/model/board-langy.ts";
+import { catalogueWidgetActions } from "../../catalogue/index.ts";
+import type { WidgetAction, WidgetSetup } from "../../langy/model/board-langy.ts";
 import type { BoardPeriod } from "../../model/board-period.ts";
 import type { BoardWidget } from "../../model/board-widgets.ts";
 import { WIDGET_EDIT_PERMISSION } from "../../model/dashboards-access.ts";
 import {
   picksNoSources,
   widgetCardFooter,
+  widgetCardSourcesLine,
   widgetProjectsLine,
-  widgetSourcesLine,
 } from "../../model/widget-sources.ts";
 import { AskLangyButton } from "../blocks/ask-langy-button.tsx";
 import { NoSourcesPicked } from "../blocks/no-sources-picked.tsx";
+import { WidgetActionRow } from "../blocks/widget-action-row.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
 
@@ -39,6 +41,10 @@ export interface WidgetCardLangy {
   readonly setUp: (setup: WidgetSetup) => void;
   /** Drafts how to start sending the field this widget's traces lack. */
   readonly setUpMissing: (missing: { field: string; label: string }) => void;
+  /** Drafts an investigation of the bar, point or legend entry clicked on its chart. */
+  readonly askAbout: (subject: ChartAskSubject) => void;
+  /** Drafts one of the actions its catalogue widget declares. */
+  readonly act: (action: WidgetAction) => void;
 }
 
 export function BoardWidgetCard({
@@ -90,6 +96,10 @@ export function BoardWidgetCard({
   // A widget the reader may not see offers nothing that reads its data: no Langy, alert or report.
   const langyOnData = face === "no_access" ? undefined : langy;
   const canEditCode = face !== "no_access" || host.hasPermission(WIDGET_EDIT_PERMISSION);
+  const source = widget.definition.source;
+  const actions = langyOnData
+    ? catalogueWidgetActions(source?.kind === "catalogue" ? source.catalogueId : undefined)
+    : [];
   const { periodStart, periodEnd, granularitySeconds } = period;
   const timeWindow = useMemo(
     () => ({ start: periodStart, end: periodEnd }),
@@ -102,7 +112,7 @@ export function BoardWidgetCard({
       name={widget.name}
       description={widget.definition.description}
       footer={widgetCardFooter({
-        sourcesLine: widgetSourcesLine(widget.definition.queries),
+        sourcesLine: widgetCardSourcesLine(widget.definition.queries),
         projectsLine: widgetProjectsLine({
           queries: widget.definition.queries,
           boardProjectName: host.project()?.name ?? "",
@@ -110,6 +120,13 @@ export function BoardWidgetCard({
         }),
         limits,
       })}
+      ask={langyOnData && <AskLangyButton name={widget.name} onClick={langyOnData.ask} />}
+      actions={
+        langyOnData &&
+        actions.length > 0 && (
+          <WidgetActionRow name={widget.name} actions={actions} onAction={langyOnData.act} />
+        )
+      }
       controls={
         <>
           {onEdit && (
@@ -128,7 +145,6 @@ export function BoardWidgetCard({
               <GripVertical size={14} aria-hidden />
             </Box>
           )}
-          {langyOnData && <AskLangyButton name={widget.name} onClick={langyOnData.ask} />}
           <WidgetMenu
             name={widget.name}
             disabled={isWriting}
@@ -155,7 +171,9 @@ export function BoardWidgetCard({
           projectSlug={projectSlug}
           dashboardId={dashboardId}
           widgetName={widget.name}
-          maxHeight={widgetBodyHeightPx(widget.placement.rowSpan)}
+          maxHeight={widgetBodyHeightPx(widget.placement.rowSpan, {
+            withActions: actions.length > 0,
+          })}
           timeWindow={timeWindow}
           granularitySeconds={granularitySeconds}
           periodKey={periodKey}
@@ -173,6 +191,7 @@ export function BoardWidgetCard({
           onEmptyChange={onEmptyChange}
           onLimitFailureChange={onLimitFailureChange}
           {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
+          {...(langyOnData ? { onAskLangyAbout: langyOnData.askAbout } : {})}
         />
       )}
     </WidgetCardShell>

@@ -120,7 +120,7 @@ describe("given the Flight Deck cockpit widgets", () => {
     expect(queries.changes).toContain("LastUsedPromptVersionId");
     expect(queries.changes).toContain("MetadataPromptVersion AS name");
     expect(queries.changes).not.toContain("Attributes[");
-    expect(code).toContain("markers={changes.data.map(markerOf)}");
+    expect(code).toContain("markers={changes.data.map((row) => markerOf(row, names))}");
   });
 
   /** @scenario "AC26 Flight Deck: Task success is the share of calls that got the job done, per language" */

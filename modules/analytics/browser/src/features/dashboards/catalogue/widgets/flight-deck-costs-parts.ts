@@ -172,8 +172,11 @@ function MarkedChart({ points, series, format, rightFormat, markers = [], domain
   );
 }
 
-// A model or prompt version first seen in the period, as a marker on its bucket.
-const markerOf = (row) => ({
+// A model or prompt version first seen in the period, as a marker on its bucket. \`names\` maps a
+// managed version id to "handle vN", so a marker never shows the id.
+const markerOf = (row, names) => ({
   x: bucketLabel(row.bucket),
-  label: row.kind === "prompt" ? "prompt " + row.name : row.name,
+  label: row.kind === "prompt"
+    ? "prompt " + ((names instanceof Map && names.get(row.name)) || row.name)
+    : row.name,
 });`;
