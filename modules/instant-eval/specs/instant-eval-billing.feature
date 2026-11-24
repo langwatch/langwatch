@@ -405,7 +405,8 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
   Rule: The price on the docs page is the price in the code
 
     @unit
-    Scenario: The pricing page states the shipped rate
-      Given the classifier's published rate and markup
-      When the pricing page is read
-      Then it states the customer price per million input tokens those two produce
+    Scenario: The pricing page states the published rates before VAT
+      Given the Instant tier's and the Evals tier's published rates
+      When the pricing page and the Instant Evals cost page are read
+      Then each states 0.30 USD per million input tokens for Instant Evals and 0.60 USD for an LLM judge
+      And each says the rates exclude VAT and our cost times 1.3 is the floor

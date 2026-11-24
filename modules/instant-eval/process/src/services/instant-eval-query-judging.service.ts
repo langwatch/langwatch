@@ -12,7 +12,7 @@ import type {
 import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
 import {
   instantEvalCostUsd,
-  instantEvalPriceUsd,
+  instantEvalFloorPriceUsd,
   isInstantEvalSpendBillable,
   pickInstantEvalRoutedSpend,
 } from "@langwatch/instant-eval-judge-contract";
@@ -112,13 +112,17 @@ export class InstantEvalQueryJudgingService {
   }
 
   /**
-   * The token budget at the dearest base input rate a routed call could reach: a best-effort hold,
-   * not a hard cap on a routed query's spend (ADR-190 decision 7).
+   * The token budget at the dearest base input rate a routed call could reach, at the markup: a
+   * best-effort hold, not a hard cap (ADR-190 decision 7). Not the published rate, whose default
+   * hold of 1.20 USD would refuse every free organization's query; see the pricing feature.
    */
   async #holdPriceOf(inputTokens: number): Promise<number> {
     const pricing = await this.options.holdPricing();
 
-    return instantEvalPriceUsd({ costUsd: instantEvalCostUsd({ inputTokens, pricing }), pricing });
+    return instantEvalFloorPriceUsd({
+      costUsd: instantEvalCostUsd({ inputTokens, pricing }),
+      pricing,
+    });
   }
 
   /**

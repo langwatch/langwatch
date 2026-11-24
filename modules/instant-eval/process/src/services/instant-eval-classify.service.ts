@@ -43,7 +43,14 @@ export class InstantEvalClassifyService {
   priceOf({ inputTokens }: { inputTokens: number }): { costUsd: number; priceUsd: number } {
     const costUsd = instantEvalCostUsd({ inputTokens, pricing: this.judge.pricing });
 
-    return { costUsd, priceUsd: instantEvalPriceUsd({ costUsd, pricing: this.judge.pricing }) };
+    const priceUsd = instantEvalPriceUsd({
+      costUsd,
+      inputTokens,
+      tier: "instant",
+      pricing: this.judge.pricing,
+    });
+
+    return { costUsd, priceUsd };
   }
 
   /** The limits this judge publishes, which a query judged through it is trimmed to. */

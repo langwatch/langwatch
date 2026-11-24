@@ -9,8 +9,9 @@ Feature: What an Instant Eval run costs, and what the customer is charged
   The shape:
   - The run accumulates the tokens each page reported and reports one spend record at the
     end; a synchronous query reports one when it finishes.
-  - The rate and the markup are the classifier's own published pricing, never a constant
-    held by the run.
+  - The cost is the classifier's own rate, never a constant held by the run; the price is the
+    Instant tier's published rate with the cost times the markup as its floor (ADR-174
+    decision 25).
   - The spend goes through the InstantEvalSpendRecorder port. The recorder that meters it
     against the customer's budget is bound by the gateway spend pipeline; the default
     binding logs the record and meters nothing. What is here is the record, the cost and

@@ -142,6 +142,31 @@ describe("given a statement a run was accepted for", () => {
       expect(estimate.totalTokens).toBe(estimate.avgTokens * 120);
     });
 
+    /** @scenario "The estimate is priced by the same rule as the run" */
+    it("prices 10,000 rows of 1,070 input tokens at the Instant tier's 0.30 USD per million", async () => {
+      const text = estimateJudgedTextTokens({
+        text: "x".repeat(400),
+        limits: INSTANT_EVAL_CLASSIFIER_LIMITS,
+      });
+      const asked = instantEvalQuestionTokens(ACCEPTED.questions.map((one) => one.question));
+      const limits = {
+        ...INSTANT_EVAL_CLASSIFIER_LIMITS,
+        requestOverheadTokens: 1070 - text - asked,
+      };
+      const { estimates } = harness({ total: 10_000, limits });
+
+      const estimate = await estimates.estimateRun({
+        caller: CALLER,
+        protections: PROTECTIONS,
+        accepted: ACCEPTED,
+        rowLimit: 10_000,
+      });
+
+      expect(estimate).toMatchObject({ avgTokens: 1070, totalTokens: 10_700_000 });
+      expect(estimate.costUsd).toBe(0.4494);
+      expect(estimate.priceUsd).toBe(3.21);
+    });
+
     /** @scenario "The average token count comes from a sample rather than from every row" */
     it("measures the texts of a sample rather than of the selection", async () => {
       const { estimates, textSource } = harness({ total: 5_000 });

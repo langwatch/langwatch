@@ -155,6 +155,9 @@ export class InstantEvalFinishService {
       pricing,
     });
 
-    return { costUsd, priceUsd: instantEvalPriceUsd({ costUsd, pricing }) };
+    return {
+      costUsd,
+      priceUsd: instantEvalPriceUsd({ costUsd, inputTokens, tier: "instant", pricing }),
+    };
   }
 }

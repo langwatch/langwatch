@@ -15,7 +15,7 @@ import {
   INSTANT_EVAL_PRICING,
   InstantEvalJudgeStoppedError,
   instantEvalCostUsd,
-  instantEvalPriceUsd,
+  instantEvalFloorPriceUsd,
 } from "@langwatch/instant-eval-judge-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -616,7 +616,9 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
         rows: [{ annoyed: "one" }],
       });
 
-      const ceiling = instantEvalPriceUsd({ costUsd: instantEvalCostUsd({ inputTokens: 1_000 }) });
+      const ceiling = instantEvalFloorPriceUsd({
+        costUsd: instantEvalCostUsd({ inputTokens: 1_000 }),
+      });
       expect(events).toEqual([`reserve ${ceiling} with 0 judged`, "release after 1 recorded"]);
     });
 
@@ -631,7 +633,7 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
         rows: [{ annoyed: "one" }],
       });
 
-      const ceiling = instantEvalPriceUsd({
+      const ceiling = instantEvalFloorPriceUsd({
         costUsd: instantEvalCostUsd({ inputTokens: 1_000, pricing: holdPricing }),
         pricing: holdPricing,
       });

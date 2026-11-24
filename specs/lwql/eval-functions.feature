@@ -344,7 +344,7 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     Then one spend record is reported for the project with the classifier's input tokens
     And it names no run, because a synchronous query has none
     And its cost is the classifier's own cost
-    And the customer price carries the platform markup
+    And the customer price is the Instant tier's published rate, never below the cost times the markup
 
   @unit
   Scenario: A conversation past the judge's budget is cut through the bounded renderer, keeping both ends

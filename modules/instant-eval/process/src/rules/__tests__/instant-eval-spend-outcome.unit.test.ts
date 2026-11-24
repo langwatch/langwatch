@@ -59,9 +59,12 @@ describe("instantEvalSpendRequestId", () => {
 });
 
 describe("instantEvalRateVersion", () => {
-  it("stamps the two published numbers, so a price change is visible on the row", () => {
-    expect(instantEvalRateVersion({ usdPerMillionInputTokens: 0.8, markup: 1.3 })).toBe(
-      "instant_eval@0.8x1.3",
+  /** @scenario "The rate version names the tier's rate and the floor" */
+  it("stamps the published rate and the floor's numbers, so a price change is visible on the row", () => {
+    const pricing = { usdPerMillionInputTokens: 0.8, markup: 1.3 };
+
+    expect(instantEvalRateVersion({ tier: "instant", pricing })).toBe(
+      "instant_eval@instant0.3+0.8x1.3",
     );
   });
 });

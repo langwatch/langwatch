@@ -262,11 +262,11 @@ describe("spent cost", () => {
   /** @scenario "A routed judgement is priced from the summed cost of every call" */
   /** @scenario "A routed judgement is priced from its summed cost, not its tokens" */
   it("takes the routed cost when one was recorded, and prices it at the markup", () => {
-    const spent = { inputTokens: 1_000_000, costNanoUsd: 3_000_000, routedInputTokens: 1_000_000 };
+    const spent = { inputTokens: 5_000, costNanoUsd: 3_000_000, routedInputTokens: 5_000 };
 
     expect(instantEvalSpentCostUsd(spent)).toBe(0.003);
-    // $0.003 at the published 1.3 markup.
-    expect(instantEvalSpentPriceUsd(spent)).toBe(0.0039);
+    // $0.003 at the 1.3 markup, above 5,000 tokens at the Evals tier's $0.60 per million.
+    expect(instantEvalSpentPriceUsd({ ...spent, tier: "evals" })).toBe(0.0039);
   });
 
   /** @scenario "Routed and unrouted tokens are billed separately" */
@@ -287,6 +287,14 @@ describe("spent cost", () => {
       routedInputTokens: 20_000,
     });
     expect(costUsd).toBe(0);
+    expect(
+      instantEvalSpentPriceUsd({
+        inputTokens: 20_000,
+        costNanoUsd: 0,
+        routedInputTokens: 20_000,
+        tier: "instant",
+      }),
+    ).toBe(0.006);
   });
 });
 

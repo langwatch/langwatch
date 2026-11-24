@@ -6,10 +6,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING,
   INSTANT_EVAL_PRICING,
+  INSTANT_EVAL_PUBLISHED_RATES,
   instantEvalCostUsd,
+  instantEvalJudgeRouteRateVersion,
   pickInstantEvalJudgementRoutedSpend,
   instantEvalPriceUsd,
+  instantEvalRateVersion,
+  instantEvalSpentPriceUsd,
   pickInstantEvalRoutedSpend,
   toNanoUsdPrecision,
 } from "../instant-eval-pricing.ts";
@@ -36,15 +41,89 @@ describe("given a response from the classifier", () => {
   });
 
   describe("when the customer price is computed", () => {
-    /** @scenario "The customer price is the cost at the published markup" */
-    /** @scenario "The customer price carries the platform markup" */
-    it("is the cost times the markup", () => {
+    /** @scenario "The customer price is the published rate, never below the cost times the markup" */
+    it("is the tokens at the tier's rate, or the cost times the markup when that is higher", () => {
       const costUsd = instantEvalCostUsd({ inputTokens: 2_000_000 });
 
-      expect(instantEvalPriceUsd({ costUsd })).toBeCloseTo(
-        costUsd * INSTANT_EVAL_PRICING.markup,
-        10,
+      expect(instantEvalPriceUsd({ costUsd, inputTokens: 2_000_000, tier: "instant" })).toBe(0.6);
+      expect(instantEvalPriceUsd({ costUsd: 1, inputTokens: 2_000_000, tier: "instant" })).toBe(
+        INSTANT_EVAL_PRICING.markup,
       );
+    });
+  });
+});
+
+describe("given the published rates (ADR-174 decision 25)", () => {
+  describe("when an Instant tier call of one million input tokens is priced", () => {
+    /** @scenario "An Instant tier call is priced at 0.30 USD per million input tokens" */
+    it("is 0.30 USD, not the cost times 1.3", () => {
+      const costUsd = instantEvalCostUsd({ inputTokens: 1_000_000 });
+
+      expect(costUsd).toBe(0.042);
+      expect(INSTANT_EVAL_PUBLISHED_RATES.instant).toBe(0.3);
+      expect(instantEvalPriceUsd({ costUsd, inputTokens: 1_000_000, tier: "instant" })).toBe(0.3);
+    });
+  });
+
+  describe("when an Evals tier call of one million input tokens is priced", () => {
+    /** @scenario "An Evals tier call is priced at 0.60 USD per million input tokens" */
+    it("is 0.60 USD", () => {
+      expect(INSTANT_EVAL_PUBLISHED_RATES.evals).toBe(0.6);
+      expect(instantEvalPriceUsd({ costUsd: 0.042, inputTokens: 1_000_000, tier: "evals" })).toBe(
+        0.6,
+      );
+    });
+  });
+
+  describe("when the cost times 1.3 is above the rate", () => {
+    /** @scenario "A call whose cost times 1.3 is above the rate is priced at that floor" */
+    it("prices the call at the floor, on either tier", () => {
+      expect(instantEvalPriceUsd({ costUsd: 0.5, inputTokens: 1_000_000, tier: "evals" })).toBe(
+        0.65,
+      );
+      expect(instantEvalPriceUsd({ costUsd: 0.25, inputTokens: 1_000_000, tier: "instant" })).toBe(
+        0.325,
+      );
+    });
+
+    /** @scenario "A call whose cost times 1.3 is above the rate is priced at that floor" */
+    it("prices a routed spend from its summed cost at the floor", () => {
+      expect(
+        instantEvalSpentPriceUsd({
+          inputTokens: 1_000_000,
+          costNanoUsd: 500_000_000,
+          routedInputTokens: 1_000_000,
+          tier: "evals",
+        }),
+      ).toBe(0.65);
+    });
+  });
+
+  describe("when a routed call's cost includes output tokens", () => {
+    /** @scenario "Output tokens are free at the published rate" */
+    it("prices only the input tokens at the rate", () => {
+      expect(
+        instantEvalSpentPriceUsd({
+          inputTokens: 1_000_000,
+          costNanoUsd: 200_000_000,
+          routedInputTokens: 1_000_000,
+          tier: "evals",
+        }),
+      ).toBe(0.6);
+    });
+  });
+
+  describe("when the rate version is stamped", () => {
+    /** @scenario "The rate version names the tier's rate and the floor" */
+    it("names the tier, its rate and the floor's rate and markup", () => {
+      expect(instantEvalRateVersion({ tier: "instant" })).toBe("instant_eval@instant0.3+0.042x1.3");
+      expect(instantEvalRateVersion({ tier: "evals" })).toBe("instant_eval@evals0.6+0.042x1.3");
+      expect(
+        instantEvalJudgeRouteRateVersion({
+          routePricing: INSTANT_EVAL_JUDGE_DEFAULT_ROUTE_PRICING,
+          tier: "evals",
+        }),
+      ).toBe("instant_eval_judge_router@evals0.6+defaultx1.3");
     });
   });
 });
@@ -54,10 +133,10 @@ describe("given a judgement whose raw product carries float noise", () => {
     /** @scenario "A priced amount is rounded to nano-USD precision" */
     it("rounds both to the ledger's nano-USD unit", () => {
       const costUsd = instantEvalCostUsd({ inputTokens: 211_727 });
-      const priceUsd = instantEvalPriceUsd({ costUsd });
+      const priceUsd = instantEvalPriceUsd({ costUsd, inputTokens: 211_727, tier: "instant" });
 
       expect(costUsd).toBe(0.008892534);
-      expect(priceUsd).toBe(0.011560294);
+      expect(priceUsd).toBe(0.0635181);
       expect(String(priceUsd)).not.toMatch(/0000000\d$/);
     });
 

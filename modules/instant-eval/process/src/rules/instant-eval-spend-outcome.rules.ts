@@ -45,7 +45,7 @@ export interface InstantEvalSpendRecord {
   readonly requests: number;
   /** What the classifier charged us, in USD. */
   readonly costUsd: number;
-  /** What the customer is charged, in USD: the cost at the published markup. */
+  /** What the customer is charged, in USD: the published rate, never below cost times markup. */
   readonly priceUsd: number;
   readonly occurredAt: Instant;
 }
@@ -134,7 +134,7 @@ export function instantEvalPricedSpend({
     ...(record.virtualKeyId ? { virtualKeyId: record.virtualKeyId } : {}),
     requestType: INSTANT_EVAL_REQUEST_TYPE,
     model: INSTANT_EVAL_SPEND_MODEL,
-    rateVersion: instantEvalRateVersion(pricing),
+    rateVersion: instantEvalRateVersion({ tier: "instant", pricing }),
     inputTokens: record.inputTokens,
     // The CUSTOMER price, because that is the figure every consumer of the
     // ledger charges, caps and reports.

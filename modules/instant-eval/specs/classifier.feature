@@ -123,13 +123,13 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
   Scenario: Cost is the input tokens at the published rate, and output is free
     Given a response reporting one million input tokens and two hundred thousand output tokens
     When the cost is computed
-    Then it is the published rate for one million tokens
+    Then it is the classifier's rate for one million tokens
 
   @unit
-  Scenario: The customer price carries the platform markup
-    Given a classifier cost
+  Scenario: The customer price is the published rate, never below the cost times the markup
+    Given a classifier cost for some input tokens
     When the price is computed
-    Then it is the cost times the markup
+    Then it is those tokens at the tier's published rate, or the cost times the markup when that is higher
 
   # ---------------------------------------------------------------------------
   # Transport, retries and refusals

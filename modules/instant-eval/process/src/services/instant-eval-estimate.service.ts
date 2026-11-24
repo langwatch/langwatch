@@ -204,7 +204,12 @@ export class InstantEvalEstimateService {
       totalTokens,
       requests: rows,
       costUsd,
-      priceUsd: instantEvalPriceUsd({ costUsd, pricing: this.judge.pricing }),
+      priceUsd: instantEvalPriceUsd({
+        costUsd,
+        inputTokens: totalTokens,
+        tier: "instant",
+        pricing: this.judge.pricing,
+      }),
     };
   }
 }

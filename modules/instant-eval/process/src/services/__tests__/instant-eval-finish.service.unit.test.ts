@@ -74,6 +74,22 @@ describe("given a run that judged rows", () => {
       expect(spend.priceUsd).toBeGreaterThan(spend.costUsd);
     });
 
+    /** @scenario "The estimate is priced by the same rule as the run" */
+    /** @scenario "An Instant tier call is priced at 0.30 USD per million input tokens" */
+    it("prices a run that read 10,700,000 input tokens at 3.21 USD, as its estimate did", async () => {
+      const { service } = finishing();
+
+      const spend = await service.finish({
+        runId: RUN_ID,
+        projectId: PROJECT_ID,
+        outcome: "finished",
+        inputTokens: 10_700_000,
+        requests: 10_000,
+      });
+
+      expect(spend).toEqual({ costUsd: 0.4494, priceUsd: 3.21 });
+    });
+
     /** @scenario "A hold is released when the run's spend lands" */
     it("drops the hold only after the spend is recorded", async () => {
       const { service, order, released } = finishing();
@@ -174,7 +190,7 @@ describe("given a routed run", () => {
   });
 
   /** @scenario "A routed judgement is priced from the summed cost of every call" */
-  it("hands a routed run that cost nothing to the judge as routed, so its tokens bill nothing", async () => {
+  it("hands a routed run that cost nothing to the judge as routed, so its tokens cost nothing", async () => {
     const { service, recorded } = finishing();
 
     const spend = await service.finish({
@@ -187,7 +203,7 @@ describe("given a routed run", () => {
       routedInputTokens: 1_000_000,
     });
 
-    expect(spend.costUsd).toBe(0);
+    expect(spend).toEqual({ costUsd: 0, priceUsd: 0.3 });
     expect(recorded[0]).toMatchObject({ costNanoUsd: 0, routedInputTokens: 1_000_000 });
   });
 
@@ -260,7 +276,8 @@ describe("given a routed page that reported after its run finished", () => {
       routedInputTokens: 1_000_000,
     });
 
-    expect(spend).toEqual({ costUsd: 0.005, priceUsd: 0.0065 });
+    // One million input tokens at the Instant tier's rate, above the cost times the markup.
+    expect(spend).toEqual({ costUsd: 0.005, priceUsd: 0.3 });
     expect(recorded).toEqual([
       {
         projectId: PROJECT_ID,

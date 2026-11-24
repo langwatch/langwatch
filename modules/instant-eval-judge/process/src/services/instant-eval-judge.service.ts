@@ -267,6 +267,8 @@ export class InstantEvalJudgeService {
       }),
       inputTokens,
       occurredAt: this.deps.now().epochMilliseconds,
+      // The judge call's only caller is an LLM-judge evaluator (ADR-174 decision 25).
+      tier: "evals",
       ...this.pricing(),
       routed: this.priced(pickInstantEvalJudgementRoutedSpend({ inputTokens, costNanoUsd })),
     });
@@ -299,6 +301,7 @@ export class InstantEvalJudgeService {
       occurredAt,
       requests,
       runId,
+      tier: "instant",
       ...this.pricing(),
       routed: this.priced(pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens })),
     });

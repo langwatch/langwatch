@@ -334,7 +334,7 @@ export class InstantEvalJudgePageService {
     const costNanoUsd = Math.round(costUsd * NANO_USD_PER_USD);
     if (!isInstantEvalSpendBillable({ inputTokens: tokens, costNanoUsd })) return 0;
     const { pricing } = this.judge;
-    return instantEvalSpentPriceUsd({ inputTokens: tokens, costNanoUsd, pricing });
+    return instantEvalSpentPriceUsd({ inputTokens: tokens, costNanoUsd, tier: "instant", pricing });
   }
 
   /** The page's texts, judged, with a cancel or the lease able to stop it. */

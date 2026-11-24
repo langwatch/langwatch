@@ -110,7 +110,8 @@ rate, under the model `langwatch-instant-preview` (older rows carry `langwatch-e
 `jev`). A routed judgement is
 priced from the summed cost of its calls at the same markup, under the model `langwatch-judge`
 and the rate version
-`instant_eval_judge_router@<version>x<markup>`. A judgement that carries a cost, including 0, is a
+`instant_eval_judge_router@<tier><rate>+<version>x<markup>`. Either cost is the floor of the price, the input tokens at
+the tier's published rate (ADR-174 decision 25). A judgement that carries a cost, including 0, is a
 routed one. It also carries `routedInputTokens`, the input tokens its cost covers; a page or run
 costs its routed cost plus its other input tokens at the classifier's rate, so a run that mixes
 routed and unrouted calls is billed correctly. The flag `release_instant_evals_judge_router` gates routing per organization.

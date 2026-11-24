@@ -29,7 +29,7 @@ import {
   type InstantEvalRunInput,
 } from "@langwatch/instant-eval-contract";
 import {
-  INSTANT_EVAL_PRICING,
+  INSTANT_EVAL_PUBLISHED_RATES,
   INSTANT_EVAL_REQUEST_TYPE,
   INSTANT_EVALS_HOSTED_DISABLED_FLAG,
   type InstantEvalClassification,
@@ -699,11 +699,9 @@ describe("given a hosted Connect call judged on LangWatch Cloud", () => {
 
       expect(judgement.verdicts.map((verdict) => verdict.questionId)).toEqual(["polite"]);
       expect(judgement.inputTokens).toBeGreaterThan(0);
+      // The Instant tier's published rate, above the classifier's cost times the markup.
       const listPriceNanoUsd =
-        (judgement.inputTokens / 1_000_000) *
-        INSTANT_EVAL_PRICING.usdPerMillionInputTokens *
-        INSTANT_EVAL_PRICING.markup *
-        1_000_000_000;
+        (judgement.inputTokens / 1_000_000) * INSTANT_EVAL_PUBLISHED_RATES.instant * 1_000_000_000;
       expect(recorded).toHaveLength(1);
       expect(recorded[0]).toMatchObject({
         organizationId: ORGANIZATION,
