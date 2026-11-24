@@ -13,6 +13,7 @@ import type {
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
+  SpanAnalyticsFloor,
   TraceSummaryListOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
@@ -40,6 +41,11 @@ export type ResolveTraceSpansBatchFn = (
   projectId: string,
   spansPerTrace: NormalizedSpan[][],
 ) => Promise<ResolvedTraceSpans[]>;
+
+/** The span_analytics floor a legacy list's filters read by; the unknown floor when none apply. */
+export type SpanAnalyticsFloorFor = (
+  filters: GetAllTracesForProjectInput["filters"],
+) => Promise<SpanAnalyticsFloor>;
 
 /**
  * Partition-key bound for multi-trace reads: earliest and latest occurrence
@@ -84,6 +90,8 @@ export abstract class TraceLegacyReadRepository {
       options: GetAllTracesForProjectOptions;
       /** The own-only proof the span, evaluation and event reads go through. */
       ownRead: Authorization;
+      /** Where span_analytics is complete; absent or null, span types come from stored_spans. */
+      spanAnalyticsFloor?: SpanAnalyticsFloor | null;
     },
   ): Promise<TraceLegacyPage>;
 

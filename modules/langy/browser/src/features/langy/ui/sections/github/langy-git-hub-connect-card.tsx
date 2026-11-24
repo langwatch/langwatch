@@ -9,11 +9,15 @@ import { type ReactNode, useState } from "react";
 import { FolderPlus, GitHub } from "react-feather";
 
 import { api } from "../../../../../behavior/langy-api.ts";
+import { useLangyHost } from "../../../../../model/langy-host.ts";
 import { useGitHubConnectPopup } from "../../../behavior/github-connect-popup.ts";
 
 // The in-app Integrations page — the SAME GitHub App flow the rest of the app
 // opens (Settings → Integrations), reachable without a popup.
 const GITHUB_SETTINGS_PATH = "/settings/integrations#github";
+
+/** The self-hosting guide for registering the GitHub App Langy opens pull requests with. */
+const GITHUB_APP_SETUP_DOCS = "https://docs.langwatch.ai/self-hosting/langy/github-app";
 
 export type LangyGitHubConnectCardProps = {
   organizationId: string;
@@ -55,6 +59,8 @@ export function LangyGitHubNotSetUpCard({
 }: {
   onShareLocalFolder?: (() => void) | undefined;
 }) {
+  // Registering the App is an instance setup step, so only an organization admin gets the guide.
+  const isAdmin = useLangyHost().hasOrganizationPermission("organization:manage");
   return (
     <CardFrame>
       <HStack gap={2}>
@@ -79,6 +85,21 @@ export function LangyGitHubNotSetUpCard({
           <FolderPlus size={14} />
           Share local folder
         </Button>
+      ) : null}
+      {isAdmin ? (
+        <chakra.a
+          href={GITHUB_APP_SETUP_DOCS}
+          target="_blank"
+          rel="noreferrer"
+          alignSelf="flex-start"
+          textStyle="xs"
+          color="fg.muted"
+          textDecoration="underline"
+          textUnderlineOffset="2px"
+          _hover={{ color: "fg" }}
+        >
+          How to set up the GitHub App
+        </chakra.a>
       ) : null}
     </CardFrame>
   );
