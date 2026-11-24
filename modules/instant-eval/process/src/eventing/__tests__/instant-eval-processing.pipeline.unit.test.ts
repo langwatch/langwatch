@@ -38,6 +38,7 @@ function pipeline(): InstantEvalProcessingPipelineDefinition {
         recordPageJudged: vi.fn(),
         recordFinished: vi.fn(),
         recordLatePageBilled: vi.fn(),
+        recordPageFailed: vi.fn(),
       }),
     },
   });
@@ -130,6 +131,8 @@ const lateBill = {
   priceUsd: 0.0000065,
 };
 
+const pageFailed = { runId: RUN_ID, page: 3, errorCode: "internal_error" };
+
 /** One complete payload per command, so each parses against its own schema. */
 const payloadOf: Record<string, Record<string, unknown>> = {
   requestRun: requestedEvent().data,
@@ -138,12 +141,13 @@ const payloadOf: Record<string, Record<string, unknown>> = {
   requestCancel: { runId: RUN_ID, requestedByUserId: null },
   recordFinished: finished,
   recordLatePageBilled: lateBill,
+  recordPageFailed: pageFailed,
 };
 
 describe("given the pipeline the worker registers", () => {
   describe("when it is built", () => {
-    /** @scenario "The worker mounts one run projection, six commands and the process manager" */
-    it("mounts one run projection, six commands and the process manager", () => {
+    /** @scenario "The worker mounts one run projection, seven commands and the process manager" */
+    it("mounts one run projection, seven commands and the process manager", () => {
       const built = pipeline();
 
       expect(built.metadata.name).toBe(INSTANT_EVAL_PIPELINE_NAME);
@@ -155,6 +159,7 @@ describe("given the pipeline the worker registers", () => {
         "requestCancel",
         "recordFinished",
         "recordLatePageBilled",
+        "recordPageFailed",
       ]);
       expect([...(built.stateProjections?.keys() ?? [])]).toEqual(["instantEvalRun"]);
       expect([...built.processManagers.keys()]).toEqual([INSTANT_EVAL_PROCESS_NAME]);
@@ -236,6 +241,15 @@ describe("given a run whose events arrive more than once", () => {
       expect(next.idempotencyKey).not.toBe(first.idempotencyKey);
       expect(first.idempotencyKey).toContain("late-page-3");
     });
+
+    /** @scenario "A failure delivered again is still one spend record" */
+    it("keys a page failure by its page, so a redelivered failure is one event", async () => {
+      const first = await eventOf("recordPageFailed", pageFailed);
+      const again = await eventOf("recordPageFailed", pageFailed);
+
+      expect(again.idempotencyKey).toBe(first.idempotencyKey);
+      expect(first.idempotencyKey).toContain("page-failed-3");
+    });
   });
 });
 
@@ -255,7 +269,7 @@ describe("given two runs of one project judging at the same time", () => {
         }),
       );
 
-      expect(aggregateIds).toEqual([RUN_ID, RUN_ID, RUN_ID, RUN_ID, RUN_ID, RUN_ID]);
+      expect(aggregateIds).toEqual(Array.from({ length: 7 }, () => RUN_ID));
     });
 
     it("gives the project one queue lane, so a run's pages never overtake each other", () => {
@@ -271,7 +285,7 @@ describe("given two runs of one project judging at the same time", () => {
         }),
       );
 
-      expect(groupKeys).toEqual(Array.from({ length: 6 }, () => PROJECT_ID));
+      expect(groupKeys).toEqual(Array.from({ length: 7 }, () => PROJECT_ID));
     });
   });
 });

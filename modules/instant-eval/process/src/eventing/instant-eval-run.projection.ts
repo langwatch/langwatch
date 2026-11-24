@@ -166,6 +166,10 @@ export function applyInstantEvalRunEvent(
         priceUsd: toNanoUsdPrecision(state.priceUsd + event.data.priceUsd),
       };
 
+    case INSTANT_EVAL_EVENT_TYPES.PAGE_FAILED:
+      // The status waits for the finish this leads to, which sets it with what the run cost.
+      return state;
+
     default:
       return state;
   }

@@ -171,6 +171,8 @@ export const instantEvalProcessEventViewSchema = z.object({
   cursor: z.string().nullable().default(null),
   cursorSpanId: z.string().nullable().default(null),
   hasNextPage: z.boolean().default(false),
+  /** A failed page's code; null on every other event. */
+  errorCode: z.string().nullable().default(null),
 });
 
 export type InstantEvalProcessEventView = z.infer<typeof instantEvalProcessEventViewSchema>;

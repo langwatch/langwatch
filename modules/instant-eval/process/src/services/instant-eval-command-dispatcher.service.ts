@@ -43,13 +43,14 @@ export class InstantEvalCommandDispatcherService
     return this.#send("requestCancel", command);
   }
 
-  /** The four the pipeline's own intents record their outcomes through. */
+  /** The five the pipeline's own intents record their outcomes through. */
   outcomeCommands(): InstantEvalOutcomeCommands {
     return {
       recordPlanned: (args) => this.#send("recordPlanned", args),
       recordPageJudged: (args) => this.#send("recordPageJudged", args),
       recordFinished: (args) => this.#send("recordFinished", args),
       recordLatePageBilled: (args) => this.#send("recordLatePageBilled", args),
+      recordPageFailed: (args) => this.#send("recordPageFailed", args),
     };
   }
 

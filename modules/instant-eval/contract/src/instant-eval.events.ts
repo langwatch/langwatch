@@ -1,5 +1,5 @@
 /**
- * What one run records as it goes. None of the six carries judged text: a page
+ * What one run records as it goes. None of the seven carries judged text: a page
  * event carries counts and a cursor, so a hundred thousand rows is a couple of
  * hundred events. @see modules/instant-eval/specs/instant-eval-pipeline.feature
  */
@@ -236,6 +236,37 @@ export const instantEvalLatePageBilledEventSchema: InstantEvalLatePageBilledEven
   instantEvalLatePageBilledEventSchemaDefinition;
 export type InstantEvalLatePageBilledEvent = z.infer<typeof instantEvalLatePageBilledEventSchema>;
 
+/**
+ * A page that failed on its last attempt, or with an error the outbox will not retry. It names
+ * only the page and the code: the run's process finishes it as failed with what its judged pages
+ * summed, so the finish bills them (ADR-174 decision 24).
+ */
+const instantEvalPageFailedEventDataSchemaDefinition = z.object({
+  runId: z.string().min(1),
+  page: z.number().int().positive(),
+  /** The failure's code, never prose. */
+  errorCode: z.string().min(1),
+});
+export interface InstantEvalPageFailedEventDataSchema extends Named<
+  typeof instantEvalPageFailedEventDataSchemaDefinition
+> {}
+export const instantEvalPageFailedEventDataSchema: InstantEvalPageFailedEventDataSchema =
+  instantEvalPageFailedEventDataSchemaDefinition;
+export type InstantEvalPageFailedEventData = z.infer<typeof instantEvalPageFailedEventDataSchema>;
+
+const instantEvalPageFailedEventSchemaDefinition = z.object({
+  ...instantEvalEventSchema.shape,
+  type: z.literal(INSTANT_EVAL_EVENT_TYPES.PAGE_FAILED),
+  version: z.literal(INSTANT_EVAL_EVENT_VERSIONS.PAGE_FAILED),
+  data: instantEvalPageFailedEventDataSchema,
+});
+export interface InstantEvalPageFailedEventSchema extends Named<
+  typeof instantEvalPageFailedEventSchemaDefinition
+> {}
+export const instantEvalPageFailedEventSchema: InstantEvalPageFailedEventSchema =
+  instantEvalPageFailedEventSchemaDefinition;
+export type InstantEvalPageFailedEvent = z.infer<typeof instantEvalPageFailedEventSchema>;
+
 /** Every event one run's pipeline folds. */
 export type InstantEvalProcessingEvent =
   | InstantEvalRequestedEvent
@@ -243,4 +274,5 @@ export type InstantEvalProcessingEvent =
   | InstantEvalPageJudgedEvent
   | InstantEvalCancelRequestedEvent
   | InstantEvalFinishedEvent
-  | InstantEvalLatePageBilledEvent;
+  | InstantEvalLatePageBilledEvent
+  | InstantEvalPageFailedEvent;
