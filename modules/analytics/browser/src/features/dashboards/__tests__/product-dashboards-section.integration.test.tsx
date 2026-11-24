@@ -144,6 +144,35 @@ describe("a product's Dashboards section", () => {
     });
   });
 
+  describe("given the board I have open is listed", () => {
+    // The params each board route captures, as the route table declares them.
+    describe.each([
+      { address: "/dashboards/Checkout", params: { dashboardId: "Checkout" } },
+      {
+        address: "/shop-abc123/dashboards/Checkout",
+        params: { project: SHOP.slug, dashboardId: "Checkout" },
+      },
+    ])("when it is open at $address", ({ params }) => {
+      /** @scenario "The open board's sidebar row is marked as the page I am on" */
+      it("marks its row, and no other, as the current page", async () => {
+        render({
+          element: <ProductDashboardsSection product="gateway" />,
+          listed: [board({ id: "Checkout" }), board({ id: "Refunds" })],
+          host: new StubAnalyticsHost({ route: { params, query: {} } }),
+        });
+
+        const list = await screen.findByRole("list", { name: "Dashboards" });
+        expect(within(list).getByRole("link", { name: "Checkout" })).toHaveAttribute(
+          "aria-current",
+          "page",
+        );
+        expect(within(list).getByRole("link", { name: "Refunds" })).not.toHaveAttribute(
+          "aria-current",
+        );
+      });
+    });
+  });
+
   describe("given LLM Ops with no saved board", () => {
     /** @scenario "From LangWatch boards are not listed for now" */
     it("says No dashboards yet and lists no From LangWatch group", async () => {

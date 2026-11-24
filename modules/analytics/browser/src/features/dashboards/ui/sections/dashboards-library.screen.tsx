@@ -1,7 +1,7 @@
 /**
- * `/dashboards`, the organization's Dashboards library (ADR-002): every board the member can
- * see, by home product; the one place a board moves between
- * products. Every board opens at `/dashboards/<id>`. dashboards-organization-area.feature
+ * `/dashboards`, the organization's Dashboards library (ADR-002): every board the member can see,
+ * by home product; the one place a board moves between products. Every board opens at
+ * `/dashboards/<id>`; `?new=1` opens the create dialog. dashboards-organization-area.feature
  */
 
 import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
@@ -13,6 +13,7 @@ import { LayoutDashboard, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { useBoardReader } from "../../behavior/use-board-access.ts";
+import { useLibraryCreateDialog } from "../../behavior/use-library-create-dialog.ts";
 import { useLibraryShowMore } from "../../behavior/use-library-show-more.ts";
 import { useOrganizationLibrary } from "../../behavior/use-organization-library.ts";
 import {
@@ -30,12 +31,12 @@ import { NewDashboardDialog } from "./new-dashboard-dialog.tsx";
 
 export default function DashboardsLibraryScreen() {
   const library = useOrganizationLibrary();
-  const [isNewDialogOpen, setIsNewDialogOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<LibraryBoard | undefined>();
   const [pendingMove, setPendingMove] = useState<LibraryBoard | undefined>();
   const { storeProject } = library;
   // The store project is one where the member may create, so having one is the permission.
   const mayCreate = storeProject !== void 0;
+  const createDialog = useLibraryCreateDialog({ mayCreate });
 
   if (readHandledError(library.loadError)?.code === "dashboards_not_enabled") {
     return <UiPageNotFound />;
@@ -46,7 +47,7 @@ export default function DashboardsLibraryScreen() {
   const duplicates = mayCreate ? { onDuplicate: library.duplicateBoard } : {};
   const groups = libraryGroups({ boards: library.boards });
   const newButton = mayCreate ? (
-    <Button size="sm" colorPalette="teal" onClick={() => setIsNewDialogOpen(true)}>
+    <Button size="sm" colorPalette="teal" onClick={createDialog.open}>
       <Plus size={14} aria-hidden />
       New dashboard
     </Button>
@@ -67,8 +68,8 @@ export default function DashboardsLibraryScreen() {
       />
       <LibraryDialogs
         library={library}
-        isNewDialogOpen={isNewDialogOpen}
-        onCloseNewDialog={() => setIsNewDialogOpen(false)}
+        isNewDialogOpen={createDialog.isOpen}
+        onCloseNewDialog={createDialog.close}
         pendingMove={pendingMove}
         onSettleMove={() => setPendingMove(void 0)}
         pendingDelete={pendingDelete}

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import { useAnalyticsEntry } from "../../../behavior/use-analytics-entry.ts";
+import { useHasOrganizationLibrary } from "../../../behavior/use-product-home.ts";
 import { useNavigationHost } from "../../../model/navigation-host.ts";
 import { planManagementHref } from "../../../model/plan-management-href.ts";
 import {
@@ -10,6 +11,7 @@ import {
 import type { Command } from "../model/command-bar-types.ts";
 import {
   actionCommands,
+  createDashboardCommand,
   filterCommands,
   filterCommandsByFeatureFlags,
   filterCommandsByProjectNavigation,
@@ -113,6 +115,9 @@ export function useFilteredCommands({
   const productCommands = useProductCommands();
   const analyticsEntry = useAnalyticsEntry();
   const { path: analyticsPath, leadsToDashboards, isSettled: analyticsSettled } = analyticsEntry;
+  const hasOrganizationLibrary = useHasOrganizationLibrary();
+  // The project's Dashboards page has no create dialog, so without the library there is no action.
+  const offersCreateDashboard = leadsToDashboards && hasOrganizationLibrary;
 
   const availableNavCommands = useMemo(() => {
     const commands = (
@@ -161,8 +166,9 @@ export function useFilteredCommands({
     const commands = hasOpsAccess
       ? actionCommands
       : actionCommands.filter((cmd) => cmd.id !== "action-send-trace");
-    return filterCommandsByProjectNavigation({ commands, navigation: projectNavigation });
-  }, [hasOpsAccess, projectNavigation]);
+    const offered = filterCommandsByProjectNavigation({ commands, navigation: projectNavigation });
+    return offersCreateDashboard ? [...offered, createDashboardCommand] : offered;
+  }, [hasOpsAccess, projectNavigation, offersCreateDashboard]);
 
   const filteredActions = useMemo(
     () =>

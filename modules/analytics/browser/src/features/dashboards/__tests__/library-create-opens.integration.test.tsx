@@ -21,13 +21,24 @@ import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helper
 const IN_VIEW = { id: "proj-1", slug: "test-project", name: "Test Project" };
 const UNAVAILABLE = "This dashboard was deleted or isn't shared with you.";
 
+type Query = Readonly<Record<string, string | undefined>>;
+
 /** A host whose address follows `navigate`, so the test moves from the library to the board. */
 class NavigatingHost extends StubAnalyticsHost {
   dashboardId: string | undefined;
+  query: Query = {};
+  /** Each query write and whether it replaced the history entry rather than adding one. */
+  readonly queryWrites: { query: Query; replace: boolean }[] = [];
   onNavigate: () => void = () => void 0;
 
   override route() {
-    return { params: this.dashboardId ? { dashboardId: this.dashboardId } : {}, query: {} };
+    const params = this.dashboardId ? { dashboardId: this.dashboardId } : {};
+    return { params, query: this.query };
+  }
+
+  override setQuery(next: Query, options?: { replace?: boolean }): void {
+    this.query = next;
+    this.queryWrites.push({ query: next, replace: options?.replace ?? false });
   }
 
   override navigate(to: string, options?: { replace?: boolean }): void {
@@ -132,6 +143,26 @@ describe("a board made in the library", () => {
       expect(heading).toBeInTheDocument();
       expect(host.navigations).toEqual(["/dashboards/board-new"]);
       expect(seen.unavailable).toBe(false);
+    });
+  });
+
+  describe("when the library is opened at ?new=1", () => {
+    /** @scenario "The library opened to create a dashboard opens its create dialog" */
+    it("opens the create dialog, drops the key in place, and the made board opens", async () => {
+      const host = new NavigatingHost({
+        projectPermissions: { [IN_VIEW.id]: ["analytics:create", "analytics:update"] },
+      });
+      host.query = { new: "1" };
+      renderDashboards({ element: <Pages host={host} />, host, answer: server() });
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+
+      await user.click(await screen.findByRole("radio", { name: /Organization/ }));
+      expect(host.queryWrites).toEqual([{ query: {}, replace: true }]);
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      const heading = await screen.findByRole("heading", { name: "Untitled dashboard 1" });
+      expect(heading).toBeInTheDocument();
+      expect(host.navigations).toEqual(["/dashboards/board-new"]);
     });
   });
 });

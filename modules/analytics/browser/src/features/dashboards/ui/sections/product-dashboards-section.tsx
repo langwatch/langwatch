@@ -26,7 +26,7 @@ import {
 } from "../../model/organization-library.ts";
 import { PRODUCT_BOARDS_SHOWN_MAX, sharingTitle } from "../../model/product-dashboards.ts";
 import { BoardMenu } from "../blocks/board-menu.tsx";
-import { SidebarLinkRow } from "../blocks/sidebar-link-row.tsx";
+import { SIDEBAR_ROW_ICON_SIZE, SidebarLinkRow } from "../blocks/sidebar-link-row.tsx";
 import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 import { BoardMenuDialogs } from "./board-menu-dialogs.tsx";
 import { hasSharingChoice, NewDashboardDialog } from "./new-dashboard-dialog.tsx";
@@ -69,7 +69,7 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           <SidebarLinkRow
             name="Browse templates"
             href={dashboardTemplatesPath({ projectSlug })}
-            icon={<LayoutTemplate size={14} />}
+            icon={<LayoutTemplate size={SIDEBAR_ROW_ICON_SIZE} />}
           />
         </RowList>
       )}
@@ -183,7 +183,7 @@ function BoardRow({
     <SidebarLinkRow
       name={board.name}
       href={href}
-      icon={<Icon size={14} />}
+      icon={<Icon size={SIDEBAR_ROW_ICON_SIZE} />}
       iconTitle={sharingTitle(board)}
       isActive={isOpen}
       menu={<BoardMenu name={board.name} actions={actions} />}
