@@ -131,6 +131,7 @@ describe("the embedded skills bundle", () => {
   // Langy's own render (skills/_compiled/native) drops the login partials
   // because Langy already holds a key. A CLI user does not, so pointing the
   // bundle back at that render must fail here, not ship without login steps.
+  /** @scenario "The cli render keeps every sign-in step its skills import" */
   it("keeps every login partial its skills import, verbatim", () => {
     const withLogin = SKILLS_BUNDLE.filter((entry) => loginPartialsOf(sourceOf(entry)).length > 0);
     expect(

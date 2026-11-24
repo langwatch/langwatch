@@ -20,6 +20,7 @@ const setupLwFor = (mode: string): string =>
   );
 
 describe("renderModeDir", () => {
+  /** @scenario "Building the CLI without choosing a render bundles the cli render" */
   it("defaults to the cli render when the env var is unset", () => {
     expect(renderModeDir(undefined)).toBe("cli");
   });
@@ -29,6 +30,7 @@ describe("renderModeDir", () => {
     expect(renderModeDir("native")).toBe("native");
   });
 
+  /** @scenario "An unknown render value fails the build" */
   it("rejects any other value with a clear error", () => {
     expect(() => renderModeDir("nativ")).toThrow(
       /LANGWATCH_SKILLS_RENDER must be one of cli, native/,
@@ -38,14 +40,17 @@ describe("renderModeDir", () => {
 });
 
 describe("the skills render guard", () => {
+  /** @scenario "The native render leaves the sign-in steps out" */
   it("native mode bundles setup-lw without login steps", () => {
     expect(setupLwFor("native")).not.toContain("langwatch login");
   });
 
+  /** @scenario "The cli render keeps every sign-in step its skills import" */
   it("cli mode bundles setup-lw with login steps", () => {
     expect(setupLwFor("cli")).toContain("langwatch login");
   });
 
+  /** @scenario "The Langy image builds its CLI with the native render" */
   it("Dockerfile.langyagent sets LANGWATCH_SKILLS_RENDER=native on its generate step", () => {
     const dockerfile = fs.readFileSync(
       path.join(REPO_ROOT, "infra/docker/Dockerfile.langyagent"),

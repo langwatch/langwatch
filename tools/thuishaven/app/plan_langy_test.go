@@ -296,6 +296,7 @@ func TestEnsureLangyCLI(t *testing.T) {
 		}
 	})
 
+	// @scenario "The host-tier Langy CLI is built with the native render"
 	t.Run("builds a missing CLI first, with the native skills render", func(t *testing.T) {
 		sup := &fakeSupervisor{}
 		run(t, sup, false, domain.LangyTierHostUnsafe)
