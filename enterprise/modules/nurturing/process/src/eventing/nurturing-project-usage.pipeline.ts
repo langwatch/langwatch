@@ -18,6 +18,10 @@ import {
   SUBSCRIPTION_CHANGED_EVENT_TYPE,
   subscriptionChangedEventDataSchema,
 } from "@langwatch/enterprise-billing-contract";
+import {
+  GOVERNANCE_ATTR,
+  GOVERNANCE_ORIGIN_KIND_VALUE,
+} from "@langwatch/enterprise-governance-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import {
   EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
@@ -318,16 +322,21 @@ const originAttributesSchema = z
   .array(z.object({ key: z.string(), value: z.object({ stringValue: z.string().nullish() }) }))
   .optional();
 
-function extractOrigin(attributes: z.output<typeof originAttributesSchema>): string | undefined {
-  const origin = attributes?.find(({ key }) => key === ORIGIN_ATTRIBUTE)?.value.stringValue;
-  return origin ? origin : undefined;
+function extractAttribute(
+  attributes: z.output<typeof originAttributesSchema>,
+  name: string,
+): string | undefined {
+  const value = attributes?.find(({ key }) => key === name)?.value.stringValue;
+  return value ? value : undefined;
 }
 
-/** What the trace-day count reads of a span: whether it is a root, and its origin; no body. */
+/** What the trace-day count reads of a span: whether it is a root, and its origins; no body. */
 export type NurturingTraceSpanData = Readonly<{
   span: Pick<SpanReceivedEventData["span"], "parentSpanId">;
   /** The explicit origin, the span's own before its resource's, as trace hoists it. */
   origin?: string;
+  /** The span's own `langwatch.origin.kind`, the one key trace hoists governance ingest by. */
+  originKind?: string;
 }>;
 
 const traceSpanDataSchema = z
@@ -339,7 +348,10 @@ const traceSpanDataSchema = z
   })
   .transform(({ span: { parentSpanId, attributes }, resource }): NurturingTraceSpanData => ({
     span: { parentSpanId },
-    origin: extractOrigin(attributes) ?? extractOrigin(resource?.attributes),
+    origin:
+      extractAttribute(attributes, ORIGIN_ATTRIBUTE) ??
+      extractAttribute(resource?.attributes, ORIGIN_ATTRIBUTE),
+    originKind: extractAttribute(attributes, GOVERNANCE_ATTR.ORIGIN_KIND),
   }));
 
 /** Not a sample's or Langy's own trace, which trace's `isRealFirstIngest` leaves out too. */
@@ -347,14 +359,22 @@ function isCustomerOrigin(origin: string | undefined): boolean {
   return origin === undefined || !NON_CUSTOMER_ORIGINS.has(origin);
 }
 
+/**
+ * Governance ingest, which lands in the organization's hidden governance project and which
+ * trace's `isRealFirstIngest` leaves out too.
+ */
+function isGovernanceIngest(originKind: string | undefined): boolean {
+  return originKind === GOVERNANCE_ORIGIN_KIND_VALUE;
+}
+
 /** A root span: one per trace, the only span the trace-day count takes. */
 export function isRootSpan(data: NurturingTraceSpanData): boolean {
   return !data.span.parentSpanId;
 }
 
-/** A customer's trace: its root span, unless a sample's or Langy's own turn. */
+/** A customer's trace: its root span, unless a sample's, Langy's own turn or governance ingest. */
 export function isCountedTrace(data: NurturingTraceSpanData): boolean {
-  return isRootSpan(data) && isCustomerOrigin(data.origin);
+  return isRootSpan(data) && isCustomerOrigin(data.origin) && !isGovernanceIngest(data.originKind);
 }
 
 /** Lane names under `<host pipeline>.`, which the withMigrations steps in nurturing.module.ts name. */
@@ -393,9 +413,10 @@ const NO_LAST_EVENT_OCCURRED_AT = "LastEventOccurredAt";
 
 /**
  * One project's traces per UTC day of append, from trace's span_received (§9): a customer root
- * span is one trace. Child, sample and Langy spans mint no job (the enqueue filter), and apply
- * skips any a replay hands it. A redelivered batch folds once; a root span stored again under a
- * new event id counts again (issue 9378). Counts every organization's traces: the read gates them.
+ * span is one trace. Child, sample, Langy and governance-ingest spans mint no job (the enqueue
+ * filter), and apply skips any a replay hands it. A redelivered batch folds once; a root span
+ * stored again under a new event id counts again (issue 9378). Counts every organization's
+ * traces: the read gates them.
  */
 export function nurturingTraceDaySpansFold(
   store: FoldProjectionStore<NurturingTraceDay>,

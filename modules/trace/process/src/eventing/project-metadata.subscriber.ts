@@ -4,6 +4,7 @@
  * first real trace. `isRealFirstIngest` guards a re-delivered first trace.
  */
 
+import { isGovernanceOriginTrace } from "@langwatch/enterprise-governance-contract";
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type {
@@ -241,12 +242,17 @@ export function projectMetadataGroupKey(event: { tenantId: string }): string {
   return `project-metadata:${event.tenantId}`;
 }
 
-// Skip sample traces from empty-state onboarding and Langy's own turns:
-// neither should flip the integrated flag, dismiss the onboarding card,
-// or reach a CRM milestone as the customer's own first trace.
+// Skip sample traces from empty-state onboarding, Langy's own turns and
+// governance ingest (it lands in the organization's hidden governance
+// project): none should flip the integrated flag, dismiss the onboarding
+// card, or reach a CRM milestone as the customer's own first trace.
 export function isRealFirstIngest(foldState: TraceSummaryData): boolean {
   const origin = foldState.attributes?.["langwatch.origin"];
-  return origin !== "sample" && origin !== LANGY_TRACE_ORIGIN;
+  return (
+    origin !== "sample" &&
+    origin !== LANGY_TRACE_ORIGIN &&
+    !isGovernanceOriginTrace(foldState.attributes)
+  );
 }
 
 // Long dedup TTL ensures at most one database write per project window

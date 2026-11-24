@@ -645,6 +645,28 @@ describe("the trace-day spans fold", () => {
     expect(fold.options?.enqueue?.filter?.(withResource("langy", "application"))).toBe(true);
   });
 
+  /** @scenario "Governance-ingested traces are not counted" */
+  it.each([
+    ["governance ingest", "ingestion_source", false],
+    ["another origin kind", "something_else", true],
+  ])("decides whether a root span of %s is staged and counted", (_name, kind, counted) => {
+    const raw = spanReceived({ id: "trace-1", createdAt: NOON });
+    const data = raw.data as { span: object };
+    const span = spanOf({
+      ...raw,
+      data: {
+        ...data,
+        span: {
+          ...data.span,
+          attributes: [{ key: "langwatch.origin.kind", value: { stringValue: kind } }],
+        },
+      },
+    });
+
+    expect(fold.options?.enqueue?.filter?.(span)).toBe(counted);
+    expect(foldAll([span]).traceCount).toBe(counted ? 1 : 0);
+  });
+
   /** @scenario "Traces arriving out of order count the same" */
   it("counts an older trace that arrives after a newer one, keeping the newer time", () => {
     expect(foldAll([root("trace-2", NOON + 1000), root("trace-1", NOON)])).toMatchObject({

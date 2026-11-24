@@ -204,6 +204,14 @@ Feature: Per-email usage reaches Customer.io from nurturing's own project rows
     And a trace_failed of a sample or Langy trace mints no failures fold job and counts no failed trace
 
   @unit
+  Scenario: Governance-ingested traces are not counted
+    Given root spans stamped langwatch.origin.kind "ingestion_source" by governance ingestion
+    When trace appends them
+    Then none is staged on the trace-day spans fold, as trace keeps them out of a project's first trace
+    And one a replay hands the fold is not counted
+    And a root span of any other origin kind is staged
+
+  @unit
   Scenario: A failed trace is counted from trace's trace_failed fact
     Given trace records trace_failed for a project's trace, by its own rule
     When the trace-day failures fold takes it
