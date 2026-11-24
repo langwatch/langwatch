@@ -1,6 +1,6 @@
 # ADR-001: Nurturing learns from events and keeps its own copies
 
-**Status:** Accepted (2026-09-29; amended 2026-11-11, 2026-11-17 (twice) and 2026-11-19)
+**Status:** Accepted (2026-09-29; amended 2026-11-11, 2026-11-17 (twice), 2026-11-19 and 2026-11-24)
 
 **Behavioural contract:** [Nurturing](../specs/nurturing.feature)
 
@@ -50,11 +50,21 @@ before the send; a refused send retries its own job, so a refused catch-up's
 retry still sends again unless a fact that beats it landed first. The member
 copy's history before organization recorded member facts comes from
 organization's `member_listed` facts, recorded once by organization's own step;
-the `nurturing-member-backfill` task is removed. The trace-day counts stay a
-batch subscriber and keep the owner's decision of issue 9378: a replay over
-counted rows would count every trace again. An organization's evaluation and run
-counts and coding columns stay subscriber-written, because each write decides a
-send from the row before it. `NurturingUncopiedProject` holds no owner fact.
+the `nurturing-member-backfill` task is removed. An organization's evaluation
+and run counts and coding columns stay subscriber-written, because each write
+decides a send from the row before it.
+
+**Amended (2026-11-24): trace days are a peer fold.** The trace-day counts are
+two peer folds, one over trace's root spans and one over its failed traces, as
+each event has its own owner pipeline. Both write `NurturingProjectTraceDayCount`
+keyed by project, UTC day and source, so a replay rebuilds each day exactly
+instead of adding to it; two deploy steps replay trace's log one counting window
+back. This reverses the decision of issue 9378 that kept them a batch
+subscriber. A span stored under two event ids still counts twice, as before.
+`NurturingUncopiedProject` and its retry clock are retired: a fold counts a
+trace whether or not its project's placement copy has landed. It and
+`NurturingProjectTraceDay` are read and written by no code, and stay until an
+operator step drops them.
 
 ## Known exceptions on main, tracked
 
@@ -105,8 +115,8 @@ log),
 (a project that traced).
 It also owns `NurturingOrganization` (admin, milestone counts, coding signals,
 last trace), `NurturingProjectUsageView` (one peer fold row per project and
-owner), `NurturingProjectTraceDay` (trace counts per project and UTC day, kept
-30 days) and `NurturingErasedUser` (a SHA-256 of each erased account's id, never
+owner), `NurturingProjectTraceDayCount` (trace and failure counts per project,
+UTC day and source, kept 30 days) and `NurturingErasedUser` (a SHA-256 of each erased account's id, never
 the id, so no member fact or gateway key fact folded after the erasure stores
 them again, whatever its stamp; https://github.com/langwatch/tasks/issues/1204).
 User ids are nanoids (~126 random bits), so a keyed hash (as governance uses for
@@ -148,9 +158,9 @@ first while neither is marked; if that one is erased later, the key has no
 holder until the other person's fact at that stamp is redelivered. Erasure no
 longer moves a cleared holder's stamp to now. A hand-over stamped between the
 holder's stamp and the erasure, which was dropped, now lands. The race the moved
-stamp closed is now closed by the re-check. A redelivered batch can count a
-trace twice, and so can a root span stored more than once; accepted (owner
-decision, issue 9378).
+stamp closed is now closed by the re-check. A redelivered batch folds into the
+trace days once, but a root span stored under two event ids counts twice, as
+before (issue 9378).
 Signals are events on the `nurturing` pipeline.
 A delivered signal is claimed in Redis for seven days under the process-wide idempotency key prefix,
 so a redelivered event sends nothing. A gateway key's creation and its budget's crossings
