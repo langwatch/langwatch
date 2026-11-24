@@ -900,15 +900,15 @@ describe("NurturingDeliveryService", () => {
 
       expect(cio.sent).toEqual([
         {
+          path: "/v1/group",
+          body: expect.objectContaining({ userId: "admin-1", groupId: "org-1" }),
+        },
+        {
           path: "/v1/identify",
           body: expect.objectContaining({
             userId: "admin-1",
             traits: expect.objectContaining({ evaluation_count: 7 }),
           }),
-        },
-        {
-          path: "/v1/group",
-          body: expect.objectContaining({ userId: "admin-1", groupId: "org-1" }),
         },
         {
           path: "/v1/track",
@@ -980,6 +980,41 @@ describe("NurturingDeliveryService", () => {
       ]);
     });
 
+    /** @scenario "A debounced evaluation batch still updates the organization's Company" */
+    it("updates the Company for a batch whose person-level update is debounced", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-3",
+        signal: counted("project-1:eval-3"),
+      });
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-4",
+        signal: counted("project-1:eval-4", {
+          evaluationId: "eval-4",
+          organizationEvaluationCount: 9,
+        }),
+      });
+      await settle();
+
+      expect(cio.sent.filter((call) => call.path === "/v1/group")).toEqual([
+        {
+          path: "/v1/group",
+          body: expect.objectContaining({
+            traits: expect.objectContaining({ evaluation_count: 7 }),
+          }),
+        },
+        {
+          path: "/v1/group",
+          body: expect.objectContaining({
+            traits: expect.objectContaining({ evaluation_count: 9 }),
+          }),
+        },
+      ]);
+      expect(cio.sent.filter((call) => call.path === "/v1/identify")).toHaveLength(1);
+      expect(cio.sent.filter((call) => call.path === "/v1/track")).toHaveLength(1);
+    });
+
     /** @scenario "An evaluation signal recorded before it named its organization updates no Company" */
     it("updates no Company for a signal recorded before it named its organization", async () => {
       const { cio, delivery } = deliveryOverBothSinks();
@@ -1008,7 +1043,8 @@ describe("NurturingDeliveryService", () => {
       });
       await settle();
 
-      expect(cio.sent.slice(0, 2)).toEqual([
+      expect(cio.sent.filter((call) => call.path === "/v1/group")).toHaveLength(1);
+      expect(cio.sent.filter((call) => call.path !== "/v1/group").slice(0, 2)).toEqual([
         {
           path: "/v1/identify",
           body: expect.objectContaining({

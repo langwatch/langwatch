@@ -121,6 +121,12 @@ Feature: Nurturing sends the signals its owners record
     Then the Company is sent first_evaluation_at as well
 
   @unit
+  Scenario: A debounced evaluation batch still updates the organization's Company
+    Given an evaluation_completed signal naming its organization was delivered, and its tenant is debounced
+    When a second signal for the same tenant is delivered within the debounce window
+    Then Customer.io receives both Company group updates and the admin's identify and track once
+
+  @unit
   Scenario: An evaluation signal recorded before it named its organization updates no Company
     Given an evaluation_completed signal with no organization
     When the signal is delivered

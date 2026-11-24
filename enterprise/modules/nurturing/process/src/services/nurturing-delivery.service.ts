@@ -116,6 +116,7 @@ export class NurturingDeliveryService {
     await this.parts.joinedOrganization?.deliver(signal);
     const deliveredClaim = `nurturing:${key}`;
     if (!(await this.deps.claims.claim(deliveredClaim, DELIVERED_WINDOW_SECONDS))) return;
+    this.sendEvaluationCompany(signal);
     if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
     const memberBatch = await this.memberBatchOf({ signal, deliveredClaim });
     this.toCustomerIo(signal);
@@ -446,6 +447,27 @@ export class NurturingDeliveryService {
     ]);
   }
 
+  /**
+   * The Company's evaluation facts, sent before the debounce: the person-level update is
+   * debounced per tenant, but a skipped batch must still keep the organization's count current.
+   */
+  private sendEvaluationCompany(signal: NurturingSignal): void {
+    if (signal.kind !== "evaluation_completed" || !signal.organizationId) return;
+    const count = signal.organizationEvaluationCount;
+    this.sendCustomerIoCalls([
+      {
+        type: "group",
+        userId: signal.userId,
+        groupId: signal.organizationId,
+        traits: {
+          has_evaluation_results: true,
+          evaluation_count: count,
+          ...(signal.first ? { first_evaluation_at: unixSecondsOf(signal.occurredAt) } : {}),
+        },
+      },
+    ]);
+  }
+
   /** Main's evaluation sync once per batch; `first` picks the milestone, `count` the batch's. */
   private evaluationCompleted(signal: NurturingSignalOf<"evaluation_completed">): void {
     const { userId, projectId, organizationEvaluationCount: count } = signal;
@@ -465,18 +487,6 @@ export class NurturingDeliveryService {
           },
         ]
       : [{ type: "identify", userId, traits: { evaluation_count: count, last_evaluation_at: at } }];
-    if (signal.organizationId) {
-      calls.push({
-        type: "group",
-        userId,
-        groupId: signal.organizationId,
-        traits: {
-          has_evaluation_results: true,
-          evaluation_count: count,
-          ...(signal.first ? { first_evaluation_at: at } : {}),
-        },
-      });
-    }
     calls.push({
       type: "track",
       userId,
