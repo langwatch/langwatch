@@ -47,6 +47,31 @@ export const TEMPLATES_SEGMENT = "templates";
 /** The From LangWatch boards' segment, ranked above a board id like the library's. */
 export const CURATED_SEGMENT = "curated";
 
+/**
+ * A new board's segment: "+" opens an unsaved board here, stored on its first edit. Board ids
+ * are generated and never read "new", so the board route keeps it.
+ */
+export const DRAFT_SEGMENT = "new";
+
+/** The address of a new, unsaved board. */
+export function draftBoardPath({ projectSlug }: { projectSlug: string }): string {
+  return `${dashboardsPath({ projectSlug })}/${DRAFT_SEGMENT}`;
+}
+
+/** An address with a query, its empty keys left out; an empty query adds nothing. */
+export function withQueryString({
+  path,
+  query,
+}: {
+  path: string;
+  query: Readonly<Record<string, string | undefined>>;
+}): string {
+  const kept = Object.entries(query).flatMap(([key, value]) =>
+    value === void 0 ? [] : [[key, value]],
+  );
+  return kept.length === 0 ? path : `${path}?${new URLSearchParams(kept).toString()}`;
+}
+
 /** The address of the templates library. */
 export function dashboardTemplatesPath({ projectSlug }: { projectSlug: string }): string {
   return `${dashboardsPath({ projectSlug })}/${TEMPLATES_SEGMENT}`;
@@ -93,6 +118,7 @@ export function templateLinks({
 export type DashboardsPlace =
   | { readonly kind: "landing" }
   | { readonly kind: "templates" }
+  | { readonly kind: "draft" }
   | { readonly kind: "board"; readonly dashboardId: string }
   | { readonly kind: "curated"; readonly templateId: string };
 
@@ -101,6 +127,7 @@ export function dashboardsPlace(openPath: string): DashboardsPlace {
   const [first, second] = openPath.split("/").map((segment) => decodeURIComponent(segment));
   if (!first) return { kind: "landing" };
   if (first === TEMPLATES_SEGMENT) return { kind: "templates" };
+  if (first === DRAFT_SEGMENT) return { kind: "draft" };
   if (first === CURATED_SEGMENT && second) return { kind: "curated", templateId: second };
   return { kind: "board", dashboardId: first };
 }

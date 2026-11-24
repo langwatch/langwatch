@@ -38,7 +38,7 @@ Feature: Organization-wide Dashboards area
     When I open "/dashboards", "/dashboards/<a board id>", "/dashboards/templates" or "/dashboards/curated/<id>"
     Then I see the same page the base commit of PR 9698 shows for that address
     And the Gateway, Governance and Coding agents sidebars are as the base commit draws them: the project's Dashboards section only where "Dashboards in every product" is on, and no "Starred dashboards" group
-    And the LLM Ops sidebar's Dashboards section lists my pins, at most 7, its "+" makes a board at once, and it has no "Browse templates"
+    And the LLM Ops sidebar's Dashboards section lists my pins, at most 7, its "+" opens a new board stored on its first edit, and it has no "Browse templates"
     And the Dashboards sidebar at "/shop/dashboards" is the one dashboards-v1 AC3 describes
     And "/shop/dashboards" lands on my My dashboard of "Shop", as today
     And switching project in the top bar on an Organization board at "/shop/dashboards/<id>" keeps the board open, re-read for the project switched to (D2)

@@ -553,3 +553,29 @@ function widgetText({
   const room = MAX_WIDGET_DRAFT_LENGTH - textWith([]).length;
   return textWith(fittedSql({ sqls, room }));
 }
+
+/**
+ * An ask built on a new board, retold about the board it was stored as: the board's id in each
+ * context and in what the draft is about. Nothing else in the ask names the board by id.
+ */
+export function askAboutStoredBoard({
+  request,
+  draftId,
+  dashboardId,
+}: {
+  request: AnalyticsLangyAskRequest;
+  draftId: string;
+  dashboardId: string;
+}): AnalyticsLangyAskRequest {
+  const { about } = request;
+  return {
+    ...request,
+    context: request.context.map((each) => ({
+      ...each,
+      ref: each.ref.replace(`(id ${draftId})`, `(id ${dashboardId})`),
+    })),
+    ...(about === void 0
+      ? {}
+      : { about: about.ref === draftId ? { ...about, ref: dashboardId } : about }),
+  };
+}

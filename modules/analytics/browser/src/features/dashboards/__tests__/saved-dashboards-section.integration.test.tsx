@@ -192,14 +192,75 @@ describe("the Dashboards sidebar", () => {
   });
 
   describe("when the member presses the '+' on Your dashboards", () => {
-    /** @scenario "AC162 The '+' on Your dashboards makes a blank board at once" */
-    it("makes a blank board at once, with no menu", async () => {
-      const { user, calls } = renderSection();
+    /** @scenario "AC162 The '+' on Your dashboards opens a new board without storing it" */
+    it("opens a new board at once, with no menu, and stores nothing", async () => {
+      const { user, calls, host } = renderSection();
       await listNamed("Your dashboards");
 
       await user.click(screen.getByRole("button", { name: "New dashboard" }));
+
       expect(screen.queryByRole("menuitem")).toBeNull();
-      await waitFor(() => expect(inputsTo(calls, "boards.create")).toHaveLength(1));
+      expect(host.navigations).toEqual(["/test-project/dashboards/new"]);
+      expect(inputsTo(calls, "boards.create")).toEqual([]);
+    });
+  });
+
+  describe("given the new board is open", () => {
+    /** @scenario "AC162 The '+' on Your dashboards opens a new board without storing it" */
+    it("lists it under Your dashboards as the open, numbered untitled board", async () => {
+      renderSection({ openPath: "new" });
+
+      expect(await namesIn("Your dashboards")).toEqual([
+        "My dashboard",
+        "Costs",
+        "Weekly review",
+        "Untitled dashboard 5",
+      ]);
+      const row = screen.getByRole("link", { name: "Untitled dashboard 5" });
+      expect(row).toHaveAttribute("aria-current", "page");
+      expect(row).toHaveAttribute("href", "/test-project/dashboards/new");
+    });
+
+    /** @scenario "AC162b Leaving a new board unedited stores nothing" */
+    it("drops the row once the member is elsewhere, having stored nothing", async () => {
+      const { calls } = renderSection({ openPath: "board-1" });
+
+      expect(await namesIn("Your dashboards")).not.toContain("Untitled dashboard 5");
+      expect(inputsTo(calls, "boards.create")).toEqual([]);
+    });
+
+    /** @scenario "AC162d Renaming, describing or pinning a new board stores it with that edit" */
+    it("stores the board under the name it is renamed to, in one call", async () => {
+      const { user, calls } = renderSection({ openPath: "new" });
+      await listNamed("Your dashboards");
+
+      await user.click(screen.getByRole("button", { name: "Actions for Untitled dashboard 5" }));
+      await user.click(await screen.findByRole("menuitem", { name: /Rename/ }));
+      const field = screen.getByRole("textbox", { name: "Dashboard name" });
+      await user.clear(field);
+      await user.type(field, "Refunds{Enter}");
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "boards.create")).toEqual([
+          { projectId: "proj-1", name: "Refunds" },
+        ]),
+      );
+      expect(inputsTo(calls, "boards.update")).toEqual([]);
+    });
+
+    /** @scenario "AC162d Renaming, describing or pinning a new board stores it with that edit" */
+    it("stores and pins the board when its pin is pressed", async () => {
+      const { user, calls } = renderSection({ openPath: "new" });
+      const draftLink = await screen.findByRole("link", { name: "Untitled dashboard 5" });
+
+      await user.click(within(draftLink).getByRole("button", { name: "Pin dashboard" }));
+
+      await waitFor(() =>
+        expect(inputsTo(calls, "boards.star")).toEqual([
+          { projectId: "proj-1", star: { kind: "board", dashboardId: "board-new" } },
+        ]),
+      );
+      expect(inputsTo(calls, "boards.create")).toHaveLength(1);
     });
   });
 

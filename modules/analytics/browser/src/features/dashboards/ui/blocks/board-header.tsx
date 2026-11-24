@@ -35,8 +35,8 @@ export function BoardHeader({
   onRename?: (name: string) => void;
   /** Absent where the reader cannot edit the board. */
   onDescribe?: (description: string) => void;
-  /** The board as the actions peers lend the header point at it. */
-  pointer: Omit<BoardHeaderActionProps, "boardName">;
+  /** The board as the actions peers lend the header point at it; none on a board not stored yet. */
+  pointer?: Omit<BoardHeaderActionProps, "boardName">;
   /** "Add a widget" on a board the reader may edit; null where there is nothing to offer. */
   action: ReactNode;
   /** An Organization board's read-only "Data from <project>": whose data it shows. */
@@ -52,7 +52,7 @@ export function BoardHeader({
           {scope}
         </HStack>
         <HStack flexShrink={0} gap={2}>
-          <LentBoardActions boardName={name} {...pointer} />
+          {pointer && <LentBoardActions boardName={name} {...pointer} />}
           {action}
         </HStack>
       </HStack>

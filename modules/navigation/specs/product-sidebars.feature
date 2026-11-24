@@ -332,8 +332,8 @@ Feature: Product sidebars
     Given I may create dashboards in this project
     And Dashboards in every product is off
     When I press the "+" at the right of the "Dashboards" title
-    Then a new dashboard is made in this project and pinned to it for me
-    And it opens with "Add a widget" open
+    Then a new dashboard opens in this project with "Add a widget" open
+    And nothing is stored until its first edit, which stores it pinned to this project for me
     And a member who may not create dashboards sees no "+"
 
   @integration
@@ -350,13 +350,13 @@ Feature: Product sidebars
   Scenario: A double click leaves exactly one dashboard
     Given I may create dashboards in this project
     When I press the "+" or the "Add dashboard" item twice in quick succession
-    Then one dashboard is made, and the control ignores the second press while it is made
+    Then no dashboard is made by the presses, and the new dashboard's first edit makes exactly one
 
   @integration
   Scenario: A failed pin leaves exactly one dashboard
     Given I may create dashboards in this project
-    When the pin fails after the dashboard is made
-    Then that one dashboard still exists, opens with "Add a widget" open, and I see "Couldn't pin the dashboard"
+    When the pin fails after the new dashboard's first edit stores it
+    Then that one dashboard still exists and stays open, and I see "Couldn't pin the dashboard"
 
   @integration
   Scenario: With the pinned list unreadable, the Dashboards section keeps its title and plus and lists nothing

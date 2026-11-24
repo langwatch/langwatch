@@ -1,7 +1,7 @@
 /**
  * The sidebar's "Dashboards" section, lent through `StarredDashboardsToken` (§10.1): the
- * dashboards the member pinned to the project (their stars there), the first 7 then
- * "All pinned (N)", and a "+" that makes a pinned dashboard and opens "Add a widget".
+ * member's pins in the project, the first 7 then "All pinned (N)", and a "+" that opens a new
+ * dashboard with "Add a widget" open, pinned once its first edit stores it.
  * @see modules/navigation/specs/product-sidebars.feature
  */
 
@@ -16,6 +16,7 @@ import { InProject } from "../../../../behavior/in-project.tsx";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardAccess, useBoardReader } from "../../behavior/use-board-access.ts";
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
+import { useStartDraft } from "../../behavior/use-draft-board.ts";
 import { useFavourites } from "../../behavior/use-favourites.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { dashboardsPath, myDashboardId } from "../../model/boards.ts";
@@ -30,7 +31,7 @@ import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 const PINNED_SHOWN_MAX = 7;
 
 /** What the create path offers: the "+" and the empty-state item both run `onAdd`. */
-type CreateControls = { isCreating: boolean; onAdd: () => void };
+type CreateControls = { onAdd: () => void };
 
 export function StarredDashboardsSection({ project }: StarredDashboardsProps) {
   if (!project) return <PinnedDashboards />;
@@ -63,16 +64,23 @@ function PinnedDashboards({ projectName }: { projectName?: string }) {
       create={create}
     />
   );
-  // The create path reads the board list to name the new one; only members who may create mount it.
+  // Only members who may create mount the create path.
   return mayCreate ? <WithCreate>{frame}</WithCreate> : frame();
 }
 
 function WithCreate({ children }: { children: (create: CreateControls) => ReactNode }) {
-  const saved = useSavedDashboards();
+  const host = useAnalyticsHost();
+  const startDraft = useStartDraft();
+  const project = host.project();
   return children({
-    isCreating: saved.isCreating,
-    // Pinned on creation; drop `pin` to stop pinning.
-    onAdd: () => saved.createBoard({ pin: true, addWidget: true }),
+    // Pinned once stored; drop `pin` to stop pinning.
+    onAdd: () =>
+      startDraft({
+        projectId: project?.id ?? "",
+        projectSlug: project?.slug ?? "",
+        pin: true,
+        addWidget: true,
+      }),
   });
 }
 
@@ -100,12 +108,10 @@ function SectionFrame({
         <Box minWidth={0} overflow="hidden" title={projectName}>
           <SidebarSectionLabel label={label} />
         </Box>
-        {create && <NewDashboardButton isCreating={create.isCreating} onCreate={create.onAdd} />}
+        {create && <NewDashboardButton onCreate={create.onAdd} />}
       </HStack>
       <VStack as="ul" align="stretch" gap={0.5} margin={0} padding={0}>
-        {create && isLoaded && links.length === 0 && (
-          <AddDashboardRow isCreating={create.isCreating} onAdd={create.onAdd} />
-        )}
+        {create && isLoaded && links.length === 0 && <AddDashboardRow onAdd={create.onAdd} />}
         {shown.map((link) =>
           link.board ? (
             <PinnedBoardRow key={link.key} link={link} board={link.board} />

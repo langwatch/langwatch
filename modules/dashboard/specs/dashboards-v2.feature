@@ -1323,10 +1323,49 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And with no pins there is no Pinned group
 
   @integration
-  Scenario: AC162 The '+' on Your dashboards makes a blank board at once
+  Scenario: AC162 The '+' on Your dashboards opens a new board without storing it
     When the member presses "+" by "Your dashboards"
-    Then a new blank board is made and opened, with no menu in between
+    Then a new blank board opens at "/dashboards/new", with no menu in between
+    And it is named "Untitled dashboard <n>" and listed under "Your dashboards" while it is open
     And the new board offers "Or start from a template"
+    But no dashboard is stored yet
+
+  @integration
+  Scenario: AC162b Leaving a new board unedited stores nothing
+    Given the member opened a new board with "+"
+    When they go to another page without editing it
+    Then no dashboard is stored and none is left in the sidebar
+
+  @integration
+  Scenario: AC162c A new board's first widget stores it once
+    Given the member opened a new board with "+"
+    When they add a widget, or two edits land at the same time
+    Then exactly one dashboard is stored, holding the widget
+    And the address becomes the stored board's without a page reload or a new history entry
+
+  @integration
+  Scenario: AC162d Renaming, describing or pinning a new board stores it with that edit
+    Given the member opened a new board with "+"
+    When they rename it from its sidebar row, describe it, pin it or pick its scope
+    Then one dashboard is stored with that name, description, pin or scope
+
+  @unit
+  Scenario: AC162e Asking Langy on a new board stores it first
+    Given the member opened a new board with "+"
+    When they ask Langy about it
+    Then the board is stored first, and the ask names the stored board's id
+
+  @integration
+  Scenario: AC162f A refused store keeps the new board open
+    Given the member opened a new board with "+"
+    When the server refuses to store it on the first edit
+    Then they see why, the board stays open unsaved, and the next edit tries again
+
+  @integration
+  Scenario: AC162g Opening the new board's address again starts a new unsaved board
+    Given a new board was stored by its first edit
+    When the member opens "/dashboards/new" again, by address or by reload
+    Then a new unsaved board opens, and nothing is written to the stored one
 
   @integration
   Scenario: AC163 My dashboard cannot be deleted

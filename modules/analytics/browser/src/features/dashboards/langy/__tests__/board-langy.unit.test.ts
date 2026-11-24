@@ -2,12 +2,14 @@
  * What a board hands Langy, as text the agent reads: the open board, the
  * widgets on it and the period it reads over.
  * @see modules/dashboard/specs/dashboards-v1.feature
+ * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
+  askAboutStoredBoard,
   boardContextChip,
   boardPromptDraft,
   boardQuestion,
@@ -157,5 +159,20 @@ describe("a board whose widgets show no data", () => {
       expect(request.about).toEqual({ ref: "board-3" });
       expect(request.context[0]?.label).toBe("Agent health");
     });
+  });
+});
+
+describe("an ask made on a new board before it was stored", () => {
+  /** @scenario "AC162e Asking Langy on a new board stores it first" */
+  it("names the stored board's id in its context and in what the draft is about", () => {
+    const board = boardSubject({ board: { id: "new", name: "Untitled dashboard 3" }, widgets: [] });
+    const asked = boardSetupDraft({ emptyWidgetNames: [], board, period: PERIOD });
+
+    const told = askAboutStoredBoard({ request: asked, draftId: "new", dashboardId: "board-9" });
+
+    expect(told.context[0]?.ref).toContain('dashboard "Untitled dashboard 3" (id board-9)');
+    expect(told.context[0]?.ref).not.toContain("(id new)");
+    expect(told.about).toEqual(asked.about && { ...asked.about, ref: "board-9" });
+    expect(told.draft).toBe(asked.draft);
   });
 });

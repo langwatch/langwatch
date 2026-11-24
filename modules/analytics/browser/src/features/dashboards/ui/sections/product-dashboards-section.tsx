@@ -51,7 +51,7 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
       <HStack minHeight="28px" paddingX={2} paddingTop={2.5} paddingBottom={0.5} gap={1}>
         <SidebarSectionLabel label={LABEL} />
         {store.storeProject && hasSharingChoice({ product, mayShare: store.mayShare }) && (
-          <NewDashboardButton isCreating={false} onCreate={() => setIsNewDialogOpen(true)} />
+          <NewDashboardButton onCreate={() => setIsNewDialogOpen(true)} />
         )}
       </HStack>
       <BoardRows

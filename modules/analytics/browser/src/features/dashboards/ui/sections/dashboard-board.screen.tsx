@@ -10,6 +10,7 @@ import type { DashboardHomeProduct } from "@langwatch/dashboard-contract";
 import { Button, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { Plus } from "lucide-react";
+import { useEffect } from "react";
 
 import {
   DashboardRefetchIntervalContext,
@@ -24,17 +25,22 @@ import {
   WIDGET_PICKER_QUERY_KEY,
 } from "../../behavior/use-block-picker-address.ts";
 import { useBoardAccess } from "../../behavior/use-board-access.ts";
-import { useBoardDescription } from "../../behavior/use-board-description.ts";
 import { useBoardEditor } from "../../behavior/use-board-editor.ts";
+import { type UnsavedBoard, useBoardHeaderEdits } from "../../behavior/use-board-header-edits.ts";
 import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
+import { restartStoredDraft, useDraftBoard } from "../../behavior/use-draft-board.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
 import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
-import { useBoardLangyChip, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
+import {
+  UnsavedBoardProvider,
+  useBoardLangyChip,
+  useLangyAsk,
+} from "../../langy/behavior/use-board-langy.ts";
 import {
   boardContextChip,
   boardSetupDraft,
@@ -44,7 +50,7 @@ import {
   widgetSetupDraft,
 } from "../../langy/model/board-langy.ts";
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
-import { myDashboardId, templateLinks } from "../../model/boards.ts";
+import { DRAFT_SEGMENT, myDashboardId, templateLinks } from "../../model/boards.ts";
 import { CURATED_BOARDS } from "../../model/curated-boards.ts";
 import { mayRenameBoard } from "../../model/organization-library.ts";
 import { AddBlockCard, EmptyBoard } from "../blocks/blank-board.tsx";
@@ -116,7 +122,27 @@ function useBoardTitleRename(board: SavedBoard): ((name: string) => void) | unde
     edits.renameBoard({ board: { ...board, project: { id: board.projectId } }, name });
 }
 
-function OpenBoard({ board }: { board: SavedBoard }) {
+/** What the header's lent actions point at; a board not stored yet offers none. */
+function boardPointer({
+  board,
+  unsaved,
+  boardWidgets: { status, widgets },
+}: {
+  board: SavedBoard;
+  unsaved: UnsavedBoard | undefined;
+  boardWidgets: ReturnType<typeof useBoardWidgets>;
+}) {
+  if (unsaved) return {};
+  const widgetCount = status === "success" ? widgets.length : void 0;
+  return { pointer: { boardKind: "dashboard" as const, boardId: board.id, widgetCount } };
+}
+
+/** On a new board, Langy's asks store it first and then name the stored board. */
+function unsavedLangy(unsaved: UnsavedBoard | undefined) {
+  return unsaved && { draftId: DRAFT_SEGMENT, storedBoardId: unsaved.materialise };
+}
+
+function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoard }) {
   const host = useAnalyticsHost();
   const readsOrganization = ORGANIZATION_DATA_HOMES.includes(board.homeProduct);
   const projectId = host.project()?.id ?? "";
@@ -127,10 +153,13 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const boardWidgets = useBoardWidgets({
     dashboardId: board.id,
     isOwnedElsewhere: !access.isHome,
+    storedBoardId: unsaved?.materialise,
   });
-  const { description, saveDescription } = useBoardDescription({
-    dashboardId: board.id,
-    stored: board.description,
+  const { description, saveDescription, pickScope } = useBoardHeaderEdits({
+    board,
+    unsaved,
+    names,
+    scope,
   });
   const { range } = useBoardRange();
   const autoRefresh = useDashboardAutoRefresh({ live: range === "live" });
@@ -144,7 +173,8 @@ function OpenBoard({ board }: { board: SavedBoard }) {
     dashboardId: board.id,
     dashboardKind: "stored",
     widgetCount: widgets.length,
-    isLoaded: boardWidgets.status === "success",
+    // A new board is viewed once stored; a draft nobody edits was never a dashboard.
+    isLoaded: boardWidgets.status === "success" && !unsaved,
   });
   const subject = boardSubject({ board, widgets });
   const langy = useLangyAsk();
@@ -178,6 +208,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
 
   return (
     <WidgetReadsEveryProjectContext.Provider value={readsOrganization}>
+      <UnsavedBoardProvider value={unsavedLangy(unsaved)}>
       <BoardPage
         header={
           <BoardHeader
@@ -188,16 +219,12 @@ function OpenBoard({ board }: { board: SavedBoard }) {
                 scope={board.scope}
                 lock={access.scopeLock}
                 names={names}
-                onPick={(to) => scope.request({ board, names, to })}
+                onPick={pickScope}
               />
             }
             onRename={renameBoard}
             onDescribe={canEdit && !isMyDashboard ? saveDescription : void 0}
-            pointer={{
-              boardKind: "dashboard",
-              boardId: board.id,
-              widgetCount: boardWidgets.status === "success" ? widgets.length : void 0,
-            }}
+            {...boardPointer({ board, unsaved, boardWidgets })}
             action={canEdit ? <AddWidgetButton onClick={openPicker} /> : null}
             {...dataSourceLabel({ readsOrganization, projectName: host.project()?.name })}
             periodControl={
@@ -328,27 +355,44 @@ function OpenBoard({ board }: { board: SavedBoard }) {
           onCancel={scope.cancel}
         />
       </BoardPage>
+      </UnsavedBoardProvider>
     </WidgetReadsEveryProjectContext.Provider>
   );
 }
 
 /** The board the address names, in the project in view; the org-level page runs it too. */
 export function Board() {
-  const dashboardId = useAnalyticsHost().route().params.dashboardId;
+  const host = useAnalyticsHost();
+  const projectId = host.project()?.id ?? "";
+  const dashboardId = host.route().params.dashboardId;
   const { boards, organizationBoards, isLoading, isRefreshing, loadError } = useSavedDashboards();
+  const draft = useDraftBoard({ existingCount: boards.length });
+  const isDraft = dashboardId === DRAFT_SEGMENT;
+  useEffect(() => {
+    if (isDraft) restartStoredDraft(projectId);
+  }, [isDraft, projectId]);
   if (isLoading) return <UiPageLoading />;
   // A member the list refuses sees the page the flag being off shows (AC21).
   if (loadError) return <UiPageNotFound />;
+  if (isDraft) {
+    return (
+      <>
+        <OldAnalyticsBanner />
+        <OpenBoard key={draft.key} board={draft.board} unsaved={draft} />
+      </>
+    );
+  }
   const board = [...boards, ...organizationBoards].find(({ id }) => id === dashboardId);
   // A board made a moment ago is missing from the list held before it; wait for the re-read.
   if (!board && isRefreshing) return <UiPageLoading />;
   // A deleted board and one set to Only me read the same: the server tells neither apart.
   if (!board) return <ProjectBoardUnavailable />;
-  // Keyed so a board's in-flight edits never leak into the next board.
+  // Keyed so a board's in-flight edits never leak into the next board; a draft just stored
+  // keeps its key, so the screen stays as it was while its address moves to the board's.
   return (
     <>
       <OldAnalyticsBanner />
-      <OpenBoard key={board.id} board={board} />
+      <OpenBoard key={board.id === draft.savedId ? draft.key : board.id} board={board} />
     </>
   );
 }

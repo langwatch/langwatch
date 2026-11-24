@@ -31,6 +31,7 @@ import { useBoardRange } from "../use-board-period.ts";
 import { useBoardWidgetEditor } from "../use-board-widget-editor.ts";
 import { useBoardWidgets } from "../use-board-widgets.ts";
 import { useDashboardViewed } from "../use-dashboard-viewed.ts";
+import { useDraftBoard } from "../use-draft-board.ts";
 import { useFavourites } from "../use-favourites.ts";
 import { useSavedDashboards } from "../use-saved-dashboards.ts";
 
@@ -124,12 +125,15 @@ afterEach(cleanup);
 
 describe("given a member making and deleting boards", () => {
   /** @scenario "Telemetry: making a board sends dashboards.created.dashboard with where it came from" */
-  it("sends a blank board's creation once the server made it", async () => {
-    const { latest, host } = mount(useSavedDashboards);
+  it("sends a new board's creation once its first edit stored it, and none before", async () => {
+    const { latest, host } = mount(() => useDraftBoard({ existingCount: 0 }), {
+      route: { params: { dashboardId: "new" }, query: {} },
+    });
+    expect(tracked.events).toEqual([]);
 
-    act(() => latest().createBoard());
+    await act(() => latest().materialise());
 
-    await waitFor(() => expect(host.navigations).toHaveLength(1));
+    expect(host.replacements).toEqual(["/test-project/dashboards/board-2"]);
     expect(tracked.events).toEqual([
       {
         boundary: "dashboards",
