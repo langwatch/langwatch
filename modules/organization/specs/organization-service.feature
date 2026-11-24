@@ -459,3 +459,34 @@ Feature: Shared organization service
     When organization hears the fact from its own side
     Then it records no member removal for the deleted organisation
     And it still records the removal for every live organisation the fact names
+
+  @unit
+  Scenario: Changing a member's role records the new and previous role
+    Given a member holds an organization role
+    When an administrator changes it to another role
+    Then organization records the member_role_changed fact with the new role, the previous role and who changed it
+
+  @unit
+  Scenario: A role change to the role already held records nothing
+    Given a member holds an organization role
+    When an administrator sets the role they already hold
+    Then organization records no member_role_changed fact
+
+  @unit
+  Scenario: A role change whose record fails still stands
+    Given a member's role change has committed
+    When organization cannot record the member_role_changed fact
+    Then the failure is reported and the role change is not undone or raised
+
+  @unit
+  Scenario: A membership created outside an invite records the member as admitted
+    Given a person is given a membership by the SSO domain join, a join request or a provisioning door
+    When organization creates the membership
+    Then organization records the member_admitted fact with their seat and the path
+    And a membership that already existed, or one still waiting for a seat, records nothing
+
+  @unit
+  Scenario: A waiting member given a seat is recorded as admitted
+    Given a person admission left waiting for a seat
+    When a full seat is given to them
+    Then organization records the member_admitted fact for them as a member

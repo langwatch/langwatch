@@ -58,6 +58,13 @@ describe("fireSignup", () => {
         });
       });
 
+      /** @scenario "A founder who signs up is identified with seat admin" */
+      it("decides to identify the founder with seat admin", () => {
+        const calls = fireSignup(SIGNUP);
+
+        expect(calls[0]).toMatchObject({ type: "identify", traits: { seat: "admin" } });
+      });
+
       /**
        * @scenario "New signup associates user with organization via group call"
        * @scenario "The sign-up path keeps its calls"
@@ -70,6 +77,17 @@ describe("fireSignup", () => {
           userId: "user-1",
           groupId: "org-1",
           traits: { name: "Acme Corp", company_size: "11-50", plan: "free" },
+        });
+      });
+
+      /** @scenario "A founder who signs up is linked to their organization as admin" */
+      it("decides to link the founder to their organization as admin", () => {
+        const calls = fireSignup(SIGNUP);
+
+        expect(calls[1]).toMatchObject({
+          type: "group",
+          groupId: "org-1",
+          traits: { name: "Acme Corp", relationshipAttributes: { seat: "admin" } },
         });
       });
 

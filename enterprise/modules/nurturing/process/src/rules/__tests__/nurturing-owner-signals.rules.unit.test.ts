@@ -136,13 +136,19 @@ describe("evaluationCompletedSignal", () => {
       evaluationCompletedSignal({
         latest,
         count: 2,
-        organization: { adminUserId: "admin-1", seeded: false, evaluationCount: 3 },
+        organization: {
+          organizationId: "org-1",
+          adminUserId: "admin-1",
+          seeded: false,
+          evaluationCount: 3,
+        },
       }),
     ).toMatchObject([
       {
         kind: "evaluation_completed",
         sourceEventId: "project-1:eval-1",
         userId: "admin-1",
+        organizationId: "org-1",
         evaluationsCounted: 2,
         organizationEvaluationCount: 3,
         first: false,
@@ -155,7 +161,12 @@ describe("evaluationCompletedSignal", () => {
       const [signal] = evaluationCompletedSignal({
         latest,
         count: 2,
-        organization: { adminUserId: "admin-1", seeded: false, evaluationCount: 2 },
+        organization: {
+          organizationId: "org-1",
+          adminUserId: "admin-1",
+          seeded: false,
+          evaluationCount: 2,
+        },
       });
 
       expect(signal).toMatchObject({ first: true, organizationEvaluationCount: 2 });
@@ -166,7 +177,12 @@ describe("evaluationCompletedSignal", () => {
       const [signal] = evaluationCompletedSignal({
         latest,
         count: 1,
-        organization: { adminUserId: "admin-1", seeded: true, evaluationCount: 1 },
+        organization: {
+          organizationId: "org-1",
+          adminUserId: "admin-1",
+          seeded: true,
+          evaluationCount: 1,
+        },
       });
 
       expect(signal).toMatchObject({ first: false, organizationEvaluationCount: 1 });
@@ -178,7 +194,12 @@ describe("evaluationCompletedSignal", () => {
       evaluationCompletedSignal({
         latest,
         count: 1,
-        organization: { adminUserId: null, seeded: false, evaluationCount: 1 },
+        organization: {
+          organizationId: "org-1",
+          adminUserId: null,
+          seeded: false,
+          evaluationCount: 1,
+        },
       }),
     ).toEqual([]);
   });

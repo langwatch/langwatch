@@ -131,6 +131,8 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     projectId: id,
     /** The latest of the evaluations this signal counts; its type, score and verdict follow. */
     evaluationId: id,
+    /** The organization counted against; optional because a signal recorded before it was named is re-parsed. */
+    organizationId: id.optional(),
     evaluatorType: z.string().nullish(),
     score: z.number().nullish(),
     passed: z.boolean().nullish(),
@@ -185,6 +187,25 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     organizationName: z.string(),
     /** The OrganizationUserRole joined with; absent on events stored before it was recorded. */
     role: z.string().optional(),
+  }),
+  z.object({
+    /** An admin moved a member to another seat: the person's seat is told, never a join. */
+    kind: z.literal("member_role_changed"),
+    ...signalSource,
+    userId: id,
+    organizationId: id,
+    /** The OrganizationUserRole now held; a plain string so an unknown role still parses. */
+    role: z.string(),
+    previousRole: z.string().optional(),
+  }),
+  z.object({
+    /** A person admitted by a path with no joined fact of its own: their seat and Company link. */
+    kind: z.literal("member_admitted"),
+    ...signalSource,
+    userId: id,
+    organizationId: id,
+    /** The OrganizationUserRole admitted with; a plain string so an unknown role still parses. */
+    role: z.string(),
   }),
   z.object({
     kind: z.literal("sso_auto_added"),

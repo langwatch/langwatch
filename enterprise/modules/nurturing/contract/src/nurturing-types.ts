@@ -61,6 +61,8 @@ export interface CioPersonTraits extends CioOrganizationUsageTraits {
   email: string;
   name: string;
   role: string;
+  /** The org seat (lite_member/member/admin/developer), not the sign-up `role` (job title). */
+  seat?: string;
   company_size: string;
   signup_usage: string;
   signup_solution: string;
@@ -173,6 +175,9 @@ export interface CioOrgTraits extends CioOrganizationUsageTraits {
   project_count: number;
   /** Unix seconds of the organization's creation, as nurturing's own copy holds it. */
   created_at?: number;
+  has_evaluation_results?: boolean;
+  evaluation_count?: number;
+  first_evaluation_at?: number;
   onboarding_variant?: string;
   onboarding_paths?: string;
   onboarding_primary_path?: string;
@@ -258,7 +263,10 @@ export type CioBatchCall =
       type: "group";
       userId: string;
       groupId: string;
-      traits?: Partial<CioOrgTraits>;
+      traits?: Partial<CioOrgTraits> & {
+        /** The person's seat in this organization, per the Pipelines group spec. */
+        relationshipAttributes?: { seat?: string };
+      };
     };
 
 /**

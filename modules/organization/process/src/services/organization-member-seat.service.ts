@@ -242,6 +242,7 @@ export class OrganizationMemberSeatService {
       actorUserId: actingUserId,
     });
     if (!enabled) return false;
+    seatNotices.memberAdmitted({ organizationId, userId, role: "MEMBER", via: "seat_admission" });
     try {
       await this.finishAdmission({ organizationId, userId, grantId, actingUserId, caller });
     } catch (error) {

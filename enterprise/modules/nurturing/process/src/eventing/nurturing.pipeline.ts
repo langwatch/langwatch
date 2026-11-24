@@ -89,6 +89,10 @@ import {
   inviteAcceptedEventDataSchema,
   MEMBERS_INVITED_EVENT_TYPE,
   membersInvitedEventDataSchema,
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+  organizationMemberAdmittedEventDataSchema,
+  ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
+  organizationMemberRoleChangedEventDataSchema,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   organizationSignedUpEventDataSchema,
 } from "@langwatch/organization-contract";
@@ -140,6 +144,8 @@ import {
   guidedOnboardingSignal,
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
+  memberAdmittedSignal,
+  memberRoleChangedSignal,
   membersInvitedSignal,
   onboardingVariantAssignedSignal,
   projectActiveDaySignal,
@@ -452,6 +458,22 @@ export function buildNurturingPipeline(deps: {
         data: inviteAcceptedEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = inviteAcceptedSignal({ data, aggregateId });
+          return deliverSignal(signal);
+        },
+      })
+      .withPeerSubscriber("memberRoleChanged", {
+        eventType: ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
+        data: organizationMemberRoleChangedEventDataSchema,
+        handle: (data, { aggregateId }) => {
+          const signal = memberRoleChangedSignal({ data, aggregateId });
+          return deliverSignal(signal);
+        },
+      })
+      .withPeerSubscriber("memberAdmitted", {
+        eventType: ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+        data: organizationMemberAdmittedEventDataSchema,
+        handle: (data, { aggregateId }) => {
+          const signal = memberAdmittedSignal({ data, aggregateId });
           return deliverSignal(signal);
         },
       })

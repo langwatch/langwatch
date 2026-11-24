@@ -1469,17 +1469,17 @@ type Response = z.infer<typeof gatewayEndUserSpendResponseSchema>; // ../contrac
 
 Contract `../contract/src/gateway-a2a-target.trpc.ts:20`, router `src/transport/gateway-a2a-target.trpc.ts:8`.
 
-| Procedure                                | Kind     | Gate                            | Input                   | Output                      |
-| ---------------------------------------- | -------- | ------------------------------- | ----------------------- | --------------------------- |
-| `gatewayA2aTargets.list`                 | query    | Permission `virtualKeys:view`   | inline                  | inline                      |
-| `gatewayA2aTargets.create`               | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
-| `gatewayA2aTargets.update`               | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
-| `gatewayA2aTargets.setBlocked`           | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
-| `gatewayA2aTargets.archive`              | mutation | Permission `virtualKeys:manage` | `targetIdSchema`        | `gatewayA2aTargetDtoSchema` |
-| `gatewayA2aTargets.listForProject`       | query    | Permission `virtualKeys:view`   | inline                  | inline                      |
-| `gatewayA2aTargets.updateForProject`     | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
-| `gatewayA2aTargets.setBlockedForProject` | mutation | Permission `virtualKeys:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
-| `gatewayA2aTargets.archiveForProject`    | mutation | Permission `virtualKeys:manage` | `projectTargetIdSchema` | `gatewayA2aTargetDtoSchema` |
+| Procedure                                | Kind     | Gate                                  | Input                   | Output                      |
+| ---------------------------------------- | -------- | ------------------------------------- | ----------------------- | --------------------------- |
+| `gatewayA2aTargets.list`                 | query    | Permission `gatewayA2aTargets:view`   | inline                  | inline                      |
+| `gatewayA2aTargets.create`               | mutation | Permission `gatewayA2aTargets:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.update`               | mutation | Permission `gatewayA2aTargets:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.setBlocked`           | mutation | Permission `gatewayA2aTargets:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.archive`              | mutation | Permission `gatewayA2aTargets:manage` | `targetIdSchema`        | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.listForProject`       | query    | Permission `gatewayA2aTargets:view`   | inline                  | inline                      |
+| `gatewayA2aTargets.updateForProject`     | mutation | Permission `gatewayA2aTargets:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.setBlockedForProject` | mutation | Permission `gatewayA2aTargets:manage` | inline                  | `gatewayA2aTargetDtoSchema` |
+| `gatewayA2aTargets.archiveForProject`    | mutation | Permission `gatewayA2aTargets:manage` | `projectTargetIdSchema` | `gatewayA2aTargetDtoSchema` |
 
 ```typescript
 // gatewayA2aTargets.list
@@ -1503,7 +1503,7 @@ interface Input {
   blocked?: boolean;
   blockReason?: string | null;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:129
 
 // gatewayA2aTargets.update
 // Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:30
@@ -1518,7 +1518,7 @@ interface Input {
   blocked?: boolean;
   blockReason?: string | null;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:129
 
 // gatewayA2aTargets.setBlocked
 // Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:34
@@ -1528,7 +1528,7 @@ interface Input {
   blocked: boolean;
   blockReason: string | null;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:129
 
 // gatewayA2aTargets.archive
 // Input: targetIdSchema, ../contract/src/gateway-a2a-target.trpc.ts:17
@@ -1536,7 +1536,7 @@ interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:129
 
 // gatewayA2aTargets.listForProject
 // Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:42
@@ -1558,7 +1558,7 @@ interface Input {
   blockReason?: string | null;
   projectId: string;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:129
 
 // gatewayA2aTargets.setBlockedForProject
 // Input: inline, ../contract/src/gateway-a2a-target.trpc.ts:50
@@ -1568,7 +1568,7 @@ interface Input {
   blockReason: string | null;
   projectId: string;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:129
 
 // gatewayA2aTargets.archiveForProject
 // Input: projectTargetIdSchema, ../contract/src/gateway-a2a-target.trpc.ts:18
@@ -1576,7 +1576,7 @@ interface Input {
   projectId: string;
   id: string;
 }
-type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:127
+type Output = z.infer<typeof gatewayA2aTargetDtoSchema>; // ../contract/src/gateway-a2a-target.ts:129
 ```
 
 ### `gatewayBudgets`

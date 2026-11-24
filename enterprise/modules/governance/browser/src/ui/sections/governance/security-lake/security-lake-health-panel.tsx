@@ -18,9 +18,10 @@ type SourceHealth = SecurityLakeSourceHealth;
 const formatTime = (ms: number | null): ReactNode =>
   ms === null ? "Not read yet" : <FormattedDate value={ms} />;
 
-/** Lag in the largest unit that keeps it a whole number of minutes, hours or seconds. */
-function formatLag(ms: number | null): string {
-  if (ms === null) return "None";
+/** Lag in the largest unit that keeps it a whole number; a read that wrote nothing has none. */
+function formatLag({ ms, lastReadAt }: { ms: number | null; lastReadAt: number | null }): string {
+  if (lastReadAt === null) return "Not read yet";
+  if (ms === null) return "No new events";
   if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
   if (ms < 3_600_000) return `${Math.round(ms / 60_000)} min`;
   return `${(ms / 3_600_000).toFixed(1)} h`;
@@ -31,7 +32,7 @@ export function SecurityLakeHealthPanel({ health }: { health: SourceHealth }) {
   const folded = health.health;
   const stats: { label: string; value: ReactNode }[] = [
     { label: "Last read", value: formatTime(folded.lastReadAt) },
-    { label: "Lag", value: formatLag(folded.lagMs) },
+    { label: "Lag", value: formatLag({ ms: folded.lagMs, lastReadAt: folded.lastReadAt }) },
     { label: "Objects read", value: String(folded.objects) },
     { label: "Events written", value: String(folded.written) },
     { label: "Events dropped", value: String(folded.dropped) },

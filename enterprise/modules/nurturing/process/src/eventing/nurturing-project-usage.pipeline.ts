@@ -58,6 +58,7 @@ import {
   INVITE_ACCEPTED_EVENT_TYPE,
   inviteAcceptedEventDataSchema,
   ORGANIZATION_CREATED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
   ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
   ORGANIZATION_MEMBER_ENABLED_EVENT_TYPE,
   ORGANIZATION_MEMBER_LISTED_EVENT_TYPE,
@@ -65,6 +66,7 @@ import {
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   type OrganizationCreatedEventData,
   organizationCreatedEventDataSchema,
+  organizationMemberAdmittedEventDataSchema,
   organizationMemberDisabledEventDataSchema,
   organizationMemberEnabledEventDataSchema,
   organizationMemberListedEventDataSchema,
@@ -906,6 +908,10 @@ const ORGANIZATION_MEMBER_EVENTS = [
   { type: ORGANIZATION_CREATED_EVENT_TYPE, data: organizationCreatedEventDataSchema },
   { type: ORGANIZATION_SIGNED_UP_EVENT_TYPE, data: organizationSignedUpEventDataSchema },
   { type: INVITE_ACCEPTED_EVENT_TYPE, data: inviteAcceptedEventDataSchema },
+  {
+    type: ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+    data: organizationMemberAdmittedEventDataSchema,
+  },
   { type: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE, data: organizationMemberRemovedEventDataSchema },
   {
     type: ORGANIZATION_MEMBER_DISABLED_EVENT_TYPE,
@@ -958,6 +964,7 @@ export function organizationMembershipFactOf(
     }
     case ORGANIZATION_SIGNED_UP_EVENT_TYPE:
     case INVITE_ACCEPTED_EVENT_TYPE:
+    case ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE:
       return membership({
         organizationId,
         userId: event.data.userId,

@@ -109,6 +109,30 @@ Feature: Nurturing sends the signals its owners record
     Then first_evaluation_created is sent once, against the admin
 
   @unit
+  Scenario: A counted evaluation tells the organization's Company it has evaluation results and its count
+    Given an evaluation_completed signal naming its organization
+    When the signal is delivered
+    Then Customer.io groups the admin into that organization with has_evaluation_results true and the evaluation_count
+
+  @unit
+  Scenario: The organization's first counted evaluations set first_evaluation_at on its Company
+    Given an evaluation_completed signal naming its organization, marked first
+    When the signal is delivered
+    Then the Company is sent first_evaluation_at as well
+
+  @unit
+  Scenario: A debounced evaluation batch still updates the organization's Company
+    Given an evaluation_completed signal naming its organization was delivered, and its tenant is debounced
+    When a second signal for the same tenant is delivered within the debounce window
+    Then Customer.io receives both Company group updates and the admin's identify and track once
+
+  @unit
+  Scenario: An evaluation signal recorded before it named its organization updates no Company
+    Given an evaluation_completed signal with no organization
+    When the signal is delivered
+    Then Customer.io receives no group call for it
+
+  @unit
   Scenario: A redelivered settled evaluation is counted once
     Given an evaluation settled and was counted
     When the same settled evaluation is delivered again, in the same batch or a later one

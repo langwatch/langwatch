@@ -882,6 +882,7 @@ function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayContro
       repository: repositories.a2aTargets,
       changeEvents: changes,
       auditLog: repositories.audit,
+      projects,
       transactions: repositories.transactions,
     }),
     budgetSpend,

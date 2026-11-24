@@ -54,6 +54,21 @@ export interface OrganizationSeatRevocationNotice {
     userId: string;
     enabledByUserId: string | null;
   }): Promise<void>;
+  /** Fire-and-forget: the role is already committed, so a failed record must not fail it. */
+  memberRoleChanged(input: {
+    organizationId: string;
+    userId: string;
+    role: string;
+    previousRole: string;
+    changedByUserId: string | null;
+  }): void;
+  /** Fire-and-forget: the membership is already committed, so a failed record must not fail it. */
+  memberAdmitted(input: {
+    organizationId: string;
+    userId: string;
+    role: string;
+    via: string;
+  }): void;
 }
 
 /**
@@ -273,7 +288,7 @@ export class OrganizationMemberRoleService {
       grants: intendedRoleChangeGrants({ organizationId, role, effectiveTeamRoleUpdates }),
     });
 
-    return this.dependencies.seats.withSeat({
+    const result = await this.dependencies.seats.withSeat({
       organizationId,
       work: (lease) =>
         this.writeRoleChange({
@@ -284,6 +299,16 @@ export class OrganizationMemberRoleService {
           lease,
         }),
     });
+    if (role !== currentMember.role) {
+      this.dependencies.seatNotices.memberRoleChanged({
+        organizationId,
+        userId,
+        role,
+        previousRole: currentMember.role,
+        changedByUserId: currentUserId,
+      });
+    }
+    return result;
   }
 
   /** The role change's seat and its write, under the seat lease the caller holds. */
