@@ -186,9 +186,9 @@ GROUP BY step
 ORDER BY traces DESC
 LIMIT 3`;
 
-export const TRAFFIC_AND_SPEND_SQL = `SELECT sum(TraceCount) AS traces, sum(CostSum) AS cost
-FROM trace_metrics_by_minute
-WHERE ${inPeriod("BucketStart")}`;
+export const TRAFFIC_AND_SPEND_SQL = `SELECT uniqExact(TraceId) AS traces, sum(TotalCost) AS cost
+FROM trace_metrics
+WHERE ${inPeriod("OccurredAt")}`;
 
 const WRONG_TOOL_RESULTS = `FROM evaluation_metrics
 WHERE ${inPeriod("OccurredAt")}

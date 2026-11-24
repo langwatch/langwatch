@@ -5,6 +5,7 @@
  */
 
 import { bucketOf, inPeriod, inPeriodAndPrevious, MIDPOINT, START } from "./lwql-period.ts";
+import { costByModelSql } from "./model-cost-queries.ts";
 
 export const TRAFFIC_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket, uniqExact(TraceId) AS traces
 FROM trace_metrics
@@ -31,11 +32,11 @@ FROM traces
 WHERE ${inPeriodAndPrevious("OccurredAt")}
   AND SatisfactionScore IS NOT NULL`;
 
-export const TOKEN_TREND_SQL = `SELECT ${bucketOf("BucketStart")} AS bucket,
-  sum(PromptTokensSum) AS prompt_tokens,
-  sum(CompletionTokensSum) AS completion_tokens
-FROM trace_metrics_by_minute
-WHERE ${inPeriod("BucketStart")}
+export const TOKEN_TREND_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket,
+  sum(PromptTokens) AS prompt_tokens,
+  sum(CompletionTokens) AS completion_tokens
+FROM trace_metrics
+WHERE ${inPeriod("OccurredAt")}
 GROUP BY bucket
 ORDER BY bucket`;
 
@@ -89,13 +90,7 @@ GROUP BY model
 ORDER BY traces DESC
 LIMIT 10`;
 
-export const MODEL_COSTS_SQL = `SELECT Model AS model, sum(CostSum) AS cost
-FROM model_usage_by_minute
-WHERE ${inPeriod("BucketStart")}
-  AND Model != ''
-GROUP BY model
-ORDER BY cost DESC
-LIMIT 50`;
+export const MODEL_COSTS_SQL = costByModelSql({ limit: 50 });
 
 /** All trace spend, read from `TotalCost` so the report names the models with no price. */
 export const MODEL_SPEND_TOTAL_SQL = `SELECT sum(TotalCost) AS cost
