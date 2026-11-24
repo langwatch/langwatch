@@ -23,6 +23,9 @@ type Direction string
 const (
 	DirectionRequest  Direction = "request"
 	DirectionResponse Direction = "response"
+	// DirectionStreamChunk is one streamed reply event, judged by the key's
+	// stream_chunk guardrails as well as its response guardrails.
+	DirectionStreamChunk Direction = "stream_chunk"
 )
 
 // ScanInput is the text of one A2A payload and who sent it.
@@ -55,6 +58,7 @@ func (NoopScanner) Scan(context.Context, ScanInput) (domain.GuardrailVerdict, er
 type guardrailEvaluator interface {
 	EvaluatePre(ctx context.Context, bundle *domain.Bundle, req *domain.Request) (domain.GuardrailVerdict, error)
 	EvaluatePost(ctx context.Context, bundle *domain.Bundle, req *domain.Request, resp *domain.Response) (domain.GuardrailVerdict, error)
+	EvaluateChunk(ctx context.Context, bundle *domain.Bundle, req *domain.Request, chunk []byte) (domain.GuardrailVerdict, error)
 }
 
 // GuardrailScanner runs the caller key's model-call guardrails over A2A text,
@@ -68,8 +72,8 @@ func (GuardrailScanner) Applies(bundle *domain.Bundle, dir Direction) bool {
 	return bundle != nil && len(bundle.Config.Guardrails.IDs(string(dir))) > 0
 }
 
-// Scan runs the key's request or response guardrails over the text. A key
-// with no guardrail in that direction is allowed without a call.
+// Scan runs the key's request, response or stream_chunk guardrails over the
+// text. A key with no guardrail in that direction is allowed without a call.
 func (s GuardrailScanner) Scan(ctx context.Context, in ScanInput) (domain.GuardrailVerdict, error) {
 	bundle, dir, texts := in.Bundle, in.Direction, in.Texts
 	allow := domain.GuardrailVerdict{Action: domain.GuardrailAllow}
@@ -77,12 +81,17 @@ func (s GuardrailScanner) Scan(ctx context.Context, in ScanInput) (domain.Guardr
 		return allow, nil
 	}
 	text := strings.Join(texts, "\n")
-	if dir == DirectionRequest {
+	switch dir {
+	case DirectionRequest:
 		body, _ := json.Marshal(map[string]any{"messages": []map[string]string{{"role": "user", "content": text}}})
 		return s.Evaluator.EvaluatePre(ctx, bundle, &domain.Request{Body: body})
+	case DirectionResponse:
+		body, _ := json.Marshal(map[string]any{"choices": []map[string]any{{"message": map[string]string{"role": "assistant", "content": text}}}})
+		return s.Evaluator.EvaluatePost(ctx, bundle, &domain.Request{}, &domain.Response{Body: body})
+	case DirectionStreamChunk:
+		return s.Evaluator.EvaluateChunk(ctx, bundle, &domain.Request{}, []byte(text))
 	}
-	body, _ := json.Marshal(map[string]any{"choices": []map[string]any{{"message": map[string]string{"role": "assistant", "content": text}}}})
-	return s.Evaluator.EvaluatePost(ctx, bundle, &domain.Request{}, &domain.Response{Body: body})
+	return allow, nil
 }
 
 // payload is what the scanner sees of one body: its text, and whether the
@@ -97,10 +106,11 @@ type payload struct {
 
 // partText is the text-part text of one artifact, joined. An empty id holds
 // the text outside any artifact, such as a status message's. appends is false
-// for an artifact update that replaces the artifact's earlier content.
+// for an artifact update that replaces the artifact's earlier content; split
+// is true when the text came in more than one piece.
 type partText struct {
-	id, text string
-	appends  bool
+	id, text       string
+	appends, split bool
 }
 
 // maxJSONDepth bounds how deep the scan walks one body.
@@ -308,14 +318,22 @@ func (w *tokenWalker) appendValue(s string) {
 	*w.out = append(*w.out, s)
 }
 
+// fileEncodings are the base64 forms a file part's bytes may arrive in:
+// padded or not, standard or URL-safe, as ProtoJSON accepts them.
+var fileEncodings = []*base64.Encoding{
+	base64.StdEncoding, base64.RawStdEncoding, base64.URLEncoding, base64.RawURLEncoding,
+}
+
 // fileText is the text a file part's bytes decode to when that is valid
 // UTF-8; any other value is returned as written.
 func fileText(key, s string) string {
 	if key != "bytes" && key != "raw" {
 		return s
 	}
-	if b, err := base64.StdEncoding.DecodeString(s); err == nil && utf8.Valid(b) {
-		return string(b)
+	for _, enc := range fileEncodings {
+		if b, err := enc.DecodeString(s); err == nil && utf8.Valid(b) {
+			return string(b)
+		}
 	}
 	return s
 }
@@ -371,15 +389,17 @@ func (w *tokenWalker) noteAppend(v bool) {
 	}
 }
 
-// partTexts joins each group's text, leaving out groups with none. Text
-// outside an artifact always joins what came before it.
+// partTexts joins each group's text. A group with none is left out unless it
+// replaces a named artifact, whose earlier text it clears. Text outside an
+// artifact always joins what came before it.
 func (w *tokenWalker) partTexts() []partText {
 	var out []partText
 	for i, g := range w.groups {
-		if len(g.pieces) > 0 {
-			appends := i == w.outside || (g.appends != nil && *g.appends)
-			out = append(out, partText{id: g.id, text: strings.Join(g.pieces, ""), appends: appends})
+		appends := i == w.outside || (g.appends != nil && *g.appends)
+		if len(g.pieces) == 0 && (appends || g.id == "") {
+			continue
 		}
+		out = append(out, partText{id: g.id, text: strings.Join(g.pieces, ""), appends: appends, split: len(g.pieces) > 1})
 	}
 	return out
 }
@@ -435,14 +455,19 @@ type resultShape struct {
 }
 
 // setResultAttrs records the task the reply names, for JSON-RPC and
-// HTTP+JSON replies and stream events alike.
+// HTTP+JSON replies and stream events alike. A JSON-RPC reply without a
+// result names no task: its top-level id is the request's.
 func setResultAttrs(span trace.Span, body []byte) {
 	var v struct {
-		Result *resultShape `json:"result"`
+		JSONRPC *string      `json:"jsonrpc"`
+		Result  *resultShape `json:"result"`
 		resultShape
 	}
 	_ = json.Unmarshal(body, &v)
 	r := v.Result
+	if r == nil && v.JSONRPC != nil {
+		return
+	}
 	if r == nil {
 		r = &v.resultShape
 	}

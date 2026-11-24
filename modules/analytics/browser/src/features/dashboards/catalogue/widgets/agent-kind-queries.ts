@@ -4,6 +4,7 @@
  * check names are the ones the dashboards dev seed sends, so the demo fills every panel.
  */
 
+import { SOURCES_PLACEHOLDER } from "../../model/sources-parameter.ts";
 import { gatheredRows } from "../../templates/model/lwql-gathered.ts";
 import {
   bucketOf,
@@ -106,14 +107,16 @@ const JUDGED_IN_BOTH_PERIODS = `OccurredAt >= ${PREVIOUS_START} AND ${inPeriodAn
       AND Passed IS NOT NULL
       AND IsGuardrail = false`;
 
-/** Each judged trace once, with the unit and metadata version of its first evaluation row. */
+/**
+ * Each judged trace once, with the unit of its first evaluation row. No version: the pass rates
+ * never read one, and every column read widens the settled view's GROUP BY (analytics ADR-007).
+ */
 const JUDGED_UNIT_TRACES = `SELECT ${TRACE_KEY} AS trace,
     argMin(unit, TraceOccurredAt) AS unit,
-    argMin(MetadataPromptVersion, TraceOccurredAt) AS version,
     min(TraceOccurredAt) AS at,
     countIf(Passed = 1) AS passed,
     count() AS judged
-  FROM (SELECT TraceId, TraceOccurredAt, MetadataPromptVersion, Passed, ${METRICS_UNIT} AS unit
+  FROM (SELECT TraceId, TraceOccurredAt, Passed, ${METRICS_UNIT} AS unit
     FROM trace_evaluation_metrics
     WHERE ${JUDGED_IN_BOTH_PERIODS})
   GROUP BY trace`;
@@ -205,6 +208,38 @@ const METADATA_VERSIONED = `SELECT cityHash64(TraceId)
         WHERE ${inPeriodAndPrevious("OccurredAt")}
           AND MetadataPromptVersion != ''`;
 
+/** How far back `traces` looks a trace's sources up: one window and a day (lookupBound). */
+const SOURCES_LOOKUP_START = `subtractDays(${PREVIOUS_START}, 1)`;
+
+/**
+ * The traces `traces` keeps to the sources (stock-query-sources.ts): under application, one with
+ * no row from an unlisted source; else one with a row from a listed source.
+ */
+const TRACE_IN_SOURCES = `if(has(${SOURCES_PLACEHOLDER}, 'application'),
+        countIf(Source NOT IN ${SOURCES_PLACEHOLDER}) = 0,
+        countIf(Source IN ${SOURCES_PLACEHOLDER}) > 0)`;
+
+/**
+ * Each metadata-less trace's managed prompt version and time as `traces` holds them: newest row
+ * inside both windows, no upper bound (the caller drops a row past the end), '' if none. It keeps
+ * to the sources itself, per trace, from every source's rows back to where `traces` looks them up.
+ */
+const MANAGED_VERSION_PER_TRACE = `SELECT ${TRACE_KEY} AS trace,
+        argMaxIf(LastUsedPromptVersionId, UpdatedAt, OccurredAt >= ${PREVIOUS_START}) AS managed,
+        argMaxIf(OccurredAt, UpdatedAt, OccurredAt >= ${PREVIOUS_START}) AS anchored
+      FROM trace_metrics
+      WHERE OccurredAt >= ${SOURCES_LOOKUP_START}
+        AND cityHash64(TraceId) NOT IN (
+          ${METADATA_VERSIONED}
+        )
+      GROUP BY trace
+      HAVING ${TRACE_IN_SOURCES}`;
+
+/**
+ * Each version's first use inside both windows, never all history, as it was on `traces`: a
+ * version first used long ago and still in use dates from its first use in the window. A trace
+ * counts once, at the time and with the version of its newest `trace_metrics` row.
+ */
 const VERSIONS = `SELECT version, min(first_seen) AS first_seen
     FROM (
       SELECT MetadataPromptVersion AS version, min(OccurredAt) AS first_seen
@@ -213,13 +248,12 @@ const VERSIONS = `SELECT version, min(first_seen) AS first_seen
         AND MetadataPromptVersion != ''
       GROUP BY version
       UNION ALL
-      SELECT ifNull(LastUsedPromptVersionId, '') AS version, min(OccurredAt) AS first_seen
-      FROM traces
-      WHERE ${inPeriodAndPrevious("OccurredAt")}
-        AND LastUsedPromptVersionId != ''
-        AND cityHash64(TraceId) NOT IN (
-          ${METADATA_VERSIONED}
-        )
+      SELECT managed AS version, min(anchored) AS first_seen
+      FROM (
+      ${MANAGED_VERSION_PER_TRACE}
+      )
+      WHERE anchored < ${END}
+        AND managed != ''
       GROUP BY version
     )
     GROUP BY version`;

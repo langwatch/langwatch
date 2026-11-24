@@ -79,15 +79,21 @@ dev's Personal Workspace at https://<your-host>/coding-agents .
       curl http://{{ .Release.Name }}-gateway/healthz
 {{- $gwHost := ((.Values.ingress | default dict).gateway | default dict).host }}
 {{- if and .Values.ingress.enabled $gwHost }}
-  • AI Gateway public route: Ingress {{ .Release.Name }}-gateway-ingress for {{ $gwHost }}, paths /v1 and /health.
+  • AI Gateway public route: Ingress {{ .Release.Name }}-gateway-ingress for {{ $gwHost }}, paths /v1, /a2a and /health.
+{{- if not .Values.gateway.publicUrl }}
+{{- $gwScheme := "http" }}
+{{- if (((.Values.ingress).gateway).tls).secretName }}{{- $gwScheme = "https" }}{{- end }}
+  • A2A Agent Cards: the gateway refuses them (a2a_public_url_unset) until
+    gateway.publicUrl is set. Set it to {{ $gwScheme }}://{{ $gwHost }}.
+{{- end }}
 {{- else if .Values.gateway.publicUrl }}
   • AI Gateway public URL: {{ .Values.gateway.publicUrl }} (no Ingress
-    rendered; your own route must send /v1 and /health to Service
+    rendered; your own route must send /v1, /a2a and /health to Service
     {{ .Release.Name }}-gateway port 80).
 {{- else }}
   • The AI Gateway has no public route. LLM clients and the CLI need one.
     Either set ingress.gateway.host on the app Ingress, or route
-    /v1 and /health on your gateway hostname to Service
+    /v1, /a2a and /health on your gateway hostname to Service
     {{ .Release.Name }}-gateway port 80 (Gateway API HTTPRoute, a load
     balancer) and set gateway.publicUrl. Routes, timeouts and body size:
       https://docs.langwatch.ai/self-hosting/deployment/routing
@@ -387,9 +393,9 @@ CreateContainerConfigError; `kubectl describe pod` names the missing key.
 8. LangWatchQL (LWQL) — governed analytics SQL
 ──────────────────────────────────────────────────────────────────────
 {{- if .Values.lwql.enabled }}
-The `release_lwql_workbench` feature flag still gates the HTTP endpoint —
-until it is on for a project, queries are refused with `lwql_not_enabled`
-while the backend objects sit ready.
+The `release_lwql_workbench` feature flag gates the HTTP endpoint. It is on
+by default on a self-hosted install; where an operator switches it off for a
+project, queries are refused with `lwql_not_enabled`.
 
 The application owns the LangWatchQL access model in code. How it reaches
 ClickHouse depends on the posture:

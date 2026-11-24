@@ -4,13 +4,12 @@ import { describe, expect, it } from "vitest";
 import {
   decisionModelPickerOptions,
   isHostedDecisionModelOffered,
-  ROUTED_HOSTED_DECISION_MODEL_SUBTITLE,
   rolePickerOptions,
 } from "../decision-model-options.ts";
 
-const HOSTED = { value: LANGWATCH_DECISION_MODEL_ID, label: "Evals Preview" };
+const HOSTED = { value: LANGWATCH_DECISION_MODEL_ID, label: "LangWatch Instant (preview)" };
 const OPENAI = { value: "openai/decisions:gpt-6-luna", label: "OpenAI Decisions" };
-const LANGWATCH_TITLES = ["Evals Preview", "Scenario Judge Preview", "Search Preview"];
+const LANGWATCH_TITLES = ["LangWatch Instant (preview)", "LangWatch Judge (preview)"];
 
 describe("decisionModelPickerOptions", () => {
   const hostedSubtitle = (isJudgeRouted: boolean) =>
@@ -18,13 +17,27 @@ describe("decisionModelPickerOptions", () => {
       (option) => option.value === LANGWATCH_DECISION_MODEL_ID,
     )?.subtitle;
 
-  /** @scenario "With the router flag on LangWatch Evals Preview says it routes" */
-  it("says Evals Preview routes when the judge router flag is on", () => {
-    expect(hostedSubtitle(true)).toBe(ROUTED_HOSTED_DECISION_MODEL_SUBTITLE);
+  /** @scenario "LangWatch Instant (preview) reads the same whether or not the judge router flag is on" */
+  it("reads Optimized for search and quick classification with the router flag on or off", () => {
+    expect(hostedSubtitle(true)).toBe("Optimized for search and quick classification");
+    expect(hostedSubtitle(false)).toBe("Optimized for search and quick classification");
   });
 
-  it("reads Optimized for evals when the judge router flag is off", () => {
-    expect(hostedSubtitle(false)).toBe("Optimized for evals");
+  /** @scenario "The column picker lists only the new LangWatch model ids" */
+  it("lists only LangWatch Instant (preview) and LangWatch Judge (preview) of LangWatch's ids, never LangWatch Evals (preview)", () => {
+    for (const isJudgeRouted of [true, false]) {
+      const values = decisionModelPickerOptions({
+        pickable: [],
+        isJudgeRouted,
+        isOwnModelEnabled: true,
+      }).map((option) => option.value);
+      expect(values).not.toContain("langwatch/evals-preview");
+      expect(values.filter((value) => value.startsWith("langwatch/"))).toEqual(
+        isJudgeRouted
+          ? ["langwatch/instant-preview", "langwatch/judge-preview"]
+          : ["langwatch/instant-preview"],
+      );
+    }
   });
 
   describe("given own decision models are on", () => {
@@ -90,13 +103,13 @@ describe("decisionModelPickerOptions", () => {
     expect(options.map((option) => option.label)).toEqual(LANGWATCH_TITLES);
   });
 
-  it("lists Evals Preview alone, no coming-soon preview, with the router flag off", () => {
+  it("lists LangWatch Instant (preview) alone, no coming-soon preview, with the router flag off", () => {
     const options = decisionModelPickerOptions({
       pickable: [HOSTED],
       isJudgeRouted: false,
       isOwnModelEnabled: false,
     });
-    expect(options.map((option) => option.label)).toEqual(["Evals Preview"]);
+    expect(options.map((option) => option.label)).toEqual(["LangWatch Instant (preview)"]);
   });
 
   it("lists the previews that are not hosted yet as coming soon, unpickable", () => {
@@ -137,7 +150,7 @@ describe("rolePickerOptions", () => {
 });
 
 describe("isHostedDecisionModelOffered()", () => {
-  /** @scenario "Evals Preview is offered where it is released or one switch away" */
+  /** @scenario "LangWatch Instant (preview) is offered where it is released or one switch away" */
   it.each([
     [{ hostedReleased: true, offer: "contact_us" }, true],
     [{ hostedReleased: false, offer: "enable" }, true],
@@ -149,7 +162,7 @@ describe("isHostedDecisionModelOffered()", () => {
     expect(isHostedDecisionModelOffered(access)).toBe(offered);
   });
 
-  /** @scenario "Without Evals Preview, the drawer offers only the project's own decision models" */
+  /** @scenario "Without LangWatch Instant (preview), the drawer offers only the project's own decision models" */
   it("leaves LangWatch's models out of the picker when not offered", () => {
     const options = decisionModelPickerOptions({
       pickable: [],
@@ -158,6 +171,8 @@ describe("isHostedDecisionModelOffered()", () => {
       isHostedOffered: false,
     });
 
-    expect(options.find((option) => option.label === "Evals Preview")).toBeUndefined();
+    expect(
+      options.find((option) => option.label === "LangWatch Instant (preview)"),
+    ).toBeUndefined();
   });
 });
