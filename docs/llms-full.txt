@@ -50707,7 +50707,11 @@ Open [Experiments](https://app.langwatch.ai/@project/experiments), click **New E
 <Step title="Create the judge">
 On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the **LLM as Judge** category and **LLM-as-a-Judge Boolean Evaluator**.
 
-Name it, pick the judge model, and replace the default prompt with your criteria. The model picker also lists **Decision models**, such as OpenAI Decisions API, TypeSafe Jev, Cloudflare Clef or Gemini Decision 1, which answer yes or no, score and category questions on your own provider key. [Your own model](/features/instant-evals/own-model) lists each one and the key it needs. On LangWatch Cloud the picker can also list **Instant Evals**, a judge that needs no key of your own; see [Judge with Instant Evals](#judge-with-instant-evals). Write the criteria as a checklist the judge can apply to one answer at a time. For example:
+Name it, pick the judge model, and replace the default prompt with your criteria. The model picker also lists **Decision models**, such as OpenAI Decisions API, TypeSafe Jev, Cloudflare Clef or Gemini Decision 1, which answer yes or no, score and category questions on your own provider key. [Your own model](/features/instant-evals/own-model) lists each one and the key it needs.
+
+On LangWatch Cloud the picker can also list **Instant Evals**, a judge that needs no key of your own; see [Judge with Instant Evals](#judge-with-instant-evals).
+
+Write the criteria as a checklist the judge can apply to one answer at a time. For example:
 
 ```text
 You are evaluating a business coaching assistant.
@@ -50749,7 +50753,7 @@ On LangWatch Cloud, once Instant Evals is switched on for your organization, the
 
 - **What it reads.** Your prompt, plus the input, output and contexts you mapped, each as its own section. When the text is too long, the input is shortened first and the output is kept whole; an output that alone is too long keeps its first and last lines.
 - **What it returns.** The Boolean, Score and Category judges keep their usual result. A Score judge on Instant Evals shows a minimum and a maximum: a whole-number range of at most ten values, such as 1 to 5, is asked as it is, and any other range is asked on 1 to 10 and mapped back onto yours. With no range set, the score is between 0 and 1.
-- **What it costs.** Each judged call is one Instant Evals row on the [billing events](/ai-gateway/billing-events) ledger, and the result's cost is its price. A call that judged nothing records nothing. An organization that is not billed per use can spend 1 USD on Instant Evals in total, shared with Instant Evals runs and judged queries; past it, the judge returns an error with `instant_eval_free_budget_exhausted` and judges nothing.
+- **What it costs.** Each judged call is one Instant Evals row on the [billing events](/ai-gateway/billing-events) ledger, and the result's cost is its price. A call that judged no text records no row and no cost. An organization that is not billed per use can spend 1 USD on Instant Evals in total, shared with Instant Evals runs and judged queries; past it, the judge returns an error with `instant_eval_free_budget_exhausted` instead of a verdict.
 
 ## Calibrate the judge
 
