@@ -19,7 +19,7 @@ import {
   type TeamOption,
   validateInviteEmails,
 } from "../../model/add-members-form-model.ts";
-import type { MembersForm } from "../../model/member-invite-form.ts";
+import type { InviteSeat, MembersForm } from "../../model/member-invite-form.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
 import { InviteEmailChips } from "../elements/invite-email-chips.tsx";
 import { OrganizationUserRoleField } from "../elements/organization-user-role-field.tsx";
@@ -42,6 +42,8 @@ interface AddMembersFormProps {
    * retyped.
    */
   initialEmails?: string;
+  /** The choice the form opens with; the limit dialog opens it on Billing only. */
+  initialSeat?: InviteSeat;
 }
 
 export function AddMembersForm({
@@ -55,6 +57,7 @@ export function AddMembersForm({
   onCloseText = "Cancel",
   isInviterAdmin = true,
   initialEmails = "",
+  initialSeat = OrganizationUserRole.MEMBER,
 }: AddMembersFormProps) {
   const firstTeamId = teamOptions[0]?.value;
   const {
@@ -66,8 +69,11 @@ export function AddMembersForm({
   } = useForm<InviteFormValues>({
     defaultValues: {
       emailsRaw: initialEmails,
-      orgRole: OrganizationUserRole.MEMBER,
-      teams: firstTeamId !== undefined ? [{ teamId: firstTeamId, role: TeamUserRole.MEMBER }] : [],
+      orgRole: initialSeat,
+      teams:
+        firstTeamId !== undefined && initialSeat === OrganizationUserRole.MEMBER
+          ? [{ teamId: firstTeamId, role: TeamUserRole.MEMBER }]
+          : [],
     },
   });
 
