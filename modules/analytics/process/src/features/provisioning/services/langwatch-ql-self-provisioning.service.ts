@@ -10,6 +10,7 @@ import { createHash } from "node:crypto";
 import type { LangWatchQLConnection } from "../../../repositories/langwatch-ql-executor.repository.ts";
 import type { LwqlCollectionState } from "../../../repositories/langwatch-ql-provisioning.repository.ts";
 import { flooredViewName, flooredViewNames } from "../../../rules/lwql-dedup-floor.rules.ts";
+import { traceIdsViewName, traceIdsViewNames } from "../../../rules/lwql-dedup-trace-ids.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "../../../services/langwatch-ql-access-model-definition.service.ts";
 import {
@@ -306,6 +307,7 @@ export class LangWatchQLSelfProvisioningService {
       (view) =>
         drifted.has(view.name) ||
         drifted.has(flooredViewName(view.name)) ||
+        drifted.has(traceIdsViewName(view.name)) ||
         (catalogShapes.isPostgresResident(view) && replaced.has(view.sourceTable)),
     );
     const functions = includeAppFunctions
@@ -364,6 +366,7 @@ export class LangWatchQLSelfProvisioningService {
       ...catalogShapes.postgresViews(LWQL_VIEW_CATALOG).map((view) => view.sourceTable),
       ...LWQL_VIEW_CATALOG.map((view) => view.name),
       ...flooredViewNames(LWQL_VIEW_CATALOG),
+      ...traceIdsViewNames(LWQL_VIEW_CATALOG),
     ];
   }
 

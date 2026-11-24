@@ -9,11 +9,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { startMigratedClickHouse } from "../../__tests__/migrated-clickhouse.harness.ts";
 import { LangWatchQLAppFunctionStatementsService } from "../../features/provisioning/services/langwatch-ql-app-function-statements.service.ts";
-import {
-  LangWatchQLViewStatementsService,
-  SHIPPED_LWQL_DEDUP,
-} from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
-import { langWatchQLPassSql } from "../langwatch-ql-pass-sql.rules.ts";
+import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import { LangWatchQLPassRunService } from "../../services/langwatch-ql-pass-run.service.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 
 const PARTS = 3;
@@ -62,20 +60,22 @@ describe("given an Instant Evals statement over a busy project's traces", () => 
     }
     const traces = LWQL_VIEW_CATALOG.find((view) => view.name === "traces");
     if (!traces) throw new Error("the shipped catalogue has no traces view");
-    await ch.command({
-      query: LangWatchQLViewStatementsService.create().viewStatement({
-        names: {
-          database,
-          restrictedUser: "unused",
-          settingsProfile: "unused",
-          keyMapTable: "unused",
-          tenantSetting: "custom_unused",
-        },
-        sourceDatabase: database,
-        view: traces,
-        dedup: SHIPPED_LWQL_DEDUP,
-      }),
+    // The view and its trace-ids twin, as provisioning emits them.
+    const setup = LangWatchQLViewProvisioningService.create().setupStatements({
+      names: {
+        database,
+        restrictedUser: "unused",
+        settingsProfile: "unused",
+        keyMapTable: "unused",
+        tenantSetting: "custom_unused",
+      },
+      sourceDatabase: database,
+      views: [traces],
+      dedup: SHIPPED_LWQL_DEDUP,
     });
+    for (const query of setup) {
+      await ch.command({ query });
+    }
 
     const total = PARTS * ROWS_PER_PART;
     for (let part = 0; part < PARTS; part++) {
@@ -130,9 +130,16 @@ describe("given an Instant Evals statement over a busy project's traces", () => 
     );
   }
 
+  /** The pass as the service runs it: every query it sends goes through `capped`. */
   async function runPass(pass: LangWatchQLPass): Promise<KeyRow[]> {
-    const composed = langWatchQLPassSql({ sql: statement, pass });
-    return capped(composed.sql, { ...composed.parameters });
+    const result = await LangWatchQLPassRunService.create().run({
+      sql: statement,
+      pass,
+      database,
+      views: LWQL_VIEW_CATALOG,
+      query: async (composed) => ({ rows: await capped(composed.sql, { ...composed.parameters }) }),
+    });
+    return result.rows;
   }
 
   describe("when the sample pass runs under the memory cap", () => {

@@ -4,7 +4,8 @@
  * @see specs/lwql/api.feature
  */
 
-import { flooredViewName, LWQL_FLOOR_PARAMETER } from "../../../rules/lwql-dedup-floor.rules.ts";
+import { LWQL_FLOOR_PARAMETER } from "../../../rules/lwql-dedup-floor.rules.ts";
+import { twinViewName } from "../../../rules/lwql-dedup-trace-ids.rules.ts";
 import { TENANT_COLUMN } from "../../../rules/lwql-view-catalog.rules.ts";
 import {
   FLOORED_DEDUP_STRATEGIES,
@@ -327,6 +328,7 @@ export class LangWatchQLViewStatementsService {
     view,
     dedup,
     floor,
+    traceIds,
   }: {
     names: LangWatchQLNames;
     sourceDatabase: string;
@@ -334,6 +336,8 @@ export class LangWatchQLViewStatementsService {
     dedup: LangWatchQLDedupStrategy;
     /** Renders the floored twin, whose dedup reads only versions from this bound. */
     floor?: string;
+    /** Renders the trace-ids twin, whose dedup reads only these traces. */
+    traceIds?: string;
   }): string {
     const relation = sourceRelation({ names, sourceDatabase, view });
     // A PostgreSQL-resident source keeps one row per key, so there is no version
@@ -375,6 +379,7 @@ export class LangWatchQLViewStatementsService {
           strategy,
           engineDedup: !postgres && !grouped,
           ...floored,
+          ...(traceIds === undefined ? {} : { traceIds }),
         });
     const joinClause = joinRelationClause(view, sourceDatabase);
     const enginePredicate =
@@ -386,7 +391,7 @@ export class LangWatchQLViewStatementsService {
     const grouping = groupingClause({ view, grouped, settled });
     const collapse = postgres ? postgresFanOutCollapse(view) : "";
 
-    const viewName = floor === undefined ? view.name : flooredViewName(view.name);
+    const viewName = twinViewName({ view: view.name, floor, traceIds });
     return (
       `CREATE OR REPLACE VIEW ` +
       `${sqlText.assertIdentifier(names.database, "database")}.${sqlText.assertIdentifier(viewName, "view")}\n` +
