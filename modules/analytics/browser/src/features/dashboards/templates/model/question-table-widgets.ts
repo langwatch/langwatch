@@ -19,17 +19,17 @@ import {
 /** A share of a whole, a dash when the part is unknown or the whole is zero. */
 const SHARE = `const share = (part, whole) => pct(ratio(part, whole), 0);`;
 
-/** A model's cost, or "no price" when none of its calls had one: unknown, never $0.00. */
+/** A model's cost, or "price unknown" when none of its calls had one: unknown, never $0.00. */
 const MODEL_COST = `function ModelCost({ cost }) {
   if (num(cost) > 0) return <b>{usd(cost)}</b>;
-  return <span style={{ color: C.faint }}>no price</span>;
+  return <span style={{ color: C.faint }}>price unknown</span>;
 }`;
 
 export const MODEL_SPEND_CODE = widgetCode({
   summary: "The five models that cost the most, with each one's share of all model spend.",
   subtitle:
-    "The models behind the bill. A model with no price shows its row with a dash: its cost is " +
-    "unknown, not zero",
+    'What each model cost in this period, most expensive first, with "price unknown" where ' +
+    "LangWatch has no price for the model.",
   source: "models",
   parts: [NUMBERS, COMPLETENESS, TABLE, SHARE, MODEL_COST],
   queries: ["models", "spend"],
@@ -55,7 +55,8 @@ export const MODEL_SPEND_CODE = widgetCode({
 
 export const TOP_MODELS_CODE = widgetCode({
   summary: "The ten models most traces use, with their share of all traces and their cost.",
-  subtitle: "The models behind most of your traffic, and so most of your bill",
+  subtitle:
+    "Models your agent calls most often, where a request that calls two models counts for both.",
   source: "models",
   parts: [NUMBERS, TABLE, SHARE, MODEL_COST],
   queries: ["models", "modelCosts", "traffic"],
@@ -64,8 +65,9 @@ export const TOP_MODELS_CODE = widgetCode({
   const costs = new Map(modelCosts.data.map((row) => [row.model, num(row.cost)]));
   const columns = [
     { header: "Model", cell: (row) => mono(row.model) },
-    { header: "Traces", align: "right", cell: (row) => count(num(row.traces)) },
-    { header: "Share", align: "right", cell: (row) => share(num(row.traces), traces) },
+    { header: "Requests using it", align: "right", cell: (row) => count(num(row.traces)) },
+    { header: "Share of model requests", align: "right",
+      cell: (row) => share(num(row.traces), traces) },
     { header: "Cost", align: "right", cell: (row) => <ModelCost cost={costs.get(row.model)} /> },
   ];
   return (
@@ -77,11 +79,18 @@ export const TOP_MODELS_CODE = widgetCode({
 
 export const TOPICS_CODE = widgetCode({
   summary: "The ten topics with the most traces, their share, and the topic that grew most.",
-  subtitle: "Turn the most common questions into a roadmap",
+  subtitle:
+    "LangWatch groups similar requests into topics, so the top ones tell you what to improve next.",
   parts: [NUMBERS, TABLE, HEADLINE, SHARE],
   queries: ["topics", "topicTraffic"],
   body: `  if (topics.data.length === 0) {
-    return <Panel><Note>No traces with a topic in this period.</Note></Panel>;
+    return (
+      <Panel>
+        <Note>
+          No topics yet. LangWatch groups requests into topics once it has a few hundred of them.
+        </Note>
+      </Panel>
+    );
   }
   const total = num(topicTraffic.data[0]?.traces);
   const name = (row) => row.topic || "Unnamed topic";
@@ -89,18 +98,19 @@ export const TOPICS_CODE = widgetCode({
   const change = (value) => (value > 0 ? "+" : "") + count(value);
   const columns = [
     { header: "Topic", cell: (row) => name(row) },
-    { header: "Traces", align: "right", cell: (row) => count(num(row.traces)) },
+    { header: "Requests", align: "right", cell: (row) => count(num(row.traces)) },
     { header: "Share", align: "right", cell: (row) => share(num(row.traces), total) },
     {
-      header: "Second half",
+      header: "Change",
       align: "right",
       cell: (row) => <span style={{ color: C.subtle }}>{change(num(row.growth))}</span>,
     },
   ];
   return (
     <Panel>
-      <Headline value={name(grew)}
-        label={"grew most, " + change(num(grew.growth)) + " traces in the second half"} />
+      <Headline value={name(topics.data[0])}
+        label={share(num(topics.data[0].traces), total) + " of requests with a topic. " +
+          "Growing fastest: " + name(grew)} />
       <Table columns={columns} rows={topics.data} rowPadding={3} />
     </Panel>
   );`,
@@ -108,26 +118,24 @@ export const TOPICS_CODE = widgetCode({
 
 export const SLOWEST_OPERATIONS_CODE = widgetCode({
   summary: "Typical and slowest trace latency, then the five operations that take the most time.",
-  subtitle:
-    "Find the slow tail, then watch it shrink as you fix it. Typical is the median trace, " +
-    "slowest the 99th percentile; an operation's slowest is its 95th percentile",
+  subtitle: "Which step takes the biggest share of each reply. Fix the top one first.",
   source: "spans",
   parts: [NUMBERS, TABLE, STAT],
   queries: ["operations", "latency"],
   body: `  if (operations.data.length === 0) return <Panel><CallToAction /></Panel>;
   const spread = latency.data[0] || {};
   const columns = [
-    { header: "Operation", cell: (row) => mono(row.operation) },
+    { header: "Step", cell: (row) => mono(row.operation) },
     { header: "Total time", align: "right", cell: (row) => <b>{ms(num(row.total_ms))}</b> },
-    { header: "Slowest", align: "right", cell: (row) => ms(num(row.p95_ms)) },
-    { header: "Spans", align: "right", cell: (row) => count(num(row.spans)) },
+    { header: "Slowest 1 in 20", align: "right", cell: (row) => ms(num(row.p95_ms)) },
+    { header: "Calls", align: "right", cell: (row) => count(num(row.spans)) },
   ];
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8,
         marginBottom: 8 }}>
-        <Stat label="Typical trace" value={ms(num(spread.p50_ms))} />
-        <Stat label="Slowest traces" value={ms(num(spread.p99_ms))} />
+        <Stat label="Typical reply" value={ms(num(spread.p50_ms))} />
+        <Stat label="Slowest 1 in 100" value={ms(num(spread.p99_ms))} />
       </div>
       <Table columns={columns} rows={operations.data} />
     </Panel>
@@ -137,8 +145,8 @@ export const SLOWEST_OPERATIONS_CODE = widgetCode({
 export const SLOWEST_MODELS_CODE = widgetCode({
   summary: "The five models whose traces have the slowest response time.",
   subtitle:
-    "Response time of the traces that call each model, at the 95th percentile: 1 in 20 took " +
-    "longer",
+    "Time each model takes to answer, at the slow end: the figure that 1 in 20 of its calls " +
+    "took longer than.",
   source: "models",
   parts: [NUMBERS, BARS, HEADLINE],
   queries: ["main"],
@@ -146,7 +154,8 @@ export const SLOWEST_MODELS_CODE = widgetCode({
   const ranked = main.data.map((row) => ({ label: row.model, value: num(row.p95_ms) }));
   return (
     <Panel>
-      <Headline value={ms(ranked[0].value)} label={ranked[0].label + " is slowest"} />
+      <Headline value={ms(ranked[0].value)}
+        label={"for 1 in 20 replies of " + ranked[0].label + ", the slowest model"} />
       <Bars rows={ranked} format={ms} />
     </Panel>
   );`,
@@ -154,7 +163,7 @@ export const SLOWEST_MODELS_CODE = widgetCode({
 
 export const THUMBS_DOWN_CODE = widgetCode({
   summary: "Share of reviewer thumbs down, then the latest traces reviewers voted down.",
-  subtitle: "Thumbs from people reviewing traces in LangWatch, newest first",
+  subtitle: "Answers your team marked with a thumbs down in LangWatch, newest first.",
   source: "feedback",
   parts: [NUMBERS, DATES, TABLE, TRACE_LINK, HEADLINE],
   queries: ["summary", "traces"],
@@ -163,15 +172,21 @@ export const THUMBS_DOWN_CODE = widgetCode({
   if (!add(up, down)) return <Panel><CallToAction /></Panel>;
   const label = count(down) + " of " + count(add(up, down)) + " reviewer votes were thumbs down";
   if (traces.data.length === 0) {
-    return <Panel><Note color={C.green}>No reviewer thumbs down in this period</Note></Panel>;
+    return (
+      <Panel>
+        <Note color={C.green}>
+          Your reviewers gave no thumbs down in this period.
+        </Note>
+      </Panel>
+    );
   }
   const when = (value) =>
     utc(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric" });
   const columns = [
-    { header: "Trace", cell: (row) => <TraceLink id={row.trace_id} /> },
+    { header: "Answer", cell: (row) => <TraceLink id={row.trace_id} /> },
     { header: "Thumbs down", align: "right", cell: (row) => count(num(row.thumbs_down)) },
     {
-      header: "Last",
+      header: "When",
       align: "right",
       cell: (row) => <span style={{ color: C.faint }}>{when(row.last_at)}</span>,
     },
@@ -186,7 +201,9 @@ export const THUMBS_DOWN_CODE = widgetCode({
 
 export const LOWEST_SCORES_CODE = widgetCode({
   summary: "The eight evaluation results with the lowest score, each linked to its trace.",
-  subtitle: "Start from the answers your evaluators scored worst",
+  subtitle:
+    "The answers that scored lowest on each automatic check, with the score out of that check's " +
+    "maximum.",
   source: "evaluations",
   parts: [NUMBERS, TABLE, TRACE_LINK],
   queries: ["main"],
@@ -196,13 +213,13 @@ export const LOWEST_SCORES_CODE = widgetCode({
       return <span style={{ color: C.faint }}>-</span>;
     }
     const passed = row.passed === true || num(row.passed) === 1;
-    return <span style={{ color: passed ? C.green : C.red }}>{passed ? "pass" : "fail"}</span>;
+    return <span style={{ color: passed ? C.green : C.red }}>{passed ? "Yes" : "No"}</span>;
   };
   const columns = [
-    { header: "Trace", cell: (row) => <TraceLink id={row.trace_id} /> },
-    { header: "Evaluator", cell: (row) => row.evaluator || "Unnamed" },
+    { header: "Answer", cell: (row) => <TraceLink id={row.trace_id} /> },
+    { header: "Check", cell: (row) => row.evaluator || "Unnamed check" },
     { header: "Score", align: "right", cell: (row) => <b>{known(row.score) ? num(row.score).toFixed(2) : GAP}</b> },
-    { header: "Verdict", align: "right", cell: verdict },
+    { header: "Passed", align: "right", cell: verdict },
   ];
   return (
     <Panel>
@@ -213,15 +230,16 @@ export const LOWEST_SCORES_CODE = widgetCode({
 
 export const LOWEST_PASSING_EVALUATORS_CODE = widgetCode({
   summary: "The five evaluators with the lowest pass rate, with their run counts.",
-  subtitle: "Where quality slips first",
+  subtitle:
+    "Automatic checks your agent fails most, lowest pass rate first, once a check has 20 answers.",
   source: "evaluations",
   parts: [NUMBERS, TABLE],
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
   const columns = [
-    { header: "Evaluator", cell: (row) => row.evaluator || "Unnamed" },
-    { header: "Pass rate", align: "right", cell: (row) => <b>{pct(num(row.pass_rate), 0)}</b> },
-    { header: "Runs", align: "right", cell: (row) => count(num(row.runs)) },
+    { header: "Check", cell: (row) => row.evaluator || "Unnamed check" },
+    { header: "Answers passed", align: "right", cell: (row) => <b>{pct(num(row.pass_rate), 0)}</b> },
+    { header: "Answers checked", align: "right", cell: (row) => count(num(row.runs)) },
   ];
   return (
     <Panel>
@@ -232,7 +250,7 @@ export const LOWEST_PASSING_EVALUATORS_CODE = widgetCode({
 
 export const EVALUATION_COVERAGE_CODE = widgetCode({
   summary: "What each evaluator runs on, its pass rate, and the share of traces evaluated at all.",
-  subtitle: "Start from real traces and watch coverage grow as judges come online",
+  subtitle: "How much of your agent's traffic your automatic checks read.",
   source: "evaluations",
   parts: [NUMBERS, TABLE, HEADLINE, SHARE],
   queries: ["evaluators", "evaluated", "traffic"],
@@ -241,14 +259,15 @@ export const EVALUATION_COVERAGE_CODE = widgetCode({
   const evaluatedTraces = num(evaluated.data[0]?.traces);
   const passRate = (row) => pct(num(row.pass_rate), 0);
   const columns = [
-    { header: "Evaluator", cell: (row) => row.evaluator || "Unnamed" },
-    { header: "Runs", align: "right", cell: (row) => count(num(row.runs)) },
-    { header: "Pass rate", align: "right", cell: passRate },
-    { header: "Coverage", align: "right", cell: (row) => <b>{share(num(row.traces), traces)}</b> },
+    { header: "Check", cell: (row) => row.evaluator || "Unnamed check" },
+    { header: "Requests checked", align: "right", cell: (row) => count(num(row.runs)) },
+    { header: "Passed", align: "right", cell: passRate },
+    { header: "Share of requests", align: "right",
+      cell: (row) => <b>{share(num(row.traces), traces)}</b> },
   ];
   return (
     <Panel>
-      <Headline value={share(evaluatedTraces, traces)} label="of traces evaluated at least once" />
+      <Headline value={share(evaluatedTraces, traces)} label="of requests were checked at least once" />
       <Table columns={columns} rows={evaluators.data} rowPadding={3} />
     </Panel>
   );`,

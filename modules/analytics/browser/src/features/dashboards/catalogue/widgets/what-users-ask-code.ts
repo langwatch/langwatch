@@ -21,7 +21,7 @@ import { SHARE_ROWS, SPARK, TOPIC_NAME } from "./answers-asks-parts.ts";
 
 export const CANNOT_SERVE_CODE = widgetCode({
   summary: "Conversations per topic judged to ask for something the agent cannot do.",
-  subtitle: "These are product ideas, not bugs",
+  subtitle: "Requests your agent has no way to serve, which you can treat as product ideas.",
   source: "judges",
   parts: [NUMBERS, HEADLINE, TOPIC_NAME, SHARE_ROWS],
   queries: ["topics", "totals"],
@@ -29,16 +29,17 @@ export const CANNOT_SERVE_CODE = widgetCode({
   const cannot = num(totals.data[0]?.cannot);
   if (!closed) return <Panel><CallToAction /></Panel>;
   if (!cannot) {
-    return <Panel><Note>Nothing people asked for was out of reach</Note></Panel>;
+    return <Panel><Note>Your agent could do everything people asked in this period.</Note></Panel>;
   }
   const widest = Math.max(...topics.data.map((row) => num(row.requests)), 1);
   const rows = topics.data.map((row) => ({
     label: topicName(row.topic),
     value: num(row.requests) / widest,
     figure: count(num(row.requests)),
-    note: row.reason ? "Most often: " + row.reason : undefined,
+    note: row.reason ? "Most asked: " + row.reason : undefined,
   }));
-  const label = "of " + count(closed) + " closed conversations asked for something my agent cannot do";
+  const label = "of " + count(closed) + " finished conversations (" + pct(ratio(cannot, closed), 0) +
+    ") asked for something your agent can't do";
   return (
     <Panel>
       <Headline value={count(cannot)} label={label} />
@@ -49,17 +50,31 @@ export const CANNOT_SERVE_CODE = widgetCode({
 
 export const RISING_TOPICS_CODE = widgetCode({
   summary: "Topics whose share of traces grew against the period before, and topics that are new.",
-  subtitle: "Check whether the product covers them",
+  subtitle:
+    "Topics that take a bigger share of requests than in the previous period. Check that your " +
+    "agent can handle them.",
   parts: [NUMBERS, TOPIC_NAME, SPARK],
   queries: ["shares", "daily"],
   body: `  if (shares.data.length === 0) {
-    return <Panel><Note>No traces with a topic in this period.</Note></Panel>;
+    return (
+      <Panel>
+        <Note>
+          No topics yet. LangWatch groups requests into topics once it has a few hundred of them.
+        </Note>
+      </Panel>
+    );
   }
   const total = (key) => shares.data.reduce((sum, row) => sum + num(row[key]), 0);
   const now = total("in_period");
   const before = total("in_previous");
   if (before === 0) {
-    return <Panel><Note>No topics in the period before to compare with</Note></Panel>;
+    return (
+      <Panel>
+        <Note>
+          Nothing to compare with yet: the previous period had no topics.
+        </Note>
+      </Panel>
+    );
   }
   const buckets = {};
   for (const row of daily.data) {
@@ -79,7 +94,7 @@ export const RISING_TOPICS_CODE = widgetCode({
     .toSorted((a, b) => Number(b.fresh) - Number(a.fresh) || b.share - b.was - (a.share - a.was))
     .slice(0, 5);
   if (rows.length === 0) {
-    return <Panel><Note>No topic grew against the period before</Note></Panel>;
+    return <Panel><Note>No topic grew against the previous period.</Note></Panel>;
   }
   return (
     <Panel>
@@ -93,7 +108,7 @@ export const RISING_TOPICS_CODE = widgetCode({
                   fontSize: 10, color: C.teal, background: C.muted }}>New</span> : null}
               </div>
               <div style={{ fontSize: 11, color: C.subtle }}>
-                {pct(row.share, 1) + " of traces" +
+                {pct(row.share, 1) + " of requests" +
                   (row.fresh ? ", none in the period before" : ", up from " + pct(row.was, 1))}
               </div>
             </div>
@@ -108,11 +123,19 @@ export const RISING_TOPICS_CODE = widgetCode({
 
 export const TOPIC_QUALITY_CODE = widgetCode({
   summary: "Per topic: traces, the share that went well, and requests the agent could not serve.",
-  subtitle: "Open a weak topic's traces to see what goes wrong",
+  subtitle:
+    "Went well counts resolved conversations (or checks passed, until outcomes are scored), and " +
+    "red marks a topic clearly below your others. Click a topic to open its conversations.",
   parts: [NUMBERS, TABLE, TOPIC_NAME],
   queries: ["topics"],
   body: `  if (topics.data.length === 0) {
-    return <Panel><Note>No traces with a topic in this period.</Note></Panel>;
+    return (
+      <Panel>
+        <Note>
+          No topics yet. LangWatch groups requests into topics once it has a few hundred of them.
+        </Note>
+      </Panel>
+    );
   }
   // Judged outcomes read best; without an outcome judge, the checks' pass rate stands in.
   const byOutcome = topics.data.some((row) => num(row.closed) > 0);
@@ -131,10 +154,10 @@ export const TOPIC_QUALITY_CODE = widgetCode({
   };
   const columns = [
     { header: "Topic", cell: (row) => topicName(row.topic) },
-    { header: "Traces", align: "right", cell: (row) => count(num(row.requests)) },
-    { header: byOutcome ? "Resolved" : "Checks passed", align: "right", cell: success },
+    { header: "Conversations", align: "right", cell: (row) => count(num(row.requests)) },
+    { header: "Went well", align: "right", cell: success },
     {
-      header: "Cannot do",
+      header: "Could not do",
       align: "right",
       cell: (row) => <span style={{ color: C.subtle }}>{count(num(row.cannot))}</span>,
     },
@@ -148,16 +171,16 @@ export const TOPIC_QUALITY_CODE = widgetCode({
 
 export const ASKED_AGAIN_CODE = widgetCode({
   summary: "Share of closed conversations judged misread the first time, and returning users.",
-  subtitle: "A high share means the first answer missed what people meant",
+  subtitle: "Share of conversations where your agent misread what the person meant.",
   source: "judges",
   recharts: SERIES_CHART_IMPORTS,
   parts: [NUMBERS, DATES, CHART_STYLE, BUCKETS, GAP_BRIDGE, SERIES_CHART, STAT],
   queries: ["trend", "users"],
   body: `  if (trend.data.length === 0) return <Panel><CallToAction /></Panel>;
   const closed = trend.data.reduce((sum, row) => sum + num(row.closed), 0);
-  const misread = trend.data.reduce((sum, row) => sum + num(row.misunderstood), 0);
   const active = num(users.data[0]?.active);
   const returning = num(users.data[0]?.returning);
+  const misread = trend.data.reduce((sum, row) => sum + num(row.misunderstood), 0);
   const points = withBuckets(trend, ["misunderstood", "closed"]).map((row) => ({
     x: bucketLabel(row.bucket),
     misread: ratio(row.misunderstood, row.closed),
@@ -166,15 +189,15 @@ export const ASKED_AGAIN_CODE = widgetCode({
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8,
         marginBottom: 8 }}>
-        <Stat label={"Misread first time, " + count(misread) + " of " + count(closed)}
-          value={pct(ratio(misread, closed), 1)} />
+        <Stat label={"Misunderstood the first time: " + count(misread) + " of " + count(closed) +
+          " conversations"} value={pct(ratio(misread, closed), 1)} />
         {active > 0 ? (
-          <Stat label={"Came back, " + count(returning) + " of " + count(active) + " people"}
+          <Stat label={"Came back: " + count(returning) + " of " + count(active) + " people"}
             value={pct(returning / active, 0)} />
         ) : null}
       </div>
       <SeriesChart points={points} format={(value) => pct(value, 0)} domain={[0, "auto"]}
-        series={[{ key: "misread", label: "misread first time", colour: C.orange }]} />
+        series={[{ key: "misread", label: "Misunderstood the first time", colour: C.orange }]} />
     </Panel>
   );`,
 });

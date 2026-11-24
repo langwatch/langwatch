@@ -502,7 +502,7 @@ describe("given a member changes a query's sources in the editor", () => {
     expect(server.updates()[0]?.queries[0]?.sources).toEqual([]);
     await vi.waitFor(() => expect(screen.getByTestId("no-sources-picked")).toBeTruthy());
     expect(screen.getByTestId("widget-card-footer").textContent).toBe(
-      "No sources picked · Project: Test Project",
+      "Pick at least one source. · Project: Test Project",
     );
     expect(screen.queryByTestId("sandboxed-frame")).toBeNull();
   });
@@ -521,7 +521,7 @@ describe("given a member saves only a query's sources and presses Undo", () => {
     await vi.waitFor(() => expect(server.updates()).toHaveLength(1));
     await vi.waitFor(() =>
       expect(screen.getByTestId("widget-card-footer").textContent).toBe(
-        "Sources: application, langy · Project: Test Project",
+        "Counts: your app and Langy · Project: Test Project",
       ),
     );
 

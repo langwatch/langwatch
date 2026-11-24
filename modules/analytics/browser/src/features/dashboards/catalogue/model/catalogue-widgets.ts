@@ -52,7 +52,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "How busy is my agent? Query the LangWatchQL view trace_metrics over the dashboard period, bucketed at the dashboard grain: count traces with uniqExact(TraceId) per bucket of OccurredAt. Answer with the total for the period, the busiest and the quietest bucket with their counts, and a short series of traces per bucket. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+      "How busy is my agent? Query the LangWatchQL view trace_metrics over the dashboard period, " +
+      "bucketed at the dashboard grain: count traces with uniqExact(TraceId) per bucket of " +
+      "OccurredAt. Answer with the total for the period, the busiest and the quietest bucket " +
+      "with their counts, and a short series of traces per bucket. Quote the real numbers from " +
+      "the query result. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period rather than guessing.",
   },
   {
     id: "satisfaction-shift",
@@ -69,7 +74,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Are users happier than before? Query the LangWatchQL view traces over the dashboard period, bucketed at the dashboard grain: avg(SatisfactionScore) per bucket of OccurredAt, skipping rows where SatisfactionScore is null. Compare the last seven days with the seven days before them. Answer with the two averages, the change between them, and the bucket where the score moved most. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+      "Are users happier than before? Query the LangWatchQL view traces over the dashboard " +
+      "period, bucketed at the dashboard grain: avg(SatisfactionScore) per bucket of OccurredAt, " +
+      "skipping rows where SatisfactionScore is null. Compare the last seven days with the seven " +
+      "days before them. Answer with the two averages, the change between them, and the bucket " +
+      "where the score moved most. Quote the real numbers from the query result. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period rather than " +
+      "guessing.",
   },
   {
     id: "token-drift",
@@ -86,7 +97,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Is my agent using more tokens over time? Query the LangWatchQL view trace_metrics_by_minute over the dashboard period, bucketed at the dashboard grain: sum(PromptTokensSum) and sum(CompletionTokensSum) per bucket of BucketStart. Answer with the first and last bucket's prompt and completion tokens, the change between them as a percentage, and whether the trend is up, flat or down. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+      "Is my agent using more tokens over time? Query the LangWatchQL view " +
+      "trace_metrics_by_minute over the dashboard period, bucketed at the dashboard grain: " +
+      "sum(PromptTokensSum) and sum(CompletionTokensSum) per bucket of BucketStart. Answer with " +
+      "the first and last bucket's prompt and completion tokens, the change between them as a " +
+      "percentage, and whether the trend is up, flat or down. Quote the real numbers from the " +
+      "query result. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period rather than guessing.",
   },
   {
     id: "conversation-length",
@@ -103,7 +120,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Are conversations getting longer? Query the LangWatchQL view trace_metrics over the dashboard period, bucketed at the dashboard grain: per bucket of OccurredAt, count uniqExact(TraceId) for each non-empty ConversationId, then average those counts. Answer with a series of average traces per conversation per bucket, and the change from the first bucket to the last. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+      "Are conversations getting longer? Query the LangWatchQL view trace_metrics over the " +
+      "dashboard period, bucketed at the dashboard grain: per bucket of OccurredAt, count " +
+      "uniqExact(TraceId) for each non-empty ConversationId, then average those counts. Answer " +
+      "with a series of average traces per conversation per bucket, and the change from the " +
+      "first bucket to the last. Quote the real numbers from the query result. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period rather than " +
+      "guessing.",
   },
   {
     id: "latency-slo",
@@ -120,7 +143,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "When was my agent slower than usual? Query the LangWatchQL view trace_metrics over the dashboard period, bucketed at the dashboard grain: quantileExact(0.95)(TotalDurationMs) per bucket of OccurredAt. Answer with the p95 in milliseconds for the latest bucket and for the whole period, and list the buckets well above the period's p95. No target is stored, so ask me for mine if I have not given one. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+      "When was my agent slower than usual? Query the LangWatchQL view trace_metrics over the " +
+      "dashboard period, bucketed at the dashboard grain: quantileExact(0.95)(TotalDurationMs) " +
+      "per bucket of OccurredAt. Answer with the p95 in milliseconds for the latest bucket and " +
+      "for the whole period, and list the buckets well above the period's p95. No target is " +
+      "stored, so ask me for mine if I have not given one. Quote the real numbers from the query " +
+      "result. If a query returns no rows, say plainly that there is no data for the dashboard " +
+      "period rather than guessing.",
   },
   {
     id: "error-rate",
@@ -137,7 +166,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Is my agent failing more often? Query the LangWatchQL view trace_metrics over the dashboard period, bucketed at the dashboard grain: countIf(HasError) / count() per bucket of OccurredAt. Then query spans where StatusCode = 2 for the top five error types from SpanAttributes['exception.type'] with their SpanName and count. Answer with the error rate series, the first and last bucket's rate, and a top-five table of error types. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+      "Is my agent failing more often? Query the LangWatchQL view trace_metrics over the " +
+      "dashboard period, bucketed at the dashboard grain: countIf(HasError) / count() per bucket " +
+      "of OccurredAt. Then query spans where StatusCode = 2 for the top five error types from " +
+      "SpanAttributes['exception.type'] with their SpanName and count. Answer with the error " +
+      "rate series, the first and last bucket's rate, and a top-five table of error types. Quote " +
+      "the real numbers from the query result. If a query returns no rows, say plainly that " +
+      "there is no data for the dashboard period rather than guessing.",
     actions: ["investigate", "propose-fix"],
   },
   {
@@ -155,7 +190,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "How fast does my agent answer? Query the LangWatchQL view trace_metrics over the dashboard period: quantileExact at 0.5, 0.9 and 0.99 of TotalDurationMs, for the whole period and per bucket of OccurredAt at the dashboard grain. Answer with p50, p90 and p99 in milliseconds for the period, the ratio of p99 to p50, and the bucket with the longest tail. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+      "How fast does my agent answer? Query the LangWatchQL view trace_metrics over the " +
+      "dashboard period: quantileExact at 0.5, 0.9 and 0.99 of TotalDurationMs, for the whole " +
+      "period and per bucket of OccurredAt at the dashboard grain. Answer with p50, p90 and p99 " +
+      "in milliseconds for the period, the ratio of p99 to p50, and the bucket with the longest " +
+      "tail. Quote the real numbers from the query result. If a query returns no rows, say " +
+      "plainly that there is no data for the dashboard period rather than guessing.",
   },
   {
     id: "spend",
@@ -172,7 +212,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "How much is my agent costing me? Query the LangWatchQL view trace_metrics over the dashboard period, bucketed at the dashboard grain: sum(TotalCost) per bucket of OccurredAt. Then query model_usage_by_minute for sum(CostSum) by Model over the same period. Answer with total spend in USD, the most expensive bucket, and a top-five table of models by cost with each one's share of the total. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+      "How much is my agent costing me? Query the LangWatchQL view trace_metrics over the " +
+      "dashboard period, bucketed at the dashboard grain: sum(TotalCost) per bucket of " +
+      "OccurredAt. Then query model_usage_by_minute for sum(CostSum) by Model over the same " +
+      "period. Answer with total spend in USD, the most expensive bucket, and a top-five table " +
+      "of models by cost with each one's share of the total. Quote the real numbers from the " +
+      "query result. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period rather than guessing.",
   },
   {
     id: "top-models",
@@ -189,7 +235,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Which models does my agent use? Query the LangWatchQL view trace_metrics over the dashboard period: arrayJoin(Models) and count uniqExact(TraceId) per model. Add each model's sum(CostSum) from model_usage_by_minute over the same period. Answer with a top-10 table of models: traces, share of all traces, and cost in USD. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+      "Which models does my agent use? Query the LangWatchQL view trace_metrics over the " +
+      "dashboard period: arrayJoin(Models) and count uniqExact(TraceId) per model. Add each " +
+      "model's sum(CostSum) from model_usage_by_minute over the same period. Answer with a " +
+      "top-10 table of models: traces, share of all traces, and cost in USD. Quote the real " +
+      "numbers from the query result. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period rather than guessing.",
   },
   {
     id: "lowest-passing-evaluators",
@@ -206,7 +257,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Which checks fail most often? Answer it with LangWatchQL over the dashboard period. What the answer shows: The five evaluators with the lowest pass rate, with their run counts. It needs: evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which checks fail most often? Answer it with LangWatchQL over the dashboard period. What " +
+      "the answer shows: The five evaluators with the lowest pass rate, with their run counts. " +
+      "It needs: evaluator results. Quote the real numbers from the query result and name the " +
+      "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
     actions: ["investigate", "propose-fix"],
   },
   {
@@ -224,7 +279,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Does my agent still pass its test scenarios? Query the LangWatchQL view simulations over the dashboard period, bucketed at the dashboard grain: rows where ArchivedAt is null and Verdict is not null, by bucket of StartedAt, with countIf(Verdict = 'success') / count() as the pass rate, and the same per ScenarioSetId. Answer with the pass rate and run count for the period, its series per bucket, and a top-five table of suites by runs. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+      "Does my agent still pass its test scenarios? Query the LangWatchQL view simulations over " +
+      "the dashboard period, bucketed at the dashboard grain: rows where ArchivedAt is null and " +
+      "Verdict is not null, by bucket of StartedAt, with countIf(Verdict = 'success') / count() " +
+      "as the pass rate, and the same per ScenarioSetId. Answer with the pass rate and run count " +
+      "for the period, its series per bucket, and a top-five table of suites by runs. Quote the " +
+      "real numbers from the query result. If a query returns no rows, say plainly that there is " +
+      "no data for the dashboard period rather than guessing.",
     actions: ["investigate", "propose-fix"],
   },
   {
@@ -242,7 +303,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "What do users ask my agent about? Query the LangWatchQL view trace_metrics over the dashboard period: uniqExact(TraceId) per non-empty TopicId, joined to the topics view for TopicName. Answer with a top-10 table of topics: name, traces and share of all traces with a topic, and name the one topic that grew most across the period. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+      "What do users ask my agent about? Query the LangWatchQL view trace_metrics over the " +
+      "dashboard period: uniqExact(TraceId) per non-empty TopicId, joined to the topics view for " +
+      "TopicName. Answer with a top-10 table of topics: name, traces and share of all traces " +
+      "with a topic, and name the one topic that grew most across the period. Quote the real " +
+      "numbers from the query result. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period rather than guessing.",
   },
   {
     id: "slowest-models",
@@ -259,7 +325,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Which model slows my agent down? Answer it with LangWatchQL over the dashboard period. What the answer shows: The five models whose traces have the slowest-5% latency. It needs: model name. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which model slows my agent down? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: The five models whose traces have the slowest-5% latency. It " +
+      "needs: model name. Quote the real numbers from the query result and name the traces " +
+      "behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "thumbs-down",
@@ -276,7 +346,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Which answers did my reviewers mark as bad? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of reviewer thumbs down, then the latest traces marked down. The widget reads reviewer annotations, not end-user feedback; the PR label says otherwise. It needs: reviewer annotations. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which answers did my reviewers mark as bad? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Share of reviewer thumbs down, then the latest traces " +
+      "marked down. The widget reads reviewer annotations, not end-user feedback; the PR label " +
+      "says otherwise. It needs: reviewer annotations. Quote the real numbers from the query " +
+      "result and name the traces behind them. If a query returns no rows, say plainly that " +
+      "there is no data for the dashboard period.",
   },
   {
     id: "lowest-scores",
@@ -293,7 +368,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Which answers scored worst? Answer it with LangWatchQL over the dashboard period. What the answer shows: The eight evaluation results with the lowest score, each linked to its trace. It needs: evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which answers scored worst? Answer it with LangWatchQL over the dashboard period. What " +
+      "the answer shows: The eight evaluation results with the lowest score, each linked to its " +
+      "trace. It needs: evaluator results. Quote the real numbers from the query result and name " +
+      "the traces behind them. If a query returns no rows, say plainly that there is no data for " +
+      "the dashboard period.",
     actions: ["investigate", "propose-fix"],
   },
   {
@@ -311,7 +390,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "How much of my traffic gets checked? Answer it with LangWatchQL over the dashboard period. What the answer shows: What each evaluator runs on, its pass rate, and the share of traces evaluated at all. It needs: evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How much of my traffic gets checked? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: What each evaluator runs on, its pass rate, and the share " +
+      "of traces evaluated at all. It needs: evaluator results. Quote the real numbers from the " +
+      "query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
     actions: ["investigate", "fill-gaps"],
   },
   {
@@ -329,7 +412,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "How do volume, speed and errors move together? Answer it with LangWatchQL over the dashboard period. What the answer shows: Traces per bucket as bars, slowest-5% latency as a line and the error rate as a ribbon. It needs: traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How do volume, speed and errors move together? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Traces per bucket as bars, slowest-5% latency as " +
+      "a line and the error rate as a ribbon. It needs: traces. Quote the real numbers from the " +
+      "query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "fd-cost-efficiency",
@@ -346,7 +433,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "What does each successful answer cost me? Answer it with LangWatchQL over the dashboard period. What the answer shows: Cost per successful trace, tokens in and out, and the five models that cost the most. It needs: cost and tokens; model name. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What does each successful answer cost me? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Cost per successful trace, tokens in and out, and the five " +
+      "models that cost the most. It needs: cost and tokens; model name. Quote the real numbers " +
+      "from the query result and name the traces behind them. If a query returns no rows, say " +
+      "plainly that there is no data for the dashboard period.",
   },
   {
     id: "fd-failures",
@@ -363,7 +454,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Which errors happen most? Answer it with LangWatchQL over the dashboard period. What the answer shows: Error spans grouped by exception or error type and operation, most frequent first. The same query backs the “Top error types” widget. It needs: error status on spans. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which errors happen most? Answer it with LangWatchQL over the dashboard period. What the " +
+      "answer shows: Error spans grouped by exception or error type and operation, most frequent " +
+      "first. The same query backs the “Top error types” widget. It needs: error status on " +
+      "spans. Quote the real numbers from the query result and name the traces behind them. If a " +
+      "query returns no rows, say plainly that there is no data for the dashboard period.",
     actions: ["investigate", "propose-fix"],
   },
   {
@@ -381,7 +476,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Is quality holding while errors move? Answer it with LangWatchQL over the dashboard period. What the answer shows: Evaluator pass rate over time, drawn against the trace error rate of the same buckets. It needs: evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Is quality holding while errors move? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Evaluator pass rate over time, drawn against the trace " +
+      "error rate of the same buckets. It needs: evaluator results. Quote the real numbers from " +
+      "the query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "fd-feedback",
@@ -398,13 +497,18 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "What does my team think of my agent's answers? Answer it with LangWatchQL over the dashboard period. What the answer shows: Reviewer thumbs up and down, then the positive share over time. The widget reads reviewer annotations, not end-user feedback; the PR label says otherwise. It needs: reviewer annotations. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What does my team think of my agent's answers? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Reviewer thumbs up and down, then the positive " +
+      "share over time. The widget reads reviewer annotations, not end-user feedback; the PR " +
+      "label says otherwise. It needs: reviewer annotations. Quote the real numbers from the " +
+      "query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "fd-gateway",
     origin: "pr",
-    question: "Which gateway keys spend the most?",
-    title: "Which gateway keys spend the most?",
+    question: "Which AI gateway keys spend the most?",
+    title: "Which AI gateway keys spend the most?",
     why: "Gateway spend per key (one key per app, team or customer), top five.",
     questionId: "orgspend",
     alsoAnswers: ["acctcost"],
@@ -415,7 +519,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "org",
     prompt:
-      "Which gateway keys spend the most? Answer it with LangWatchQL over the dashboard period. What the answer shows: Gateway spend per virtual key (one key per app, team or customer), the five that spend the most. It needs: gateway traffic. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which AI gateway keys spend the most? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Gateway spend per virtual key (one key per app, team or " +
+      "customer), the five that spend the most. It needs: gateway traffic. Quote the real " +
+      "numbers from the query result and name the traces behind them. If a query returns no " +
+      "rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "fd-coding-agents",
@@ -432,7 +540,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "org",
     prompt:
-      "What does each coding tool cost the team, and does each one finish the job? Answer it with LangWatchQL over the dashboard period. What the answer shows: Sessions, tokens, cost and success rate per coding agent, with its session trend. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What does each coding tool cost the team, and does each one finish the job? Answer it " +
+      "with LangWatchQL over the dashboard period. What the answer shows: Sessions, tokens, cost " +
+      "and success rate per coding agent, with its session trend. It needs: coding-agent traces. " +
+      "Quote the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "ck-kpis",
@@ -449,7 +561,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "feature",
     scope: "project",
     prompt:
-      "Is my agent doing its job? Answer it with LangWatchQL over the dashboard period. What the answer shows: Four numbers against the period before: how often my agent succeeds in its own terms (resolved conversations, correct documents, completed calls), how much my agent is used, the share of automatic checks that pass, and the cost of one success. It needs: conversation outcome judge or outcome event; evaluator results; cost and tokens. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Is my agent doing its job? Answer it with LangWatchQL over the dashboard period. What the " +
+      "answer shows: Four numbers against the period before: how often my agent succeeds in its " +
+      "own terms (resolved conversations, correct documents, completed calls), how much my agent " +
+      "is used, the share of automatic checks that pass, and the cost of one success. It needs: " +
+      "conversation outcome judge or outcome event; evaluator results; cost and tokens. Quote " +
+      "the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "ck-status",
@@ -466,7 +584,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Is my agent working right now? Query the LangWatchQL view trace_metrics over the dashboard period and over the equally long period right before it. Report traces (uniqExact(TraceId)), success rate (share of traces where HasError is false), p95 latency (quantileExact(0.95) of TotalDurationMs) and total cost (sum of TotalCost). Answer with one line per measure: its value now and its change against the previous period, as a number and a percentage. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+      "Is my agent working right now? Query the LangWatchQL view trace_metrics over the " +
+      "dashboard period and over the equally long period right before it. Report traces " +
+      "(uniqExact(TraceId)), success rate (share of traces where HasError is false), p95 latency " +
+      "(quantileExact(0.95) of TotalDurationMs) and total cost (sum of TotalCost). Answer with " +
+      "one line per measure: its value now and its change against the previous period, as a " +
+      "number and a percentage. Quote the real numbers from the query result. If a query returns " +
+      "no rows, say plainly that there is no data for the dashboard period rather than guessing.",
   },
   {
     id: "ck-attention",
@@ -483,7 +607,14 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "What should I fix first this week? Answer it with LangWatchQL over the dashboard period. What the answer shows: Names the single biggest problem and links to its traces. It tries, in order: the topic or customer whose pass rate fell most this week (beyond normal noise); the failure reason that grew most; an automatic grader that stopped agreeing with human reviewers; the step that fails most. It needs: evaluator results; labels or metadata or customer id or topics. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What should I fix first this week? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Names the single biggest problem and links to its traces. It " +
+      "tries, in order: the topic or customer whose pass rate fell most this week (beyond normal " +
+      "noise); the failure reason that grew most; an automatic grader that stopped agreeing with " +
+      "human reviewers; the step that fails most. It needs: evaluator results; labels or " +
+      "metadata or customer id or topics. Quote the real numbers from the query result and name " +
+      "the traces behind them. If a query returns no rows, say plainly that there is no data for " +
+      "the dashboard period.",
   },
   {
     id: "ck-top-ask",
@@ -500,7 +631,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "What do users ask for most that my agent can't do? Answer it with LangWatchQL over the dashboard period. What the answer shows: The topic users ask for most that my agent has no way to serve, how often, and one example request. An automatic grader marks these conversations. It needs: conversation outcome judge; topics. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What do users ask for most that my agent can't do? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: The topic users ask for most that my agent has " +
+      "no way to serve, how often, and one example request. An automatic grader marks these " +
+      "conversations. It needs: conversation outcome judge; topics. Quote the real numbers from " +
+      "the query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "ck-trend",
@@ -517,7 +653,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Does my agent resolve more conversations each day? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of closed conversations that went well, per day, with prompt, model and deploy changes marked on the line. It needs: conversation outcome judge or outcome event. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Does my agent resolve more conversations each day? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Share of closed conversations that went well, " +
+      "per day, with prompt, model and deploy changes marked on the line. It needs: conversation " +
+      "outcome judge or outcome event. Quote the real numbers from the query result and name the " +
+      "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "up-errors",
@@ -534,7 +675,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Did a change start new errors? Answer it with LangWatchQL over the dashboard period. What the answer shows: Failed traces per day split by error type, the error rate as a line, and prompt, model and deploy changes marked. A spike that starts at a change points to that change. It needs: error status on spans. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Did a change start new errors? Answer it with LangWatchQL over the dashboard period. What " +
+      "the answer shows: Failed traces per day split by error type, the error rate as a line, " +
+      "and prompt, model and deploy changes marked. A spike that starts at a change points to " +
+      "that change. It needs: error status on spans. Quote the real numbers from the query " +
+      "result and name the traces behind them. If a query returns no rows, say plainly that " +
+      "there is no data for the dashboard period.",
     actions: ["investigate", "propose-fix"],
   },
   {
@@ -552,7 +698,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Which step or tool fails most? Answer it with LangWatchQL over the dashboard period. What the answer shows: Each step and tool call: how often it fails, and how often my agent did not recover (no later retry or fallback fixed it). Fix the one with the most unrecovered failures. It needs: tool and step spans; error status on spans. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which step or tool fails most? Answer it with LangWatchQL over the dashboard period. What " +
+      "the answer shows: Each step and tool call: how often it fails, and how often my agent did " +
+      "not recover (no later retry or fallback fixed it). Fix the one with the most unrecovered " +
+      "failures. It needs: tool and step spans; error status on spans. Quote the real numbers " +
+      "from the query result and name the traces behind them. If a query returns no rows, say " +
+      "plainly that there is no data for the dashboard period.",
     actions: ["investigate", "propose-fix"],
   },
   {
@@ -570,7 +721,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Which requests failed or ran slowest? Answer it with LangWatchQL over the dashboard period. What the answer shows: The traces that failed or ran slowest in this period. Each opens to the step that broke. It needs: traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which requests failed or ran slowest? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: The traces that failed or ran slowest in this period. Each " +
+      "opens to the step that broke. It needs: traces. Quote the real numbers from the query " +
+      "result and name the traces behind them. If a query returns no rows, say plainly that " +
+      "there is no data for the dashboard period.",
     actions: ["investigate", "propose-fix"],
   },
   {
@@ -588,7 +743,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Which step makes my agent slow? Answer it with LangWatchQL over the dashboard period. What the answer shows: Typical and slowest-5% time for each step of a trace. The step that holds most of the slow time is the one to shorten. It needs: tool and step spans. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which step makes my agent slow? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Typical and slowest-5% time for each step of a trace. The step " +
+      "that holds most of the slow time is the one to shorten. It needs: tool and step spans. " +
+      "Quote the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "up-loops",
@@ -605,7 +764,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Does my agent go in circles? Answer it with LangWatchQL over the dashboard period. What the answer shows: Traces where my agent calls the same tool with the same input 3 or more times, or retries a step, and what the repeats cost. It needs: tool and step spans; cost and tokens. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Does my agent go in circles? Answer it with LangWatchQL over the dashboard period. What " +
+      "the answer shows: Traces where my agent calls the same tool with the same input 3 or more " +
+      "times, or retries a step, and what the repeats cost. It needs: tool and step spans; cost " +
+      "and tokens. Quote the real numbers from the query result and name the traces behind them. " +
+      "If a query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "ans-outcomes",
@@ -630,7 +793,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "How do conversations with my agent end? Answer it with LangWatchQL over the dashboard period. What the answer shows: Closed conversations per day by how they ended: resolved, misunderstood, could not do the task, refused without reason, handed to a person. An outcome my app sends wins; otherwise an automatic grader decides. It needs: conversation outcome judge or outcome event; conversation id. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How do conversations with my agent end? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Closed conversations per day by how they ended: resolved, " +
+      "misunderstood, could not do the task, refused without reason, handed to a person. An " +
+      "outcome my app sends wins; otherwise an automatic grader decides. It needs: conversation " +
+      "outcome judge or outcome event; conversation id. Quote the real numbers from the query " +
+      "result and name the traces behind them. If a query returns no rows, say plainly that " +
+      "there is no data for the dashboard period.",
   },
   {
     id: "ans-evaluators",
@@ -647,7 +816,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Are my agent's answers good enough? Query the LangWatchQL view evaluation_metrics over the dashboard period, bucketed at the dashboard grain: countIf(Passed = 1) / count() per bucket of OccurredAt, skipping rows where Passed is null, and the same pass rate per EvaluatorName. Answer with the pass rate for the period, its series per bucket, and a table of the five evaluators with the lowest pass rate and their run counts. Quote the real numbers from the query result. If a query returns no rows, say plainly that there is no data for the dashboard period rather than guessing.",
+      "Are my agent's answers good enough? Query the LangWatchQL view evaluation_metrics over " +
+      "the dashboard period, bucketed at the dashboard grain: countIf(Passed = 1) / count() per " +
+      "bucket of OccurredAt, skipping rows where Passed is null, and the same pass rate per " +
+      "EvaluatorName. Answer with the pass rate for the period, its series per bucket, and a " +
+      "table of the five evaluators with the lowest pass rate and their run counts. Quote the " +
+      "real numbers from the query result. If a query returns no rows, say plainly that there is " +
+      "no data for the dashboard period rather than guessing.",
     actions: ["investigate", "propose-fix"],
   },
   {
@@ -665,7 +840,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which topics does my agent handle well, and which badly? Answer it with LangWatchQL over the dashboard period. What the answer shows: For each topic users ask about: how many conversations, the share that went well (graded on a sample), and requests my agent could not serve. It needs: topics; evaluator results or conversation outcome judge. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which topics does my agent handle well, and which badly? Answer it with LangWatchQL over " +
+      "the dashboard period. What the answer shows: For each topic users ask about: how many " +
+      "conversations, the share that went well (graded on a sample), and requests my agent could " +
+      "not serve. It needs: topics; evaluator results or conversation outcome judge. Quote the " +
+      "real numbers from the query result and name the traces behind them. If a query returns no " +
+      "rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "ans-idk",
@@ -682,7 +862,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Where does my agent fail to answer? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of conversations per topic where my agent gave no answer or refused. Add content or tools for the topics at the top. It needs: conversation outcome judge; topics. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Where does my agent fail to answer? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Share of conversations per topic where my agent gave no answer or " +
+      "refused. Add content or tools for the topics at the top. It needs: conversation outcome " +
+      "judge; topics. Quote the real numbers from the query result and name the traces behind " +
+      "them. If a query returns no rows, say plainly that there is no data for the dashboard " +
+      "period.",
   },
   {
     id: "ans-review",
@@ -699,7 +884,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Which conversations should a person check? Answer it with LangWatchQL over the dashboard period. What the answer shows: A queue from the last 3 days: conversations that failed or were flagged, plus 1 in 5 picked at random as a check, each with the grader's reason. Bad ones go into a test dataset. It needs: evaluator results or end-user thumbs events. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which conversations should a person check? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: A queue from the last 3 days: conversations that failed or " +
+      "were flagged, plus 1 in 5 picked at random as a check, each with the grader's reason. Bad " +
+      "ones go into a test dataset. It needs: evaluator results or end-user thumbs events. Quote " +
+      "the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "ask-cannot",
@@ -716,7 +906,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "What do users want that my agent can't do? Answer it with LangWatchQL over the dashboard period. What the answer shows: Requests per topic that an automatic grader marked as out of reach: my agent has no tool or content for them. These are product gaps, not bugs. It needs: conversation outcome judge; topics. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What do users want that my agent can't do? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Requests per topic that an automatic grader marked as out " +
+      "of reach: my agent has no tool or content for them. These are product gaps, not bugs. It " +
+      "needs: conversation outcome judge; topics. Quote the real numbers from the query result " +
+      "and name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "ask-rising",
@@ -733,7 +928,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which topics are users asking about more? Answer it with LangWatchQL over the dashboard period. What the answer shows: Topics whose share of conversations grew against the previous period of the same length, and topics that are new. It needs: topics. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which topics are users asking about more? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Topics whose share of conversations grew against the " +
+      "previous period of the same length, and topics that are new. It needs: topics. Quote the " +
+      "real numbers from the query result and name the traces behind them. If a query returns no " +
+      "rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "ask-again",
@@ -750,7 +949,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Do users have to ask twice? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of conversations per day where the user rephrased after a missed answer, and how many users came back. It needs: conversation id; user id; conversation outcome judge. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Do users have to ask twice? Answer it with LangWatchQL over the dashboard period. What " +
+      "the answer shows: Share of conversations per day where the user rephrased after a missed " +
+      "answer, and how many users came back. It needs: conversation id; user id; conversation " +
+      "outcome judge. Quote the real numbers from the query result and name the traces behind " +
+      "them. If a query returns no rows, say plainly that there is no data for the dashboard " +
+      "period.",
   },
   {
     id: "ship-verdict",
@@ -767,7 +971,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Is the new version ready to ship? Answer it with LangWatchQL over the dashboard period. What the answer shows: The new version's test runs against the current version's on the same scenarios: pass rate, the scenarios that got worse by more than their normal flakiness, and the change in cost and response time. Ship when nothing got worse. It needs: scenario runs or experiment runs. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Is the new version ready to ship? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: The new version's test runs against the current version's on the " +
+      "same scenarios: pass rate, the scenarios that got worse by more than their normal " +
+      "flakiness, and the change in cost and response time. Ship when nothing got worse. It " +
+      "needs: scenario runs or experiment runs. Quote the real numbers from the query result and " +
+      "name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "ship-compare",
@@ -792,7 +1002,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "How do my last test runs compare? Answer it with LangWatchQL over the dashboard period. What the answer shows: The last five test runs side by side against a baseline I choose: scenarios passed, criteria met, grader scores, cost and typical reply time. It needs: experiment runs or scenario runs. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How do my last test runs compare? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: The last five test runs side by side against a baseline I choose: " +
+      "scenarios passed, criteria met, grader scores, cost and typical reply time. It needs: " +
+      "experiment runs or scenario runs. Quote the real numbers from the query result and name " +
+      "the traces behind them. If a query returns no rows, say plainly that there is no data for " +
+      "the dashboard period.",
   },
   {
     id: "ship-suites",
@@ -809,7 +1024,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Do my test suites keep passing? Answer it with LangWatchQL over the dashboard period. What the answer shows: Each suite's pass rate over time, CI runs apart from local runs. A suite whose CI line drops needs a look. It needs: scenario runs. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Do my test suites keep passing? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Each suite's pass rate over time, CI runs apart from local runs. A " +
+      "suite whose CI line drops needs a look. It needs: scenario runs. Quote the real numbers " +
+      "from the query result and name the traces behind them. If a query returns no rows, say " +
+      "plainly that there is no data for the dashboard period.",
     actions: ["investigate", "propose-fix"],
   },
   {
@@ -827,7 +1046,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which tests flip between pass and fail? Answer it with LangWatchQL over the dashboard period. What the answer shows: The last ten runs of each test scenario as a strip of passes and fails. A scenario that flips cannot be trusted: fix it or set it aside. It needs: scenario runs. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which tests flip between pass and fail? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: The last ten runs of each test scenario as a strip of " +
+      "passes and fails. A scenario that flips cannot be trusted: fix it or set it aside. It " +
+      "needs: scenario runs. Quote the real numbers from the query result and name the traces " +
+      "behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
     actions: ["investigate", "propose-fix"],
   },
   {
@@ -848,7 +1072,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Did my last change make my agent worse? Answer it with LangWatchQL over the dashboard period. What the answer shows: Up to 7 days after the last prompt, model or deploy change, against the same weekdays a week earlier: pass rate, errors, response time and cost. Topics are evened out, so new questions do not look like a regression. It needs: prompt version on trace or deploy or environment tag; evaluator results or outcome event. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Did my last change make my agent worse? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Up to 7 days after the last prompt, model or deploy " +
+      "change, against the same weekdays a week earlier: pass rate, errors, response time and " +
+      "cost. Topics are evened out, so new questions do not look like a regression. It needs: " +
+      "prompt version on trace or deploy or environment tag; evaluator results or outcome event. " +
+      "Quote the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "ship-models",
@@ -865,7 +1095,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Which model gives me the same quality for less? Answer it with LangWatchQL over the dashboard period. What the answer shows: From test runs that compared models: pass rate, cost and slowest-5% reply time for each model or setup. Pick the cheapest one that keeps quality. It needs: experiment runs; cost and tokens. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which model gives me the same quality for less? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: From test runs that compared models: pass rate, " +
+      "cost and slowest-5% reply time for each model or setup. Pick the cheapest one that keeps " +
+      "quality. It needs: experiment runs; cost and tokens. Quote the real numbers from the " +
+      "query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "cost-verdict",
@@ -882,7 +1117,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "feature",
     scope: "project",
     prompt:
-      "Will I stay within my AI budget this month? Answer it with LangWatchQL over the dashboard period. What the answer shows: Spend so far this month (production, failed runs, evaluations and simulations), the forecast to month end at the last 7 days' pace against my budget, and the cost of one resolved conversation. It needs: cost and tokens; budget on project spend. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Will I stay within my AI budget this month? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Spend so far this month (production, failed runs, " +
+      "evaluations and simulations), the forecast to month end at the last 7 days' pace against " +
+      "my budget, and the cost of one resolved conversation. It needs: cost and tokens; budget " +
+      "on project spend. Quote the real numbers from the query result and name the traces behind " +
+      "them. If a query returns no rows, say plainly that there is no data for the dashboard " +
+      "period.",
   },
   {
     id: "cost-by-source",
@@ -899,7 +1140,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "How much do I spend on testing versus real users? Answer it with LangWatchQL over the dashboard period. What the answer shows: Spend split by where it came from: production traffic, evaluations and simulations. It needs: cost and tokens. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How much do I spend on testing versus real users? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Spend split by where it came from: production " +
+      "traffic, evaluations and simulations. It needs: cost and tokens. Quote the real numbers " +
+      "from the query result and name the traces behind them. If a query returns no rows, say " +
+      "plainly that there is no data for the dashboard period.",
   },
   {
     id: "cost-by-model",
@@ -916,7 +1161,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Which model costs me the most? Answer it with LangWatchQL over the dashboard period. What the answer shows: Spend per model, with its share of traffic. A model that costs more than its share of traffic is the one to move off. It needs: cost and tokens; model name. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which model costs me the most? Answer it with LangWatchQL over the dashboard period. What " +
+      "the answer shows: Spend per model, with its share of traffic. A model that costs more " +
+      "than its share of traffic is the one to move off. It needs: cost and tokens; model name. " +
+      "Quote the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "cost-waste",
@@ -933,7 +1182,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "How much of my spend is wasted? Answer it with LangWatchQL over the dashboard period. What the answer shows: Spend on failed runs my agent never recovered from, on retries, and on the repeated part of loops, each counted once, as a share of production spend. Fix the biggest line first. It needs: cost and tokens; tool and step spans. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How much of my spend is wasted? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Spend on failed runs my agent never recovered from, on retries, " +
+      "and on the repeated part of loops, each counted once, as a share of production spend. Fix " +
+      "the biggest line first. It needs: cost and tokens; tool and step spans. Quote the real " +
+      "numbers from the query result and name the traces behind them. If a query returns no " +
+      "rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "cost-by-segment",
@@ -950,7 +1204,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Which customers or teams cost me the most? Answer it with LangWatchQL over the dashboard period. What the answer shows: Spend per customer, team or other group I choose from trace metadata, top ten. Calls that carry no group get their own row. It needs: cost and tokens; customer id or labels or metadata. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which customers or teams cost me the most? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Spend per customer, team or other group I choose from " +
+      "trace metadata, top ten. Calls that carry no group get their own row. It needs: cost and " +
+      "tokens; customer id or labels or metadata. Quote the real numbers from the query result " +
+      "and name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "att-share",
@@ -975,7 +1234,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Which customers use my agent most? Answer it with LangWatchQL over the dashboard period. What the answer shows: Conversations (or documents, or calls) per customer in the last 7 days, and each customer's share of the total. It needs: customer id or labels or metadata. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which customers use my agent most? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Conversations (or documents, or calls) per customer in the last 7 " +
+      "days, and each customer's share of the total. It needs: customer id or labels or " +
+      "metadata. Quote the real numbers from the query result and name the traces behind them. " +
+      "If a query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "att-table",
@@ -992,7 +1255,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "How does my agent do for each of my customers? Answer it with LangWatchQL over the dashboard period. What the answer shows: One row per customer: volume, pass rate and its trend, AI cost and cost per conversation. Each row has a read-only link I can share with that customer. It needs: customer id or labels or metadata; evaluator results; cost and tokens. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How does my agent do for each of my customers? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: One row per customer: volume, pass rate and its " +
+      "trend, AI cost and cost per conversation. Each row has a read-only link I can share with " +
+      "that customer. It needs: customer id or labels or metadata; evaluator results; cost and " +
+      "tokens. Quote the real numbers from the query result and name the traces behind them. If " +
+      "a query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "att-change",
@@ -1009,7 +1277,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Did my last change break anything for a customer? Answer it with LangWatchQL over the dashboard period. What the answer shows: Each customer's pass rate in the 7 days after the last prompt, model or config change, against the 7 days before. It needs: customer id or labels or metadata; evaluator results; prompt version on trace or deploy or environment tag. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Did my last change break anything for a customer? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Each customer's pass rate in the 7 days after " +
+      "the last prompt, model or config change, against the 7 days before. It needs: customer id " +
+      "or labels or metadata; evaluator results; prompt version on trace or deploy or " +
+      "environment tag. Quote the real numbers from the query result and name the traces behind " +
+      "them. If a query returns no rows, say plainly that there is no data for the dashboard " +
+      "period.",
   },
   {
     id: "so-verdict",
@@ -1034,7 +1308,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Can risk sign off this release? Answer it with LangWatchQL over the dashboard period. What the answer shows: This week against last week: what each safety control checked, items flagged but not blocked, review items pending, and how well each automatic grader agrees with human reviewers. It needs: guardrail results; evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Can risk sign off this release? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: This week against last week: what each safety control checked, " +
+      "items flagged but not blocked, review items pending, and how well each automatic grader " +
+      "agrees with human reviewers. It needs: guardrail results; evaluator results. Quote the " +
+      "real numbers from the query result and name the traces behind them. If a query returns no " +
+      "rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "so-rubric",
@@ -1059,7 +1338,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Does my agent pass each policy check? Answer it with LangWatchQL over the dashboard period. What the answer shows: Pass rate per policy criterion (accuracy, completeness, made-up facts, inappropriate content), with an error margin, against the minimum I set. It needs: evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Does my agent pass each policy check? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Pass rate per policy criterion (accuracy, completeness, " +
+      "made-up facts, inappropriate content), with an error margin, against the minimum I set. " +
+      "It needs: evaluator results. Quote the real numbers from the query result and name the " +
+      "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
     actions: ["investigate", "propose-fix"],
   },
   {
@@ -1085,7 +1369,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Is the review queue keeping up? Answer it with LangWatchQL over the dashboard period. What the answer shows: Items flagged for review plus random checks: how many reviewers have checked, how many wait, and how long a review takes. It needs: reviewer annotations. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Is the review queue keeping up? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Items flagged for review plus random checks: how many reviewers " +
+      "have checked, how many wait, and how long a review takes. It needs: reviewer annotations. " +
+      "Quote the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "so-agreement",
@@ -1102,7 +1390,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Can I trust my automatic checks? Answer it with LangWatchQL over the dashboard period. What the answer shows: Each week, an agreement score between each grader and human reviewers on a random sample (0.8 or more is good). A grader whose score falls has drifted. It needs: evaluator results; reviewer annotations. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Can I trust my automatic checks? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Each week, an agreement score between each grader and human " +
+      "reviewers on a random sample (0.8 or more is good). A grader whose score falls has " +
+      "drifted. It needs: evaluator results; reviewer annotations. Quote the real numbers from " +
+      "the query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "so-changes",
@@ -1127,7 +1420,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Who changed my agent, and when? Answer it with LangWatchQL over the dashboard period. What the answer shows: A log of every prompt version, model, evaluator and setting change, with who made it and when. The audit trail for each release. It needs: change history in langwatch. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Who changed my agent, and when? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: A log of every prompt version, model, evaluator and setting " +
+      "change, with who made it and when. The audit trail for each release. It needs: change " +
+      "history in langwatch. Quote the real numbers from the query result and name the traces " +
+      "behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "voice-turn-latency",
@@ -1144,7 +1442,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which part of a reply makes my voice agent slow? Answer it with LangWatchQL over the dashboard period. What the answer shows: Slowest-5% time per reply, split into its stages: speech to text, thinking, and text to speech. It needs: voice stage timings. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which part of a reply makes my voice agent slow? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Slowest-5% time per reply, split into its " +
+      "stages: speech to text, thinking, and text to speech. It needs: voice stage timings. " +
+      "Quote the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "voice-task-success",
@@ -1161,7 +1463,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "feature",
     scope: "project",
     prompt:
-      "Do my voice agent's calls get the job done? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of calls that an automatic check marks as task done, per language. Calls where no task applies are left out. It needs: conversation outcome judge or outcome event; labels or metadata. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Do my voice agent's calls get the job done? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Share of calls that an automatic check marks as task done, " +
+      "per language. Calls where no task applies are left out. It needs: conversation outcome " +
+      "judge or outcome event; labels or metadata. Quote the real numbers from the query result " +
+      "and name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "voice-call-health",
@@ -1178,7 +1485,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which calls drop, or have my agent repeat itself? Answer it with LangWatchQL over the dashboard period. What the answer shows: Per 1,000 calls: calls that dropped before an ending, and calls where my agent repeated a sentence. It needs: voice stage timings; conversation id. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which calls drop, or have my agent repeat itself? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Per 1,000 calls: calls that dropped before an " +
+      "ending, and calls where my agent repeated a sentence. It needs: voice stage timings; " +
+      "conversation id. Quote the real numbers from the query result and name the traces behind " +
+      "them. If a query returns no rows, say plainly that there is no data for the dashboard " +
+      "period.",
   },
   {
     id: "voice-cost-per-call",
@@ -1195,7 +1507,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "feature",
     scope: "project",
     prompt:
-      "What does one call cost, speech included? Answer it with LangWatchQL over the dashboard period. What the answer shows: LLM cost per call from traces, plus speech to text and text to speech at the speech vendor's rate. It needs: cost and tokens; speech vendor rates. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What does one call cost, speech included? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: LLM cost per call from traces, plus speech to text and " +
+      "text to speech at the speech vendor's rate. It needs: cost and tokens; speech vendor " +
+      "rates. Quote the real numbers from the query result and name the traces behind them. If a " +
+      "query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "rag-failure-source",
@@ -1212,7 +1528,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "When my assistant is wrong, is search or the answer to blame? Answer it with LangWatchQL over the dashboard period. What the answer shows: Failed traces split by cause: the search found wrong or no passages, or the answer was wrong although the passages were good. Tool errors are shown apart. It needs: retrieved contexts; conversation outcome judge. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "When my assistant is wrong, is search or the answer to blame? Answer it with LangWatchQL " +
+      "over the dashboard period. What the answer shows: Failed traces split by cause: the " +
+      "search found wrong or no passages, or the answer was wrong although the passages were " +
+      "good. Tool errors are shown apart. It needs: retrieved contexts; conversation outcome " +
+      "judge. Quote the real numbers from the query result and name the traces behind them. If a " +
+      "query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "rag-empty-retrieval",
@@ -1229,7 +1550,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "How often does my assistant's search find nothing? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of questions per day whose search step returned no documents. It needs: retrieved contexts. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How often does my assistant's search find nothing? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Share of questions per day whose search step " +
+      "returned no documents. It needs: retrieved contexts. Quote the real numbers from the " +
+      "query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "rag-dataset-versions",
@@ -1246,7 +1571,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Does my test set still match what users ask? Answer it with LangWatchQL over the dashboard period. What the answer shows: The correctness score of each test-set version, and the same score reweighted to the topic mix of real traffic. A large gap means the test set is out of date. It needs: experiment runs; topics. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Does my test set still match what users ask? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: The correctness score of each test-set version, " +
+      "and the same score reweighted to the topic mix of real traffic. A large gap means the " +
+      "test set is out of date. It needs: experiment runs; topics. Quote the real numbers from " +
+      "the query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "ext-field-accuracy",
@@ -1263,7 +1593,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which fields does my agent get wrong? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of documents with each field correct, per document type, from an automatic check. It needs: per-field checks; labels or metadata. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which fields does my agent get wrong? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Share of documents with each field correct, per document " +
+      "type, from an automatic check. It needs: per-field checks; labels or metadata. Quote the " +
+      "real numbers from the query result and name the traces behind them. If a query returns no " +
+      "rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "ext-precision-recall",
@@ -1280,7 +1614,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Does the new version find more fields, and get them right? Answer it with LangWatchQL over the dashboard period. What the answer shows: For each of the last 12 test runs on labelled documents: the share of extracted fields that are right, and the share of real fields my agent found. It needs: experiment runs; per-field checks. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Does the new version find more fields, and get them right? Answer it with LangWatchQL " +
+      "over the dashboard period. What the answer shows: For each of the last 12 test runs on " +
+      "labelled documents: the share of extracted fields that are right, and the share of real " +
+      "fields my agent found. It needs: experiment runs; per-field checks. Quote the real " +
+      "numbers from the query result and name the traces behind them. If a query returns no " +
+      "rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "ext-human-review",
@@ -1297,7 +1636,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "How many documents go to a person? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of documents sent to human review per day, and the document type sent most. It needs: outcome event. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How many documents go to a person? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Share of documents sent to human review per day, and the document " +
+      "type sent most. It needs: outcome event. Quote the real numbers from the query result and " +
+      "name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "ext-cost-per-doc",
@@ -1314,7 +1657,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "What does one document cost to process? Answer it with LangWatchQL over the dashboard period. What the answer shows: Production cost per document, overall and per model, with model changes marked. It needs: cost and tokens; model name. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What does one document cost to process? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Production cost per document, overall and per model, with " +
+      "model changes marked. It needs: cost and tokens; model name. Quote the real numbers from " +
+      "the query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "tools-error-rate",
@@ -1331,7 +1678,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which tools fail, and does my agent recover? Answer it with LangWatchQL over the dashboard period. What the answer shows: Error rate per tool, and the share of those errors a later step fixed. It needs: tool and step spans; error status on spans. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which tools fail, and does my agent recover? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Error rate per tool, and the share of those " +
+      "errors a later step fixed. It needs: tool and step spans; error status on spans. Quote " +
+      "the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
     actions: ["investigate", "propose-fix"],
   },
   {
@@ -1349,7 +1700,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Does my agent pick the right tool first? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of tasks per day where an automatic grader marks the first tool chosen as wrong. It needs: tool and step spans; evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Does my agent pick the right tool first? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Share of tasks per day where an automatic grader marks the " +
+      "first tool chosen as wrong. It needs: tool and step spans; evaluator results. Quote the " +
+      "real numbers from the query result and name the traces behind them. If a query returns no " +
+      "rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "gen-acceptance",
@@ -1366,7 +1721,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Do users keep what my agent writes? Answer it with LangWatchQL over the dashboard period. What the answer shows: Per day: the share of generated outputs that users accepted, edited, regenerated or ignored. It needs: end-user thumbs events. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Do users keep what my agent writes? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Per day: the share of generated outputs that users accepted, " +
+      "edited, regenerated or ignored. It needs: end-user thumbs events. Quote the real numbers " +
+      "from the query result and name the traces behind them. If a query returns no rows, say " +
+      "plainly that there is no data for the dashboard period.",
   },
   {
     id: "gen-dropoff",
@@ -1383,7 +1742,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Where do users drop what my agent wrote? Answer it with LangWatchQL over the dashboard period. What the answer shows: How many outputs were generated, shown, used and kept. The biggest drop is the step to fix. It needs: end-user thumbs events; outcome event. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Where do users drop what my agent wrote? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: How many outputs were generated, shown, used and kept. The " +
+      "biggest drop is the step to fix. It needs: end-user thumbs events; outcome event. Quote " +
+      "the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "users",
@@ -1400,7 +1763,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "How many users does my agent have, and who are the heaviest users? Answer it with LangWatchQL over the dashboard period. What the answer shows: Active users per day and the heaviest users. The denominator for every per-user number. It needs: user id. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How many users does my agent have, and who are the heaviest users? Answer it with " +
+      "LangWatchQL over the dashboard period. What the answer shows: Active users per day and " +
+      "the heaviest users. The denominator for every per-user number. It needs: user id. Quote " +
+      "the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "return",
@@ -1417,7 +1784,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Do users come back to my agent? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of users who come back the next week, by the week they started. Falling return means my agent did not help the first time. It needs: user id. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Do users come back to my agent? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Share of users who come back the next week, by the week they " +
+      "started. Falling return means my agent did not help the first time. It needs: user id. " +
+      "Quote the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "cost-conv",
@@ -1434,7 +1805,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "What does one conversation with my agent cost? Answer it with LangWatchQL over the dashboard period. What the answer shows: Cost per conversation, its spread, and the most expensive conversations. The unit a business compares with the cost of a person. It needs: cost and tokens; conversation id. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What does one conversation with my agent cost? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Cost per conversation, its spread, and the most " +
+      "expensive conversations. The unit a business compares with the cost of a person. It " +
+      "needs: cost and tokens; conversation id. Quote the real numbers from the query result and " +
+      "name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "cost-outcome",
@@ -1451,7 +1827,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "What does each correct outcome of my agent cost? Answer it with LangWatchQL over the dashboard period. What the answer shows: Cost divided by successful tasks, over time. The number falls when quality rises or cost drops. It needs: cost and tokens; conversation outcome judge or outcome event. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What does each correct outcome of my agent cost? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Cost divided by successful tasks, over time. The " +
+      "number falls when quality rises or cost drops. It needs: cost and tokens; conversation " +
+      "outcome judge or outcome event. Quote the real numbers from the query result and name the " +
+      "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "work-saved",
@@ -1468,7 +1849,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "feature",
     scope: "project",
     prompt:
-      "How much manual work does my agent save? Answer it with LangWatchQL over the dashboard period. What the answer shows: Successful tasks times my own value of one task. Shown only when I set that value; never in a default template. It needs: conversation outcome judge or outcome event; value settings. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How much manual work does my agent save? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Successful tasks times my own value of one task. Shown " +
+      "only when I set that value; never in a default template. It needs: conversation outcome " +
+      "judge or outcome event; value settings. Quote the real numbers from the query result and " +
+      "name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "task-drop",
@@ -1485,7 +1871,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "At which step do my agent's tasks drop off? Answer it with LangWatchQL over the dashboard period. What the answer shows: How many tasks reach each step the customer defines (asked, answered, acted, converted). It needs: outcome event. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "At which step do my agent's tasks drop off? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: How many tasks reach each step the customer defines " +
+      "(asked, answered, acted, converted). It needs: outcome event. Quote the real numbers from " +
+      "the query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "user-thumbs",
@@ -1502,7 +1892,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which answers did users rate badly? Answer it with LangWatchQL over the dashboard period. What the answer shows: End-user thumbs down per day and the latest rated traces, from the thumbs events the app sends. It needs: end-user thumbs events. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which answers did users rate badly? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: End-user thumbs down per day and the latest rated traces, from the " +
+      "thumbs events the app sends. It needs: end-user thumbs events. Quote the real numbers " +
+      "from the query result and name the traces behind them. If a query returns no rows, say " +
+      "plainly that there is no data for the dashboard period.",
   },
   {
     id: "grounded",
@@ -1519,7 +1913,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "How often does my agent make things up? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of answers a faithfulness check fails, per day and per topic. It needs: evaluator results; retrieved contexts. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How often does my agent make things up? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Share of answers a faithfulness check fails, per day and " +
+      "per topic. It needs: evaluator results; retrieved contexts. Quote the real numbers from " +
+      "the query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "pii",
@@ -1536,7 +1934,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Is personal data leaking through my agent? Answer it with LangWatchQL over the dashboard period. What the answer shows: Personal data found in inputs and outputs per day, and what was blocked. It needs: guardrail results or evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Is personal data leaking through my agent? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Personal data found in inputs and outputs per day, and " +
+      "what was blocked. It needs: guardrail results or evaluator results. Quote the real " +
+      "numbers from the query result and name the traces behind them. If a query returns no " +
+      "rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "attacks",
@@ -1553,7 +1955,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Is anyone trying to break my agent? Answer it with LangWatchQL over the dashboard period. What the answer shows: Prompt-injection and jailbreak attempts per day, and how many got through. It needs: guardrail results or evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Is anyone trying to break my agent? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Prompt-injection and jailbreak attempts per day, and how many got " +
+      "through. It needs: guardrail results or evaluator results. Quote the real numbers from " +
+      "the query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "off-scope",
@@ -1570,7 +1976,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Does my agent stay on brand and in scope? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of answers that break a scope, tone or policy check, with examples. It needs: evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Does my agent stay on brand and in scope? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Share of answers that break a scope, tone or policy check, " +
+      "with examples. It needs: evaluator results. Quote the real numbers from the query result " +
+      "and name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "data-health",
@@ -1587,7 +1997,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "What is my agent not sending yet? Answer it with LangWatchQL over the dashboard period. What the answer shows: Share of traces that carry model, cost, user, conversation, labels and outcome. Each gap names what to send and the widgets it unlocks. It needs: traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What is my agent not sending yet? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Share of traces that carry model, cost, user, conversation, labels " +
+      "and outcome. Each gap names what to send and the widgets it unlocks. It needs: traces. " +
+      "Quote the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "noise",
@@ -1604,7 +2018,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "How much of my traffic is tests, not real users? Answer it with LangWatchQL over the dashboard period. What the answer shows: Traffic that clearly comes from tests, staging and the like: playground, evaluation and simulation runs, and traces from a test, staging or dev environment. Each source's share of traces and of cost. It needs: traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How much of my traffic is tests, not real users? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Traffic that clearly comes from tests, staging " +
+      "and the like: playground, evaluation and simulation runs, and traces from a test, staging " +
+      "or dev environment. Each source's share of traces and of cost. It needs: traces. Quote " +
+      "the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "cost-accuracy",
@@ -1621,7 +2040,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "Are my cost numbers complete? Answer it with LangWatchQL over the dashboard period. What the answer shows: Traces with a model but no price, and the models with no known price. Missing cost understates spend. Traces stored before 7 October 2026 have no unpriced record, so they count as priced. It needs: model name. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Are my cost numbers complete? Answer it with LangWatchQL over the dashboard period. What " +
+      "the answer shows: Traces with a model but no price, and the models with no known price. " +
+      "Missing cost understates spend. Traces stored before 7 October 2026 have no unpriced " +
+      "record, so they count as priced. It needs: model name. Quote the real numbers from the " +
+      "query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
     actions: ["investigate", "fill-gaps"],
   },
   {
@@ -1639,7 +2063,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "org",
     prompt:
-      "Which agents run here, and who owns them? Answer it with LangWatchQL over the dashboard period. What the answer shows: Every project, service and agent seen in traces, with owner and last activity. It needs: several projects. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which agents run here, and who owns them? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Every project, service and agent seen in traces, with " +
+      "owner and last activity. It needs: several projects. Quote the real numbers from the " +
+      "query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "ai-tools",
@@ -1656,7 +2084,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "org",
     prompt:
-      "Which AI tools does my company use? Answer it with LangWatchQL over the dashboard period. What the answer shows: Staff and teams per AI tool, from coding-agent and gateway traffic. It needs: coding-agent traces or gateway traffic. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which AI tools does my company use? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Staff and teams per AI tool, from coding-agent and gateway " +
+      "traffic. It needs: coding-agent traces or gateway traffic. Quote the real numbers from " +
+      "the query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "seats",
@@ -1673,7 +2105,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "feature",
     scope: "org",
     prompt:
-      "Which AI seats bought for my staff sit unused? Answer it with LangWatchQL over the dashboard period. What the answer shows: Seats bought minus seats assigned, per vendor pool. Counts only paid, per-person pools, as the governance cost screen does. It needs: seat licences in lwql. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which AI seats bought for my staff sit unused? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Seats bought minus seats assigned, per vendor " +
+      "pool. Counts only paid, per-person pools, as the governance cost screen does. It needs: " +
+      "seat licences in lwql. Quote the real numbers from the query result and name the traces " +
+      "behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "tool-access",
@@ -1690,7 +2127,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "org",
     prompt:
-      "Which tools does each of my agents use? Answer it with LangWatchQL over the dashboard period. What the answer shows: Tools seen in each agent's traces. LangWatch sees use, not permissions. It needs: tool and step spans. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which tools does each of my agents use? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Tools seen in each agent's traces. LangWatch sees use, not " +
+      "permissions. It needs: tool and step spans. Quote the real numbers from the query result " +
+      "and name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "standard",
@@ -1707,7 +2148,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "org",
     prompt:
-      "Is every one of my agents held to the same checks? Answer it with LangWatchQL over the dashboard period. What the answer shows: For each project: which evaluators and scenarios run, and its pass rate against the org floor. It needs: evaluator results; several projects. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Is every one of my agents held to the same checks? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: For each project: which evaluators and scenarios " +
+      "run, and its pass rate against the org floor. It needs: evaluator results; several " +
+      "projects. Quote the real numbers from the query result and name the traces behind them. " +
+      "If a query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "org-spend",
@@ -1724,7 +2169,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "org",
     prompt:
-      "What does each team and app spend? Answer it with LangWatchQL over the dashboard period. What the answer shows: Spend per project and team, month to date. It needs: cost and tokens; several projects. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What does each team and app spend? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Spend per project and team, month to date. It needs: cost and " +
+      "tokens; several projects. Quote the real numbers from the query result and name the " +
+      "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "lw-value",
@@ -1741,7 +2190,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "org",
     prompt:
-      "What has LangWatch caught for me? Answer it with LangWatchQL over the dashboard period. What the answer shows: Failures found, regressions blocked before release and alerts sent this month. It needs: traces; evaluator results. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What has LangWatch caught for me? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Failures found, regressions blocked before release and alerts sent " +
+      "this month. It needs: traces; evaluator results. Quote the real numbers from the query " +
+      "result and name the traces behind them. If a query returns no rows, say plainly that " +
+      "there is no data for the dashboard period.",
   },
   {
     id: "me-burn-summary",
@@ -1758,7 +2211,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Where did my tokens go this month? Answer it with LangWatchQL over the dashboard period. What the answer shows: Spend and tokens for the period, this week's pace, and how often I hit rate limits. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Where did my tokens go this month? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Spend and tokens for the period, this week's pace, and how often I " +
+      "hit rate limits. It needs: coding-agent traces. Quote the real numbers from the query " +
+      "result and name the traces behind them. If a query returns no rows, say plainly that " +
+      "there is no data for the dashboard period.",
   },
   {
     id: "me-expensive-sessions",
@@ -1775,7 +2232,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Which sessions cost the most? Answer it with LangWatchQL over the dashboard period. What the answer shows: My most expensive sessions, ranked. Each one opens its session. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which sessions cost the most? Answer it with LangWatchQL over the dashboard period. What " +
+      "the answer shows: My most expensive sessions, ranked. Each one opens its session. It " +
+      "needs: coding-agent traces. Quote the real numbers from the query result and name the " +
+      "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "me-by-pr",
@@ -1792,7 +2253,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which pull requests did my tokens go to? Answer it with LangWatchQL over the dashboard period. What the answer shows: Tokens and cost per pull request. It needs: coding-agent traces; github pull requests. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which pull requests did my tokens go to? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Tokens and cost per pull request. It needs: coding-agent " +
+      "traces; github pull requests. Quote the real numbers from the query result and name the " +
+      "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "me-spend-by-model",
@@ -1809,7 +2274,10 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "Which models do I spend on? Answer it with LangWatchQL over the dashboard period. What the answer shows: My coding-agent cost per model, per day. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which models do I spend on? Answer it with LangWatchQL over the dashboard period. What " +
+      "the answer shows: My coding-agent cost per model, per day. It needs: coding-agent traces. " +
+      "Quote the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "me-pace",
@@ -1826,7 +2294,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Am I spending faster than usual? Answer it with LangWatchQL over the dashboard period. What the answer shows: Money spent day by day against my typical week. Dots mark rate limits. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Am I spending faster than usual? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Money spent day by day against my typical week. Dots mark rate " +
+      "limits. It needs: coding-agent traces. Quote the real numbers from the query result and " +
+      "name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "me-cache-gauge",
@@ -1843,7 +2315,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Is my cache working? Answer it with LangWatchQL over the dashboard period. What the answer shows: The share of input the model reads from cache instead of processing again. Higher is cheaper; under 60% means caching is not working. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Is my cache working? Answer it with LangWatchQL over the dashboard period. What the " +
+      "answer shows: The share of input the model reads from cache instead of processing again. " +
+      "Higher is cheaper; under 60% means caching is not working. It needs: coding-agent traces. " +
+      "Quote the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "me-tool-round-trips",
@@ -1860,7 +2336,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which tool calls flooded my context? Answer it with LangWatchQL over the dashboard period. What the answer shows: The tool calls that returned the most tokens. Filtering or paging these saves the most. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which tool calls flooded my context? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: The tool calls that returned the most tokens. Filtering or " +
+      "paging these saves the most. It needs: coding-agent traces. Quote the real numbers from " +
+      "the query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "me-main-vs-sub",
@@ -1877,7 +2357,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "How do my tokens split between main chat and subagents? Answer it with LangWatchQL over the dashboard period. What the answer shows: Tokens per day, main conversation against subagents. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How do my tokens split between main chat and subagents? Answer it with LangWatchQL over " +
+      "the dashboard period. What the answer shows: Tokens per day, main conversation against " +
+      "subagents. It needs: coding-agent traces. Quote the real numbers from the query result " +
+      "and name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "me-leaks",
@@ -1894,7 +2378,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Where am I wasting money? Answer it with LangWatchQL over the dashboard period. What the answer shows: Six fixed rules that find wasted spend in my session data, each with what to do about it. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Where am I wasting money? Answer it with LangWatchQL over the dashboard period. What the " +
+      "answer shows: Six fixed rules that find wasted spend in my session data, each with what " +
+      "to do about it. It needs: coding-agent traces. Quote the real numbers from the query " +
+      "result and name the traces behind them. If a query returns no rows, say plainly that " +
+      "there is no data for the dashboard period.",
   },
   {
     id: "me-value-per-token",
@@ -1911,7 +2399,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "What does one merged pull request cost? Answer it with LangWatchQL over the dashboard period. What the answer shows: Coding-agent cost per merged pull request, and the trend. It needs: coding-agent traces; github pull requests. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What does one merged pull request cost? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Coding-agent cost per merged pull request, and the trend. " +
+      "It needs: coding-agent traces; github pull requests. Quote the real numbers from the " +
+      "query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "me-shipping-calendar",
@@ -1928,7 +2420,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "ready",
     scope: "project",
     prompt:
-      "How many pull requests did I merge each day? Answer it with LangWatchQL over the dashboard period. What the answer shows: Merged pull requests per day, as a calendar. It needs: github pull requests. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How many pull requests did I merge each day? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Merged pull requests per day, as a calendar. It " +
+      "needs: github pull requests. Quote the real numbers from the query result and name the " +
+      "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "me-cost-per-pr",
@@ -1945,7 +2441,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which pull requests cost far more than usual? Answer it with LangWatchQL over the dashboard period. What the answer shows: Coding-agent cost of each merged pull request; the ones far above my median stand out. It needs: coding-agent traces; github pull requests. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which pull requests cost far more than usual? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Coding-agent cost of each merged pull request; " +
+      "the ones far above my median stand out. It needs: coding-agent traces; github pull " +
+      "requests. Quote the real numbers from the query result and name the traces behind them. " +
+      "If a query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "me-babysit",
@@ -1962,7 +2462,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "What does a pull request cost from open to merge? Answer it with LangWatchQL over the dashboard period. What the answer shows: Cost before the pull request opened against cost after it opened. It needs: coding-agent traces; github pull requests. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What does a pull request cost from open to merge? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Cost before the pull request opened against cost " +
+      "after it opened. It needs: coding-agent traces; github pull requests. Quote the real " +
+      "numbers from the query result and name the traces behind them. If a query returns no " +
+      "rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "me-pr-leaderboard",
@@ -1979,7 +2483,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which of my pull requests cost the most? Answer it with LangWatchQL over the dashboard period. What the answer shows: My pull requests ranked by coding-agent cost. It needs: coding-agent traces; github pull requests. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which of my pull requests cost the most? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: My pull requests ranked by coding-agent cost. It needs: " +
+      "coding-agent traces; github pull requests. Quote the real numbers from the query result " +
+      "and name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "me-output-vs-spend",
@@ -1996,7 +2504,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Is my output keeping up with my spend? Answer it with LangWatchQL over the dashboard period. What the answer shows: Merged pull requests and commits next to what I spent, per week. It needs: coding-agent traces; github pull requests. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Is my output keeping up with my spend? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Merged pull requests and commits next to what I spent, per " +
+      "week. It needs: coding-agent traces; github pull requests. Quote the real numbers from " +
+      "the query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "me-gantt",
@@ -2013,7 +2525,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "What did my sessions do through the day? Answer it with LangWatchQL over the dashboard period. What the answer shows: My sessions across the day: working, or waiting for my reply. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What did my sessions do through the day? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: My sessions across the day: working, or waiting for my " +
+      "reply. It needs: coding-agent traces. Quote the real numbers from the query result and " +
+      "name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "me-waiting-on-you",
@@ -2030,7 +2546,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which sessions waited longest for me? Answer it with LangWatchQL over the dashboard period. What the answer shows: The sessions that sat longest waiting for me this week. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which sessions waited longest for me? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: The sessions that sat longest waiting for me this week. It " +
+      "needs: coding-agent traces. Quote the real numbers from the query result and name the " +
+      "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "me-reply-latency",
@@ -2047,7 +2567,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "How long do my agents wait for my reply? Answer it with LangWatchQL over the dashboard period. What the answer shows: Time from the end of an agent's turn to my reply. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How long do my agents wait for my reply? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Time from the end of an agent's turn to my reply. It " +
+      "needs: coding-agent traces. Quote the real numbers from the query result and name the " +
+      "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "me-parallel-heatmap",
@@ -2064,7 +2588,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "How many sessions do I run at once? Answer it with LangWatchQL over the dashboard period. What the answer shows: Sessions running at the same time, by hour and day. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How many sessions do I run at once? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Sessions running at the same time, by hour and day. It needs: " +
+      "coding-agent traces. Quote the real numbers from the query result and name the traces " +
+      "behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "me-overnight",
@@ -2081,7 +2609,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "What did my coding agents do overnight? Answer it with LangWatchQL over the dashboard period. What the answer shows: What ran between midnight and 07:00 this week. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What did my coding agents do overnight? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: What ran between midnight and 07:00 this week. It needs: " +
+      "coding-agent traces. Quote the real numbers from the query result and name the traces " +
+      "behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "me-active-waiting",
@@ -2098,7 +2630,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "How much time do my agents work, and how much do they wait for me? Answer it with LangWatchQL over the dashboard period. What the answer shows: Working time against waiting time, per day. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How much time do my agents work, and how much do they wait for me? Answer it with " +
+      "LangWatchQL over the dashboard period. What the answer shows: Working time against " +
+      "waiting time, per day. It needs: coding-agent traces. Quote the real numbers from the " +
+      "query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "me-context-per-call",
@@ -2115,7 +2651,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "How big does my context get? Answer it with LangWatchQL over the dashboard period. What the answer shows: Context size per model call, each day, against the 250k to 450k band. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How big does my context get? Answer it with LangWatchQL over the dashboard period. What " +
+      "the answer shows: Context size per model call, each day, against the 250k to 450k band. " +
+      "It needs: coding-agent traces. Quote the real numbers from the query result and name the " +
+      "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "me-compaction",
@@ -2132,7 +2672,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Do I compact at the right time? Answer it with LangWatchQL over the dashboard period. What the answer shows: Each compaction at the context size where it happened, against the best point. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Do I compact at the right time? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Each compaction at the context size where it happened, against the " +
+      "best point. It needs: coding-agent traces. Quote the real numbers from the query result " +
+      "and name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "me-call-cost",
@@ -2149,7 +2693,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "What does one call cost as context grows? Answer it with LangWatchQL over the dashboard period. What the answer shows: Average price of one model call by context size. Compacting earlier makes calls cheaper. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What does one call cost as context grows? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Average price of one model call by context size. " +
+      "Compacting earlier makes calls cheaper. It needs: coding-agent traces. Quote the real " +
+      "numbers from the query result and name the traces behind them. If a query returns no " +
+      "rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "me-oversized-context",
@@ -2166,7 +2714,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "How much do I pay for oversized context? Answer it with LangWatchQL over the dashboard period. What the answer shows: Money spent on context above the 450k line. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How much do I pay for oversized context? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Money spent on context above the 450k line. It needs: " +
+      "coding-agent traces. Quote the real numbers from the query result and name the traces " +
+      "behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "me-subagent-context",
@@ -2183,7 +2735,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "How much context does each subagent type carry? Answer it with LangWatchQL over the dashboard period. What the answer shows: Median context per subagent type. A fork carries the whole conversation; a small explorer starts small. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How much context does each subagent type carry? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Median context per subagent type. A fork carries " +
+      "the whole conversation; a small explorer starts small. It needs: coding-agent traces. " +
+      "Quote the real numbers from the query result and name the traces behind them. If a query " +
+      "returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "me-steps",
@@ -2200,7 +2756,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "How many model calls does a task take? Answer it with LangWatchQL over the dashboard period. What the answer shows: Model calls per task, and the long tail. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How many model calls does a task take? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Model calls per task, and the long tail. It needs: " +
+      "coding-agent traces. Quote the real numbers from the query result and name the traces " +
+      "behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "me-harness-effect",
@@ -2217,7 +2777,12 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Do my skills and MCPs make pull requests cheaper? Answer it with LangWatchQL over the dashboard period. What the answer shows: Tokens per merged pull request in sessions that used each one, against sessions that did not. A correlation, not a controlled test. It needs: coding-agent traces; github pull requests. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Do my skills and MCPs make pull requests cheaper? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Tokens per merged pull request in sessions that " +
+      "used each one, against sessions that did not. A correlation, not a controlled test. It " +
+      "needs: coding-agent traces; github pull requests. Quote the real numbers from the query " +
+      "result and name the traces behind them. If a query returns no rows, say plainly that " +
+      "there is no data for the dashboard period.",
   },
   {
     id: "me-tool-mix",
@@ -2234,7 +2799,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which tools eat the most tokens? Answer it with LangWatchQL over the dashboard period. What the answer shows: Result tokens by tool, with shell commands grouped by command. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which tools eat the most tokens? Answer it with LangWatchQL over the dashboard period. " +
+      "What the answer shows: Result tokens by tool, with shell commands grouped by command. It " +
+      "needs: coding-agent traces. Quote the real numbers from the query result and name the " +
+      "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "me-clis-mcps",
@@ -2251,7 +2820,10 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which CLIs and MCPs do I use? Answer it with LangWatchQL over the dashboard period. What the answer shows: Calls per CLI and MCP server, and the trend. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which CLIs and MCPs do I use? Answer it with LangWatchQL over the dashboard period. What " +
+      "the answer shows: Calls per CLI and MCP server, and the trend. It needs: coding-agent " +
+      "traces. Quote the real numbers from the query result and name the traces behind them. If " +
+      "a query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "me-harness-changes",
@@ -2268,7 +2840,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "What changed in my setup since last week? Answer it with LangWatchQL over the dashboard period. What the answer shows: Skills, MCPs and CLIs added, removed or changed. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What changed in my setup since last week? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Skills, MCPs and CLIs added, removed or changed. It needs: " +
+      "coding-agent traces. Quote the real numbers from the query result and name the traces " +
+      "behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "me-skills-in-use",
@@ -2285,7 +2861,10 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which skills actually run? Answer it with LangWatchQL over the dashboard period. What the answer shows: How often each skill runs, and what it steers. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which skills actually run? Answer it with LangWatchQL over the dashboard period. What the " +
+      "answer shows: How often each skill runs, and what it steers. It needs: coding-agent " +
+      "traces. Quote the real numbers from the query result and name the traces behind them. If " +
+      "a query returns no rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "me-harness-speed",
@@ -2302,7 +2881,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which tools slow my coding agent down? Answer it with LangWatchQL over the dashboard period. What the answer shows: Time per tool call, and total time per tool this week. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which tools slow my coding agent down? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Time per tool call, and total time per tool this week. It " +
+      "needs: coding-agent traces. Quote the real numbers from the query result and name the " +
+      "traces behind them. If a query returns no rows, say plainly that there is no data for the " +
+      "dashboard period.",
   },
   {
     id: "me-dead-weight",
@@ -2319,7 +2902,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Which MCPs load every time but rarely run? Answer it with LangWatchQL over the dashboard period. What the answer shows: Servers whose schemas load into every session, with how rarely they are used. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Which MCPs load every time but rarely run? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: Servers whose schemas load into every session, with how " +
+      "rarely they are used. It needs: coding-agent traces. Quote the real numbers from the " +
+      "query result and name the traces behind them. If a query returns no rows, say plainly " +
+      "that there is no data for the dashboard period.",
   },
   {
     id: "me-sub-vs-api",
@@ -2336,7 +2923,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Is my seat cheaper than paying per token? Answer it with LangWatchQL over the dashboard period. What the answer shows: My last 30 days priced at API list rates, against my seat price. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Is my seat cheaper than paying per token? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: My last 30 days priced at API list rates, against my seat " +
+      "price. It needs: coding-agent traces. Quote the real numbers from the query result and " +
+      "name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "me-provider-replay",
@@ -2353,7 +2944,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "What would last month cost with other vendors? Answer it with LangWatchQL over the dashboard period. What the answer shows: My last 30 days priced on other vendors' rate cards. Prices only, no quality adjustment. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "What would last month cost with other vendors? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: My last 30 days priced on other vendors' rate " +
+      "cards. Prices only, no quality adjustment. It needs: coding-agent traces. Quote the real " +
+      "numbers from the query result and name the traces behind them. If a query returns no " +
+      "rows, say plainly that there is no data for the dashboard period.",
   },
   {
     id: "me-context-fit",
@@ -2370,7 +2965,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Would my calls fit in other vendors' context limits? Answer it with LangWatchQL over the dashboard period. What the answer shows: The share of my calls above each vendor's context limit. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Would my calls fit in other vendors' context limits? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: The share of my calls above each vendor's " +
+      "context limit. It needs: coding-agent traces. Quote the real numbers from the query " +
+      "result and name the traces behind them. If a query returns no rows, say plainly that " +
+      "there is no data for the dashboard period.",
   },
   {
     id: "me-cache-sensitivity",
@@ -2387,7 +2986,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "How would my bill change with a better cache rate? Answer it with LangWatchQL over the dashboard period. What the answer shows: My bill at different cache hit rates, per vendor. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "How would my bill change with a better cache rate? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: My bill at different cache hit rates, per " +
+      "vendor. It needs: coding-agent traces. Quote the real numbers from the query result and " +
+      "name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
   {
     id: "me-peak-hours",
@@ -2404,6 +3007,10 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "logic",
     scope: "project",
     prompt:
-      "Do my tokens land in peak-price hours? Answer it with LangWatchQL over the dashboard period. What the answer shows: When my tokens happen in the day, against vendors' peak windows. It needs: coding-agent traces. Quote the real numbers from the query result and name the traces behind them. If a query returns no rows, say plainly that there is no data for the dashboard period.",
+      "Do my tokens land in peak-price hours? Answer it with LangWatchQL over the dashboard " +
+      "period. What the answer shows: When my tokens happen in the day, against vendors' peak " +
+      "windows. It needs: coding-agent traces. Quote the real numbers from the query result and " +
+      "name the traces behind them. If a query returns no rows, say plainly that there is no " +
+      "data for the dashboard period.",
   },
 ];

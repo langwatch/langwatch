@@ -3,6 +3,7 @@
  * @see modules/dashboard/specs/dashboards-v2.feature AC200, AC200m, AC240
  */
 
+import { TRACE_SOURCES } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -87,18 +88,24 @@ describe("widgetCardSourcesLine", () => {
 
   describe("when the sources change how the figures read", () => {
     /** @scenario "AC240c Card sources line: a widget counting more or other sources than the default names them" */
-    it("names them, each query's own list, all sources or none picked", () => {
-      expect(widgetCardSourcesLine([query("a", ["application", "langy"])])).toBe(
-        "Sources: application, langy",
+    it("names them in plain words, each query's own list, everything or none picked", () => {
+      expect(widgetCardSourcesLine([query("a", ["application", "gateway"])])).toBe(
+        "Counts: your app and the AI gateway",
       );
-      expect(widgetCardSourcesLine([query("a", ["langy"])])).toBe("Sources: langy");
+      expect(widgetCardSourcesLine([query("a", ["application", "langy", "simulation"])])).toBe(
+        "Counts: your app, Langy and simulated tests",
+      );
+      expect(widgetCardSourcesLine([query("a", ["langy"])])).toBe("Counts: Langy");
       expect(widgetCardSourcesLine([query("a"), query("b", ["langy"])])).toBe(
-        "Sources: a: application · b: langy",
+        "Counts: a: your app · b: Langy",
       );
       expect(widgetCardSourcesLine([query("a", ["application"], IGNORES)])).toBe(
-        "Sources: all sources",
+        "Counts everything, tests included.",
       );
-      expect(widgetCardSourcesLine([query("a", [])])).toBe("No sources picked");
+      expect(widgetCardSourcesLine([query("a", [...TRACE_SOURCES])])).toBe(
+        "Counts everything, tests included.",
+      );
+      expect(widgetCardSourcesLine([query("a", [])])).toBe("Pick at least one source.");
     });
   });
 });

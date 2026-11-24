@@ -37,7 +37,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC3c A status tile caps a change past tenfold
     Given the current period has more than eleven times the figure of the period before
     When the Status widget renders
-    Then the tile's change reads "999%+", as the legacy summary tiles do
+    Then the tile's change reads "more than 10 times the previous period"
 
   @unit @unimplemented
   Scenario: AC4 Money has cents
@@ -467,7 +467,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And each field it reads is a filter, so a missing field shows as a gap on the card, never as a setup view
     And each field missing on some traces says what to send and how many built widgets read it
     And its hover lists those widgets by their question
-    And when every field is on every trace it says "Every field arrives" with a check, filling the card
+    And when every field is on every request it says "Your agent sends everything the dashboards need" with a check, filling the card
 
   @unit
   Scenario: AC167 Can I trust my numbers?: cost accuracy counts traces with a model but no price
@@ -2003,7 +2003,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then each query's "Parameters" lead with a built-in "sources" row of pills, one per source it counts
     And an "Add source" menu offers the sources it does not count yet
     And "No parameters declared yet" does not show, while "Add parameter" still does
-    And under the widget's card a quiet line says "Sources: application, langy"
+    And under the widget's card a quiet line says "Counts: your app and Langy"
     # The line names each query's own list when the queries differ
 
   @unit @integration
@@ -2262,7 +2262,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then the query counts every origin, with no hidden filter
     # Changed in phase 2: the wording is the one the editor shows, as the reason its Add source menu is disabled.
     And the editor says on that query: "The SQL does not read {dashboard_context_sources}"
-    And the card line reads "Sources: all sources"
+    And the card line reads "Counts everything, tests included."
     And the run answers a SOURCES_IGNORED diagnostic
     # Why: the owner called a filter the SQL does not show a confusing surprise (2026-10-29)
     # Evidence: a haven browser screenshot of the editor warning and of the card line, and the answer's params from the same run
@@ -2500,16 +2500,16 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC240c Card sources line: a widget counting more or other sources than the default names them
     Given a widget whose queries count "application" and "langy", or each count a different list, or ignore the parameter and count every origin
     When its card is drawn
-    Then the card names them, as "Sources: application, langy", each query's own list, or "Sources: all sources"
-    And a widget with no source picked says "No sources picked"
+    Then the card names them in plain words, as "Counts: your app and Langy", each query's own list, or "Counts everything, tests included."
+    And a widget with no source picked says "Pick at least one source."
 
   @unit
   Scenario: AC241 Widget labels: the test pass rate widget names each suite by its own name
     Given scenario runs of a suite, runs started from the platform, runs an SDK sent with its own set id and runs with no set id
     When the "Do my test suites keep passing?" widget runs
     Then a suite's bar reads the suite's name, never its internal set id
-    And the platform's runs read "Manual Run", an SDK set reads the set id its author chose, and no set id reads "default"
-    And a suite that no longer exists reads "Unnamed suite"
+    And the platform's runs read "Tests run by hand", an SDK set reads the set id its author chose, and no set id reads "default"
+    And a suite that no longer exists reads "Untitled test suite"
 
   @unit
   Scenario: AC241b Widget labels: a managed prompt version reads as its prompt handle and number
@@ -2523,6 +2523,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a scenario run or a topic whose name is empty
     When a stock widget lists it
     Then it reads "Unnamed scenario" or "Unnamed topic"
+
+  @unit
+  Scenario: AC242 Widget cards speak the reader's words: no request-internal terms on any card face
+    Given every stock widget, from the catalogue and from the gallery templates
+    When its card face, info tip, title and setup step are read
+    Then none says trace, span, bucket, p95, p99, percentile, evaluator, LangWatchQL, LWQL, metadata, thread_id, user_id, origin or judge
+    And the card says request, conversation, answer, automatic check, "1 in 20" or "over time" instead
+    And those terms may still appear in the widget's queries, keys and setup code
 
   # ---------------------------------------------------------------------------
   # Guard rails
@@ -2584,5 +2592,5 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # Boards, From LangWatch and Langy drafts (langwatch/tasks#911) → the "Boards:", "From LangWatch:" and "Langy drafts:" scenarios
   # AC 120-126: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate; Scenario: AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period; Scenario: AC124b Chart asks: a clickable bar is a keyboard-reachable button with a name; Scenario: AC124c Chart asks: a chart with nothing to investigate offers no click; Scenario: AC125 Widget actions: a problem widget offers its declared actions under the chart; Scenario: AC125b Widget actions: each action drafts its own prompt about the widget; Scenario: AC125c Widget actions: a widget that declares no actions shows no action row; Scenario: AC126 Widget asks on a new board store the board first
   # AC 130-139: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: a category lists its branches as sections, the best-ranked first; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for; Scenario: AC139 Picker copy: a widget is named by its question in plain words; Scenario: AC139b Picker copy: a retired widget is not offered, and saved boards still draw it
-  # AC 240-241: "What a card says: names, not internal ids, and a sources line only when it informs" (owner, 2026-11-24) → Scenario: AC240 Card sources line: a widget counting only the default application source shows no sources line; Scenario: AC240b Card sources line: a widget whose views keep no origin shows no sources line; Scenario: AC240c Card sources line: a widget counting more or other sources than the default names them; Scenario: AC241 Widget labels: the test pass rate widget names each suite by its own name; Scenario: AC241b Widget labels: a managed prompt version reads as its prompt handle and number; Scenario: AC241c Widget labels: a scenario or a topic with no name reads as unnamed, never as its id
+  # AC 240-241: "What a card says: names, not internal ids, and a sources line only when it informs" (owner, 2026-11-24) → Scenario: AC240 Card sources line: a widget counting only the default application source shows no sources line; Scenario: AC240b Card sources line: a widget whose views keep no origin shows no sources line; Scenario: AC240c Card sources line: a widget counting more or other sources than the default names them; Scenario: AC241 Widget labels: the test pass rate widget names each suite by its own name; Scenario: AC241b Widget labels: a managed prompt version reads as its prompt handle and number; Scenario: AC241c Widget labels: a scenario or a topic with no name reads as unnamed, never as its id; Scenario: AC242 Widget cards speak the reader's words: no request-internal terms on any card face
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board; Scenario: AC145b Template card: a board made under a template's former name still counts as added

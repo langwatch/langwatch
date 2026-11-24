@@ -20,7 +20,12 @@ describe("given the Flight Deck cockpit widgets", () => {
   /** @scenario "AC20 Flight Deck: This period sets four figures against the period before" */
   it("sets resolved, conversations, checks and cost per resolved against the period before", () => {
     const { code, queries } = build("ck-kpis");
-    for (const label of ["Resolved", "Conversations", "Checks passing", "AI cost per resolved"]) {
+    for (const label of [
+      "Resolved conversations",
+      "Conversations",
+      "Automatic checks passed",
+      "AI cost per resolved conversation",
+    ]) {
       expect(code).toContain(`label="${label}"`);
     }
     expect(code).toContain("<Change ");
@@ -31,7 +36,7 @@ describe("given the Flight Deck cockpit widgets", () => {
     expect(queries.checks).toContain("FROM trace_evaluation_metrics");
     expect(queries.checks).toContain("countIf(TraceOccurredAt >= ");
     expect(queries.checks).not.toContain("JOIN");
-    expect(code).toContain('"Not measured"');
+    expect(code).toContain('"Not scored yet"');
     expect(code).toContain('LW.navigate("onlineEvaluations"');
   });
 
@@ -70,7 +75,7 @@ describe("given the Flight Deck cockpit widgets", () => {
       "growingReason(reasons.data)",
       "kappa: kappa(row)",
       "step.data[0]",
-      "Nothing got worse in this period.",
+      "Nothing got worse against the previous period.",
     ].map((text) => code.indexOf(text));
     expect(order.every((index) => index > 0)).toBe(true);
     expect(order.toSorted((a, b) => a - b)).toEqual(order);
@@ -92,8 +97,8 @@ describe("given the Flight Deck cockpit widgets", () => {
     expect(queries.gap).toContain("minIf(g.trace_id, g.gaps > 0) AS trace_id");
     expect(queries.gap).not.toContain("anyIf(");
     expect(queries.gap).toContain("ORDER BY gaps DESC");
-    expect(code).toContain("<TraceLink id={top.trace_id} />");
-    expect(code).toContain("conversations asked for something my agent cannot do.");
+    expect(code).toContain('LW.navigate("trace", { traceId: top.trace_id })');
+    expect(code).toContain("this and your agent could not do it.");
   });
 
   /** @scenario "AC24 Flight Deck: An outcome widget tells a quiet period from a missing judge" */
@@ -102,10 +107,10 @@ describe("given the Flight Deck cockpit widgets", () => {
       const { code, queries } = build(id);
       expect(queries.seen, id).toContain("subtractDays(now(), 90)");
       expect(code, id).toMatch(
-        /<OutcomeEmpty quiet="No (conversation outcomes|calls with an outcome) in this period\." \/>/,
+        /<OutcomeEmpty quiet="No (conversations|calls) were scored in this period\." \/>/,
       );
       expect(code, id).toContain("if (seen.data.length > 0) return <Note>{quiet}</Note>;");
-      expect(code, id).toContain(`Add the ${OUTCOME_JUDGE}`);
+      expect(code, id).toContain("Have your app send how each conversation ended");
       expect(code.indexOf('LW.useChartQuery("seen"'), id).toBeGreaterThan(
         code.indexOf("function SeenOrSetup"),
       );
@@ -129,7 +134,7 @@ describe("given the Flight Deck cockpit widgets", () => {
     expect(queries.trend).toContain(", MetadataLanguage AS language");
     expect(queries.trend).not.toContain("Attributes[");
     expect(queries.trend).toContain("countIf(outcome = 'resolved') AS done");
-    expect(code).toContain('label={"Task success: " + row.language}');
+    expect(code).toContain('label={languageName(row.language) + ": calls that got the job done"}');
   });
 
   /** @scenario "AC27 Flight Deck: Accepted, edited or regenerated reads each output's action" */
@@ -151,7 +156,7 @@ describe("given the Running costs widgets", () => {
     expect(queries.month).toContain("subtractDays(now(), 7)");
     expect(queries.month).toContain("uniqExact(toDate(OccurredAt))");
     expect(code).toContain("const pace = ratio(m.last_7_days, m.days_with_data);");
-    expect(code).toContain('label="Cost per success"');
+    expect(code).toContain('label="Cost per resolved conversation"');
   });
 
   /** @scenario "AC29 Running costs: Production vs testing splits spend by where it came from" */
@@ -161,7 +166,7 @@ describe("given the Running costs widgets", () => {
       expect(queries.main).toContain(source);
     }
     expect(queries.main).toContain("'evaluations' AS source\n  FROM evaluation_metrics");
-    expect(code).toContain('<Headline value={pct(ratio(test, total), 0)} label="test traffic" />');
+    expect(code).toContain('label="of AI spend goes on testing"');
   });
 
   /** @scenario "AC30 Running costs: Wasted spend counts each production trace once" */
@@ -174,7 +179,7 @@ describe("given the Running costs widgets", () => {
     expect(queries.main).toContain("sumIf(rows, failed) AS failed_traces");
     expect(queries.main).toContain("NOT failed AND repeats = 0 AND retries > 0");
     expect(queries.main).not.toContain("Origin IN");
-    expect(code).toContain('" of production spend"');
+    expect(code).toContain('" of what your agent cost"');
   });
 
   /** @scenario "AC31 Running costs: Cost per call shows speech as not priced" */

@@ -46,7 +46,7 @@ ORDER BY cost DESC
 LIMIT 5`;
 
 export const FAILURES_SQL = `SELECT
-  coalesce(nullIf(ErrorType, ''), 'Unclassified error') AS category,
+  coalesce(nullIf(ErrorType, ''), 'Error with no type') AS category,
   SpanName AS operation,
   min(StartTime) AS first_seen,
   count() AS failures
@@ -68,13 +68,13 @@ const SUITE_ID_OF_SET = `if(startsWith(ScenarioSetId, '__internal__') AND endsWi
       substring(ScenarioSetId, 13, length(ScenarioSetId) - 19), '')`;
 
 /**
- * The five busiest sets by the name a person knows them by: a suite's own name, "Manual Run"
- * for runs started from the platform, and the set id an SDK run sent, which its author chose.
+ * The five busiest sets by the name a person knows them by: a suite's own name, "Tests run by
+ * hand" for runs started from the platform, and the set id an SDK run sent, which its author chose.
  */
 export const SCENARIO_SUITES_SQL = `SELECT r.ScenarioSetId AS suite_id,
   multiIf(ifNull(any(n.Name), '') != '', any(n.Name),
-    endsWith(r.ScenarioSetId, '__on-platform-scenarios'), 'Manual Run',
-    startsWith(r.ScenarioSetId, '__internal__'), 'Unnamed suite',
+    endsWith(r.ScenarioSetId, '__on-platform-scenarios'), 'Tests run by hand',
+    startsWith(r.ScenarioSetId, '__internal__'), 'Untitled test suite',
     r.ScenarioSetId = '', 'default',
     r.ScenarioSetId) AS suite,
   countIf(r.Verdict = 'success') AS passed,

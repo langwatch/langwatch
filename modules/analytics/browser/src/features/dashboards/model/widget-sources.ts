@@ -3,7 +3,12 @@
  * counts nothing at all (dashboards-v2 AC200, AC200m).
  */
 
-import { DEFAULT_WIDGET_SOURCES, effectiveSources } from "@langwatch/analytics-contract";
+import {
+  DEFAULT_WIDGET_SOURCES,
+  effectiveSources,
+  TRACE_SOURCES,
+  type TraceSource,
+} from "@langwatch/analytics-contract";
 import { type DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
 import { canFollowSources, PRESENCE_QUERY, readsSourcesParameter } from "./sources-parameter.ts";
@@ -68,17 +73,64 @@ export function widgetSourcesLine(allQueries: readonly Sourced[]): string {
   return `Sources: ${named.map(({ name, list }) => `${name}: ${list}`).join(" · ")}`;
 }
 
-/** The line of a widget that counts only what every widget counts unless told otherwise. */
-const DEFAULT_SOURCES_LINE = `Sources: ${DEFAULT_WIDGET_SOURCES.join(", ")}`;
+/** Each source as a card names it to a reader. */
+const PLAIN_SOURCE_NAMES: Readonly<Record<TraceSource, string>> = {
+  application: "your app",
+  simulation: "simulated tests",
+  evaluation: "automatic checks",
+  sample: "sample data",
+  coding_agent: "coding agents",
+  ai_tool: "AI tools",
+  gateway: "the AI gateway",
+  workflow: "workflows",
+  playground: "the playground",
+  langy: "Langy",
+  other: "other",
+};
+
+/** The card line of a widget that counts every source. */
+export const EVERY_SOURCE_CARD_LINE = "Counts everything, tests included.";
+
+/** The card line of a widget with no source picked. */
+export const NO_SOURCES_CARD_LINE = "Pick at least one source.";
+
+/** "your app, Langy and the AI gateway", or "everything" when the list holds every source. */
+function plainSources(sources: readonly TraceSource[]): string {
+  if (TRACE_SOURCES.every((source) => sources.includes(source))) return "everything";
+  const names = sources.map((source) => PLAIN_SOURCE_NAMES[source]);
+  if (names.length <= 1) return names[0] ?? "nothing";
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+const isDefault = (sources: readonly TraceSource[]) =>
+  sources.length === DEFAULT_WIDGET_SOURCES.length &&
+  sources.every((source) => DEFAULT_WIDGET_SOURCES.includes(source));
 
 /**
- * The sources line a card shows: only one that changes how the figures read. A widget counting
- * just the default sources, or reading only views that keep no origin, shows none (AC240,
- * AC240b); the editor keeps the full line from {@link widgetSourcesLine}.
+ * The sources line a card shows, in plain names: only one that changes how the figures read. A
+ * widget counting just the default sources, or reading only views that keep no origin, shows
+ * none (AC240, AC240b); the editor keeps the full line from {@link widgetSourcesLine}.
  */
-export function widgetCardSourcesLine(queries: readonly Sourced[]): string {
-  const line = widgetSourcesLine(queries);
-  return line === DEFAULT_SOURCES_LINE || line === SOURCES_DO_NOT_APPLY_LINE ? "" : line;
+export function widgetCardSourcesLine(allQueries: readonly Sourced[]): string {
+  const queries = allQueries.filter((query) => query.name !== PRESENCE_QUERY);
+  if (queries.length === 0) return "";
+  if (picksNoSources(queries)) return NO_SOURCES_CARD_LINE;
+  const following = queries.filter((query) => readsSourcesParameter(query.sql));
+  if (following.length === 0) {
+    return queries.some((query) => canFollowSources(query.sql)) ? EVERY_SOURCE_CARD_LINE : "";
+  }
+  const named = following.map((query) => ({
+    name: query.name,
+    sources: effectiveSources(query.sources),
+  }));
+  const lists = new Set(named.map(({ sources }) => plainSources(sources)));
+  if (lists.size === 1) {
+    const sources = named[0]?.sources ?? [];
+    if (isDefault(sources)) return "";
+    const list = plainSources(sources);
+    return list === "everything" ? EVERY_SOURCE_CARD_LINE : `Counts: ${list}`;
+  }
+  return `Counts: ${named.map(({ name, sources }) => `${name}: ${plainSources(sources)}`).join(" · ")}`;
 }
 
 /**

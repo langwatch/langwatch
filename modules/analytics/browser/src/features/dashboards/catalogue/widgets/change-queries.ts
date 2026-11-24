@@ -24,14 +24,14 @@ const NEW_MODELS = `SELECT Model, min(BucketStart) AS first_seen
 
 /** Every change in the period, unordered, with the bucket a chart marks it on. */
 export const CHANGES_SQL = `SELECT ${bucketOf("v.CreatedAt")} AS bucket, toDateTime(v.CreatedAt) AS at,
-  concat(p.PromptHandle, ' v', toString(v.VersionNumber)) AS label
+  concat('Prompt ', p.PromptHandle, ' v', toString(v.VersionNumber)) AS label
 FROM prompt_versions AS v
 INNER JOIN prompts AS p ON p.PromptId = v.PromptId
 WHERE ${inPeriod("v.CreatedAt")}
 LIMIT 50
 UNION ALL
 SELECT ${bucketOf("first_seen")} AS bucket, toDateTime(first_seen) AS at,
-  concat('model ', Model) AS label
+  concat('Model: ', Model) AS label
 FROM (${NEW_MODELS})
 LIMIT 50`;
 

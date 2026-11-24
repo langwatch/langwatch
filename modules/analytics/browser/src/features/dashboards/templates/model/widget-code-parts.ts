@@ -66,6 +66,11 @@ function bucketLabel(value) {
   const daily = LW.dashboardContext.granularitySeconds >= 86400;
   const parts = daily ? { month: "short", day: "numeric" } : { day: "numeric", hour: "numeric" };
   return utc(value).toLocaleString("en-US", parts);
+}
+// The span one point of a chart covers, in words: "hour", "day" or "week".
+function bucketUnit() {
+  const seconds = LW.dashboardContext.granularitySeconds;
+  return seconds >= 604800 ? "week" : seconds >= 86400 ? "day" : "hour";
 }`;
 
 export const CHART_STYLE = `const AXIS = { fontSize: 14, fill: dark ? C.faint : "#666666" };
@@ -243,7 +248,7 @@ function pricedShare(query) {
 // The models the report found with no price, as rows a cost list shows with a dash.
 const unpricedRows = (query, listed = []) => (query.completeness?.unpriced?.models || [])
   .filter((model) => !listed.includes(model))
-  .map((model) => ({ label: model, value: null, note: "no price",
+  .map((model) => ({ label: model, value: null, note: "price unknown",
     title: model + " has no price, so its cost is unknown." }));`;
 
 /** The Recharts components `SERIES_CHART` draws with. */

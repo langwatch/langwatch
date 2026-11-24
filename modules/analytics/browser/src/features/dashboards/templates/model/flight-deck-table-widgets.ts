@@ -19,8 +19,8 @@ import {
 export const COST_EFFICIENCY_CODE = widgetCode({
   summary: "Cost per successful trace, tokens in and out, and the five models that cost the most.",
   subtitle:
-    "What the spend buys. Cost per success counts only the traces with a known price, so a " +
-    "model with no price never pulls it down",
+    "What a request that ran without errors costs, leaving out requests on a model with no " +
+    "price.",
   source: "traces",
   parts: [NUMBERS, COMPLETENESS, BARS, STAT],
   queries: ["summary", "models"],
@@ -28,17 +28,17 @@ export const COST_EFFICIENCY_CODE = widgetCode({
   if (!num(totals.traces)) return <Panel><CallToAction /></Panel>;
   const perSuccess = ratio(totals.cost, num(totals.successes) * pricedShare(summary));
   const priced = models.data.map((row) => ({ label: row.model, value: num(row.cost) || null,
-    note: "no price" }));
+    note: "price unknown" }));
   const ranked = [...priced, ...unpricedRows(summary, priced.map((row) => row.label))];
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-        <Stat label="Cost / success" value={usd(perSuccess)} />
-        <Stat label="Tokens in" value={count(num(totals.tokens_in))} />
-        <Stat label="Tokens out" value={count(num(totals.tokens_out))} />
+        <Stat label="Cost per request without errors" value={usd(perSuccess)} />
+        <Stat label="Tokens sent" value={count(num(totals.tokens_in))} />
+        <Stat label="Tokens received" value={count(num(totals.tokens_out))} />
       </div>
       <div style={{ margin: "12px 0 4px", fontSize: 11, fontWeight: 500, color: C.subtle }}>
-        Highest-cost models
+        Models that cost most
       </div>
       <Bars rows={ranked} format={usd} height={128} />
     </Panel>
@@ -47,7 +47,7 @@ export const COST_EFFICIENCY_CODE = widgetCode({
 
 export const FAILURES_CODE = widgetCode({
   summary: "Error spans grouped by exception or error type and operation, most frequent first.",
-  subtitle: "Top error categories in the window",
+  subtitle: "The errors your agent hit most in this period, and the step where each happened.",
   source: "traces",
   parts: [NUMBERS, DATES, TABLE],
   components: `// A moment as "Thu, Jul 23, 1pm".
@@ -60,13 +60,17 @@ function firstSeen(value) {
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
   const columns = [
-    { header: "Category", cell: (row) => row.category },
-    { header: "Operation", cell: (row) => mono(row.operation) },
+    { header: "Error", cell: (row) => row.category },
+    { header: "Where", cell: (row) => row.operation },
     {
       header: "First seen",
       cell: (row) => <span style={{ color: C.faint }}>{firstSeen(row.first_seen)}</span>,
     },
-    { header: "Count", align: "right", cell: (row) => <b>{count(num(row.failures))}</b> },
+    {
+      header: "Requests affected",
+      align: "right",
+      cell: (row) => <b>{count(num(row.failures))}</b>,
+    },
   ];
   return (
     <Panel>
@@ -77,7 +81,7 @@ function firstSeen(value) {
 
 export const SCENARIOS_CODE = widgetCode({
   summary: "Share of scenario runs that passed, overall and for the five busiest suites.",
-  subtitle: "How much behaviour your scenario suites exercise",
+  subtitle: "Share of test runs that passed in each test suite.",
   source: "scenarios",
   parts: [NUMBERS, BARS],
   queries: ["summary", "suites"],
@@ -90,7 +94,7 @@ export const SCENARIOS_CODE = widgetCode({
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
         <span style={{ fontSize: 22, fontWeight: 600 }}>{pct(passed / runs, 0)}</span>
         <span style={{ fontSize: 11, color: C.subtle }}>
-          {count(passed)} / {count(runs)} runs passing
+          of test runs passed ({count(passed)} of {count(runs)})
         </span>
       </div>
       <Bars rows={ranked} format={pct} />
@@ -100,7 +104,7 @@ export const SCENARIOS_CODE = widgetCode({
 
 export const GATEWAY_CODE = widgetCode({
   summary: "Gateway spend per virtual key, the five that spend the most.",
-  subtitle: "Cost broken down by virtual key / route",
+  subtitle: "Spend through the AI gateway, by key.",
   source: "gateway",
   parts: [NUMBERS, BARS],
   queries: ["main"],
@@ -115,7 +119,7 @@ export const GATEWAY_CODE = widgetCode({
 
 export const CODING_AGENTS_CODE = widgetCode({
   summary: "Sessions, tokens, cost and success rate per coding agent, with its session trend.",
-  subtitle: "Sessions, spend and success across Claude Code, Cursor and Codex",
+  subtitle: "Sessions, spend and sessions that ran without errors, per coding agent.",
   source: "codingAgents",
   parts: [NUMBERS, TABLE],
   components: `const AGENTS = {
@@ -150,7 +154,7 @@ function Sparkline({ points }) {
     { header: "Sessions", align: "right", cell: (row) => count(num(row.sessions)) },
     { header: "Tokens", align: "right", cell: (row) => count(num(row.tokens)) },
     { header: "Cost", align: "right", cell: (row) => <b>{usd(num(row.cost))}</b> },
-    { header: "Success", align: "right", cell: (row) => pct(num(row.success_rate), 0) },
+    { header: "Without errors", align: "right", cell: (row) => pct(num(row.success_rate), 0) },
     { header: "Trend", align: "right", cell: (row) => <Sparkline points={trendOf(row.agent)} /> },
   ];
   return (
@@ -162,18 +166,18 @@ function Sparkline({ points }) {
 
 export const IMPACTFUL_TRACES_CODE = widgetCode({
   summary: "The ten traces with the highest impact: errors, slow and costly runs, thumbs down.",
-  subtitle: "Ranked by blended impact: errors, extreme latency, cost, negative feedback",
+  subtitle: "Requests that failed, ran slowest, cost most or got a thumbs down, worst first.",
   source: "traces",
   parts: [NUMBERS, TABLE, THUMBS, TRACE_LINK],
   components: `function Status({ row }) {
-  let label = "ok";
+  let label = "OK";
   let color = C.green;
   if (num(row.p95_latency) > 0 && num(row.latency_ms) >= num(row.p95_latency)) {
-    label = "slow";
+    label = "Slow";
     color = C.orange;
   }
   if (num(row.has_error) > 0) {
-    label = "error";
+    label = "Failed";
     color = C.red;
   }
   return (
@@ -192,17 +196,12 @@ function Feedback({ value }) {
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
   const columns = [
-    { header: "Trace", cell: (row) => <TraceLink id={row.trace_id} /> },
-    { header: "Operation", cell: (row) => mono(row.operation) },
-    { header: "Status", cell: (row) => <Status row={row} /> },
-    { header: "Latency", align: "right", cell: (row) => ms(num(row.latency_ms)) },
+    { header: "Request", cell: (row) => <TraceLink id={row.trace_id} /> },
+    { header: "Step", cell: (row) => row.operation },
+    { header: "What went wrong", cell: (row) => <Status row={row} /> },
+    { header: "Time", align: "right", cell: (row) => ms(num(row.latency_ms)) },
     { header: "Cost", align: "right", cell: (row) => usd(num(row.cost)) },
     { header: "Feedback", align: "center", cell: (row) => <Feedback value={row.feedback} /> },
-    {
-      header: "Impact",
-      align: "right",
-      cell: (row) => <b>{known(row.impact) ? Math.round(num(row.impact)) : GAP}</b>,
-    },
   ];
   return (
     <Panel>

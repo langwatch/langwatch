@@ -35,8 +35,8 @@ describe("given the Can I trust my numbers? widgets", () => {
       /^SELECT arrayJoin\(splitByChar\(',', '[a-z,]+'\)\) AS field,\n  multiIf\(/,
     );
     expect(code).toContain("Missing on ");
-    expect(code).toContain("Sending it unlocks: ");
-    expect(code).toContain('<AllGood title="Every field arrives"');
+    expect(code).toContain('"Cards that need it:\\n"');
+    expect(code).toContain('<AllGood title="Your agent sends everything the dashboards need"');
   });
 
   /** @scenario "AC166 Can I trust my numbers?: data health names each missing field and what it unlocks" */

@@ -34,8 +34,8 @@ describe("given the Test pass rate widget", () => {
     expect(queries.suites).toContain("FROM simulation_suites");
     expect(queries.suites).toContain("n.SimulationSuiteId = r.suite_key");
     expect(queries.suites).toContain("substring(ScenarioSetId, 13, length(ScenarioSetId) - 19)");
-    expect(queries.suites).toContain("'Manual Run'");
-    expect(queries.suites).toContain("'Unnamed suite'");
+    expect(queries.suites).toContain("'Tests run by hand'");
+    expect(queries.suites).toContain("'Untitled test suite'");
     expect(queries.suites).toContain("r.ScenarioSetId = '', 'default'");
     expect(queries.suites).toContain(") AS suite,");
     expect(code).toContain("label: row.suite,");
@@ -49,13 +49,13 @@ describe("given a widget that names managed prompt versions", () => {
   it("marks a managed version by its handle and number, and a sent one by its value", () => {
     expect(markerOf({ kind: "prompt", name: "prompt_version_9", bucket: "Mon" }, names)).toEqual({
       x: "Mon",
-      label: "prompt support-agent v4",
+      label: "Prompt support-agent v4",
     });
     expect(markerOf({ kind: "prompt", name: "v2-beta", bucket: "Tue" }, names).label).toBe(
-      "prompt v2-beta",
+      "Prompt v2-beta",
     );
     // A chart that marks only models passes markerOf straight to map, so names is an index.
-    expect(markerOf({ kind: "model", name: "gpt-6", bucket: "Wed" }, 0).label).toBe("gpt-6");
+    expect(markerOf({ kind: "model", name: "gpt-6", bucket: "Wed" }, 0).label).toBe("Model: gpt-6");
   });
 
   /** @scenario "AC241b Widget labels: a managed prompt version reads as its prompt handle and number" */

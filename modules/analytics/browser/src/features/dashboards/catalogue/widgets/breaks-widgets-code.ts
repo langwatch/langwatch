@@ -87,7 +87,8 @@ const MARKED_PARTS = [NUMBERS, DATES, CHART_STYLE, HEADLINE, BUCKETS, GAP_BRIDGE
 export const ERRORS_PER_DAY_CODE = widgetCode({
   summary: "Traces with an error per bucket by what failed first, the error rate, and changes.",
   subtitle:
-    "Errors by type, with prompt and model changes marked. Check whether a spike starts at a change",
+    "Failed requests over time, by error. Lines mark a new prompt version or model: if a spike " +
+    "starts at one, look there first.",
   source: "traces",
   recharts: MARKED_CHART_IMPORTS,
   parts: MARKED_PARTS,
@@ -115,11 +116,11 @@ const COLOURS = [C.red, C.orange, C.pink, "#9f7aea", C.faint];`,
   }));
   const errored = Object.values(totals).reduce((sum, value) => sum + value, 0);
   const bars = keys.map((key, index) => ({ key, label: key, colour: COLOURS[index] }));
-  const line = { key: "rate", label: "error rate", colour: C.teal };
+  const line = { key: "rate", label: "Share with an error", colour: C.teal };
+  const label = "requests failed" + (ranked.length > 0 ? ". Most common: " + ranked[0] : "");
   return (
     <Panel>
-      <Headline value={count(errored)}
-        label={"traces with an error, by the step or error type that failed first"} />
+      <Headline value={count(errored)} label={label} />
       <MarkedChart points={points} bars={bars} line={line} marks={changeMarks(changes.data)}
         barFormat={count} lineFormat={(value) => pct(value)} />
     </Panel>
@@ -136,9 +137,10 @@ const FAILURE_ROWS = `function FailureRows({ rows }) {
         <div key={row.step}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 11.5 }}>
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis",
-              whiteSpace: "nowrap", fontFamily: "ui-monospace, monospace" }}>{row.step}</span>
+              whiteSpace: "nowrap" }}>"{row.step}"</span>
             <span style={{ fontSize: 10.5, color: C.faint }}>
-              fails {pct(row.failures / row.calls)} of {count(row.calls)} calls
+              fails {pct(row.failures / row.calls)} of {count(row.calls)} calls,{" "}
+              {count(row.failures - row.recovered)} times the user saw it
             </span>
             <span style={{ width: 40, textAlign: "right", fontWeight: 600 }}>
               {count(row.failures - row.recovered)}
@@ -159,8 +161,8 @@ function FailureLegend() {
   return (
     <div style={{ display: "flex", gap: 12, marginTop: "auto", paddingTop: 6, fontSize: 10.5,
       color: C.subtle }}>
-      <span><b style={{ color: C.red }}>■</b> reached the user</span>
-      <span><b style={{ color: C.orange }}>■</b> recovered: the step above it still succeeded</span>
+      <span><b style={{ color: C.red }}>■</b> User saw the failure</span>
+      <span><b style={{ color: C.orange }}>■</b> Agent recovered</span>
     </div>
   );
 }
@@ -176,7 +178,7 @@ const FAILURE_ROW = `const failureRow = (row) => ({
 
 export const FAILING_STEPS_CODE = widgetCode({
   summary: "Steps and tools below the root that failed, how often, and how many reached the user.",
-  subtitle: "Fix the step with the most failures that reached the user",
+  subtitle: "Fix the step with the most failures that reached the user.",
   source: "spans",
   parts: [NUMBERS],
   components: `${FAILURE_ROW}\n\n${FAILURE_ROWS}`,
@@ -187,7 +189,7 @@ export const FAILING_STEPS_CODE = widgetCode({
   return (
     <Panel>
       <div style={{ fontSize: 10.5, color: C.faint, textAlign: "right", marginBottom: 4 }}>
-        reached the user
+        User saw it
       </div>
       <FailureRows rows={rows} />
       <FailureLegend />
@@ -197,7 +199,7 @@ export const FAILING_STEPS_CODE = widgetCode({
 
 export const TOOL_ERROR_RATE_CODE = widgetCode({
   summary: "Error rate per tool, the share of tool errors the agent recovered, and the worst tool.",
-  subtitle: "Fix the tool with the highest rate of errors that reached the user",
+  subtitle: "Fix the tool whose failures users see most.",
   source: "spans",
   parts: [NUMBERS, BARS, STAT],
   components: FAILURE_ROW,
@@ -209,9 +211,9 @@ export const TOOL_ERROR_RATE_CODE = widgetCode({
   const recovered = tools.reduce((sum, tool) => sum + tool.recovered, 0);
   const ranked = [...tools].sort((a, b) => b.failures / b.calls - a.failures / a.calls);
   const worst = ranked[0];
-  const worstLine = failures === 0 ? "No tool failed" : worst.step + " fails " +
-    pct(worst.failures / worst.calls) + ", " + count(worst.failures - worst.recovered) +
-    " reached the user";
+  const worstLine = failures === 0 ? "No tool failed" : '"' + worst.step + '" fails ' +
+    pct(worst.failures / worst.calls) + ", the user saw " +
+    count(worst.failures - worst.recovered);
   const bars = ranked.slice(0, 5).map((tool) => ({
     label: tool.step,
     value: tool.failures / tool.calls,
@@ -219,11 +221,11 @@ export const TOOL_ERROR_RATE_CODE = widgetCode({
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-        <Stat label={"Tool error rate, " + count(failures) + " of " + count(calls) + " calls"}
+        <Stat label={"Tool calls that failed: " + count(failures) + " of " + count(calls)}
           value={pct(ratio(failures, calls))} />
-        <Stat label={"Recovered, of " + count(failures) + " errors"}
+        <Stat label={"Agent recovered from " + count(failures) + " failures"}
           value={failures > 0 ? pct(recovered / failures) : "-"} />
-        <Stat label="Worst tool" value={failures > 0 ? worst.step : "none"} />
+        <Stat label="Fails most" value={failures > 0 ? worst.step : "No tool failed"} />
       </div>
       <div style={{ margin: "8px 0 4px", fontSize: 11, color: C.subtle }}>{worstLine}</div>
       <Bars rows={bars} format={(value) => pct(value)} />
@@ -233,7 +235,9 @@ export const TOOL_ERROR_RATE_CODE = widgetCode({
 
 export const LOOPS_AND_RETRIES_CODE = widgetCode({
   summary: "Traces that repeat a tool call or retry a failed step, per bucket, and their cost.",
-  subtitle: "Cap retries on the step that loops most",
+  subtitle:
+    "Requests where your agent called the same tool with the same input 3 or more times, or " +
+    "retried after a failure. Cap retries on the step that loops most.",
   source: "spans",
   recharts: SERIES_CHART_IMPORTS,
   parts: [NUMBERS, DATES, CHART_STYLE, STAT, BUCKETS, GAP_BRIDGE, SERIES_CHART],
@@ -241,7 +245,7 @@ export const LOOPS_AND_RETRIES_CODE = widgetCode({
   body: `  const traffic = num(totals.data[0]?.traces);
   if (!traffic) return <Panel><CallToAction /></Panel>;
   if (daily.data.length === 0) {
-    return <Panel><Note>No trace looped or retried in this period.</Note></Panel>;
+    return <Panel><Note>Your agent did not go in circles in this period.</Note></Panel>;
   }
   const counts = ["looped_traces", "retried_traces"].map((key) => ({ key, kind: "count" }));
   const points = withBuckets(daily, counts).map((row) => ({
@@ -255,17 +259,17 @@ export const LOOPS_AND_RETRIES_CODE = widgetCode({
   const lowerBound = daily.data.some((row) => num(row.uncosted_spans) > 0);
   const spend = num(totals.data[0]?.cost);
   const series = [
-    { key: "looped", label: "looped: same tool, same input, 3+ times", colour: C.teal,
+    { key: "looped", label: "Same tool, same input, 3 or more times", colour: C.teal,
       bars: true },
-    { key: "retried", label: "retried after a failure", colour: C.orange, bars: true },
+    { key: "retried", label: "Tried again after a failure", colour: C.orange, bars: true },
   ];
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8,
         marginBottom: 8 }}>
-        <Stat label={"Looped or retried, " + pct(repeated / traffic) + " of traces"}
+        <Stat label={"Went in circles or retried: " + pct(repeated / traffic) + " of requests"}
           value={count(repeated)} />
-        <Stat label={"Cost of the repeats, " + pct(ratio(repeatCost, spend)) +
+        <Stat label={"Cost of the repeats: " + pct(ratio(repeatCost, spend)) +
           " of spend"} value={usd(repeatCost) + (lowerBound ? "+" : "")} />
         <div style={{ minWidth: 0, fontSize: 11 }}>
           <div style={{ fontSize: 10, color: C.faint }}>Most repeated steps</div>
@@ -286,7 +290,9 @@ export const LOOPS_AND_RETRIES_CODE = widgetCode({
 
 export const WRONG_TOOL_CODE = widgetCode({
   summary: `Share of judged tasks per bucket whose first tool the "${WRONG_TOOL_JUDGE}" judge marked wrong.`,
-  subtitle: "Sharpen the tool descriptions when the line rises",
+  subtitle:
+    "Share of tasks where your agent's first tool was the wrong one. If it rises, rewrite the " +
+    "tool descriptions.",
   source: "evaluations",
   recharts: MARKED_CHART_IMPORTS,
   parts: MARKED_PARTS,
@@ -295,9 +301,10 @@ export const WRONG_TOOL_CODE = widgetCode({
   body: `  if (trend.data.length === 0) {
     return (
       <Panel>
-        <SetupNote line={'Add an evaluator named "${WRONG_TOOL_JUDGE}" that fails a task whose first tool was wrong.'}>
+        <SetupNote line={'Not checked yet. Add a check named "${WRONG_TOOL_JUDGE}" that fails a task ' +
+          "whose first tool was wrong."}>
           <button style={BUTTON} onClick={() => LW.navigate("onlineEvaluations", {})}>
-            Add a judge
+            Turn on the tool choice check
           </button>
         </SetupNote>
       </Panel>
@@ -311,12 +318,13 @@ export const WRONG_TOOL_CODE = widgetCode({
   const second = ratio(num(totals.wrong) - num(totals.wrong_first), secondJudged);
   const points = withBuckets(trend, ["wrong_rate"])
     .map((row) => ({ x: bucketLabel(row.bucket), wrong: num(row.wrong_rate) }));
-  const label = "wrong first tool · first half " + pct(first) + ", second half " + pct(second);
+  const label = "of tasks started with the wrong tool, " + pct(first) +
+    " earlier in this period, " + pct(second) + " lately";
   return (
     <Panel>
       <Headline value={pct(ratio(totals.wrong, judged))} label={label} />
       <MarkedChart points={points} bars={[]} marks={changeMarks(changes.data)}
-        line={{ key: "wrong", label: "wrong first tool", colour: C.red }}
+        line={{ key: "wrong", label: "Started with the wrong tool", colour: C.red }}
         lineFormat={(value) => pct(value)} />
     </Panel>
   );`,

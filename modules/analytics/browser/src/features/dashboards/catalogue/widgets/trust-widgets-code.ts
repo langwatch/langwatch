@@ -66,7 +66,9 @@ export function dataHealthCode({
   return widgetCode({
     summary:
       "Share of traces that carry each field the dashboards read, and what sending it unlocks.",
-    subtitle: "Send what is missing so every dashboard can answer",
+    subtitle:
+      "Checks that your agent's data carries what the dashboards read. Model and cost are " +
+      "checked only on requests that call a model.",
     parts: [NUMBERS, SHARE_PCT, HEADLINE, SHARE_ROWS],
     components: `${ALL_GOOD}
 
@@ -84,7 +86,7 @@ function fieldRow(field, value) {
     value: num(value) ?? 0,
     colour: whole ? C.green : num(value) >= 0.5 ? C.orange : C.red,
     note: whole ? "" : "Missing on " + share(1 - value) + ": send " + field.send + unlock + ".",
-    title: field.unlocks.length > 0 ? "Sending it unlocks: " + field.unlocks.join("; ") : undefined,
+    title: field.unlocks.length > 0 ? "Cards that need it:\\n" + field.unlocks.join("\\n") : undefined,
   };
 }`,
     queries: ["fields"],
@@ -94,15 +96,15 @@ function fieldRow(field, value) {
   if (complete === FIELDS.length) {
     return (
       <Panel>
-        <AllGood title="Every field arrives"
-          line="Each trace in this period carries a model, cost, user, conversation, labels and an outcome." />
+        <AllGood title="Your agent sends everything the dashboards need"
+          line="Every card can answer from your data in this period." />
       </Panel>
     );
   }
   return (
     <Panel>
       <Headline value={complete + " of " + FIELDS.length}
-        label="fields are on every trace in this period" />
+        label="fields are on every request in this period" />
       <ShareRows rows={rows} />
     </Panel>
   );`,
@@ -111,7 +113,9 @@ function fieldRow(field, value) {
 
 export const COST_ACCURACY_CODE = widgetCode({
   summary: "Traces with a model but no price per bucket, and the models with no known price.",
-  subtitle: "Add a price for each model so cost totals stop reading low",
+  subtitle:
+    "Requests on a model LangWatch has no price for. Add a price for each model in Settings so " +
+    "totals are complete.",
   recharts: SERIES_CHART_IMPORTS,
   parts: [
     NUMBERS,
@@ -129,13 +133,19 @@ export const COST_ACCURACY_CODE = widgetCode({
   body: `  const withModel = add(...trend.data.map((row) => row.with_model));
   const unpriced = add(...trend.data.map((row) => row.unpriced));
   if (!(withModel > 0)) {
-    return <Panel><Note>No trace in this period names its model, so none can be priced.</Note></Panel>;
+    return (
+      <Panel>
+        <Note>
+          No request in this period names its model, so none can be priced.
+        </Note>
+      </Panel>
+    );
   }
   if (!(unpriced > 0)) {
     return (
       <Panel>
         <AllGood title="All costs priced"
-          line="Every trace with a model in this period has a price." />
+          line="Every model your agent used in this period has a price." />
       </Panel>
     );
   }
@@ -144,15 +154,15 @@ export const COST_ACCURACY_CODE = widgetCode({
     x: bucketLabel(row.bucket),
     unpriced: num(row.unpriced),
   }));
-  const series = [{ key: "unpriced", label: "traces with no price", colour: C.orange, bars: true }];
+  const series = [{ key: "unpriced", label: "Requests with no price", colour: C.orange, bars: true }];
   const unpricedModels = models.data.map((row) => ({ label: row.model, value: num(row.traces) }));
   return (
     <Panel>
       <Headline value={share(ratio(unpriced, withModel))}
-        label="of traces with a model have no price, so cost totals read low" />
+        label="of model requests have no price, so your cost totals read low" />
       <SeriesChart points={points} series={series} format={count} />
       <div style={{ margin: "8px 0 4px", fontSize: 10.5, color: C.faint }}>
-        Models with no price, by traces
+        Models with no price (add one to fix)
       </div>
       <Bars rows={unpricedModels} format={count} height={unpricedModels.length * 22} />
     </Panel>
@@ -162,17 +172,17 @@ export const COST_ACCURACY_CODE = widgetCode({
 export const NOISE_CODE = widgetCode({
   summary:
     "Traffic from tests, staging and the like, by source, with its share of traces and cost.",
-  subtitle: "Filter test and staging traffic out before you read the other dashboards",
+  subtitle: "Requests from tests, staging or dev that would skew your other dashboards.",
   parts: [NUMBERS, SHARE_PCT, TABLE, HEADLINE],
   components: `${ALL_GOOD}
 
 const ORIGIN_NAMES = {
   playground: "Playground",
-  evaluation: "Evaluations",
-  simulation: "Simulations",
+  evaluation: "Automatic checks",
+  simulation: "Simulated tests",
 };
 const sourceName = (source) => ORIGIN_NAMES[source] ||
-  source.charAt(0).toUpperCase() + source.slice(1) + " environment";`,
+  source.charAt(0).toUpperCase() + source.slice(1) + " setup";`,
   queries: ["sources"],
   body: `  const traffic = add(...sources.data.map((row) => row.traces));
   const spend = add(...sources.data.map((row) => row.cost));
@@ -181,17 +191,17 @@ const sourceName = (source) => ORIGIN_NAMES[source] ||
     return (
       <Panel>
         <AllGood title="No test traffic"
-          line="Nothing in this period comes from tests, staging and the like." />
+          line="Every request in this period came from production." />
       </Panel>
     );
   }
   const costShare = ratio(add(...noise.map((row) => row.cost)), spend);
-  const label = "of traces come from tests, staging and the like" +
+  const label = "of requests are tests or staging" +
     (known(costShare) ? ", " + share(costShare) + " of cost" : "");
   const columns = [
-    { header: "Source", cell: (row) => sourceName(row.source) },
-    { header: "Traces", align: "right", cell: (row) => count(row.traces) },
-    { header: "Of traffic", align: "right", cell: (row) => share(ratio(row.traces, traffic)) },
+    { header: "From", cell: (row) => sourceName(row.source) },
+    { header: "Requests", align: "right", cell: (row) => count(row.traces) },
+    { header: "Of requests", align: "right", cell: (row) => share(ratio(row.traces, traffic)) },
     { header: "Of cost", align: "right", cell: (row) => share(ratio(row.cost, spend)) },
   ];
   return (

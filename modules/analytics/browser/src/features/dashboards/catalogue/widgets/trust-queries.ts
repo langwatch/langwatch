@@ -22,7 +22,7 @@ export interface HealthField {
 export const HEALTH_FIELDS: readonly HealthField[] = [
   {
     key: "model",
-    label: "Model",
+    label: "Model name",
     send: "the model name on each LLM call",
     view: "trace_metrics",
     condition: "notEmpty(Models)",
@@ -59,7 +59,7 @@ export const HEALTH_FIELDS: readonly HealthField[] = [
   },
   {
     key: "labels",
-    label: "Labels",
+    label: "Customer or labels",
     send: "labels in the trace metadata",
     view: "trace_metrics",
     condition: "notEmpty(Labels)",
@@ -68,7 +68,7 @@ export const HEALTH_FIELDS: readonly HealthField[] = [
   },
   {
     key: "outcome",
-    label: "Outcome",
+    label: "How it ended",
     send: "an outcome, such as resolved, in the trace metadata",
     view: "trace_metrics",
     condition: "MetadataOutcome != ''",

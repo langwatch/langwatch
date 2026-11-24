@@ -29,8 +29,8 @@ export const SPEND_CODE = widgetCode({
   summary:
     "Spend against the period before, cost per resolved conversation and the month forecast.",
   subtitle:
-    "Production, evaluations and simulations together. Spend with traces on a model with no " +
-    "price is a lower bound, marked +; the forecast runs at the pace of the last 7 days with data",
+    "Your app's own spend plus automatic checks. Requests on a model with no price add " +
+    "nothing, so totals read low.",
   source: "traces",
   compactCallToAction: true,
   parts: [NUMBERS, COMPLETENESS, FIGURES],
@@ -52,18 +52,19 @@ export const SPEND_CODE = widgetCode({
         <Figure label="Spent" value={usd(cost) + plus(spend)}>
           <Change now={cost} before={num(s.cost_prev)} better="down" format={usd} />
         </Figure>
-        <Figure label="Cost per success" value={resolved > 0 ? usd(perSuccess) : "Not measured"}>
+        <Figure label="Cost per resolved conversation"
+          value={resolved > 0 ? usd(perSuccess) : "Not scored yet"}>
           {resolved > 0 ? (
             <Change now={perSuccess} before={ratio(num(s.cost_prev), num(o.resolved_prev))}
               better="down" format={usd} />
           ) : (
             <Hint onClick={() => LW.navigate("onlineEvaluations", {})}>
-              Add an outcome judge
+              Score how conversations end
             </Hint>
           )}
         </Figure>
         <Figure label={monthName + " forecast"} value={usd(forecast)}>
-          <Hint>{usd(num(m.month_to_date))} so far, at the last 7 days' pace</Hint>
+          <Hint>{usd(num(m.month_to_date))} so far, forecast at the pace of the last 7 days</Hint>
         </Figure>
       </Figures>
     </Panel>
@@ -74,8 +75,8 @@ export const SPEND_CODE = widgetCode({
 export const SPEND_BY_SOURCE_CODE = widgetCode({
   summary: "Spend per bucket split into production, evaluations, simulations and experiments.",
   subtitle:
-    "Check that test traffic stays a small share. A source with no traces reads No runs; " +
-    "traces on a model with no price add to the Unpriced row",
+    "Where your AI spend goes: your app in production, or tests. Testing should stay a small " +
+    "share.",
   source: "traces",
   recharts: MARKED_CHART_IMPORTS,
   parts: [
@@ -91,17 +92,17 @@ export const SPEND_BY_SOURCE_CODE = widgetCode({
   ],
   components: `// key, label, colour and the trace origin the row opens.
 const SOURCES = [
-  ["production", "Production", C.teal, "application"],
-  ["evaluations", "Evaluations", C.orange, "evaluation"],
-  ["simulations", "Simulations", C.pink, "simulation"],
-  ["experiments", "Experiments", "#9f7aea", "playground"],
+  ["production", "Your app", C.teal, "application"],
+  ["evaluations", "Automatic checks", C.orange, "evaluation"],
+  ["simulations", "Simulated tests", C.pink, "simulation"],
+  ["experiments", "Playground and workflows", "#9f7aea", "playground"],
   ["other", "Other", C.faint, undefined],
 ];
 
 // A source with no traces says so; one with traces but no price shows a dash, never $0.00.
 function SourceRow({ label, colour, cost, total, traces, unpriced, origin }) {
   const open = origin && traces > 0 ? () => openTraces({ origin }) : undefined;
-  const figure = traces === 0 ? "No runs" : usd(cost) + (unpriced > 0 && known(cost) ? "+" : "");
+  const figure = traces === 0 ? "Nothing ran" : usd(cost) + (unpriced > 0 && known(cost) ? "+" : "");
   return (
     <div onClick={open} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5,
       padding: "3px 0", cursor: open ? "pointer" : "default",
@@ -123,12 +124,12 @@ function SourceRow({ label, colour, cost, total, traces, unpriced, origin }) {
 
 function UnpricedRow({ traces }) {
   return (
-    <div title={count(traces) + " traces ran on a model with no price, so their cost is unknown."}
+    <div title={count(traces) + " requests ran on a model with no price, so their cost is unknown."}
       style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11.5, padding: "3px 0",
         color: C.subtle }}>
       <span style={{ width: 8, height: 8, borderRadius: 4, border: "1px solid " + C.faint }} />
-      <span style={{ width: 84, fontWeight: 500 }}>Unpriced</span>
-      <span style={{ flex: 1 }}>{count(traces)} traces, no price</span>
+      <span style={{ width: 84, fontWeight: 500 }}>Price unknown</span>
+      <span style={{ flex: 1 }}>{count(traces)} requests on a model with no price</span>
       <span style={{ width: 64, textAlign: "right" }}>{GAP}</span>
     </div>
   );
@@ -151,7 +152,7 @@ function UnpricedRow({ traces }) {
   const test = known(total) ? total - (costOf("production") ?? 0) : null;
   return (
     <Panel>
-      <Headline value={pct(ratio(test, total), 0)} label="test traffic" />
+      <Headline value={pct(ratio(test, total), 0)} label="of AI spend goes on testing" />
       <MarkedChart points={points} series={series} format={usd} />
       <div style={{ marginTop: 8 }}>
         {shown.map(([key, label, colour, origin]) => (
@@ -168,8 +169,8 @@ function UnpricedRow({ traces }) {
 export const WASTE_CODE = widgetCode({
   summary: "Spend on failed runs, recovered retries and loops, each trace counted once.",
   subtitle:
-    "Fix the line with the biggest price first. Traces on a model with no price add no cost, " +
-    "so a total marked + can only grow",
+    "Spend on requests that failed, retried or went in circles, so you can fix the most " +
+    "expensive line first.",
   source: "traces",
   compactCallToAction: true,
   parts: [NUMBERS, COMPLETENESS, TABLE, HEADLINE, TRACES_LINK],
@@ -178,13 +179,13 @@ export const WASTE_CODE = widgetCode({
   const spend = num(w.spend);
   if (!spend) return <Panel><CallToAction /></Panel>;
   const lines = [
-    { label: "Failed, not recovered", traces: num(w.failed_traces), cost: num(w.failed_cost),
+    { label: "Requests that failed", traces: num(w.failed_traces), cost: num(w.failed_cost),
       filter: { status: "error" } },
-    { label: "Retries that recovered", traces: num(w.retry_traces), cost: num(w.retry_cost) },
-    { label: "Loops", traces: num(w.loop_traces), cost: num(w.loop_cost) },
+    { label: "Retries before it worked", traces: num(w.retry_traces), cost: num(w.retry_cost) },
+    { label: "Going in circles", traces: num(w.loop_traces), cost: num(w.loop_cost) },
   ].toSorted((a, b) => b.cost - a.cost);
   const total = add(...lines.map((line) => line.cost));
-  if (!total) return <Panel><Note>No wasted spend in this period.</Note></Panel>;
+  if (!total) return <Panel><Note>No spend was wasted in this period.</Note></Panel>;
   const columns = [
     {
       header: "Wasted on",
@@ -192,14 +193,15 @@ export const WASTE_CODE = widgetCode({
         <span onClick={() => openTraces(row.filter)} style={{ cursor: "pointer" }}>{row.label}</span>
       ),
     },
-    { header: "Traces", align: "right", cell: (row) => count(row.traces) },
+    { header: "Requests", align: "right", cell: (row) => count(row.traces) },
     { header: "Share", align: "right", cell: (row) => pct(ratio(row.cost, total), 0) },
     { header: "Cost", align: "right", cell: (row) => <b>{usd(row.cost)}</b> },
   ];
   return (
     <Panel>
       <Headline value={usd(total) + plus(main)}
-        label={"wasted, " + pct(total / spend, 0) + " of production spend"} />
+        label={"spent on requests that bought nothing, " + pct(total / spend, 0) +
+          " of what your agent cost"} />
       <Table columns={columns} rows={lines} />
     </Panel>
   );`,
@@ -210,8 +212,8 @@ export const COST_PER_CALL_CODE = widgetCode({
   summary:
     "LLM cost per call from traces; speech to text and text to speech wait for vendor rates.",
   subtitle:
-    "Check the share speech takes before cutting model cost. LLM per call counts only the calls " +
-    "with a known price",
+    "Model cost per voice call, without speech costs yet and without calls on a model with no " +
+    "price.",
   source: "traces",
   recharts: MARKED_CHART_IMPORTS,
   parts: [NUMBERS, DATES, CHART_STYLE, COMPLETENESS, FIGURES, BUCKETS, GAP_BRIDGE, MARKED_CHART],
@@ -226,16 +228,16 @@ export const COST_PER_CALL_CODE = widgetCode({
   return (
     <Panel>
       <Figures>
-        <Figure label="LLM per call" value={usd(ratio(num(t.cost), calls * pricedShare(total)))}>
+        <Figure label="Model cost per call" value={usd(ratio(num(t.cost), calls * pricedShare(total)))}>
           <Hint>{count(calls)} calls</Hint>
         </Figure>
         <Figure label="Speech per call" value="Not priced">
-          <Hint>Speech vendor rates are not in LangWatch yet</Hint>
+          <Hint>Speech to text and text to speech are not included yet.</Hint>
         </Figure>
       </Figures>
       <div style={{ height: 8 }} />
       <MarkedChart points={points} format={usd}
-        series={[{ key: "llm", label: "LLM cost per call", colour: C.teal }]} />
+        series={[{ key: "llm", label: "Model cost per call", colour: C.teal }]} />
     </Panel>
   );`,
 });
@@ -243,7 +245,9 @@ export const COST_PER_CALL_CODE = widgetCode({
 /** Cost per document: whether a model change made each document cheaper. */
 export const COST_PER_DOCUMENT_CODE = widgetCode({
   summary: "Production cost per document, overall and per model, with model changes marked.",
-  subtitle: "Compare it with the accuracy per field before moving more traffic",
+  subtitle:
+    "What one document costs to process. Check field accuracy before you move work to the " +
+    "cheapest model.",
   source: "models",
   recharts: MARKED_CHART_IMPORTS,
   parts: [NUMBERS, DATES, CHART_STYLE, BARS, FIGURES, BUCKETS, GAP_BRIDGE, MARKED_CHART],
@@ -281,7 +285,7 @@ export const COST_PER_DOCUMENT_CODE = widgetCode({
     ...rows.map((row, index) => ({
       key: row.model, label: row.model, colour: colourFor(row.model, index), dashed: true,
     })),
-    { key: "all", label: "all documents", colour: C.text },
+    { key: "all", label: "All documents", colour: C.text },
   ];
   const markers = changes.data.filter((row) => row.kind === "model").map(markerOf);
   return (
@@ -290,12 +294,13 @@ export const COST_PER_DOCUMENT_CODE = widgetCode({
         <Figure label="Cost per document" value={usd(ratio(cost, documents))}>
           <Hint>{count(documents)} documents</Hint>
         </Figure>
-        <Figure label="Second half against the first"
-          value={first > 0 && known(second) ? signedPct(second / first - 1) : "No earlier data"}>
-          <Hint>{usd(first)} to {usd(second)}</Hint>
+        <Figure label="Trend"
+          value={first > 0 && known(second) ? signedPct(second / first - 1)
+            : "Nothing to compare with yet"}>
+          <Hint>{usd(first)} earlier in this period, {usd(second)} lately</Hint>
         </Figure>
         <Figure label="Cheapest model" value={cheapest ? usd(perDocument(cheapest)) : GAP}>
-          <Hint>{cheapest ? cheapest.model : "No priced model"}</Hint>
+          <Hint>{cheapest ? cheapest.model : "No model has a price"}</Hint>
         </Figure>
       </Figures>
       <div style={{ height: 8 }} />

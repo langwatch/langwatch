@@ -4,8 +4,6 @@
  * links to the traces behind a number, and the setup step for conversation outcomes.
  */
 
-import { OUTCOME_JUDGE } from "./flight-deck-costs-queries.ts";
-
 /** The Recharts components `MARKED_CHART` draws with. */
 export const MARKED_CHART_IMPORTS = [
   "ResponsiveContainer",
@@ -26,7 +24,7 @@ export const FIGURES = `const signedPct = (value) => (known(value) && value > 0 
 function Change({ now, before, better, format }) {
   const line = { marginTop: 2, fontSize: 11, fontWeight: 500 };
   if (!known(now)) return null;
-  if (!(before > 0)) return <div style={{ ...line, color: C.faint }}>No earlier data</div>;
+  if (!(before > 0)) return <div style={{ ...line, color: C.faint }}>Nothing to compare with yet</div>;
   const delta = (now - before) / before;
   const flat = Math.abs(delta) < 0.005;
   let color = C.faint;
@@ -104,10 +102,10 @@ export const SEEN_OR_SETUP = `function SeenOrSetup({ quiet, action, onAction, ch
 /** The empty face of a widget that counts conversation outcomes; reads `SEEN_OR_SETUP`. */
 export const OUTCOME_EMPTY = `function OutcomeEmpty({ quiet }) {
   return (
-    <SeenOrSetup quiet={quiet} action="Add a judge"
+    <SeenOrSetup quiet={quiet} action="Score how conversations end"
       onAction={() => LW.navigate("onlineEvaluations", {})}>
-      No conversation outcomes yet. Add the ${OUTCOME_JUDGE}, or send "outcome" in the metadata
-      of each conversation's last trace.
+      Not scored yet. Have your app send how each conversation ended, or let LangWatch read
+      each conversation and record it.
     </SeenOrSetup>
   );
 }`;
@@ -177,6 +175,6 @@ function MarkedChart({ points, series, format, rightFormat, markers = [], domain
 const markerOf = (row, names) => ({
   x: bucketLabel(row.bucket),
   label: row.kind === "prompt"
-    ? "prompt " + ((names instanceof Map && names.get(row.name)) || row.name)
-    : row.name,
+    ? "Prompt " + ((names instanceof Map && names.get(row.name)) || row.name)
+    : "Model: " + row.name,
 });`;
