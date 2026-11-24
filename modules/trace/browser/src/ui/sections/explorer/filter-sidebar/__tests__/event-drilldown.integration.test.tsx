@@ -137,6 +137,31 @@ describe("EventDrilldown", () => {
         ).toBeInTheDocument();
       });
     });
+
+    describe("when a group in the query makes a vote value optional", () => {
+      /** @scenario "Attribute and event rows a group makes optional also say in group" */
+      it("names the row in group, neither included nor excluded", () => {
+        renderDrilldown({
+          ast: parse("NOT (event.attribute.event.metrics.vote:-1 AND status:error)"),
+        });
+
+        const row = screen.getByRole("button", { name: "vote thumbs down — in group" });
+        expect(row).toHaveAttribute("title", "Part of a group in the search bar");
+        expect(row).toHaveTextContent("in group");
+      });
+
+      it("still toggles that metric value on click", () => {
+        const { toggleFacet } = renderDrilldown({
+          ast: parse("NOT (event.attribute.event.metrics.vote:-1 AND status:error)"),
+        });
+
+        fireEvent.click(screen.getByRole("button", { name: "vote thumbs down — in group" }));
+        expect(toggleFacet).toHaveBeenLastCalledWith({
+          field: "event.attribute.event.metrics.vote",
+          value: "-1",
+        });
+      });
+    });
   });
 
   describe("given two metric groups that share a stored value", () => {

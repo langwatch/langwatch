@@ -1,6 +1,7 @@
 import {
   analyzeOrGroups,
   buildFacetDisplayLookup,
+  type FacetDisplayState,
   getFacetValues,
 } from "@langwatch/trace-contract";
 import { useCallback, useEffect, useMemo } from "react";
@@ -11,7 +12,6 @@ import {
   type AttributesSectionData,
   type CategoricalSection,
   type FacetItem,
-  type FacetValueState,
   type RangeSectionData,
   type Section,
 } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
@@ -422,7 +422,7 @@ export function useFilterSidebarData() {
   const getValueStates = useMemo(() => {
     const getFor =
       (field: string) =>
-      (value: string): FacetValueState =>
+      (value: string): FacetDisplayState =>
         facetStateLookup.get(`${field}|${value}`) ?? "neutral";
     const keys = [...categoricals.map((c) => c.key), ...discreteEligible.keys()];
     return new Map(keys.map((key) => [key, getFor(key)]));

@@ -676,6 +676,18 @@ Rule: Categorical facet selection logic
     When the user searches for "@status:error AND @model:gpt-5-mini", "NOT (@status:error OR @model:gpt-5-mini)" or "@status:error OR @status:warning"
     Then each named row shows include or exclude as before, with no "in group" label
 
+  @unit
+  Scenario: The exclude button on a row in a group says what a click does
+    When the user searches for "NOT (@status:error AND @model:gpt-5-mini)" and hovers the "Error" row
+    Then its exclude button reads "Stop excluding error" and shows as pressed, because a click removes that negation
+    And on a row in a group the query does not negate, the button reads "Exclude <value>"
+
+  @unit
+  Scenario: Attribute and event rows a group makes optional also say in group
+    When a group in the search bar makes an attribute or event value optional
+    Then its row in the sidebar says "in group", titled "Part of a group in the search bar", and is neither included nor excluded
+    And clicking it does what it did before
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RANGE FACETS

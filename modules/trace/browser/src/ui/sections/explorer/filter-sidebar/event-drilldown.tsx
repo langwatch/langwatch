@@ -1,8 +1,11 @@
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
+  buildFacetDisplayLookup,
   EVENT_METRICS_PREFIX,
   eventMetricValueLabel,
+  type FacetDisplayState,
   getFacetValueState,
+  isGroupedState,
 } from "@langwatch/trace-contract";
 import type { LiqeQuery } from "liqe";
 import type React from "react";
@@ -11,6 +14,10 @@ import {
   type EventMetricValues,
   type FacetItem,
 } from "../../../../behavior/explorer/filter-sidebar/types.ts";
+import {
+  IN_GROUP_TITLE,
+  InGroupLabel,
+} from "../../../elements/explorer/filter-sidebar/in-group-label.tsx";
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 import { formatCount } from "./utils.ts";
 
@@ -82,6 +89,7 @@ const MetricGroup: React.FC<{
     ? metric.key.slice(EVENT_METRICS_PREFIX.length)
     : metric.key;
   const maxCount = Math.max(...metric.values.map((v) => v.count), 0);
+  const displayStates = buildFacetDisplayLookup(ast);
 
   return (
     <VStack align="stretch" gap={0}>
@@ -95,7 +103,7 @@ const MetricGroup: React.FC<{
         {displayKey}
       </Text>
       {metric.values.map((v) => {
-        const state = getFacetValueState(ast, field, v.value);
+        const state = displayStates.get(`${field}|${v.value}`) ?? "neutral";
         return (
           <MetricValueRow
             key={v.value}
@@ -125,7 +133,8 @@ const MetricGroup: React.FC<{
   );
 };
 
-function metricStateLabel(state: "neutral" | "include" | "exclude"): string {
+function metricStateLabel(state: FacetDisplayState): string {
+  if (isGroupedState(state)) return "in group";
   if (state === "include") return "included";
   if (state === "exclude") return "excluded";
   return "click to filter";
@@ -144,10 +153,11 @@ const MetricValueRow: React.FC<{
   displayKey: string;
   count: number;
   maxCount: number;
-  state: "neutral" | "include" | "exclude";
+  state: FacetDisplayState;
   onClick: () => void;
 }> = ({ value: _value, displayValue, displayKey, count, maxCount, state, onClick }) => {
-  const active = state !== "neutral";
+  const active = state === "include" || state === "exclude";
+  const grouped = isGroupedState(state);
   const palette = state === "exclude" ? "red" : "blue";
   const fillPct = maxCount > 0 ? Math.max((count / maxCount) * 100, MIN_VISIBLE_FILL_PCT) : 0;
   // The key qualifies the value: two metrics on one event may share a value
@@ -159,6 +169,7 @@ const MetricValueRow: React.FC<{
       type="button"
       aria-label={`${displayKey} ${displayValue} — ${stateLabel}`}
       data-state={state}
+      title={grouped ? IN_GROUP_TITLE : undefined}
       position="relative"
       width="full"
       paddingY={0.5}
@@ -206,6 +217,7 @@ const MetricValueRow: React.FC<{
         <Text textStyle="2xs" color="fg.muted" truncate>
           {displayValue}
         </Text>
+        {grouped && <InGroupLabel />}
         <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
           {formatCount(count)}
         </Text>

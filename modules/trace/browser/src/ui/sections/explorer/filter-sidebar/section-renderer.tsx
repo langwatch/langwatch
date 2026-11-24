@@ -1,5 +1,10 @@
 import { Box } from "@langwatch/design-system/primitives";
-import { getFacetValueState, extractRangeValue } from "@langwatch/trace-contract";
+import {
+  buildFacetDisplayLookup,
+  getFacetValueState,
+  extractRangeValue,
+  type FacetDisplayState,
+} from "@langwatch/trace-contract";
 import type { LiqeQuery } from "liqe";
 import { ChevronDown, ChevronRight, type LucideIcon } from "lucide-react";
 import type React from "react";
@@ -7,7 +12,6 @@ import { memo } from "react";
 
 import {
   type FacetItem,
-  type FacetValueState,
   type Section,
 } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import type { NumericMode } from "../../../../features/explorer/behavior/numeric-mode.store.ts";
@@ -23,7 +27,7 @@ interface SectionRendererProps {
   section: Section;
   ast: LiqeQuery;
   facetItemsByKey: Map<string, FacetItem[]>;
-  valueStateGetters: Map<string, (value: string) => FacetValueState>;
+  valueStateGetters: Map<string, (value: string) => FacetDisplayState>;
   toggleFacet: ({ field, value }: { field: string; value: string }) => void;
   /** Force a categorical value to excluded / back to neutral — drives the
    * row's trailing exclude affordance. */
@@ -313,7 +317,7 @@ const RangeSectionRenderer: React.FC<
         icon={icon}
         field={section.key}
         items={facetItemsByKey.get(section.key) ?? []}
-        getValueState={valueStateGetters.get(section.key) ?? ((): FacetValueState => "neutral")}
+        getValueState={valueStateGetters.get(section.key) ?? ((): FacetDisplayState => "neutral")}
         onToggle={(field, value) => toggleFacet({ field, value })}
         onExclude={(field, value) => excludeFacet({ field, value })}
         onShiftToggle={onShiftToggle}
@@ -354,6 +358,7 @@ const AttributesSectionRenderer: React.FC<
   // filter prefix and key list, so the renderer doesn't need to know which flavour it's drawing.
   const { filterPrefix, keys, label, displayStripPrefix, emptyDocsHref } = section;
   const fieldFor = (attrKey: string) => `${filterPrefix}.${attrKey}`;
+  const displayStates = buildFacetDisplayLookup(ast);
   return (
     <AttributesSection
       title={label}
@@ -362,7 +367,9 @@ const AttributesSectionRenderer: React.FC<
       filterPrefix={filterPrefix}
       displayStripPrefix={displayStripPrefix}
       emptyDocsHref={emptyDocsHref}
-      getValueState={(attrKey, value) => getFacetValueState(ast, fieldFor(attrKey), value)}
+      getValueState={(attrKey, value) =>
+        displayStates.get(`${fieldFor(attrKey)}|${value}`) ?? "neutral"
+      }
       getNoneActive={(attrKey) => getFacetValueState(ast, "none", fieldFor(attrKey)) === "include"}
       onToggleValue={(attrKey, value) => toggleFacet({ field: fieldFor(attrKey), value })}
       onToggleNone={(attrKey) => toggleFacet({ field: "none", value: fieldFor(attrKey) })}

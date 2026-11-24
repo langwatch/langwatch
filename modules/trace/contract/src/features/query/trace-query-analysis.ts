@@ -191,8 +191,25 @@ function displayStateOf({
   negated: boolean;
   grouped: boolean;
 }): FacetDisplayState {
-  if (grouped) return "grouped";
+  if (grouped) return negated ? "grouped-exclude" : "grouped-include";
   return negated ? "exclude" : "include";
+}
+
+/**
+ * A required mark beats a grouped one. Among grouped ones a plain term beats a negated one, as a
+ * click reads it (`getFacetValueState` checks includes first), so the exclude button matches it.
+ */
+function shouldMark({
+  previous,
+  negated,
+  grouped,
+}: {
+  previous: FacetDisplayState | undefined;
+  negated: boolean;
+  grouped: boolean;
+}): boolean {
+  if (!grouped || previous === undefined) return true;
+  return previous === "grouped-exclude" && !negated;
 }
 
 function markDisplayStates({
@@ -208,9 +225,10 @@ function markDisplayStates({
 }): void {
   switch (node.type) {
     case "Tag": {
-      // A term every result must match keeps its mark even where it also sits in a group.
       for (const key of rowKeysNamedBy(node)) {
-        if (!(grouped && map.has(key))) map.set(key, displayStateOf({ negated, grouped }));
+        if (shouldMark({ previous: map.get(key), negated, grouped })) {
+          map.set(key, displayStateOf({ negated, grouped }));
+        }
       }
       return;
     }
@@ -266,8 +284,8 @@ function requiredSignedKeys({ node, negated }: { node: LiqeQuery; negated: boole
 
 /**
  * What each sidebar row shows, keyed by `${field}|${value}`. A term keeps include or exclude only
- * when every result must match it; one a group makes optional is "grouped" (#9810). Display only:
- * clicks still read `getFacetValueState`.
+ * when every result must match it; one a group makes optional is grouped, keeping whether the
+ * query negates it (#9810). Display only: clicks still read `getFacetValueState`.
  */
 export function buildFacetDisplayLookup(ast: LiqeQuery): ReadonlyMap<string, FacetDisplayState> {
   const map = new Map<string, FacetDisplayState>();

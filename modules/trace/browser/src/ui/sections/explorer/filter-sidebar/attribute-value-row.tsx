@@ -1,11 +1,15 @@
 import { CheckboxCard, Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { type FacetDisplayState, isGroupedState } from "@langwatch/trace-contract";
 import { memo } from "react";
 
-import { type FacetValueState } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import { hashColor } from "../../../../model/display-formatters.ts";
+import {
+  IN_GROUP_TITLE,
+  InGroupLabel,
+} from "../../../elements/explorer/filter-sidebar/in-group-label.tsx";
 import { paletteFromColor } from "./utils.ts";
 
-function attributeCheckedState(state: FacetValueState): boolean | "indeterminate" {
+function attributeCheckedState(state: FacetDisplayState): boolean | "indeterminate" {
   if (state === "include") return true;
   if (state === "exclude") return "indeterminate";
   return false;
@@ -21,12 +25,13 @@ export const AttributeValueRow = memo(function AttributeValueRow({
   attrKey: string;
   value: string;
   label: string;
-  state: FacetValueState;
+  state: FacetDisplayState;
   onToggle: (attrKey: string, value: string) => void;
 }) {
   const isInclude = state === "include";
   const isExclude = state === "exclude";
   const isActive = isInclude || isExclude;
+  const isGrouped = isGroupedState(state);
 
   const palette = paletteFromColor(hashColor(value));
   const barBg = isExclude ? "red.subtle" : `${palette}.subtle`;
@@ -37,6 +42,8 @@ export const AttributeValueRow = memo(function AttributeValueRow({
       unstyled
       checked={attributeCheckedState(state)}
       onCheckedChange={() => onToggle(attrKey, value)}
+      title={isGrouped ? IN_GROUP_TITLE : undefined}
+      data-state={state}
       display="block"
       position="relative"
       width="full"
@@ -77,6 +84,8 @@ export const AttributeValueRow = memo(function AttributeValueRow({
         transition="opacity 120ms ease, background 120ms ease"
       />
       <HStack gap={1.5} position="relative" minWidth={0} zIndex={1}>
+        {/* First, not last: long attribute values run past the sidebar edge and would hide it. */}
+        {isGrouped && <InGroupLabel />}
         <Text
           textStyle="xs"
           fontWeight={isActive ? "600" : "500"}

@@ -1,27 +1,28 @@
 import { CheckboxCard, Box, chakra, HStack, Icon, Text } from "@langwatch/design-system/primitives";
+import { type FacetDisplayState, isGroupedState } from "@langwatch/trace-contract";
 import { Ban, Minus } from "lucide-react";
 import { memo, useCallback } from "react";
 
-import {
-  type FacetItem,
-  type FacetValueState,
-} from "../../../../behavior/explorer/filter-sidebar/types.ts";
+import { type FacetItem } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import { useFacetHoverStore } from "../../../../features/facet/behavior/facet-hover.store.ts";
+import {
+  IN_GROUP_TITLE,
+  InGroupLabel,
+} from "../../../elements/explorer/filter-sidebar/in-group-label.tsx";
 import { formatCount, paletteFromColor } from "./utils.ts";
 
 const MIN_VISIBLE_FILL_PCT = 4;
-const GROUPED_TITLE = "Part of a group in the search bar";
 
-function facetCheckedState(state: FacetValueState): boolean | "indeterminate" {
+function facetCheckedState(state: FacetDisplayState): boolean | "indeterminate" {
   if (state === "include") return true;
   if (state === "exclude") return "indeterminate";
   return false;
 }
 
-function facetStateLabel(state: FacetValueState): string {
+function facetStateLabel(state: FacetDisplayState): string {
   if (state === "include") return "included";
   if (state === "exclude") return "excluded";
-  if (state === "grouped") return GROUPED_TITLE;
+  if (isGroupedState(state)) return "in group";
   return "click to include";
 }
 
@@ -39,7 +40,7 @@ export const FacetRow = memo(function FacetRow({
   field,
 }: {
   item: FacetItem;
-  state: FacetValueState;
+  state: FacetDisplayState;
   maxCount: number;
   /** Row-body click: include a neutral value, or clear an active one. */
   onToggle: (value: string) => void;
@@ -61,8 +62,10 @@ export const FacetRow = memo(function FacetRow({
 
   const isInclude = state === "include";
   const isExclude = state === "exclude";
-  const isGrouped = state === "grouped";
+  const isGrouped = isGroupedState(state);
   const isActive = isInclude || isExclude;
+  // What the exclude button does follows the query: a negated term in a group is cleared by it.
+  const queryNegates = isExclude || state === "grouped-exclude";
 
   const palette = isExclude ? "red" : paletteFromColor(item.dotColor);
   const orbOpacity = orbOpacityFor({ dimmed: item.dimmed, isActive });
@@ -130,7 +133,7 @@ export const FacetRow = memo(function FacetRow({
           overflow="hidden"
           background={isActive ? subtleBg : "transparent"}
           borderWidth={0}
-          title={isGrouped ? GROUPED_TITLE : undefined}
+          title={isGrouped ? IN_GROUP_TITLE : undefined}
           data-state={state}
           data-facet-field={field}
           data-facet-value={item.value}
@@ -181,17 +184,7 @@ export const FacetRow = memo(function FacetRow({
             >
               {item.label}
             </Text>
-            {isGrouped && (
-              <Text
-                textStyle="2xs"
-                color="blue.fg"
-                fontWeight="medium"
-                flexShrink={0}
-                data-facet-grouped
-              >
-                in group
-              </Text>
-            )}
+            {isGrouped && <InGroupLabel />}
             {!item.synthetic && item.countState !== "pending" && (
               <Text
                 data-facet-count
@@ -214,42 +207,64 @@ export const FacetRow = memo(function FacetRow({
             hidden at rest, fades in on row hover, and stays solid (as a `Ban`
             ∅, in red) while the value is excluded. Sibling of the checkbox card, not a
             child — you can't nest a <button> inside the row's <button>. */}
-        <chakra.button
-          type="button"
-          aria-label={isExclude ? `Stop excluding ${item.label}` : `Exclude ${item.label}`}
-          title={isExclude ? "Stop excluding" : "Exclude (NOT)"}
-          aria-pressed={isExclude}
-          data-facet-exclude
-          flexShrink={0}
-          // Reserved fixed slot at the end of the line, after the count — a
-          // distinct, always-present element (faint at rest, brighter on row
-          // hover, solid red `Ban` while excluded). Reserved so it never shifts
-          // the row; the label flex-grows so the count + this sit at the right.
-          width="20px"
-          height="22px"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          borderRadius="sm"
-          background="transparent"
-          border="none"
-          cursor="pointer"
-          color={isExclude ? "red.fg" : "fg.subtle"}
-          opacity={isExclude ? 1 : 0.3}
-          transition="opacity 120ms ease, color 120ms ease, background 120ms ease"
-          _hover={{ color: "red.fg", opacity: 1, background: "red.subtle" }}
-          _focusVisible={{
-            opacity: 1,
-            color: "red.fg",
-            outline: "2px solid",
-            outlineColor: "red.focusRing",
-            outlineOffset: "1px",
-          }}
+        <ExcludeButton
+          label={item.label}
+          negates={queryNegates}
+          excluded={isExclude}
           onClick={() => onExclude(item.value)}
-        >
-          <Icon boxSize="13px">{isExclude ? <Ban /> : <Minus />}</Icon>
-        </chakra.button>
+        />
       </HStack>
     </Box>
   );
 });
+
+/** The trailing exclude button: it says what a click does, which follows the query's negation. */
+function ExcludeButton({
+  label,
+  negates,
+  excluded,
+  onClick,
+}: {
+  label: string;
+  negates: boolean;
+  excluded: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      aria-label={negates ? `Stop excluding ${label}` : `Exclude ${label}`}
+      title={negates ? "Stop excluding" : "Exclude (NOT)"}
+      aria-pressed={negates}
+      data-facet-exclude
+      flexShrink={0}
+      // Reserved fixed slot at the end of the line, after the count — a
+      // distinct, always-present element (faint at rest, brighter on row
+      // hover, solid red `Ban` while excluded). Reserved so it never shifts
+      // the row; the label flex-grows so the count + this sit at the right.
+      width="20px"
+      height="22px"
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      borderRadius="sm"
+      background="transparent"
+      border="none"
+      cursor="pointer"
+      color={excluded ? "red.fg" : "fg.subtle"}
+      opacity={excluded ? 1 : 0.3}
+      transition="opacity 120ms ease, color 120ms ease, background 120ms ease"
+      _hover={{ color: "red.fg", opacity: 1, background: "red.subtle" }}
+      _focusVisible={{
+        opacity: 1,
+        color: "red.fg",
+        outline: "2px solid",
+        outlineColor: "red.focusRing",
+        outlineOffset: "1px",
+      }}
+      onClick={onClick}
+    >
+      <Icon boxSize="13px">{negates ? <Ban /> : <Minus />}</Icon>
+    </chakra.button>
+  );
+}
