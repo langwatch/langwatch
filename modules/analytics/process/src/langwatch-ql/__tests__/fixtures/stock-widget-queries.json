@@ -73,7 +73,7 @@
  },
  {
   "label": "top-models/modelCosts",
-  "sql": "SELECT model,\n  sum(TotalCost / length(Models)) AS cost\nFROM (SELECT arrayJoin(Models) AS model, Models, TotalCost\n  FROM trace_metrics\n  WHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n    AND notEmpty(Models)))\nWHERE model != ''\nGROUP BY model\nORDER BY cost DESC\nLIMIT 50"
+  "sql": "SELECT model,\n  sum(TotalCost / length(Models)) AS cost\nFROM (SELECT arrayJoin(Models) AS model, Models, TotalCost\n  FROM trace_metrics\n  WHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n    AND notEmpty(Models)))\nWHERE model != ''\n  AND model IN (SELECT model FROM (SELECT arrayJoin(Models) AS model, uniqExact(TraceId) AS traces\nFROM trace_metrics\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime})\nGROUP BY model\nORDER BY traces DESC\nLIMIT 10))\nGROUP BY model\nORDER BY cost DESC\nLIMIT 10"
  },
  {
   "label": "top-models/traffic",

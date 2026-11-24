@@ -90,7 +90,7 @@ GROUP BY model
 ORDER BY traces DESC
 LIMIT 10`;
 
-export const MODEL_COSTS_SQL = costByModelSql({ limit: 50 });
+export const MODEL_COSTS_SQL = costByModelSql({ limit: 10, among: TOP_MODELS_SQL });
 
 /** All trace spend, read from `TotalCost` so the report names the models with no price. */
 export const MODEL_SPEND_TOTAL_SQL = `SELECT sum(TotalCost) AS cost
