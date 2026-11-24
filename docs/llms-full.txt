@@ -1342,6 +1342,7 @@ A team role applies to one team and, through inheritance, to every project in it
 | `routingPolicies`   | view   | view                         | manage                      |
 | `gatewayGuardrails` | view   | view                         | manage                      |
 | `gatewayCacheRules` | view   | view                         | manage                      |
+| `gatewayA2aTargets` | view   | view                         | manage                      |
 | `gatewayUsage`      | view   | view                         | view                        |
 | `gatewayLogs`       | view   | view                         | view                        |
 
@@ -1411,6 +1412,7 @@ Each table lists the actions a resource accepts. Resources marked **organization
 | `routingPolicies`   | view, manage                                                    | any               |
 | `gatewayGuardrails` | view, attach, detach, manage                                    | any               |
 | `gatewayCacheRules` | view, create, update, delete, manage                            | any               |
+| `gatewayA2aTargets` | view, manage                                                    | any               |
 | `gatewayUsage`      | view                                                            | any               |
 | `gatewayLogs`       | view                                                            | any               |
 | `gatewaySpend`      | view, manage                                                    | organization only |
@@ -2538,7 +2540,7 @@ A target is an A2A agent registered for a project. It holds the agent's upstream
 
 ## Register a target
 
-Call the procedures from a TypeScript client that already has a session, in the same way as the other gateway procedures. Creating, editing, blocking and archiving need `virtualKeys:manage`; listing needs `virtualKeys:view`.
+Call the procedures from a TypeScript client that already has a session, in the same way as the other gateway procedures. Creating, editing, blocking and archiving need `gatewayA2aTargets:manage`; listing needs `gatewayA2aTargets:view`. Managing virtual keys does not reach targets. See [RBAC](/ai-gateway/rbac).
 
 ```ts
 await trpc.gatewayA2aTargets.create.mutate({
@@ -3515,7 +3517,11 @@ Calls to `/a2a/{target}` answer in the A2A binding the caller used. A JSON-RPC c
 | `a2a_target_not_https`        | -32023        | 502  | The gateway calls customer endpoints over https only and the agent's URL is http.  |
 | `a2a_public_url_unset`        | -32024        | 503  | The gateway has no `A2A_PUBLIC_BASE_URL`, so it refuses Agent Card calls.          |
 
-The gateway calls an A2A agent under the same egress rule as provider endpoints. With `BLOCK_LOCAL_HTTP_CALLS` on, a private address is refused (`a2a_upstream_unreachable`) unless the host in the agent's URL is in `ALLOWED_PROXY_HOSTS`. An entry matches only the host the URL names, never an address that a name resolves to: to admit an agent whose URL names an IP address, list that IP address; to admit one whose URL names a hostname, list the hostname. A query parameter the agent's registered URL sets always wins: the gateway drops a caller parameter of the same name.
+The gateway calls an A2A agent under the same egress rule as provider endpoints. With `BLOCK_LOCAL_HTTP_CALLS` on, a private address is refused (`a2a_upstream_unreachable`) unless the host in the agent's URL is in `ALLOWED_PROXY_HOSTS`.
+
+An entry in `ALLOWED_PROXY_HOSTS` matches only the host the URL names, never an address that a name resolves to: to admit an agent whose URL names an IP address, list that IP address; to admit one whose URL names a hostname, list the hostname.
+
+A query parameter the agent's registered URL sets always wins: the gateway drops a caller parameter of the same name.
 
 ## Streaming errors
 
@@ -10634,6 +10640,7 @@ The gateway adds its own resources to that model. Provider credentials, the audi
 | `routingPolicies` | Routing policies. | `view`, `manage` |
 | `gatewayGuardrails` | Attaching and detaching guardrails on a key. | `view`, `attach`, `detach`, `manage` |
 | `gatewayCacheRules` | Cache rules, and `/api/gateway/v1/cache-rules*`. | `view`, `create`, `update`, `delete`, `manage` |
+| `gatewayA2aTargets` | The [A2A agents](/ai-gateway/a2a-proxy) the gateway may call, and the upstream headers it sends them. | `view`, `manage` |
 | `gatewayUsage` | The Usage page and `GET /api/gateway/v1/virtual-keys/:id/spend`. | `view` |
 | `gatewaySpend` | Spend events and spend summaries under `/api/gateway/v1/spend-events*`, `/api/gateway/v1/spend-summaries` and `/api/gateway/v1/end-users/:id/spend`. Organization tier only. | `view`, `manage` |
 | `webhookEndpoints` | Webhook endpoints, their secrets and delivery logs. Organization tier only. | `view`, `manage` |
@@ -10663,6 +10670,8 @@ Team roles apply on the teams and projects the binding names. Organization roles
 | `gatewayGuardrails:attach`, `detach`, `manage` | | | yes | |
 | `gatewayCacheRules:view` | yes | yes | yes | |
 | `gatewayCacheRules:create`, `update`, `delete`, `manage` | | | yes | |
+| `gatewayA2aTargets:view` | yes | yes | yes | |
+| `gatewayA2aTargets:manage` | | | yes | |
 | `gatewayUsage:view` | yes | yes | yes | |
 | `auditLog:view` | | | yes | |
 | `gatewaySpend:view`, `manage` | | | | yes |
@@ -11614,14 +11623,22 @@ Time spans are a plain count of seconds on a `_SECONDS` or `_S` variable: `300`,
 
 ## Provider endpoint security
 
-These apply to the base URLs customers configure on their own provider credentials. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused in every configuration.
+These apply to the base URLs customers configure on their own provider credentials and to the upstream and Agent Card URLs of A2A targets. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused in every configuration.
 
 | Var                              | Default | Purpose                                                                                                                             |
 | -------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | `false` | Refuse a provider endpoint that resolves to a private, loopback or otherwise non-public address                                     |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme                                                                                 |
-| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off |
+| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hosts, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off. See the matching rule below |
 | `SSL_CERT_DIR`                   | unset   | Colon-separated directories of PEM CA certificates trusted beside the public roots, for provider endpoints on a private CA            |
+
+An `ALLOWED_PROXY_HOSTS` entry matches the host a URL names, as written: a hostname entry admits that hostname and every address it resolves to, and an IP address entry admits a URL whose host is that IP address. The address a hostname resolves to is never matched, so listing `127.0.0.1` admits `https://127.0.0.1` but not `https://localhost`. Provider endpoints and A2A targets follow the same rule.
+
+## A2A proxy
+
+| Var                   | Default | Purpose                                                                                                                                                                                                                                                                                       |
+| --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `A2A_PUBLIC_BASE_URL` | unset   | The gateway's public origin, an absolute URL such as `https://gateway.example.com`. The gateway builds the URLs in the Agent Cards it serves on `/a2a` from it. Unset, Agent Card calls are refused with `a2a_public_url_unset`; every other A2A call still works. The chart sets it from `publicUrl` (`gateway.publicUrl` in the langwatch chart) |
 
 ## Browser access
 
