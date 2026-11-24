@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { IngestionSourceFactData } from "@langwatch/enterprise-governance-contract";
+import type { IngestionSourceFactData } from "@langwatch/enterprise-governance-contract/ingestion-source-lifecycle";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 
 import type { NurturingErasedUserRepository } from "../repositories/nurturing-erased-user.repository.ts";

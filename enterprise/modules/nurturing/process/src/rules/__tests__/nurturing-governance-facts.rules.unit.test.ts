@@ -3,7 +3,7 @@
  * @vitest-environment node
  * @see enterprise/modules/nurturing/specs/governance-facts.feature
  */
-import type { IngestionSourceFactData } from "@langwatch/enterprise-governance-contract";
+import type { IngestionSourceFactData } from "@langwatch/enterprise-governance-contract/ingestion-source-lifecycle";
 import { describe, expect, it } from "vitest";
 
 import {

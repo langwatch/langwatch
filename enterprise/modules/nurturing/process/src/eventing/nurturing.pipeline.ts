@@ -25,7 +25,7 @@ import {
   INGESTION_SOURCE_WENT_LIVE_EVENT_TYPE,
   type IngestionSourceFactData,
   ingestionSourceFactDataSchema,
-} from "@langwatch/enterprise-governance-contract";
+} from "@langwatch/enterprise-governance-contract/ingestion-source-lifecycle";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import {
   USAGE_REPORT_RECEIVED_EVENT_TYPE,

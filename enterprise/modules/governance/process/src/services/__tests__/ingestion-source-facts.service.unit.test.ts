@@ -5,7 +5,7 @@
  * store, to what governance's pipeline senders were handed.
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
  */
-import type { IngestionSourceFactData } from "@langwatch/enterprise-governance-contract";
+import type { IngestionSourceFactData } from "@langwatch/enterprise-governance-contract/ingestion-source-lifecycle";
 import type {
   InternalProject,
   InternalProjectQuery,

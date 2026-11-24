@@ -11,7 +11,7 @@ import {
   INGESTION_SOURCE_LIFECYCLE_EVENT_VERSION,
   INGESTION_SOURCE_WENT_LIVE_EVENT_TYPE,
   type IngestionSourceFactData,
-} from "@langwatch/enterprise-governance-contract";
+} from "@langwatch/enterprise-governance-contract/ingestion-source-lifecycle";
 import { createTenantId, type Event } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 

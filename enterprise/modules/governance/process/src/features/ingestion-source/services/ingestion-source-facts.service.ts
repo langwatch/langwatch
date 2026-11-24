@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type {
-  GovernanceIngestionSource,
-  IngestionSourceFactData,
-} from "@langwatch/enterprise-governance-contract";
+import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
+import type { IngestionSourceFactData } from "@langwatch/enterprise-governance-contract/ingestion-source-lifecycle";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import type { Instant } from "@langwatch/time";
 

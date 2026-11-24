@@ -6,7 +6,7 @@
  * the organization only: never its name, configuration or secret.
  * Spec: enterprise/modules/nurturing/specs/governance-facts.feature
  */
-import type { IngestionSourceFactData } from "@langwatch/enterprise-governance-contract";
+import type { IngestionSourceFactData } from "@langwatch/enterprise-governance-contract/ingestion-source-lifecycle";
 import type {
   CioBatchCall,
   CioEventName,
