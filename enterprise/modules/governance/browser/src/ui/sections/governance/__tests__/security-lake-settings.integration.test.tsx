@@ -23,6 +23,12 @@ afterEach(cleanup);
 const render = (element: React.ReactElement) =>
   renderWithGovernanceHost(element, { host: fakeGovernanceHost() });
 
+/** Pastes a whole value into a field: typing it key by key is slow enough to time out. */
+async function fill(label: string, value: string) {
+  await userEvent.click(screen.getByLabelText(label));
+  await userEvent.paste(value);
+}
+
 const formProps = {
   initialValues: blankSecurityLakeForm(),
   isNew: true,
@@ -48,8 +54,8 @@ describe("SecurityLakeSourceForm", () => {
   it("names the Region and role ARN fields and does not submit", async () => {
     const onSubmit = vi.fn();
     render(<SecurityLakeSourceForm {...formProps} onSubmit={onSubmit} />);
-    await userEvent.type(screen.getByLabelText("Region"), "Europe");
-    await userEvent.type(screen.getByLabelText("Subscriber role ARN"), "not-an-arn");
+    await fill("Region", "Europe");
+    await fill("Subscriber role ARN", "not-an-arn");
     await userEvent.click(screen.getByRole("button", { name: "Add source" }));
     expect(screen.getByText("an AWS Region such as eu-west-1")).toBeInTheDocument();
     expect(screen.getByText("an IAM role ARN")).toBeInTheDocument();
@@ -59,17 +65,11 @@ describe("SecurityLakeSourceForm", () => {
   it("submits a complete source with the sources left checked", async () => {
     const onSubmit = vi.fn();
     render(<SecurityLakeSourceForm {...formProps} onSubmit={onSubmit} />);
-    await userEvent.type(screen.getByLabelText("Region"), "eu-west-1");
-    await userEvent.type(
-      screen.getByLabelText("Subscriber role ARN"),
-      "arn:aws:iam::123456789012:role/subscriber",
-    );
-    await userEvent.type(
-      screen.getByLabelText("SQS queue URL"),
-      "https://sqs.eu-west-1.amazonaws.com/123456789012/queue",
-    );
-    await userEvent.type(screen.getByLabelText("Access key id"), "AKIAEXAMPLE");
-    await userEvent.type(screen.getByLabelText("Secret access key"), "secret");
+    await fill("Region", "eu-west-1");
+    await fill("Subscriber role ARN", "arn:aws:iam::123456789012:role/subscriber");
+    await fill("SQS queue URL", "https://sqs.eu-west-1.amazonaws.com/123456789012/queue");
+    await fill("Access key id", "AKIAEXAMPLE");
+    await fill("Secret access key", "secret");
     await userEvent.click(screen.getByLabelText("CloudTrail Lambda data events"));
     await userEvent.click(screen.getByRole("button", { name: "Add source" }));
     expect(onSubmit).toHaveBeenCalledWith(
@@ -81,23 +81,17 @@ describe("SecurityLakeSourceForm", () => {
     const onSubmit = vi.fn();
     render(<SecurityLakeSourceForm {...formProps} onSubmit={onSubmit} />);
     expect(screen.queryByLabelText("S3 endpoint")).not.toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText("Region"), "eu-west-1");
-    await userEvent.type(
-      screen.getByLabelText("Subscriber role ARN"),
-      "arn:aws:iam::123456789012:role/subscriber",
-    );
-    await userEvent.type(
-      screen.getByLabelText("SQS queue URL"),
-      "https://sqs.eu-west-1.amazonaws.com/123456789012/queue",
-    );
-    await userEvent.type(screen.getByLabelText("Access key id"), "AKIAEXAMPLE");
-    await userEvent.type(screen.getByLabelText("Secret access key"), "secret");
+    await fill("Region", "eu-west-1");
+    await fill("Subscriber role ARN", "arn:aws:iam::123456789012:role/subscriber");
+    await fill("SQS queue URL", "https://sqs.eu-west-1.amazonaws.com/123456789012/queue");
+    await fill("Access key id", "AKIAEXAMPLE");
+    await fill("Secret access key", "secret");
     await userEvent.click(screen.getByRole("button", { name: "Advanced" }));
-    await userEvent.type(screen.getByLabelText("S3 endpoint"), "not a url");
+    await fill("S3 endpoint", "not a url");
     await userEvent.click(screen.getByRole("button", { name: "Add source" }));
     expect(onSubmit).not.toHaveBeenCalled();
     await userEvent.clear(screen.getByLabelText("S3 endpoint"));
-    await userEvent.type(screen.getByLabelText("S3 endpoint"), "https://bucket.vpce.example.com");
+    await fill("S3 endpoint", "https://bucket.vpce.example.com");
     await userEvent.click(screen.getByRole("button", { name: "Add source" }));
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ s3Endpoint: "https://bucket.vpce.example.com", sqsEndpoint: "" }),

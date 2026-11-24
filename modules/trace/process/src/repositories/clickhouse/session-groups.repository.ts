@@ -1,5 +1,6 @@
 import type { Authorization } from "@langwatch/authorization";
 import { type AuthorizedClickHouse, tenantScope, tenantSet } from "@langwatch/clickhouse-client";
+import { latestTraceVersionOnly } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 import { TRACE_SUMMARY_TOTAL_TOKENS_SQL } from "../../rules/trace-token-total.rules.ts";
@@ -128,14 +129,8 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
     const { sql: baseWhere, params } = buildBaseWhere(query.timeRange);
 
     // Latest-version dedup, the rollup must sum each logical trace exactly
-    // once even while ReplacingMergeTree merges lag. Same IN-tuple shape as
-    // every other `trace_summaries` read.
-    const dedupFilter = `(TenantId, TraceId, UpdatedAt) IN (
-          SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM ${TABLE_NAME}
-          WHERE ${baseWhere}
-          GROUP BY TenantId, TraceId
-        )`;
+    // once even while ReplacingMergeTree merges lag.
+    const dedupFilter = latestTraceVersionOnly({ where: baseWhere });
 
     const { sql: sessionMatchClause, params: matchParams } = this.buildSessionMatchClause(
       query,
