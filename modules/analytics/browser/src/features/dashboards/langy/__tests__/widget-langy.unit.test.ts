@@ -76,6 +76,20 @@ describe("widgetPromptDraft", () => {
     });
   });
 
+  describe("given a query with a comment line and spaces inside a literal", () => {
+    /** @scenario "AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period" */
+    it("hands Langy the query as the widget runs it", () => {
+      const sql = "SELECT 'a  b' AS label -- why\nFROM trace_metrics";
+      const request = widgetPromptDraft({
+        widget: widget({ queries: [{ name: "main", sql: `  ${sql}\n` }] }),
+        board: BOARD,
+        period: PERIOD,
+      });
+
+      expect(request.context[1]?.ref).toContain(`queries (LangWatchQL): main: ${sql}`);
+    });
+  });
+
   describe("given a widget whose queries are longer than its context allows", () => {
     /** @scenario "AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period" */
     it("cuts the long query with a marker, keeps the short one whole and stays in bounds", () => {

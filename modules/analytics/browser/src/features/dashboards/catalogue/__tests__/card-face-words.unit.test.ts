@@ -38,8 +38,23 @@ function visibleCopy(code: string): string[] {
   for (const match of source.matchAll(/(?<!=)>([^<>{}=;]*[A-Za-z][^<>{}=;]*)</g)) {
     copy.push(match[1] ?? "");
   }
+  // A template literal's own words, without what its ${} parts put in.
+  for (const match of source.matchAll(/`((?:[^`\\]|\\.)*)`/g)) {
+    const text = (match[1] ?? "").replace(/\$\{[^{}]*\}/g, " ");
+    if (/[A-Za-z]/.test(text)) copy.push(text);
+  }
   return copy;
 }
+
+describe("the visible copy scan", () => {
+  /** @scenario "AC242 Widget cards speak the reader's words: no request-internal terms on any card face" */
+  it("reads the words of a template literal, leaving out what its expressions put in", () => {
+    const copy = visibleCopy("<Stat label={`Missing traces: ${count}`} />");
+
+    expect(copy.some((text) => text.includes("Missing traces:"))).toBe(true);
+    expect(copy.some((text) => text.includes("count"))).toBe(false);
+  });
+});
 
 const built = [
   ...IMPLEMENTED_WIDGET_IDS.flatMap((id) => implementedWidget(id) ?? []),

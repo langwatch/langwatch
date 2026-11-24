@@ -29,7 +29,7 @@ describe("given a run the server limited in every way it can", () => {
   /** @scenario "AC213b Diagnostics: the (i) line speaks plain words, never a parameter name" */
   it("says the sources were ignored in the words a card shows", () => {
     expect(notes.find((note) => note.code === "SOURCES_IGNORED")?.message).toBe(
-      "This query doesn't filter by source, so it counts every source, tests included.",
+      "This query doesn't read the sources you picked, so they change nothing it counts.",
     );
   });
 });

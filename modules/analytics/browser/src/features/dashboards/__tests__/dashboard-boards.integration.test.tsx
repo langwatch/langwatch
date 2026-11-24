@@ -8,6 +8,7 @@
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
@@ -1504,7 +1505,7 @@ describe("a member's board", () => {
       await user.click(await screen.findByRole("button", { name: "Add a description" }));
       await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "Q{Enter}");
       await waitFor(() => expect(host.failures).toHaveLength(1));
-      expect(host.failures[0]?.fallbackTitle).toBe("Couldn't save the description");
+      expect(readHandledError(host.failures[0]?.error)?.code).toBe("dashboard_not_found");
       expect(host.replacements).toEqual(["/test-project/dashboards/board-new-3"]);
 
       await user.click(screen.getByRole("button", { name: "Q" }));
@@ -1513,6 +1514,31 @@ describe("a member's board", () => {
       await waitFor(() => expect(callsTo(server, "boards.update")).toHaveLength(2));
       expect(callsTo(server, "boards.create")).toHaveLength(1);
       expect(server.state.boards.at(-1)).toMatchObject({ id: "board-new-3", description: "QR" });
+    });
+
+    /** @scenario "AC162f A refused store keeps the new board open" */
+    it("sends the same description again when the member confirms it after a refusal", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS, refuseBoardCreates: 1 });
+      const { host } = openBoard({ server, dashboardId: "new" });
+
+      await user.click(await screen.findByRole("button", { name: "Add a description" }));
+      await user.type(
+        screen.getByRole("textbox", { name: "Dashboard description" }),
+        "Refunds{Enter}",
+      );
+      await waitFor(() => expect(host.failures).toHaveLength(1));
+
+      await user.click(screen.getByRole("button", { name: "Refunds" }));
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(2));
+      await waitFor(() =>
+        expect(server.state.boards.at(-1)).toMatchObject({
+          id: "board-new-3",
+          description: "Refunds",
+        }),
+      );
     });
 
     /** @scenario "AC162f A refused store keeps the new board open" */
@@ -1552,6 +1578,31 @@ describe("a member's board", () => {
 
       await waitFor(() => expect(callsTo(server, "dashboardWidgets.updateLayout")).toHaveLength(1));
       expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1);
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+    });
+
+    /** @scenario "AC162j Edits made while a new board is being stored land on it in the order made" */
+    it("keeps the description given while the first widget's save stores the board", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = inMemoryServer({ boards: OWN_BOARDS, holdBoardCreates: true });
+      openBoard({ server, dashboardId: "new", query: { editWidget: "new" } });
+      const drawer = await screen.findByRole("dialog");
+
+      await user.click(within(drawer).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(1));
+      fireEvent.click(screen.getByRole("button", { name: "Add a description", hidden: true }));
+      const field = screen.getByRole("textbox", { name: "Dashboard description", hidden: true });
+      fireEvent.change(field, { target: { value: "Refunds" } });
+      fireEvent.keyDown(field, { key: "Enter" });
+      server.releaseBoardCreates();
+
+      await waitFor(() => expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1));
+      await waitFor(() =>
+        expect(server.state.boards.at(-1)).toMatchObject({
+          id: "board-new-3",
+          description: "Refunds",
+        }),
+      );
       expect(callsTo(server, "boards.create")).toHaveLength(1);
     });
 

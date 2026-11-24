@@ -245,6 +245,8 @@ describe("the actions catalogue widgets declare", () => {
     ).toEqual([]);
     expect(catalogueWidgetActions("no-such-widget")).toEqual([]);
     expect(catalogueWidgetActions(undefined)).toEqual([]);
+    expect(catalogueWidgetActions("constructor")).toEqual([]);
+    expect(catalogueWidgetActions("__proto__")).toEqual([]);
   });
 
   /** @scenario "AC243 Widget actions: each catalogue widget asks Langy its own question for each action and each kind of value" */

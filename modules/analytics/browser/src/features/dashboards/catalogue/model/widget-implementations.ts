@@ -67,6 +67,6 @@ export const IMPLEMENTED_WIDGET_IDS: readonly string[] = CATALOGUE_WIDGETS.map(
 
 /** What a catalogue widget declares for its card (AC243 to AC245); none for any other widget. */
 export function catalogueWidgetActions(catalogueId: string | undefined): readonly WidgetAction[] {
-  if (catalogueId === void 0) return [];
+  if (catalogueId === void 0 || !Object.hasOwn(CATALOGUE_WIDGET_ACTIONS, catalogueId)) return [];
   return CATALOGUE_WIDGET_ACTIONS[catalogueId] ?? [];
 }

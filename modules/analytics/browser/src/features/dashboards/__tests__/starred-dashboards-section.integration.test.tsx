@@ -10,7 +10,8 @@
 
 import type { StarredDashboardsProject } from "@langwatch/analytics-client";
 import type { UiAnalyticsEvent } from "@langwatch/browser-host/analytics";
-import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
+import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
@@ -74,6 +75,7 @@ function renderSection({
   fails = false,
   permissions,
   pinFails = false,
+  holdUpdates = false,
   project,
   projectPermissions,
   tracked,
@@ -83,6 +85,8 @@ function renderSection({
   fails?: boolean;
   permissions?: string[];
   pinFails?: boolean;
+  /** Holds every `boards.update` answer until the test releases it. */
+  holdUpdates?: boolean;
   /** What navigation hands the section on a page about no project. */
   project?: StarredDashboardsProject;
   /** The member's grants in projects other than the page's, by project id. */
@@ -98,6 +102,7 @@ function renderSection({
     ...(route ? { route } : {}),
   });
   const calls: UiProcedureCall[] = [];
+  const heldUpdates: (() => void)[] = [];
   const answer = (call: UiProcedureCall) => {
     calls.push(call);
     if (call.path === "boards.listStarred") {
@@ -107,11 +112,18 @@ function renderSection({
     if (call.path === "boards.create") {
       return Promise.resolve({ ...LATENCY, id: "board-new" });
     }
+    if (call.path === "boards.update") {
+      const updated = { ...LATENCY, id: "board-new" };
+      if (!holdUpdates) return Promise.resolve(updated);
+      return new Promise((resolve) => heldUpdates.push(() => resolve(updated)));
+    }
     if (call.path === "boards.unstar" || call.path === "boards.delete") {
       return Promise.resolve({ success: true });
     }
     if (call.path === "boards.star") {
-      return pinFails ? Promise.reject(new Error("pin down")) : Promise.resolve({ success: true });
+      return pinFails
+        ? Promise.reject(new UiProcedureRefusal("dashboard_not_found", 404))
+        : Promise.resolve({ success: true });
     }
     return NO_PROCEDURES(call);
   };
@@ -126,17 +138,22 @@ function renderSection({
     host,
     answer,
   });
-  return { host, calls };
+  return { host, calls, releaseUpdate: () => heldUpdates.shift()?.() };
 }
 
 /** The new board's first edit, made as the board screen makes it. */
-const draft: { edit: (edit?: DraftEdit) => Promise<string> } = {
+const draft: {
+  edit: (edit?: DraftEdit) => Promise<string>;
+  unpin: () => void;
+} = {
   edit: () => Promise.reject(new Error("No draft mounted")),
+  unpin: () => undefined,
 };
 
 function DraftEdits() {
-  const { materialise } = useDraftBoard({ takenNames: [] });
+  const { materialise, unpin } = useDraftBoard({ takenNames: [] });
   draft.edit = materialise;
+  draft.unpin = unpin;
   return null;
 }
 
@@ -383,6 +400,46 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
     });
   });
 
+  describe("when two descriptions are submitted while the board is being stored", () => {
+    /** @scenario "AC162j Edits made while a new board is being stored land on it in the order made" */
+    it("writes them in the order submitted, the second only after the first", async () => {
+      const { calls, releaseUpdate } = renderSection({ stars: [], holdUpdates: true });
+      await section();
+
+      const stored = draft.edit();
+      const first = draft.edit({ description: "Weekly costs" });
+      const second = draft.edit({ description: "Per team" });
+      await expect(stored).resolves.toBe("board-new");
+      await waitFor(() => expect(inputsTo(calls, "boards.update")).toHaveLength(1));
+      expect(inputsTo(calls, "boards.update")).toEqual([
+        expect.objectContaining({ description: "Weekly costs" }),
+      ]);
+
+      releaseUpdate();
+      await first;
+      await waitFor(() => expect(inputsTo(calls, "boards.update")).toHaveLength(2));
+      releaseUpdate();
+      await second;
+
+      expect(inputsTo(calls, "boards.update").at(-1)).toMatchObject({ description: "Per team" });
+    });
+  });
+
+  describe("when the member pins a board being stored, then unpins it", () => {
+    /** @scenario "AC162j Edits made while a new board is being stored land on it in the order made" */
+    it("writes no pin once the board is stored", async () => {
+      const { calls } = renderSection({ stars: [] });
+      await section();
+
+      const stored = draft.edit();
+      const pinned = draft.edit({ pin: true });
+      draft.unpin();
+
+      await Promise.all([stored, pinned]);
+      expect(inputsTo(calls, "boards.star")).toEqual([]);
+    });
+  });
+
   describe("when the pin fails after the board is stored", () => {
     /** @scenario "A failed pin leaves exactly one dashboard" */
     it("keeps the one board, opens it and tells the member", async () => {
@@ -393,8 +450,8 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
       await expect(draft.edit()).resolves.toBe("board-new");
 
       expect(inputsTo(calls, "boards.create")).toHaveLength(1);
-      expect(host.failures.map(({ fallbackTitle }) => fallbackTitle)).toEqual([
-        "Couldn't pin the dashboard",
+      expect(host.failures.map(({ error }) => readHandledError(error)?.code)).toEqual([
+        "dashboard_not_found",
       ]);
       expect(host.replacements).toEqual(["/test-project/dashboards/board-new?addBlock=open"]);
     });

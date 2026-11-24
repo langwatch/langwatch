@@ -48,7 +48,8 @@ function MarkedChart({ points, bars, line, marks, barFormat, lineFormat }) {
   const drawn = [...bars, ...(line ? [line] : [])];
   let pointed = null;
   const onClick = (state) => {
-    const at = points[Number(state?.activeTooltipIndex)];
+    const index = state?.activeTooltipIndex;
+    const at = index == null ? undefined : points[Number(index)];
     const hit = pointed ?? (drawn.length === 1 ? drawn[0].label : null);
     pointed = null;
     if (!at) return;
@@ -227,7 +228,10 @@ export const TOOL_ERROR_RATE_CODE = widgetCode({
   const calls = tools.reduce((sum, tool) => sum + tool.calls, 0);
   const failures = tools.reduce((sum, tool) => sum + tool.failures, 0);
   const recovered = tools.reduce((sum, tool) => sum + tool.recovered, 0);
-  const ranked = [...tools].sort((a, b) => b.failures / b.calls - a.failures / a.calls);
+  // The tool whose failures users saw most first; the rate breaks a tie.
+  const seen = (tool) => tool.failures - tool.recovered;
+  const ranked = [...tools].sort((a, b) => seen(b) - seen(a) ||
+    b.failures / b.calls - a.failures / a.calls);
   const worst = ranked[0];
   const worstLine = failures === 0 ? "No tool failed" : '"' + worst.step + '" fails ' +
     pct(worst.failures / worst.calls) + ", the user saw " +
@@ -245,7 +249,7 @@ export const TOOL_ERROR_RATE_CODE = widgetCode({
           value={pct(ratio(failures, calls))} />
         <Stat label={"Agent recovered from " + count(failures) + " failures"}
           value={failures > 0 ? pct(recovered / failures) : "-"} />
-        <Stat label="Fails most" value={failures > 0 ? worst.step : "No tool failed"} />
+        <Stat label="Users saw most failures" value={failures > 0 ? worst.step : "No tool failed"} />
       </div>
       <div style={{ margin: "8px 0 4px", fontSize: 11, color: C.subtle }}>{worstLine}</div>
       <Bars rows={bars} format={(value) => pct(value)} kind="tool" />

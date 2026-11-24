@@ -577,13 +577,15 @@ const GEN_DROPOFF_CODE = widgetCode({
     { label: "Accepted as is", value: num(totals.accepted) },
   ].map((step, index, all) => ({
     ...step,
+    from: index === 0 ? undefined : all[index - 1].label,
     drop: index === 0 ? undefined : 1 - step.value / Math.max(1, all[index - 1].value),
   }));
   const worst = steps.slice(1).reduce((top, step) => (step.drop > top.drop ? step : top));
   return (
     <Panel>
       <Headline value={pct(worst.drop, 0)}
-        label={'of outputs are lost at "' + worst.label.toLowerCase() + '"'} />
+        label={'of "' + worst.from.toLowerCase() + '" outputs are lost at "' +
+          worst.label.toLowerCase() + '"'} />
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {steps.map((step) => <Step key={step.label} {...step} of={generated} />)}
       </div>
@@ -610,7 +612,7 @@ const SO_VERDICT_CODE = widgetCode({
   const zone = (act, watch) => (act ? "act" : watch ? "watch" : undefined);
   const figures = [
     {
-      label: "Checked by every safety check",
+      label: "Lowest safety-check coverage",
       value: pct(lowest, 0),
       sub: weakest.control + " checked the fewest requests",
       tone: traces >= 30 ? zone(lowest < 0.9, lowest < 0.99) : undefined,
@@ -666,7 +668,7 @@ function Criterion({ name, passed, judged }) {
   let colour = C.green;
   if (judged < MIN_JUDGED) colour = C.faint;
   else if (high < FLOOR) colour = C.red;
-  else if (share < FLOOR) colour = C.orange;
+  else if (low < FLOOR) colour = C.orange;
   return (
     <div {...askable({ kind: "check", label: name || "Unnamed", value: name })}
       style={askCursor()} title={"Passed " + pct(share, 0) + " of " + count(judged) +
@@ -693,8 +695,9 @@ function Criterion({ name, passed, judged }) {
 }`,
   queries: ["main"],
   body: `  if (main.data.length === 0) return <Panel><CallToAction /></Panel>;
-  signalProblem(main.data.some((row) => num(row.judged) >= MIN_JUDGED &&
-    num(row.passed) / num(row.judged) < FLOOR));
+  const enoughJudged = (row) => num(row.judged) >= MIN_JUDGED;
+  signalProblem(main.data.some((row) => enoughJudged(row) &&
+    margin(num(row.passed), num(row.judged))[0] < FLOOR));
   return (
     <Panel>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

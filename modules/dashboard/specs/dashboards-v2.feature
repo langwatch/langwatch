@@ -1395,7 +1395,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC162h The product sidebar lists the new board while it is open
     Given the member opened a new board in a project
     When the project's sidebar shows its Dashboards section
-    Then the new board is listed first, by its "Untitled dashboard <n>" name, as the page in view
+    Then the new board is listed first, by its current name, as the page in view
+    And an unnamed new board is listed as "Untitled dashboard <n>"
     And once it is stored, or the member leaves it unedited, that row is gone
 
   @integration
@@ -1416,8 +1417,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   @integration
   Scenario: AC162c A new board's first widget stores it once
     Given the member opened a new board with "+"
-    When they add a widget, or two edits land at the same time
-    Then exactly one dashboard is stored, holding the widget
+    When they add a widget, or press Save again while it is being stored
+    Then exactly one dashboard is stored, holding the widget once
     And the address becomes the stored board's without a page reload or a new history entry
 
   @integration
@@ -1437,6 +1438,14 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given the member opened a new board with "+"
     When the server refuses to store it on the first edit
     Then they see why, the board stays open unsaved, and the next edit tries again
+
+  @integration
+  Scenario: AC162j Edits made while a new board is being stored land on it in the order made
+    Given the member opened a new board with "+"
+    When they add a widget and change the description while the board is being stored
+    Then exactly one dashboard is stored, and it holds the widget and the new description
+    And two descriptions given while it is being stored are written in the order given, so the last one is kept
+    And a pin taken off while it is being stored is not written
 
   @integration
   Scenario: AC162g Opening the new board's address again starts a new unsaved board
@@ -1794,7 +1803,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC125 Widget actions: a problem widget offers its declared actions under the chart
     Given a widget built from a catalogue widget whose definition declares actions
     When Langy is available
-    Then the card shows one outline button per declared action under its chart while it shows
+    Then the card shows one outline button per declared action under its chart
+    And an action declared for a problem shows only while the widget reports that problem (AC244)
     And failures, test suite and evaluator widgets offer "Investigate" and "Propose a fix"
     And a widget whose fix is one thing names it, as "Fill the gaps" or "Add prices"
     # Decision: the actions are data on the catalogue widget, not code in the card
@@ -1950,8 +1960,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does
     Given Langy is available
     When the member picks a built widget in the "Add a block" picker
-    Then the draft is the one "Ask Langy" on that widget's card gives: its prompt, its name,
-      description and queries, then the dashboard period
+    Then the draft is the one "Ask Langy" on that widget's card gives, in the reader's words
+    And the widget is attached as context with its prompt, description and queries, as AC121 attaches it
 
   @unit @integration
   Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget
@@ -1959,7 +1969,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the member picks "Set an alert" in a widget's menu
     Then Langy opens with a draft, not a sent question, asking to set up an alert on that widget:
       which number to watch, the threshold and where to send it
-    And the draft names the widget and its queries, then the dashboard period
+    And the draft names the widget, and its queries ride in the widget's attached context (AC247)
     # Decision: the automation drawer's graph alerts and reports read builder graphs only, and a
     # stored widget has no series to watch, so Langy sets them up from the widget's queries
 
@@ -1969,7 +1979,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the member picks "Send as a report" in a widget's menu
     Then Langy opens with a draft, not a sent question, asking to send that widget as a
       scheduled report: how often and where to send it
-    And the draft names the widget and its queries, then the dashboard period
+    And the draft names the widget, and its queries ride in the widget's attached context (AC247)
 
   @integration
   Scenario: AC143b Widget menu: without Langy the menu offers no alert or report
@@ -1994,6 +2004,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC145b Template card: a board made under a template's former name still counts as added
     Given this project has a board named "Agent health", made before the template was renamed
     Then the "My agent at a glance" card shows "Added", linking to that board
+    And a board made from a former per-kind focus template, such as "Release check: RAG focus", counts as that kind's variant
 
   @integration
   Scenario: Template card: the category icon names its category and description on hover and focus
@@ -2057,7 +2068,9 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC195 Langy: per-minute rollups cannot leave Langy out yet
     Given a widget that reads trace_metrics_by_minute or model_usage_by_minute
     When it runs on a board
-    Then it still counts Langy's spans and the run answers a SOURCES_IGNORED diagnostic
+    Then it still counts Langy's spans
+    And a card runs it naming no sources, so it answers no SOURCES_IGNORED diagnostic (AC202i)
+    And a direct run that names sources answers SOURCES_IGNORED, since they change nothing
     And its card shows no sources line (AC240b), while its editor says "Sources don't apply: this widget reads a view that keeps no origin"
     # Known gap: the rollups are written per span before a trace's origin is known, so they
     # carry no origin; a follow-up would add one
@@ -2078,7 +2091,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit @integration
   Scenario: AC200 Sources: each query shows its sources as pills, and the card names them
-    Given a stored widget on a board
+    Given a stored widget on a board whose query reads the sources parameter and stores "application" and "langy"
     When a member who may edit the board opens its editor on the Queries tab
     Then each query's "Parameters" lead with a built-in "sources" row of pills, one per source it counts
     And an "Add source" menu offers the sources it does not count yet
@@ -2348,7 +2361,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @unit @integration
   Scenario: AC204 Sources: SQL that does not read the parameter counts every origin and says so
-    Given a stored widget query storing ["application"] whose SQL has no {dashboard_context_sources:Array(String)}
+    Given a stored widget query storing ["application"] whose SQL reads a view that keeps an origin but has no {dashboard_context_sources:Array(String)}
     When the card runs
     Then the query counts every origin, with no hidden filter
     # Changed in phase 2: the wording is the one the editor shows, as the reason its Add source menu is disabled.
@@ -2563,7 +2576,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC213b Diagnostics: the (i) line speaks plain words, never a parameter name
     Given a run answering SHARE_WINDOW_LIMITED, SOURCES_IGNORED or GRANULARITY_COARSENED
     Then its message names no placeholder in braces and no request-internal term such as origin, trace or span
-    And SOURCES_IGNORED reads "This query doesn't filter by source, so it counts every source, tests included."
+    And SOURCES_IGNORED reads "This query doesn't read the sources you picked, so they change nothing it counts."
 
   @unit
   Scenario: AC212 Skill: the dashboard-widgets skill teaches projects, the reserved names and params

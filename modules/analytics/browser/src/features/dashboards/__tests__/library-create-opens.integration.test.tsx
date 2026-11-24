@@ -69,13 +69,13 @@ function Pages({ host }: { host: NavigatingHost }) {
 
 /** The server: the new board is in every read made after the create, and in none before. */
 function server({ calls }: { calls: UiProcedureCall[] }) {
-  const made: { id: string; name: string; scope: string }[] = [];
+  const made: { id: string; name: string; scope: string; description?: string | null }[] = [];
   const listed = () =>
-    made.map(({ id, name, scope }) => ({
+    made.map(({ id, name, scope, description = null }) => ({
       id,
       projectId: IN_VIEW.id,
       name,
-      description: null,
+      description,
       createdById: "user-1",
       scope,
       organizationId: scope === "ORGANIZATION" ? "org-1" : null,
@@ -95,8 +95,13 @@ function server({ calls }: { calls: UiProcedureCall[] }) {
         return Promise.resolve([]);
       case "boards.getAll":
         return Promise.resolve(listed());
-      case "boards.update":
+      case "boards.update": {
+        const board = made.find(({ id }) => id === input.dashboardId);
+        if (board && "description" in input) {
+          board.description = (input as { description?: string | null }).description ?? null;
+        }
         return Promise.resolve({ ...listed()[0], ...input });
+      }
       case "boards.createAtScope": {
         const board = { id: "board-new", name: String(input.name), scope: String(input.scope) };
         made.push(board);
@@ -105,8 +110,8 @@ function server({ calls }: { calls: UiProcedureCall[] }) {
       case "boards.resolve": {
         const board = made.find(({ id }) => id === input.dashboardId);
         return Promise.resolve({
-          ...board,
           description: null,
+          ...board,
           createdById: "user-1",
           updatedAt: new Date("2026-11-01"),
           project: IN_VIEW,
@@ -163,6 +168,7 @@ describe("a board made in the library", () => {
       expect(calls.filter(({ path }) => path === "boards.create")).toEqual([]);
       expect(heading).toBeInTheDocument();
       expect(seen.unavailable).toBe(false);
+      expect(await screen.findByRole("button", { name: "Weekly costs" })).toBeInTheDocument();
     });
   });
 
@@ -200,6 +206,7 @@ describe("a board made in the library", () => {
         homeProduct: "gateway",
       },
     ]);
+    expect(await screen.findByRole("button", { name: "Per team" })).toBeInTheDocument();
   });
 
   describe("when the library is opened at ?new=1", () => {

@@ -305,7 +305,8 @@ function SeriesChart({ points, series, format, domain, legendKind }) {
   let pointed = null;
   const point = (item) => () => { pointed = item.label; };
   const onClick = (state) => {
-    const at = points[Number(state?.activeTooltipIndex)];
+    const index = state?.activeTooltipIndex;
+    const at = index == null ? undefined : points[Number(index)];
     const hit = pointed ?? (drawn.length === 1 ? drawn[0].label : null);
     pointed = null;
     if (!at) return;
@@ -526,7 +527,11 @@ export interface WidgetCodeSpec {
 export const ASK_CODE = `const canAskLangy = () => LW.dashboardContext?.canAskLangy === true;
 const askLangy = (subject) => { if (canAskLangy()) LW.askLangy(subject); };
 // Whether the problem this widget watches for is on the card now; only a change is sent.
-const signalProblem = (problem) => LW.signal?.({ problem: problem === true });
+let problemSignalled = false;
+const signalProblem = (problem) => {
+  problemSignalled = true;
+  LW.signal?.({ problem: problem === true });
+};
 const askCursor = () => (canAskLangy() ? { cursor: "pointer" } : {});
 function askable(subject) {
   if (!canAskLangy()) return {};
@@ -553,6 +558,26 @@ function importsOf({ recharts, code }: { recharts?: readonly string[]; code: str
     .join("");
 }
 
+/**
+ * `Widget()` itself. A body that signals a problem runs as one call, so a draw that returns
+ * before its own `signalProblem` (an empty period, say) clears the problem the last draw showed.
+ */
+function widgetFunction({ queries, body }: { queries: readonly string[]; body: string }): string {
+  const states = queryStatesCode(queries);
+  if (!/\bsignalProblem\(/.test(body)) {
+    return `export default function Widget() {\n${states}\n${body}\n}`;
+  }
+  return `export default function Widget() {
+${states}
+  problemSignalled = false;
+  const drawn = (() => {
+${body}
+  })();
+  if (!problemSignalled) signalProblem(false);
+  return drawn;
+}`;
+}
+
 /** One widget's stored TSX, put together from its spec. */
 export function widgetCode({
   summary,
@@ -575,7 +600,7 @@ export function widgetCode({
     panelCode(),
     ...(source ? [callToActionCode({ source, compact: compactCallToAction })] : []),
     ...(components ? [components] : []),
-    `export default function Widget() {\n${queryStatesCode(queries)}\n${body}\n}`,
+    widgetFunction({ queries, body }),
   ];
   const code = sections.join("\n\n");
   const imports = importsOf({ recharts, code });

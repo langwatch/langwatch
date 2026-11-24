@@ -37,10 +37,10 @@ export const LWQL_SOURCES_PARAMETER = "dashboard_context_sources";
 
 /** SQL without its comments and with its string literals emptied: what a statement executes. */
 export function lwqlExecutedText(sql: string): string {
-  return sql
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/--[^\n]*/g, " ")
-    .replace(/'(?:[^'\\]|\\.|'')*'/g, "''");
+  // One left-to-right pass, so `--` inside a literal and a quote inside a comment stay inert.
+  return sql.replace(/\/\*[\s\S]*?\*\/|--[^\n]*|'(?:[^'\\]|\\.|'')*'/g, (token) =>
+    token.startsWith("'") ? "''" : " ",
+  );
 }
 
 /** Whether a statement reads the sources placeholder in an expression, not a comment or literal. */

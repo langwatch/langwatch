@@ -45,7 +45,8 @@ export const KPIS_CODE = widgetCode({
   const resolved = num(o.resolved);
   const resolvedPrev = num(o.resolved_prev);
   const perSuccess = ratio(num(s.cost), resolved * pricedShare(spend));
-  const perSuccessPrev = ratio(num(s.cost_prev), resolvedPrev);
+  // The previous period read with the same priced share, so an unpriced model moves neither.
+  const perSuccessPrev = ratio(num(s.cost_prev), resolvedPrev * pricedShare(spend));
   const addJudge = () => LW.navigate("onlineEvaluations", {});
   const percent = (value) => pct(value, 0);
   // Worse: moved the wrong way by more than the half a percent Change reads as flat.

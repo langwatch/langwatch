@@ -136,7 +136,8 @@ function MarkedChart({ points, series, format, rightFormat, markers = [], domain
   let pointed = null;
   const point = (item) => () => { pointed = item.label; };
   const onClick = (state) => {
-    const at = points[Number(state?.activeTooltipIndex)];
+    const index = state?.activeTooltipIndex;
+    const at = index == null ? undefined : points[Number(index)];
     const hit = pointed ?? (drawn.length === 1 ? drawn[0].label : null);
     pointed = null;
     if (!at) return;

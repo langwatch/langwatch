@@ -130,7 +130,8 @@ export const THROUGHPUT_CODE = widgetCode({
     latest(points, key) > by(earliest(points, key));
   signalProblem(rose("errorRate", (first) => first + 0.01) || rose("p95", (first) => first * 1.2));
   const onDay = (state) => {
-    const point = points[Number(state?.activeTooltipIndex)];
+    const index = state?.activeTooltipIndex;
+    const point = index == null ? undefined : points[Number(index)];
     if (point) askLangy({ kind: "day", label: String(point.x), at: point.at });
   };
   return (

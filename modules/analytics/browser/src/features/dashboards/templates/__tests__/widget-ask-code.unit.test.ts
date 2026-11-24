@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { CATALOGUE_WIDGET_ACTIONS } from "../../catalogue/model/catalogue-widget-actions.ts";
 import { CATALOGUE_WIDGET_BUILDS } from "../../catalogue/widgets/index.ts";
-import { ASK_CODE, TABLE, TRACE_LINK } from "../model/widget-code-parts.ts";
+import { ASK_CODE, TABLE, TRACE_LINK, widgetCode } from "../model/widget-code-parts.ts";
 
 interface Subject {
   kind?: string;
@@ -131,6 +131,24 @@ describe("the problem signal", () => {
     helpers.signalProblem(0);
 
     expect(signals).toEqual([{ problem: true }, { problem: false }]);
+  });
+
+  /** @scenario "AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem" */
+  it("clears the problem when a draw returns before it signals, such as an empty period", () => {
+    const { tsx } = widgetCode({
+      summary: "Test",
+      subtitle: "Test",
+      parts: [],
+      queries: ["main"],
+      body: "  if (main.data.length === 0) return null;\n  signalProblem(true);\n  return null;",
+    });
+    const widget = tsx.slice(tsx.indexOf("export default function Widget"));
+
+    expect(widget).toContain("problemSignalled = false;");
+    expect(widget).toContain("if (!problemSignalled) signalProblem(false);");
+    expect(widget.indexOf("if (main.data.length === 0) return null;")).toBeGreaterThan(
+      widget.indexOf("const drawn = (() => {"),
+    );
   });
 });
 

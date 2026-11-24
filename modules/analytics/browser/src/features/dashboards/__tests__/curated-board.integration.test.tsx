@@ -411,11 +411,13 @@ describe("given a member opens a From LangWatch board", () => {
       openCurated({ templateId: "data" });
 
       expect(await screen.findByRole("heading", { name: "Fix missing data" })).toBeInTheDocument();
-      expect(screen.getByText("What is my agent not sending yet?")).toBeInTheDocument();
-      expect(
-        screen.getByText("How much of my traffic is tests, not real users?"),
-      ).toBeInTheDocument();
-      expect(screen.queryByText("Not built yet")).toBeNull();
+      const widgets = curatedBoardById("data")?.widgets ?? [];
+      expect(widgets).toHaveLength(4);
+      for (const { name, definition } of widgets) {
+        expect(screen.getByText(name)).toBeInTheDocument();
+        expect(definition.code.trim(), name).not.toBe("");
+      }
+      expect(await screen.findAllByTitle("Custom chart")).toHaveLength(4);
     });
   });
 

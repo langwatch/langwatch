@@ -143,4 +143,32 @@ describe("given a sandboxed chart frame", () => {
       expect(screen.queryByText("Loading cover")).toBeNull();
     });
   });
+
+  describe("when its frame reported a problem and is torn down", () => {
+    /** @scenario "AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem" */
+    it("clears the problem at teardown and again when the new frame starts", () => {
+      const onSignal = vi.fn();
+      render(
+        <DesignSystemProvider forcedTheme="light">
+          <SandboxedChartFrame
+            code="A"
+            executeQuery={vi.fn()}
+            dashboardContext={dashboardContext}
+            onLog={vi.fn()}
+            onSignal={onSignal}
+          />
+        </DesignSystemProvider>,
+      );
+      const options = bridgeMock.mock.calls.at(-1)?.[0] as {
+        onSignal: (signal: { problem: boolean }) => void;
+        onTeardown: () => void;
+      };
+      act(() => options.onSignal({ problem: true }));
+      expect(onSignal).toHaveBeenLastCalledWith({ problem: true });
+
+      act(() => options.onTeardown());
+
+      expect(onSignal).toHaveBeenLastCalledWith({ problem: false });
+    });
+  });
 });

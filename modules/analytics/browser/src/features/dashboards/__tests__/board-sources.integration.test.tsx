@@ -556,13 +556,19 @@ describe("given a member who may not edit the board", () => {
   /** @scenario "AC200d Sources: only a member who can edit the board changes them" */
   it("shows the card's footer and no way into the editor", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    openBoard({ permissions: MEMBER.filter((grant) => grant !== "analytics:update") });
+    const counted = { ...GRAPH.queries[0]!, sources: ["application", "langy"] };
+    openBoard({
+      permissions: MEMBER.filter((grant) => grant !== "analytics:update"),
+      widgets: [{ ...WIDGET, graph: { ...GRAPH, queries: [counted] } }],
+    });
     await screen.findByTestId("sandboxed-frame");
 
     await user.click(await screen.findByRole("button", { name: "Actions for Traces" }));
     await screen.findByRole("menuitem", { name: "Copy widget id" });
 
-    expect(screen.getByTestId("widget-card-footer").textContent).toBe("Project: Test Project");
+    expect(screen.getByTestId("widget-card-footer").textContent).toBe(
+      "Counts: your app and Langy · Project: Test Project",
+    );
     expect(screen.queryByRole("menuitem", { name: "Edit code" })).toBeNull();
   });
 });

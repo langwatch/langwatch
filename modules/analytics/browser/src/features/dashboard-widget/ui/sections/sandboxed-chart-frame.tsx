@@ -167,10 +167,15 @@ export function SandboxedChartFrame({
       onNavigate: (args) => onNavigateRef.current?.(args),
       onAskLangy: (subject) => onAskLangyRef.current?.(subject),
       onSignal: (signal) => onSignalRef.current?.(signal),
-      onTeardown: noteTornDown,
+      onTeardown: () => {
+        onSignalRef.current?.({ problem: false });
+        noteTornDown();
+      },
       onIdleChange: (idle) => onIdleChangeRef.current?.(idle),
     });
     bridgeRef.current = bridge;
+    // A new frame reports its own problem; until it does, the last frame's is gone.
+    onSignalRef.current?.({ problem: false });
     onIdleChangeRef.current?.(false);
     noteFrameMounted();
     return () => {

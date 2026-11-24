@@ -170,7 +170,8 @@ describe("given the Outputs users keep widget", () => {
   it("counts outputs by reported action and names the biggest drop", () => {
     const { code, sql } = built("gen-dropoff");
     expect(sql.main).toContain("MetadataOutputAction IN ('accepted', 'edited')");
-    expect(code).toContain("of outputs are lost at");
+    expect(code).toContain('" outputs are lost at "');
+    expect(code).toContain("from: index === 0 ? undefined : all[index - 1].label");
   });
 });
 
@@ -183,6 +184,7 @@ describe("given the Risk sign-off widgets", () => {
     expect(sql.backlog).toContain("FROM annotation_queue_items");
     expect(code).toContain("tone: traces >= 30 ? zone(lowest < 0.9, lowest < 0.99) : undefined");
     expect(code).not.toContain("Ready to sign");
+    expect(code).toContain('label: "Lowest safety-check coverage"');
   });
 
   /** @scenario "AC91 Risk sign-off: policy checks with their margin" */
@@ -192,6 +194,8 @@ describe("given the Risk sign-off widgets", () => {
     expect(sql.main).toContain("ORDER BY passed / judged ASC");
     expect(code).toContain("const FLOOR = 0.9;");
     expect(code).toContain("function margin(passed, judged)");
+    expect(code).toContain("margin(num(row.passed), num(row.judged))[0] < FLOOR");
+    expect(code).toContain("else if (low < FLOOR) colour = C.orange;");
   });
 
   /** @scenario "AC92 Risk sign-off: review queue" */

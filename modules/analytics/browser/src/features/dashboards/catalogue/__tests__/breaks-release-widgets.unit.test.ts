@@ -102,7 +102,8 @@ describe("given the Where my agent breaks widgets", () => {
     expect(sql.main).not.toContain("SpanAttributes");
     expect(code).toContain("Tool calls that failed: ");
     expect(code).toContain("Agent recovered from ");
-    expect(code).toContain('label="Fails most"');
+    expect(code).toContain('label="Users saw most failures"');
+    expect(code).toContain("const seen = (tool) => tool.failures - tool.recovered;");
   });
 
   /** @scenario "AC64 Where my agent breaks: wrong tool rate reads one named judge" */

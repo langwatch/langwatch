@@ -56,8 +56,10 @@ type DraftState = DraftFrame & {
   pin: boolean;
   /** The board this draft became, once stored. */
   savedId: string | undefined;
-  /** The one store in flight; every edit waits on it rather than storing again. */
+  /** The one store in flight, then each edit queued on it; every edit waits on the last. */
   saving: Promise<string> | undefined;
+  /** The last store was refused: what the draft shows is not stored, so sending it again counts. */
+  refused: boolean;
 };
 
 const FRESH = {
@@ -66,6 +68,7 @@ const FRESH = {
   pin: false,
   savedId: void 0,
   saving: void 0,
+  refused: false,
 } as const;
 
 const useDraftStore = defineSlice<DraftState>({
@@ -278,7 +281,8 @@ async function storeDraft({
 
 /**
  * Stores the draft with this edit, or, while it is being stored, writes the edit onto it once
- * it is. Resolves the stored board's id; a refused store rejects and keeps the draft.
+ * it is and after every edit queued before it, so the last one submitted is the one kept.
+ * Resolves the stored board's id; a refused store rejects and keeps the draft.
  */
 function materialiseDraft({ writer, edit }: { writer: DraftWriter; edit: DraftEdit }) {
   const at = currentDraft(writer.projectId);
@@ -288,21 +292,34 @@ function materialiseDraft({ writer, edit }: { writer: DraftWriter; edit: DraftEd
     ...(edit.description === void 0 ? {} : { description: edit.description }),
     ...(edit.pin ? { pin: true } : {}),
   });
-  if (at.saving) {
-    return at.saving.then(async (dashboardId) => {
-      await applyEdit({ writer, dashboardId, edit });
+  const { saving } = at;
+  if (saving) {
+    const queued = saving.then(async (dashboardId) => {
+      // A pin taken off while the store ran is not written.
+      const pin = edit.pin === true && (!isHeld(at) || useDraftStore.getState().pin);
+      await applyEdit({ writer, dashboardId, edit: { ...edit, pin } });
       await refreshLists(writer);
       return dashboardId;
     });
+    // The next edit waits on this one, and still gets the board when this one is refused.
+    const next = queued.catch(() => saving);
+    next.catch(() => void 0);
+    if (isHeld(at)) useDraftStore.setState({ saving: next });
+    return queued;
   }
-  const saving = storeDraft({ writer, edit, at });
-  useDraftStore.setState({ saving });
+  const storing = storeDraft({ writer, edit, at });
+  useDraftStore.setState({ saving: storing, refused: false });
   // The caller reports the refusal; the draft stays to be stored by the next edit. A newer
   // draft's own store is never dropped by this one failing.
-  saving.catch(() => {
-    if (useDraftStore.getState().saving === saving) useDraftStore.setState({ saving: void 0 });
+  storing.catch(() => {
+    if (!isHeld(at)) return;
+    const { savedId } = useDraftStore.getState();
+    // A board made before the failure stays the one every later edit writes onto.
+    useDraftStore.setState(
+      savedId === void 0 ? { saving: void 0, refused: true } : { saving: Promise.resolve(savedId) },
+    );
   });
-  return saving;
+  return storing;
 }
 
 export function useDraftBoard({ takenNames }: { takenNames: readonly string[] }) {
@@ -344,6 +361,8 @@ export function useDraftBoard({ takenNames }: { takenNames: readonly string[] })
     /** The board this draft became, while the screen still shows it as the draft's. */
     savedId: held.savedId,
     materialise: (edit: DraftEdit = {}): Promise<string> => materialiseDraft({ writer, edit }),
+    /** Whether the last store was refused, so an unchanged edit is still worth sending. */
+    refused: held.refused,
     /** Takes the pin off a draft not stored yet; it stores nothing. */
     unpin: () => {
       if (useDraftStore.getState().projectId === projectId) useDraftStore.setState({ pin: false });

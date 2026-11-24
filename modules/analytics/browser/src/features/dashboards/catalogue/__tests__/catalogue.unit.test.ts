@@ -115,6 +115,12 @@ describe("given a template with its own widget list for some agent kinds", () =>
     expect(TEMPLATE_VARIANTS.map(({ id }) => id)).toContain(ragId);
   });
 
+  /** @scenario "AC145b Template card: a board made under a template's former name still counts as added" */
+  it("keeps the former focus template's name, so a board made from it counts as the variant", () => {
+    expect(rag.formerNames).toEqual(expect.arrayContaining(["Release check: RAG focus"]));
+    expect(rag.formerNames).toEqual(expect.arrayContaining([...release.formerNames]));
+  });
+
   /** @scenario "Finder: a template adapts to the agent kind instead of listing a copy per kind" */
   it("asks for a report on the adapted template's own widgets", () => {
     expect(rag.reportPrompt).toContain(`"${release.name}"`);

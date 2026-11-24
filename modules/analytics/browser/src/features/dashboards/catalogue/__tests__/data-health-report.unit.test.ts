@@ -309,7 +309,9 @@ describe("given the data completeness card", () => {
       const code = CATALOGUE_WIDGET_BUILDS["data-health"]?.code.tsx ?? "";
 
       expect(rowOf(report, "cost").priceModel).toBe("acme-small");
-      expect(rowOf(report, "cost").note).toContain('30 use "acme-small", which has no price');
+      expect(rowOf(report, "cost").note).toContain(
+        '30 use a model with no price, such as "acme-small"',
+      );
       expect(rowOf(report, "cost").ask).toBeNull();
       expect(rowOf(report, "cost").example).toBe("trace-3");
       expect(rowOf(report, "conversation").docs).toBe(true);

@@ -21,9 +21,11 @@ import {
 const SERIES_PARTS = [NUMBERS, DATES, CHART_STYLE, HEADLINE, BUCKETS, GAP_BRIDGE, SERIES_CHART];
 
 /** The median of the known values: the usual level a far-off bucket is read against. */
-const MIDDLE = `function middle(values) {
+export const MIDDLE = `function middle(values) {
   const sorted = values.filter(known).toSorted((a, b) => a - b);
-  return sorted.length > 0 ? sorted[Math.floor(sorted.length / 2)] : null;
+  if (sorted.length === 0) return null;
+  const half = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[half] : (sorted[half - 1] + sorted[half]) / 2;
 }`;
 
 export const TRAFFIC_CODE = widgetCode({

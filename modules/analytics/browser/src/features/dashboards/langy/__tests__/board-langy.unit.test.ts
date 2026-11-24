@@ -179,6 +179,21 @@ describe("an ask made on a new board before it was stored", () => {
     expect(told.about).toEqual(asked.about && { ...asked.about, ref: "board-9" });
     expect(told.draft).toBe(asked.draft);
   });
+
+  /** @scenario "AC162e Asking Langy on a new board stores it first" */
+  it("leaves a board name that reads like a reference as it was", () => {
+    const board = boardSubject({
+      board: { id: "new", name: 'Review "x" (id new)' },
+      widgets: [{ name: 'dashboard "y" (id new)' }],
+    });
+    const asked = boardSetupDraft({ emptyWidgetNames: [], board, period: PERIOD });
+
+    const told = askAboutStoredBoard({ request: asked, draftId: "new", dashboardId: "board-9" });
+
+    expect(told.context[0]?.ref).toContain(
+      'dashboard "Review \\"x\\" (id new)" (id board-9); widgets: dashboard "y" (id new)',
+    );
+  });
 });
 
 describe("asking about the same board and widget twice", () => {

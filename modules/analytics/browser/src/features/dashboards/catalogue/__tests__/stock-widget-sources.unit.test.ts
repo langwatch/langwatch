@@ -61,6 +61,12 @@ describe("given the stock widgets of the catalogue", () => {
     expect(
       readsSourcesParameter("SELECT 1 WHERE Source IN {dashboard_context_sources:Array(String)}"),
     ).toBe(true);
+    expect(
+      readsSourcesParameter(
+        "SELECT '--' AS label FROM trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)}",
+      ),
+    ).toBe(true);
+    expect(namedViews("SELECT '--' AS label FROM trace_metrics")).toEqual(["trace_metrics"]);
   });
 
   /** @scenario "AC202b Stock widgets: each stock widget declares its own list of sources" */

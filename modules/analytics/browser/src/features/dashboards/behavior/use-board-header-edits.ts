@@ -13,7 +13,11 @@ import type { DraftEdit } from "./use-draft-board.ts";
 import type { SavedBoard } from "./use-saved-dashboards.ts";
 
 /** A board "+" opened that nothing has stored yet. */
-export type UnsavedBoard = { materialise: (edit?: DraftEdit) => Promise<string> };
+export type UnsavedBoard = {
+  materialise: (edit?: DraftEdit) => Promise<string>;
+  /** The last store was refused: the description shown is not stored yet. */
+  refused?: boolean;
+};
 
 export function useBoardHeaderEdits({
   board,
@@ -42,7 +46,7 @@ export function useBoardHeaderEdits({
     description,
     saveDescription: (next: string) => {
       const trimmed = next.trim();
-      if (trimmed === description) return;
+      if (trimmed === description && unsaved.refused !== true) return;
       unsaved
         .materialise({ description: trimmed === "" ? null : trimmed })
         .catch(failed("Couldn't save the description"));

@@ -67,7 +67,7 @@ function firstSeen(value) {
       cell: (row) => <span style={{ color: C.faint }}>{firstSeen(row.first_seen)}</span>,
     },
     {
-      header: "Requests affected",
+      header: "Errors",
       align: "right",
       cell: (row) => <b>{count(num(row.failures))}</b>,
     },

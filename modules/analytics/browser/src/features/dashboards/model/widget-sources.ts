@@ -126,14 +126,14 @@ export function widgetCardSourcesLine(allQueries: readonly Sourced[]): string {
   const queries = allQueries.filter((query) => query.name !== PRESENCE_QUERY);
   if (queries.length === 0) return "";
   if (picksNoSources(queries)) return NO_SOURCES_CARD_LINE;
-  const following = queries.filter((query) => readsSourcesParameter(query.sql));
-  if (following.length === 0) {
-    return queries.some((query) => canFollowSources(query.sql)) ? EVERY_SOURCE_CARD_LINE : "";
-  }
-  const named = following.map((query) => ({
-    name: query.name,
-    sources: effectiveSources(query.sources),
-  }));
+  // A query over origin-keeping views that ignores the parameter counts every source.
+  const named = queries
+    .filter((query) => canFollowSources(query.sql))
+    .map((query) => ({
+      name: query.name,
+      sources: readsSourcesParameter(query.sql) ? effectiveSources(query.sources) : TRACE_SOURCES,
+    }));
+  if (named.length === 0) return "";
   const lists = new Set(named.map(({ sources }) => plainSources(sources)));
   if (lists.size === 1) {
     const sources = named[0]?.sources ?? [];

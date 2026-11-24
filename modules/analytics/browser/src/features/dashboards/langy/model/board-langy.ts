@@ -129,7 +129,7 @@ export function boardAskContext({
   const widgets = board.widgetNames.length > 0 ? board.widgetNames.join(", ") : "none yet";
   const which =
     board.templateId === void 0
-      ? `dashboard "${board.name}" (id ${board.id})`
+      ? `dashboard ${JSON.stringify(board.name)} (id ${board.id})`
       : `From LangWatch dashboard "${board.name}" (template ${board.templateId}, read-only, not stored)`;
   return context({
     ref: [
@@ -271,7 +271,8 @@ export function widgetContext({
           ]
         : []),
     ].join("; ");
-  const sqls = queries.map(({ sql }) => sql.replace(/\s+/g, " ").trim());
+  // Whole, as the widget runs it: a literal's spaces and the line a comment ends on both count.
+  const sqls = queries.map(({ sql }) => sql.trim());
   const room = MAX_REF_LENGTH - ref(queries.map(() => "")).length;
   return context({
     ref: ref(fittedSql({ sqls, room })),
@@ -584,8 +585,8 @@ export function widgetEditorContext({
 }): AnalyticsLangyContext {
   const which =
     widget.id === void 0
-      ? `new widget "${widget.name}", not saved yet`
-      : `widget "${widget.name}" (id ${widget.id})`;
+      ? `new widget ${JSON.stringify(widget.name)}, not saved yet`
+      : `widget ${JSON.stringify(widget.name)} (id ${widget.id})`;
   return context({
     ref: `${which}, open in the editor on ${boardAskContext({ board, period }).ref}`,
     label: widget.name,
@@ -738,6 +739,11 @@ function widgetDraft({
   };
 }
 
+/** The board's reference in a context: first, its quoted name holding no bare quote. */
+const escapedRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const boardReference = (id: string) =>
+  new RegExp(`(dashboard "(?:[^"\\\\]|\\\\.)*" )\\(id ${escapedRegExp(id)}\\)`);
+
 /**
  * An ask built on a new board, retold about the board it was stored as: the board's id in each
  * context and in what the draft is about. Nothing else in the ask names the board by id.
@@ -756,7 +762,10 @@ export function askAboutStoredBoard({
     ...request,
     context: request.context.map((each) => ({
       ...each,
-      ref: each.ref.replace(`(id ${draftId})`, `(id ${dashboardId})`),
+      ref: each.ref.replace(
+        boardReference(draftId),
+        (_, named: string) => `${named}(id ${dashboardId})`,
+      ),
       key: each.key.replace(boardKey({ id: draftId }), boardKey({ id: dashboardId })),
     })),
     ...(about === void 0

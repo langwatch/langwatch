@@ -635,9 +635,23 @@ function catalogueTemplate(template: AuthoredTemplate): CatalogueTemplate {
   };
 }
 
+/** How the separate focus templates named their kind ("Release check: voice focus"). */
+const FORMER_FOCUS_LABELS: Readonly<Record<AgentKind, string>> = {
+  "support-bot": "support bot",
+  rag: "RAG",
+  vendor: "agent platform",
+  voice: "voice",
+  extraction: "extraction",
+  regulated: "regulated",
+  "tools-agent": "tools agent",
+  generative: "generative",
+  coding: "coding",
+};
+
 /**
  * The template adapted to an agent kind: its widgets for that kind under the template's own
- * name, with an id of its own; the template itself when it has no widgets for that kind.
+ * name, with an id of its own; the template itself when it has no widgets for that kind. A
+ * board made from the kind's former focus template still counts as this variant.
  */
 export function templateForKind({
   template,
@@ -656,6 +670,12 @@ export function templateForKind({
     preloadFor: template.preloadFor.includes(kind) ? [kind] : [],
     focusKind: kind,
     reportPrompt: reportPromptFor({ ...template, widgets }),
+    formerNames: [
+      ...template.formerNames,
+      ...[template.name, ...template.formerNames].map(
+        (name) => `${name}: ${FORMER_FOCUS_LABELS[kind]} focus`,
+      ),
+    ],
   };
 }
 

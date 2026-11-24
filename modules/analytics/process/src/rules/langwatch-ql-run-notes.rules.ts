@@ -17,7 +17,7 @@ export function sourcesIgnoredDiagnostics({
   return [
     {
       code: "SOURCES_IGNORED",
-      message: "This query doesn't filter by source, so it counts every source, tests included.",
+      message: "This query doesn't read the sources you picked, so they change nothing it counts.",
     },
   ];
 }

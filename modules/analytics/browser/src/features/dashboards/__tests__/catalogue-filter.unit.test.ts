@@ -116,6 +116,10 @@ describe("the picker's catalogue filter", () => {
           expect(question.branch.title, question.id).toBe(section.title);
           expect(question.trunk, question.id).toBe(section.trunk);
         }
+        const ranked = PICKER_QUESTIONS.filter(
+          (question) => question.branch.title === section.title && question.trunk === section.trunk,
+        );
+        expect(ids(section.questions), section.title).toEqual(ids(ranked));
       }
     });
 

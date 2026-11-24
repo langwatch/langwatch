@@ -86,8 +86,8 @@ const SOURCES_LINE = "This counts your app's own requests, leaving out tests and
 function costNote(row, tokens, price, model) {
   const causes = [
     ...(tokens > 0 ? [whole(tokens) + " send no token counts"] : []),
-    ...(price > 0 ? [whole(price) + (model ? ' use "' + model + '", which has no price'
-      : " use a model with no price")] : []),
+    ...(price > 0 ? [whole(price) + " use a model with no price" +
+      (model ? ', such as "' + model + '"' : "")] : []),
   ];
   return "Cost is missing on " + whole(row.missing) + " of " + whole(row.base) +
     " requests that call a model" + (causes.length > 0 ? ": " + causes.join(", ") : "") + ".";

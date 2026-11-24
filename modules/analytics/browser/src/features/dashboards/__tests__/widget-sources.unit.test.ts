@@ -107,6 +107,9 @@ describe("widgetCardSourcesLine", () => {
         "Counts everything, tests included.",
       );
       expect(widgetCardSourcesLine([query("a", [])])).toBe("Pick at least one source.");
+      expect(
+        widgetCardSourcesLine([query("a", ["application"]), query("b", void 0, IGNORES)]),
+      ).toBe("Counts: a: your app · b: everything");
     });
   });
 });
