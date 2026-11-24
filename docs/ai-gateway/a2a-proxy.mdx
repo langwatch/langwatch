@@ -90,4 +90,4 @@ An unknown name and a key missing from the allow list both answer `a2a_target_no
 
 ## Self-hosting
 
-A self-hosted install must route `/a2a` to the gateway Service as well as `/v1` and `/health`. The chart Ingress does this when you set `ingress.gateway.host`. For your own routes, see [Routing](/self-hosting/deployment/routing).
+A self-hosted install must route `/a2a` to the gateway Service as well as `/v1` and `/health`. The chart Ingress does this when you set `ingress.gateway.host` with `ingress.enabled` and `gateway.chartManaged` both true. For your own routes, see [Routing](/self-hosting/deployment/routing).
