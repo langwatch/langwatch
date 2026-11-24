@@ -483,7 +483,7 @@
             }
           ],
           "refId": "A",
-          "expression": "fields @timestamp, projectId, projectIds, outcome, level, dashboardId, widgetId, queryHash\n| filter msg = \"LangWatchQL failed\" and caller = \"dashboard_widget\" and outcome != \"aborted\"\n| sort @timestamp desc\n| limit 100"
+          "expression": "fields @timestamp, projectId, projectIds.0, projectIds.1, projectIds.2, outcome, level, dashboardId, widgetId, queryHash\n| filter msg = \"LangWatchQL failed\" and caller = \"dashboard_widget\" and outcome != \"aborted\"\n| sort @timestamp desc\n| limit 100"
         }
       ],
       "title": "Failed widget queries",
