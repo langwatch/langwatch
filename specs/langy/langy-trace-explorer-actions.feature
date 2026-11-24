@@ -184,6 +184,7 @@ Feature: Langy drives and reads the Trace Explorer
       Given the find-traces skill
       Then it says to open the Explorer and drive explorer.setTimeRange and explorer.setFilter when finding traces is the ask
       And it says to stay on the page and answer with cards and a link when traces are a means to another task
+      And it says to answer the secondary way, with the filter to paste, outside a Langy worker where there is no page to drive
 
     @unit
     Scenario: The skill takes the window and the filter from the page

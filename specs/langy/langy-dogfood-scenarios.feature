@@ -192,6 +192,7 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     Then it says an empty first answer means the trace has not arrived yet
     And it bounds the retries and says how long to leave between them
     And it says not to report the change as verified when the wait runs out
+    And it ties the search to the time noted at the start of the run with --start-date, so an older trace is not taken for this run's
 
   # A filmed run put langwatch.setup() at the top of the entry file, above the
   # import that loaded the .env it had just written, and the agent died at
@@ -204,6 +205,8 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And the env loader is added to the entry file when the project has it and the entry file does not load it
     And the key is checked visible to the process the way the project reads it, without printing it
     And the given command is the first and only check, copied as written for the project's runner, with no probe before it
+    And the one change the check takes is the project's own loader, or none when the environment comes from the shell
+    And the Python check of the install runs through the interpreter of the rung of the install ladder that worked
 
   # A filmed run put the LangChain callback on the model call inside one graph
   # node. The trace then held llm spans only: the tool nodes and the plain

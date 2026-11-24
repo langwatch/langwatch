@@ -395,6 +395,7 @@ describe("statusCommand", () => {
       const out = consoleLogSpy.mock.calls.flat().join("\n");
       expect(out).toContain("Needs Attention:");
       expect(out).toContain("7 traces errored in the last 24h");
+      expect(out).toContain("langwatch trace search  (defaults to the last 7d)");
       expect(out).toContain('experiment "Eval X" is still running (5/10)');
       expect(out).toContain("langwatch experiment status eval-x --run-id run_1");
       expect(out).toContain('budget "prod" (month, project) at 92%');

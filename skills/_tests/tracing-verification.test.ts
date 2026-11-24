@@ -56,9 +56,23 @@ describe("given the tracing skill", () => {
       );
       expect(rendered).toContain("No variant before it");
       expect(rendered).toContain("Always `-c`, never `python -` with a heredoc");
+      expect(rendered).toContain("The one change it takes is the loader");
+      expect(rendered).toContain(
+        "put the project's own loader in place of the dotenv call, or nothing when the environment comes from the shell",
+      );
       expect(rendered).toContain(
         "```bash\nuv run python -c \"from dotenv import load_dotenv; load_dotenv(); import os; print(bool(os.getenv('LANGWATCH_API_KEY')))\"\n```",
       );
+    });
+
+    /** @scenario "LangWatch initialises after the project's environment is loaded" */
+    it("runs the install check through the interpreter of the rung that worked", () => {
+      const rendered = tracingSkill();
+      expect(rendered).toContain("through the interpreter of the rung that worked");
+      expect(rendered).toContain("`.venv/bin/python -c` after `.venv/bin/python -m pip`");
+      expect(rendered).toContain("`python3 -c` after `python3 -m pip`");
+      expect(rendered).toContain("`<interpreter> -m pip show langwatch`");
+      expect(rendered).not.toContain("`uv pip show langwatch` after `uv add`");
     });
 
     /** @scenario "A LangGraph callback is attached at the graph, not inside a node" */
@@ -108,6 +122,13 @@ describe("given the tracing skill", () => {
     it("says not to report the change as verified when the wait runs out", () => {
       const rendered = tracingSkill();
       expect(rendered).toContain("do not report the change as verified");
+    });
+
+    /** @scenario "The tracing skill waits for the trace instead of asking again at once" */
+    it("ties the search to the time noted at the start of the run", () => {
+      const rendered = tracingSkill();
+      expect(rendered).toContain("--start-date <the time you noted>");
+      expect(rendered).toContain("A trace from before the run is not this run's");
     });
   });
 });

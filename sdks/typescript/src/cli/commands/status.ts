@@ -16,6 +16,7 @@ import { resolveCredentials } from "../utils/apiKey.ts";
 import { buildCatalog, renderStatusSummary } from "../utils/commandCatalog.ts";
 import { printResult, type RawOutputFlags } from "../utils/output.ts";
 import { createSpinner } from "../utils/spinner.ts";
+import { DEFAULT_LOOKBACK } from "../utils/timeWindow.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Budgets at or above this utilization are worth a human's attention. */
@@ -494,7 +495,7 @@ function printAttention({
     console.log(
       chalk.red(
         `    ⚠ ${attention.erroredTraces24h} trace${attention.erroredTraces24h === 1 ? "" : "s"} errored in the last 24h`,
-      ) + chalk.gray(`  →  langwatch trace search  (defaults to the last 24h)`),
+      ) + chalk.gray(`  →  langwatch trace search  (defaults to the last ${DEFAULT_LOOKBACK})`),
     );
   }
   for (const experiment of attention.runningExperiments ?? []) {
