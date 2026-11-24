@@ -203,22 +203,24 @@ async function createHandler({
 // Tests
 // ---------------------------------------------------------------------------
 
+function resetMocks() {
+  vi.clearAllMocks();
+  countedTotal = undefined;
+  countedEventId = undefined;
+  instantEvalMeterProvisioned = true;
+  piiRedactionMeterProvisioned = true;
+  // No spend ledger unless a test says otherwise, so the Instant Evals
+  // meter stays out of the way of every assertion about the events one.
+  mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "unavailable" });
+  mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "unavailable" });
+  missingPrices = [];
+  mockSubscriptionCarriesPrice.mockImplementation(
+    async ({ price }) => !missingPrices.includes(price),
+  );
+}
+
 describe("ReportUsageForMonthCommand", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    countedTotal = undefined;
-    countedEventId = undefined;
-    instantEvalMeterProvisioned = true;
-    piiRedactionMeterProvisioned = true;
-    // No spend ledger unless a test says otherwise, so the Instant Evals
-    // meter stays out of the way of every assertion about the events one.
-    mockQueryInstantEvalSpendTotal.mockResolvedValue({ outcome: "unavailable" });
-    mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "unavailable" });
-    missingPrices = [];
-    mockSubscriptionCarriesPrice.mockImplementation(
-      async ({ price }) => !missingPrices.includes(price),
-    );
-  });
+  beforeEach(resetMocks);
 
   // ========================================================================
   // Skip conditions
@@ -1533,6 +1535,90 @@ describe("ReportUsageForMonthCommand", () => {
       await handler.handle(makeCommand());
 
       expect(mockConnectedUsageCeiling).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("ReportUsageForMonthCommand: the PII redaction price", () => {
+  beforeEach(resetMocks);
+
+  describe("given an active subscription with no PII redaction price", () => {
+    /** @scenario "Usage is held while the subscription carries no PII redaction price" */
+    it("warns with the organization, the PII redaction meter and the amount held", async () => {
+      missingPrices = ["GROWTH_PII_REDACTION_USD"];
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org-1",
+          meter: "langwatch_pii_redaction_usd",
+          heldValue: 0.5,
+        }),
+        expect.stringContaining("holding"),
+      );
+    });
+
+    /** @scenario "A pending PII redaction total is replayed even while the price is missing" */
+    it("replays a pending PII redaction total under its own identifier", async () => {
+      missingPrices = ["GROWTH_PII_REDACTION_USD"];
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockBillingCheckpoints.findCheckpoint.mockImplementation(
+        async ({ meter }: { meter: string }) =>
+          meter === "langwatch_pii_redaction_usd"
+            ? { lastReportedTotal: 0, pendingReportedTotal: 5_000, consecutiveFailures: 0 }
+            : null,
+      );
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      const handler = await createHandler();
+
+      await handler.handle(makeCommand());
+
+      expect(mockReportUsageDelta).toHaveBeenCalledTimes(1);
+      expect(mockReportUsageDelta.mock.calls[0]?.[0].events[0]).toMatchObject({
+        eventName: "langwatch_pii_redaction_usd",
+        identifier: "org-1:2026-02:langwatch_pii_redaction_usd:from:0:to:5000",
+      });
+    });
+  });
+
+  describe("given a PII redaction price read that always fails", () => {
+    /** @scenario "A PII redaction price read that keeps failing stops at the circuit breaker" */
+    it("stops reading and scheduling after five failed reads", async () => {
+      const store = MemoryBillingStore.create();
+      const checkpoints = MemoryBillingCheckpointRepository.create(store);
+      mockSubscriptionCarriesPrice.mockImplementation(async ({ price }) => {
+        if (price === "GROWTH_PII_REDACTION_USD") throw new Error("No such customer");
+        return true;
+      });
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
+      mockQueryPiiRedactionSpendTotal.mockResolvedValue({ outcome: "counted", total: 5_000 });
+      const handler = await createHandler({ billingCheckpoints: checkpoints });
+
+      for (let run = 0; run < 8; run++) await handler.handle(makeCommand());
+
+      const reads = mockSubscriptionCarriesPrice.mock.calls.filter(
+        ([input]) => input.price === "GROWTH_PII_REDACTION_USD",
+      );
+      expect(reads).toHaveLength(5);
+      expect(mockSelfDispatch).toHaveBeenCalledTimes(5);
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(
+        await checkpoints.findCheckpoint({
+          organizationId: "org-1",
+          billingMonth: "2026-02",
+          meter: "langwatch_pii_redaction_usd",
+        }),
+      ).toMatchObject({ lastReportedTotal: 0, pendingReportedTotal: null, consecutiveFailures: 5 });
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ meter: "langwatch_pii_redaction_usd", consecutiveFailures: 5 }),
+        expect.stringContaining("ALARM"),
+      );
     });
   });
 });
