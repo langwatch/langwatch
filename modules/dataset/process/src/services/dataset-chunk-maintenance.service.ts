@@ -22,15 +22,19 @@ import {
   assertReady,
   isChunkLine,
   mapPreviousColumnsToNewColumns,
+  readOffsets,
   recomputeOffsets,
   toChunkLines,
 } from "../rules/dataset-chunk-lines.rules.ts";
 import { chunkedMeta, chunkMetaOf, toSingleJsonl } from "../rules/dataset-chunking.rules.ts";
+import { DatasetChunkReadService } from "./dataset-chunk-read.service.ts";
 
 export class DatasetChunkMaintenanceService {
   static create(options: { datasets: DatasetContentRepository }): DatasetChunkMaintenanceService {
     return new DatasetChunkMaintenanceService(options.datasets);
   }
+
+  private readonly reads = DatasetChunkReadService.create();
 
   private constructor(private readonly datasets: DatasetContentRepository) {}
 
@@ -55,14 +59,16 @@ export class DatasetChunkMaintenanceService {
 
       const chunkCount = current.chunkCount ?? 0;
       const perChunk: { rowCount: number; byteSize: number }[] = [];
-      for (let index = 0; index < chunkCount; index++) {
-        // `readChunk` throws `MissingChunkError` if a chunk the count claims is
-        // gone — corruption, not emptiness. Propagate it (loud) rather than mask it.
-        const rows = await datasetStorage.readChunk({
-          projectId,
-          datasetId,
-          index,
-        });
+      // `readChunk` throws `MissingChunkError` if a chunk the count claims is
+      // gone — corruption, not emptiness. Propagate it (loud) rather than mask it.
+      const chunks = this.reads.chunksInOrder({
+        storage: datasetStorage,
+        projectId,
+        datasetId,
+        chunkCount,
+        offsets: readOffsets(current),
+      });
+      for await (const rows of chunks) {
         // Measure bytes from the actual chunk rows so the recomputed totals reflect
         // S3 truth, not a possibly-drifted offset entry.
         perChunk.push({
@@ -202,8 +208,14 @@ export class DatasetChunkMaintenanceService {
   }): Promise<{ ids: string[]; entries: DatasetRecordEntry[] }> {
     const ids: string[] = [];
     const entries: DatasetRecordEntry[] = [];
-    for (let index = 0; index < chunkCount; index++) {
-      const rows = await storage.readChunk({ projectId, datasetId: dataset.id, index });
+    const chunks = this.reads.chunksInOrder({
+      storage,
+      projectId,
+      datasetId: dataset.id,
+      chunkCount,
+      offsets: readOffsets(dataset),
+    });
+    for await (const rows of chunks) {
       for (const line of rows) {
         if (isChunkLine(line)) {
           ids.push(line.id);

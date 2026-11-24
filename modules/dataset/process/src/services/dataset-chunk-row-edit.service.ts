@@ -12,6 +12,7 @@ import {
   isChunkLine,
   readOffsets,
 } from "../rules/dataset-chunk-lines.rules.ts";
+import { DatasetChunkReadService } from "./dataset-chunk-read.service.ts";
 
 const logger = createLogger("langwatch:datasets:mutations");
 
@@ -33,6 +34,8 @@ export class DatasetChunkRowEditService {
   static create(): DatasetChunkRowEditService {
     return new DatasetChunkRowEditService();
   }
+
+  private readonly reads = DatasetChunkReadService.create();
 
   private constructor() {}
 
@@ -125,9 +128,16 @@ export class DatasetChunkRowEditService {
    */
   private async editByFullScan(target: EditTarget): Promise<{ updated: true } | null> {
     const { current, dataset, projectId, recordId, storage } = target;
-    const chunkCount = current.chunkCount ?? 0;
-    for (let index = 0; index < chunkCount; index++) {
-      const rows = await storage.readChunk({ projectId, datasetId: dataset.id, index });
+    const chunks = this.reads.chunksInOrder({
+      storage,
+      projectId,
+      datasetId: dataset.id,
+      chunkCount: current.chunkCount ?? 0,
+      offsets: readOffsets(current),
+    });
+    let index = -1;
+    for await (const rows of chunks) {
+      index += 1;
       const rowIndex = rows.findIndex((line) => isChunkLine(line) && line.id === recordId);
       if (rowIndex === -1) {
         continue;

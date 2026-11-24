@@ -15,7 +15,10 @@ const CHUNK_PREFETCH_BYTES = CHUNK_MAX_BYTES;
 /** Which chunks a read walks: every one up to `chunkCount`, or the named indices in order. */
 type ChunkSelection = { chunkCount: number } | { indices: readonly number[] };
 
-type PendingChunk = { rows: Promise<unknown[]>; bytes: number };
+/** What the prefetch needs of the offset index: each chunk's recorded size, when it has one. */
+type ChunkSize = { index: number; byteSize?: number | null };
+
+type PendingChunk<Chunk> = { chunk: Promise<Chunk>; bytes: number };
 
 /** Reads rows out of a dataset stored as s3_jsonl chunks, a bounded prefetch in memory. */
 export class DatasetChunkReadService {
@@ -30,18 +33,32 @@ export class DatasetChunkReadService {
    * dataset of many small chunks does not wait for each in turn. Holds at most the budget plus
    * the chunk being read; a read the reader leaves early, or that fails, rejects nothing unseen.
    */
-  async *chunksInOrder({
+  chunksInOrder({
     storage,
     projectId,
     datasetId,
-    offsets,
-    ...selection
+    ...rest
   }: {
     storage: DatasetChunkRepository;
     projectId: string;
     datasetId: string;
     offsets: readonly ChunkOffset[];
   } & ChunkSelection): AsyncGenerator<unknown[]> {
+    return this.readsInOrder({
+      ...rest,
+      read: (index) => storage.readChunk({ projectId, datasetId, index }),
+    });
+  }
+
+  /** One per-chunk read in order, fetched ahead within the budget and the in-flight cap. */
+  private async *readsInOrder<Chunk>({
+    offsets,
+    read,
+    ...selection
+  }: {
+    offsets: readonly ChunkSize[];
+    read: (index: number) => Promise<Chunk>;
+  } & ChunkSelection): AsyncGenerator<Chunk> {
     const indices =
       "indices" in selection
         ? selection.indices
@@ -51,7 +68,7 @@ export class DatasetChunkReadService {
       const size = sizes.get(index);
       return typeof size === "number" && size > 0 ? size : CHUNK_MAX_BYTES;
     };
-    const pending: PendingChunk[] = [];
+    const pending: PendingChunk<Chunk>[] = [];
     let next = 0;
     let aheadBytes = 0;
     const fill = () => {
@@ -59,19 +76,19 @@ export class DatasetChunkReadService {
         const index = indices[next]!;
         const bytes = sizeOf(index);
         if (pending.length > 0 && aheadBytes + bytes > CHUNK_PREFETCH_BYTES) return;
-        const rows = storage.readChunk({ projectId, datasetId, index });
-        rows.catch(() => undefined);
-        pending.push({ rows, bytes });
+        const chunk = read(index);
+        chunk.catch(() => undefined);
+        pending.push({ chunk, bytes });
         aheadBytes += bytes;
         next += 1;
       }
     };
     fill();
     for (let head = pending.shift(); head; head = pending.shift()) {
-      const rows = await head.rows;
+      const chunk = await head.chunk;
       aheadBytes -= head.bytes;
       fill();
-      yield rows;
+      yield chunk;
     }
   }
 

@@ -16,6 +16,7 @@ import {
   recomputeOffsets,
 } from "../rules/dataset-chunk-lines.rules.ts";
 import { type ChunkOffset, toSingleJsonl } from "../rules/dataset-chunking.rules.ts";
+import { DatasetChunkReadService } from "./dataset-chunk-read.service.ts";
 
 const logger = createLogger("langwatch:datasets:mutations");
 
@@ -39,6 +40,8 @@ export class DatasetChunkDeleteService {
   static create(deps: DatasetChunkDeleteServiceOptions): DatasetChunkDeleteService {
     return new DatasetChunkDeleteService(deps);
   }
+
+  private readonly reads = DatasetChunkReadService.create();
 
   private constructor(private readonly deps: DatasetChunkDeleteServiceOptions) {}
 
@@ -121,6 +124,7 @@ export class DatasetChunkDeleteService {
         storage: datasetStorage,
         removeSet,
         chunkCount,
+        offsets,
       });
     });
   }
@@ -285,6 +289,7 @@ export class DatasetChunkDeleteService {
     storage,
     removeSet,
     chunkCount,
+    offsets,
   }: {
     tx: DatasetContentRepository;
     dataset: DatasetMutationRecord;
@@ -292,6 +297,8 @@ export class DatasetChunkDeleteService {
     storage: DatasetChunkRepository;
     removeSet: Set<string>;
     chunkCount: number;
+    /** The offset index read under the lock; it only paces the prefetch. */
+    offsets: readonly ChunkOffset[];
   }): Promise<{ deleted: number }> {
     // Full in-lock scan (the proven path): read every chunk, drop target rows,
     // recompute. Used on a legacy/no-offset dataset, or when the fast path
@@ -299,12 +306,16 @@ export class DatasetChunkDeleteService {
     // bytes, so this path also self-heals any pre-existing counter drift.
     const perChunk: { rowCount: number; byteSize: number }[] = [];
     let deleted = 0;
-    for (let index = 0; index < chunkCount; index++) {
-      const rows = await storage.readChunk({
-        projectId,
-        datasetId: dataset.id,
-        index,
-      });
+    const chunks = this.reads.chunksInOrder({
+      storage,
+      projectId,
+      datasetId: dataset.id,
+      chunkCount,
+      offsets,
+    });
+    let index = -1;
+    for await (const rows of chunks) {
+      index += 1;
       const kept = rows.filter((line) => !(isChunkLine(line) && removeSet.has(line.id)));
       const removedHere = rows.length - kept.length;
       if (removedHere > 0) {
