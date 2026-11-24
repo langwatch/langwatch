@@ -1,6 +1,10 @@
 /** Which models a picker offers, from the providers a project has stored. Pure: consumers fetch. */
 import { isCodexModel, isModelAllowedForFeature } from "./catalog/codex-restrictions.ts";
-import { findDecisionModel, isOwnDecisionModelId } from "./catalog/decision-models.ts";
+import {
+  canonicalModelId,
+  findDecisionModel,
+  isOwnDecisionModelId,
+} from "./catalog/decision-models.ts";
 import { isLatestAlias } from "./catalog/latest-aliases.ts";
 import { allLitellmModels, isChatSurfaceCatalogModel } from "./catalog/model-catalog.ts";
 import type { ModelOption } from "./model-options.ts";
@@ -14,8 +18,11 @@ export type ModelOptionGroup = {
   models: ModelOption[];
 };
 
-/** A model LangWatch serves itself, so a project needs no provider of its own to pick it. */
-export type BuiltInModel = { value: string; label: string };
+/**
+ * A model LangWatch serves itself, so a project needs no provider of its own to pick it. Its line
+ * is the catalogue's, unless it sets its own: one id may be offered under two names.
+ */
+export type BuiltInModel = { value: string; label: string; description?: string };
 
 /**
  * The heading built-in models are listed under. Not "LangWatch": an own decision model in it
@@ -299,9 +306,9 @@ export function modelSelectionFrom({
     isCustom: customModelIdSet.has(modelValue),
   }));
   // A decision model's line, and a shorter row title where it has one, come from the catalogue.
-  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label }) => {
+  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label, description }) => {
     const entry = findDecisionModel(value);
-    const subtitle = entry?.description;
+    const subtitle = description ?? entry?.description;
     return {
       label: entry?.pickerLabel ?? label,
       value,
@@ -325,4 +332,23 @@ export function modelSelectionFrom({
     selectOptions: [...builtInOptions, ...selectOptions],
     groupedByProvider: [...builtInGroups, ...groupOptionsByProvider(selectOptions)],
   };
+}
+
+/**
+ * The options a stored model selects, best first: the one with its exact id, then the ones it reads
+ * as (a legacy LangWatch id, ADR-182). Exact first, so two names on related ids stay apart.
+ */
+export function findSelectedOptions<T extends { value: string }>({
+  options,
+  model,
+}: {
+  options: readonly T[];
+  model: string;
+}): T[] {
+  const canonical = canonicalModelId(model);
+  const exact = options.filter((option) => option.value === model);
+  const read = options.filter(
+    (option) => option.value !== model && canonicalModelId(option.value) === canonical,
+  );
+  return [...exact, ...read];
 }

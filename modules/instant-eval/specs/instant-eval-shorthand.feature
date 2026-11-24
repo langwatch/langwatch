@@ -89,6 +89,19 @@ Feature: The Instant Eval shorthand, a target and a filter expanded into one sta
     And the statement orders by TraceId and SpanId, which is what the run pages by
 
   @unit
+  Scenario: The llm_spans target reads the span type from span_metrics inside its floor
+    Given span_analytics holds every span from a floor at or before the window start
+    When an llm_spans shorthand is expanded
+    Then it keeps model calls by span_metrics' SpanType column
+    And it never reads the span attribute map to find them
+
+  @unit
+  Scenario: The llm_spans target reads the span type from its map outside the floor
+    Given no floor, a floor after the window start, or a rebuilding floor
+    When an llm_spans shorthand is expanded
+    Then it keeps model calls by the span type in the attribute map, as before
+
+  @unit
   Scenario: The text budget comes from what the questions leave of the classifier's state
     Given a shorthand whose questions are long enough to crowd the classifier's state
     When it is expanded

@@ -130,12 +130,12 @@ override-dependencies = [
   "cryptography>=50.0.0",
   # h2 HTTP/2 control-frame flood DoS.
   "h2>=4.4.1",
-  # setuptools path traversal in PackageIndex.
-  "setuptools>=83.0.0",
+  # setuptools path traversal in PackageIndex, and the advisory covering <84.1.0 (#3203).
+  "setuptools>=84.1.0",
   # torch: deserialization advisory in torch.load.
   "torch>=2.13.0",
-  # tornado: HTTP header and multipart parsing advisories.
-  "tornado>=6.5.9",
+  # tornado: HTTP header, multipart and chunked body advisories (#3331-#3333).
+  "tornado>=6.6",
   # httpx2: two advisories fixed in 2.11.0 and one in 2.12.0.
   "httpx2>=2.12.0",
   #
@@ -147,12 +147,17 @@ override-dependencies = [
 # requirements already in the tree; an override would replace them, extras
 # and upper bounds included.
 constraint-dependencies = [
+  # fastmcp-slim: post-transform component authorization skipped on direct calls (#3202).
+  # Capped below 4: 4.x is a major with its own fixes, and a bare floor lets a relock float onto it.
+  "fastmcp-slim>=3.4.10,<4",
   "fsspec>=2026.6.0", # fsspec advisory covering <2026.6.0
   "datasets>=5.0.1", # datasets advisory covering <5.0.1; 4.x also caps fsspec below its fix
   "mako>=1.4.2", # Mako advisory covering <=1.4.1
-  "joserfc>=1.7.6", # joserfc advisories covering <1.7.5 (high) and <1.7.6
   "multidict>=6.9.1", # multidict advisory covering 6.7.0-6.9.0
-  "langgraph-sdk>=0.4.4", # langgraph-sdk advisory covering <=0.4.3
+  "langgraph-sdk>=0.4.6", # langgraph-sdk advisories covering <=0.4.3 and 0.4.0-0.4.5 (#3301)
+  "langgraph>=1.2.14", # LangGraph SDK v3 streaming identifiers advisory (#3302)
+  "joserfc>=1.7.7", # joserfc advisories covering <1.7.5 (high) and <1.7.6, then JWE recipients and compact JWS size (#3364, #3365)
+  "filelock>=4.2.1", # filelock lock-file advisories covering <=4.2.0 (#3303, #3304)
   # pydantic-ai: 2.30.0 is the highest floor that resolves. From 2.44.0 its
   # openai extra needs openai>=3.8.0, whose jiter requirement every
   # instructor release (a dependency of the notebooks and tutorials) excludes

@@ -169,22 +169,23 @@ export const FEATURE_FLAGS = [
     key: "release_instant_evals",
     scope: "PRODUCT",
     defaultValue: false,
+    selfHostedDefaultValue: true,
     description:
-      "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. On the hosted service this releases an enterprise organization only: a self-serve one is released by switching them on itself from the search bar, whatever this says. A self-hosted install that judges through Connect is released by a license that names Instant Evals alone, and this never releases it; only a development checkout that judges with its own key still needs this. A deployment with no classifier configured keeps them unavailable either way.",
+      "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default on LangWatch Cloud; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. On the hosted service this releases an enterprise organization only: a self-serve one is released by switching them on itself from the search bar, whatever this says. On by default on a self-hosted install, which needs nothing from this flag: one that judges through Connect is released by a license that names Instant Evals alone, and this never releases it; a project on its own decision model is released by that model alone; only an install that judges with its own classifier key, such as a development checkout, reads it, and an operator can still switch it off there. A deployment with no classifier configured keeps LangWatch's model unavailable either way.",
   },
   {
     key: "release_instant_evals_own_decision_model",
     scope: "PRODUCT",
     defaultValue: true,
     description:
-      "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). On by default; switch it off fleet-wide or per organization. A run on an own key is not metered by LangWatch and skips the free budget, but a gateway budget set to block still applies. Off, the column offers LangWatch Evals Preview only, new picks of any other model are refused, and a project that already picked one skips its Instant Evals as not configured; it is never moved onto the billed LangWatch model.",
+      "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). On by default; switch it off fleet-wide or per organization. A run on an own key is not metered by LangWatch and skips the free budget, but a gateway budget set to block still applies. Off, the column offers LangWatch Instant (preview) only, new picks of any other model are refused, and a project that already picked one skips its Instant Evals as not configured; it is never moved onto the billed LangWatch model.",
   },
   {
     key: "instant_evals_hosted_disabled",
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Switches LangWatch's hosted Instant Evals model (Evals Preview) off for an organization, whatever its plan. Off by default; turn it on for one organization with a targeting rule { organizationId }. On, the organization is never released onto the hosted model: not by release_instant_evals, its own Instant Evals switch, or a license. It is offered no switch, Default models does not list Evals Preview, and no run, judged query, search-bar route or LLM-judge evaluation calls the hosted classifier. Its own decision models, picked in the Instant Evals column of Default models, keep running.",
+      "Switches LangWatch's hosted Instant Evals model, LangWatch Instant (preview), off for an organization, whatever its plan. Off by default; turn it on for one organization with a targeting rule { organizationId }. On, the organization is never released onto the hosted model: not by release_instant_evals, its own Instant Evals switch, or a license. It is offered no switch, Default models does not list LangWatch Instant (preview), and no run, judged query, search-bar route or LLM-judge evaluation calls the hosted classifier. Its own decision models, picked in the Instant Evals column of Default models, keep running.",
   },
   {
     key: "release_instant_evals_judge_router",
@@ -192,14 +193,15 @@ export const FEATURE_FLAGS = [
     defaultValue: true,
     selfHostedDefaultValue: false,
     description:
-      "Routes an organization's Instant Evals judgements through the LangWatch Judge router: a decision model answers what it is sure of and an LLM answers the rest, priced by the summed cost of every call. On by default on LangWatch Cloud; turn it off per organization via a targeting rule. Off by default on a self-hosted install, whose judgements through Connect carry no route, so it never offers routing unless an operator switches it on. On, an LLM-judge evaluation on LangWatch Evals Preview sends the llm_judge route and the Instant Evals column says it routes; an own decision model is never routed. Off, no caller sends a route and every judgement is the single hosted classifier call it is today. The route table and prices are deploy-time configuration; with none set, as on a self-hosted install, every slot goes to the hosted classifier at its published rate, so the answer and the cost are today's.",
+      "Routes an organization's Instant Evals judgements through the LangWatch Judge router: a decision model answers what it is sure of and an LLM answers the rest, priced by the summed cost of every call. On by default on LangWatch Cloud; turn it off per organization via a targeting rule. Off by default on a self-hosted install, whose judgements through Connect carry no route, so it never offers routing unless an operator switches it on. On, the judge picker names LangWatch's hosted model LangWatch Evals (preview), and an LLM judge on it (saved as langwatch/instant-evals, or on langwatch/evals-preview) sends the llm_judge route where the project's Instant Evals column is LangWatch's; a judge on langwatch/instant-preview, and any judge answered by an own decision model, is never routed. Off, the picker names it LangWatch Instant (preview), no caller sends a route, and every judgement is the single hosted classifier call it is today. The route table and prices are deploy-time configuration; with none set, as on a self-hosted install, every slot goes to the hosted classifier at its published rate, so the answer and the cost are today's.",
   },
   {
     key: "release_lwql_workbench",
     scope: "PRODUCT",
     defaultValue: false,
+    selfHostedDefaultValue: true,
     description:
-      "Gates the whole LangWatchQL surface — the Custom query workbench UI and the analytics.lwql tRPC endpoints — while it is experimental. Off by default; enable per project or organization via a targeting rule, or globally via the operator store.",
+      "Gates the whole LangWatchQL surface: the Custom query workbench UI, the analytics.lwql tRPC endpoints and building widgets on a dashboard. Off by default on LangWatch Cloud, where targeting rules and the operator store roll it out. On by default on a self-hosted install; an operator switches it off per project or organization with a targeting rule. An install whose LangWatchQL backend is not provisioned refuses each query by name (lwql_not_provisioned) instead of running it.",
   },
   {
     key: "release_ui_ai_gateway_menu_enabled",

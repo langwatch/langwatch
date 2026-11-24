@@ -650,7 +650,8 @@
               "ai-gateway/overview",
               "ai-gateway/quickstart",
               "ai-gateway/cap-spend-per-team",
-              "ai-gateway/concepts"
+              "ai-gateway/concepts",
+              "ai-gateway/a2a-proxy"
             ]
           },
           {
@@ -1745,6 +1746,17 @@
               "api-reference/governance-ocsf/export-project-traces-as-ocsf-1-9-0",
               "api-reference/governance-ocsf/export-the-audit-log-as-ocsf-1-9-0",
               "api-reference/governance-ocsf/push-ocsf-events-in-from-another-source"
+            ]
+          },
+          {
+            "group": "Security Lake Sources",
+            "pages": [
+              "api-reference/governance-security-lake/overview",
+              "api-reference/governance-security-lake/add-an-aws-security-lake-source",
+              "api-reference/governance-security-lake/edit-an-aws-security-lake-source",
+              "api-reference/governance-security-lake/test-a-security-lake-source-s-connection",
+              "api-reference/governance-security-lake/read-a-security-lake-source-s-health",
+              "api-reference/governance-security-lake/read-a-security-lake-source"
             ]
           },
           {

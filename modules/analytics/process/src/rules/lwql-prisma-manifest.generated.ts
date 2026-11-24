@@ -1488,6 +1488,22 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly RetentionApplyStatus: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly scopeType: "RetentionPolicyScopeType";
+    readonly scopeId: "String";
+    readonly changedAt: "Float?";
+    readonly appliedAt: "Float?";
+    readonly raisedAt: "Float?";
+    readonly shortenedAt: "Float?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
+  };
   readonly DataPrivacyPolicy: {
     readonly id: "String";
     readonly organizationId: "String";
@@ -2275,6 +2291,24 @@ export interface LwqlPrismaRows {
     readonly updatedAt: "DateTime";
     readonly createdById: "String?";
     readonly updatedById: "String?";
+  };
+  readonly GatewayA2ATarget: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly projectId: "String?";
+    readonly name: "String";
+    readonly agentName: "String";
+    readonly cardUrl: "String";
+    readonly upstreamUrl: "String";
+    readonly encryptedUpstreamHeaders: "String?";
+    readonly restrictToAllowList: "Boolean";
+    readonly allowedVirtualKeyIds: "String[]";
+    readonly blocked: "Boolean";
+    readonly blockReason: "String?";
+    readonly createdById: "String";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+    readonly archivedAt: "DateTime?";
   };
   readonly GatewayConnectUpstream: {
     readonly organizationId: "String";

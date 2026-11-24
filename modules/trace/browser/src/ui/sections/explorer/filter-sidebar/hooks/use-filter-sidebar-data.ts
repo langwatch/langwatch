@@ -364,8 +364,15 @@ export function useFilterSidebarData() {
             discovered,
             filtered: filtered.data,
             filteredIsPlaceholder: filtered.isPlaceholderData,
+            filteredMatchesNothing: filtered.matchesNothing,
           }),
-    [isSamplePreview, discovered, filtered.data, filtered.isPlaceholderData],
+    [
+      isSamplePreview,
+      discovered,
+      filtered.data,
+      filtered.isPlaceholderData,
+      filtered.matchesNothing,
+    ],
   );
 
   const lensSectionOrder = useFacetLensStore((s) => s.lens.sectionOrder);

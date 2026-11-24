@@ -82,6 +82,12 @@ import {
   parseVirtualKeyConfig,
   type ArchiveGatewayBudgetInput,
   type ArchiveGatewayCacheRuleInput,
+  type CreateGatewayA2aTargetInput,
+  type GatewayA2aTargetDto,
+  type SetGatewayA2aTargetBlockedInput,
+  type SetProjectGatewayA2aTargetBlockedInput,
+  type UpdateGatewayA2aTargetInput,
+  type UpdateProjectGatewayA2aTargetInput,
   type ArchiveGatewayGuardrailInput,
   type CreateGatewayBudgetInput,
   type CreateGatewayCacheRuleInput,
@@ -254,10 +260,12 @@ import type { GatewaySpendFoldCacheRepository } from "../repositories/gateway-sp
 import type { GatewaySpendScopeRepository } from "../repositories/gateway-spend-scope.repository.ts";
 import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.repository.ts";
 import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
+import { a2aTargetToDto } from "../rules/gateway-a2a-target.rules.ts";
 import {
   ConnectManagedKeyService,
   type ManagedKeyProvisionedSender,
 } from "../services/connect-managed-key.service.ts";
+import { GatewayA2aTargetService } from "../services/gateway-a2a-target.service.ts";
 import { GatewayAgentCacheService } from "../services/gateway-agent-cache.service.ts";
 import { GatewayAuthzScopePermissionsService } from "../services/gateway-authz-scope-permissions.service.ts";
 import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
@@ -495,6 +503,8 @@ interface GatewayAppDependencies extends GatewayRestInfrastructure {
    * copies of the same tables, so a rule written through one was invisible to the other.
    */
   budgetDecisions: GatewayService;
+  /** The A2A target registry the `/a2a/{name}` proxy reads through the config bundle. */
+  a2aTargets: GatewayA2aTargetService;
   /**
    * The ClickHouse budget-spend source. Absent on a deployment without it,
    * which is why every read of it degrades explicitly rather than reporting a
@@ -864,6 +874,13 @@ function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayContro
   return {
     virtualKeys,
     budgetDecisions,
+    a2aTargets: GatewayA2aTargetService.create({
+      repository: repositories.a2aTargets,
+      changeEvents: changes,
+      auditLog: repositories.audit,
+      projects,
+      transactions: repositories.transactions,
+    }),
     budgetSpend,
     changeEvents: changes,
     principalSpend,
@@ -1262,6 +1279,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
         repository: repositories.traceExportKeys,
         apiKeys: setup.dependencies.apiKeys,
       }),
+      a2aTargets: controlPlane.a2aTargets,
     });
     const guardrails = GatewayGuardrailEvaluationService.create({
       repository: repositories.guardrails,
@@ -2080,6 +2098,73 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
 
   archiveCacheRule(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
     return this.#dependencies.budgetDecisions.cacheRuleArchive(input);
+  }
+
+  async listA2aTargets(organizationId: string): Promise<GatewayA2aTargetDto[]> {
+    await this.#dependencies.assertOrganizationExists(organizationId);
+    return (await this.#dependencies.a2aTargets.list(organizationId)).map(a2aTargetToDto);
+  }
+
+  async createA2aTarget(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetDto> {
+    await this.#dependencies.assertOrganizationExists(input.organizationId);
+    return a2aTargetToDto(await this.#dependencies.a2aTargets.create(input));
+  }
+
+  async updateA2aTarget(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetDto> {
+    await this.#dependencies.assertOrganizationExists(input.organizationId);
+    return a2aTargetToDto(await this.#dependencies.a2aTargets.update(input));
+  }
+
+  async setA2aTargetBlocked(input: SetGatewayA2aTargetBlockedInput): Promise<GatewayA2aTargetDto> {
+    await this.#dependencies.assertOrganizationExists(input.organizationId);
+    return a2aTargetToDto(await this.#dependencies.a2aTargets.setBlocked(input));
+  }
+
+  async archiveA2aTarget(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<GatewayA2aTargetDto> {
+    await this.#dependencies.assertOrganizationExists(input.organizationId);
+    return a2aTargetToDto(await this.#dependencies.a2aTargets.archive(input));
+  }
+
+  async listProjectA2aTargets(input: { projectId: string }): Promise<GatewayA2aTargetDto[]> {
+    const organizationId = await this.#dependencies.organizationIdForProject(input.projectId);
+    const targets = await this.#dependencies.a2aTargets.listForProject({
+      organizationId,
+      projectId: input.projectId,
+    });
+    return targets.map(a2aTargetToDto);
+  }
+
+  async updateProjectA2aTarget(
+    input: UpdateProjectGatewayA2aTargetInput,
+  ): Promise<GatewayA2aTargetDto> {
+    const organizationId = await this.#dependencies.organizationIdForProject(input.projectId);
+    return a2aTargetToDto(
+      await this.#dependencies.a2aTargets.updateForProject({ ...input, organizationId }),
+    );
+  }
+
+  async setProjectA2aTargetBlocked(
+    input: SetProjectGatewayA2aTargetBlockedInput,
+  ): Promise<GatewayA2aTargetDto> {
+    const organizationId = await this.#dependencies.organizationIdForProject(input.projectId);
+    return a2aTargetToDto(
+      await this.#dependencies.a2aTargets.setBlockedForProject({ ...input, organizationId }),
+    );
+  }
+
+  async archiveProjectA2aTarget(input: {
+    id: string;
+    projectId: string;
+    actorUserId: string;
+  }): Promise<GatewayA2aTargetDto> {
+    const organizationId = await this.#dependencies.organizationIdForProject(input.projectId);
+    return a2aTargetToDto(
+      await this.#dependencies.a2aTargets.archiveForProject({ ...input, organizationId }),
+    );
   }
 
   async findProjectOrganization(projectId: string): Promise<string | null> {

@@ -266,11 +266,12 @@ Feature: Redacting personal data out of a span at ingestion
     Then the model answers it and Presidio is not called
 
   @unit
-  Scenario: Only a resolved strict policy reaches the PII redaction model
+  Scenario: Only a batch whose effective PII level is strict reaches the PII redaction model
     Given a deployment that names the PII redaction model
     And the project's organization is allowlisted for it
     When a batch whose request level is STRICT is analysed
     Then the model answers it when the project's resolved policy is strict, for spans and log records alike
+    And the model answers it when the resolved policy is essential, which the STRICT request raises to strict
     And Presidio answers it when the resolved policy is custom, even with every analysis-service entity selected
     And Presidio answers it when the project's policy could not be loaded
     And in both of those cases the model is not called and the flag is not read
@@ -283,8 +284,9 @@ Feature: Redacting personal data out of a span at ingestion
     Then Presidio answers it and the model is not called
     And a span redacted through the whole module never invokes the model's Lambda
 
-  # Self-hosted, the model comes with the Enterprise licence and has no usage price. Like SSO
-  # and SCIM, the licence's signature is what counts: an expired licence keeps the model.
+  # Self-hosted, the model comes with the Enterprise licence and has no usage price. Routing
+  # follows the organization's active plan. Unlike SSO, an expired licence does not keep the
+  # model: entitlement resolves it to the baseline plan, so the batch stays on Presidio.
 
   @unit
   Scenario: A self-hosted organization without an Enterprise licence keeps the Presidio path
@@ -302,6 +304,14 @@ Feature: Redacting personal data out of a span at ingestion
     And the organization's active plan is Enterprise
     When a strict batch is analysed
     Then the model answers it and Presidio is not called
+
+  @unit
+  Scenario: A self-hosted organization whose Enterprise licence expired keeps the Presidio path
+    Given a self-hosted deployment that names the PII redaction model, with its flag forced on
+    And the organization's Enterprise licence has expired, so its active plan is the baseline plan
+    When a strict batch is analysed
+    Then Presidio answers it and the model is not called
+    And the batch is counted with the reason not_licensed
 
   @unit
   Scenario: A self-hosted organization's plan is read once a minute

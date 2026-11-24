@@ -467,6 +467,15 @@ Rule: A Code Mode session reads like the real CLI, not like REPL and Poll
     And it is named after the tool and carries the command it ran
     And it is ordered by the time it was decided, after the script that made it
 
+  @unit
+  Scenario: A script result Claude Code delivered without a Poll call is listed
+    Given a Claude Code session in Code Mode whose script finished before the model called Poll
+    And Claude Code handed its result to the model as a Poll call of its own in the next request
+    When the transcript is derived from the session's spans and logs
+    Then that result is a Poll tool call carrying the delivered text
+    And it is listed once although later requests repeat it
+    And a request body that does not parse adds nothing
+
   @integration
   Scenario: The calls a Code Mode script made are shown under its Code row
     Given a Claude Code session in Code Mode whose script ran Bash commands
@@ -548,11 +557,19 @@ Rule: A Code Mode session reads like the real CLI, not like REPL and Poll
     And a faint note says Claude Code recorded only the start of the script and its full length
 
   @integration
-  Scenario: A Code call with no script recorded says so
-    Given a Claude Code session in Code Mode exported without content
+  Scenario: A session exported without content says so once
+    Given a Claude Code session in Code Mode exported without content, two scripts and a poll
     When the Terminal tab renders the session
-    Then the Code row says the script was not recorded
+    Then one faint line at the top says "This agent sends metadata only, so its prompts, scripts and output are not recorded"
+    And each Code row reads "Code" with no note of its own
     And the poll is still one wait line with its duration
+
+  @integration
+  Scenario: A Code call with no script recorded says so
+    Given a Claude Code session in Code Mode that recorded its prompt, with one script exported without its source
+    When the Terminal tab renders the session
+    Then that Code row says the script was not recorded
+    And no line says the agent sends metadata only
 
   @unit
   Scenario: A model reply that only names its tool calls adds no line of its own
