@@ -1,7 +1,4 @@
-/**
- * @see specs/identity/scim-sso-signin.feature
- * @see specs/identity/sso-signin-error-boundary.feature
- */
+/** @see specs/identity/sso-signin-error-boundary.feature */
 import { describe, expect, it } from "vitest";
 
 import {
@@ -9,6 +6,7 @@ import {
   isStableAuthError,
   normalizeSignInErrorCode,
   signInErrorMayCross,
+  STABLE_AUTH_ERRORS,
 } from "../sign-in-error-codes.ts";
 
 describe("normalizeSignInErrorCode", () => {
@@ -19,6 +17,44 @@ describe("normalizeSignInErrorCode", () => {
       expect(normalizeSignInErrorCode(undefined)).toBeNull();
       expect(normalizeSignInErrorCode("")).toBeNull();
       expect(signInErrorMayCross(null)).toBe(false);
+    });
+  });
+
+  describe("when the library refuses a link because the emails differ", () => {
+    /** @scenario "The different-email refusal shows the specific message" */
+    it("maps email_does_not_match to DIFFERENT_EMAIL_NOT_ALLOWED", () => {
+      expect(normalizeSignInErrorCode("email_does_not_match")).toBe("DIFFERENT_EMAIL_NOT_ALLOWED");
+    });
+  });
+
+  describe("when the library refuses a sign-in for an account under another method", () => {
+    /** @scenario "The native account-link refusal maps to a stable sign-in error" */
+    it("maps account_not_linked to OAuthAccountNotLinked, which is stable and may cross", () => {
+      const code = normalizeSignInErrorCode("account_not_linked");
+      expect(code).toBe("OAuthAccountNotLinked");
+      expect(isStableAuthError(code)).toBe(true);
+      expect(signInErrorMayCross("account_not_linked")).toBe(true);
+    });
+  });
+
+  describe("when the provider account being linked already belongs to another user", () => {
+    /** @scenario "A provider account already linked to another user crosses with its own code" */
+    it("maps it to its own screen code, which is stable and may cross", () => {
+      const code = normalizeSignInErrorCode("account_already_linked_to_different_user");
+      expect(code).toBe("ACCOUNT_LINKED_TO_ANOTHER_USER");
+      expect(isStableAuthError(code)).toBe(true);
+      expect(signInErrorMayCross("account_already_linked_to_different_user")).toBe(true);
+    });
+  });
+
+  describe("when the code is already a screen code", () => {
+    it.each([
+      "SSO_PROVIDER_NOT_ALLOWED",
+      "DIFFERENT_EMAIL_NOT_ALLOWED",
+      "OAuthAccountNotLinked",
+      "ACCOUNT_LINKED_TO_ANOTHER_USER",
+    ])("returns %s as itself", (code) => {
+      expect(normalizeSignInErrorCode(code)).toBe(code);
     });
   });
 
@@ -40,7 +76,7 @@ describe("normalizeSignInErrorCode", () => {
 
   describe("when an address carries a spelling no release redirects with", () => {
     /** @scenario "A bookmarked error address with a retired spelling shows the generic error" */
-    it.each(["LINKING_DIFFERENT_EMAILS_NOT_ALLOWED"])(
+    it.each(["LINKING_DIFFERENT_EMAILS_NOT_ALLOWED", "some_other_error"])(
       "leaves %s as it is, so it is withheld and the screen shows the generic error",
       (code) => {
         expect(normalizeSignInErrorCode(code)).toBe(code);
@@ -56,5 +92,22 @@ describe("normalizeSignInErrorCode", () => {
       expect(isStableAuthError(code)).toBe(true);
       expect(signInErrorMayCross(code)).toBe(true);
     });
+  });
+});
+
+describe("isStableAuthError", () => {
+  describe("when the code is one somebody has to act on", () => {
+    it.each(STABLE_AUTH_ERRORS)("treats %s as stable, so the screen does not bounce", (code) => {
+      expect(isStableAuthError(code)).toBe(true);
+    });
+  });
+
+  describe("when there is no code, or one a retry may clear", () => {
+    it.each([null, undefined, "", "CredentialsSignin", "some_other_error"])(
+      "treats %s as not stable",
+      (code) => {
+        expect(isStableAuthError(code)).toBe(false);
+      },
+    );
   });
 });
