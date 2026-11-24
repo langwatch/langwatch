@@ -120,6 +120,18 @@ Feature: CI exit gate for platform experiment runs
     Then the command exits with code 1
 
   @unit
+  Scenario: The CLI opt-in fails a waited run that was stopped before it completed
+    Given a run that was stopped, so it carries no evaluator results
+    When I run "langwatch experiment run quality-check --wait --fail-on-evaluator-failures"
+    Then the command exits with code 1
+
+  @unit
+  Scenario: The CLI leaves a stopped run's exit code alone by default
+    Given a run that was stopped, so it carries no evaluator results
+    When I run "langwatch experiment run quality-check --wait"
+    Then the command exits with code 0
+
+  @unit
   Scenario: The CLI opt-in leaves a clean run green
     Given a completed run with no errored cell and every evaluation passed
     When I run "langwatch experiment run quality-check --wait --fail-on-evaluator-failures"

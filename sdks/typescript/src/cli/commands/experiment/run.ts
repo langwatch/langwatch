@@ -121,6 +121,8 @@ function reportFinishedRun({
 }): void {
   if (status.status !== "completed") {
     spinner.warn(`Experiment ${status.status}`);
+    // A run that never completed carries no evaluator results, so the opt-in cannot pass it.
+    if (failOnEvaluatorFailures) process.exitCode = 1;
     return;
   }
   if (failOnEvaluatorFailures && evaluatorTalliesMissing(status.summary)) {

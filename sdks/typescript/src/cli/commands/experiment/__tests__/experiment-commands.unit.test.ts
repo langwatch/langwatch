@@ -370,6 +370,30 @@ describe("runExperimentCommand()", () => {
       expect(process.exitCode).toBe(1);
     });
 
+    const stoppedRun = { runId: "run_123", status: "stopped", progress: 1, total: 3 };
+
+    /** @scenario "The CLI opt-in fails a waited run that was stopped before it completed" */
+    it("fails the job when opted in and the run was stopped", async () => {
+      mockGetRunStatus.mockResolvedValue(stoppedRun);
+
+      const result = await runExperimentCommand("quality-check", {
+        wait: true,
+        failOnEvaluatorFailures: true,
+      });
+
+      expect(result?.data).toMatchObject({ status: "stopped" });
+      expect(process.exitCode).toBe(1);
+    });
+
+    /** @scenario "The CLI leaves a stopped run's exit code alone by default" */
+    it("leaves a stopped run's exit code alone by default", async () => {
+      mockGetRunStatus.mockResolvedValue(stoppedRun);
+
+      await runExperimentCommand("quality-check", { wait: true });
+
+      expect(process.exitCode).toBeUndefined();
+    });
+
     /** @scenario "The CLI opt-in leaves a clean run green" */
     it("leaves a clean run green when opted in", async () => {
       mockGetRunStatus.mockResolvedValue(
