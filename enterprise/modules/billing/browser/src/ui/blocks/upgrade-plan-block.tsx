@@ -2,10 +2,10 @@ import { AccessState } from "@langwatch/design-system/access-state";
 /**
  * Upgrade Plan Block - displays upgrade CTA with features and dynamic pricing
  */
-import { Button, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
-import { Check } from "lucide-react";
+import { Button, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
+import { PlanFeatureList } from "../elements/plan-feature-list.tsx";
 import { PricingSummary } from "../elements/pricing-summary.tsx";
 
 export function UpgradePlanBlock({
@@ -62,19 +62,7 @@ export function UpgradePlanBlock({
           perSeatPrice={monthlyEquivalent}
           totalTestId="upgrade-total"
         />
-        <SimpleGrid
-          data-testid="upgrade-plan-features-grid"
-          templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }}
-          gap={2}
-          color="fg.muted"
-        >
-          {features.map((feature, index) => (
-            <HStack key={index} gap={2}>
-              <Check size={16} />
-              <Text fontSize="sm">{feature}</Text>
-            </HStack>
-          ))}
-        </SimpleGrid>
+        <PlanFeatureList features={features} data-testid="upgrade-plan-features-grid" />
       </VStack>
     </AccessState>
   );

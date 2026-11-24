@@ -31,10 +31,12 @@ export type PIICheckOptions = {
   /** The tenant the batch belongs to, when the path has one. */
   projectId?: string;
   /**
-   * The PII level of the tenant's resolved policy, absent when none was resolved. Only a
-   * resolved strict level may reach the PII redaction model.
+   * The level in force: the resolved policy's level, or under an essential policy the
+   * request's own level. Absent when no policy was resolved. Only strict reaches the model.
    */
-  resolvedPiiLevel?: PiiLevel;
+  effectivePiiLevel?: PiiLevel;
+  /** The record's trace and span, which the model's spend request id is derived from. */
+  recordKey?: string;
 };
 
 /**
@@ -114,8 +116,15 @@ const batchClearPII = async ({
   options: PIICheckOptions;
   spareNamesAndPlaces: readonly boolean[];
 }): Promise<(string | null)[]> => {
-  const { piiRedactionLevel, mainMethod, entities, exceptPatterns, projectId, resolvedPiiLevel } =
-    options;
+  const {
+    piiRedactionLevel,
+    mainMethod,
+    entities,
+    exceptPatterns,
+    projectId,
+    effectivePiiLevel,
+    recordKey,
+  } = options;
 
   if (mainMethod === "google_dlp") {
     return runGoogleDlpBatch({
@@ -133,8 +142,9 @@ const batchClearPII = async ({
       piiRedactionLevel,
       entities,
       projectId,
-      resolvedPiiLevel,
+      effectivePiiLevel,
       spareNamesAndPlaces,
+      recordKey,
     });
   } catch {
     // The DLP fallback redacts by level, not by the custom entity subset; the
@@ -350,13 +360,13 @@ export class PiiRedactionPolicyService {
     entities,
     exceptPatterns,
     projectId,
-    resolvedPiiLevel,
+    effectivePiiLevel,
   }: {
     piiRedactionLevel: PIIRedactionLevel;
     entities?: readonly string[] | undefined;
     exceptPatterns?: readonly string[] | undefined;
     projectId?: string | undefined;
-    resolvedPiiLevel?: PiiLevel | undefined;
+    effectivePiiLevel?: PiiLevel | undefined;
   }): Promise<RedactionOptions> {
     const disabled = this.deps.featureFlags
       ? await this.deps.featureFlags.isEnabled("ops_pii_strict_presidio_redaction_disabled", {
@@ -390,7 +400,7 @@ export class PiiRedactionPolicyService {
         ...(entities && entities.length > 0 ? { entities } : {}),
         ...(exceptPatterns && exceptPatterns.length > 0 ? { exceptPatterns } : {}),
         ...(projectId ? { projectId } : {}),
-        ...(resolvedPiiLevel ? { resolvedPiiLevel } : {}),
+        ...(effectivePiiLevel ? { effectivePiiLevel } : {}),
       },
     };
   }

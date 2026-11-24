@@ -29,6 +29,95 @@ describe("projectSwitchGroups", () => {
   });
 });
 
+describe("projectSwitchGroups within one organization", () => {
+  /** @scenario "A settings page shows the top bar's searchable project picker" */
+  it("titles each group by its team alone, as the top bar does", () => {
+    const groups = projectSwitchGroups([
+      {
+        id: "org-a",
+        name: "Acme",
+        teams: [
+          { id: "team-a", name: "Platform", projects: [project("Web")] },
+          { id: "team-b", name: "Growth", projects: [project("Leads")] },
+        ],
+      },
+    ]);
+
+    expect(groups.map((group) => group.title)).toEqual(["Platform", "Growth"]);
+  });
+
+  it("leaves out a team with no project", () => {
+    const groups = projectSwitchGroups([
+      {
+        id: "org-a",
+        name: "Acme",
+        teams: [
+          { id: "team-a", name: "Platform", projects: [project("Web")] },
+          { id: "team-empty", name: "Empty", projects: [] },
+        ],
+      },
+    ]);
+
+    expect(groups.map((group) => group.key)).toEqual(["team-a"]);
+  });
+});
+
+describe("projectSwitchGroups across organizations", () => {
+  it("lists the active organization's teams first, the rest by name", () => {
+    const organization = (id: string, name: string) => ({
+      id,
+      name,
+      teams: [{ id: `team-${id}`, name: "Core", projects: [project(name)] }],
+    });
+    const groups = projectSwitchGroups(
+      [organization("org-a", "Acme"), organization("org-z", "Zeta"), organization("org-b", "Beta")],
+      { organizationId: "org-z" },
+    );
+
+    expect(groups.map((group) => group.title)).toEqual([
+      "Zeta - Core",
+      "Acme - Core",
+      "Beta - Core",
+    ]);
+  });
+});
+
+describe("projectSwitchGroups with personal workspaces", () => {
+  const graph = [
+    {
+      id: "org-a",
+      name: "Acme",
+      teams: [
+        {
+          id: "mine",
+          name: "Mine",
+          isPersonal: true,
+          ownerUserId: "user-1",
+          projects: [project("A")],
+        },
+        {
+          id: "theirs",
+          name: "Theirs",
+          isPersonal: true,
+          ownerUserId: "user-2",
+          projects: [project("B")],
+        },
+      ],
+    },
+  ];
+
+  /** @scenario "A colleague's personal workspace stays out of the list" */
+  it("lists the reader's own personal workspace and not a colleague's", () => {
+    expect(projectSwitchGroups(graph, { userId: "user-1" }).map((group) => group.key)).toEqual([
+      "mine",
+    ]);
+  });
+
+  it("lists no personal workspace while the reader is unknown", () => {
+    expect(projectSwitchGroups(graph)).toEqual([]);
+  });
+});
+
 describe("projectSwitchHref", () => {
   describe("when the address names the current project", () => {
     it("keeps the page, under the new project", () => {

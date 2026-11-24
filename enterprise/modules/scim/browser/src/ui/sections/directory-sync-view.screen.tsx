@@ -68,7 +68,7 @@ export default function DirectorySyncView() {
       <PageLayout.Header>
         <PageLayout.Heading>Directory sync</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start">
         <SearchInput
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}

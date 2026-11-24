@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { PrismaRepository } from "@langwatch/prisma-client";
+import { PrismaRepository, skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import {
   MAX_CODING_REPOSITORY_KEYS,
   type NurturingCodingMilestonesRepository,
   type NurturingMilestonesRepository,
+  type NurturingOrganizationAdminRepository,
   type NurturingOrganizationCounts,
   type NurturingOrganizationRow,
   type NurturingTraceMilestonesRepository,
@@ -35,7 +36,8 @@ export class PrismaNurturingMilestonesRepository
   implements
     NurturingMilestonesRepository,
     NurturingCodingMilestonesRepository,
-    NurturingTraceMilestonesRepository
+    NurturingTraceMilestonesRepository,
+    NurturingOrganizationAdminRepository
 {
   static create({
     prisma,
@@ -89,6 +91,16 @@ export class PrismaNurturingMilestonesRepository
         where: { organizationId },
         data: { adminUserId },
       });
+  }
+
+  async forgetAdmin({ adminUserId }: Readonly<{ adminUserId: string }>): Promise<void> {
+    await this.#database.$executeRaw`${skipTenantCheck({
+      // An erased account is admin of no organization: every row naming it is cleared by user.
+      SKIP_TENANT_CHECK: true,
+    })}
+      UPDATE "NurturingOrganization"
+         SET "adminUserId" = NULL, "updatedAt" = now()
+       WHERE "adminUserId" = ${adminUserId}`;
   }
 
   countEvaluation({

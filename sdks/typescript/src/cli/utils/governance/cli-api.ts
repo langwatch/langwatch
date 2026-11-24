@@ -4,10 +4,16 @@
  */
 
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
-import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
+import { buildRequestHeaders, buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
-import { type GovernanceConfig } from "./config";
+import {
+  type LoginElsewhere,
+  loginElsewhereMessage,
+  loginMadeElsewhere,
+  resolvePersonCredentials,
+} from "../apiKey";
+import { type GovernanceConfig, isLoggedIn, loadConfig } from "./config";
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
 import {
   canRefreshSession,
@@ -126,6 +132,15 @@ export interface CliApiOptions {
    * since fetch has no default timeout of its own.
    */
   timeoutMs?: number;
+  /** Seam for the management door's credentials (the login key and its project). Tests only. */
+  managementCredentials?: () => Promise<ManagementCredentials>;
+}
+
+/** What the management REST door authenticates with: the login key, acting in a project. */
+export interface ManagementCredentials {
+  apiKey: string;
+  endpoint: string;
+  projectId?: string;
 }
 
 /** Copy shown when the session cannot be recovered without a fresh login. */
@@ -477,6 +492,92 @@ async function requestREST<T>(
     };
   };
   const res = await authorizedFetch(cfg, url, buildInit, options);
+  return readRestAnswer<T>({ res, method, path });
+}
+
+/**
+ * Sends a request to the management door (`/api/v1/...`), which takes an API key and the project
+ * it acts in, not the device access token: the login key, in the personal project, as every other
+ * `/api/v1` command sends. The organization answers the same from any of its projects.
+ */
+async function requestManagementREST<T>(
+  method: RestMethod,
+  path: string,
+  options: { body?: unknown } & CliApiOptions = {},
+): Promise<T> {
+  const credentials = await (options.managementCredentials ?? managementCredentialsFromLogin)();
+  const headers: Record<string, string> = {
+    ...buildRequestHeaders({ apiKey: credentials.apiKey, projectId: credentials.projectId }),
+    Accept: "application/json",
+    ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
+  };
+  const res = await (options.fetchImpl ?? fetch)(normalizeEndpoint(credentials.endpoint) + path, {
+    method,
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    ...(options.timeoutMs === undefined ? {} : { signal: AbortSignal.timeout(options.timeoutMs) }),
+  });
+  return readRestAnswer<T>({ res, method, path });
+}
+
+async function managementCredentialsFromLogin(): Promise<ManagementCredentials> {
+  const elsewhere = loginMadeElsewhere();
+  return managementCredentialsOrRefusal({
+    elsewhere,
+    credentials: elsewhere ? undefined : await resolvePersonCredentials(),
+    isSignedIn: isLoggedIn(loadConfig()),
+  });
+}
+
+/**
+ * The login key and the project it acts in, or the refusal that says why there is none. A missing
+ * project is refused rather than left to `LANGWATCH_PROJECT_ID`, which may name another org's.
+ */
+export function managementCredentialsOrRefusal({
+  elsewhere,
+  credentials,
+  isSignedIn,
+}: {
+  elsewhere: LoginElsewhere | undefined;
+  credentials: ManagementCredentials | undefined;
+  isSignedIn: boolean;
+}): ManagementCredentials & { projectId: string } {
+  if (elsewhere) {
+    throw new GovernanceCliError(
+      401,
+      "login_endpoint_mismatch",
+      loginElsewhereMessage({ ...elsewhere, canUseApiKey: false }),
+    );
+  }
+  if (!credentials) {
+    throw new GovernanceCliError(
+      401,
+      "not_logged_in",
+      isSignedIn
+        ? "This device login holds no login key. Run `langwatch login --device` again."
+        : "Not logged in. Run `langwatch login --device` first.",
+    );
+  }
+  if (!credentials.projectId) {
+    throw new GovernanceCliError(
+      409,
+      "personal_project_unknown",
+      "Your personal project could not be read, so the request would name no project. Run `langwatch login --device` again.",
+    );
+  }
+  return { ...credentials, projectId: credentials.projectId };
+}
+
+/** Reads a REST answer, raising the failure the platform named. */
+async function readRestAnswer<T>({
+  res,
+  method,
+  path,
+}: {
+  res: Response;
+  method: RestMethod;
+  path: string;
+}): Promise<T> {
   if (res.status === 204) return undefined as T;
   if (res.status === 401) {
     const body = await res.json().catch(() => undefined);
@@ -682,25 +783,21 @@ export async function describeIngestionKey(
 // IngestionTemplate verbs ----------------------------------------------------
 
 export async function adminListIngestionTemplates(
-  cfg: GovernanceConfig,
   options: CliApiOptions = {},
 ): Promise<IngestionTemplateRow[]> {
-  const body = await requestREST<{ ingestion_templates: IngestionTemplateRow[] }>(
-    cfg,
+  const body = await requestManagementREST<{ data: IngestionTemplateRow[] }>(
     "GET",
     "/api/v1/governance/ingestion-templates/admin",
     options,
   );
-  return body.ingestion_templates;
+  return body.data;
 }
 
 export async function getIngestionTemplate(
-  cfg: GovernanceConfig,
   id: string,
   options: CliApiOptions = {},
 ): Promise<IngestionTemplateRow> {
-  const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
-    cfg,
+  const body = await requestManagementREST<{ ingestion_template: IngestionTemplateRow }>(
     "GET",
     `/api/v1/governance/ingestion-templates/${encodeURIComponent(id)}`,
     options,
@@ -709,7 +806,6 @@ export async function getIngestionTemplate(
 }
 
 export async function createIngestionTemplate(
-  cfg: GovernanceConfig,
   input: {
     source_type: string;
     display_name: string;
@@ -720,8 +816,7 @@ export async function createIngestionTemplate(
   },
   options: CliApiOptions = {},
 ): Promise<IngestionTemplateRow> {
-  const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
-    cfg,
+  const body = await requestManagementREST<{ ingestion_template: IngestionTemplateRow }>(
     "POST",
     "/api/v1/governance/ingestion-templates",
     { ...options, body: input },
@@ -730,13 +825,11 @@ export async function createIngestionTemplate(
 }
 
 export async function updateIngestionTemplateOttlRules(
-  cfg: GovernanceConfig,
   id: string,
   ottlRules: string,
   options: CliApiOptions = {},
 ): Promise<IngestionTemplateRow> {
-  const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
-    cfg,
+  const body = await requestManagementREST<{ ingestion_template: IngestionTemplateRow }>(
     "PATCH",
     `/api/v1/governance/ingestion-templates/${encodeURIComponent(id)}/ottl-rules`,
     { ...options, body: { ottl_rules: ottlRules } },
@@ -745,12 +838,10 @@ export async function updateIngestionTemplateOttlRules(
 }
 
 export async function archiveIngestionTemplate(
-  cfg: GovernanceConfig,
   id: string,
   options: CliApiOptions = {},
-): Promise<{ ok: true }> {
-  return requestREST<{ ok: true }>(
-    cfg,
+): Promise<{ archived: true }> {
+  return requestManagementREST<{ archived: true }>(
     "DELETE",
     `/api/v1/governance/ingestion-templates/${encodeURIComponent(id)}`,
     { ...options },
@@ -758,12 +849,10 @@ export async function archiveIngestionTemplate(
 }
 
 export async function cloneIngestionTemplateFromPlatform(
-  cfg: GovernanceConfig,
   sourceTemplateId: string,
   options: CliApiOptions = {},
 ): Promise<IngestionTemplateRow> {
-  const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
-    cfg,
+  const body = await requestManagementREST<{ ingestion_template: IngestionTemplateRow }>(
     "POST",
     "/api/v1/governance/ingestion-templates/clone",
     {

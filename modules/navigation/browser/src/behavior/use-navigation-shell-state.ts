@@ -6,8 +6,14 @@
 import { useBreakpointValue } from "@langwatch/design-system/primitives";
 import { FrontendFlags, type FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import type { NavigationProject, NavigationUser } from "@langwatch/navigation-contract";
+import { useSyncExternalStore } from "react";
 
 import { belongsToNoOrganization } from "../model/belongs-to-no-organization.ts";
+import {
+  honourDashboardsSidebarHint,
+  readDashboardsSidebarHint,
+  subscribeToDashboardsSidebarHint,
+} from "../model/dashboards-sidebar-hint.ts";
 import { showsDevelopmentIndicator, useNavigationHost } from "../model/navigation-host.ts";
 import type { ProductId } from "../model/products.ts";
 import {
@@ -26,6 +32,7 @@ import {
   SHELL_SIDEBAR_WIDTH_EXPANDED,
 } from "../model/shell-layout.ts";
 import { useIsMobileViewport } from "./use-is-mobile-viewport.ts";
+import { useReachableProducts } from "./use-reachable-products.ts";
 
 export interface NavigationShellReadyState {
   status: "ready";
@@ -68,6 +75,14 @@ export function useNavigationShellState({
   const isSmallScreen = useBreakpointValue({ base: true, lg: false }, { fallback: "lg" });
   const isMobile = useIsMobileViewport();
   const host = useNavigationHost();
+  const { reachableProducts } = useReachableProducts();
+  const projectId = host.project()?.id;
+  const storedHint = useSyncExternalStore(
+    subscribeToDashboardsSidebarHint,
+    () => readDashboardsSidebarHint({ projectId }),
+    () => null,
+  );
+  const sidebarHint = honourDashboardsSidebarHint({ hint: storedHint, reachableProducts });
 
   const user = host.currentUser();
   const project = host.project();
@@ -92,6 +107,7 @@ export function useNavigationShellState({
     isOrgScope,
     isOnOwnPersonalProject: !!team?.isPersonal && team.ownerUserId === user?.id,
     organizationRole: host.organizationRole(),
+    sidebarHint,
   });
 
   if (user && route.isResolverRoute && isOrgless(host)) {

@@ -13,6 +13,7 @@ import type { PostgresNamedCollection } from "../features/provisioning/services/
 import { LangWatchQLViewProvisioningService } from "../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
 import { LangWatchQLViewStatementsService } from "../features/provisioning/services/langwatch-ql-view-statements.service.ts";
 import { clickHouseLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
+import { flooredViewNames } from "../rules/lwql-dedup-floor.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLAccessModelService,
@@ -161,6 +162,11 @@ export class LangWatchQLAccessModelDefinitionService {
       constant("max_result_rows", limits.maxResultRows),
       constant("max_result_bytes", limits.maxResultBytes),
       constant("result_overflow_mode", "throw", true),
+      // Spill to disk instead of failing at max_memory_usage (code 241).
+      constant("max_bytes_before_external_group_by", limits.maxBytesBeforeExternalGroupBy),
+      constant("max_bytes_before_external_sort", limits.maxBytesBeforeExternalSort),
+      constant("join_algorithm", limits.joinAlgorithm, true),
+      constant("max_bytes_in_join", limits.maxBytesInJoin),
       // The capability rides in each statement's SETTINGS clause; query_log never keeps it.
       constant("log_query_settings", 0),
       // Opt-in: no server default may turn a cache or introspection on for this identity.
@@ -333,6 +339,10 @@ export class LangWatchQLAccessModelDefinitionService {
           ...new Set([...view.join.sourceColumns, ...(view.join.onSourceColumns?.joined ?? [])]),
         ],
       });
+    }
+    // Before the views, so the views stay the trailing block their catalogue test reads.
+    for (const name of flooredViewNames(views)) {
+      grants.push({ database: names.database, table: name });
     }
     for (const view of views) {
       grants.push({ database: names.database, table: view.name });

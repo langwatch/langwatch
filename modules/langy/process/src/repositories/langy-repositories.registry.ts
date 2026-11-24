@@ -11,7 +11,6 @@ import type { LangyConversationRepository } from "./langy-conversation-projectio
 import type { LangyCredentialRepository } from "./langy-credential.repository.ts";
 import type { LangyDeleteConfirmationRepository } from "./langy-delete-confirmation.repository.ts";
 import type { LangyFeedbackPromptRepository } from "./langy-feedback-prompt.repository.ts";
-import type { LangyGithubPrCountRepository } from "./langy-github-pr-count.repository.ts";
 import type {
   LangyFrameDedupRepository,
   LangyResourceLinksRepository,
@@ -23,6 +22,7 @@ import type { LangyLocalControlRequestRepository } from "./langy-local-control-r
 import type { LangyLocalPresenceRepository } from "./langy-local-presence.repository.ts";
 import type { LangyLocalUserWaitRepository } from "./langy-local-user-wait.repository.ts";
 import type { LangyMessageRepository } from "./langy-message.repository.ts";
+import type { LangyPullRequestRepository } from "./langy-pull-request.repository.ts";
 import type { LangyRateLimitRepository } from "./langy-rate-limit.repository.ts";
 import type { LangySessionKeyRepository } from "./langy-session-key.repository.ts";
 import type { LangyTokenBufferRepository } from "./langy-token-buffer.repository.ts";
@@ -47,8 +47,6 @@ export interface LangyRepositories extends LangyDatabaseRepositories {
   readonly localControlRequests: LangyLocalControlRequestRepository;
   /** Which conversation each Langy key works for, its waiting cards and unspent Yes clicks. */
   readonly deleteConfirmations: LangyDeleteConfirmationRepository;
-  /** The per-user daily count of pull requests Langy opened. */
-  readonly githubPrCounts: LangyGithubPrCountRepository;
   /** When each person was last asked for feedback. */
   readonly feedbackPrompts: LangyFeedbackPromptRepository;
   /**
@@ -80,6 +78,8 @@ export interface LangyDatabaseRepositories {
   readonly admission: LangyTurnAdmissionRepository;
   readonly conversationState: StateProjectionStore<LangyConversationStateData>;
   readonly conversationTurnState: StateProjectionStore<LangyConversationTurnData>;
+  /** The pull requests Langy opened, one row each. */
+  readonly pullRequests: LangyPullRequestRepository;
   readonly messageStorage: AppendStore<LangyMessageProjectionRecord>;
   readonly sessionKeys: LangySessionKeyRepository;
 }

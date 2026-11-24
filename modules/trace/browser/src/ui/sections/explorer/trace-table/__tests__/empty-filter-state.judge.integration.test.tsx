@@ -26,8 +26,12 @@ vi.mock("../../../../../features/explorer/behavior/use-explorer-counts.ts", () =
 }));
 
 let mockChips: { runId: string | null; question: string }[] = [];
+let mockHasUnjudgeableEval = false;
 vi.mock("../../../../../features/instant-eval/behavior/use-instant-eval-runs.ts", () => ({
   useInstantEvalRuns: () => ({ chips: mockChips }),
+}));
+vi.mock("../../../../../features/instant-eval/behavior/use-has-unjudgeable-eval.ts", () => ({
+  useHasUnjudgeableEval: () => mockHasUnjudgeableEval,
 }));
 
 vi.mock("../query-breakdown-chips.tsx", () => ({
@@ -44,6 +48,7 @@ describe("<EmptyFilterState /> under an eval chip no run has answered", () => {
     useExplorerStore.getState().clearAll();
     useExplorerStore.getState().applyQueryText(QUERY);
     mockChips = [{ runId: null, question: "is the user annoyed" }];
+    mockHasUnjudgeableEval = false;
   });
 
   afterEach(() => {
@@ -62,6 +67,18 @@ describe("<EmptyFilterState /> under an eval chip no run has answered", () => {
         text: QUERY,
         nonce: 1,
       });
+    });
+  });
+
+  describe("when a NOT reaches the chip across an OR, so no run can answer it", () => {
+    /** @scenario "A NOT the run of a typed chip cannot answer is refused" */
+    it("says the NOT must be rewritten and offers no judge button that only ends in a refusal", () => {
+      mockHasUnjudgeableEval = true;
+      renderEmptyState();
+
+      expect(screen.getByText("This NOT cannot be judged as typed")).toBeInTheDocument();
+      expect(screen.getByText(/Rewrite the NOT beside them with AND/)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Judge these results" })).not.toBeInTheDocument();
     });
   });
 

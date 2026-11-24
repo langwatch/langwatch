@@ -94,6 +94,8 @@ interface LogContribution {
   traceId: string;
   input: string | null;
   output: string | null;
+  /** The record declared its output rather than having it inferred from a response. */
+  outputDeclared?: boolean;
   timeUnixMs: number;
   correlationSource: LogContributedEvent["data"]["correlationSource"];
   /** When the platform accepted the record: what its own time is checked against. */
@@ -220,6 +222,8 @@ export class TraceSummaryFoldProjection
       attributes: {},
       // storageAnchorMs frozen on first contribution (ADR-087)
       storageAnchorMs: 0,
+      // A trace never stored mints its id in the corrected layout (#9575)
+      idLayout: "v2",
       // events/costs removed (O(n^2) perf); occurredAt used for first-span detection
       occurredAt: 0,
     };
@@ -296,6 +300,7 @@ export class TraceSummaryFoldProjection
       scopeName: event.data.scopeName,
       body: event.data.body,
       attributes: event.data.attributes,
+      resourceAttributes: event.data.resourceAttributes,
     }).attributes;
 
     return TraceSummaryFoldProjection.applyLogContribution({
@@ -305,6 +310,7 @@ export class TraceSummaryFoldProjection
         traceId: event.data.traceId,
         input: logIO.input,
         output: logIO.output,
+        outputDeclared: logIO.outputDeclared === true,
         timeUnixMs: event.data.timeUnixMs,
         // Only a record carrying its own trace context reaches this fold here.
         correlationSource: "wire",
@@ -326,6 +332,7 @@ export class TraceSummaryFoldProjection
         traceId: event.data.traceId,
         input: event.data.input,
         output: event.data.output,
+        outputDeclared: event.data.outputDeclared === true,
         timeUnixMs: event.data.timeUnixMs,
         correlationSource: event.data.correlationSource,
         acceptedAtMs: event.occurredAt,
@@ -487,7 +494,7 @@ export class TraceSummaryFoldProjection
         TraceIOAccumulationService.shouldOverrideOutput({
           isRoot: false,
           outputFromRoot: state.outputFromRootSpan,
-          isExplicit: false,
+          isExplicit: contribution.outputDeclared === true,
           currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
           endTime: contribution.timeUnixMs,
           currentEndTime: outputSpanEndTimeMs,
@@ -495,7 +502,8 @@ export class TraceSummaryFoldProjection
       if (shouldReplace) {
         computedOutput = contribution.output;
         outputSpanEndTimeMs = contribution.timeUnixMs;
-        mergedAttributes["langwatch.reserved.output_source"] = OUTPUT_SOURCE.INFERRED;
+        mergedAttributes["langwatch.reserved.output_source"] =
+          contribution.outputDeclared === true ? OUTPUT_SOURCE.EXPLICIT : OUTPUT_SOURCE.INFERRED;
         delete mergedAttributes["langwatch.reserved.output_is_fallback"];
       }
     }

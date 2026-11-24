@@ -1,5 +1,5 @@
 Feature: Budget overview, the one source for every member-facing budget surface
-  Every place that tells a member about a budget (the /me page, the
+  Every place that tells a member about a budget (the /coding-agents page, the
   `langwatch login` epilogue, the REST endpoint behind it) reads one
   service, so the numbers agree everywhere and every number says WHICH
   budget it belongs to: "used $2.43 of $100.00 (whole organization
@@ -56,13 +56,13 @@ Feature: Budget overview, the one source for every member-facing budget surface
   @integration
   Scenario: Every surface reports the same spend for the same budget
     Given an organization budget with spend recorded in several projects
-    When the /me overview, the CLI budget-overview endpoint, and the budgets settings page each report that budget
+    When the /coding-agents overview, the CLI budget-overview endpoint, and the budgets settings page each report that budget
     Then all three report the same spent amount
 
   @integration
   Scenario: Spend recorded in an archived project still counts, on every surface
     Given an organization budget with spend recorded in an archived project
-    When the /me overview, the CLI budget-overview endpoint, and the budgets settings page each report that budget
+    When the /coding-agents overview, the CLI budget-overview endpoint, and the budgets settings page each report that budget
     Then all three include the archived project's spend
     And the figure matches the one the gateway enforces against
 

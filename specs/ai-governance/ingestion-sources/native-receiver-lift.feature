@@ -24,7 +24,7 @@ Feature: Native receiver-side lift via canonicalisation extractor pipeline
   platform-native tools.
 
   As a developer running Claude Code / Codex / Gemini CLI / opencode
-  on their `/me` ingestion endpoint, my session's cost, tokens,
+  on their `/coding-agents` ingestion endpoint, my session's cost, tokens,
   model, and conversation grouping land on the trace summary without
   the admin needing to author OTTL statements per tool.
 

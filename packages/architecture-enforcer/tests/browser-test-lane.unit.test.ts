@@ -139,6 +139,9 @@ describe("the real-browser test lane", () => {
       expect(BROWSER_LANE.map((m) => m.dir)).toEqual([
         "enterprise/modules/billing/browser",
         "modules/analytics/browser",
+        "modules/api-key/browser",
+        "modules/auth/browser",
+        "modules/authz/browser",
         "modules/experiment/browser",
         "modules/model-provider/browser",
         "modules/navigation/browser",

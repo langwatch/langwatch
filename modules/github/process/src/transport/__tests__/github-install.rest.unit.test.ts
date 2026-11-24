@@ -294,6 +294,16 @@ describe("given the GitHub installation routes", () => {
       expect(response.status).toBe(503);
       expect(api.sessionReads.count).toBe(0);
     });
+
+    /** @scenario Starting an installation on an instance without the GitHub App reads as a page */
+    it("answers a page the popup can read, naming the local folder way instead", async () => {
+      const api = mount({ configured: false });
+
+      const response = await api.install("mode=popup&organizationId=org_1");
+
+      expect(response.headers.get("content-type")).toContain("text/html");
+      expect(await response.text()).toContain("GitHub is not set up on this instance");
+    });
   });
 
   describe("when nobody is signed in", () => {

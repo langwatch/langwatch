@@ -458,7 +458,7 @@ describe("aggregation-builder", () => {
       // the substitution rewrite. Keep this list minimal and documented.
       const SPECIAL_CASE_ALLOWLIST = new Set([
         "TraceId", // -> uniqExact(trace_id)
-        "OccurredAt", // used only in period/date boundaries, not in outer aggregations
+        "LatestOccurredAt", // used only in period/date boundaries, not in outer aggregations
       ]);
       const { dedupSubstitutions } = __testOnly__;
       const registered = new Set(
@@ -1602,7 +1602,7 @@ describe("aggregation-builder", () => {
 
       expect(result.sql).toContain("documentId");
       expect(result.sql).toContain("count");
-      expect(result.sql).toContain("traceId");
+      expect(result.sql).toContain("any(TraceId) AS trace_id");
       expect(result.sql).toContain("content");
       expect(result.sql).toContain("langwatch.rag.contexts");
       expect(result.sql).toContain("{{tenantScope:OccurredAt}}");
@@ -1619,7 +1619,7 @@ describe("aggregation-builder", () => {
       // attribute the ARRAY JOIN reads, never the whole SpanAttributes map
       // (every span's inputs, outputs and prompts in range).
       expect(result.sql.match(/JOIN \(SELECT ([\s\S]+?) FROM stored_spans/)?.[1]).toBe(
-        "TenantId, TraceId, SpanId, map('langwatch.rag.contexts', SpanAttributes['langwatch.rag.contexts']) AS SpanAttributes",
+        "TenantId, TraceId, SpanId, map('langwatch.rag.contexts', SpanAttributes['langwatch.rag.contexts']) AS JoinedSpanAttributes",
       );
       // ...and only for the spans that have one.
       expect(result.sql).toMatch(
@@ -1885,7 +1885,7 @@ describe("aggregation-builder", () => {
       // The user_id filter references ts.Attributes[...], so Attributes must be
       // present in the deduped subquery's column list for the query to be valid.
       expect(result.sql).toContain(
-        "SELECT TenantId, TraceId, OccurredAt, UpdatedAt, Attributes FROM trace_summaries",
+        "SELECT TenantId, TraceId, OccurredAt AS LatestOccurredAt, UpdatedAt AS LatestUpdatedAt, Attributes FROM trace_summaries",
       );
       expect(result.sql).toContain("ts.Attributes[{metaValues_");
     });

@@ -42,7 +42,7 @@ function gate(): { held: Promise<void>; release: () => void } {
 }
 
 const statusOf = async (port: number, path: string): Promise<number> =>
-  (await fetch(`http://127.0.0.1:${port}${path}`)).status;
+  (await fetch(`http://localhost:${port}${path}`)).status;
 
 interface BootingApi {
   booted(): boolean;

@@ -7,6 +7,7 @@ import type {
   EventStoreEventReadInput,
   EventStoreReadContext,
 } from "./eventStore.types.ts";
+import type { EventLogProbe } from "./repositories/eventRepository.types.ts";
 
 /**
  * Event store for producer-only processes; refuses all operations loudly to prevent silent
@@ -70,6 +71,16 @@ export class EventStoreProducerOnly<
     beforeEventId: string;
   }): Promise<number> {
     return Promise.reject(this.refuse("countEventsBefore"));
+  }
+
+  probeEventsBefore(_request: {
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    aggregateType: AggregateType;
+    event: EventType;
+    ignoreEventIds?: readonly string[];
+  }): Promise<EventLogProbe> {
+    return Promise.reject(this.refuse("probeEventsBefore"));
   }
 
   storeEvents(

@@ -78,6 +78,12 @@ Feature: What a failed single sign-on is allowed to say
     # single sign-on shipped.
 
   @unit
+  Scenario: The logged cause names the provider's code
+    Given a sign-in that failed with a provider code we have not written down
+    When the failure is logged
+    Then the record's cause is a sign-in refusal carrying that code
+
+  @unit
   Scenario: A description supplied by the caller is never echoed
     Given somebody opens the sign-in error screen with an error description of their own
     When the screen renders
@@ -131,3 +137,9 @@ Feature: What a failed single sign-on is allowed to say
     And the screen says their company sign-in refused it, not LangWatch
     And it tells them their IT team can assign them the LangWatch app, or to try again if they cancelled
     # What the refusal names and when it becomes a seat limit: specs/identity/idp-refused-sign-in.feature
+
+  @unit @regression
+  Scenario: A sign-in that succeeds is not read as a failure
+    Given a person who is signed in, or whose provider account is already linked, signs in
+    When the callback redirects without an error code
+    Then no error code is read and the redirect passes through unchanged

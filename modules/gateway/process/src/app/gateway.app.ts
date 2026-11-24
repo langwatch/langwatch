@@ -5,7 +5,11 @@ import { ClickHouseUnavailableError } from "@langwatch/analytics-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { RestIdentity } from "@langwatch/api/hosting";
 import type { RestDeclaredResult } from "@langwatch/api/rest";
-import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
+import {
+  type AuthzPermission,
+  ImpersonationCannotMintCredentialError,
+  PermissionDeniedError,
+} from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -78,6 +82,12 @@ import {
   parseVirtualKeyConfig,
   type ArchiveGatewayBudgetInput,
   type ArchiveGatewayCacheRuleInput,
+  type CreateGatewayA2aTargetInput,
+  type GatewayA2aTargetDto,
+  type SetGatewayA2aTargetBlockedInput,
+  type SetProjectGatewayA2aTargetBlockedInput,
+  type UpdateGatewayA2aTargetInput,
+  type UpdateProjectGatewayA2aTargetInput,
   type ArchiveGatewayGuardrailInput,
   type CreateGatewayBudgetInput,
   type CreateGatewayCacheRuleInput,
@@ -129,6 +139,7 @@ import {
   type GatewaySpendDay,
   type GatewayInternalSpendCommandRecord,
   type GatewayInternalSpendSubmission,
+  type GatewayPresentedVirtualKey,
   type GatewayVirtualKeyRecord,
   GatewayBudgetNotFoundError,
   GatewayCacheRuleNotFoundError,
@@ -176,6 +187,10 @@ import {
   type GatewayInstantEvalJudgeSpendPipeline,
 } from "../eventing/gateway-instant-eval-judge-spend.pipeline.ts";
 import {
+  buildGatewayPiiRedactionSpendPipeline,
+  type GatewayPiiRedactionSpendPipeline,
+} from "../eventing/gateway-pii-redaction-spend.pipeline.ts";
+import {
   buildGatewayPulledUsageLedgerPipeline,
   type GatewayPulledUsageLedgerPipeline,
 } from "../eventing/gateway-pulled-usage-ledger.pipeline.ts";
@@ -208,6 +223,7 @@ import { GatewayRealtimeSessionSweepService } from "../features/realtime-session
 import type { GatewayRealtimeSessionCollaborators } from "../features/realtime-session/services/gateway-realtime-session.service.ts";
 import { FixedGatewaySettlementPolicyService } from "../features/spend/services/fixed-gateway-settlement-policy.service.ts";
 import { GatewayInstantEvalJudgeSpendService } from "../features/spend/services/gateway-instant-eval-judge-spend.service.ts";
+import { GatewayPiiRedactionSpendService } from "../features/spend/services/gateway-pii-redaction-spend.service.ts";
 import { GatewaySpendDebitService } from "../features/spend/services/gateway-spend-debit.service.ts";
 import { GatewaySpendEventsService } from "../features/spend/services/gateway-spend-events.service.ts";
 import {
@@ -244,10 +260,12 @@ import type { GatewaySpendFoldCacheRepository } from "../repositories/gateway-sp
 import type { GatewaySpendScopeRepository } from "../repositories/gateway-spend-scope.repository.ts";
 import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.repository.ts";
 import type { GatewayRepositories } from "../repositories/gateway.repositories.ts";
+import { a2aTargetToDto } from "../rules/gateway-a2a-target.rules.ts";
 import {
   ConnectManagedKeyService,
   type ManagedKeyProvisionedSender,
 } from "../services/connect-managed-key.service.ts";
+import { GatewayA2aTargetService } from "../services/gateway-a2a-target.service.ts";
 import { GatewayAgentCacheService } from "../services/gateway-agent-cache.service.ts";
 import { GatewayAuthzScopePermissionsService } from "../services/gateway-authz-scope-permissions.service.ts";
 import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
@@ -485,6 +503,8 @@ interface GatewayAppDependencies extends GatewayRestInfrastructure {
    * copies of the same tables, so a rule written through one was invisible to the other.
    */
   budgetDecisions: GatewayService;
+  /** The A2A target registry the `/a2a/{name}` proxy reads through the config bundle. */
+  a2aTargets: GatewayA2aTargetService;
   /**
    * The ClickHouse budget-spend source. Absent on a deployment without it,
    * which is why every read of it degrades explicitly rather than reporting a
@@ -854,6 +874,12 @@ function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayContro
   return {
     virtualKeys,
     budgetDecisions,
+    a2aTargets: GatewayA2aTargetService.create({
+      repository: repositories.a2aTargets,
+      changeEvents: changes,
+      auditLog: repositories.audit,
+      transactions: repositories.transactions,
+    }),
     budgetSpend,
     changeEvents: changes,
     principalSpend,
@@ -1252,6 +1278,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
         repository: repositories.traceExportKeys,
         apiKeys: setup.dependencies.apiKeys,
       }),
+      a2aTargets: controlPlane.a2aTargets,
     });
     const guardrails = GatewayGuardrailEvaluationService.create({
       repository: repositories.guardrails,
@@ -1466,6 +1493,16 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     });
   }
 
+  /** gateway_pii_redaction_spend: the ledger row for each PII redaction model call (ADR-201). */
+  piiRedactionSpendPipeline(): GatewayPiiRedactionSpendPipeline {
+    return buildGatewayPiiRedactionSpendPipeline({
+      spend: GatewayPiiRedactionSpendService.create({
+        projects: this.#dependencies.projects,
+        recordPricedSpend: (input) => this.#internalProtocol.recordPricedSpend(input),
+      }),
+    });
+  }
+
   /** gateway_connect_managed_key: ends or re-resolves a licence's managed key from its facts. */
   connectManagedKeyPipeline(): GatewayConnectManagedKeyPipeline {
     return buildGatewayConnectManagedKeyPipeline({
@@ -1509,7 +1546,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return this.#internalDoor;
   }
 
-  findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null> {
+  findVirtualKeyBySecret(secret: string): Promise<GatewayPresentedVirtualKey | null> {
     return this.#internalProtocol.findVirtualKeyBySecret(secret);
   }
 
@@ -2060,6 +2097,73 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
 
   archiveCacheRule(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
     return this.#dependencies.budgetDecisions.cacheRuleArchive(input);
+  }
+
+  async listA2aTargets(organizationId: string): Promise<GatewayA2aTargetDto[]> {
+    await this.#dependencies.assertOrganizationExists(organizationId);
+    return (await this.#dependencies.a2aTargets.list(organizationId)).map(a2aTargetToDto);
+  }
+
+  async createA2aTarget(input: CreateGatewayA2aTargetInput): Promise<GatewayA2aTargetDto> {
+    await this.#dependencies.assertOrganizationExists(input.organizationId);
+    return a2aTargetToDto(await this.#dependencies.a2aTargets.create(input));
+  }
+
+  async updateA2aTarget(input: UpdateGatewayA2aTargetInput): Promise<GatewayA2aTargetDto> {
+    await this.#dependencies.assertOrganizationExists(input.organizationId);
+    return a2aTargetToDto(await this.#dependencies.a2aTargets.update(input));
+  }
+
+  async setA2aTargetBlocked(input: SetGatewayA2aTargetBlockedInput): Promise<GatewayA2aTargetDto> {
+    await this.#dependencies.assertOrganizationExists(input.organizationId);
+    return a2aTargetToDto(await this.#dependencies.a2aTargets.setBlocked(input));
+  }
+
+  async archiveA2aTarget(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<GatewayA2aTargetDto> {
+    await this.#dependencies.assertOrganizationExists(input.organizationId);
+    return a2aTargetToDto(await this.#dependencies.a2aTargets.archive(input));
+  }
+
+  async listProjectA2aTargets(input: { projectId: string }): Promise<GatewayA2aTargetDto[]> {
+    const organizationId = await this.#dependencies.organizationIdForProject(input.projectId);
+    const targets = await this.#dependencies.a2aTargets.listForProject({
+      organizationId,
+      projectId: input.projectId,
+    });
+    return targets.map(a2aTargetToDto);
+  }
+
+  async updateProjectA2aTarget(
+    input: UpdateProjectGatewayA2aTargetInput,
+  ): Promise<GatewayA2aTargetDto> {
+    const organizationId = await this.#dependencies.organizationIdForProject(input.projectId);
+    return a2aTargetToDto(
+      await this.#dependencies.a2aTargets.updateForProject({ ...input, organizationId }),
+    );
+  }
+
+  async setProjectA2aTargetBlocked(
+    input: SetProjectGatewayA2aTargetBlockedInput,
+  ): Promise<GatewayA2aTargetDto> {
+    const organizationId = await this.#dependencies.organizationIdForProject(input.projectId);
+    return a2aTargetToDto(
+      await this.#dependencies.a2aTargets.setBlockedForProject({ ...input, organizationId }),
+    );
+  }
+
+  async archiveProjectA2aTarget(input: {
+    id: string;
+    projectId: string;
+    actorUserId: string;
+  }): Promise<GatewayA2aTargetDto> {
+    const organizationId = await this.#dependencies.organizationIdForProject(input.projectId);
+    return a2aTargetToDto(
+      await this.#dependencies.a2aTargets.archiveForProject({ ...input, organizationId }),
+    );
   }
 
   async findProjectOrganization(projectId: string): Promise<string | null> {
@@ -2668,11 +2772,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     callerProjectId?: string | undefined;
   }): Promise<void> {
     const { actor, organizationId, scopes, traceProjectId, guardrailAttachments } = input;
-    refuseImpersonatedMint({
-      impersonatorId: input.impersonatorId,
-      permission: "virtualKeys:create",
-      organizationId,
-    });
+    refuseImpersonatedMint({ impersonatorId: input.impersonatorId });
     if (input.callerProjectId === undefined) {
       await this.authorizeVirtualKeyScopeSelection({
         actor,
@@ -2769,11 +2869,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     permission: AuthzPermission;
   }): Promise<VirtualKeyWithScopes> {
     if (input.permission === "virtualKeys:rotate") {
-      refuseImpersonatedMint({
-        impersonatorId: input.impersonatorId,
-        permission: input.permission,
-        organizationId: input.organizationId,
-      });
+      refuseImpersonatedMint({ impersonatorId: input.impersonatorId });
     }
     const existing = await this.#dependencies.getExistingVirtualKey({
       organizationId: input.organizationId,
@@ -2863,15 +2959,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
 }
 
 /** An operator acting as a member holds no grant to issue credentials as them (F05). */
-function refuseImpersonatedMint(input: {
-  impersonatorId: string | undefined;
-  permission: AuthzPermission;
-  organizationId: string;
-}): void {
+function refuseImpersonatedMint(input: { impersonatorId: string | undefined }): void {
   if (!input.impersonatorId) return;
-  throw new PermissionDeniedError({
-    permission: input.permission,
-    scope: { type: "organization", id: input.organizationId },
-    denialReason: "no-grant",
-  });
+  throw new ImpersonationCannotMintCredentialError();
 }

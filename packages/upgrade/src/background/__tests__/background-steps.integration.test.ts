@@ -12,6 +12,11 @@ import { UpgradeLedgerRepository } from "../../ledger.repository.ts";
 import { UpgradeRunnerRepository } from "../../runner/runner-ledger.repository.ts";
 import { defineMigrationStep, type MigrationStepRun } from "../../step/migration-step.ts";
 import {
+  type LaneReplayer,
+  PROJECTION_REPLAY_PAGED,
+  defineProjectionReplayStep,
+} from "../../step/projection-replay-step.ts";
+import {
   type BackgroundStepsOptions,
   BackgroundStepsService,
   startBackgroundSteps,
@@ -368,6 +373,61 @@ describe.skipIf(!DB_URL)("BackgroundStepsService over a ledger", () => {
       expect(await sweep(service)).toMatchObject({ ran: [STEP] });
       expect(resumedFrom).toEqual({ cursor: "c-1" });
       expect(await stepRow()).toMatchObject({ status: "done", report: { finished: true } });
+    });
+  });
+
+  describe("given a projection replay step that paged an aggregate and failed", () => {
+    const PAGED = "tenant-1:trace:trace-a";
+
+    /** A lane replay that pages one aggregate; the first run fails after it started paging. */
+    function pagingLane() {
+      const handed: Record<string, number>[] = [];
+      const replayer: LaneReplayer = {
+        async replayLane(input) {
+          handed.push(Object.fromEntries(input.paging?.unfinished ?? []));
+          await input.paging?.started({ key: PAGED });
+          if (handed.length === 1) throw new Error("ClickHouse refused the connection");
+          input.paging?.finished({ key: PAGED });
+          return {
+            lane: input.lane,
+            kind: "fold",
+            aggregatesReplayed: 1,
+            totalEvents: 1,
+            replayedThrough: "2026-11-14T00:00:00Z",
+          };
+        },
+      };
+      const step = defineProjectionReplayStep({
+        id: STEP,
+        description: "Refolds the lane.",
+        lane: "traceAnalytics",
+        replayer,
+      });
+      return { run: step.run, handed };
+    }
+
+    /** @scenario "An aggregate paged before is paged at once on the next run" */
+    it("hands the run after a reset the aggregate it pages, its attempts cleared", async () => {
+      await recordStep({ status: "pending" });
+      const { run, handed } = pagingLane();
+      const service = serviceOver({ run });
+
+      expect(await sweep(service)).toMatchObject({ failed: [STEP] });
+      expect(await stepRow()).toMatchObject({
+        status: "failed",
+        report: { lane: "traceAnalytics", [PROJECTION_REPLAY_PAGED]: { [PAGED]: 1 } },
+      });
+      await UpgradeRunnerRepository.create({ postgres: scratch.postgres }).resetFailedSteps({
+        mode: "background",
+        runId: "run_2",
+      });
+      expect(await sweep(service)).toMatchObject({ ran: [STEP] });
+
+      expect(handed).toEqual([{}, { [PAGED]: 0 }]);
+      expect(await stepRow()).toMatchObject({
+        status: "done",
+        report: { lane: "traceAnalytics", [PROJECTION_REPLAY_PAGED]: { [PAGED]: 0 } },
+      });
     });
   });
 });

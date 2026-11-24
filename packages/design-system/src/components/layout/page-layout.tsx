@@ -86,7 +86,9 @@ function Container({
       maxW={bodyMaxWidth({ width, sidebarWidth })}
       marginX={width === "narrow" ? "auto" : undefined}
       paddingX={PAGE_INSET}
-      paddingY={3}
+      // The one gap between the header rule and the body, on every page that has a body container.
+      paddingTop={6}
+      paddingBottom={3}
       width={named ? undefined : width}
       {...props}
     >

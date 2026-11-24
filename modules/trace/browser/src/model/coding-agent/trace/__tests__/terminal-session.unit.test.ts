@@ -71,7 +71,47 @@ describe("promptLineText", () => {
     });
   });
 
+  describe("given a trace with no name of its own in a named session", () => {
+    /** @scenario "The prompt line shows the session's name when the trace has none of its own" */
+    it("shows the session's name, ahead of its first prompt", () => {
+      expect(
+        promptLineText({
+          traceId: TRACE_ID,
+          sessionName: "claude_code.llm_request",
+          declaredSessionName: " ACME release notes ",
+          spans: [rootSpan("claude_code.llm_request")],
+          entries: [prompt(1, null), prompt(2, "write the release notes")],
+        }),
+      ).toBe("ACME release notes");
+    });
+
+    /** @scenario "The prompt line shows the session's name when the trace has none of its own" */
+    it("shows nothing when the session's name is blank and no prompt carries text", () => {
+      expect(
+        promptLineText({
+          traceId: TRACE_ID,
+          sessionName: "claude_code.llm_request",
+          declaredSessionName: "  ",
+          spans: [rootSpan("claude_code.llm_request")],
+          entries: [prompt(1, null)],
+        }),
+      ).toBeNull();
+    });
+  });
+
   describe("given a trace with a name of its own", () => {
+    it("keeps the name over the session's name", () => {
+      expect(
+        promptLineText({
+          traceId: TRACE_ID,
+          sessionName: "Fix the flaky CI job",
+          declaredSessionName: "ACME agent",
+          spans: [rootSpan("claude_code.interaction")],
+          entries: [],
+        }),
+      ).toBe("Fix the flaky CI job");
+    });
+
     it("keeps the name", () => {
       expect(
         promptLineText({

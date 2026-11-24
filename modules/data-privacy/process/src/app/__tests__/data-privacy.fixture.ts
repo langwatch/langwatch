@@ -84,6 +84,7 @@ export async function createDataPrivacyTestApp({
   enforcement,
   settings = {},
   channels,
+  keyPepper = "test-key-pepper",
 }: {
   directory?: MemoryDataPrivacyDirectoryRepository;
   dependencies: Parameters<typeof DataPrivacyModule.create>[0]["dependencies"];
@@ -92,11 +93,14 @@ export async function createDataPrivacyTestApp({
   settings?: Partial<DataPrivacyServerConfig>;
   /** Channels composed from the settings; memory channels when absent. */
   channels?: (config: DataPrivacyServerConfig) => Promise<DataPrivacyChannels>;
+  /** What every secret handle answers, so the key pepper is set; `null` for none. */
+  keyPepper?: string | null;
 }): Promise<DataPrivacyModule> {
   const config: DataPrivacyServerConfig = {
     googleDlpDisabled: undefined,
     enforcement,
     nodeEnvironment: undefined,
+    isSaas: true,
     langevalsEndpoint: undefined,
     piiRedactionModelEndpoint: undefined,
     ...settings,
@@ -110,7 +114,7 @@ export async function createDataPrivacyTestApp({
     channels: channels ? await channels(config) : MemoryDataPrivacyChannels.create({ config }),
     dependencies,
     config,
-    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    secrets: new ScopedSecrets(async (_handle, build) => build(keyPepper ?? undefined)),
     resources: { own: () => void 0, ownService: () => void 0 },
   });
 }

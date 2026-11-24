@@ -20,6 +20,7 @@ import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract"
 import { describe, expect, it } from "vitest";
 
 import { fakeTraceProcessingCommands } from "../../__tests__/support/trace-processing-commands.fake.ts";
+import { braidTwins } from "../../app/__tests__/support/trace-app.harness.ts";
 import { TraceModule } from "../../app/trace.app.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
@@ -87,6 +88,7 @@ function deployment() {
 
   const app = TraceModule.fromDependencies(
     TraceModule.composeDependencies({
+      ...braidTwins(),
       repositories: MemoryTraceRepositories.create(),
       storedObjects: createApiFixture<StoredObjectApi>(),
       canonicalisation: TraceCanonicalisationService.create(),
