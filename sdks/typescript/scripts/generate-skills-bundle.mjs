@@ -6,9 +6,9 @@
  */
 
 /**
- * Bodies come from the COMMITTED `skills/_compiled/<mode>/<slug>/SKILL.md` files,
- * where <mode> is LANGWATCH_SKILLS_RENDER (default `cli`, pinned by
- * `native-skills.test.ts`). `native` drops the login steps: only the Langy image sets it.
+ * Bodies: committed skills/_compiled/<mode>/<slug>/SKILL.md, mode = LANGWATCH_SKILLS_RENDER
+ * (default `cli`, pinned by `native-skills.test.ts`). `native` drops the login steps.
+ * Only langyagent (Dockerfile.langyagent) and haven's host-tier Langy (plan_langy.go) set it.
  */
 
 /**
@@ -102,13 +102,14 @@ const skills = listPublishedSkills()
     if (!fs.existsSync(src)) {
       throw new Error(`Published skill ${slug} has no SKILL.mdx at ${src}`);
     }
-    // The body is the committed CLI render (recipes are flattened there).
+    // The body is the committed render `renderMode` names, cli or native
+    // (recipes are flattened there).
     // Missing means the sources changed without regenerating — say so loudly,
     // with the fix, rather than shipping a stale or half-empty bundle.
     const compiledPath = path.join(compiledRoot, slug, "SKILL.md");
     if (!fs.existsSync(compiledPath)) {
       throw new Error(
-        `No compiled CLI skill for ${slug} at ${path.relative(process.cwd(), compiledPath)}.\n` +
+        `No compiled ${renderMode} skill for ${slug} at ${path.relative(process.cwd(), compiledPath)}.\n` +
           `Regenerate from the repo root: bash skills/_compiled/generate.sh`,
       );
     }
