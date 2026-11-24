@@ -242,6 +242,46 @@ describe("given three tenants' attribution traces, read over a 60-day period and
     );
   });
 
+  /**
+   * units stays over the memory cap in both forms on this seed because the evaluations read sets
+   * the floor (shared with att-table/passRates), so these cases pin history growth by rows read,
+   * not peak memory.
+   */
+  describe("when the catalogue's att-change/units is measured by rows read on each tenant", () => {
+    const label = "att-change/units";
+
+    /** @scenario "att-change/units's memory no longer grows with the project's older history" */
+    it(
+      "reads within a tenth of the rows of the tenant with no older history",
+      async () => {
+        const large = await measured({ form: "catalogue", label, tenant: TENANTS.LARGE });
+        const bare = await measured({ form: "catalogue", label, tenant: TENANTS.BARE });
+        const largeMax = Math.max(...large.map((run) => run.rowsRead));
+        const bareMin = Math.min(...bare.map((run) => run.rowsRead));
+        const drift = (largeMax - bareMin) / bareMin;
+        expect(drift, `${described(large)} against ${described(bare)}`).toBeLessThanOrEqual(
+          HISTORY_TOLERANCE,
+        );
+      },
+      CASE_TIMEOUT_MS,
+    );
+
+    it(
+      "reads fewer rows than main's att-change/units on the tenant with older history",
+      async () => {
+        const catalogue = await measured({ form: "catalogue", label, tenant: TENANTS.LARGE });
+        const main = await measured({ form: "main", label, tenant: TENANTS.LARGE });
+        const catalogueMax = Math.max(...catalogue.map((run) => run.rowsRead));
+        const mainMin = Math.min(...main.map((run) => run.rowsRead));
+        expect(
+          catalogueMax,
+          `${described(catalogue)} against main ${described(main)}`,
+        ).toBeLessThan(mainMin);
+      },
+      CASE_TIMEOUT_MS,
+    );
+  });
+
   describe.skipIf(!SWEEP)("when older history grows to 4M traces, the window fixed", () => {
     const label = "att-change/change";
     const swept: (SweepCase & { pending: Promise<Run[]> })[] = [];
