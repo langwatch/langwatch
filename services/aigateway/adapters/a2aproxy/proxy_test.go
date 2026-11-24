@@ -545,3 +545,22 @@ func TestUpstreamUnreachableRecordsItsCause(t *testing.T) {
 	assert.Contains(t, recorded, "connection refused")
 	assert.Contains(t, logged, "connection refused")
 }
+
+// @scenario "a refusal caused by an error keeps the cause for the operator"
+func TestRecordedCauseLeavesOutTheUpstreamQuery(t *testing.T) {
+	f := newFixture(t)
+	gone := httptest.NewServer(http.NotFoundHandler())
+	gone.Close()
+	f.setTarget(func(tg *domain.A2ATarget) { tg.UpstreamURL = gone.URL + "/a2a?api_key=target-s3cret" })
+	core, logs := observer.New(zap.DebugLevel)
+	rec := f.doWith(Config{Logger: zap.New(core)}, http.MethodPost, "/a2a/billing?token=caller-s3cret", sendMessage("SendMessage", "hi"))
+
+	_, reason, _ := rpcError(t, rec)
+	require.Equal(t, "a2a_upstream_unreachable", reason)
+	recorded, logged := hopCause(t, f, logs, "a2a_upstream_unreachable")
+	for _, cause := range []string{recorded, logged} {
+		assert.Contains(t, cause, "connection refused")
+		assert.Contains(t, cause, gone.URL+"/a2a")
+		assert.NotContains(t, cause, "s3cret")
+	}
+}

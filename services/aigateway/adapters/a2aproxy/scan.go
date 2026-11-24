@@ -106,10 +106,11 @@ type payload struct {
 
 // partText is the text-part text of one artifact, joined. An empty id holds
 // the text outside any artifact, such as a status message's. appends is false
-// for an artifact update that replaces the artifact's earlier content.
+// for an artifact update that replaces the artifact's earlier content; split
+// is true when the text came in more than one piece.
 type partText struct {
-	id, text string
-	appends  bool
+	id, text       string
+	appends, split bool
 }
 
 // maxJSONDepth bounds how deep the scan walks one body.
@@ -388,15 +389,17 @@ func (w *tokenWalker) noteAppend(v bool) {
 	}
 }
 
-// partTexts joins each group's text, leaving out groups with none. Text
-// outside an artifact always joins what came before it.
+// partTexts joins each group's text. A group with none is left out unless it
+// replaces a named artifact, whose earlier text it clears. Text outside an
+// artifact always joins what came before it.
 func (w *tokenWalker) partTexts() []partText {
 	var out []partText
 	for i, g := range w.groups {
-		if len(g.pieces) > 0 {
-			appends := i == w.outside || (g.appends != nil && *g.appends)
-			out = append(out, partText{id: g.id, text: strings.Join(g.pieces, ""), appends: appends})
+		appends := i == w.outside || (g.appends != nil && *g.appends)
+		if len(g.pieces) == 0 && (appends || g.id == "") {
+			continue
 		}
+		out = append(out, partText{id: g.id, text: strings.Join(g.pieces, ""), appends: appends, split: len(g.pieces) > 1})
 	}
 	return out
 }

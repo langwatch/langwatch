@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -232,4 +233,37 @@ func TestStreamChunkGuardrailFailureFailsOpen(t *testing.T) {
 	rec := f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
 
 	assert.Equal(t, "data: "+events[0]+"\n\ndata: "+events[1]+"\n\n", rec.Body.String())
+}
+
+// @scenario "text of artifacts streamed side by side is scanned per artifact"
+func TestFileOnlyReplacementClearsTheArtifactsText(t *testing.T) {
+	f := cardNumberStreamFixture(t)
+	fileOnly := `{"jsonrpc":"2.0","id":7,"result":{"artifactUpdate":{"taskId":"t1","append":false,` +
+		`"artifact":{"artifactId":"a1","parts":[{"file":{"uri":"https://files.acme.test/r.pdf","mediaType":"application/pdf"}}]}}}}`
+	f.reply = sseReply(artifactUpdate("a1", "your card", false), fileOnly, artifactUpdate("a1", " number of items", true))
+	rec := f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
+
+	assert.NotContains(t, rec.Body.String(), "a2a_content_blocked")
+	assert.Contains(t, rec.Body.String(), "number of items")
+}
+
+// @scenario "a phrase split across streamed events is scanned whole"
+func TestPhraseSplitAcrossTextPartsOfTheFirstEventIsBlocked(t *testing.T) {
+	f := cardNumberStreamFixture(t)
+	f.reply = sseReply(`{"jsonrpc":"2.0","id":7,"result":{"artifactUpdate":{"taskId":"t1",` +
+		`"artifact":{"artifactId":"a1","parts":[{"text":"your card"},{"text":" number 4111"}]}}}}`)
+	rec := f.do(http.MethodPost, "/a2a/billing", sendMessage("SendStreamingMessage", "hello"))
+
+	assert.Contains(t, rec.Body.String(), `"reason":"a2a_content_blocked"`)
+	assert.NotContains(t, rec.Body.String(), "4111")
+}
+
+func TestStreamTailIsACopyOfTheTextItKeeps(t *testing.T) {
+	var s streamText
+	text := strings.Repeat("x", 4*streamTailBytes)
+	s.add("a1", text)
+	tail := s.tail("a1")
+	require.Len(t, tail, streamTailBytes)
+	start, kept := uintptr(unsafe.Pointer(unsafe.StringData(text))), uintptr(unsafe.Pointer(unsafe.StringData(tail)))
+	assert.False(t, kept >= start && kept < start+uintptr(len(text)), "the tail shares the event text's memory")
 }

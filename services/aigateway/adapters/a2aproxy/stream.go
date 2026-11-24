@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 )
 
 // errEventTooLarge is an SSE event, or one of its lines, over maxEventBytes.
@@ -94,7 +95,8 @@ func (s *streamText) add(id, text string) {
 		}
 	}
 	if len(joined) > streamTailBytes {
-		joined = joined[len(joined)-streamTailBytes:]
+		// A copy, so the tail no longer holds the whole event's text in memory.
+		joined = strings.Clone(joined[len(joined)-streamTailBytes:])
 	}
 	s.tails = append(s.tails, streamTail{id: id, text: joined})
 	if len(s.tails) > maxStreamTails {
@@ -120,10 +122,12 @@ func (h *Handler) checkEvent(c *call, event []byte, seen *streamText) *refusal {
 		if !part.appends {
 			seen.drop(part.id)
 		}
-		if prev := seen.tail(part.id); prev != "" {
+		if prev := seen.tail(part.id); prev != "" || part.split {
 			p.texts = append(p.texts, prev+part.text)
 		}
-		seen.add(part.id, part.text)
+		if part.text != "" {
+			seen.add(part.id, part.text)
+		}
 	}
 	if response {
 		if r := h.checkTexts(c, DirectionResponse, p.texts); r != nil {

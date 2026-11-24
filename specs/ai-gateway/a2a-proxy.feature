@@ -81,6 +81,8 @@ Feature: A2A proxy on the gateway
     Then the gateway fetches the card from the target's card URL
     And every interface URL in the card points at the gateway's /a2a/billing
     And no URL in the card points at "https://billing.acme.test"
+    And the card carries none of the upstream's signatures, which signed the URLs the gateway replaced
+    And numbers in the card keep the digits the upstream wrote
 
   @unit
   Scenario: an allowed JSON-RPC call is forwarded
@@ -219,6 +221,14 @@ Feature: A2A proxy on the gateway
     And the upstream is not called
 
   @unit
+  Scenario: a body that stops arriving is refused, not waited on
+    When the caller sends part of a request body and then stops sending
+    Then the caller receives HTTP 400 with reason "a2a_invalid_request" once the request body timeout passes
+    And the upstream is not called
+    When the upstream sends the headers and part of a reply that is not a stream and then stops sending
+    Then the caller receives reason "a2a_upstream_unreachable" once the reply body timeout passes
+
+  @unit
   Scenario: a reply over the size limit is refused, not cut
     When the upstream replies with a body over 1 MiB
     Then the caller receives HTTP 502 with reason "a2a_payload_too_large"
@@ -259,6 +269,7 @@ Feature: A2A proxy on the gateway
     When the caller fetches GET /a2a/billing/.well-known/agent.json, the A2A v0.2 card path
     Then the card's url and its one interface point at the gateway's /a2a/billing
     And the interface at the other path is left out
+    And an interface naming the upstream URL in another host case or with its default port is kept
 
   @unit
   Scenario: an A2A v0.2 card request reads the agent's v0.2 card path
@@ -293,6 +304,7 @@ Feature: A2A proxy on the gateway
     Then the caller receives the error reply unchanged
     And the reply carries no gateway card URL
     And the error reply is still scanned by the key's response guardrails
+    And a reply of JSON null is relayed unchanged
 
   @unit
   Scenario: the Agent Card is scanned before it reaches the caller
@@ -372,6 +384,7 @@ Feature: A2A proxy on the gateway
     When a call is refused with "a2a_scan_unavailable" or "a2a_upstream_unreachable"
     Then the error behind it is recorded on the hop span and in a gateway log line
     And the caller's reply does not carry it
+    And the recorded error never holds the query or user info of the upstream URL
 
   @integration
   Scenario: the config version token reads the same A2A targets as the bundle
@@ -444,6 +457,7 @@ Feature: A2A proxy on the gateway
     Then the first event is forwarded
     And the stream ends with an error event with reason "a2a_content_blocked"
     And "4111" never reaches the caller
+    And "your card" and " number 4111" as two text parts of the first event are scanned joined
 
   @unit
   Scenario: a phrase split across streamed events is scanned whole with names and ids between them
@@ -459,6 +473,7 @@ Feature: A2A proxy on the gateway
     When the upstream streams "your card num" for artifact "a1", then text for artifact "a2", then "ber 4111" for artifact "a1"
     Then the stream ends with an error event with reason "a2a_content_blocked"
     And "your card" in artifact "a1" followed by " number of items" in artifact "a2" is forwarded, not joined into one phrase
+    And "your card" in artifact "a1", replaced by a file-only "a1", then " number of items" appended to "a1" is forwarded
 
   @unit
   Scenario: an allowed host may resolve to a local address and no environment proxy is used

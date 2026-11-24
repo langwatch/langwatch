@@ -9,9 +9,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -92,6 +95,11 @@ type Config struct {
 	Tracer trace.Tracer
 	// Logger records why a refusal caused by an error happened. Nil logs nothing.
 	Logger *zap.Logger
+	// RequestBodyTimeout bounds reading the caller's body. Zero is one minute.
+	RequestBodyTimeout time.Duration
+	// ReplyBodyTimeout bounds reading a reply that is not a stream, from its
+	// headers on. Zero is two minutes; a stream has no such bound.
+	ReplyBodyTimeout time.Duration
 }
 
 // Handler serves /a2a/{target}/...
@@ -113,6 +121,12 @@ func New(cfg Config) *Handler {
 	}
 	if cfg.Logger == nil {
 		cfg.Logger = zap.NewNop()
+	}
+	if cfg.RequestBodyTimeout <= 0 {
+		cfg.RequestBodyTimeout = time.Minute
+	}
+	if cfg.ReplyBodyTimeout <= 0 {
+		cfg.ReplyBodyTimeout = 2 * time.Minute
 	}
 	return &Handler{cfg: cfg}
 }
@@ -140,6 +154,10 @@ type call struct {
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := &call{w: w, r: r, ctx: r.Context(), binding: bindingHTTPJSON, span: trace.SpanFromContext(context.Background())}
+	// The deadline stays when the body is not read whole, so the server's own
+	// read of what is left cannot wait on a stalled caller either.
+	rc := http.NewResponseController(w)
+	_ = rc.SetReadDeadline(time.Now().Add(h.cfg.RequestBodyTimeout))
 	bad := parseRoute(c)
 	c.bundle = h.cfg.Bundle(c.ctx)
 	if c.bundle != nil {
@@ -154,6 +172,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if bad == nil {
 		bad = parseBody(c)
+	}
+	if bad == nil {
+		_ = rc.SetReadDeadline(time.Time{})
 	}
 	if c.bundle == nil {
 		c.refuse(refuseUnauthenticated)
@@ -192,6 +213,9 @@ func parseBody(c *call) *refusal {
 	c.body = body
 	if tooLarge {
 		return &refuseTooLarge
+	}
+	if errors.Is(err, os.ErrDeadlineExceeded) {
+		return &refuseBodyTimeout
 	}
 	if err != nil {
 		return &refuseInvalidRequest
@@ -333,6 +357,20 @@ func peekRequestID(r io.Reader) json.RawMessage {
 	return nil
 }
 
+// errReplyStalled is a reply body that did not arrive within ReplyBodyTimeout.
+var errReplyStalled = errors.New("the A2A agent reply body did not arrive within the reply body timeout")
+
+// readReply reads a reply that is not a stream with readLimited. When the body
+// takes longer than ReplyBodyTimeout it calls cancel, which ends the upstream call.
+func (h *Handler) readReply(body io.Reader, cancel context.CancelFunc) ([]byte, bool, error) {
+	timer := time.AfterFunc(h.cfg.ReplyBodyTimeout, cancel)
+	raw, tooLarge, err := readLimited(body)
+	if !timer.Stop() && err != nil {
+		err = fmt.Errorf("%w: %w", errReplyStalled, err)
+	}
+	return raw, tooLarge, err
+}
+
 // readLimited reads at most maxBodyBytes. A body over the limit is reported,
 // never returned cut, so a truncated payload is neither scanned nor relayed.
 func readLimited(r io.Reader) (body []byte, tooLarge bool, err error) {
@@ -439,7 +477,9 @@ func (h *Handler) forward(c *call, target domain.A2ATarget) {
 	if !h.scan(c, DirectionRequest, c.body) {
 		return
 	}
-	req, err := newUpstreamRequest(c, target)
+	ctx, cancel := context.WithCancel(c.ctx)
+	defer cancel()
+	req, err := newUpstreamRequest(ctx, c, target)
 	if err != nil {
 		c.refuse(refuseUpstream.withMessage("the A2A agent URL is invalid"))
 		return
@@ -455,7 +495,7 @@ func (h *Handler) forward(c *call, target domain.A2ATarget) {
 		h.stream(c, resp)
 		return
 	}
-	respBody, tooLarge, err := readLimited(resp.Body)
+	respBody, tooLarge, err := h.readReply(resp.Body, cancel)
 	if tooLarge {
 		c.refuse(refuseReplyTooLarge)
 		return
@@ -500,9 +540,9 @@ func (h *Handler) refuseUpstreamFailure(c *call, err error) {
 	h.refuseWithCause(c, r, err)
 }
 
-func newUpstreamRequest(c *call, target domain.A2ATarget) (*http.Request, error) {
+func newUpstreamRequest(ctx context.Context, c *call, target domain.A2ATarget) (*http.Request, error) {
 	upstreamURL := upstreamEndpoint(target.UpstreamURL, c.rest, c.r.URL.RawQuery)
-	req, err := http.NewRequestWithContext(c.ctx, c.r.Method, upstreamURL, bytes.NewReader(c.body))
+	req, err := http.NewRequestWithContext(ctx, c.r.Method, upstreamURL, bytes.NewReader(c.body))
 	if err != nil {
 		return nil, err
 	}

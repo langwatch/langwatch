@@ -2,7 +2,9 @@ package a2aproxy
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"net/url"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -23,6 +25,7 @@ type refusal struct {
 var (
 	refuseInvalidRequest  = refusal{-32600, "a2a_invalid_request", "the body is not a valid A2A request", http.StatusBadRequest}
 	refuseInvalidPath     = refusal{-32600, "a2a_invalid_request", "the A2A path is not allowed", http.StatusBadRequest}
+	refuseBodyTimeout     = refusal{-32600, "a2a_invalid_request", "the request body did not arrive in time", http.StatusBadRequest}
 	refuseTargetBlocked   = refusal{-32011, string(domain.A2ATargetBlocked), "this A2A agent is blocked", http.StatusForbidden}
 	refuseContentBlocked  = refusal{-32012, "a2a_content_blocked", "blocked by a guardrail", http.StatusForbidden}
 	refuseTargetNotFound  = refusal{-32013, "a2a_target_not_found", "no such A2A agent in this project", http.StatusNotFound}
@@ -55,8 +58,24 @@ func (h *Handler) refuseWithCause(c *call, r refusal, cause error) {
 // recordCause puts the error behind a refusal on the hop span and in a log
 // line, as app/pipeline/guardrail.go does; the caller's reply never holds it.
 func (h *Handler) recordCause(c *call, reason string, cause error) {
+	cause = withoutURLSecrets(cause)
 	c.span.RecordError(cause)
 	h.cfg.Logger.Warn(reason, zap.String("a2a.target", c.name), zap.String("a2a.method", c.method), zap.Error(cause))
+}
+
+// withoutURLSecrets drops the query, fragment and user info from the URL an
+// HTTP client error names: the target or the caller may keep a credential there.
+func withoutURLSecrets(err error) error {
+	var ue *url.Error
+	if !errors.As(err, &ue) {
+		return err
+	}
+	u, parseErr := url.Parse(ue.URL)
+	if parseErr != nil {
+		return &url.Error{Op: ue.Op, URL: "(unparsable URL)", Err: ue.Err}
+	}
+	u.RawQuery, u.ForceQuery, u.Fragment, u.User = "", false, "", nil
+	return &url.Error{Op: ue.Op, URL: u.String(), Err: ue.Err}
 }
 
 func (r refusal) withMessage(msg string) refusal {
