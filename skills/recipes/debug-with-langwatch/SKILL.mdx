@@ -82,7 +82,7 @@ langwatch analytics query -m trace-count -a sum --group-by metadata.model -o jso
 
 1. Form a hypothesis from the failing span's input + the monitor's failure mode: prompt change, model change, bad retrieval, code regression. `git log` on the agent's code and prompts tells you what changed when the failures started.
 2. Apply the fix (prompt, code, or configuration).
-3. Generate fresh traffic, then re-run Step 1: the errored traces should stop appearing.
+3. Note the start time first (`date +%s000` prints epoch ms). Generate fresh traffic, then re-run Step 1 with `--start-date <that time>`. Confirm the new run produced a trace (search without `--errors-only`), then check no errored ones appear. Without `--start-date`, the old errors in the last 7 days still show.
 4. If the failure was a regression, add a scenario so it stays fixed. The `scenarios` skill covers this.
 
 ## Discovery
