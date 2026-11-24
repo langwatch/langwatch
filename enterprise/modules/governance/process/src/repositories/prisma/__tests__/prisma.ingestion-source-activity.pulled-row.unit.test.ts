@@ -5,23 +5,25 @@
  * rather than splicing it into the SQL text, as the ClickHouse OCSF events reads do.
  * Spec: enterprise/modules/governance/specs/security-lake-ingest.feature
  */
+import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it } from "vitest";
 
 import { PrismaActivityMonitorRepository } from "../prisma.ingestion-source-activity.repository.ts";
 
-type QueryCall = { query: string; query_params: Record<string, unknown> };
+type QueryCall = { query: string; query_params: Record<string, unknown> | undefined };
 
 function repositoryRecordingQueries() {
   const calls: QueryCall[] = [];
-  const client = {
-    query: async (call: QueryCall) => {
-      calls.push(call);
+  const client = clickHouseClientDouble({
+    query: async ({ query, query_params }) => {
+      calls.push({ query, query_params });
       return { json: async () => [] };
     },
-  };
+  });
   const repository = PrismaActivityMonitorRepository.create({
-    prisma: {} as never,
-    clickhouse: { getClient: async () => client } as never,
+    prisma: prismaDouble(),
+    clickhouse: { getClient: async () => client },
   });
   return { calls, repository };
 }

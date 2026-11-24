@@ -5,13 +5,14 @@
  * strings and become numbers, and a row of the wrong shape is refused rather than passed on.
  * Spec: enterprise/modules/governance/specs/security-lake-ingest.feature
  */
+import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import { ClickHouseOcsfEventsRepository } from "../clickhouse.ocsf-events.repository.ts";
 
 function repositoryOver(rows: unknown[]) {
-  const client = { query: async () => ({ json: async () => rows }) };
-  return ClickHouseOcsfEventsRepository.create(async () => client as never);
+  const client = clickHouseClientDouble({ query: async () => ({ json: async () => rows }) });
+  return ClickHouseOcsfEventsRepository.create(async () => client);
 }
 
 const callersOf = (rows: unknown[]) =>
