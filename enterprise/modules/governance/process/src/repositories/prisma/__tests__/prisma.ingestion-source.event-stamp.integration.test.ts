@@ -44,7 +44,7 @@ describe.skipIf(!databaseUrl)("PrismaIngestionSourceRepository.recordEventReceiv
       data: {
         organizationId,
         sourceType: "otel_generic",
-        name: `OTel ${status}`,
+        name: `OTel ${status} ${nanoid(8)}`,
         ingestSecretHash: `hash-${status}-${suffix}`,
         parserConfig: {},
         status,
