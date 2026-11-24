@@ -222,4 +222,24 @@ describe.skipIf(!enabled)("the seat read against a real ClickHouse", () => {
       await repository.findLatestSeatReports({ tenantId, actionName: SEAT_REPORT_ACTION }),
     ).toEqual([]);
   });
+
+  it("leaves out a seat report read from Security Lake", async () => {
+    const tenantId = `gov-lake-${run}`;
+    await repository.insertEvents([
+      {
+        ...seatReport({
+          tenantId,
+          eventId: "lake",
+          day: "2026-11-10",
+          seatsBought: 9999,
+          seatsAssigned: 8888,
+        }),
+        sourceType: "security_lake",
+      },
+    ]);
+
+    expect(
+      await repository.findLatestSeatReports({ tenantId, actionName: SEAT_REPORT_ACTION }),
+    ).toEqual([]);
+  });
 });

@@ -6,7 +6,11 @@ import {
 } from "@langwatch/eventing";
 
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-event-types.rules.ts";
-import { storedRunTargetOf } from "../rules/experiment-run-stored-target.rules.ts";
+import {
+  storedRunRepeatOf,
+  storedRunTargetOf,
+  withRunRepeat,
+} from "../rules/experiment-run-stored-target.rules.ts";
 import type {
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
@@ -92,8 +96,11 @@ function mergeTargetsJson(
   for (const t of incoming) {
     byId.set(t.id, storedRunTargetOf(t));
   }
+  const merged = Array.from(byId.values());
+  // The run's repeat survives a later event that restates a target without it.
+  const repeat = Math.max(storedRunRepeatOf(merged), storedRunRepeatOf(existing));
 
-  return JSON.stringify(Array.from(byId.values()));
+  return JSON.stringify(withRunRepeat({ targets: merged, repeat }));
 }
 
 const experimentRunEvents = [
@@ -176,7 +183,10 @@ export class ExperimentRunStateFoldProjection
       ExperimentId: event.data.experimentId,
       WorkflowVersionId: event.data.workflowVersionId ?? null,
       Total: Math.max(state.Total, event.data.total),
-      Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
+      Targets: mergeTargetsJson(
+        state.Targets,
+        withRunRepeat({ targets: event.data.targets ?? [], repeat: event.data.plan?.repeat }),
+      ),
       StartedAt: state.StartedAt ?? event.occurredAt,
       Concurrency: event.data.plan?.concurrency ?? state.Concurrency,
     };

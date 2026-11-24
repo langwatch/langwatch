@@ -577,6 +577,96 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And a cached key last confirmed 3 hours ago with a silent change feed
       Then the key serves
 
+  Rule: A change-feed backlog refuses a key locally only for the state it ends in
+
+    # A gateway that starts reads its organization's whole change history from
+    # revision 0, and one that reconnects reads what it missed. Both arrive in
+    # full pages of 500 events, so a disable and the enable that undoes it can
+    # sit on different pages. A disable read from a full page still evicts the
+    # key and voids every confirmation that began before it, but it refuses
+    # no credential locally: the next request asks the control plane, and a
+    # request whose answer it voided is asked again once. Once a page
+    # shorter than a full one (or an empty poll) ends the backlog, every key
+    # the backlog left disabled or revoked is refused locally, as a live event
+    # would be. See issue #9754.
+
+    @unit @regression
+    Scenario: a key disabled and re-enabled on different pages of a replayed history keeps serving
+      Given a gateway that just started and cached an active key
+      And its organization's history disables the key on one full page and re-enables it on the next
+      When the replay has read the page with the disable
+      Then the key serves
+      When the page with the enable fails to load
+      Then the key keeps serving
+      When the page with the enable arrives
+      Then the key serves and the control plane going down does not refuse it
+
+    @unit
+    Scenario: a disable at the head of a replayed history is refused once the replay ends
+      Given a gateway that cached an active key and is replaying its organization's history
+      And the history disables the key, re-enables it on a later full page, and disables it again on the last page
+      When the replay has read the first disable
+      Then the key serves after the control plane confirms it
+      When the replay reads the last page and the control plane stops answering
+      Then the key gets virtual_key_disabled, not a retryable error
+
+    @unit
+    Scenario: a disable and an enable on the page that ends a replay never refuse the key between them
+      Given a gateway that cached an active key
+      When the change feed returns a short page that disables the key and then re-enables it
+      Then the disable stays pending while the page is applied
+      And the key serves, and the control plane going down afterwards does not refuse it
+
+    @unit
+    Scenario: a key cached before a reconnect is refused by a disable in the backlog it missed
+      Given two cached keys and a change feed whose poll failed during an outage
+      When the feed reconnects to a backlog of full pages
+      And the backlog disables both keys and re-enables only the first on a later page
+      Then the first key serves throughout the backlog
+      And the second key is not served from its cached copy
+      When the backlog ends and the control plane stops answering
+      Then the second key gets virtual_key_disabled and the first key serves
+
+    @unit @regression
+    Scenario: an answer read before a pending denial is re-asked, not served
+      Given a gateway replaying its organization's history in full pages
+      And a resolve-key call for an active key is in flight
+      When a backlog page disables the key before that call returns
+      Then the gateway asks the control plane again instead of serving the old answer
+      And the request gets the control plane's current answer
+      When that second call fails
+      Then the request gets a retryable auth_upstream_unavailable
+
+    @unit
+    Scenario: a disable that lands while the replay is in flight is refused
+      Given a gateway replaying its organization's history in full pages
+      And a resolve-key call for a key is in flight
+      When a backlog page disables the key before that call returns
+      And the control plane now refuses the key
+      Then that request is asked again and refused with virtual_key_disabled
+      And nothing is cached and the next request is refused by the control plane
+      When the replay ends and the control plane stops answering
+      Then the key gets virtual_key_disabled, not a retryable error
+
+    @unit @regression
+    Scenario: a held session survives an outage between backlog pages
+      Given a voice session holds an active key
+      And a backlog page recorded a pending disable of that key
+      When its key watch re-reads the key while the control plane is down
+      Then the read fails as an outage and the session is not ended as revoked
+
+    @unit @regression
+    Scenario: a stale denied-list entry never refuses a key whose denial is pending
+      Given the denied list still maps a credential to its key after the key left the revocation list
+      When a backlog page records a pending disable of that key
+      Then the next request with that credential asks the control plane and serves
+
+    @unit @regression
+    Scenario: a key that leaves the revocation list leaves the credential index too
+      Given a disabled key whose credential is refused locally
+      When later denials push the key off the bounded revocation list
+      Then the credential no longer maps to that key
+
   Rule: Revocation propagates within 60 seconds via long-poll /changes
 
     @integration @unimplemented

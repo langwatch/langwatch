@@ -67,8 +67,8 @@ const ROUTE_PATHS = [
   "/",
   "/messages",
   "/settings/api-keys",
-  "/me",
-  "/me/sessions",
+  "/coding-agents",
+  "/coding-agents/sessions",
   "/share/:id",
   "/:project",
   "/:project/traces",
@@ -199,7 +199,7 @@ describe("given the page is the personal workspace's own", () => {
     window.localStorage.setItem(UI_SELECTED_PROJECT_SLUG_KEY, JSON.stringify("acme-app"));
     const { transport } = recordingTransport();
 
-    const view = renderScope({ path: "/me/sessions", transport });
+    const view = renderScope({ path: "/coding-agents/sessions", transport });
 
     await waitFor(() => expect(view.getByTestId("project").textContent).toBe("proj-personal"));
   });

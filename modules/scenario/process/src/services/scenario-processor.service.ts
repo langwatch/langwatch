@@ -15,6 +15,10 @@ import {
   type ScenarioChildBootstrap,
   type ScenarioChildExecutionSession,
 } from "../app/scenario.app.ts";
+import {
+  RedTeamReportWriterService,
+  type RedTeamReportRecord,
+} from "../features/red-team/services/red-team-report-writer.service.ts";
 import { redTeamRunEnvironment } from "../rules/red-team-job.rules.ts";
 import { isCustomerActionablePrefetchFailure } from "../rules/scenario-prefetch-failure.rules.ts";
 import {
@@ -22,10 +26,6 @@ import {
   hasHookResults,
   hookCallsEnvironment,
 } from "../rules/scenario-run-hooks.rules.ts";
-import {
-  RedTeamReportWriterService,
-  type RedTeamReportRecord,
-} from "./red-team-report-writer.service.ts";
 import type {
   ExecutionJobData,
   ScenarioExecutionPoolService,

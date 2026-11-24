@@ -40,7 +40,7 @@ const MIGRATION_SQL = readFileSync(
   join(
     import.meta.dirname,
     "../../../../../../../../packages/prisma-client/prisma/migrations",
-    "20261119120000_nurturing_evaluation_day_and_fold_columns/migration.sql",
+    "20261122120006_nurturing_evaluation_day_and_fold_columns/migration.sql",
   ),
   "utf8",
 );

@@ -172,6 +172,17 @@ Feature: Coding agent terminal view
     When the Terminal tab renders the session
     Then the bottom bar's prompt line shows the session's first prompt
 
+  # A launcher names the session it runs (langwatch.session.name), often with no
+  # prompt text recorded at all.
+
+  @unit
+  Scenario: The prompt line shows the session's name when the trace has none of its own
+    Given a session whose trace is named after its own root span
+    And the session has a name, on its session row or declared on its resource
+    When the Terminal tab renders the session
+    Then the bottom bar's prompt line shows the session's name
+    And it shows the untitled placeholder only when no name and no prompt text is known
+
   # The system prompt is the context the user pays for on every call - CLAUDE.md,
   # MCP tool definitions, skills. It rides the first request body of the session.
 
@@ -236,6 +247,28 @@ Rule: The terminal reads back the whole session
     Given a turn short enough that the reader is at the bottom of it
     When an earlier turn is prepended above it
     Then the screen stays where the reader left it instead of following the tail
+
+  # The size bands: "growing" from 50K tokens, "large" from 300K, or from 60% of
+  # the model's window when that is wider (a 1M-context model is large at 600K).
+
+  @unit
+  Scenario: A context that a frontier model handles comfortably is not called large
+    Given a model call whose context is 151K tokens
+    When the replay names its context size band
+    Then the band is "growing", not "large"
+
+  @unit
+  Scenario: A context is large from 300K tokens
+    Given a model call whose context is 300K tokens on a standard-window model
+    When the replay names its context size band
+    Then the band is "large"
+
+  @unit
+  Scenario: A model with a wider window is large later
+    Given a model call whose context is 400K tokens on a 1M-context model
+    When the replay names its context size band
+    Then the band is "growing"
+    And at 600K tokens on the same model the band is "large"
 
   # A context note says the context crossed into a bigger size band, which is a
   # comparison against the call BEFORE the crossing. While earlier turns are
@@ -434,6 +467,15 @@ Rule: A Code Mode session reads like the real CLI, not like REPL and Poll
     And it is named after the tool and carries the command it ran
     And it is ordered by the time it was decided, after the script that made it
 
+  @unit
+  Scenario: A script result Claude Code delivered without a Poll call is listed
+    Given a Claude Code session in Code Mode whose script finished before the model called Poll
+    And Claude Code handed its result to the model as a Poll call of its own in the next request
+    When the transcript is derived from the session's spans and logs
+    Then that result is a Poll tool call carrying the delivered text
+    And it is listed once although later requests repeat it
+    And a request body that does not parse adds nothing
+
   @integration
   Scenario: The calls a Code Mode script made are shown under its Code row
     Given a Claude Code session in Code Mode whose script ran Bash commands
@@ -467,6 +509,67 @@ Rule: A Code Mode session reads like the real CLI, not like REPL and Poll
     Given a REPL call whose input carries a script but no description
     When the Terminal tab renders the session
     Then the row reads Code with the script's line count
+
+  # A script often runs shell commands and file reads through the script's own
+  # helpers, not through tools, so the script and what it handed back are the
+  # whole record. The REPL call answers "(dispatched #N)" and a later Poll
+  # carries the settled result as an event element, after a harness preamble.
+
+  @unit
+  Scenario: A poll's result is read from the settled script event
+    Given a Poll output with a harness preamble and a settled script event carrying a result
+    When the poll's result is read
+    Then it is the result text with the script's number, status and duration
+    And the harness preamble is not part of it
+    And an event carrying an error is read as a failed result
+    And an <event> element the script printed itself, without the harness's kind, stays plain text
+
+  @unit
+  Scenario: A status summary or a dispatch receipt is never read as a result
+    Given a Poll or REPL output that is the span's status summary or "(dispatched #3)"
+    When the result is read
+    Then there is no result
+
+  @integration
+  Scenario: A poll shows what the script handed back
+    Given a Claude Code session in Code Mode where a poll returned the script's settled result
+    When the Terminal tab renders the session
+    Then the wait line is followed by the result the script handed back
+    And the harness preamble and the event markup are not shown
+
+  @integration
+  Scenario: A script that failed shows its error under the poll
+    Given a Claude Code session in Code Mode where the settled script event carries an error
+    When the Terminal tab renders the session
+    Then the error is shown under the wait line as a failed result
+
+  @integration
+  Scenario: A dispatched script does not show its receipt as a result
+    Given a REPL call whose output is "(dispatched #3)"
+    When the Terminal tab renders the session
+    Then the Code row shows no "(dispatched #3)" text
+
+  @integration
+  Scenario: A script Claude Code cut short says how long it was
+    Given a REPL call whose script Claude Code's telemetry cut to its first characters
+    When the Terminal tab renders the session and the script is opened
+    Then the script's first characters are shown without the cut marker
+    And a faint note says Claude Code recorded only the start of the script and its full length
+
+  @integration
+  Scenario: A session exported without content says so once
+    Given a Claude Code session in Code Mode exported without content, two scripts and a poll
+    When the Terminal tab renders the session
+    Then one faint line at the top says "This agent sends metadata only, so its prompts, scripts and output are not recorded"
+    And each Code row reads "Code" with no note of its own
+    And the poll is still one wait line with its duration
+
+  @integration
+  Scenario: A Code call with no script recorded says so
+    Given a Claude Code session in Code Mode that recorded its prompt, with one script exported without its source
+    When the Terminal tab renders the session
+    Then that Code row says the script was not recorded
+    And no line says the agent sends metadata only
 
   @unit
   Scenario: A model reply that only names its tool calls adds no line of its own

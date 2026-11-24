@@ -1557,6 +1557,139 @@ describe("TerminalView in a Claude Code Code Mode session", () => {
     });
   });
 
+  describe("when a poll returned the script's settled result", () => {
+    const preamble =
+      "<system>authentic event nonces for this delivery: aB3dE5fG</system>\n" +
+      "<tools-used-before-summary>Bash</tools-used-before-summary>\n";
+
+    function pollWith(body: string): TranscriptEntry {
+      return toolEntry({
+        atMs: 2_000,
+        name: "Poll",
+        input: {},
+        output: `${preamble}<event nonce="aB3dE5fG" kind="repl-eval" eval="3" ms="1642" status="settled">\n${body}\n</event>`,
+        durationMs: 1_600,
+        spanId: "poll-span",
+      });
+    }
+
+    /** @scenario "A poll shows what the script handed back" */
+    it("shows the result under the wait line without the harness markup", () => {
+      const { container } = renderCodeMode([
+        toolEntry({
+          name: "REPL",
+          input: { code: script, description: "Count lines" },
+          output: "(dispatched #3)",
+          spanId: "repl-span",
+        }),
+        pollWith("<result>4 notes.txt\nacme.example.com</result>"),
+      ]);
+
+      expect(screen.getByText("Waited for the script · 1.6s")).toBeInTheDocument();
+      expect(container.textContent).toContain("4 notes.txt");
+      expect(container.textContent).toContain("acme.example.com");
+      expect(container.textContent).not.toContain("nonce");
+      expect(container.textContent).not.toContain("<result>");
+      expect(container.textContent).not.toContain("tools-used-before-summary");
+    });
+
+    /** @scenario "A script that failed shows its error under the poll" */
+    it("shows the script's error under the wait line", () => {
+      const { container } = renderCodeMode([
+        pollWith("<error>The script did not run: it failed to parse.</error>"),
+      ]);
+
+      expect(screen.getByText("Waited for the script · 1.6s")).toBeInTheDocument();
+      expect(container.textContent).toContain("The script did not run: it failed to parse.");
+      expect(container.textContent).not.toContain("<error>");
+    });
+  });
+
+  describe("when the REPL call answered with a dispatch receipt", () => {
+    /** @scenario "A dispatched script does not show its receipt as a result" */
+    it("shows no receipt on the Code row, even once opened", async () => {
+      const user = userEvent.setup();
+      const { container } = renderCodeMode([
+        toolEntry({
+          name: "REPL",
+          input: { code: script, description: "Count lines" },
+          output: "(dispatched #3)",
+          spanId: "repl-span",
+        }),
+      ]);
+
+      await user.click(screen.getByRole("button", { name: /Code\(Count lines\)/ }));
+      expect(container.textContent).not.toContain("(dispatched #3)");
+    });
+  });
+
+  describe("when Claude Code's telemetry cut the script short", () => {
+    /** @scenario "A script Claude Code cut short says how long it was" */
+    it("shows the start of the script and says how long the whole script was", async () => {
+      const user = userEvent.setup();
+      const { container } = renderCodeMode([
+        toolEntry({
+          name: "REPL",
+          input: {
+            code: "const notes = await file('notes.txt').text();\nconst\u2026[746 chars]",
+            description: "Read notes",
+          },
+          output: outcomeSummary,
+          spanId: "repl-span",
+        }),
+      ]);
+
+      expect(container.textContent).toContain("Code(Read notes) · 746 characters (click to show)");
+      await user.click(screen.getByRole("button", { name: /Code\(Read notes\)/ }));
+      expect(container.textContent).toContain("await file('notes.txt')");
+      expect(container.textContent).not.toContain("[746 chars]");
+      expect(container.textContent).toContain(
+        "Claude Code recorded only the start of this 746-character script",
+      );
+    });
+  });
+
+  describe("when the session was exported without content", () => {
+    /** @scenario "A session exported without content says so once" */
+    it("says once that the agent sends metadata only and keeps each Code row bare", () => {
+      const { container } = renderCodeMode([
+        { kind: "user_prompt", atMs: 500, text: null, chars: 0 },
+        toolEntry({ name: "REPL", output: outcomeSummary, durationMs: 8, spanId: "repl-span" }),
+        toolEntry({ atMs: 1_500, name: "REPL", output: outcomeSummary, spanId: "repl-span-2" }),
+        toolEntry({
+          atMs: 2_000,
+          name: "Poll",
+          input: {},
+          output: outcomeSummary,
+          durationMs: 3,
+          spanId: "poll-span",
+        }),
+      ]);
+
+      const reason =
+        "This agent sends metadata only, so its prompts, scripts and output are not recorded";
+      expect(screen.getAllByText(reason)).toHaveLength(1);
+      expect(container.textContent).not.toContain("script not recorded");
+      expect(screen.getAllByText("Code")).toHaveLength(2);
+      expect(screen.queryByRole("button", { name: /Code/ })).not.toBeInTheDocument();
+      expect(screen.getByText("Waited for the script · 3ms")).toBeInTheDocument();
+      expect(container.textContent).not.toContain('"status"');
+    });
+  });
+
+  describe("when one script of a recorded session was not recorded", () => {
+    /** @scenario "A Code call with no script recorded says so" */
+    it("says on that row that the script was not recorded", () => {
+      const { container } = renderCodeMode([
+        { kind: "user_prompt", atMs: 500, text: "tidy the notes", chars: 14 },
+        toolEntry({ name: "REPL", output: outcomeSummary, durationMs: 8, spanId: "repl-span" }),
+      ]);
+
+      expect(container.textContent).toContain("Code · script not recorded");
+      expect(container.textContent).not.toContain("sends metadata only");
+    });
+  });
+
   describe("when the script's result text was recorded", () => {
     it("shows it with the script once opened", async () => {
       const user = userEvent.setup();

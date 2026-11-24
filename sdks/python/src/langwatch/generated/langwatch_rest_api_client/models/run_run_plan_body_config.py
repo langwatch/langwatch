@@ -38,6 +38,12 @@ class RunRunPlanBodyConfig:
             each scenario's own choice. Leave it out for the scenario or project default.
         judge_model (None | str | Unset): The model that judges every scenario in the run. Overrides each scenario's own
             choice. Leave it out for the scenario or project default.
+        trace_quiet_period_ms (int | None | Unset): Milliseconds (0 to 60000) the agent's trace must stay unchanged
+            before the judge reads it, for every scenario in the run. Overrides each scenario's own setting. Leave it out
+            for the scenario setting or the project's recommendation.
+        trace_wait_timeout_ms (int | None | Unset): Milliseconds (1000 to 300000) the judge waits for the agent's trace
+            before a verdict, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the
+            scenario setting or the project's recommendation.
         scenario_ids (list[str] | Unset): The scenarios a test_suites or scenarios scope covers. Read by a scenarios
             scope alone; a scope that states a rule resolves its own list at run time.
         evaluators (list[RunRunPlanBodyConfigEvaluatorsItem] | Unset): The plan's own evaluators, run beside the ones
@@ -55,6 +61,8 @@ class RunRunPlanBodyConfig:
     repeat_count: int | Unset = UNSET
     simulator_model: None | str | Unset = UNSET
     judge_model: None | str | Unset = UNSET
+    trace_quiet_period_ms: int | None | Unset = UNSET
+    trace_wait_timeout_ms: int | None | Unset = UNSET
     scenario_ids: list[str] | Unset = UNSET
     evaluators: list[RunRunPlanBodyConfigEvaluatorsItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -93,6 +101,18 @@ class RunRunPlanBodyConfig:
         else:
             judge_model = self.judge_model
 
+        trace_quiet_period_ms: int | None | Unset
+        if isinstance(self.trace_quiet_period_ms, Unset):
+            trace_quiet_period_ms = UNSET
+        else:
+            trace_quiet_period_ms = self.trace_quiet_period_ms
+
+        trace_wait_timeout_ms: int | None | Unset
+        if isinstance(self.trace_wait_timeout_ms, Unset):
+            trace_wait_timeout_ms = UNSET
+        else:
+            trace_wait_timeout_ms = self.trace_wait_timeout_ms
+
         scenario_ids: list[str] | Unset = UNSET
         if not isinstance(self.scenario_ids, Unset):
             scenario_ids = self.scenario_ids
@@ -118,6 +138,10 @@ class RunRunPlanBodyConfig:
             field_dict["simulatorModel"] = simulator_model
         if judge_model is not UNSET:
             field_dict["judgeModel"] = judge_model
+        if trace_quiet_period_ms is not UNSET:
+            field_dict["traceQuietPeriodMs"] = trace_quiet_period_ms
+        if trace_wait_timeout_ms is not UNSET:
+            field_dict["traceWaitTimeoutMs"] = trace_wait_timeout_ms
         if scenario_ids is not UNSET:
             field_dict["scenarioIds"] = scenario_ids
         if evaluators is not UNSET:
@@ -203,6 +227,24 @@ class RunRunPlanBodyConfig:
 
         judge_model = _parse_judge_model(d.pop("judgeModel", UNSET))
 
+        def _parse_trace_quiet_period_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_quiet_period_ms = _parse_trace_quiet_period_ms(d.pop("traceQuietPeriodMs", UNSET))
+
+        def _parse_trace_wait_timeout_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_wait_timeout_ms = _parse_trace_wait_timeout_ms(d.pop("traceWaitTimeoutMs", UNSET))
+
         scenario_ids = cast(list[str], d.pop("scenarioIds", UNSET))
 
         _evaluators = d.pop("evaluators", UNSET)
@@ -220,6 +262,8 @@ class RunRunPlanBodyConfig:
             repeat_count=repeat_count,
             simulator_model=simulator_model,
             judge_model=judge_model,
+            trace_quiet_period_ms=trace_quiet_period_ms,
+            trace_wait_timeout_ms=trace_wait_timeout_ms,
             scenario_ids=scenario_ids,
             evaluators=evaluators,
         )

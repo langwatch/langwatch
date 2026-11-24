@@ -28,7 +28,8 @@ Feature: Dashboards v1
   @integration
   Scenario: AC3 Sidebar matches the reference
     Given the release_dashboards flag is on for the project
-    When the member looks at the Dashboards product sidebar
+    And Dashboards in every product is off
+    When the member looks at the Dashboards product sidebar at /[project]/dashboards
     Then they see "Your dashboards" with My dashboard first, then Pinned when they have pins,
       then From LangWatch, each board with a menu
     And the sidebar shows nothing else besides Quick Search
