@@ -83,9 +83,10 @@ describe("the dashboard-widgets skill on finding the data", () => {
     const rendered = renderedSkill();
 
     expect(rendered).toContain("langwatch dashboard widget schema -f json > schema.json");
-    expect(rendered).toContain('select(.name == "langwatch.trace_metrics")');
-    expect(rendered).toContain("`langwatch.judgments`: Instant Eval verdicts");
-    expect(rendered).toContain("`langwatch.evaluation_metrics`");
+    expect(rendered).toContain('select(.name | endswith(".trace_metrics"))');
+    expect(rendered).toContain("write the name exactly as `schema.json` gives it");
+    expect(rendered).toContain("`judgments`: Instant Eval verdicts");
+    expect(rendered).toContain("`evaluation_metrics`");
     expect(rendered).not.toContain("subtractDays(now(), 400) GROUP BY");
     expect(rendered).not.toContain("Seed data is stale");
     expect(rendered).not.toContain("north-star-widgets");

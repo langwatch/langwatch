@@ -2270,6 +2270,13 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     # The diagnostic is written for the query's author (CLI, MCP, the editor); a reader never wrote the SQL
 
   @unit
+  Scenario: AC213c Sources line: a view named with its database still keeps its origin
+    Given a widget whose query reads "langwatch.trace_metrics" or "analytics.trace_metrics" and not {dashboard_context_sources:Array(String)}
+    Then its sources line says "Sources: all sources"
+    And never that sources don't apply
+    # The database a deployment serves the views from differs: "langwatch" on Cloud, "analytics" by default
+
+  @unit
   Scenario: AC212 Skill: the dashboard-widgets skill teaches projects, the reserved names and params
     Given Langy builds or edits a widget with the dashboard-widgets skill
     Then the skill names {dashboard_context_sources} and {dashboard_context_projects} as reserved, the type Array(String), that a query is kept to its sources only where its SQL reads the first, that `projects` defaults to the board's project, and that every run answers with params, a flat map of each declared placeholder by its SQL name, and diagnostics, which say when the server limited the run or ignored a setting (SHARE_WINDOW_LIMITED, SOURCES_IGNORED, GRANULARITY_COARSENED)
@@ -2287,6 +2294,13 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And it says never to write a hex colour, white or a light background, so a tile stays readable in dark mode
     And its worked example uses only those variables
     # Evidence: the compiled skill text, quoted
+
+  @integration
+  Scenario: AC260b Langy widgets: switching the theme repaints a widget in the new colours
+    Given a board with a widget open in the light theme
+    When the reader switches to the dark theme
+    Then the widget's frame starts again with the dark theme's colour variables
+    # The frame reads the colours when it loads, after the new theme has painted, not when it began
 
   @unit
   Scenario: AC261 Langy widgets: the skill teaches a widget to fill its card
@@ -2317,6 +2331,12 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then Langy's rules send it to the dashboard-widgets skill
     And the answer is a widget added to that dashboard, not a chart drawn only in the chat
     # Langy's rules are the same for every model; nothing here is written for one provider
+
+  @unit
+  Scenario: AC264b Langy widgets: a question from a board's ask bar asks for a widget on that board
+    Given a member types "Is our AI saving us time?" in the "What do you want to know?" bar of a dashboard they saved
+    Then the board context sent with the question says to answer by adding a widget to that dashboard, then say the answer in a sentence
+    And on a From LangWatch dashboard, which is read-only, the context asks for no widget
 
   # ---------------------------------------------------------------------------
   # Guard rails

@@ -63662,15 +63662,15 @@ Never guess dataset or column names. The schema command lists every view your cr
 ```bash
 langwatch dashboard widget schema -f json > schema.json
 jq -r '.views[] | "\(.name) (\(.timeColumn)): \(.description)"' schema.json
-jq '.views[] | select(.name == "langwatch.trace_metrics")' schema.json
+jq '.views[] | select(.name | endswith(".trace_metrics"))' schema.json
 ```
 
-Read the view's grain, its time column, and which columns are `available` to you. The views most questions need:
+Read the view's grain, its time column, and which columns are `available` to you. A view's full name carries the database this deployment serves it from (`langwatch.trace_metrics` on LangWatch Cloud, `analytics.trace_metrics` on some self-hosted installs): write the name exactly as `schema.json` gives it. The examples below use the Cloud spelling. The views most questions need:
 
-- `langwatch.trace_metrics`: one row per trace with cost, latency, tokens, the user, conversation and `Source` (the origin). Traces, cost, latency and usage questions start here.
-- `langwatch.evaluation_metrics` and `langwatch.trace_evaluation_metrics`: evaluation and online evaluation outcomes.
-- `langwatch.judgments`: Instant Eval verdicts, one row per run, trace and question. `langwatch instant-eval list -f json` gives each run's id and question; filter with `RunId = '<id>'`, and `Passed = 1` is a trace the question matched.
-- `langwatch.span_metrics` and `langwatch.model_usage_by_minute`: per span and per model.
+- `trace_metrics`: one row per trace with cost, latency, tokens, the user, conversation and `Source` (the origin). Traces, cost, latency and usage questions start here.
+- `evaluation_metrics` and `trace_evaluation_metrics`: evaluation and online evaluation outcomes.
+- `judgments`: Instant Eval verdicts, one row per run, trace and question. `langwatch instant-eval list -f json` gives each run's id and question; filter with `RunId = '<id>'`, and `Passed = 1` is a trace the question matched.
+- `span_metrics` and `model_usage_by_minute`: per span and per model.
 
 Every query reads the dashboard's own period: bound the view's time column with `{dashboard_context_period_start:DateTime}` and `{dashboard_context_period_end:DateTime}` (Step 2), never a fixed window such as `subtractDays(now(), 400)`. Try the statement once before writing the widget, with the dashboard period from your context: `langwatch query run "<sql>" --start "<period start>" --end "<period end>" --format json` (this command takes `--format`, not `-f`). Zero rows over the period is an answer, not a bug.
 

@@ -107,4 +107,13 @@ describe("cardLimitMessages", () => {
     expect(footer).toBe("Sources: all sources \u00b7 Project: Alpha");
     expect(footer).not.toContain("{dashboard_context_sources}");
   });
+
+  /** @scenario "AC213c Sources line: a view named with its database still keeps its origin" */
+  it("reads the view behind any database qualifier", () => {
+    for (const view of ["langwatch.trace_metrics", "analytics.trace_metrics"]) {
+      const line = widgetSourcesLine([query("a", null, `SELECT count() FROM ${view}`)]);
+
+      expect(line).toBe("Sources: all sources");
+    }
+  });
 });

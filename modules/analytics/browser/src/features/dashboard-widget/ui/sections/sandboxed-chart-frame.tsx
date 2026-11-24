@@ -147,7 +147,7 @@ export function SandboxedChartFrame({
     const bridge = FrameBridgeSession.create({
       iframe,
       executeQuery: (args) => executeQueryRef.current(args),
-      dashboardContext: withThemeColors(dashboardContextRef.current),
+      readDashboardContext: () => withThemeColors(dashboardContextRef.current),
       params: paramsRef.current,
       source: codeRef.current,
       onLog: (entry) => onLogRef.current(entry),
