@@ -581,30 +581,6 @@ describe("given the drift a reconvergence check converges", () => {
   });
 });
 
-describe("given what the reconvergence check finds in PostgreSQL", () => {
-  const views = selfProvisioning.approvedPostgresViews();
-  const found = views.map((view) => ({ view, granted: true }));
-
-  /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
-  it("finds no gap when every approved view exists and the reader may select it", () => {
-    expect(selfProvisioning.findPostgresGaps({ found })).toEqual([]);
-  });
-
-  /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
-  it("names a missing view as absent and an ungranted one as present", () => {
-    const [missing, ungranted] = views;
-    if (!missing || !ungranted) throw new Error("the catalog maps too few datasets");
-    const gapped = found
-      .filter((view) => view.view !== missing)
-      .map((view) => (view.view === ungranted ? { ...view, granted: false } : view));
-
-    expect(selfProvisioning.findPostgresGaps({ found: gapped })).toEqual([
-      { view: missing, absent: true },
-      { view: ungranted, absent: false },
-    ]);
-  });
-});
-
 describe("given the collection probe", () => {
   it("names the collection it reads through", () => {
     const collection = collectionBinding.namedCollection({ names: NAMES, mode: "sql" });

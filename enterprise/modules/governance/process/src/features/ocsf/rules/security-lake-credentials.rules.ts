@@ -13,7 +13,7 @@ export function isAwsHostedEndpoint(endpoint: string): boolean {
 export const SECURITY_LAKE_EXTERNAL_ID_KEY = "external_id";
 
 /** Named as aws-client names its own refusal, so one check covers the SDK's and this one. */
-export const MISSING_KEY_PAIR_ERROR = "MissingStaticAwsCredentialsError";
+const MISSING_KEY_PAIR_ERROR = "MissingStaticAwsCredentialsError";
 
 function missingKeyPairError(): Error {
   const error = new Error("An access key ID and secret access key are required");
@@ -26,7 +26,7 @@ export function isMissingKeyPairError(error: unknown): error is Error {
 }
 
 /** The name of the error a source without its generated external id is refused with. */
-export const MISSING_EXTERNAL_ID_ERROR = "MissingSecurityLakeExternalIdError";
+const MISSING_EXTERNAL_ID_ERROR = "MissingSecurityLakeExternalIdError";
 
 function missingExternalIdError(): Error {
   const error = new Error("The Security Lake source has no external id; add it again to get one");
