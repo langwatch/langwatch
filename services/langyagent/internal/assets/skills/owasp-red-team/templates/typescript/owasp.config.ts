@@ -95,8 +95,30 @@ export function privilegedTools(agent: OwaspAgentConfig): string[] {
   return agent.privileged_tools.length > 0 ? agent.privileged_tools : agent.tools;
 }
 
+/** LiteLLM provider prefixes, so one OWASP_MODEL value serves the Python and TypeScript packs. */
+const PROVIDER_PREFIXES = [
+  "openai",
+  "azure",
+  "anthropic",
+  "gemini",
+  "vertex_ai",
+  "bedrock",
+  "groq",
+  "mistral",
+  "xai",
+  "deepseek",
+  "openrouter",
+];
+
+/** The model id the AI SDK provider takes: openai/gpt-5-mini becomes gpt-5-mini. */
+export function modelId(raw: string | undefined): string {
+  const id = raw ?? "gpt-6-luna";
+  const slash = id.indexOf("/");
+  return slash > 0 && PROVIDER_PREFIXES.includes(id.slice(0, slash)) ? id.slice(slash + 1) : id;
+}
+
 /** Attacker and judge model: an OpenAI-compatible chat model (Gemini fails in the SDK). */
-export const MODEL = process.env.OWASP_MODEL ?? "gpt-6-luna";
+export const MODEL = modelId(process.env.OWASP_MODEL);
 
 export const DEFAULT_TURNS = 10;
 

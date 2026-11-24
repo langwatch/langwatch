@@ -25,7 +25,7 @@ The OWASP pack is a set of multi-turn [red team](/agent-testing/red-teaming) tes
 | ASI03 | Identity and Privilege Abuse | Privileged tools used on a claimed identity |
 | ASI06 | Memory & Context Poisoning | A false rule planted early and used later |
 
-The other ids (LLM03, LLM04, LLM08, ASI04, ASI05, ASI07 to ASI10) concern supply chain, training data, vector stores and multi-agent systems, which a conversation with your agent cannot reach.
+LLM03, LLM04, LLM08, ASI04, ASI07, ASI08 and ASI10 concern supply chain, training data, vector stores and multi-agent systems, which a conversation with your agent cannot reach. A conversation can reach ASI05 (Unexpected Code Execution) and ASI09 (Human-Agent Trust Exploitation), but the pack has no attack for them: ASI05 needs an agent that runs code, and ASI09 turns on what a person does with the reply.
 
 ## Apply it with your coding agent
 
@@ -55,23 +55,25 @@ It follows the [OWASP red team recipe](https://github.com/langwatch/skills/tree/
 Install the test dependencies if your repo does not have them yet:
 
 ```bash
-pip install "langwatch-scenario>=1.6" pytest pytest-asyncio         # Python
+pip install "langwatch-scenario>=1.6" pytest "pytest-asyncio>=0.24"  # Python
 npm install -D @langwatch/scenario@^1.7 vitest @ai-sdk/openai@^3     # TypeScript
 ```
 
-Keep `@ai-sdk/openai` on 3.x: `@langwatch/scenario` 1.7 refuses 4.x models. The attacker and the judge need an OpenAI-compatible chat model, set with `OWASP_MODEL`. For Python, set `OWASP_MODEL` to that provider's LiteLLM id. For TypeScript, also swap the `openai` import and factory in `owasp-pack.test.ts` for that provider's AI SDK package. Gemini fails as attacker or judge in the current SDK. Your agent can use any model.
+Keep `@ai-sdk/openai` on 3.x: `@langwatch/scenario` 1.7 refuses 4.x models. The attacker and the judge need an OpenAI-compatible chat model, set with `OWASP_MODEL`. For Python, set `OWASP_MODEL` to that provider's LiteLLM id. Both languages take a LiteLLM id such as `openai/gpt-5-mini`. For TypeScript, also swap the `openai` import and factory in `owasp-pack.redteam.ts` for that provider's AI SDK package. Gemini fails as attacker or judge in the current SDK. Your agent can use any model.
 
 Set `LANGWATCH_API_KEY` and the API key of the provider `OWASP_MODEL` points to (`OPENAI_API_KEY` for the default), then run:
 
 ```bash
-pytest test_owasp_pack.py -v            # Python
-npx vitest run owasp-pack.test.ts       # TypeScript
+pytest test_owasp_pack.py -v -m agent_test                      # Python
+npx vitest run --config tests/owasp/owasp.vitest.config.ts      # TypeScript
 ```
 
-Add `-k LLM01` (pytest) or `-t LLM01` (vitest) to run one id. `OWASP_TURNS` sets the attacker's turns per attack: 10 when unset or empty, 30 before a release. A value that is not a whole number of at least 1 stops the run.
+Add `-k LLM01` (pytest) or `-t LLM01` (vitest) to run one id.
+
+The pack calls live models, so keep it out of your default test run and CI. For pytest, add `-m "not agent_test"` to your default options (`addopts` under `[tool.pytest.ini_options]`); `-m agent_test` on the command line overrides it. For vitest, the pack file `owasp-pack.redteam.ts` does not end in `.test.ts`, so the default include skips it and only `owasp.vitest.config.ts` runs it. `OWASP_TURNS` sets the attacker's turns per attack: 10 when unset or empty, 30 before a release. A value that is not a whole number of at least 1 stops the run.
 
 To read the results:
 
 1. In LangWatch, open Simulations.
 2. Pick the `owasp-red-team` set: it holds one run per OWASP id.
-3. Open a run to read the conversation and the judge's verdict on each criterion. The test output names the unmet criteria but not the turn, so find the first agent reply that breaks one here.
+3. Open a run to read the conversation and the judge's verdict on each criterion. The criteria judge security only, so a plain refusal passes. The test output names the unmet criteria but not the turn, so find the first agent reply that breaks one here.

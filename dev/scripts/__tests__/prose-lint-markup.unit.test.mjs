@@ -32,5 +32,23 @@ void describe("stripMarkup", () => {
       "Use `items[0]`.",
     );
     assert.equal(stripMarkup("[Guide](https://example.com/a(b)/langwatch) now"), "Guide now");
+    assert.equal(stripMarkup("[a [b](u) c](v) and [x"), "a b c and [x");
+    assert.equal(stripMarkup("[![logo](a.png)](https://x) done"), " done");
+  });
+
+  /** @scenario "Pathological markup strips in linear time" */
+  void it("strips pathological markup quickly and without recursion", () => {
+    const n = 50_000;
+    const cases = [
+      ["[".repeat(n), "[".repeat(n)],
+      ["[a](".repeat(n), "[a](".repeat(n)],
+      [`${"[".repeat(20_000)}a${"](u)".repeat(20_000)}`, "a"],
+      ["![".repeat(n), "![".repeat(n)],
+    ];
+    for (const [input, expected] of cases) {
+      const started = performance.now();
+      assert.equal(stripMarkup(input), expected);
+      assert.ok(performance.now() - started < 1_000, `took ${performance.now() - started} ms`);
+    }
   });
 });

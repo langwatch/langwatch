@@ -366,49 +366,59 @@ export function stripMarkup(s) {
 }
 
 // Walks `[label](url)` and `![alt](url)` with nested brackets and balanced
-// parentheses, which a regex cannot match.
+// parentheses, which a regex cannot match. Brackets are paired in one pass
+// first, so the walk stays linear and never recurses.
 function stripLinks(text) {
+  const match = pairBrackets(text);
+  const skipTo = new Map();
   let out = "";
   let i = 0;
   while (i < text.length) {
+    if (skipTo.has(i)) {
+      i = skipTo.get(i);
+      continue;
+    }
     // An escaped character is literal, so `\![` and `\[` open nothing.
     if (text[i] === "\\" && i + 1 < text.length) {
       out += text.slice(i, i + 2);
       i += 2;
       continue;
     }
-    const link = readLink(text, i);
-    if (link) {
-      out += link.keep;
-      i = link.end;
-    } else {
+    const link = linkAt({ text, start: i, match });
+    if (!link) {
       out += text[i];
       i += 1;
+    } else if (link.isImage) {
+      i = link.urlEnd + 1;
+    } else {
+      // Keep the label, nested links included, then jump over `](url)`.
+      skipTo.set(link.labelEnd, link.urlEnd + 1);
+      i = link.open + 1;
     }
   }
   return out;
 }
 
-function readLink(text, start) {
+function linkAt({ text, start, match }) {
   const isImage = text[start] === "!" && text[start + 1] === "[";
   const open = isImage ? start + 1 : start;
-  if (text[open] !== "[") return null;
-  const labelEnd = closingIndex({ text, from: open, open: "[", close: "]" });
-  if (labelEnd < 0 || text[labelEnd + 1] !== "(") return null;
-  const urlEnd = closingIndex({ text, from: labelEnd + 1, open: "(", close: ")" });
-  if (urlEnd < 0) return null;
-  const keep = isImage ? "" : stripLinks(text.slice(open + 1, labelEnd));
-  return { keep, end: urlEnd + 1 };
+  const labelEnd = text[open] === "[" ? match[open] : -1;
+  const urlEnd = labelEnd >= 0 && text[labelEnd + 1] === "(" ? match[labelEnd + 1] : -1;
+  return urlEnd < 0 ? null : { isImage, open, labelEnd, urlEnd };
 }
 
-function closingIndex({ text, from, open, close }) {
-  let depth = 0;
-  for (let i = from; i < text.length; i += 1) {
-    if (text[i] === "\\") i += 1;
-    else if (text[i] === open) depth += 1;
-    else if (text[i] === close && --depth === 0) return i;
+// The index of the closing bracket for every unescaped `[` and `(`, or -1.
+function pairBrackets(text) {
+  const match = Array.from({ length: text.length }, () => -1);
+  const stacks = { "[": [], "(": [] };
+  const opener = { "]": "[", ")": "(" };
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (c === "\\") i += 1;
+    else if (c in stacks) stacks[c].push(i);
+    else if (c in opener && stacks[opener[c]].length > 0) match[stacks[opener[c]].pop()] = i;
   }
-  return -1;
+  return match;
 }
 
 function stripInlineCode(s) {

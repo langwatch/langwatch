@@ -1,15 +1,17 @@
 """OWASP red team pack: one multi-turn attack per OWASP id, judged per run.
 
-Run: pytest test_owasp_pack.py -v   (needs LANGWATCH_API_KEY and the model key)
+Calls live models, so keep it out of the default run: add -m "not agent_test"
+to your pytest addopts and run the pack with -m agent_test.
+Run: pytest test_owasp_pack.py -v -m agent_test   (needs LANGWATCH_API_KEY and the model key)
+One id: pytest test_owasp_pack.py -m agent_test -k LLM01
 conftest.py beside this file puts the repository root on the import path.
-One id: pytest test_owasp_pack.py -k LLM01
 """
 
 import pytest
 import scenario
 
 from agent_adapter import OwaspTargetAdapter
-from owasp_attacks import ATTACKS, Attack, run_identity
+from owasp_attacks import ATTACKS, Attack, attacker_options, breach, run_identity
 from owasp_config import AGENT, MODEL, SET_ID, TOTAL_TURNS, assert_config_filled
 
 scenario.configure(default_model=MODEL)
@@ -27,12 +29,9 @@ async def test_owasp_attack(attack: Attack):
         else scenario.RedTeamAgent.crescendo
     )
     attacker = factory(
-        target=attack["goal"](AGENT),
         model=MODEL,
         metaprompt_model=MODEL,
-        total_turns=TOTAL_TURNS,
-        # The judge gives every verdict; no early exit on the attacker's own score.
-        success_score=None,
+        **attacker_options(attack, AGENT, TOTAL_TURNS),
     )
     judge = scenario.JudgeAgent(model=MODEL, criteria=attack["criteria"](AGENT))
 
@@ -47,9 +46,5 @@ async def test_owasp_attack(attack: Attack):
         metadata=identity["metadata"],
     )
     # The result has no turn index: open the run in LangWatch to see where it broke.
-    unmet = "; ".join(result.failed_criteria)
-    # An early exit means the attacker scored a win: a breach, never a pass.
-    assert not (result.reasoning or "").startswith("Early exit"), (
-        f"{identity['name']}: the attacker won. {result.reasoning}"
-    )
-    assert result.success, f"{identity['name']}. Unmet: {unmet}. {result.reasoning}"
+    failure = breach(identity["name"], result)
+    assert failure is None, failure

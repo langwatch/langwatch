@@ -1,5 +1,6 @@
-import { execFileSync } from "child_process";
+import { execFileSync, spawn } from "child_process";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -110,9 +111,97 @@ export function pythonPack(): PythonPack {
   return JSON.parse(out) as PythonPack;
 }
 
-export function packTest(lang: "python" | "typescript"): string {
-  const file = lang === "python" ? "test_owasp_pack.py" : "owasp-pack.test.ts";
-  return fs.readFileSync(path.join(lang === "python" ? pythonDir : typescriptDir, file), "utf8");
+const e2eDir = path.join(__dirname, "..", "fixtures", "owasp-e2e");
+
+/** How one end-to-end run of a pack ended: a failure message per attack, null when it held. */
+export interface PackRun {
+  outcomes: { id: string; failure: string | null }[];
+  /** An error that stopped the whole suite before any attack ran. */
+  suiteError: string | null;
+}
+
+export interface PackRunInput {
+  config: "shipped" | "example";
+  verdict: "held" | "breach";
+}
+
+/** Runs the Python pack's test function with stub pytest and scenario modules. */
+export function runPythonPack({ config, verdict }: PackRunInput): PackRun & {
+  runs: { name: string; set_id: string; metadata: Record<string, string>; reply: string }[];
+  marks: string[];
+} {
+  const out = execFileSync(
+    "python3",
+    ["-I", "-B", path.join(e2eDir, "run_python_pack.py"), pythonDir, config, verdict],
+    { encoding: "utf8" },
+  );
+  return { suiteError: null, ...JSON.parse(out) };
+}
+
+interface VitestReport {
+  success: boolean;
+  numFailedTests: number;
+  testResults: {
+    assertionResults: { title: string; status: string; failureMessages: string[] }[];
+  }[];
+}
+
+/** Runs a command and resolves its stdout and stderr once it exits. */
+function run(
+  command: string,
+  args: string[],
+  options: { cwd: string; env: NodeJS.ProcessEnv },
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, options);
+    let output = "";
+    child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
+    child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString()));
+    child.on("error", reject);
+    child.on("close", () => resolve(output));
+  });
+}
+
+/** Runs the TypeScript pack on the real scenario SDK with a stub model (fixtures/owasp-e2e). */
+export async function runTypescriptPack({ config, verdict }: PackRunInput): Promise<PackRun> {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "owasp-ts-e2e-"));
+  const outputFile = path.join(outDir, "report.json");
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([key]) => !key.startsWith("VITEST") && key !== "LANGWATCH_API_KEY",
+    ),
+  );
+  try {
+    const vitest = await run(
+      path.join(skillsRoot, "node_modules", ".bin", "vitest"),
+      [
+        "run",
+        "--config",
+        path.join(e2eDir, "vitest.config.ts"),
+        "--reporter=default",
+        "--reporter=json",
+        `--outputFile.json=${outputFile}`,
+      ],
+      {
+        // The SDK writes a redteam-reports folder into the working directory.
+        cwd: outDir,
+        env: { ...env, OWASP_E2E_CONFIG: config, OWASP_E2E_VERDICT: verdict },
+      },
+    );
+    const report = JSON.parse(fs.readFileSync(outputFile, "utf8")) as VitestReport;
+    const [file] = report.testResults;
+    // The JSON report drops a failed beforeAll, so a suite error comes from the console report.
+    const suiteFailed = !report.success && report.numFailedTests === 0;
+    return {
+      suiteError: suiteFailed ? vitest : null,
+      outcomes: (file?.assertionResults ?? []).map((a) => ({
+        id: a.title.split(" ")[0]!,
+        failure: a.status === "passed" ? null : a.failureMessages.join("\n") || a.status,
+      })),
+    };
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
 }
 
 export function owaspSkill() {

@@ -4,10 +4,13 @@ import os from "os";
 import path from "path";
 
 import { describe, expect, it } from "vitest";
+import { configDefaults } from "vitest/config";
 
 import { renderSkill } from "../_compiler/native.ts";
 import {
   ATTACKS,
+  attackerOptions,
+  breach,
   runIdentity,
 } from "../recipes/owasp-red-team/templates/typescript/owasp-attacks.ts";
 import {
@@ -16,16 +19,21 @@ import {
   FILL_ME,
   OwaspTurnsError,
   assertConfigFilled,
+  modelId,
   parseTurns,
 } from "../recipes/owasp-red-team/templates/typescript/owasp.config.ts";
+import packVitestConfig from "../recipes/owasp-red-team/templates/typescript/owasp.vitest.config.ts";
 import {
   OFFICIAL_TITLES,
+  type PackRun,
+  type PackRunInput,
   configProblem,
   owaspSkill,
-  packTest,
   pythonDir,
   pythonPack,
   repoRoot,
+  runPythonPack,
+  runTypescriptPack,
 } from "./helpers/owasp-pack.ts";
 
 // Backs specs/skills/owasp-red-team.feature: the Python and TypeScript packs,
@@ -46,6 +54,47 @@ for raw in sys.argv[2:]:
         out[raw] = {"code": e.code, "message": str(e)}
 print(json.dumps({"unset": parse_turns(None), **out}))
 `;
+
+const PY_CONFTEST = `
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import conftest
+class Config:
+    lines = []
+    def addinivalue_line(self, name, line):
+        self.lines.append([name, line])
+config = Config()
+conftest.pytest_configure(config)
+print(json.dumps(config.lines))
+`;
+
+const PY_BREACH = `
+import json, sys, types
+sys.path.insert(0, sys.argv[1])
+from owasp_attacks import breach
+cases = json.loads(sys.argv[2])
+print(json.dumps([breach("X", types.SimpleNamespace(success=c["success"], reasoning=c.get("reasoning"),
+    failed_criteria=c["unmetCriteria"])) for c in cases]))
+`;
+
+const TS_RUNS: PackRunInput[] = [
+  { config: "shipped", verdict: "held" },
+  { config: "example", verdict: "held" },
+  { config: "example", verdict: "breach" },
+];
+const runKey = ({ config, verdict }: PackRunInput) => `${config}:${verdict}`;
+let tsRuns: Promise<Map<string, PackRun>> | undefined;
+
+/** A TypeScript run starts a vitest process, so all three start together on first use. */
+async function packRun(lang: "python" | "typescript", input: PackRunInput): Promise<PackRun> {
+  if (lang === "python") return runPythonPack(input);
+  tsRuns ??= Promise.all(
+    TS_RUNS.map(async (mode) => [runKey(mode), await runTypescriptPack(mode)] as const),
+  ).then((entries) => new Map(entries));
+  return (await tsRuns).get(runKey(input))!;
+}
+
+const E2E_TIMEOUT_MS = 120_000;
 
 function tsTurns(raw: string | undefined): number | { code: string; message: string } {
   try {
@@ -197,12 +246,22 @@ describe("OWASP red team pack", () => {
       unfilled: Object.keys(pyValues),
       empty: [],
     });
-    expect(packTest("python")).toMatch(/\bassert_config_filled\(/);
-    expect(fs.readFileSync(path.join(pythonDir, "conftest.py"), "utf8")).toContain(
-      '"markers", "agent_test',
-    );
-    expect(packTest("typescript")).toMatch(/\bassertConfigFilled\(/);
   });
+
+  /** @scenario "The pack refuses to run on the shipped config" */
+  it(
+    "fails every attack with owasp_config_incomplete when run on the shipped config",
+    async () => {
+      const ids = ATTACKS.map((a) => a.id);
+      const py = await packRun("python", { config: "shipped", verdict: "held" });
+      expect(py.outcomes).toEqual(ids.map((id) => ({ id, failure: CODE })));
+      const ts = await packRun("typescript", { config: "shipped", verdict: "held" });
+      expect(ts.suiteError).toContain("OwaspConfigError: Fill AGENT in owasp.config.ts");
+      expect(ts.outcomes.map((o) => o.id)).toEqual(ids);
+      for (const outcome of ts.outcomes) expect(outcome.failure).not.toBeNull();
+    },
+    E2E_TIMEOUT_MS,
+  );
 
   /** @scenario "The consumption attack judges against the configured limits" */
   it("builds the LLM10 criteria from max_reply_words and max_tool_calls_per_turn", () => {
@@ -297,7 +356,9 @@ describe("OWASP red team pack", () => {
       expect(text).toContain("OpenAI-compatible chat model");
     }
   });
+});
 
+describe("OWASP red team pack runs", () => {
   /** @scenario "Each run carries its OWASP id as the scenario id in both languages" */
   it("builds the same run id, name and metadata from the OWASP id in both languages", () => {
     const py = pythonPack();
@@ -308,15 +369,127 @@ describe("OWASP red team pack", () => {
       expect(identity.metadata).toEqual({ owasp: attack.id, strategy: attack.strategy });
       expect(py.attacks.find((a) => a.id === attack.id)!.identity).toEqual(identity);
     }
-    expect(packTest("python")).toMatch(/\brun_identity\(/);
-    expect(packTest("typescript")).toMatch(/\brunIdentity\(/);
   });
+
+  /** @scenario "Each run carries its OWASP id as the scenario id in both languages" */
+  it(
+    "names every end-to-end run after its OWASP id",
+    async () => {
+      const py = runPythonPack({ config: "example", verdict: "held" });
+      expect(py.runs.map(({ name, set_id, metadata }) => ({ name, set_id, metadata }))).toEqual(
+        ATTACKS.map((attack) => {
+          const { name, metadata } = runIdentity({ attack, agent: EXAMPLE_AGENT });
+          return { name, set_id: "owasp-red-team", metadata };
+        }),
+      );
+      const ts = await packRun("typescript", { config: "example", verdict: "breach" });
+      for (const attack of ATTACKS) {
+        const { name } = runIdentity({ attack, agent: EXAMPLE_AGENT });
+        const outcome = ts.outcomes.find((o) => o.id === attack.id);
+        expect(outcome?.failure).toContain(`${name}. Unmet: `);
+      }
+    },
+    E2E_TIMEOUT_MS,
+  );
 
   /** @scenario "An attacker early exit fails the run" */
   it("switches off the attacker early exit and fails a run that still ends in one", () => {
-    expect(packTest("python")).toMatch(/success_score\s*=\s*None/);
-    expect(packTest("typescript")).toMatch(/successScore:\s*undefined/);
-    for (const lang of ["python", "typescript"] as const)
-      expect(packTest(lang)).toMatch(/Early exit/);
+    const options = attackerOptions({ attack: ATTACKS[0]!, agent: EXAMPLE_AGENT, turns: 3 });
+    expect(Object.keys(options)).toContain("successScore");
+    expect(options).toEqual({
+      target: ATTACKS[0]!.goal(EXAMPLE_AGENT),
+      totalTurns: 3,
+      successScore: undefined,
+    });
+    const cases = [
+      { success: true, reasoning: "Early exit: objective achieved on turn 3", unmetCriteria: [] },
+      { success: false, reasoning: "Leaked a card number", unmetCriteria: ["a", "b"] },
+      { success: true, reasoning: "Held", unmetCriteria: [] },
+    ];
+    const expected = [
+      "X: the attacker won. Early exit: objective achieved on turn 3",
+      "X. Unmet: a; b. Leaked a card number",
+      null,
+    ];
+    expect(cases.map((result) => breach({ name: "X", result }))).toEqual(expected);
+    const py = execFileSync(
+      "python3",
+      ["-I", "-B", "-c", PY_BREACH, pythonDir, JSON.stringify(cases)],
+      { encoding: "utf8" },
+    );
+    expect(JSON.parse(py)).toEqual(expected);
+  });
+
+  /** @scenario "The pack runs end to end against a stub model" */
+  it(
+    "passes every attack the judge says held, even when the attacker scores a win, and fails every breach",
+    async () => {
+      for (const lang of ["python", "typescript"] as const) {
+        const held = await packRun(lang, { config: "example", verdict: "held" });
+        expect(held.suiteError, lang).toBeNull();
+        expect(held.outcomes, lang).toEqual(ATTACKS.map(({ id }) => ({ id, failure: null })));
+        const broken = await packRun(lang, { config: "example", verdict: "breach" });
+        expect(
+          broken.outcomes.map((o) => o.id),
+          lang,
+        ).toEqual(ATTACKS.map((a) => a.id));
+        for (const outcome of broken.outcomes) expect(outcome.failure, lang).toContain("Unmet: ");
+      }
+      const py = runPythonPack({ config: "example", verdict: "held" });
+      expect(py.runs.map((r) => r.reply)).toEqual(
+        ATTACKS.map(() => "I can only help with your own orders."),
+      );
+    },
+    E2E_TIMEOUT_MS,
+  );
+
+  /** @scenario "The judge checks security only, from what it can see" */
+  it("judges security only, with criteria built from the config and the conversation", () => {
+    const agent = { ...EXAMPLE_AGENT, output_rendered_as: "Slack messages" };
+    const criteria = (id: string) => ATTACKS.find((a) => a.id === id)!.criteria(agent);
+    const all = ATTACKS.flatMap((a) => a.criteria(agent)).join("\n");
+    expect(all).not.toMatch(/still helps|explains what|offers|politely|plain text/);
+    expect(all).not.toMatch(/its rules require|backed by its|its own instructions/);
+    for (const text of criteria("LLM05:2025")) expect(text).toContain("Slack messages");
+    for (const id of ["LLM06:2025", "LLM09:2025"]) {
+      const text = criteria(id).join("\n");
+      for (const rule of agent.must_never) expect(text).toContain(rule);
+      expect(text).toContain("tool result");
+    }
+    expect(pythonPack().attacks.map((a) => a.criteria)).toEqual(
+      ATTACKS.map((a) => a.criteria(EXAMPLE_AGENT)),
+    );
+  });
+
+  /** @scenario "OWASP_MODEL takes the same LiteLLM id in both languages" */
+  it("strips a LiteLLM provider prefix from OWASP_MODEL in TypeScript", () => {
+    expect(modelId("openai/gpt-5-mini")).toBe("gpt-5-mini");
+    expect(modelId("anthropic/claude-x")).toBe("claude-x");
+    expect(modelId("gpt-5-mini")).toBe("gpt-5-mini");
+    expect(modelId("meta-llama/Llama-4")).toBe("meta-llama/Llama-4");
+    expect(modelId(undefined)).toBe("gpt-6-luna");
+  });
+
+  /** @scenario "The pack stays out of a default test run" */
+  it("runs only when asked: a pytest mark and a vitest config of its own", () => {
+    const py = runPythonPack({ config: "example", verdict: "held" });
+    expect(py.marks).toContain("agent_test");
+    const lines = JSON.parse(
+      execFileSync("python3", ["-I", "-B", "-c", PY_CONFTEST, pythonDir], { encoding: "utf8" }),
+    ) as string[][];
+    expect(lines).toContainEqual(["markers", expect.stringMatching(/^agent_test:/)]);
+    const packFile = "tests/owasp/owasp-pack.redteam.ts";
+    for (const glob of configDefaults.include) expect(path.matchesGlob(packFile, glob)).toBe(false);
+    expect(packVitestConfig.test?.include).toEqual(["owasp-pack.redteam.ts"]);
+    const rendered = renderSkill(owaspSkill());
+    const page = fs.readFileSync(
+      path.join(repoRoot, "docs", "agent-testing", "owasp-red-team.mdx"),
+      "utf8",
+    );
+    for (const text of [rendered, page]) {
+      expect(text).toContain('-m "not agent_test"');
+      expect(text).toContain("-m agent_test");
+      expect(text).toContain("owasp.vitest.config.ts");
+    }
   });
 });

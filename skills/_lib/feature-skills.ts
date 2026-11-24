@@ -88,11 +88,28 @@ export function listPublishedSkills(skillsRoot: string): PublishedSkill[] {
   return out;
 }
 
-/** False for build and editor leftovers: dotfiles, dot folders, __pycache__ and *.pyc. */
+/** Folders and files a local install or test run leaves in a skill folder. */
+const LEFTOVER_PARTS = new Set(["__pycache__", "node_modules", "coverage", "dist"]);
+const LOCKFILES = new Set([
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+  "bun.lockb",
+  "bun.lock",
+  "uv.lock",
+  "poetry.lock",
+  "Pipfile.lock",
+]);
+
+/** False for leftovers: dot paths, caches, installs, coverage, build output and lockfiles. */
 export function isShippableAsset(rel: string): boolean {
-  return rel
-    .split(/[\\/]/)
-    .every((part) => !part.startsWith(".") && part !== "__pycache__" && !part.endsWith(".pyc"));
+  const parts = rel.split(/[\\/]/);
+  return (
+    !LOCKFILES.has(parts.at(-1) ?? "") &&
+    parts.every(
+      (part) => !part.startsWith(".") && !LEFTOVER_PARTS.has(part) && !part.endsWith(".pyc"),
+    )
+  );
 }
 
 /**

@@ -19,3 +19,9 @@ Feature: prose-lint reads link text, not link targets
     Given a link whose label holds brackets or whose URL holds parentheses
     When the linter strips markup
     Then only the link text stays
+
+  @unit
+  Scenario: Pathological markup strips in linear time
+    Given tens of thousands of unclosed brackets, repeated half links or deeply nested links
+    When the linter strips markup
+    Then it finishes in well under a second without a stack overflow

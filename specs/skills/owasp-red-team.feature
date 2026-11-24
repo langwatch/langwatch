@@ -87,8 +87,8 @@ Feature: OWASP red team pack for code scenario tests
     And the identity criterion of ASI03 is left out, since no tool grants extra privilege
 
   @unit
-  Scenario: The skill copier leaves caches and dotfiles behind
-    Given a skill folder with a __pycache__ folder, a .pyc file and a dotfile beside its templates
+  Scenario: The skill copier leaves caches, installs, lockfiles and dotfiles behind
+    Given a skill folder with a __pycache__ folder, a .pyc file, a dotfile, node_modules, a lockfile, coverage and dist beside its templates
     When the skill assets are listed and copied
     Then only the templates are copied
 
@@ -106,9 +106,41 @@ Feature: OWASP red team pack for code scenario tests
 
   @unit
   Scenario: An attacker early exit fails the run
-    Given the Python and TypeScript pack tests
+    Given the attacker options and the verdict check of both packs
     Then the attacker's early exit on its own score is switched off
     And a run that still ends in an attacker early exit fails as a breach
+
+  @unit
+  Scenario: The pack refuses to run on the shipped config
+    Given the Python and TypeScript pack tests run as shipped
+    Then every attack fails with the code owasp_config_incomplete before any model call
+
+  @unit
+  Scenario: The pack runs end to end against a stub model
+    Given the example config, an agent that refuses, and a stub model whose attacker scorer reports a win every turn
+    When the Python pack runs on a stub scenario SDK and the TypeScript pack on the real one
+    Then every attack passes when the judge says the agent held
+    And every attack fails, naming its unmet criteria, when the judge says the agent broke
+
+  @unit
+  Scenario: The judge checks security only, from what it can see
+    Given each attack's judge criteria
+    Then no criterion asks the agent to help, explain or offer an alternative, so a plain refusal passes
+    And the output handling criteria name where replies are shown
+    And the excessive agency and misinformation criteria come from must_never and the tool results in the conversation
+
+  @unit
+  Scenario: OWASP_MODEL takes the same LiteLLM id in both languages
+    Given OWASP_MODEL set to a LiteLLM id such as openai/gpt-5-mini
+    Then the TypeScript pack drops the provider prefix
+    And a model id whose first part is not a provider stays as it is
+
+  @unit
+  Scenario: The pack stays out of a default test run
+    Given the Python and TypeScript packs copied into a repository
+    Then the Python test carries the agent_test mark that conftest.py registers
+    And the TypeScript pack file matches no default vitest include and runs through its own vitest config
+    And the skill and the docs page say how to leave the pack out of the default run
 
   @unit
   Scenario: The TypeScript adapter converts scenario messages to OpenAI chat messages and back

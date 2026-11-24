@@ -5,7 +5,7 @@ import path from "path";
 import { describe, expect, it } from "vitest";
 
 import { listNativeSkills } from "../_compiler/native.ts";
-import { copySkillAssets, isShippableAsset, listSkillAssets } from "../_lib/feature-skills.ts";
+import { copySkillAssets, listSkillAssets } from "../_lib/feature-skills.ts";
 import { sync } from "../_publish/sync.ts";
 import { owaspSkill, recipeDir, skillsRoot } from "./helpers/owasp-pack.ts";
 
@@ -18,9 +18,20 @@ describe("OWASP red team pack assets", () => {
     const skill = owaspSkill();
     expect(skill.isRecipe).toBe(true);
     const assets = listSkillAssets(skill);
-    expect(assets).toContain(path.join("templates", "python", "test_owasp_pack.py"));
-    expect(assets.filter((rel) => !isShippableAsset(rel))).toEqual([]);
-    expect(assets).toContain(path.join("templates", "typescript", "owasp-pack.test.ts"));
+    expect(assets).toEqual(
+      [
+        "python/agent_adapter.py",
+        "python/conftest.py",
+        "python/owasp_attacks.py",
+        "python/owasp_config.py",
+        "python/test_owasp_pack.py",
+        "typescript/agent-adapter.ts",
+        "typescript/owasp-attacks.ts",
+        "typescript/owasp-pack.redteam.ts",
+        "typescript/owasp.config.ts",
+        "typescript/owasp.vitest.config.ts",
+      ].map((rel) => path.join("templates", rel)),
+    );
 
     const target = fs.mkdtempSync(path.join(os.tmpdir(), "owasp-skills-sync-"));
     try {
@@ -45,7 +56,7 @@ describe("OWASP red team pack assets", () => {
     }
   });
 
-  /** @scenario "The skill copier leaves caches and dotfiles behind" */
+  /** @scenario "The skill copier leaves caches, installs, lockfiles and dotfiles behind" */
   it("copies only shippable files from a skill folder", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "owasp-skill-assets-"));
     try {
@@ -57,6 +68,11 @@ describe("OWASP red team pack assets", () => {
         "templates/b.pyc",
         "templates/.DS_Store",
         ".cache/x.txt",
+        "templates/node_modules/x/index.js",
+        "templates/package-lock.json",
+        "templates/uv.lock",
+        "templates/coverage/lcov.info",
+        "templates/dist/a.js",
       ];
       for (const rel of files) {
         fs.mkdirSync(path.dirname(path.join(from, rel)), { recursive: true });
