@@ -172,8 +172,8 @@ Feature: Dashboards v1
 
   @unit @unimplemented
   Scenario: AC5 Status tiles compare with the previous period
-    Given a request volume, success rate, p95 latency and total cost value for the selected period
-    And a request volume, success rate, p95 latency and total cost value for the period immediately before it
+    Given a request volume, share without an error, p95 latency and total cost value for the selected period
+    And a request volume, share without an error, p95 latency and total cost value for the period immediately before it
     When the Status widget's tile values are computed
     Then each tile carries its current value and its change versus the previous period
 

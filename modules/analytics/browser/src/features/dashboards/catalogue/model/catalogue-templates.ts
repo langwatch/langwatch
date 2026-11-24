@@ -334,7 +334,7 @@ const AUTHORED_TEMPLATES: readonly AuthoredTemplate[] = [
   {
     id: "unit-cost",
     name: "What each result costs",
-    job: "Cost per conversation, per successful answer and per customer. Compare those with what the same work costs done by a person.",
+    job: "Cost per request without an error, per customer and, once conversations are scored, per resolved conversation. Compare those with what the same work costs done by a person.",
     formerNames: ["Cost per result"],
     personas: ["leader", "finance", "product"],
     trunk: "Profit",

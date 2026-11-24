@@ -1222,15 +1222,25 @@ export const CATALOGUE_WIDGET_ACTIONS: Readonly<Record<string, readonly WidgetAc
       kind: "investigate",
       shown: "problem",
       prompt:
-        '"{question}" shows the cost of one success rose over {period}. Find whether more ' +
-        "requests fail or each one costs more, and which model drives it.",
+        '"{question}" shows the cost of one request without an error rose over {period}. Find ' +
+        "whether more requests fail or each one costs more, and which model drives it.",
     },
     {
       kind: "click",
       on: "model",
       prompt:
-        'On "{question}", why does {model} cost so much per success? Tell me what it is used ' +
+        'On "{question}", why does {model} cost so much per request? Tell me what it is used ' +
         "for and whether a cheaper model would hold quality.",
+    },
+    {
+      kind: "click",
+      on: "outcome",
+      prompt:
+        'On "{question}", a request without an error is not proof the answer was right. Help ' +
+        "me record how each conversation ended: turn on the conversation outcome judge, or " +
+        "find where my code finishes a conversation and send how it ended (resolved, handed to " +
+        "a person, could not do it, refused) as the outcome on its last request. Propose the " +
+        "change; change nothing until I agree.",
     },
   ],
   "fd-gateway": [
@@ -1468,15 +1478,15 @@ export const CATALOGUE_WIDGET_ACTIONS: Readonly<Record<string, readonly WidgetAc
       kind: "investigate",
       shown: "problem",
       prompt:
-        '"{question}" shows a coding agent whose cost rose or success fell over {period}. ' +
-        "Find which teams or tasks drive it and show me 3 sessions.",
+        '"{question}" shows a coding agent whose cost or errors rose over {period}. Find ' +
+        "which teams or tasks drive it and show me 3 sessions.",
     },
     {
       kind: "click",
       on: "agent",
       prompt:
         'On "{question}", how is {agent} used over {period}: by whom, for what, what it costs ' +
-        "and how often sessions succeed?",
+        "and how often its sessions hit an error?",
     },
   ],
   "ai-tools": [

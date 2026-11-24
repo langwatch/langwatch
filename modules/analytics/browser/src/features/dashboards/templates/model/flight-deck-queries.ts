@@ -31,7 +31,7 @@ ORDER BY bucket`;
 export const COST_SUMMARY_SQL = `SELECT
   uniqExact(TraceId) AS traces,
   sum(TotalCost) AS cost,
-  countIf(NOT HasError) AS successes,
+  countIf(NOT HasError) AS error_free,
   sum(PromptTokens) AS tokens_in,
   sum(CompletionTokens) AS tokens_out
 FROM trace_metrics
@@ -125,12 +125,12 @@ GROUP BY virtual_key
 ORDER BY cost DESC
 LIMIT 5`;
 
-/** A session succeeded when it hit no API, internal or retry-exhausted failure. */
+/** A session ran without an error when it hit no API, internal or retry-exhausted failure. */
 export const CODING_AGENTS_SQL = `SELECT Agent AS agent,
   count() AS sessions,
   sum(InputTokens + OutputTokens) AS tokens,
   sum(CostUsd) AS cost,
-  countIf(ApiErrors = 0 AND InternalErrors = 0 AND RetriesExhausted = 0) / count() AS success_rate
+  countIf(ApiErrors = 0 AND InternalErrors = 0 AND RetriesExhausted = 0) / count() AS error_free_rate
 FROM coding_sessions
 WHERE ${inPeriod("StartedAt")}
 GROUP BY agent

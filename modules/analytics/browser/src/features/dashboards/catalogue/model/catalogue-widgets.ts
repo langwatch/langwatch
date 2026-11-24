@@ -413,11 +413,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
   {
     id: "fd-cost-efficiency",
     origin: "pr",
-    question: "What does each successful answer cost me?",
-    title: "What does each successful answer cost me?",
-    why: "Cost per successful request, tokens in and out, and the five most expensive models.",
+    question: "What does each request without an error cost me?",
+    title: "What does each request without an error cost me?",
+    why: "Cost per request without an error, tokens in and out, and the five most expensive models. Whether an answer was right needs a scored outcome, and the card offers to set one up.",
     questionId: "spend",
-    alsoAnswers: ["outcomecost"],
+    alsoAnswers: [],
     questionType: "happened",
     personas: ["finance", "eng"],
     agentKinds: ["support-bot", "rag", "voice", "extraction", "tools-agent", "generative"],
@@ -425,9 +425,11 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "project",
     prompt:
-      "What does each successful answer cost me? Answer it with LangWatchQL over the dashboard " +
-      "period. What the answer shows: Cost per successful trace, tokens in and out, and the five " +
-      "models that cost the most. It needs: cost and tokens; model name. Quote the real numbers " +
+      "What does each request without an error cost me? Answer it with LangWatchQL over the " +
+      "dashboard period. What the answer shows: Cost per request without an error, tokens in " +
+      "and out, and the five models that cost the most. No error does not mean the answer was " +
+      "right: say so, and that whether it was needs the conversation outcome judge or an " +
+      "outcome my app sends. It needs: cost and tokens; model name. Quote the real numbers " +
       "from the query result and name the traces behind them. If a query returns no rows, say " +
       "plainly that there is no data for the dashboard period.",
   },
@@ -519,9 +521,10 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
   {
     id: "fd-coding-agents",
     origin: "pr",
-    question: "What does each coding tool cost the team, and does each one finish the job?",
-    title: "What does each coding tool cost the team, and does each one finish the job?",
-    why: "Sessions, cost and success rate for each coding tool your developers use, with the trend. Move budget to the tool that finishes more work for less.",
+    question:
+      "What does each coding tool cost the team, and how often do its sessions hit an error?",
+    title: "What does each coding tool cost the team, and how often do its sessions hit an error?",
+    why: "Sessions, cost and the share of sessions without an error for each coding tool your developers use, with the trend.",
     questionId: "codingcost",
     alsoAnswers: [],
     questionType: "happened",
@@ -531,11 +534,13 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     build: "built",
     scope: "org",
     prompt:
-      "What does each coding tool cost the team, and does each one finish the job? Answer it " +
-      "with LangWatchQL over the dashboard period. What the answer shows: Sessions, tokens, cost " +
-      "and success rate per coding agent, with its session trend. It needs: coding-agent traces. " +
-      "Quote the real numbers from the query result and name the traces behind them. If a query " +
-      "returns no rows, say plainly that there is no data for the dashboard period.",
+      "What does each coding tool cost the team, and how often do its sessions hit an error? " +
+      "Answer it with LangWatchQL over the dashboard period. What the answer shows: Sessions, " +
+      "tokens, cost and the share of sessions without an API, internal or retry-exhausted " +
+      "error per coding agent, with its session trend. A session without an error did not " +
+      "necessarily finish the job. It needs: coding-agent traces. Quote the real numbers from " +
+      "the query result and name the traces behind them. If a query returns no rows, say " +
+      "plainly that there is no data for the dashboard period.",
   },
   {
     id: "ck-kpis",
@@ -565,7 +570,7 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     origin: "prototype",
     question: "Is my agent working right now?",
     title: "Is my agent working right now?",
-    why: "Today's errors and response time, against a normal day.",
+    why: "Requests, the share without an error, response time and cost, against the period before.",
     questionId: "failing",
     alsoAnswers: ["fast"],
     questionType: "line",
@@ -577,8 +582,10 @@ export const CATALOGUE_WIDGETS: readonly CatalogueWidget[] = [
     prompt:
       "Is my agent working right now? Query the LangWatchQL view trace_metrics over the " +
       "dashboard period and over the equally long period right before it. Report traces " +
-      "(uniqExact(TraceId)), success rate (share of traces where HasError is false), p95 latency " +
-      "(quantileExact(0.95) of TotalDurationMs) and total cost (sum of TotalCost). Answer with " +
+      "(uniqExact(TraceId)), the share of traces without an error (HasError is false; no " +
+      "error does not mean the answer was right, so never call it a rate of good answers), " +
+      "p95 latency (quantileExact(0.95) of TotalDurationMs) and total cost (sum of " +
+      "TotalCost). Answer with " +
       "one line per measure: its value now and its change against the previous period, as a " +
       "number and a percentage. Quote the real numbers from the query result. If a query returns " +
       "no rows, say plainly that there is no data for the dashboard period rather than guessing.",

@@ -2714,6 +2714,29 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       description, stored prompt, clicked value, the period as instants and its LangWatchQL
 
   # ---------------------------------------------------------------------------
+  # No error is not success (owner, 2026-11-24)
+  # ---------------------------------------------------------------------------
+  # Why: "Is my agent working right now?" asked Langy for a "success rate" that only counted
+  # requests without an error; a request can run without an error and still answer wrong.
+  # Success comes from an outcome the app sends, the conversation outcome judge or a test verdict.
+
+  @unit
+  Scenario: AC248 Widget words: a card never calls requests without an error a success
+    Given every stock widget, from the catalogue and from the gallery templates
+    When a widget counts requests or sessions only by whether they hit an error
+    Then its title, info tip, card face and Langy prompts call them "without an error" or name the error rate
+    And none of them says success, successful or succeed
+    And "Is my agent working right now?" asks Langy for the share of requests without an error
+    And a widget that reads a sent outcome, the outcome judge or a test verdict keeps its success words
+
+  @unit
+  Scenario: AC248b Widget words: a cost card with only errors to go on offers to score how conversations end
+    Given the "What does each request without an error cost me?" widget on a board with requests
+    Then it shows the cost per request without an error
+    And it says it can't tell which answers were right yet
+    And it offers to score how conversations end, and, when Langy is available, to ask Langy to set it up
+
+  # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
 
@@ -2776,4 +2799,5 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 240-241: "What a card says: names, not internal ids, and a sources line only when it informs" (owner, 2026-11-24) → Scenario: AC240 Card sources line: a widget counting only the default application source shows no sources line; Scenario: AC240b Card sources line: a widget whose views keep no origin shows no sources line; Scenario: AC240c Card sources line: a widget counting more or other sources than the default names them; Scenario: AC241 Widget labels: the test pass rate widget names each suite by its own name; Scenario: AC241b Widget labels: a managed prompt version reads as its prompt handle and number; Scenario: AC241c Widget labels: a scenario or a topic with no name reads as unnamed, never as its id; Scenario: AC242 Widget cards speak the reader's words: no request-internal terms on any card face; Scenario: AC242b Model usage: each model's share is of the requests that call a model; Scenario: AC242c Widget cards: a narrow card wraps its title to a second line; Scenario: AC242d Widget cards: the chart fits between the title and the footer
   # AC 166b-166e: "The data completeness card counts each field against the requests it applies to" (owner, 2026-11-24) → Scenario: AC166b Data health: model name and cost count only the requests that call a model; Scenario: AC166c Data health: conversation id and user id rows show only for chat agents; Scenario: AC166d Data health: the headline names what is missing; Scenario: AC166e Data health: each gap asks Langy its own question and links to the fix
   # AC 243-247: "Per-widget Langy actions, problem-only Investigate, clicks that say what was clicked" (owner, 2026-11-24) → Scenario: AC243 Widget actions: each catalogue widget asks Langy its own question for each action and each kind of value; Scenario: AC244 Widget actions: Investigate and Propose a fix show only while the widget reports its problem; Scenario: AC245 Chart asks: a click says what kind of value was clicked, its raw value and the bucket it starts; Scenario: AC246 Chart asks: a table row is a button that asks Langy about that row; Scenario: AC247 Langy drafts: the visible draft is in the reader's words, the queries ride in the context
+  # AC 248: "No error is not success" (owner, 2026-11-24) → Scenario: AC248 Widget words: a card never calls requests without an error a success; Scenario: AC248b Widget words: a cost card with only errors to go on offers to score how conversations end
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board; Scenario: AC145b Template card: a board made under a template's former name still counts as added

@@ -165,7 +165,7 @@
  },
  {
   "label": "fd-cost-efficiency/summary",
-  "sql": "SELECT\n  uniqExact(TraceId) AS traces,\n  sum(TotalCost) AS cost,\n  countIf(NOT HasError) AS successes,\n  sum(PromptTokens) AS tokens_in,\n  sum(CompletionTokens) AS tokens_out\nFROM trace_metrics\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime})"
+  "sql": "SELECT\n  uniqExact(TraceId) AS traces,\n  sum(TotalCost) AS cost,\n  countIf(NOT HasError) AS error_free,\n  sum(PromptTokens) AS tokens_in,\n  sum(CompletionTokens) AS tokens_out\nFROM trace_metrics\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime})"
  },
  {
   "label": "fd-cost-efficiency/models",
@@ -217,7 +217,7 @@
  },
  {
   "label": "fd-coding-agents/agents",
-  "sql": "SELECT Agent AS agent,\n  count() AS sessions,\n  sum(InputTokens + OutputTokens) AS tokens,\n  sum(CostUsd) AS cost,\n  countIf(ApiErrors = 0 AND InternalErrors = 0 AND RetriesExhausted = 0) / count() AS success_rate\nFROM coding_sessions\nWHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime}\nGROUP BY agent\nORDER BY cost DESC\nLIMIT 10"
+  "sql": "SELECT Agent AS agent,\n  count() AS sessions,\n  sum(InputTokens + OutputTokens) AS tokens,\n  sum(CostUsd) AS cost,\n  countIf(ApiErrors = 0 AND InternalErrors = 0 AND RetriesExhausted = 0) / count() AS error_free_rate\nFROM coding_sessions\nWHERE StartedAt >= {dashboard_context_period_start:DateTime} AND StartedAt < {dashboard_context_period_end:DateTime}\nGROUP BY agent\nORDER BY cost DESC\nLIMIT 10"
  },
  {
   "label": "fd-coding-agents/trend",

@@ -21,7 +21,7 @@ Feature: Dashboards widget quality: template widgets read the completeness repor
 
   @unit
   Scenario: Widget quality: an average cost divides by the traces with a price
-    Given a cost per success, per call or per resolved conversation
+    Given a cost per request without an error, per call or per resolved conversation
     Then it divides by the share of traces whose price is known
     And a model with no price never pulls the average down
 

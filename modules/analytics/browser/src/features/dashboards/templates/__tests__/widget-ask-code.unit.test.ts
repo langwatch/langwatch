@@ -161,9 +161,9 @@ const CLICKS_NOT_OFFERED: Readonly<Record<string, string>> = {
 
 /** Widgets with a problem button whose data cannot tell the problem; the button never shows. */
 const PROBLEMS_NOT_SIGNALLED: Readonly<Record<string, string>> = {
-  "fd-cost-efficiency": "no earlier period to tell cost per success rose",
+  "fd-cost-efficiency": "no earlier period to tell cost per request rose",
   "ship-suites": "no time split to tell a suite's pass rate fell",
-  "fd-coding-agents": "no per-agent cost or success over time",
+  "fd-coding-agents": "no per-agent cost or errors over time",
   "cost-by-model": "no traffic share to weigh the cost share against",
 };
 

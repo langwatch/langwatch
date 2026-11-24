@@ -22,7 +22,8 @@ export const PAST_TENFOLD = `const pastTenfold = (current, previous) => current 
 export const statusCode = ({ source }: { source: WidgetSource }) =>
   widgetCode({
     summary:
-      "Request volume, success rate, response time and total cost against the period before.",
+      "Request volume, share without an error, response time and total cost against the period " +
+      "before.",
     subtitle:
       "Requests, errors, speed and cost for this period, each against the previous period. " +
       "Speed is the time that 1 in 20 requests took longer than.",
@@ -75,19 +76,19 @@ function Tile({ label, value, current, previous, rising }) {
   const requests = num(row.requests);
   const requestsPrev = num(row.requests_prev);
   if (!requests) return <Panel><CallToAction /></Panel>;
-  const success = 1 - num(row.errors) / requests;
-  const successPrev = requestsPrev > 0 ? 1 - num(row.errors_prev) / requestsPrev : null;
+  const errorFree = 1 - num(row.errors) / requests;
+  const errorFreePrev = requestsPrev > 0 ? 1 - num(row.errors_prev) / requestsPrev : null;
   const columns = "repeat(auto-fit, minmax(140px, 1fr))";
   // Worse than the period before: a point more requests with errors, or a fifth slower.
   const slower = num(row.p95_ms_prev) > 0 && num(row.p95_ms) > num(row.p95_ms_prev) * 1.2;
-  signalProblem((known(successPrev) && success < successPrev - 0.01) || slower);
+  signalProblem((known(errorFreePrev) && errorFree < errorFreePrev - 0.01) || slower);
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: columns, gap: 12 }}>
         <Tile label="Requests" value={count(requests)}
           current={requests} previous={requestsPrev} rising="neutral" />
-        <Tile label="Without errors" value={pct(success)}
-          current={success} previous={successPrev} rising="good" />
+        <Tile label="Without errors" value={pct(errorFree)}
+          current={errorFree} previous={errorFreePrev} rising="good" />
         <Tile label="Slowest 1 in 20" value={ms(num(row.p95_ms))}
           current={num(row.p95_ms)} previous={num(row.p95_ms_prev)} rising="bad" />
         <Tile label="Cost" value={usd(num(row.cost)) + plus(main)}

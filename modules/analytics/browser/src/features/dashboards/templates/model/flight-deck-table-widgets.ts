@@ -17,23 +17,45 @@ import {
 } from "./widget-code-parts.ts";
 
 export const COST_EFFICIENCY_CODE = widgetCode({
-  summary: "Cost per successful trace, tokens in and out, and the five models that cost the most.",
+  summary:
+    "Cost per request without an error, tokens in and out, and the five models that cost the " +
+    "most.",
   subtitle:
     "What a request that ran without errors costs, leaving out requests on a model with no " +
-    "price.",
+    "price. No error does not mean the answer was right.",
   source: "traces",
   parts: [NUMBERS, COMPLETENESS, BARS, STAT],
+  components: `const LINK = { border: 0, padding: 0, background: "none", color: C.teal,
+  fontFamily: "inherit", fontSize: 11, fontWeight: 500, cursor: "pointer" };
+const OUTCOME = { kind: "outcome", label: "how each conversation ended" };
+
+// No error is not a right answer: what it takes to know which answers did the job.
+function OutcomeNote() {
+  return (
+    <div style={{ marginTop: 10, fontSize: 11, color: C.subtle, display: "flex",
+      flexWrap: "wrap", gap: 12 }}>
+      <span>Can't tell which answers were right yet.</span>
+      <button type="button" style={LINK}
+        onClick={() => LW.navigate("onlineEvaluations", {})}>Score how conversations end</button>
+      {canAskLangy() ? (
+        <button type="button" style={LINK} onClick={() => askLangy(OUTCOME)}>
+          Ask Langy to set it up
+        </button>
+      ) : null}
+    </div>
+  );
+}`,
   queries: ["summary", "models"],
   body: `  const totals = summary.data[0] || {};
   if (!num(totals.traces)) return <Panel><CallToAction /></Panel>;
-  const perSuccess = ratio(totals.cost, num(totals.successes) * pricedShare(summary));
+  const perRequest = ratio(totals.cost, num(totals.error_free) * pricedShare(summary));
   const priced = models.data.map((row) => ({ label: row.model, value: num(row.cost) || null,
     note: "price unknown" }));
   const ranked = [...priced, ...unpricedRows(summary, priced.map((row) => row.label))];
   return (
     <Panel>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-        <Stat label="Cost per request without errors" value={usd(perSuccess)} />
+        <Stat label="Cost per request without an error" value={usd(perRequest)} />
         <Stat label="Tokens sent" value={count(num(totals.tokens_in))} />
         <Stat label="Tokens received" value={count(num(totals.tokens_out))} />
       </div>
@@ -41,6 +63,7 @@ export const COST_EFFICIENCY_CODE = widgetCode({
         Models that cost most
       </div>
       <Bars rows={ranked} format={usd} height={128} kind="model" />
+      <OutcomeNote />
     </Panel>
   );`,
 });
@@ -121,7 +144,9 @@ export const GATEWAY_CODE = widgetCode({
 });
 
 export const CODING_AGENTS_CODE = widgetCode({
-  summary: "Sessions, tokens, cost and success rate per coding agent, with its session trend.",
+  summary:
+    "Sessions, tokens, cost and the share of sessions without an error per coding agent, with " +
+    "its session trend.",
   subtitle: "Sessions, spend and sessions that ran without errors, per coding agent.",
   source: "codingAgents",
   parts: [NUMBERS, TABLE],
@@ -158,7 +183,7 @@ function Sparkline({ points }) {
     { header: "Sessions", align: "right", cell: (row) => count(num(row.sessions)) },
     { header: "Tokens", align: "right", cell: (row) => count(num(row.tokens)) },
     { header: "Cost", align: "right", cell: (row) => <b>{usd(num(row.cost))}</b> },
-    { header: "Without errors", align: "right", cell: (row) => pct(num(row.success_rate), 0) },
+    { header: "Without errors", align: "right", cell: (row) => pct(num(row.error_free_rate), 0) },
     { header: "Trend", align: "right", cell: (row) => <Sparkline points={trendOf(row.agent)} /> },
   ];
   return (
