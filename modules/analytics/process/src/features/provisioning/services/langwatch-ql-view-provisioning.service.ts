@@ -5,10 +5,6 @@
  * @see ./langwatch-ql-access-model.service.ts — the access model applied over them
  */
 
-import {
-  hasTraceIdsTwin,
-  LWQL_TRACE_IDS_PARAMETER,
-} from "../../../rules/lwql-dedup-trace-ids.rules.ts";
 import { LWQL_VIEW_CATALOG, TENANT_COLUMN } from "../../../rules/lwql-view-catalog.rules.ts";
 import type { LangWatchQLDedupStrategy } from "../../../rules/lwql-view-dedup-shape.rules.ts";
 import type {
@@ -99,28 +95,7 @@ export class LangWatchQLViewProvisioningService {
     return views.flatMap((view) => [
       viewStatements.viewStatement({ names, sourceDatabase, view, dedup }),
       ...viewStatements.flooredViewStatements({ names, sourceDatabase, view, dedup }),
-      ...this.traceIdsViewStatements({ names, sourceDatabase, view, dedup }),
+      ...viewStatements.traceIdsViewStatements({ names, sourceDatabase, view, dedup }),
     ]);
-  }
-
-  /**
-   * `CREATE OR REPLACE VIEW` for a view's trace-ids twin (analytics ADR-006, amendment
-   * 2026-11-24): a parameterised view a pass reads in place of the view, cut by the traces it
-   * holds before `LIMIT 1 BY`. None for a view that is not `latest-in-order` by trace.
-   */
-  traceIdsViewStatements({
-    names,
-    sourceDatabase,
-    view,
-    dedup,
-  }: {
-    names: LangWatchQLNames;
-    sourceDatabase: string;
-    view: LangWatchQLViewDefinition;
-    dedup: LangWatchQLDedupStrategy;
-  }): string[] {
-    if (!hasTraceIdsTwin(view)) return [];
-    const traceIds = `{${LWQL_TRACE_IDS_PARAMETER}:Array(String)}`;
-    return [viewStatements.viewStatement({ names, sourceDatabase, view, dedup, traceIds })];
   }
 }

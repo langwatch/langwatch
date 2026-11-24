@@ -7,7 +7,6 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
 import {
   LangWatchQLViewStatementsService,
   SHIPPED_LWQL_DEDUP,
@@ -44,7 +43,7 @@ function render(name: string) {
   const statement = { names: NAMES, sourceDatabase: "app", view, dedup: SHIPPED_LWQL_DEDUP };
   return {
     view: viewStatements.viewStatement(statement),
-    twins: LangWatchQLViewProvisioningService.create().traceIdsViewStatements(statement),
+    twins: viewStatements.traceIdsViewStatements(statement),
   };
 }
 
