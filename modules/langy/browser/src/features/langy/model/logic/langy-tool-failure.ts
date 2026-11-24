@@ -372,7 +372,25 @@ function describeFailure({
     };
   }
 
-  return { message: domain.message, remediationApplies: true };
+  return { message: platformSentence(domain), remediationApplies: true };
+}
+
+/** The platform's sentence; the registry's when the wire carried only the code (#5984). */
+function platformSentence(domain: LangWatchHandledErrorShape): string {
+  if (domain.message.trim() !== "" && domain.message !== domain.code) return domain.message;
+  const copy = explainHandledError({
+    code: domain.code,
+    meta: domain.meta,
+    httpStatus: domain.httpStatus,
+    fault: "customer",
+    retryable: domain.retryable,
+    tips: [],
+    docsUrl: undefined,
+    traceId: undefined,
+    reasons: [],
+  });
+  if (!copy.isRegistered) return domain.message;
+  return copy.description !== "" ? copy.description : copy.title;
 }
 
 /**
