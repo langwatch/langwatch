@@ -301,7 +301,7 @@ describe("billing's report of spend confirmed after a month's last trace", () =>
       expect(billing.sent[0]?.options?.delay).toBeGreaterThan(REPORT_DELAY_MS);
     });
 
-    /** @scenario "The follow-up is not replaced by a later spend report or a convergence report" */
+    /** @scenario "A spend or convergence report never replaces the follow-up, and a later follow-up moves it later" */
     it("queues the follow-up under its own key, with a window that covers its delay", async () => {
       const billing = rollUp();
 
@@ -316,6 +316,11 @@ describe("billing's report of spend confirmed after a month's last trace", () =>
         reportDedupId(followUp.data),
       );
       expect(followUp.options?.deduplication?.ttlMs).toBeGreaterThan(followUp.options?.delay ?? 0);
+
+      await billing.run(spendReport());
+      const laterFollowUp = billing.sent[1];
+      if (!laterFollowUp) throw new Error("the later spend report dispatched no follow-up");
+      expect(reportDedupId(laterFollowUp.data)).toBe(reportDedupId(followUp.data));
     });
 
     /** @scenario "The follow-up dispatches no further report" */

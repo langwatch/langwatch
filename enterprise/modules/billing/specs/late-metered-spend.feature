@@ -94,10 +94,11 @@ Feature: Spend confirmed after a month's last trace still reaches Stripe
       Then no report is dispatched
 
     @unit
-    Scenario: The follow-up is not replaced by a later spend report or a convergence report
+    Scenario: A spend or convergence report never replaces the follow-up, and a later follow-up moves it later
       Given the dedupe keys of a spend report and of its follow-up
       Then they differ, so neither replaces the other in the queue
       And the follow-up's dedupe window covers its delay
+      And a later spend report's follow-up shares its key, so the pending one is sent later rather than twice
 
     @unit
     Scenario: A spend report for an organization that is not usage billed dispatches no follow-up
