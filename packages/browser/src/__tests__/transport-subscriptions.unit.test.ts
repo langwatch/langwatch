@@ -269,7 +269,11 @@ describe("given the browser process transport", () => {
 
     beforeEach(() => {
       wiring = transport();
-      watch = wiring.client.subscription("traces.onTraceUpdate", { projectId: "project_1" }, {});
+      watch = wiring.client.subscription(
+        "traces.onTraceUpdate",
+        { projectId: "project_1" },
+        { onData: () => {} },
+      );
       wiring.channels[0]!.accept();
     });
 

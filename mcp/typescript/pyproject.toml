@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
   "ipykernel>=7.3.0",
   "langwatch",
-  "litellm>=1.100.4", # security: litellm advisories up to GHSA-7hp6-4w63-5g45, fixed in 1.100.4
+  "litellm>=1.110.0", # security: litellm advisories up to CVE-2026-93355 and GHSA-2364-6whj-g7vx, fixed in 1.110.0
   "mcp[cli]>=2.2.0", # security: MCP SDK unbounded StreamableHTTP sessions, fixed in 2.2.0 (#2823)
   "pandas>=2.3.2",
   "tenacity>=9.1.4",
@@ -18,10 +18,11 @@ dependencies = [
 required-version = ">=0.9.25"
 exclude-newer = "7 days"
 
-# Security fix released inside the 7-day window above, admitted up to a fixed
-# date so the rest of the tree keeps the cooldown. Drop it once the date is
-# more than 7 days old (#8958).
-exclude-newer-package = { certifi = "2026-10-21T00:00:00Z" }
+# Security fixes released inside the 7-day window above, admitted up to a fixed
+# date so the rest of the tree keeps the cooldown. Drop each once its date is
+# more than 7 days old (certifi: #8958; litellm 1.110.0: CVE-2026-93355,
+# GHSA-2364-6whj-g7vx, GHSA-fjxr-j47c-4x2x, GHSA-wpm4-hgr2-xjwr).
+exclude-newer-package = { certifi = "2026-10-21T00:00:00Z", litellm = "2026-11-18T12:00:00Z" }
 
 # Transitive-dependency security pins. Keep these even when the importing
 # package isn't a direct dependency, so a future re-resolution can't silently

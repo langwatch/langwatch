@@ -11,10 +11,22 @@ type Unsubscribable = { unsubscribe: () => void };
 
 /** The three procedures a turn runs on, off the api provider's own client. */
 export type LangyTurnClient = {
-  langy: Pick<
-    LangyTrpcClient["langy"],
-    "createConversation" | "continueConversation" | "onTurnStream"
-  >;
+  langy: Pick<LangyTrpcClient["langy"], "createConversation" | "continueConversation"> & {
+    /**
+     * Only the callback form, the one that hands back an `unsubscribe`;
+     * without callbacks tRPC hands back an async iterator instead.
+     */
+    onTurnStream: {
+      subscribe(
+        input: Parameters<LangyTrpcClient["langy"]["onTurnStream"]["subscribe"]>[0],
+        opts: {
+          onData: (entry: LangyStreamWireEntry) => void;
+          onError: (err: unknown) => void;
+          onComplete: () => void;
+        },
+      ): Unsubscribable;
+    };
+  };
 };
 
 /**

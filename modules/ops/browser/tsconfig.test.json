@@ -4,7 +4,7 @@
     "composite": false,
     "noEmit": true,
     "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
-    "types": ["vitest/globals"]
+    "types": ["node", "vitest/globals"]
   },
   "include": [
     "src/**/__tests__/**/*.ts",

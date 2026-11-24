@@ -14,8 +14,18 @@ import type { QueryClient } from "@tanstack/react-query";
 
 import type { UiFeatureApiTransport } from "./transport";
 
-/** The three lanes this dispatcher uses, so a caller hands the narrowest thing. */
-export type UiRpcTransport = Pick<UiFeatureApiTransport, "query" | "mutation" | "subscription">;
+/**
+ * The three lanes this dispatcher uses, so a caller hands the narrowest thing.
+ * A subscription always opens with a callback: only then does tRPC hand back
+ * an `unsubscribe` rather than an async iterator.
+ */
+export type UiRpcTransport = Pick<UiFeatureApiTransport, "query" | "mutation"> & {
+  subscription(
+    path: string,
+    input: unknown,
+    handlers: UiRpcSubscriptionHandlers & { onData: (value: unknown) => void },
+  ): UiRpcSubscription;
+};
 
 export class BrowserUiRpc extends UiRpc {
   static create(input: { transport: UiRpcTransport; queryClient: QueryClient }): BrowserUiRpc {
@@ -41,7 +51,10 @@ export class BrowserUiRpc extends UiRpc {
   }
 
   subscribe(path: string, input: unknown, handlers: UiRpcSubscriptionHandlers): UiRpcSubscription {
-    return this.transport.subscription(path, input, handlers);
+    return this.transport.subscription(path, input, {
+      ...handlers,
+      onData: handlers.onData ?? (() => {}),
+    });
   }
 
   async mutate(path: string, input: unknown): Promise<unknown> {
