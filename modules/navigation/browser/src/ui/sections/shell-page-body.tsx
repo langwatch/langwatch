@@ -7,6 +7,7 @@ import { PageHeaderSizeProvider } from "@langwatch/design-system/page-layout";
 import { Box, type StackProps, VStack } from "@langwatch/design-system/primitives";
 import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
 import type { NavigationTeam } from "@langwatch/navigation-contract";
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 import { useEffect, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
@@ -73,7 +74,7 @@ function readerMayOpenThePage({
   if (isResolverAddress(pathname)) return true;
   // Personal-scope addresses are the reader's by construction, even when
   // membership of the ambient team cannot be confirmed: without this a member
-  // on /me/* hits the refusal and the page never renders.
+  // on /coding-agents/* hits the refusal and the page never renders.
   if (isPersonalScopeRoute || isDemoProject) return true;
   // Administrators created through a role binding alone have no membership row
   // and still have full team access.
@@ -171,7 +172,7 @@ export const ShellPageBody = ({
       ? { label: team.name }
       : null;
   const isPersonalScopeRoute =
-    personalScope || pathname.startsWith("/me") || isOnOwnPersonalProject;
+    personalScope || isPathUnder({ pathname, base: CODING_AGENTS_PATH }) || isOnOwnPersonalProject;
 
   // Audit emission for cross-scope reads. Fires once per project the
   // administrator drills into. Fail-quiet: a refused emission must not stop

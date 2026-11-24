@@ -1,4 +1,5 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { latestTraceVersionOnly } from "@langwatch/trace-contract";
 import type {
   TraceAttributedRecency,
   TraceAttributedSpendComparison,
@@ -42,12 +43,7 @@ function matchClause(matches: readonly TraceAttributeMatch[]) {
 
 /** The latest version of each trace in the tenant's `OccurredAt` range. */
 function latestVersion(where: string): string {
-  return `(ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
-              FROM trace_summaries
-              WHERE ${where}
-              GROUP BY TenantId, TraceId
-            )`;
+  return latestTraceVersionOnly({ where, alias: "ts" });
 }
 
 const SINGLE_TENANT_RANGE = `TenantId = {tenantId:String}
@@ -353,9 +349,11 @@ export class ClickHouseTraceAttributedRollupRepository extends TraceAttributedRo
     matches: readonly TraceAttributeMatch[];
     valueKey: string;
     values: readonly string[];
+    valuePrefixes?: readonly string[];
     sinceMs: number;
   }): Promise<{ value: string; count: number }[]> {
-    if (input.values.length === 0) return [];
+    const valuePrefixes = input.valuePrefixes ?? [];
+    if (input.values.length === 0 && valuePrefixes.length === 0) return [];
     const match = matchClause(input.matches);
     const result = await this.#clickhouse.query<{ sourceId: string; c: Numeric }>({
       tenantId: input.tenantId,
@@ -366,7 +364,11 @@ export class ClickHouseTraceAttributedRollupRepository extends TraceAttributedRo
         WHERE ts.TenantId = {tenantId:String}
           AND ts.OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})
           ${match.sql}
-          AND ts.Attributes[{valueKey:String}] IN ({values:Array(String)})
+          AND (ts.Attributes[{valueKey:String}] IN ({values:Array(String)})
+            OR arrayExists(
+              prefix -> startsWith(ts.Attributes[{valueKey:String}], prefix),
+              {valuePrefixes:Array(String)}
+            ))
           AND ${latestVersion(`TenantId = {tenantId:String}
                 AND OccurredAt >= fromUnixTimestamp64Milli({since:UInt64})`)}
         GROUP BY sourceId
@@ -377,6 +379,7 @@ export class ClickHouseTraceAttributedRollupRepository extends TraceAttributedRo
         since: input.sinceMs,
         valueKey: input.valueKey,
         values: input.values,
+        valuePrefixes,
       },
     });
     return result.rows.map((row) => ({ value: row.sourceId, count: Number(row.c) }));

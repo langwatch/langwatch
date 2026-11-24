@@ -106,6 +106,30 @@ describe("redactAuditArgs", () => {
         expect(redacted.extraHeaders).toEqual(["[redacted]", "[redacted]", "[redacted]"]);
       });
 
+      // Header names say nothing about the value: vendor keys travel under any name.
+      /** @scenario "A credential typed as a header is never persisted either" */
+      it("redacts every A2A target header value whatever the header is called", () => {
+        const redacted = redactAuditArgs({
+          action: "gatewayA2aTargets.update",
+          input: {
+            id: "t1",
+            upstreamHeaders: {
+              "x-functions-key": "FUNCKEY-PLAINTEXT",
+              "Ocp-Apim-Subscription-Key": "APIM-PLAINTEXT",
+              "X-Auth": "XAUTH-PLAINTEXT",
+            },
+          },
+        }) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("PLAINTEXT");
+        expect(redacted.upstreamHeaders).toEqual({
+          "x-functions-key": "[redacted]",
+          "Ocp-Apim-Subscription-Key": "[redacted]",
+          "X-Auth": "[redacted]",
+        });
+        expect(redacted.id).toBe("t1");
+      });
+
       /** A passthrough object, so its contents cannot be assumed harmless. */
       it("redacts providerConfig values", () => {
         const redacted = redactAuditArgs({

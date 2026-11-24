@@ -19,7 +19,7 @@ import {
 import { buildOtelResourceAttributes } from "../channels/scenario-child.node.channel.ts";
 import { parseChildProcessResult } from "../channels/scenario-child.supervisor.channel.ts";
 import type { ScenarioChildChoiceService } from "../features/child/services/scenario-child-choice.service.ts";
-import { RedTeamBreakNotRecordedError } from "../services/red-team-report-writer.service.ts";
+import { RedTeamBreakNotRecordedError } from "../features/red-team/services/red-team-report-writer.service.ts";
 import {
   ScenarioExecutionPoolService,
   type ExecutionJobData,

@@ -172,6 +172,8 @@ export const ATTR_KEYS = {
   LANGWATCH_RAG_CONTEXTS: "langwatch.rag.contexts",
   LANGWATCH_RAG_CONTEXTS_LEGACY: "langwatch.rag_contexts",
   LANGWATCH_THREAD_ID: "langwatch.thread.id",
+  /** A launcher's own session over the harness sessions it runs (coding agents). */
+  LANGWATCH_SESSION_ID: "langwatch.session.id",
   LANGWATCH_THREAD_ID_LEGACY: "langwatch.thread_id",
   LANGWATCH_THREAD_ID_LEGACY_ROOT: "thread_id",
   LANGWATCH_USER_ID: "langwatch.user.id",

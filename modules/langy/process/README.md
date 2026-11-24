@@ -467,7 +467,7 @@ watchConversationUpdates(input: LangyPanelCall<typeof langyProjectInputSchema> &
 #### `watchTurnStream`
 
 ```typescript
-watchTurnStream(input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal }): AsyncIterable<LangyStreamEntry>;
+watchTurnStream(input: LangyPanelCall<typeof langyTurnStreamInputSchema> & { signal?: AbortSignal }): AsyncIterable<LangyStreamFrame>;
 ```
 
 #### `getPanelLocalRecord`
@@ -989,7 +989,7 @@ Contract `../contract/src/langy.trpc.ts:58`, router `src/transport/langy.trpc.ts
 | `langy.recordFeedback`           | mutation     | Permission `langy:create` | `langyRecordFeedbackInputSchema`          | –                                     |
 | `langy.feedbackPromptShown`      | mutation     | Permission `langy:create` | `langyFeedbackPromptShownInputSchema`     | –                                     |
 | `langy.onConversationUpdate`     | subscription | Permission `langy:view`   | `langyProjectInputSchema`                 | `langyConversationUpdateFrameSchema`  |
-| `langy.onTurnStream`             | subscription | Permission `langy:view`   | `langyTurnStreamInputSchema`              | `langyStreamEntrySchema`              |
+| `langy.onTurnStream`             | subscription | Permission `langy:view`   | `langyTurnStreamInputSchema`              | `langyStreamFrameSchema`              |
 
 ```typescript
 // langy.list
@@ -1275,7 +1275,7 @@ interface Input {
   conversationId: string;
   turnId: string;
 }
-type Output = z.infer<typeof langyStreamEntrySchema>; // ../contract/src/langy.stream-entry.ts:120
+type Output = z.infer<typeof langyStreamFrameSchema>; // ../contract/src/langy.stream-entry.ts:133
 ```
 
 ### `langyEgress`
@@ -1339,7 +1339,7 @@ interface Output {
 
 ### Pipeline `langy_conversation_processing` (aggregate `langy_conversation`)
 
-Declared at `src/eventing/langy-conversation.pipeline.ts:117`. Events: `LangyConversationStartedEventSchema`, `LangyConversationForkedEventSchema`, `LangyMessageRecordedEventSchema`, `LangyMessageImportedEventSchema`, `LangyAgentTurnAcceptedEventSchema`, `LangyToolCallInitiatedEventSchema`, `LangyToolCallSucceededEventSchema`, `LangyToolCallFailedEventSchema`, `LangyPlanUpdatedEventSchema`, `LangyAgentResponseFailedEventSchema`, `LangyAgentRespondedEventSchema`, `LangyConversationArchivedEventSchema`, `LangyConversationMetadataUpdatedEventSchema`, `LangyConversationHandoffPendingEventSchema`, `LangyConversationHandoffConsumedEventSchema`, `LangyConversationTitleGeneratedEventSchema`, `LangyLocalControlRequestedEventSchema`, `LangyLocalWorkspaceConnectedEventSchema`, `LangyLocalWorkspaceDisconnectedEventSchema`, `LangyLocalPolicyChangedEventSchema`, `LangyUserWaitStartedEventSchema`, `LangyUserWaitEndedEventSchema`.
+Declared at `src/eventing/langy-conversation.pipeline.ts:121`. Events: `LangyConversationStartedEventSchema`, `LangyConversationForkedEventSchema`, `LangyMessageRecordedEventSchema`, `LangyMessageImportedEventSchema`, `LangyAgentTurnAcceptedEventSchema`, `LangyToolCallInitiatedEventSchema`, `LangyToolCallSucceededEventSchema`, `LangyToolCallFailedEventSchema`, `LangyPlanUpdatedEventSchema`, `LangyAgentResponseFailedEventSchema`, `LangyAgentRespondedEventSchema`, `LangyConversationArchivedEventSchema`, `LangyConversationMetadataUpdatedEventSchema`, `LangyConversationHandoffPendingEventSchema`, `LangyConversationHandoffConsumedEventSchema`, `LangyConversationTitleGeneratedEventSchema`, `LangyLocalControlRequestedEventSchema`, `LangyLocalWorkspaceConnectedEventSchema`, `LangyLocalWorkspaceDisconnectedEventSchema`, `LangyLocalPolicyChangedEventSchema`, `LangyUserWaitStartedEventSchema`, `LangyUserWaitEndedEventSchema`.
 
 ### Pipeline `langy_guided_onboarding` (aggregate `langy_guided_onboarding`)
 
@@ -1352,17 +1352,18 @@ Declared at `src/eventing/langy-guided-onboarding.pipeline.ts:41`. Events: `guid
 
 ### Pipeline `langy_maintenance` (aggregate `global`)
 
-Declared at `src/eventing/langy-maintenance.pipeline.ts:30`.
+Declared at `src/eventing/langy-maintenance.pipeline.ts:37`.
 
-| Kind            | Name                         | Handles                                                      | Declared at                                     |
-| --------------- | ---------------------------- | ------------------------------------------------------------ | ----------------------------------------------- |
-| peer subscriber | `provisionProjectVirtualKey` | `lw.project.created` from [project](../../project/README.md) | `src/eventing/langy-maintenance.pipeline.ts:37` |
+| Kind            | Name                         | Handles                                                                         | Declared at                                     |
+| --------------- | ---------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------- |
+| peer subscriber | `provisionProjectVirtualKey` | `lw.project.created` from [project](../../project/README.md)                    | `src/eventing/langy-maintenance.pipeline.ts:44` |
+| peer subscriber | `langyCiFollowUp`            | `lw.github.pull_request_checks_completed` from [github](../../github/README.md) | `src/eventing/langy-maintenance.pipeline.ts:50` |
 
 ## Configuration
 
 | Kind   | Leaf                 | Environment variable        | Declared at                          |
 | ------ | -------------------- | --------------------------- | ------------------------------------ |
-| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:294`           |
+| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:297`           |
 | config | `agentUrl`           | `LANGY_AGENT_URL`           | `../contract/src/langy.config.ts:18` |
 | config | `workerCallbackUrl`  | `LANGY_WORKER_CALLBACK_URL` | `../contract/src/langy.config.ts:19` |
 | config | `workerGatewayUrl`   | `LANGY_WORKER_GATEWAY_URL`  | `../contract/src/langy.config.ts:20` |
