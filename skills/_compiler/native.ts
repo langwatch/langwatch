@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 /**
- * Native skill generator: with `--target native` (the default), verbatim opencode
- * SKILL.md files for the langyagent image; with `--target cli`, the variant the
- * CLI's `langwatch skills` bundle embeds.
- * Recipes flatten one level deep — see skills/_compiled/README.md for the pipeline.
+ * Native skill generator. `--target native` (default) writes opencode SKILL.md files
+ * for the langyagent image; `--target cli` writes the `langwatch skills` bundle variant.
  */
 import fs from "fs";
 import path from "path";
@@ -21,10 +19,9 @@ const __dirname = path.dirname(__filename);
 const skillsRoot = path.resolve(__dirname, "..");
 
 /**
- * Setup partials both renders leave out, for a different reason per reader:
- * - CLI bundle: its reader is already running the binary, so install steps are
- *   moot, and the login partials it keeps carry the key guidance.
- * - Langy: the image ships the CLI and Langy already holds a key.
+ * Setup partials both renders leave out, per reader. CLI bundle: already runs the binary,
+ * so install steps are moot and the login partials carry key guidance. Langy: the image
+ * ships the CLI and already holds a key.
  */
 const ALWAYS_EXCLUDED_PARTIALS = ["cli-setup", "projects-and-api-keys"];
 
@@ -60,7 +57,7 @@ const TARGETS: Record<
   },
 };
 
-/** Renders one skill to a self-contained SKILL.md for the given target (Langy's native render by default). */
+/** Renders one skill to a self-contained SKILL.md for the target (Langy's native by default). */
 export function renderSkill(skill: PublishedSkill, target: NativeTarget = "native"): string {
   if (!fs.existsSync(skill.src)) {
     throw new Error(`Skill source not found: ${skill.src}`);
