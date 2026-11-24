@@ -49,6 +49,8 @@ export interface LangyAttachedContext {
   label: string;
   /** Optional display/agent extras, e.g. `{ value: "8.2s", severity: "error" }`. */
   meta?: Record<string, unknown>;
+  /** What it is apart from its text: attaching the same key again replaces it in place. */
+  key?: string;
 }
 
 /**

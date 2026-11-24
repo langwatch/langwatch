@@ -5,7 +5,7 @@
  */
 
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { WidgetCompletenessSinkContext } from "../../../../behavior/widget-completeness-sink.ts";
 import {
@@ -24,7 +24,10 @@ const FOOTER_HEIGHT_PX = 22;
 /** The room the title row, the footer, the body's bottom padding and the border take. */
 const CARD_CHROME_PX = HEADER_HEIGHT_PX + FOOTER_HEIGHT_PX + 8 + 2;
 
-/** The height a card's body may take at `rowSpan` board rows, less its action row if it has one. */
+/**
+ * The height a card's body may take at `rowSpan` board rows, less its action row if it has one,
+ * with a one-line title: the first guess, before the card measured the room its body has.
+ */
 export function widgetBodyHeightPx(rowSpan: number, { withActions = false } = {}): number {
   const actions = withActions ? WIDGET_ACTION_ROW_HEIGHT_PX : 0;
   return Math.max(boardCardHeightPx(rowSpan) - CARD_CHROME_PX - actions, 60);
@@ -52,9 +55,22 @@ export function WidgetCardShell({
   footer?: string;
   /** Told the card's root, so a caller can tell when it is on screen. */
   viewRef?: (node: HTMLElement | null) => void;
-  children: ReactNode;
+  /** Or, told the body's measured height once known, so a chart fits between title and footer. */
+  children: ReactNode | ((bodyHeightPx: number | undefined) => ReactNode);
 }) {
   const [completeness, setCompleteness] = useState<WidgetCompleteness | null>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const [bodyHeightPx, setBodyHeightPx] = useState<number | undefined>(void 0);
+  useEffect(() => {
+    const element = body.current;
+    if (!element) return;
+    // The body takes what the title, actions and footer leave, whatever it holds.
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setBodyHeightPx(Math.floor(entry.contentRect.height));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   const hasNotes =
     completenessNotes(completeness).length > 0 || sampleNote(completeness) !== undefined;
   return (
@@ -120,9 +136,9 @@ export function WidgetCardShell({
           </HStack>
         )}
       </HStack>
-      <Box flex={1} minHeight={0} paddingX={2} paddingBottom={2}>
+      <Box ref={body} flex={1} minHeight={0} paddingX={2} paddingBottom={2}>
         <WidgetCompletenessSinkContext.Provider value={setCompleteness}>
-          {children}
+          {typeof children === "function" ? children(bodyHeightPx) : children}
         </WidgetCompletenessSinkContext.Provider>
       </Box>
       {actions}

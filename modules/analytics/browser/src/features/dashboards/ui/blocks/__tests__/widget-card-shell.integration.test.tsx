@@ -102,3 +102,50 @@ describe("given a card narrower than its title", () => {
     expect(style.getPropertyValue("-webkit-line-clamp")).toBe("2");
   });
 });
+
+describe("given a card whose body has less room than one title line leaves", () => {
+  /** @scenario "AC242d Widget cards: the chart fits between the title and the footer" */
+  it("hands its chart the body's measured height, not the one-line guess", async () => {
+    const real = window.ResizeObserver;
+    // jsdom lays nothing out: stand in for the browser telling the body's height.
+    class MeasuringObserver implements ResizeObserver {
+      constructor(private readonly report: ResizeObserverCallback) {}
+      observe(target: Element) {
+        const box = { x: 0, y: 0, top: 0, left: 0, width: 400, height: 271.6 };
+        const contentRect: DOMRectReadOnly = {
+          ...box,
+          right: 400,
+          bottom: 271.6,
+          toJSON: () => box,
+        };
+        const size: ResizeObserverSize = { blockSize: 271.6, inlineSize: 400 };
+        const entry: ResizeObserverEntry = {
+          target,
+          contentRect,
+          borderBoxSize: [size],
+          contentBoxSize: [size],
+          devicePixelContentBoxSize: [size],
+        };
+        this.report([entry], this);
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    Object.defineProperty(window, "ResizeObserver", {
+      configurable: true,
+      value: MeasuringObserver,
+    });
+    try {
+      renderWithAnalyticsHost(
+        <WidgetCardShell name="How much do I spend on testing versus real users?" footer="Tests">
+          {(bodyHeightPx) => <div>chart at {bodyHeightPx ?? "a guess"}</div>}
+        </WidgetCardShell>,
+      );
+
+      expect(await screen.findByText("chart at 271")).toBeInTheDocument();
+      expect(screen.getByTestId("widget-card-footer")).toHaveTextContent("Tests");
+    } finally {
+      Object.defineProperty(window, "ResizeObserver", { configurable: true, value: real });
+    }
+  });
+});

@@ -21,24 +21,33 @@ function seedDraft({
   if (!draft || !maySeed({ composer, seeded })) return seeded;
   useLangyStore.getState().setDraft(draft);
   if (!about) return null;
-  const contextIds = context.map(({ ref }) => ref);
+  const contextIds = context.map(({ ref, key }) => key ?? ref);
   return { text: draft, about, contextIds, shown: isOnScreen({ about, onScreen: screen }) };
 }
 
 /**
- * Attaches one piece of an ask's context. One the page already offers as a chip, the same kind
- * and ref, is that chip chosen, so the composer lists it once under the page's own label.
+ * Attaches one piece of an ask's context. One the page already offers as a chip, by the chip's
+ * id as its key or the same kind and ref, is that chip chosen; the rest is attached under its
+ * key, so asking about the same board or widget again replaces its entry, never repeats it.
  */
 function attachAskContext(item: NonNullable<LangyAskRequest["context"]>[number]): void {
   const langy = useLangyStore.getState();
   const onPage = useLangyPageContextStore
     .getState()
-    .pageContext.find((chip) => chip.kind === item.kind && chip.ref === item.ref);
+    .pageContext.find(
+      (chip) => chip.id === item.key || (chip.kind === item.kind && chip.ref === item.ref),
+    );
   if (onPage) {
+    if (item.key !== void 0) langy.detachContext(item.key);
     langy.chooseChip(onPage.id);
     return;
   }
-  langy.attachContext({ type: item.kind, id: item.ref, label: item.label });
+  langy.attachContext({
+    type: item.kind,
+    id: item.ref,
+    label: item.label,
+    ...(item.key === void 0 ? {} : { key: item.key }),
+  });
 }
 
 /**

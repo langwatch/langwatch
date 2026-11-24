@@ -16,6 +16,8 @@ import {
   boardSetupDraft,
   boardSubject,
   offersBoardSetup,
+  widgetChartDraft,
+  widgetPromptDraft,
 } from "../model/board-langy.ts";
 
 const PERIOD = {
@@ -173,7 +175,35 @@ describe("an ask made on a new board before it was stored", () => {
 
     expect(told.context[0]?.ref).toContain('dashboard "Untitled dashboard 3" (id board-9)');
     expect(told.context[0]?.ref).not.toContain("(id new)");
+    expect(told.context[0]?.key).toBe("dashboard:board-9");
     expect(told.about).toEqual(asked.about && { ...asked.about, ref: "board-9" });
     expect(told.draft).toBe(asked.draft);
+  });
+});
+
+describe("asking about the same board and widget twice", () => {
+  const before = boardSubject({ board: { id: "board-9", name: "Costs" }, widgets: [] });
+  const after = boardSubject({
+    board: { id: "board-9", name: "Costs" },
+    widgets: [{ name: "Which models does my agent use?" }],
+  });
+  const widget = { name: "Which models does my agent use?", definition: { queries: [] } };
+
+  /** @scenario "AC126c Langy context: a board and a widget asked about again are still listed once" */
+  it("keys the board as its chip and the widget by its name, whatever each ask's text says", () => {
+    const chip = boardContextChip({ board: after, range: "30d", period: PERIOD });
+    const added = widgetPromptDraft({ widget, board: before, period: PERIOD });
+    const clicked = widgetChartDraft({
+      subject: { kind: "model", label: "gpt-5" },
+      widget,
+      board: after,
+      period: PERIOD,
+    });
+
+    expect(added.context[0]?.ref).not.toBe(clicked.context[0]?.ref);
+    expect(added.context[0]?.key).toBe(chip.id);
+    expect(clicked.context[0]?.key).toBe(chip.id);
+    expect(added.context[1]?.ref).not.toBe(clicked.context[1]?.ref);
+    expect(added.context[1]?.key).toBe(clicked.context[1]?.key);
   });
 });

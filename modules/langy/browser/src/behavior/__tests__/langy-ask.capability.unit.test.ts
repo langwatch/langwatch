@@ -156,3 +156,70 @@ describe("given the page offers the board an ask is about", () => {
     ]);
   });
 });
+
+describe("given a widget added from the picker, then a value clicked on its card", () => {
+  const before = 'dashboard "My dashboard" (id board-1); widgets: none yet';
+  const after = 'dashboard "My dashboard" (id board-1); widgets: Which models does my agent use?';
+  const chip = {
+    id: "dashboard:board-1",
+    kind: "dashboard" as const,
+    label: "dashboard: My dashboard · 30d · 1d",
+    ref: after,
+  };
+  const board = (ref: string) => ({
+    kind: "dashboard" as const,
+    ref,
+    label: "My dashboard",
+    key: "dashboard:board-1",
+  });
+  const widget = (ref: string) => ({
+    kind: "dashboard" as const,
+    ref,
+    label: "widget: Which models does my agent use?",
+    key: "widget:Which models does my agent use?",
+  });
+
+  function addThenClick() {
+    const ask = createLangyAsk();
+    ask.onScreen({ ref: "board-1" });
+    // The picker asks with the board as it read before the widget landed on it.
+    ask.ask({
+      draft: "What does it show?",
+      about: { ref: "board-1" },
+      context: [board(before), widget('widget "Which models does my agent use?"')],
+    });
+    useLangyPageContextStore.setState({ pageContext: [chip] });
+    ask.ask({
+      draft: "What stands out about gpt-5?",
+      about: { ref: "board-1" },
+      context: [board(after), widget('widget "Which models"; clicked: model "gpt-5"')],
+    });
+  }
+
+  /** @scenario "AC126c Langy context: a board and a widget asked about again are still listed once" */
+  it("lists the board once, as the page's chip, and the widget once, as the latest ask read it", () => {
+    addThenClick();
+
+    const state = useLangyStore.getState();
+    expect(state.chosenChipIds.has(chip.id)).toBe(true);
+    expect(state.attachedContext).toEqual([
+      {
+        type: "dashboard",
+        id: 'widget "Which models"; clicked: model "gpt-5"',
+        label: "widget: Which models does my agent use?",
+        key: "widget:Which models does my agent use?",
+      },
+    ]);
+  });
+
+  /** @scenario "AC126c Langy context: a board and a widget asked about again are still listed once" */
+  it("lets a new chat start on nothing the asks attached", () => {
+    addThenClick();
+
+    useLangyStore.getState().startNewConversation();
+
+    const state = useLangyStore.getState();
+    expect(state.attachedContext).toEqual([]);
+    expect(state.chosenChipIds.size).toBe(0);
+  });
+});

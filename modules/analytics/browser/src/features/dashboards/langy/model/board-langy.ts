@@ -96,12 +96,26 @@ function shortGrainText(granularitySeconds: number): string {
   return `${granularitySeconds / found.seconds}${found.short}`;
 }
 
-function context({ ref, label }: { ref: string; label: string }): AnalyticsLangyContext {
+function context({
+  ref,
+  label,
+  key,
+}: {
+  ref: string;
+  label: string;
+  key: string;
+}): AnalyticsLangyContext {
   return {
     kind: "dashboard",
     ref: ref.slice(0, MAX_REF_LENGTH),
     label: label.slice(0, MAX_LABEL_LENGTH),
+    key: key.slice(0, MAX_REF_LENGTH),
   };
+}
+
+/** The board's key: the open board's chip id, so an ask about the board is that chip. */
+function boardKey(board: Pick<BoardSubject, "id">): string {
+  return `dashboard:${board.id}`;
 }
 
 /** The board as the agent reads it: which one, what is on it, over when. */
@@ -124,6 +138,7 @@ export function boardAskContext({
       `period: ${periodText(period)}, one bucket per ${grainText(period.granularitySeconds)}`,
     ].join("; "),
     label: board.name,
+    key: boardKey(board),
   });
 }
 
@@ -142,7 +157,7 @@ export function boardContextChip({
 }): LangyContextChip {
   const shown = `${range === "live" ? "Live" : range} · ${shortGrainText(period.granularitySeconds)}`;
   return {
-    id: `dashboard:${board.id}`,
+    id: boardKey(board),
     kind: "dashboard",
     label: `dashboard: ${board.name} · ${shown}`.slice(0, MAX_LABEL_LENGTH),
     ref: boardAskContext({ board, period }).ref,
@@ -261,6 +276,8 @@ export function widgetContext({
   return context({
     ref: ref(fittedSql({ sqls, room })),
     label: `${LANGY_WIDGET_CHIP_LABEL_PREFIX}${widget.name}`,
+    // Clicks on different values of one widget are still that widget, listed once.
+    key: `widget:${widget.name}`,
   });
 }
 
@@ -572,6 +589,7 @@ export function widgetEditorContext({
   return context({
     ref: `${which}, open in the editor on ${boardAskContext({ board, period }).ref}`,
     label: widget.name,
+    key: `${boardKey(board)}:editing:${widget.id ?? NEW_WIDGET_REF}`,
   });
 }
 
@@ -739,6 +757,7 @@ export function askAboutStoredBoard({
     context: request.context.map((each) => ({
       ...each,
       ref: each.ref.replace(`(id ${draftId})`, `(id ${dashboardId})`),
+      key: each.key.replace(boardKey({ id: draftId }), boardKey({ id: dashboardId })),
     })),
     ...(about === void 0
       ? {}

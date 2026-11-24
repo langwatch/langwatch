@@ -4,7 +4,7 @@
  */
 
 import type { ChartAskSubject } from "@langwatch/analytics-contract/chart-frame-protocol";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { useReadableProjects } from "../../../../behavior/use-readable-projects.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
@@ -67,6 +67,26 @@ export function chartAsks({
   };
 }
 
+/** Who may lift a widget's limit on an editable board, and the edits the face offers them. */
+function editableLimitAudience({
+  isWriting,
+  withLangy,
+  canEditCode,
+  onEdit,
+}: {
+  isWriting: boolean;
+  withLangy: boolean;
+  canEditCode: boolean;
+  onEdit: ((input: { withLangy: boolean }) => void) | undefined;
+}) {
+  return {
+    kind: "editable" as const,
+    editsDisabled: isWriting,
+    ...(withLangy && onEdit ? { onEditWithLangy: () => onEdit({ withLangy: true }) } : {}),
+    ...(canEditCode && onEdit ? { onEditCode: () => onEdit({ withLangy: false }) } : {}),
+  };
+}
+
 export function BoardWidgetCard({
   widget,
   projectId,
@@ -124,10 +144,7 @@ export function BoardWidgetCard({
   const [problem, setProblem] = useState(false);
   const actions = shownWidgetButtons({ actions: declared, problem: problem && face === "chart" });
   const { periodStart, periodEnd, granularitySeconds } = period;
-  const timeWindow = useMemo(
-    () => ({ start: periodStart, end: periodEnd }),
-    [periodStart, periodEnd],
-  );
+  const timeWindow = { start: periodStart, end: periodEnd };
 
   return (
     <WidgetCardShell
@@ -169,40 +186,41 @@ export function BoardWidgetCard({
         </>
       }
     >
-      {picksNoSources(widget.definition.queries) ? (
-        <NoSourcesPicked />
-      ) : (
-        <DashboardWidgetFrameOverWindow
-          id={widget.id}
-          graph={widget.definition}
-          projectId={projectId}
-          projectSlug={projectSlug}
-          dashboardId={dashboardId}
-          widgetName={widget.name}
-          maxHeight={widgetBodyHeightPx(widget.placement.rowSpan, {
-            withActions: actions.length > 0,
-          })}
-          timeWindow={timeWindow}
-          granularitySeconds={granularitySeconds}
-          periodKey={periodKey}
-          onFaceChange={setFace}
-          limitAudience={{
-            kind: "editable",
-            editsDisabled: isWriting,
-            ...(langyOnData && onEdit
-              ? { onEditWithLangy: () => onEdit({ withLangy: true }) }
-              : {}),
-            ...(canEditCode && onEdit ? { onEditCode: () => onEdit({ withLangy: false }) } : {}),
-          }}
-          onLimitsChange={setLimits}
-          onExportChange={csvExport.onExportChange}
-          onEmptyChange={onEmptyChange}
-          onLimitFailureChange={onLimitFailureChange}
-          {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
-          onSignal={({ problem: shows }) => setProblem(shows)}
-          {...chartAsks({ langy: langyOnData, declared })}
-        />
-      )}
+      {(bodyHeightPx) =>
+        picksNoSources(widget.definition.queries) ? (
+          <NoSourcesPicked />
+        ) : (
+          <DashboardWidgetFrameOverWindow
+            id={widget.id}
+            graph={widget.definition}
+            projectId={projectId}
+            projectSlug={projectSlug}
+            dashboardId={dashboardId}
+            widgetName={widget.name}
+            maxHeight={
+              bodyHeightPx ??
+              widgetBodyHeightPx(widget.placement.rowSpan, { withActions: actions.length > 0 })
+            }
+            timeWindow={timeWindow}
+            granularitySeconds={granularitySeconds}
+            periodKey={periodKey}
+            onFaceChange={setFace}
+            limitAudience={editableLimitAudience({
+              isWriting,
+              withLangy: !!langyOnData,
+              canEditCode,
+              onEdit,
+            })}
+            onLimitsChange={setLimits}
+            onExportChange={csvExport.onExportChange}
+            onEmptyChange={onEmptyChange}
+            onLimitFailureChange={onLimitFailureChange}
+            {...(langy ? { onAskLangyToSetUp: langy.setUpMissing } : {})}
+            onSignal={({ problem: shows }) => setProblem(shows)}
+            {...chartAsks({ langy: langyOnData, declared })}
+          />
+        )
+      }
     </WidgetCardShell>
   );
 }

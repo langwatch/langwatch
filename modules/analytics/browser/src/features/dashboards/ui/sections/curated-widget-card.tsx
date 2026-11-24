@@ -106,29 +106,33 @@ export function CuratedWidgetCard({
         )
       }
     >
-      <DashboardWidgetFrameOverWindow
-        id={frameId}
-        graph={definition}
-        projectId={projectId}
-        projectSlug={projectSlug}
-        widgetName={name}
-        telemetry={{
-          dashboardId: curatedBoardTelemetryId(templateId),
-          widgetId: widget.key,
-          templateId: widget.key,
-        }}
-        maxHeight={widgetBodyHeightPx(rowSpan, { withActions: actions.length > 0 })}
-        timeWindow={timeWindow}
-        granularitySeconds={granularitySeconds}
-        periodKey={periodKey}
-        onFaceChange={setFace}
-        limitAudience={{ kind: "built_in" }}
-        onExportChange={csvExport.onExportChange}
-        onEmptyChange={onEmptyChange}
-        onLimitFailureChange={onLimitFailureChange}
-        onSignal={({ problem: shows }) => setProblem(shows)}
-        {...chartAsks({ langy: langyOnData, declared })}
-      />
+      {(bodyHeightPx) => (
+        <DashboardWidgetFrameOverWindow
+          id={frameId}
+          graph={definition}
+          projectId={projectId}
+          projectSlug={projectSlug}
+          widgetName={name}
+          telemetry={{
+            dashboardId: curatedBoardTelemetryId(templateId),
+            widgetId: widget.key,
+            templateId: widget.key,
+          }}
+          maxHeight={
+            bodyHeightPx ?? widgetBodyHeightPx(rowSpan, { withActions: actions.length > 0 })
+          }
+          timeWindow={timeWindow}
+          granularitySeconds={granularitySeconds}
+          periodKey={periodKey}
+          onFaceChange={setFace}
+          limitAudience={{ kind: "built_in" }}
+          onExportChange={csvExport.onExportChange}
+          onEmptyChange={onEmptyChange}
+          onLimitFailureChange={onLimitFailureChange}
+          onSignal={({ problem: shows }) => setProblem(shows)}
+          {...chartAsks({ langy: langyOnData, declared })}
+        />
+      )}
     </WidgetCardShell>
   );
 }
