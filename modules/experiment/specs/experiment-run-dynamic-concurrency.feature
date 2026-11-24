@@ -93,6 +93,18 @@ Feature: An experiment run's default concurrency shares a cell budget between ac
     Then the run gets concurrency 20
 
   @integration
+  Scenario: A run whose start is never sent gives its claim back
+    Given a project cell budget of 24 and a run claimed active while its concurrency was resolved
+    When its start fails before the start command is sent, polled or streamed
+    Then the claim is released and the next run gets concurrency 24
+
+  @integration
+  Scenario: A streamed run that fails after its start was sent keeps its claim
+    Given a project cell budget of 24 and a streamed run whose start command was sent
+    When the stream fails afterwards
+    Then the run still counts as active and the next run gets concurrency 12
+
+  @integration
   Scenario: The active runs are shared through the deployment's Redis
     Given two replicas over one Redis
     When one replica records a run as active
