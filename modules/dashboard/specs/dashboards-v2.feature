@@ -1343,10 +1343,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: From LangWatch: the heading's (i) says what these boards are
     Given the Dashboards sidebar shows the From LangWatch group
     When the member hovers over the (i) beside its heading, or moves keyboard focus to it
-    Then it says "Dashboards LangWatch made for you. They are read-only and improve over time.
-      Duplicate one to make a copy you can edit."
+    Then it says "Dashboards LangWatch made for you. They improve over time. Change one and it
+      becomes your own copy."
     And the heading and its fold control stay exactly where they were
-    # Owner list, 2026-10-08; the prototype uses the same words
+    # Owner list, 2026-10-08; words changed on 2026-11-24, when a change began to make a copy
 
   @unit @integration
   Scenario: AC165 A pin can point at a From LangWatch board
@@ -1368,7 +1368,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given an LLM Ops board with no widgets, opened in its project
     Then it shows the ask bar, the suggested questions,
       "Or start from a template" with the three From LangWatch boards and "View all templates"
-    And each card opens its live board
+    And each card makes the member's own board from that template and opens it
+    And a card whose board cannot be made leaves the member on the empty board, told why
 
   @integration
   Scenario: Boards: the suggested questions show in full at every width
@@ -1421,13 +1422,68 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then it shows no "Add a description"
     And every other board without a description offers "Add a description"
 
+  # Owner, 2026-11-24: "we should always give users full options, and just ask 'this is a
+  # langwatch maintained dashboard, are you sure you want to modify it' ... 'Yes, modify it'".
   @integration
-  Scenario: From LangWatch: a template board is live and read-only
+  Scenario: From LangWatch: a template board is live and offers every edit
+    Given a member who may create dashboards
     When the member opens /[project]/dashboards/curated/<template id>
-    Then the template's widgets run over the project's data, badged "From LangWatch"
-    And nothing can be moved, edited or added, and nothing is stored
-    And its header has no "Duplicate to edit" button
+    Then the template's widgets run over the project's data, badged "From LangWatch", and nothing is stored
+    And it offers what an own board does: "Add a widget", the title and description to click, and on each widget a drag handle, "Edit code" and "Delete"
+    And its header offers "Use this template" and no "Duplicate to edit" button
     And an unknown template id shows the not-found page
+
+  @integration
+  Scenario: From LangWatch: a member who may not create dashboards gets no edit control
+    Given a member who may not create dashboards
+    When the member opens a From LangWatch board
+    Then it has no "Add a widget" and no "Use this template", its title and description are plain text
+    And each widget's menu holds only Export CSV, with no drag handle
+
+  @unit @integration
+  Scenario: From LangWatch: the first change asks before it makes the member's own copy
+    Given a member who may create dashboards on a From LangWatch board
+    When they rename it, change its description, press "Add a widget", move a widget, or pick a widget's "Edit code" or "Delete"
+    Then "Modify a LangWatch dashboard?" says "This dashboard is maintained by LangWatch. If you change it, it becomes your own copy and stops getting LangWatch updates. You can add the original again from Templates at any time."
+    And it offers "Cancel" and "Yes, modify it"
+    And a blank or unchanged name or description asks nothing
+
+  @integration
+  Scenario: From LangWatch: Cancel changes nothing
+    Given "Modify a LangWatch dashboard?" is open
+    When the member presses "Cancel"
+    Then the dialog closes, nothing is stored and the member stays on the unchanged board
+
+  @unit @integration
+  Scenario: From LangWatch: Yes, modify it makes the member's own copy and opens it on their change
+    Given "Modify a LangWatch dashboard?" is open after a change
+    When the member presses "Yes, modify it"
+    Then a board with the template's name, numbered from 2 when taken, is made for the project with the template's widgets and description
+    And a new name or description is saved on it, a deleted widget is left out, and a moved widget keeps where it was dropped
+    And it opens, with "Add a widget" open after "Add a widget", and the widget's editor open after "Edit code"
+    And "dashboards.created.dashboard" is sent with createdFrom "duplicate_curated" and the From LangWatch board's templateId
+
+  # No state hides a From LangWatch board per member, so its entry stays where it is listed; a
+  # pin is the one place the copy can take over.
+  @integration
+  Scenario: From LangWatch: the copy takes over the From LangWatch board's pin
+    Given the member pinned a From LangWatch board
+    When they change it and press "Yes, modify it"
+    Then the copy is pinned in the From LangWatch board's place among their pins, and the From LangWatch board is unpinned
+
+  @integration
+  Scenario: From LangWatch: a copy that cannot be made leaves the member on the board
+    Given "Modify a LangWatch dashboard?" is open
+    When the member presses "Yes, modify it" and the copy cannot be made
+    Then the member stays on the From LangWatch board and a toast says "Couldn't make your copy of the dashboard"
+    And no half-made board is left behind
+
+  @integration
+  Scenario: From LangWatch: Use this template makes the member's own board from it
+    Given a member who may create dashboards on a From LangWatch board
+    When they press "Use this template"
+    Then a board named after the template, numbered from 2 when taken, is made for the project with its widgets, and it opens
+    And the template's report prompt is drafted in Langy, unsent, as adding a template does
 
   @unit @integration
   Scenario: From LangWatch: every widget on a template board has code
@@ -1564,8 +1620,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given Langy is on for the project and the member may start a conversation
     When the member opens a saved board or a read-only From LangWatch board
     Then every widget card on it has an "Ask Langy" button, shown while the card is hovered or focused
-    And on a From LangWatch board it sits beside a menu that holds only Export CSV, and
-      clicking it drafts that widget's prompt with the board as context, as on a saved board
+    And on a From LangWatch board it sits beside a menu that holds only Export CSV for a member
+      who may not create dashboards, and clicking it drafts that widget's prompt with the board as context, as on a saved board
     And when Langy is off or the member may not start a conversation, no card shows it
 
   @unit @integration

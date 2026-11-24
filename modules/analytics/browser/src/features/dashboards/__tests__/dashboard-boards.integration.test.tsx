@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
 import { AGENT_KIND_CHIP_LABELS, PICKER_QUESTIONS, PICKER_SECTIONS } from "../catalogue/index.ts";
 import { boardSubject } from "../langy/model/board-langy.ts";
+import { CURATED_BOARDS, curatedBoardById } from "../model/curated-boards.ts";
 import { BlockPickerDialog } from "../ui/sections/block-picker-dialog.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
@@ -324,13 +325,13 @@ describe("a member's board", () => {
         expect(screen.getByRole("button", { name: question })).toBeInTheDocument();
       }
       const start = within(screen.getByRole("region", { name: "Start from a template" }));
-      expect(start.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
-        "/test-project/dashboards/curated/release",
-        "/test-project/dashboards/curated/data",
-        "/test-project/dashboards/curated/breaks",
+      expect(start.getAllByRole("button").map((card) => card.getAttribute("aria-label"))).toEqual(
+        CURATED_BOARDS.map(({ name }) => `Use ${name}`),
+      );
+      expect(start.getByRole("link", { name: "View all templates" })).toHaveAttribute(
+        "href",
         "/test-project/dashboards/templates",
-      ]);
-      expect(start.getByRole("link", { name: "View all templates" })).toBeInTheDocument();
+      );
       expect(screen.queryByRole("button", { name: /^Add a widget Start/ })).toBeNull();
     });
 
@@ -357,15 +358,47 @@ describe("a member's board", () => {
       });
     });
 
-    describe("when the member opens a From LangWatch card", () => {
+    describe("when the member presses a From LangWatch card", () => {
       /** @scenario "Boards: every empty board shows one view" */
-      it("opens that live board", async () => {
+      it("makes their own board from that template and opens it", async () => {
         const user = userEvent.setup();
-        const { host } = openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
+        const server = inMemoryServer({ boards: OWN_BOARDS });
+        const { host } = openBoard({ server });
+        const template = curatedBoardById("data")!.card.board;
 
-        await user.click(await screen.findByRole("link", { name: "Release check" }));
+        await user.click(
+          await screen.findByRole("button", { name: "Use Can I trust my numbers?" }),
+        );
 
-        expect(host.navigations).toEqual(["/test-project/dashboards/curated/release"]);
+        await waitFor(() =>
+          expect(host.navigations).toEqual(["/test-project/dashboards/board-new-3"]),
+        );
+        expect(callsTo(server, "boards.create").map(({ input }) => input)).toEqual([
+          { projectId: "proj-1", name: template.name },
+        ]);
+        expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(template.widgets.length);
+      });
+    });
+
+    describe("when the board a card makes cannot be made", () => {
+      /** @scenario "Boards: every empty board shows one view" */
+      it("leaves the member on the empty board and says so", async () => {
+        const user = userEvent.setup();
+        const { host } = openBoard({
+          server: inMemoryServer({ boards: OWN_BOARDS, refuseWidgetCreate: true }),
+        });
+
+        await user.click(await screen.findByRole("button", { name: "Use Release check" }));
+
+        await waitFor(() =>
+          expect(host.failures).toEqual([
+            expect.objectContaining({
+              fallbackTitle: "Couldn't create the dashboard from the template",
+            }),
+          ]),
+        );
+        expect(host.navigations).toEqual([]);
+        expect(screen.getByText("Or start from a template")).toBeInTheDocument();
       });
     });
 

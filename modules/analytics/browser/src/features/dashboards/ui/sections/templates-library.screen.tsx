@@ -7,14 +7,11 @@
 import { Box, Button, Grid, Heading, Text, VStack } from "@langwatch/design-system/primitives";
 import { type ReactNode, useId } from "react";
 
-import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
-import { useBoardPeriod } from "../../behavior/use-board-period.ts";
+import { useAddTemplate } from "../../behavior/use-add-template.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useStoreProject } from "../../behavior/use-store-project.ts";
 import { useTemplateLibraryFilters } from "../../behavior/use-template-library-filters.ts";
 import { TRUNK_PITCHES, TRUNK_QUESTIONS, type Trunk } from "../../catalogue/index.ts";
-import { useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
-import { boardPromptDraft, boardSubject } from "../../langy/model/board-langy.ts";
 import { boardFromTemplateId, dashboardsPath } from "../../model/boards.ts";
 import { filterCatalogue, trunkCounts } from "../../model/catalogue-filter.ts";
 import {
@@ -121,27 +118,19 @@ export function TemplatesLibrary({ atOrganization = false }: { atOrganization?: 
   const { filters, setFilters, clearFilters } = useTemplateLibraryFilters();
   const saved = useSavedDashboards();
   const store = useStoreProject({ enabled: atOrganization });
-  const fromTemplate = useBoardFromTemplate({ atOrganization, storeProject: store.storeProject });
+  const fromTemplate = useAddTemplate({
+    atOrganization,
+    storeProject: store.storeProject,
+    existingNames: atOrganization ? store.namesInStore : saved.boards.map(({ name }) => name),
+  });
   // At the organization level a board is made Only me in the store project, so it needs both
   // grants there (ADR-002); with none, nothing makes a board.
   const offersAdd = !atOrganization || (store.storeProject !== void 0 && store.mayShare);
-  const langy = useLangyAsk();
-  // The library's address carries no period, so this is the one a new board opens on.
-  const { period } = useBoardPeriod();
   // The agent type picks the pool; the search and the category narrow it.
   const pool = finderPool({ agentKind: filters.agentKind });
   const shown = filterCatalogue({ items: pool, filters });
   const isFiltered = Boolean(filters.search || filters.trunk || filters.agentKind);
 
-  const create = async ({ board: template }: LibraryTemplate) => {
-    const created = await fromTemplate.createFromTemplate({
-      template,
-      existingNames: atOrganization ? store.namesInStore : saved.boards.map(({ name }) => name),
-    });
-    if (!created || !langy.enabled || !template.reportPrompt) return;
-    const board = boardSubject({ board: created, widgets: created.widgets });
-    langy.ask(boardPromptDraft({ prompt: template.reportPrompt, board, period }));
-  };
   const addedHref = ({ board }: LibraryTemplate) => {
     if (atOrganization) return void 0;
     const dashboardId = boardFromTemplateId({ templateName: board.name, boards: saved.boards });
@@ -158,7 +147,7 @@ export function TemplatesLibrary({ atOrganization = false }: { atOrganization?: 
             isCreating={fromTemplate.creatingId === template.board.id}
             addedHref={addedHref(template)}
             inProject={!atOrganization}
-            onCreate={() => void create(template)}
+            onCreate={() => void fromTemplate.add(template.board)}
           />
         ) : null
       }

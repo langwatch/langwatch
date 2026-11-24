@@ -7,9 +7,8 @@
 
 import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
 import type { DashboardHomeProduct } from "@langwatch/dashboard-contract";
-import { Button, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
-import { Plus } from "lucide-react";
 
 import {
   DashboardRefetchIntervalContext,
@@ -19,6 +18,7 @@ import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import type { DashboardWidgetDraft } from "../../../../model/dashboard-widget-draft.ts";
 import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
 import { WidgetReadsEveryProjectContext } from "../../../dashboard-widget/behavior/use-dashboard-widget-executor.ts";
+import { useAddTemplate } from "../../behavior/use-add-template.ts";
 import {
   useBlockPickerAddress,
   WIDGET_PICKER_QUERY_KEY,
@@ -57,31 +57,12 @@ import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
 import { LimitFailedWidgetsBanner } from "../blocks/limit-failed-widgets-banner.tsx";
 import { OldAnalyticsBanner } from "../blocks/old-analytics-banner.tsx";
 import { ScopeConfirmDialog } from "../blocks/scope-confirm-dialog.tsx";
+import { AddWidgetButton } from "../elements/add-widget-button.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { BoardWidgetEditor } from "./board-widget-editor.tsx";
 import { BoardWidgetsGrid } from "./board-widgets-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
 import { ProjectBoardUnavailable } from "./project-board-unavailable.tsx";
-
-/** The header's one action on a board the reader may edit. */
-function AddWidgetButton({ onClick }: { onClick: () => void }) {
-  return (
-    <Button
-      variant="outline"
-      height={8}
-      paddingX={3}
-      gap={1.5}
-      borderRadius="lg"
-      borderColor="border"
-      textStyle="label"
-      fontWeight="medium"
-      _hover={{ borderColor: "border.emphasized", background: "bg.muted" }}
-      onClick={onClick}
-    >
-      <Plus size={15} strokeWidth={2} /> Add a widget
-    </Button>
-  );
-}
 
 /** A Gateway or Governance board reads the organization's data, not a project's (ADR-002, D2). */
 const ORGANIZATION_DATA_HOMES: readonly DashboardHomeProduct[] = ["gateway", "governance"];
@@ -175,6 +156,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
     projectSlug: saved.projectSlug,
     homeProduct: board.homeProduct,
   });
+  const fromTemplate = useAddTemplate({ existingNames: saved.boards.map(({ name }) => name) });
 
   return (
     <WidgetReadsEveryProjectContext.Provider value={readsOrganization}>
@@ -235,7 +217,8 @@ function OpenBoard({ board }: { board: SavedBoard }) {
         {isEmpty && canEdit && templates && (
           <EmptyBoard
             boards={CURATED_BOARDS}
-            boardHref={({ templateId }) => templates.curatedHref(templateId)}
+            creatingId={fromTemplate.creatingId}
+            onUse={({ card }) => void fromTemplate.add(card.board)}
             templatesHref={templates.templatesHref}
           />
         )}
