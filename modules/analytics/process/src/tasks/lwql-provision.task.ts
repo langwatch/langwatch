@@ -12,10 +12,18 @@ import { Task } from "@langwatch/task";
 import { lwqlAppFunctionNames } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
 import { canProvisionAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
 import {
+  LWQL_SCOPED_READER_GROUP,
+  LWQL_SCOPED_SCHEMA,
+} from "../features/provisioning/rules/lwql-scoped-view.rules.ts";
+import {
   LangWatchQLCollectionBindingService,
   type LwqlAccessModelMode,
   type LwqlCollectionProbe,
 } from "../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
+import {
+  LangWatchQLPostgresGapsService,
+  type LwqlPostgresGap,
+} from "../features/provisioning/services/langwatch-ql-postgres-gaps.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,
@@ -23,7 +31,6 @@ import {
 import {
   LangWatchQLSelfProvisioningService,
   type LwqlAppOwnedDrift,
-  type LwqlPostgresGap,
   type LwqlSelfProvisionRequest,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
@@ -49,6 +56,7 @@ const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
 const clusterGuard = LangWatchQLSqlModeClusterGuardService.create();
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 const collectionBinding = LangWatchQLCollectionBindingService.create();
+const postgresGaps = LangWatchQLPostgresGapsService.create();
 
 /** One global key: the self-provision convergence is a singleton, not per tenant. */
 const LWQL_SELF_PROVISION_LOCK_KEY = "lwql:self-provision";
@@ -503,9 +511,16 @@ const POSTGRES_FAILED_MESSAGES: Record<ProvisioningFailureLevel, string> = {
   warn: "lwql reconvergence statement failed",
 };
 
+/** A converge's PostgreSQL statements: the shared batch, then the scoped batch run apart. */
+interface LwqlPostgresBatches {
+  readonly shared: readonly string[];
+  readonly scoped: readonly string[];
+}
+
 /**
- * A deploy's whole half: every approved view, then the reader role with its revokes and grants.
- * A check's gaps: only the absent views, then additive grants on each gap, never a revoke.
+ * Both start with the scoped-reader group's revokes. A deploy: every view and the reader role, then
+ * the scoped schema, every copy and the group's guarded grants. A check: the absent views and the
+ * gap grants, then only the copies it found absent or unscoped, and the guarded grants.
  */
 function postgresStatements({
   plan,
@@ -513,33 +528,123 @@ function postgresStatements({
 }: {
   plan: LwqlConvergencePlan;
   gaps: readonly LwqlPostgresGap[] | undefined;
-}): string[] {
+}): LwqlPostgresBatches {
   const schema = plan.schema;
   const readerRole = LWQL_POSTGRES_READER_ROLE;
+  const revokeFirst = lwqlProvisioning.postgresScopedReaderRevokeFirstStatements({ schema });
+  const scopedGrants = lwqlProvisioning.postgresScopedReaderGrantStatements({ schema });
   if (gaps === undefined) {
-    return [
-      ...lwqlProvisioning.postgresApprovedViewStatements({ schema, readerRole }),
-      // After the views: the reader role's grants name them.
-      ...selfProvisioning.postgresReaderStatements({
-        readerPassword: plan.request.postgresReaderPassword,
-        schema,
-      }),
-    ];
+    return {
+      shared: [
+        ...revokeFirst,
+        ...lwqlProvisioning.postgresApprovedViewStatements({ schema, readerRole }),
+        // After the views: the reader role's grants name them.
+        ...selfProvisioning.postgresReaderStatements({
+          readerPassword: plan.request.postgresReaderPassword,
+          schema,
+        }),
+      ],
+      scoped: [...lwqlProvisioning.postgresScopedViewStatements({ schema }), ...scopedGrants],
+    };
   }
-  const absent = gaps.filter((gap) => gap.absent).map((gap) => gap.view);
+  const shared = postgresGaps.sharedGaps({ gaps });
+  const absent = shared.filter((gap) => gap.absent).map((gap) => gap.view);
   const views = (approvedViews: string[]) => selfProvisioning.postgresDatasets({ approvedViews });
-  return [
-    ...lwqlProvisioning.postgresApprovedViewStatements({
-      schema,
-      readerRole,
-      views: views(absent),
-    }),
-    ...lwqlProvisioning.postgresReaderGrantStatements({
-      schema,
-      role: readerRole,
-      views: views(gaps.map((gap) => gap.view)),
-    }),
-  ];
+  return {
+    shared: [
+      ...revokeFirst,
+      ...lwqlProvisioning.postgresApprovedViewStatements({
+        schema,
+        readerRole,
+        views: views(absent),
+      }),
+      ...lwqlProvisioning.postgresReaderGrantStatements({
+        schema,
+        role: readerRole,
+        views: views(shared.map((gap) => gap.view)),
+      }),
+    ],
+    scoped: [
+      ...lwqlProvisioning.postgresScopedViewStatements({
+        schema,
+        views: views(postgresGaps.scopedCopiesToRebuild({ gaps })),
+      }),
+      ...scopedGrants,
+    ],
+  };
+}
+
+/**
+ * Names what still keeps the scoped-reader group from its copies: an absent scoped schema, one
+ * another installation owns, or copies it cannot select. Best-effort: a failed read logs only.
+ */
+async function warnScopedReaderGaps({
+  database,
+  schema,
+}: {
+  database: LwqlProvisioningDatabase;
+  schema: string;
+}): Promise<void> {
+  try {
+    const state = await PrismaLangWatchQLPostgresRepository.create(database).findScopedViewState({
+      appSchema: schema,
+      group: LWQL_SCOPED_READER_GROUP,
+      views: selfProvisioning.approvedPostgresViews(),
+    });
+    if (!state.groupExists) return;
+    if (state.scopedSchema === "absent") {
+      logger.warn(
+        { scopedSchema: LWQL_SCOPED_SCHEMA },
+        "the scoped-reader schema lwql_scoped is absent and the app role could not create it, so the scoped-reader group reads nothing: grant the app role CREATE on the database, or pre-create the schema as the upgrade runbook says",
+      );
+      return;
+    }
+    if (state.scopedSchema === "foreign") {
+      logger.warn(
+        { scopedSchema: LWQL_SCOPED_SCHEMA, appSchema: schema },
+        "the scoped-reader schema lwql_scoped is not marked as this installation's, so no copy was written and the scoped-reader group was granted nothing: set its comment as the upgrade runbook says",
+      );
+      return;
+    }
+    const unreadable = state.copies
+      .filter((copy) => !(copy.exists && copy.passesGuard && copy.granted))
+      .map((copy) => copy.view);
+    if (unreadable.length > 0) {
+      logger.warn(
+        { views: unreadable },
+        "the scoped-reader group has no SELECT on these copies: they are absent or fail the scoped-view check",
+      );
+    }
+  } catch (error) {
+    logger.warn(
+      { error: clickHouseErrorSummary(error), ...postgresErrorCodeFields(error) },
+      "lwql could not read the scoped-reader group's grants",
+    );
+  }
+}
+
+/**
+ * The scoped batch, after the shared one and apart from it: a failure logs at warn and never
+ * fails the converge. The revokes already ran, so a copy left behind is ungranted (fail closed).
+ */
+async function convergeScopedCopies({
+  database,
+  plan,
+  statements,
+}: {
+  database: LwqlProvisioningDatabase;
+  plan: LwqlConvergencePlan;
+  statements: readonly string[];
+}): Promise<void> {
+  try {
+    await runPostgresStatements({ database, statements: [...statements] });
+  } catch (error) {
+    logger.warn(
+      postgresFailureFields({ error, secret: plan.request.postgresReaderPassword }),
+      "lwql could not write the scoped-reader copies; the shared views converged and the group keeps no grant on a copy that fails the scoped-view check",
+    );
+  }
+  await warnScopedReaderGaps({ database, schema: plan.schema });
 }
 
 async function convergePostgres({
@@ -553,9 +658,11 @@ async function convergePostgres({
   failureLevel: ProvisioningFailureLevel;
   gaps: readonly LwqlPostgresGap[] | undefined;
 }): Promise<unknown> {
+  let scoped: readonly string[];
   try {
-    await runPostgresStatements({ database, statements: postgresStatements({ plan, gaps }) });
-    return undefined;
+    const batches = postgresStatements({ plan, gaps });
+    await runPostgresStatements({ database, statements: [...batches.shared] });
+    scoped = batches.scoped;
   } catch (error) {
     logger[failureLevel](
       postgresFailureFields({ error, secret: plan.request.postgresReaderPassword }),
@@ -563,6 +670,8 @@ async function convergePostgres({
     );
     return error;
   }
+  await convergeScopedCopies({ database, plan, statements: scoped });
+  return undefined;
 }
 
 /** Both halves under the lock; a PostgreSQL failure is raised only once ClickHouse has run. */
@@ -654,12 +763,19 @@ async function readPostgresGaps({
   schema: string;
 }): Promise<LwqlAppOwnedDrift["postgres"]> {
   try {
-    const found = await PrismaLangWatchQLPostgresRepository.create(database).findApprovedViews({
+    const repository = PrismaLangWatchQLPostgresRepository.create(database);
+    const views = selfProvisioning.approvedPostgresViews();
+    const found = await repository.findApprovedViews({
       schema,
       role: LWQL_POSTGRES_READER_ROLE,
-      views: selfProvisioning.approvedPostgresViews(),
+      views,
     });
-    return selfProvisioning.findPostgresGaps({ found });
+    const scoped = await repository.findScopedViewState({
+      appSchema: schema,
+      group: LWQL_SCOPED_READER_GROUP,
+      views,
+    });
+    return postgresGaps.findGaps({ found, scoped });
   } catch (error) {
     logger.warn(
       { error: clickHouseErrorSummary(error), ...postgresErrorCodeFields(error) },

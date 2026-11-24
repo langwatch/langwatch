@@ -2,7 +2,11 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
-import { allModelOptions } from "@langwatch/model-provider-contract";
+import {
+  allModelOptions,
+  judgeShownModelIdOf,
+  LANGWATCH_DECISION_MODEL_ID,
+} from "@langwatch/model-provider-contract";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
@@ -38,7 +42,14 @@ export const LLM_CONFIG_KEYS = [
  * object-based API: reads params from form context, builds an LLMConfig
  * object, writes changed params back on change.
  */
-export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
+export const EvaluatorLLMConfigField = ({
+  prefix,
+  evaluatorType,
+}: {
+  prefix: string;
+  /** Only the evaluators Instant Evals answers are offered LangWatch's and own decision models. */
+  evaluatorType: string | undefined;
+}) => {
   const { setValue, control } = useFormContext();
 
   // Watch all LLM config fields for changes
@@ -60,6 +71,23 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
     return config as LLMConfig;
   }, [watchedValues]);
 
+  // Zero enabled providers shows the empty state shared with the prompt playground and
+  // workflow pickers; a skeleton renders while either query is in flight. An unanswered
+  // decision model list is not an empty one: showing the model against it marks a judge
+  // saved on an own decision model as needing an update when nothing is wrong with it.
+  const { project, organization } = useOrganizationTeamProject();
+  const instantEvals = useInstantEvalJudgeModels({
+    projectId: project?.id,
+    organizationId: organization?.id,
+    evaluatorType,
+  });
+  const { builtInModels, shownModels, isJudgeRouted } = instantEvals;
+  // Any hosted id shows as the one the picker offers; the stored value changes only on a pick.
+  const judgeModel = judgeShownModelIdOf({ id: llmConfig.model, isJudgeRouted });
+  const shownConfig: LLMConfig = { ...llmConfig, model: judgeModel };
+  // A judge that holds the LangWatch Instant (preview) id where the flag is on finds its row in the
+  // picker.
+  const popoverModels = judgeModel === LANGWATCH_DECISION_MODEL_ID ? shownModels : builtInModels;
   // Handle changes from LLMConfigPopover — write all keys back to form.
   // We iterate over LLM_CONFIG_KEYS (not just newConfig entries) so that
   // cleared fields (e.g. reasoning removed on model switch) are set to
@@ -70,23 +98,18 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
       for (const [key, value] of Object.entries(newConfig)) {
         incoming.set(toInternalKey(key), value as string | number | undefined);
       }
+      // The popover holds the shown id; a model the user did not change keeps its stored id.
+      if (incoming.get("model") === judgeModel) incoming.set("model", llmConfig.model);
       for (const key of LLM_CONFIG_KEYS) {
         setValue(`${prefix}.${key}`, incoming.get(key), { shouldDirty: true });
       }
     },
-    [prefix, setValue],
+    [prefix, setValue, judgeModel, llmConfig.model],
   );
 
-  // Zero enabled providers shows the empty state shared with the prompt playground and
-  // workflow pickers; a skeleton renders while either query is in flight. An unanswered
-  // decision model list is not an empty one: showing the model against it marks a judge
-  // saved on an own decision model as needing an update when nothing is wrong with it.
-  const { project } = useOrganizationTeamProject();
-  const instantEvals = useInstantEvalJudgeModels({ projectId: project?.id });
-  const { builtInModels } = instantEvals;
   const { isEmpty, isLoading } = useModelSelection({
     options: allModelOptions,
-    model: llmConfig.model,
+    model: judgeModel,
     mode: "chat",
     builtInModels,
   });
@@ -112,13 +135,17 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
           transition="background 0.15s"
           justify="space-between"
         >
-          <LLMModelDisplay model={llmConfig.model} builtInModels={builtInModels} />
+          <LLMModelDisplay model={judgeModel} builtInModels={shownModels} />
           <Box color="fg.muted">
             <ChevronDown size={16} />
           </Box>
         </HStack>
       </Popover.Trigger>
-      <LLMConfigPopover values={llmConfig} onChange={handleChange} builtInModels={builtInModels} />
+      <LLMConfigPopover
+        values={shownConfig}
+        onChange={handleChange}
+        builtInModels={popoverModels}
+      />
     </Popover.Root>
   );
 };

@@ -1,4 +1,8 @@
-import { analyzeOrGroups, buildFacetStateLookup, getFacetValues } from "@langwatch/trace-contract";
+import {
+  analyzeOrGroups,
+  buildFacetDisplayLookup,
+  getFacetValues,
+} from "@langwatch/trace-contract";
 import { useCallback, useEffect, useMemo } from "react";
 
 import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
@@ -52,7 +56,7 @@ import { routeToggleViaOrGroups } from "../../../../../model/explorer/filter-sid
 import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode.ts";
 import { facetLabel, sortBySectionOrder } from "../utils.ts";
 
-type ValueStateLookup = ReturnType<typeof buildFacetStateLookup>;
+type ValueStateLookup = ReturnType<typeof buildFacetDisplayLookup>;
 
 /** The filter store's query and the facet mutations the sidebar drives. */
 function useFacetFilterActions() {
@@ -382,7 +386,7 @@ export function useFilterSidebarData() {
   const prefs = useProjectFacetPrefs();
 
   // One walk of the query per identity change, so each row's state is a lookup.
-  const facetStateLookup = useMemo(() => buildFacetStateLookup(ast), [ast]);
+  const facetStateLookup = useMemo(() => buildFacetDisplayLookup(ast), [ast]);
   const activeFields = useMemo(() => activeFieldsOf(facetStateLookup), [facetStateLookup]);
   const { explicitlyHidden, explicitlyShown } = prefs;
   const isSectionVisibleForDensity = useCallback(

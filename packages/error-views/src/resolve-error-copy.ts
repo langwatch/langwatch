@@ -2,6 +2,7 @@ import {
   type ErrorExplanation,
   explainHandledError,
   explainUnhandledError,
+  isTipForPeople,
 } from "@langwatch/handled-error/presentation";
 import { readEnvelopeTraceId, readHandledError } from "@langwatch/handled-error/read-handled-error";
 
@@ -67,12 +68,13 @@ function supplementalTips({
   tips: readonly string[];
   description: string;
 }): readonly string[] {
-  if (!description) return tips;
+  const forPeople = tips.filter(isTipForPeople);
+  if (!description) return forPeople;
 
   const target = normalise(description);
-  if (!target) return tips;
+  if (!target) return forPeople;
 
-  return tips.filter((tip) => {
+  return forPeople.filter((tip) => {
     const candidate = normalise(tip);
     if (!candidate) return false;
     return !target.includes(candidate) && !candidate.includes(target);

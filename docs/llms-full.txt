@@ -1240,7 +1240,7 @@ The **Default Models** section on the same page sets the model each feature uses
 
 Click **Add config**, pick the scopes and the models. A project config beats a team config, which beats an organization config. A feature that no config names inherits from the wider scope.
 
-The **Instant Evals** column takes only decision models: LangWatch Evals Preview, the default, or one on your own key. See [Run Instant Evals on your own decision model](/features/instant-evals/own-model).
+The **Instant Evals** column takes only decision models: LangWatch Instant (preview), the default, or one on your own key. See [Run Instant Evals on your own decision model](/features/instant-evals/own-model).
 
 <Frame>
 <img src="/images/platform/model-providers-default-models.png" alt="The Default Models section with one config and the Add config button" />
@@ -1342,6 +1342,7 @@ A team role applies to one team and, through inheritance, to every project in it
 | `routingPolicies`   | view   | view                         | manage                      |
 | `gatewayGuardrails` | view   | view                         | manage                      |
 | `gatewayCacheRules` | view   | view                         | manage                      |
+| `gatewayA2aTargets` | view   | view                         | manage                      |
 | `gatewayUsage`      | view   | view                         | view                        |
 | `gatewayLogs`       | view   | view                         | view                        |
 
@@ -1411,6 +1412,7 @@ Each table lists the actions a resource accepts. Resources marked **organization
 | `routingPolicies`   | view, manage                                                    | any               |
 | `gatewayGuardrails` | view, attach, detach, manage                                    | any               |
 | `gatewayCacheRules` | view, create, update, delete, manage                            | any               |
+| `gatewayA2aTargets` | view, manage                                                    | any               |
 | `gatewayUsage`      | view                                                            | any               |
 | `gatewayLogs`       | view                                                            | any               |
 | `gatewaySpend`      | view, manage                                                    | organization only |
@@ -2519,6 +2521,106 @@ that are already past it.
 
 ---
 
+# FILE: ./ai-gateway/a2a-proxy.mdx
+
+---
+title: A2A proxy
+description: Register an agent-to-agent (A2A) target and call it through the gateway at /a2a/<name> with a virtual key.
+sidebarTitle: A2A proxy
+---
+
+The gateway proxies [A2A v1.0](https://a2a-protocol.org/latest/specification/) calls under `/a2a/{target}`. An agent calls another agent through the gateway instead of directly. The gateway checks the caller's virtual key, applies the target's allow list and block switch, scans messages and replies with the key's guardrails, and puts the hop in the caller's trace.
+
+A target is an A2A agent registered for a project. It holds the agent's upstream base URL, its Agent Card URL, the headers the gateway sends upstream, an optional allow list of virtual keys and a block switch.
+
+<Note>
+  There is no settings page for A2A targets yet. Until it ships, register targets with the
+  `gatewayA2aTargets` control plane procedures described below.
+</Note>
+
+## Register a target
+
+Call the procedures from a TypeScript client that already has a session, in the same way as the other gateway procedures. Creating, editing, blocking and archiving need `gatewayA2aTargets:manage`; listing needs `gatewayA2aTargets:view`. Managing virtual keys does not reach targets. See [RBAC](/ai-gateway/rbac).
+
+```ts
+await trpc.gatewayA2aTargets.create.mutate({
+  organizationId: "org_123",
+  projectId: "project_456", // null for a target shared by the organization
+  name: "billing", // the path segment: /a2a/billing
+  agentName: "Billing agent",
+  cardUrl: "https://billing.acme.com/.well-known/agent-card.json",
+  upstreamUrl: "https://billing.acme.com/a2a",
+  upstreamHeaders: { Authorization: "Bearer <token for the upstream>" },
+  allowedVirtualKeyIds: null, // or a list of virtual key ids
+});
+```
+
+| Field                  | Rules                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                 | Lowercase letters, digits and hyphens, up to 63 characters, starting with a letter or digit. Unique within the project or organization.                  |
+| `agentName`            | A display name, 1 to 128 characters.                                                                                                                    |
+| `cardUrl`, `upstreamUrl` | `http` or `https` URLs. They cannot hold a user name or password: put credentials in `upstreamHeaders`.                                               |
+| `upstreamHeaders`      | At most 20 headers, values up to 4096 characters. The gateway sets `Content-Type`, `Content-Length`, `A2A-Version`, `Host`, `traceparent` and `tracestate` itself, so a target cannot set them. Values are stored sealed and never shown again: reads return header names only. |
+| `allowedVirtualKeyIds` | `null` admits every virtual key that reaches the target's scope. A list admits only the keys it names.                                                  |
+| `blocked`, `blockReason` | Optional. A blocked target refuses every caller.                                                                                                       |
+
+The other procedures are:
+
+| Procedure                                                      | Use                                                                                  |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `list`, `listForProject`                                       | List the targets of an organization, or of one project.                              |
+| `update`, `updateForProject`                                   | Change a target. Sending `upstreamHeaders` replaces the whole set.                   |
+| `setBlocked`, `setBlockedForProject`                           | Block or unblock a target, with a reason.                                            |
+| `archive`, `archiveForProject`                                 | Remove a target.                                                                     |
+
+Moving `upstreamUrl` to another scheme, host or port is refused unless the same call sends new `upstreamHeaders` (an empty set is fine), so saved headers never follow the upstream to a new origin. The `...ForProject` procedures check the permission on the project and only see that project's targets. Every write is recorded in the [audit log](/ai-gateway/audit) with header names and no values. A change reaches the gateway within moments.
+
+A virtual key sees the targets of every scope its own scopes reach. A key whose traces land in a project but whose scopes do not reach it does not see that project's targets.
+
+## Call a target
+
+Send the caller's [virtual key](/ai-gateway/virtual-keys#the-key-format-and-how-to-send-it) as `Authorization: Bearer`, as on the LLM routes. The key is never forwarded upstream.
+
+```bash
+curl https://gateway.acme.com/a2a/billing \
+  -H "Authorization: Bearer $LANGWATCH_VIRTUAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "SendMessage",
+    "params": {
+      "message": {
+        "messageId": "m1",
+        "role": "ROLE_USER",
+        "parts": [{ "text": "Which invoices are overdue?" }]
+      }
+    }
+  }'
+```
+
+The gateway forwards the body to the target's `upstreamUrl` and returns the upstream reply. Streamed replies stream through.
+
+The gateway serves both A2A bindings. The HTTP+JSON binding goes to the same prefix, for example `POST /a2a/billing/message:send`, which the gateway forwards to `message:send` under the upstream base URL.
+
+Fetch the Agent Card at `GET /a2a/billing/.well-known/agent-card.json`. The gateway fetches the card from the target's `cardUrl` and points its `url` at `/a2a/billing` on the gateway. It keeps only the interfaces whose URL is the target's `upstreamUrl`, rewritten to the same gateway address, and removes the rest. It drops the card's signatures, which signed the upstream URLs it replaced and would no longer verify.
+
+Other card fields, such as `documentationUrl`, are returned as the upstream sent them and can still name the upstream host.
+
+The gateway builds those URLs only from its public base URL, never from the request's `Host` header. Without it the gateway refuses Agent Card fetches and extended-card calls with `a2a_public_url_unset` (HTTP 503, JSON-RPC `-32024`). Other A2A calls still work.
+
+Set `A2A_PUBLIC_BASE_URL` on the gateway to its public origin, for example `https://gateway.acme.com`. With the Helm chart, set `gateway.publicUrl` in the umbrella chart (`publicUrl` in the gateway chart). It is not derived from `ingress.gateway.host` for the gateway, so set it even when the chart Ingress publishes the gateway.
+
+## What can refuse a call
+
+An unknown name and a key missing from the allow list both answer `a2a_target_not_found`, so a caller cannot tell the two apart. Other refusals include a blocked target, a guardrail block, an exhausted rate limit or budget on the key, and an upstream that did not answer. A JSON-RPC call gets a JSON-RPC error and an HTTP+JSON call gets an HTTP status. See [Errors](/ai-gateway/api/errors) for every reason and code.
+
+## Self-hosting
+
+A self-hosted install must route `/a2a` to the gateway Service as well as `/v1` and `/health`. The chart Ingress does this when you set `ingress.gateway.host` with `ingress.enabled` and `gateway.chartManaged` both true. For your own routes, see [Routing](/self-hosting/deployment/routing).
+
+---
+
 # FILE: ./ai-gateway/api/audio.mdx
 
 ---
@@ -3417,8 +3519,13 @@ Calls to `/a2a/{target}` answer in the A2A binding the caller used. A JSON-RPC c
 | `a2a_rate_limited`            | -32021        | 429  | The key is over its requests-per-minute or requests-per-day limit.                 |
 | `a2a_budget_exceeded`         | -32022        | 402  | A budget on the key is used up.                                                    |
 | `a2a_target_not_https`        | -32023        | 502  | The gateway calls customer endpoints over https only and the agent's URL is http.  |
+| `a2a_public_url_unset`        | -32024        | 503  | The gateway has no `A2A_PUBLIC_BASE_URL`, so it refuses Agent Card calls.          |
 
-The gateway calls an A2A agent under the same egress rule as provider endpoints. With `BLOCK_LOCAL_HTTP_CALLS` on, a private address is refused (`a2a_upstream_unreachable`) unless the agent's host, or the IP address it resolves to, is in `ALLOWED_PROXY_HOSTS`. Listing an IP address therefore admits every hostname that resolves to it. A query parameter the agent's registered URL sets always wins: the gateway drops a caller parameter of the same name.
+The gateway calls an A2A agent under the same egress rule as provider endpoints. With `BLOCK_LOCAL_HTTP_CALLS` on, a private address is refused (`a2a_upstream_unreachable`) unless the host in the agent's URL is in `ALLOWED_PROXY_HOSTS`.
+
+An entry in `ALLOWED_PROXY_HOSTS` matches only the host the URL names, never an address that a name resolves to: to admit an agent whose URL names an IP address, list that IP address; to admit one whose URL names a hostname, list the hostname.
+
+A query parameter the agent's registered URL sets always wins: the gateway drops a caller parameter of the same name.
 
 ## Streaming errors
 
@@ -4968,7 +5075,7 @@ Spend events, spend summaries and the webhook endpoints are an Enterprise capabi
 
 An outcome that arrives after settlement is recorded as `success` or `error`. A `success` event is never downgraded.
 
-An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `langwatch-evals-preview` (or `langwatch-judge` for a routed LLM judge; older events carry `jev`), an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count.
+An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `langwatch-instant-preview` (or `langwatch-judge` for a routed LLM judge; older events carry `langwatch-evals-preview` or `jev`), an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count.
 
 A run's event id starts with `instanteval_` followed by the run id, so a run finished twice is one event. Budgets debit it like any other spend.
 
@@ -10537,6 +10644,7 @@ The gateway adds its own resources to that model. Provider credentials, the audi
 | `routingPolicies` | Routing policies. | `view`, `manage` |
 | `gatewayGuardrails` | Attaching and detaching guardrails on a key. | `view`, `attach`, `detach`, `manage` |
 | `gatewayCacheRules` | Cache rules, and `/api/gateway/v1/cache-rules*`. | `view`, `create`, `update`, `delete`, `manage` |
+| `gatewayA2aTargets` | The [A2A agents](/ai-gateway/a2a-proxy) the gateway may call, and the upstream headers it sends them. | `view`, `manage` |
 | `gatewayUsage` | The Usage page and `GET /api/gateway/v1/virtual-keys/:id/spend`. | `view` |
 | `gatewaySpend` | Spend events and spend summaries under `/api/gateway/v1/spend-events*`, `/api/gateway/v1/spend-summaries` and `/api/gateway/v1/end-users/:id/spend`. Organization tier only. | `view`, `manage` |
 | `webhookEndpoints` | Webhook endpoints, their secrets and delivery logs. Organization tier only. | `view`, `manage` |
@@ -10566,6 +10674,8 @@ Team roles apply on the teams and projects the binding names. Organization roles
 | `gatewayGuardrails:attach`, `detach`, `manage` | | | yes | |
 | `gatewayCacheRules:view` | yes | yes | yes | |
 | `gatewayCacheRules:create`, `update`, `delete`, `manage` | | | yes | |
+| `gatewayA2aTargets:view` | yes | yes | yes | |
+| `gatewayA2aTargets:manage` | | | yes | |
 | `gatewayUsage:view` | yes | yes | yes | |
 | `auditLog:view` | | | yes | |
 | `gatewaySpend:view`, `manage` | | | | yes |
@@ -11517,14 +11627,22 @@ Time spans are a plain count of seconds on a `_SECONDS` or `_S` variable: `300`,
 
 ## Provider endpoint security
 
-These apply to the base URLs customers configure on their own provider credentials. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused in every configuration.
+These apply to the base URLs customers configure on their own provider credentials and to the upstream and Agent Card URLs of A2A targets. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused in every configuration.
 
 | Var                              | Default | Purpose                                                                                                                             |
 | -------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | `false` | Refuse a provider endpoint that resolves to a private, loopback or otherwise non-public address                                     |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme                                                                                 |
-| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hostnames, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off |
+| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hosts, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off. See the matching rule below |
 | `SSL_CERT_DIR`                   | unset   | Colon-separated directories of PEM CA certificates trusted beside the public roots, for provider endpoints on a private CA            |
+
+An `ALLOWED_PROXY_HOSTS` entry matches the host a URL names, as written: a hostname entry admits that hostname and every address it resolves to, and an IP address entry admits a URL whose host is that IP address. The address a hostname resolves to is never matched, so listing `127.0.0.1` admits `https://127.0.0.1` but not `https://localhost`. Provider endpoints and A2A targets follow the same rule.
+
+## A2A proxy
+
+| Var                   | Default | Purpose                                                                                                                                                                                                                                                                                       |
+| --------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `A2A_PUBLIC_BASE_URL` | unset   | The gateway's public origin, an absolute URL such as `https://gateway.example.com`. The gateway builds the URLs in the Agent Cards it serves on `/a2a` from it. Unset, Agent Card calls are refused with `a2a_public_url_unset`; every other A2A call still works. The chart sets it from `publicUrl` (`gateway.publicUrl` in the langwatch chart) |
 
 ## Browser access
 
@@ -12085,7 +12203,7 @@ ingress:
   className: nginx
   # ...your app hosts, tls and annotations
   gateway:
-    host: gateway.acme.com        # publishes /v1 and /health on this host
+    host: gateway.acme.com        # publishes /v1, /a2a and /health on this host
     tls:
       secretName: gateway-tls
   # className nginx adds the streaming, timeout and body-size annotations
@@ -12095,8 +12213,9 @@ gateway:
   chartManaged: true
 
   # Externally reachable URL the control plane hands to CLI users at login.
-  # Leave empty to derive https://<ingress.gateway.host> from the ingress below.
-  publicUrl: ""
+  # The gateway also builds A2A Agent Card URLs from it and refuses Agent
+  # Card calls while it is empty, so set it to https://<ingress.gateway.host>.
+  publicUrl: https://gateway.acme.com
 
   # Where the gateway reaches the control plane. Empty resolves to
   # http://<release>-app:5560, the app Service of this install.
@@ -44642,8 +44761,9 @@ Dashboards is a product in the product switcher at the top left of LangWatch.
 On LangWatch Cloud, no setup is needed.
 
 On a self-hosted install, Dashboards stays off until an operator turns it on in
-**Ops > Feature flags**. Turn on `release_dashboards` to open Dashboards, and
-`release_lwql_workbench` to build and edit widgets on a dashboard.
+**Ops > Feature flags**. Turn on `release_dashboards` to open Dashboards.
+Building and editing widgets on a dashboard also needs `release_lwql_workbench`,
+which is on by default on a self-hosted install.
 
 ## Your first dashboard
 
@@ -45376,7 +45496,7 @@ The estimate counts the rows exactly, measures the text of fifty rows spread acr
 
 Without a paid plan, your organization can spend 1 USD on Instant Evals in total, across all of its projects. Run `estimate` to see what is left, as `freeBudgetRemainingUsd`. Once you pass the budget, a new run or a judged `langwatch query` is refused with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd`, until you upgrade the organization. If a run is under way when the budget runs out, it stops there and you keep the verdicts it wrote.
 
-A paid plan has no free budget: it is billed monthly for what was judged, up to the row cap. A gateway budget set to block on the project, the team or the organization still applies: once it is reached, a new run or a judged query is refused with `instant_eval_gateway_budget_exceeded`, and a run under way stops there and keeps the verdicts it wrote.
+A paid plan has no free budget and no 1 USD limit; the row cap still applies. Instant Evals are not charged on its invoice yet. A gateway budget set to block on the project, the team or the organization still applies: once it is reached, a new run or a judged query is refused with `instant_eval_gateway_budget_exceeded`, and a run under way stops there and keeps the verdicts it wrote.
 
 ## Where the spend shows up
 
@@ -45533,13 +45653,13 @@ keywords: langwatch, instant evals, decision model, own key, bring your own key,
 description: Run Instant Evals on a decision model in your own provider account, set up Azure, and read the rows your model cannot judge.
 ---
 
-## LangWatch Evals Preview or your own model
+## LangWatch Instant (preview) or your own model
 
-Instant Evals run on **LangWatch Evals Preview** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
+Instant Evals run on **LangWatch Instant (preview)** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
 
 ## The models you can pick
 
-The picker is one list: LangWatch's **Evals Preview** first, then the models on your own keys. Each row shows its provider's logo and a title. OpenAI's and Azure's `gpt-6-luna` both read **Decisions API**, and the logo tells them apart. The other titles name the provider and the model. A model whose provider has no key yet is listed but greyed out, with a line saying which key to add.
+The picker is one list: **LangWatch Instant (preview)** first, then the models on your own keys. Each row shows its provider's logo and a title. OpenAI's and Azure's `gpt-6-luna` both read **Decisions API**, and the logo tells them apart. The other titles name the provider and the model. A model whose provider has no key yet is listed but greyed out, with a line saying which key to add.
 
 | Provider to add       | Model in the picker             | What the provider needs                                                                          |
 | --------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -45572,7 +45692,7 @@ The picker is one list: LangWatch's **Evals Preview** first, then the models on 
     <Frame>
       <img
         src="/images/instant-evals/own-model-picker.png"
-        alt="Edit default models drawer for the ACME organization, with the Instant Evals picker open: Evals Preview first, then Decisions API on OpenAI ticked, then models whose provider has no key yet"
+        alt="Edit default models drawer for an organization, with the Instant Evals picker open: LangWatch Instant (preview) first, then Decisions API on Azure OpenAI ticked, then models whose provider has no key yet"
       />
     </Frame>
   </Step>
@@ -45624,7 +45744,7 @@ Without the deployment, every row is skipped as `classifier_not_configured`.
 
 ## When your model cannot answer
 
-A run on your own model never falls back to LangWatch Evals Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. When the key is refused for every row of a page, the run fails with `instant_eval_decision_model_key_invalid` instead, so it does not read as a run where no row matched. List skipped rows with `langwatch instant-eval results <run-id> --status skipped`.
+A run on your own model never falls back to LangWatch Instant (preview). Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. When the key is refused for every row of a page, the run fails with `instant_eval_decision_model_key_invalid` instead, so it does not read as a run where no row matched. List skipped rows with `langwatch instant-eval results <run-id> --status skipped`.
 
 | `error`                           | Why                                                                                                         | Fix                                                                         |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -45639,8 +45759,8 @@ Rate limits and outages are retried before the row is skipped. Refused keys and 
 
 - **Cost.** Your provider bills you. LangWatch does not, and the [free budget](/features/instant-evals/limits-and-cost#the-free-budget) does not apply.
 - **Limits.** The [row, question and text limits](/features/instant-evals/limits-and-cost#limits) still apply.
-- **Data.** Each row's text and your questions go to your provider, under your agreement with it. LangWatch Evals Preview never sees them.
-- **Search bar.** Still runs on LangWatch Evals Preview.
+- **Data.** Each row's text and your questions go to your provider, under your agreement with it. LangWatch Instant (preview) never sees them.
+- **Search bar.** Still runs on LangWatch Instant (preview).
 
 ---
 
@@ -50740,7 +50860,11 @@ Open [Experiments](https://app.langwatch.ai/@project/experiments), click **New E
 <Step title="Create the judge">
 On the prompt column, click **Add evaluator**, then **New Evaluator**. Pick the **LLM as Judge** category and **LLM-as-a-Judge Boolean Evaluator**.
 
-Name it, pick the judge model, and replace the default prompt with your criteria. The model picker also lists **Decision models**, such as OpenAI Decisions API, TypeSafe Jev, Cloudflare Clef or Gemini Decision 1, which answer yes or no, score and category questions on your own provider key. [Your own model](/features/instant-evals/own-model) lists each one and the key it needs. Write the criteria as a checklist the judge can apply to one answer at a time. For example:
+Name it, pick the judge model, and replace the default prompt with your criteria. The model picker also lists **Decision models**, such as OpenAI Decisions API, TypeSafe Jev, Cloudflare Clef or Gemini Decision 1, which answer yes or no, score and category questions on your own provider key. [Your own model](/features/instant-evals/own-model) lists each one and the key it needs.
+
+On LangWatch Cloud the picker can also list **Instant Evals**, a judge that needs no key of your own; see [Judge with Instant Evals](#judge-with-instant-evals).
+
+Write the criteria as a checklist the judge can apply to one answer at a time. For example:
 
 ```text
 You are evaluating a business coaching assistant.
@@ -50775,6 +50899,14 @@ Click an evaluator chip to open its **Result** block. **Status** is the verdict 
 </Frame>
 </Step>
 </Steps>
+
+## Judge with Instant Evals
+
+On LangWatch Cloud, once Instant Evals is switched on for your organization, the judge model picker lists **Instant Evals** first. It runs on LangWatch's key, so it needs no model provider or key of your own. A self-hosted install cannot judge with it yet. How Instant Evals is switched on, and who processes the text, is in [Where the judged text goes](/features/instant-evals/limits-and-cost#where-the-judged-text-goes).
+
+- **What it reads.** Your prompt, plus the input, output and contexts you mapped, each as its own section. Your input, output and contexts share the room the judge has. A short one stays whole; a long one keeps its beginning and its end, so a long input never pushes out a short output.
+- **What it returns.** The Boolean, Score and Category judges keep their usual result. A Score judge on Instant Evals shows a minimum and a maximum: a whole-number range of at most ten values, such as 1 to 5 (but not 0 to 1), is asked as it is, and any other range is asked on 1 to 10 and mapped back onto yours. With no range set, the score is between 0 and 1.
+- **What it costs.** Each judged call is one Instant Evals row on the [billing events](/ai-gateway/billing-events) ledger, and the result's cost is its price. A call that judged no text records no row and no cost. An organization that is not billed per use can spend 1 USD on Instant Evals in total, shared with Instant Evals runs and judged queries; past it, the judge returns an error with `instant_eval_free_budget_exhausted` instead of a verdict.
 
 ## Calibrate the judge
 
@@ -69363,7 +69495,7 @@ A delivered license that does not verify is not applied. The install keeps the l
 
 ## Instant Evals through Connect
 
-An install whose license names **Instant Evals** judges through LangWatch. The license turns them on, with no release flag to set. A self-hosted install cannot judge with a key of its own, so without Connect its eval functions are published as unavailable. Judging on your own infrastructure is planned for a later release. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+An install whose license names **Instant Evals** judges through LangWatch. The license turns them on, with no release flag to set. Without Connect, a project can still run Instant Evals on its own decision model and key, picked in the Instant Evals column of **Settings, Default models** (see [Run Instant Evals on your own decision model](/features/instant-evals/own-model)). That needs no license and no release flag. A project with neither publishes its eval functions as unavailable. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
 
 When a sentence typed in trace search can't be judged, the popover under the search bar says why:
 
@@ -69372,11 +69504,9 @@ When a sentence typed in trace search can't be judged, the popover under the sea
 | Your license doesn't include Instant Evals | Contact us to add them to your license. |
 | Instant Evals are switched off for your organization | An organization admin switches them back on in **Settings, Connect**. |
 | This install isn't connected to LangWatch | Switch Connect on, and allow outbound HTTPS to `connect.langwatch.ai` and `gateway.langwatch.ai`. |
-| Instant Evals are off on this install | The install has judging turned off. Whoever runs it sets `RELEASE_INSTANT_EVALS=1`, with a judge configured. |
+| Instant Evals are off on this install | The install has judging turned off. Whoever runs it configures a judge, or the project picks its own decision model in the Instant Evals column of **Settings, Default models**. |
 
 On an install that judges through LangWatch, the "Instant Evals can't run right now" popover also names both addresses, so check that they are still reachable.
-
-With `RELEASE_INSTANT_EVALS=1` set, the four popovers above never show: a sentence that can't be judged gets "Instant Evals can't run right now" instead, whatever the reason. An install that judges through LangWatch needs no flag, so remove it there to get the popover that says why.
 
 Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
 
@@ -70454,7 +70584,7 @@ workers:
     - { name: ADMIN_EMAILS, value: "you@yourcompany.com" }
 ```
 
-Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. Dashboard widgets need both `release_dashboards` and `release_lwql_workbench`. The Query API (`POST /api/v1/query`) works without either.
+Shipped features are on by default on a self-hosted install, including LangWatchQL (`release_lwql_workbench`) and Instant Evals (`release_instant_evals`). Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. The same page switches a feature off. Dashboard widgets need both `release_dashboards` and `release_lwql_workbench`. The Query API (`POST /api/v1/query`) works without either.
 
 ### License
 
@@ -71201,7 +71331,7 @@ LangWatch uses two hostnames. Browsers and SDKs reach the app. LLM clients and c
 | Gateway | `/health` | Exact | `<release>-gateway` | `80` |
 | Gateway | `/a2a` | Prefix | `<release>-gateway` | `80` |
 
-`<release>` is the Helm release name. The gateway Service forwards port 80 to container port 5563.
+`<release>` is the Helm release name. The gateway Service forwards its port to container port 5563. Port 80 is the default; if you set `gateway.service.port`, use that port in every route that names the gateway Service.
 
 Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Metrics are served on a separate port (`9464`) and are not part of the gateway Service. `/a2a` is the agent-to-agent proxy; route it if agents call A2A targets through the gateway. Gemini-native clients also need `/v1beta`. Add it as another Prefix rule if you use them.
 
@@ -71329,6 +71459,7 @@ spec:
     - matches:
         - path: { type: PathPrefix, value: /v1 }
         - path: { type: Exact, value: /health }
+        - path: { type: PathPrefix, value: /a2a }
       backendRefs:
         - name: langwatch-gateway
           port: 80
@@ -71633,7 +71764,7 @@ Periodic work (topic clustering, alert triggers, webhook delivery log pruning) i
 
 ## Network Topology
 
-The App is exposed externally. The AI Gateway is exposed only when you set `ingress.gateway.host`, which renders a second Ingress for `/v1`, `/a2a` and `/health` with the app Ingress class. See [Routing](/self-hosting/deployment/routing). Everything else is cluster-internal:
+The App is exposed externally. The AI Gateway is exposed only when you set `ingress.gateway.host`, which needs `ingress.enabled` and `gateway.chartManaged`. The chart-managed gateway Ingress is a second Ingress for `/v1`, `/a2a` and `/health` with the app Ingress class. See [Routing](/self-hosting/deployment/routing). Everything else is cluster-internal:
 
 | Component | Service Type | External |
 |-----------|-------------|----------|
@@ -82666,7 +82797,7 @@ Input tokens are the text the judge reads, the questions asked about it and a sm
 
 `POST /api/v1/instant-evals/estimate` returns the price of a run before it starts, from the rows the statement matches and a sample of their size. See [Running an Instant Eval](/api-reference/instant-evals/running-an-instant-eval).
 
-Organizations without a paid plan have a **$1 free budget** for Instant Evals in total, across all their projects. Past it, a new run or a judged query is refused until the organization upgrades. Paid plans have no such limit and are billed monthly for what was judged.
+Organizations without a paid plan have a **$1 free budget** for Instant Evals in total, across all their projects. Past it, a new run or a judged query is refused until the organization upgrades. Paid plans have no such limit, and Instant Evals are not charged on their invoice yet.
 
 Every judged query and run is one spend event on the [billing events](/ai-gateway/billing-events) ledger, so a [gateway budget](/ai-gateway/budgets) set on a project or an organization caps Instant Evals the same way it caps gateway traffic.
 

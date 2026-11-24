@@ -3,13 +3,15 @@
  * @see specs/langy/langy-cli-tool-envelope.feature
  *      "A failure keeps its structure all the way to the card"
  */
+import type { SerializedReason } from "@langwatch/handled-error";
 import {
   type CliErrorDocumentRead,
+  type LangWatchHandledErrorReason,
   type LangWatchHandledErrorShape,
   isTerminalFailure,
   readCliErrorDocument,
 } from "@langwatch/handled-error/langwatch-handled-error";
-import { explainHandledError } from "@langwatch/handled-error/presentation";
+import { explainHandledError, isTipForPeople } from "@langwatch/handled-error/presentation";
 import { parseCliJson } from "@langwatch/langy-contract";
 
 import { LIMIT_TYPE_LABELS } from "../../../../model/limit-type-labels.ts";
@@ -372,7 +374,38 @@ function describeFailure({
     };
   }
 
-  return { message: domain.message, remediationApplies: true };
+  return { message: platformSentence(domain), remediationApplies: true };
+}
+
+/** The platform's sentence; the registry's when the wire carried only the code (#5984). */
+function platformSentence(domain: LangWatchHandledErrorShape): string {
+  if (domain.message.trim() !== "" && domain.message !== domain.code) return domain.message;
+  const copy = explainHandledError({
+    code: domain.code,
+    meta: domain.meta,
+    httpStatus: domain.httpStatus,
+    fault: "customer",
+    retryable: domain.retryable,
+    tips: [],
+    docsUrl: undefined,
+    traceId: undefined,
+    reasons: serializedReasons(domain.reasons),
+  });
+  if (!copy.isRegistered) return domain.message;
+  return copy.description !== "" ? copy.description : copy.title;
+}
+
+/** The CLI's reason chain in the registry's shape: `kind` is the reason's code. */
+function serializedReasons(
+  reasons: readonly LangWatchHandledErrorReason[] = [],
+): SerializedReason[] {
+  return reasons.map((reason) => ({
+    code: reason.kind,
+    kind: reason.kind,
+    retryable: reason.retryable,
+    ...(reason.meta ? { meta: reason.meta } : {}),
+    reasons: serializedReasons(reason.reasons),
+  }));
 }
 
 /**
@@ -520,6 +553,7 @@ function buildDomainPresentation({
   const { message, detail, limit, remediationApplies } = describeFailure({ domain, toolName });
   // The CLI's own text for Langy's key tells the reader to log in, so it never reaches them.
   const keepsRaw = credentialFault({ code: domain.code, toolName }) !== "sandbox";
+  const tips = (domain.suggestions ?? []).filter(isTipForPeople);
 
   return {
     title: `${title} failed`,
@@ -533,8 +567,8 @@ function buildDomainPresentation({
     ...(isTerminalFailure(domain) ? { terminal: true } : {}),
     // The platform's own next steps (ADR-045's remediation channel), shown as written —
     // paraphrasing them here would put the card out of step with the docs they are
-    // pinned to.
-    ...(remediationApplies && domain.suggestions?.length ? { tips: domain.suggestions } : {}),
+    // pinned to. A step pointing at `meta` is for an API caller, so it is left out.
+    ...(remediationApplies && tips.length ? { tips } : {}),
     ...(remediationApplies && docsUrl ? { docsUrl } : {}),
     ...(traceId ? { traceId } : {}),
     ...(traceUrl ? { traceUrl } : {}),
