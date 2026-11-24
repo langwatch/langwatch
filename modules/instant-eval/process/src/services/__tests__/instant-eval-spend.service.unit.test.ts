@@ -114,36 +114,17 @@ describe("InstantEvalSpendService", () => {
     await expect(service.recordSpend(RECORD)).rejects.toThrow(/not registered/);
   });
 
-  it("nudges the organization's month once the spend has landed", async () => {
-    const reportBillingMonth = vi.fn(async () => undefined);
-    const service = InstantEvalSpendService.create({ peers: peers({ reportBillingMonth }) });
-
-    await service.recordSpend(RECORD);
-
-    expect(reportBillingMonth).toHaveBeenCalledWith({
-      organizationId: "org-1",
-      occurredAt: RECORD.occurredAt,
-    });
-  });
-
-  it("keeps the spend when the nudge fails: the report has three other ways to fire", async () => {
-    const service = InstantEvalSpendService.create({
-      peers: peers({
-        reportBillingMonth: async () => {
-          throw new Error("billing pipeline unavailable");
-        },
-      }),
-    });
-
-    await expect(service.recordSpend(RECORD)).resolves.toBeUndefined();
-  });
-
-  it("bills nothing extra on a deployment with no meter to nudge", async () => {
+  /** @scenario "Instant Evals no longer nudges the billing report itself" */
+  it("dispatches nothing to billing: billing reports the month from gateway's confirmed spend", async () => {
     const recordPricedSpend = vi.fn(async () => undefined);
-    const service = InstantEvalSpendService.create({ peers: peers({ recordPricedSpend }) });
+    const formerBillingPeer = { reportBillingMonth: vi.fn(async () => undefined) };
+    const service = InstantEvalSpendService.create({
+      peers: { ...peers({ recordPricedSpend }), ...formerBillingPeer },
+    });
 
     await service.recordSpend(RECORD);
 
     expect(recordPricedSpend).toHaveBeenCalledTimes(1);
+    expect(formerBillingPeer.reportBillingMonth).not.toHaveBeenCalled();
   });
 });

@@ -120,6 +120,7 @@ export interface ReportUsageForMonthCommandDeps {
     stripeCustomerId: string;
     price: StripePriceName;
   }) => Promise<boolean>;
+  /** Queues a report: a convergence re-run, or a spend report's one follow-up. */
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
   /** Shared organization-read cache; see `billing-organization-cache.repository.ts`. */
   organizationCache: BillingOrganizationCacheRepository;
@@ -296,7 +297,8 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
   }
 
   async handle(command: Command<ReportUsageForMonthCommandData>): Promise<never[]> {
-    const { organizationId, billingMonth, tenantId, billableEvents, countedEventId } = command.data;
+    const { organizationId, billingMonth, tenantId, billableEvents, countedEventId, trigger } =
+      command.data;
 
     // Assigned on every path that reaches the dispatch below: the catch
     // throws, so there is no third outcome to default to.
@@ -369,6 +371,18 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
         occurredAt: nowInstant().epochMilliseconds,
         billableEvents,
         countedEventId,
+      });
+    }
+
+    // 4. A spend report cannot tell a ledger row still being written from one that is not there,
+    // so it sends exactly one follow-up; the follow-up sends none (ADR-174 decision 20).
+    if (trigger === "spend_confirmed") {
+      await this.deps.selfDispatch({
+        organizationId,
+        billingMonth,
+        tenantId,
+        occurredAt: nowInstant().epochMilliseconds,
+        trigger: "spend_follow_up",
       });
     }
 
