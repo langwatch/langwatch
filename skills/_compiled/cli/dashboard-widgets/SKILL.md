@@ -1,0 +1,216 @@
+---
+name: dashboard-widgets
+user-prompt: "Build me a custom chart widget"
+description: Author a dashboard widget — a small React component backed by named LangWatchQL queries — from a plain question. Discovers the analytics schema, writes the queries, writes the widget file, saves it, then proves it renders. Use when asked to build, prototype, or iterate on a custom chart widget, or to add a widget beyond what a standard saved chart can express.
+license: MIT
+compatibility: Requires the `langwatch` CLI with a valid `LANGWATCH_API_KEY`, and a project with LangWatchQL analytics enabled. Works with Claude Code and similar coding agents.
+feature-flag: release_dashboards
+metadata:
+  category: recipe
+---
+
+# Author a Dashboard Widget
+
+Turn a question ("show cost per model as a bar chart") into a widget on a dashboard: one React file rendering data pulled through named LangWatchQL queries. The loop is: **discover the schema → write the queries → write the widget → add it to a dashboard → prove it runs**.
+
+Reach for this instead of `lwql-charts` when the visualization is not a plain Vega-Lite spec over one query result — custom layout, multiple queries in one widget, conditional rendering, or anything a component can do that a declarative spec cannot.
+
+## Prerequisites
+
+LangWatchQL analytics is switched per project. If any command answers with error code `lwql_not_enabled`, the feature is off for this project — tell the user, do not retry.
+
+The `langwatch dashboard` commands use the project of your API key. Only `langwatch dashboard widget schema` also reads `LANGWATCH_PROJECT_ID` and accepts `--project <slug-or-id>`; pass `--project` there only when you need a *different* project than the one in scope. Do not invent a `langwatch project ...` command to look the project up (there isn't one; `langwatch projects list` is the read command, plural).
+
+## Step 1: Discover the schema before writing any SQL
+
+Never guess dataset or column names. The schema command lists every dataset your credentials may query, each column's type and description, and a runnable example query per dataset:
+
+```bash
+langwatch dashboard widget schema -f json
+```
+
+Read the datasets, their grain, their time column, and which columns are `available` to you.
+
+**Seed data is stale** (newest trace 2026-08-04 as of this writing). Write SQL with a wide time window — `WHERE timestamp >= subtractDays(now(), 400)` — not a narrow recent one. A query that legitimately returns 0 rows because of a narrow window is not a bug; widen the window before assuming something is broken.
+
+## Step 2: Write the queries file
+
+`--queries-file` is a JSON array of named queries: `{ name, sql, parameters?, sources?, projects? }`. A widget's code calls a query by `name` — the two files are one unit.
+
+- `parameters` declares what a `LW.query` call may pass for this query: each entry is `{ name, type, default? }`, where `type` is one of `"string" | "number" | "boolean"` (the JS type of the value, not the SQL type). Any key the widget code passes that is **not** declared here is rejected before any request fires — declare it or don't pass it.
+- The reserved bound names `{dashboard_context_period_start:DateTime}`, `{dashboard_context_period_end:DateTime}`, `{dashboard_context_granularity_seconds:UInt32}` are opt-in: use them in a query's SQL and the executor fills them from the page's own time window automatically. The `dashboard_context_` prefix is reserved — supplied by the dashboard, read-only; author-declared params are separate. **Do not** add them to that query's `parameters` array, and never pass them yourself in a `LW.query` call — either mistake is refused with `dashboard_widget_query_reserved_param` / a schema validation error. On the dashboard-widgets authoring page, that window comes from a session-only range chip (1h / 24h / 7d / 30d, default 24h, resets on reload) — a query using the reserved bounds automatically re-runs when the chip changes. On a dashboard, a pinned widget instead follows that dashboard's own period selector.
+- `sources` lists the trace origins `{dashboard_context_sources:Array(String)}` is bound to, from `application`, `simulation`, `evaluation`, `sample`, `coding_agent`, `ai_tool`, `gateway`, `workflow`, `playground`, `langy` and `other` (any origin not listed). A query that names none counts `["application"]`, and a new widget is stored with that. Add an origin when the question is about those traces: `langy` for the user's own conversations with Langy (`TraceName = 'langy.turn'`, Langy's failed or refused requests), `simulation` for scenario runs. Without it, such a widget is always empty. An unknown name is refused.
+- A query is kept to its `sources` **only where its SQL reads `{dashboard_context_sources:Array(String)}`**, for example `WHERE Source IN {dashboard_context_sources:Array(String)}` (the `Source` column of `trace_metrics` and `evaluation_metrics` is the origin: `application` for a missing one, `other` for an unlisted one; reach the other views through `(TenantId, TraceId) IN (SELECT TenantId, TraceId FROM trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)})`). A query that does not read it counts every origin, and the editor says "The SQL does not read {dashboard_context_sources}". Every run answers with `params`, a flat map of each placeholder the SQL declares by its SQL name (`dashboard_context_sources`, `dashboard_context_projects`, your own) plus the `period`. Read `diagnostics` too: `SOURCES_IGNORED` means the query counts every origin whatever `sources` holds, `SHARE_WINDOW_LIMITED` means a project shared only from some date on, so the rows start later than the period asked for, and `GRANULARITY_COARSENED` means the step ran coarser than asked.
+- `projects` lists the project ids the query reads, bound to `{dashboard_context_projects:Array(String)}`. A query that names none reads its board's project. Name only projects the user can read; a project the writer cannot read, one that does not exist and one of another organization are all refused with `project_not_found` (404) and no id. A widget does not store `"all"` (it is for `langwatch query --projects all` and `run_query`, never in a queries file or `widget add --projects`); name the ids.
+- `{dashboard_context_sources:Array(String)}` and `{dashboard_context_projects:Array(String)}` are reserved like the period names: type `Array(String)`, never in `parameters`, never passed by you, and never assigned or aliased in the SQL (`SET param_…`, `WITH … AS dashboard_context_projects`) — all are refused with `lwql_reserved_parameter_supplied`.
+- Your own bind parameters use the same ClickHouse-style SQL placeholder syntax as `lwql-charts` (`{since:DateTime}`, `{model:String}`, …), declared with their JS type in `parameters`.
+
+```json
+[
+  {
+    "name": "cost_by_model",
+    "sql": "SELECT model, sum(costCents) / 100.0 AS cost FROM traces WHERE timestamp >= subtractDays(now(), 400) GROUP BY model ORDER BY cost DESC LIMIT 10",
+    "parameters": []
+  }
+]
+```
+
+## Step 3: Write the widget file
+
+One React/TSX file, default-exporting a component. **React and Recharts are available as globals** in the render iframe (`window.React`, `window.Recharts`) — no import needed, no build step (in-browser Babel compiles the file on load). You may also `import` from `"react"`, `"react-dom"`, `"react-dom/client"`, `"recharts"`, or `"@langwatch/charts"` if you prefer that style; these resolve to the same globals, and importing anything else is refused at compile time.
+
+Fetch data with the `LW.useChartQuery(name, params)` hook, where `name` matches an entry in the queries file. It returns the same shape as TanStack Query's `useQuery` — same field names, on purpose:
+
+```jsx
+const { data, isLoading, isError, error } = LW.useChartQuery("cost_by_model", {});
+```
+
+- `data` is the query's result rows, or `null` until the first result lands. An empty array (`data.length === 0`) means the query genuinely returned zero rows — not an error; against stale seed data that is expected unless the SQL uses a wide window (see Step 1).
+- `isLoading` is `true` only for the first fetch, before any data has ever landed. `isFetching` is `true` for any fetch in flight, including a background refetch — use it if you want to show a subtle "updating" state without clearing the chart.
+- `isError` is `true` on failure; `error` is then an `Error` (`error.message`) — it never throws into the component. An undeclared param, a reserved-param misuse, or a SQL error all surface here instead of crashing the widget. `status` is `"pending" | "error" | "success"` if you prefer a single field to branch on.
+- The hook auto-refetches when the page's time window changes, and when `params` changes by value — pass a plain object, not one you rebuild with a different identity every render for no reason. Call the returned `refetch()` to re-run it manually (e.g. from a button).
+
+Always render all three branches (loading / error / data) — a widget that only handles the happy path shows nothing useful while data is stale-empty or a query is misconfigured.
+
+Params are validated against the query's declared `parameters` before anything is forwarded to LangWatchQL — an undeclared key, or a required parameter with no default that is omitted, comes back through `error` rather than firing the request.
+
+For code outside a component (or when you need a raw promise instead of hook semantics), `LW.query(name, params)` is the low-level escape hatch the hook is built on: it returns a promise that resolves to `{ rows, statistics }` or rejects with `{ code, title, message }`.
+
+### Prebuilt charts: `@langwatch/charts`
+
+Ten chart primitives, prebuilt and themed, so most widgets don't need to hand-roll a Recharts layout: `MetricStat`, `Sparkline`, `AreaTimeseries`, `StackedBars`, `GroupedBars`, `ProjectionBars`, `Donut`, `Leaderboard`, `Heatmap`. Plus `LwqlChart`, an auto-picker that infers a chart type (area / bars / donut / leaderboard / table) from a query's row shape — pass it `data`, and optionally `kind` to force one.
+
+Every component consumes `LW.useChartQuery` rows directly and themes itself — no color or style props needed.
+
+```jsx
+export default function Widget() {
+  const { data, isLoading, isError, error } = LW.useChartQuery("cost_by_model", {});
+
+  if (isError) return <div style={{ fontSize: 11, color: "#b00" }}>{error.message}</div>;
+  if (isLoading || data === null) return <div style={{ fontSize: 11, color: "#666" }}>Loading…</div>;
+
+  return <LwqlChart data={data} />;
+}
+```
+
+More worked examples: `platform/app/scripts/north-star-widgets/`.
+
+### Drill-down: `LW.navigate`
+
+`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget. `target` is a route key, never a path: `"traces"` and `"trace"` take `params` keyed by filter field ids (e.g. `"metadata.user_id"`) or `traceId`, which the host resolves into the Trace Explorer URL; `"scenarios"`, `"onlineEvaluations"`, `"annotations"`, `"gatewayVirtualKeys"` and `"codingSessions"` open that page of the project and take no params.
+
+`Leaderboard` wraps this for you: pass `navigateTo={{ target, params: (row) => ({ ... }) }}` and a row click navigates. An unknown `target` is ignored rather than erroring.
+
+## Step 4: Add the widget to a dashboard, then prove it renders
+
+A widget always lives on a dashboard; pick one first (see **Dashboards** below), then:
+
+```bash
+langwatch dashboard widget add <dashboardId> \
+  --name "Cost by model" \
+  --code-file widget.tsx \
+  --queries-file queries.json \
+  -f json
+```
+
+Creating (and updating) validates the queries file's shape and the widget's JS/TSX syntax, but it does not execute the queries or mount the component — a wrong column name or a runtime error in the widget only surfaces when it actually runs. Open the widget's `platformUrl` (printed on success) and confirm it renders with real data before calling the work done.
+
+## Dashboards and their widgets
+
+A dashboard is the page widgets live on. **Use an existing dashboard** when the user is on one, named one, or one clearly fits; **create one** only when they ask for a new dashboard, or none fits and they agree.
+
+```bash
+langwatch dashboard list -f json                          # ids, names, widget counts
+langwatch dashboard get <dashboardId> -f json
+langwatch dashboard create "<name>" -f json               # empty dashboard; prints platformUrl
+langwatch dashboard update <dashboardId> --name "<name>"  # rename; or --description / --clear-description
+langwatch dashboard delete <dashboardId>                  # removes the dashboard and its widgets
+langwatch dashboard widget list <dashboardId> -f json
+langwatch dashboard widget get <dashboardId> <widgetId> -f json   # code, queries, platformUrl
+langwatch dashboard widget add <dashboardId> --name "<name>" --code-file widget.tsx --queries-file queries.json -f json
+langwatch dashboard widget update <dashboardId> <widgetId> --code-file widget.tsx --queries-file queries.json
+langwatch dashboard widget update <dashboardId> <widgetId> --sources application,langy   # every query counts these
+langwatch dashboard widget update <dashboardId> <widgetId> --projects A,B   # every query reads these projects
+langwatch dashboard widget delete <dashboardId> <widgetId>
+```
+
+`add` places the widget at the dashboard's next free row — edit it from the widget's menu on that dashboard. `langwatch analytics-report list` lists the old Analytics Reports, which hold no widgets.
+
+**Which dashboard:** place on the dashboard in the user's context (the one they are on, or one they named). If no dashboard is in context, ask which one with the `question` tool, one option per dashboard from `langwatch dashboard list` with its id in `ref`. Never choose a dashboard for the user.
+
+- **Never pick a dashboard for the user.** When more than one dashboard fits, ask with the `question` tool (a choices card): one option per dashboard from `langwatch dashboard list`, its id in `ref`.
+- **Confirm before any delete** of a dashboard or widget with a choices card (`Delete "NAME"?` with Delete and Keep), and run the command only on Delete. Deleting a dashboard takes its widgets with it.
+- The project needs Dashboards switched on. A 404 with `dashboards_not_released` means it is off: tell the user, do not retry.
+
+`--sources` and `--projects A,B` on `widget add` or `update` set the same list on every query of the widget, and override `sources` and `projects` in the queries file. `widget update` accepts `--name`, `--description`, `--sources` or `--projects` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
+
+## Worked example: bar chart of daily trace counts
+
+`widget.tsx`:
+
+```jsx
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+
+export default function Widget() {
+  const { data, isLoading, isError, error } = LW.useChartQuery("daily_traces", {});
+
+  if (isError) {
+    return <div style={{ fontSize: 11, color: "#b00" }}>{error.message}</div>;
+  }
+  if (isLoading || data === null) {
+    return <div style={{ fontSize: 11, color: "#666" }}>Loading…</div>;
+  }
+
+  const rows = data.map((row) => ({
+    day: String(row.day).slice(0, 10),
+    traces: Number(row.traces),
+  }));
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>{rows.length} rows</div>
+      <ResponsiveContainer width="100%" height={230}>
+        <BarChart data={rows}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+          <YAxis allowDecimals={false} />
+          <Tooltip />
+          <Bar dataKey="traces" fill="#f97316" />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+```
+
+`queries.json`:
+
+```json
+[
+  {
+    "name": "daily_traces",
+    "sql": "SELECT toStartOfDay(timestamp) AS day, count() AS traces FROM traces WHERE timestamp >= subtractDays(now(), 400) GROUP BY day ORDER BY day",
+    "parameters": []
+  }
+]
+```
+
+Add it:
+
+```bash
+langwatch dashboard widget add <dashboardId> \
+  --name "Daily traces" \
+  --code-file widget.tsx \
+  --queries-file queries.json \
+  -f json
+```
+
+## Failure modes worth knowing
+
+- `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
+- `custom_chart_playground_not_enabled` — dashboard widgets are not enabled for this project (they need Dashboards and LangWatchQL); do not retry any `langwatch dashboard widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
+- A save that succeeds but a blank or errored widget when opened — the SQL names a column that does not exist, or the component threw at render; re-read the schema (Step 1) and the error panel shown in the widget frame, then update.
+- `dashboard_widget_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
+- `dashboard_widget_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `dashboard_context_period_start`, `dashboard_context_period_end`, or `dashboard_context_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.
+- "Cannot import '\<specifier>'" — the widget imported something other than `react`, `react-dom`, `react-dom/client`, `recharts`, or `@langwatch/charts`; use only those, or the corresponding global.
+- A query returning 0 rows against seed data — the seed's newest trace is 2026-08-04; widen the time window before assuming the query is wrong.
