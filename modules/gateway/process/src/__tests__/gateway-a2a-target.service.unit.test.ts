@@ -110,15 +110,18 @@ describe("GatewayA2aTargetService", () => {
       name: "billing",
       upstreamHeaders: { "X-Agent-Tenant": "tenant-s3cret", "X-Agent-Region": "region-s3cret" },
     });
+    await targets.create({ ...base, projectId: "p1", name: "search" });
 
     const listed = [
       ...(await targets.list(base.organizationId)),
       ...(await targets.listForProject({ organizationId: base.organizationId, projectId: "p1" })),
     ].map(a2aTargetToDto);
 
-    expect(listed.map((target) => target.upstreamHeaderNames)).toEqual([
-      ["X-Agent-Region", "X-Agent-Tenant"],
-      ["X-Agent-Region", "X-Agent-Tenant"],
+    expect(listed.map((target) => [target.name, target.upstreamHeaderNames])).toEqual([
+      ["billing", ["X-Agent-Region", "X-Agent-Tenant"]],
+      ["search", []],
+      ["billing", ["X-Agent-Region", "X-Agent-Tenant"]],
+      ["search", []],
     ]);
     expect(JSON.stringify(listed)).not.toContain("s3cret");
   });
