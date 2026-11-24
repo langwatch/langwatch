@@ -48,9 +48,9 @@ export function billingMonthWindowMs(billingMonth: string): { fromMs: number; to
 }
 
 /**
- * When usage billing started for a month: the earliest start among the growth-seat periods that
- * overlap it, so a replacement mid-month never moves the start later (ADR-174 decision 23,
- * proposed in v22). A period with no start reads the whole month; none overlapping, the earliest.
+ * When usage billing started for a month: the earliest start among growth-seat periods
+ * overlapping it, so a replacement never moves it later (ADR-174 decision 23, proposed in v22).
+ * No start reads the whole month; none overlapping, the first later start.
  */
 export function usageBilledSinceInMonth({
   billingMonth,
@@ -65,7 +65,8 @@ export function usageBilledSinceInMonth({
       (endMs === null || endMs >= month.fromMs) && (startMs === null || startMs < month.toMs),
   );
   if (overlapping.some(({ startMs }) => startMs === null)) return { outcome: "whole_month" };
-  const starts = (overlapping.length > 0 ? overlapping : periods).flatMap(({ startMs }) =>
+  const startedLater = periods.filter(({ startMs }) => startMs !== null && startMs >= month.toMs);
+  const starts = (overlapping.length > 0 ? overlapping : startedLater).flatMap(({ startMs }) =>
     startMs === null ? [] : [startMs],
   );
 

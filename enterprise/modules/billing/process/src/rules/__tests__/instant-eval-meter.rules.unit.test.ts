@@ -68,6 +68,19 @@ describe("usageBilledSinceInMonth", () => {
         instantEvalWindowMs({ billingMonth: "2026-01", usageBilledSinceMs: utcMs("2026-02-10") }),
       ).toEqual({ fromMs: utcMs("2026-02-01"), toMs: utcMs("2026-02-01") });
     });
+
+    /** @scenario "A month that ended before the subscription started reports nothing" */
+    it("still reads no time when an older subscription ended before the month", () => {
+      const since = usageBilledSinceInMonth({
+        billingMonth: "2026-01",
+        periods: [
+          { startMs: utcMs("2026-02-01"), endMs: null },
+          { startMs: utcMs("2025-03-01"), endMs: utcMs("2025-09-30") },
+        ],
+      });
+
+      expect(since).toEqual({ outcome: "since", startMs: utcMs("2026-02-01") });
+    });
   });
 
   describe("given a live subscription with no recorded start", () => {
