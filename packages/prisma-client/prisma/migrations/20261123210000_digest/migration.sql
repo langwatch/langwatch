@@ -86,3 +86,9 @@ CREATE INDEX IF NOT EXISTS "DigestUserWeek_organizationId_isoWeek_idx" ON "Diges
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "DigestUserWeek_isoWeek_idx" ON "DigestUserWeek"("isoWeek");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "DigestUserWeek_userId_idx" ON "DigestUserWeek"("userId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "DigestSend_userId_idx" ON "DigestSend"("userId");

@@ -8149,6 +8149,7 @@ model DigestUserWeek {
 
   @@index([organizationId, isoWeek])
   @@index([isoWeek])
+  @@index([userId])
 }
 
 /// One person's digest for one ISO week, accepted by our own mailer. The id is `userId:isoWeek`.
@@ -8160,6 +8161,8 @@ model DigestSend {
   templateId     String
   sentAt         DateTime
   createdAt      DateTime @default(now())
+
+  @@index([userId])
 }
 
 /// The digest's one settings row. `armed` is the weekly send's master switch; it starts off.
