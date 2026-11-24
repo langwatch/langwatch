@@ -462,7 +462,6 @@ async function decodeGq1Ref({
   const data = await (readMode === "peek" ? blobs.peek({ id }) : blobs.get({ id })).catch(
     (cause: unknown) => {
       // A missing key is a null answer; a thrown read is the client, so the job retries.
-      if (!tenant) throw cause;
       throw new TransientBlobStoreError({ projectId: tenant, hash: id, cause });
     },
   );
@@ -497,7 +496,7 @@ export async function decodeJobEnvelope<Destination>({
    * have already parsed the envelope (e.g. `EnvelopeBlobLifecycle.decode`) don't
    * pay for a second `Buffer.from` + `JSON.parse` on the hot path. */
   parsed?: { header: EnvelopeHeader; body: string };
-  /** The group's tenant: a failed GQ1 blob read then fails as transient, not as a drop. */
+  /** The group's tenant, named by the transient error a failed GQ1 blob read becomes. */
   tenant?: TenantId;
 }): Promise<Record<string, unknown>> {
   if (!isEnvelope(value)) return decodeLegacyBareJson(value);

@@ -30,10 +30,19 @@ export type BlobRef =
  * replay as missing — that's what stops an outage mass-dropping in-flight jobs (ADR-029).
  */
 export class TransientBlobStoreError extends Error {
-  readonly projectId: TenantId;
+  /** Absent only for a 3.20.x GQ1 body of a group whose id carries no tenant. */
+  readonly projectId: TenantId | undefined;
   readonly hash: string;
-  constructor({ projectId, hash, cause }: { projectId: TenantId; hash: string; cause: unknown }) {
-    super(`Transient blob store error for ${projectId}/${hash}`, { cause });
+  constructor({
+    projectId,
+    hash,
+    cause,
+  }: {
+    projectId: TenantId | undefined;
+    hash: string;
+    cause: unknown;
+  }) {
+    super(`Transient blob store error for ${projectId ?? "untenanted"}/${hash}`, { cause });
     this.name = "TransientBlobStoreError";
     this.projectId = projectId;
     this.hash = hash;

@@ -33,6 +33,22 @@ describe("EnvelopeBlobLifecycle decode of a GQ1 offloaded body", () => {
     });
   });
 
+  describe("when the read fails for a group without a tenant prefix", () => {
+    /** @scenario "A GQ1 job whose offloaded body cannot be read for a moment is retried, not dropped" */
+    it("still fails as a transient blob-store error, so the job retries", async () => {
+      const lifecycle = lifecycleOver(async () => {
+        throw new Error("Connection is closed.");
+      });
+
+      const failure = await lifecycle
+        .decode({ value, groupId: "untenanted-group" })
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(TransientBlobStoreError);
+      expect(failure).toMatchObject({ projectId: undefined, hash: blobId });
+    });
+  });
+
   describe("when the body is gone", () => {
     /** @scenario "A GQ1 job whose offloaded body cannot be read for a moment is retried, not dropped" */
     it("is still a missing blob", async () => {
