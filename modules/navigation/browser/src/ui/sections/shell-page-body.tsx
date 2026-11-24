@@ -79,10 +79,20 @@ function readerMayOpenThePage({
   // Administrators created through a role binding alone have no membership row
   // and still have full team access.
   if (organizationRole === ORGANIZATION_ADMIN_ROLE) return true;
+  // The plan pages belong to the organization, not a team: whoever may pay needs no team.
+  if (PLAN_PAGES.some((base) => isPathUnder({ pathname, base }))) return true;
   // The same predicate the host's own ambient team resolution prefers on, so
   // the team the application picks and the one the chrome draws cannot diverge.
   return !!team && !!userId && (team.members ?? []).some((member) => member.userId === userId);
 }
+
+/** Each page refuses a reader without its permission on its own (ADR-205). */
+const PLAN_PAGES = [
+  "/settings/subscription",
+  "/settings/plans",
+  "/settings/usage",
+  "/settings/license",
+];
 
 const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items];
 
@@ -131,6 +141,27 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
     >
       {children}
     </Box>
+  );
+}
+
+/** On no team: whoever pays (Billing only, ADR-205) goes to the plan page; others wait. */
+function NoTeamRefusal({ organizationName }: { organizationName: string }) {
+  const host = useNavigationHost();
+  const pays = host.hasOrganizationPermission("subscription:manage");
+  const planPage = planManagementHref(!!host.deployment().isSaaS);
+  useEffect(() => {
+    if (pays) host.replace(planPage);
+  }, [pays, planPage, host]);
+
+  if (pays) return null;
+  return (
+    host.teamAccessWaiting({ organizationName }) ?? (
+      <RestrictedAccess
+        area="this organization's projects"
+        description="You are not part of any team in this organization. Ask an organization admin to add you to a team so you can open its projects."
+        onBack={() => host.navigate("/")}
+      />
+    )
   );
 }
 
@@ -231,15 +262,7 @@ export const ShellPageBody = ({
         </ErrorBoundary>
       </Box>
     ) : (
-      (host.teamAccessWaiting({
-        organizationName: organization?.name ?? "your organization",
-      }) ?? (
-        <RestrictedAccess
-          area="this organization's projects"
-          description="You are not part of any team in this organization. Ask an organization admin to add you to a team so you can open its projects."
-          onBack={() => host.navigate("/")}
-        />
-      ))
+      <NoTeamRefusal organizationName={organization?.name ?? "your organization"} />
     );
 
   return (

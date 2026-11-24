@@ -726,7 +726,7 @@ type Output =
 interface Input {
   inviteCode: string;
 }
-// Output: inviteLandingSchema, ../../organization/contract/src/organization.responses.ts:144
+// Output: inviteLandingSchema, ../../organization/contract/src/organization.responses.ts:148
 interface Output {
   organizationName: string;
   inviterName: string | null;

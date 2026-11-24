@@ -190,6 +190,10 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     const { repository } = this.options;
     await this.guards.assertScopeBelongsToOrganization({ where, organizationId });
     await this.guards.assertRoleUsable({ role, organizationId });
+    await this.bindingWriter.assertNoBillingOnlyPrincipal({
+      organizationId,
+      userIds: who.type === "user" ? [who.id] : [],
+    });
 
     const row = grantWriteRow({
       bindingId: this.options.newBindingId(),
@@ -365,6 +369,12 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
       organizationId: args.organizationId,
       caller,
       bindings: args.bindings,
+    });
+    await this.bindingWriter.assertNoBillingOnlyPrincipal({
+      organizationId: args.organizationId,
+      userIds: args.bindings.flatMap(({ principal }) =>
+        "userId" in principal ? [principal.userId] : [],
+      ),
     });
     return this.options.ledger.attachBindings(args);
   }
