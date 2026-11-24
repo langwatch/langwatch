@@ -80,6 +80,18 @@ Feature: Batch Evaluation Results Visualization
   # compares one column over 30 rows against another over 40. The workbench
   # header says the same thing the same way, so the two surfaces read alike.
 
+  @integration
+  Scenario: A column header says how much of the dataset its score covers
+    Given a saved run holds results for 5 of the dataset's 10 rows
+    When the results table renders the column header
+    Then the header shows the score together with "5/10"
+
+  @integration
+  Scenario: A column that covers the whole dataset shows the score on its own
+    Given a saved run holds results for every row of the dataset
+    When the results table renders the column header
+    Then the header shows the score with no row count beside it
+
   # A run of some rows holds them at their dataset positions, so rows 10 to 14
   # arrive as indices 10 to 14. The page keeps rows positional so two runs line
   # up row for row, but the positions the run holds nothing for are padding,
@@ -110,18 +122,6 @@ Feature: Batch Evaluation Results Visualization
     Given a run that holds rows 1 to 5 of the dataset
     When I export to CSV
     Then the CSV has 5 data rows
-
-  @integration
-  Scenario: A column header says how much of the dataset its score covers
-    Given a saved run holds results for 5 of the dataset's 10 rows
-    When the results table renders the column header
-    Then the header shows the score together with "5/10"
-
-  @integration
-  Scenario: A column that covers the whole dataset shows the score on its own
-    Given a saved run holds results for every row of the dataset
-    When the results table renders the column header
-    Then the header shows the score with no row count beside it
 
   @unimplemented
   Scenario: Display error state in target cell
