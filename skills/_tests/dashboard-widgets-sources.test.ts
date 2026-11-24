@@ -92,3 +92,14 @@ describe("the dashboard-widgets skill on finding the data", () => {
     expect(rendered).not.toContain("north-star-widgets");
   });
 });
+
+describe("the dashboard-widgets skill on a broad question", () => {
+  /** @scenario "AC264c Langy widgets: a broad question still ends in a widget on the board" */
+  it("answers it with the numbers the traces have, and stays in the skill until the widget is on", () => {
+    const rendered = renderedSkill();
+
+    expect(rendered).toContain('A broad question ("Is our AI saving us time?"');
+    expect(rendered).toContain("still ends in a widget on the board");
+    expect(rendered).toContain("Stay in this skill until the widget is on the board");
+  });
+});

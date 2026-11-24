@@ -2338,6 +2338,12 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then the board context sent with the question says to answer by adding a widget to that dashboard, then say the answer in a sentence
     And on a From LangWatch dashboard, which is read-only, the context asks for no widget
 
+  @unit
+  Scenario: AC264c Langy widgets: a broad question still ends in a widget on the board
+    Given Langy builds a widget with the dashboard-widgets skill for a broad question such as "Is our AI saving us time?"
+    Then the skill says to chart the one or two numbers in the project's traces that speak to it and say what the widget cannot tell
+    And to stay in the skill until the widget is on the board, without switching skills or looking outside the LangWatch data
+
   # ---------------------------------------------------------------------------
   # Guard rails
   # ---------------------------------------------------------------------------
