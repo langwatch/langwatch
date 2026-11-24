@@ -356,3 +356,36 @@ describe("StreamingAnswerWithCards", () => {
     });
   });
 });
+
+describe("given a recorded answer that carries a timeseries card", () => {
+  const timeseries = {
+    type: "langy-card",
+    blockId: "time-saved",
+    kind: "timeseries",
+    provenance: "derived",
+    card: {
+      kind: "timeseries",
+      blockId: "time-saved",
+      title: "Hours saved per day",
+      unit: "count",
+      series: [
+        {
+          name: "hours_saved",
+          points: [
+            { t: 1792886400000, v: 3.1 },
+            { t: 1792972800000, v: 20.9 },
+          ],
+        },
+      ],
+    },
+  };
+
+  /** @scenario "A timeseries card draws its chart in the panel" */
+  it("draws the chart, never the missing-renderer line", () => {
+    renderMessage(assistantMessage({ parts: [timeseries], metadata: recorded }));
+
+    expect(derivedFrames()).toHaveLength(1);
+    expect(screen.getByText("Hours saved per day")).toBeDefined();
+    expect(screen.queryByText("No chart renderer configured.")).toBeNull();
+  });
+});

@@ -34,7 +34,12 @@ declare const window: {
 // Theme + color helpers
 // ---------------------------------------------------------------------------
 
-const DEFAULT_HEIGHT = 240;
+/**
+ * A chart with no height fills the frame, which is the card's body, so no bar is cut off at
+ * the size a new widget lands at. Inside a parent with no height of its own it keeps this floor.
+ */
+const DEFAULT_HEIGHT = "100%";
+const MIN_FILL_HEIGHT_PX = 120;
 
 /** Resolved by the host before crossing the opaque iframe boundary. */
 function token(name: string): string {
@@ -527,7 +532,7 @@ export interface AreaTimeseriesProps {
   stacked?: boolean;
   projectionFrom?: string | number;
   colors?: string[];
-  height?: number;
+  height?: number | string;
   /** How the hover prints a value. */
   format?: MetricFormat;
   /** What the hover says over a bucket with no data, from its date: "No evals ran on Oct 7". */
@@ -757,7 +762,7 @@ export function AreaTimeseries({
       { style: { flex: 1, minHeight: 0 } },
       h(
         R.ResponsiveContainer,
-        { width: "100%", height: "100%" },
+        { width: "100%", height: "100%", minHeight: MIN_FILL_HEIGHT_PX },
         h(
           R.ComposedChart,
           { data: rows, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
@@ -832,7 +837,7 @@ export interface StackedBarsProps {
   series: string[];
   projectionFrom?: string | number;
   colors?: string[];
-  height?: number;
+  height?: number | string;
 }
 
 export function StackedBars({
@@ -857,7 +862,7 @@ export function StackedBars({
       { style: { flex: 1, minHeight: 0 } },
       h(
         R.ResponsiveContainer,
-        { width: "100%", height: "100%" },
+        { width: "100%", height: "100%", minHeight: MIN_FILL_HEIGHT_PX },
         h(
           R.BarChart,
           { data, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
@@ -905,7 +910,7 @@ export interface GroupedBarsProps {
   x: string;
   series: string[];
   colors?: string[];
-  height?: number;
+  height?: number | string;
 }
 
 export function GroupedBars({
@@ -928,7 +933,7 @@ export function GroupedBars({
       { style: { flex: 1, minHeight: 0 } },
       h(
         R.ResponsiveContainer,
-        { width: "100%", height: "100%" },
+        { width: "100%", height: "100%", minHeight: MIN_FILL_HEIGHT_PX },
         h(
           R.BarChart,
           { data, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
@@ -976,7 +981,7 @@ export interface ProjectionBarsProps {
   projectionFrom: string | number;
   budget?: number;
   colors?: string[];
-  height?: number;
+  height?: number | string;
 }
 
 export function ProjectionBars({
@@ -995,7 +1000,7 @@ export function ProjectionBars({
 
   return h(
     R.ResponsiveContainer,
-    { width: "100%", height },
+    { width: "100%", height, minHeight: MIN_FILL_HEIGHT_PX },
     h(
       R.BarChart,
       { data, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
@@ -1061,7 +1066,7 @@ export interface DonutProps {
   valueKey: string;
   centerLabel?: string;
   colors?: string[];
-  height?: number;
+  height?: number | string;
 }
 
 export function Donut({
@@ -1090,7 +1095,7 @@ export function Donut({
       { style: { flex: 1, minHeight: 0, position: "relative", width: "100%" } },
       h(
         R.ResponsiveContainer,
-        { width: "100%", height: "100%" },
+        { width: "100%", height: "100%", minHeight: MIN_FILL_HEIGHT_PX },
         h(
           R.PieChart,
           {},
@@ -1154,7 +1159,7 @@ export interface LeaderboardProps {
   valueKey: string;
   max?: number;
   format?: MetricFormat;
-  height?: number;
+  height?: number | string;
   navigateTo?: { target: string; params: (row: Row) => object };
   /**
    * The report's unpriced models, for a cost list by model: each gets a "no price" row with a
@@ -1299,7 +1304,7 @@ export interface HeatmapProps {
   colorScale?: [string, string];
   /** "count": a cell with no row is 0. "measure" (default): it is a gap, drawn empty. */
   kind?: SeriesKind;
-  height?: number;
+  height?: number | string;
 }
 
 /** The default heatmap scale, also the fallback for an unparsable colorScale. */
@@ -1401,7 +1406,7 @@ export function Heatmap({
 // Table (internal — LwqlChart's fallback kind; not exported on its own)
 // ---------------------------------------------------------------------------
 
-function Table({ data, height }: { data: Row[]; height?: number }) {
+function Table({ data, height }: { data: Row[]; height?: number | string }) {
   const c = chrome();
   const cols = columnsOf(data);
   return h(
@@ -1475,7 +1480,7 @@ export interface LwqlChartProps {
   y?: string | string[];
   series?: string;
   colors?: string[];
-  height?: number;
+  height?: number | string;
   /** The report's unpriced models; a leaderboard lists each with "no price". */
   unpriced?: { models: readonly string[] };
 }
