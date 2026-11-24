@@ -3555,6 +3555,15 @@
           "documentation": "Department assignment for spend attribution (the people lens).\nSingle-valued, org-scoped, accounting-only (never gates access).\nPlain column ref (relationMode=\"prisma\"); the service validates the\nid belongs to this org. See departments.feature."
         },
         {
+          "name": "billingOnly",
+          "columnName": "billingOnly",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "A Billing-only member (ADR-205): role EXTERNAL, the Billing grant, no team and\nno seat. Any role change clears it. See billing-only-invite.feature."
+        },
+        {
           "name": "disabledAt",
           "columnName": "disabledAt",
           "type": "DateTime",
@@ -8098,6 +8107,15 @@
           "isList": false,
           "isOptional": true,
           "documentation": ""
+        },
+        {
+          "name": "billingOnly",
+          "columnName": "billingOnly",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Invites the person who pays with the Billing grant and no seat (ADR-205)."
         },
         {
           "name": "createdAt",

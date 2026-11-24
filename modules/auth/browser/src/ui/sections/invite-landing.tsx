@@ -8,7 +8,7 @@ import { hardRedirect } from "../../behavior/hard-redirect.ts";
 import { usePasskeyCeremony } from "../../behavior/passkey-ceremony.store.ts";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
 import { explainErrorCode } from "../../model/error-presentation.ts";
-import { acceptInviteResultSchema } from "../../model/invite-messages.ts";
+import { acceptInviteResultSchema, landingAfterAccept } from "../../model/invite-messages.ts";
 import { readHandledError } from "../../model/read-handled-error.ts";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { FrontDoorLinkButton } from "../elements/front-door-link-button.tsx";
@@ -245,9 +245,7 @@ function ConfirmAndJoin({
       // organization" state have to go, or the next page bounces the new
       // member into onboarding.
       const accepted = acceptInviteResultSchema.safeParse(data);
-      hardRedirect(
-        accepted.success && accepted.data.project?.slug ? `/${accepted.data.project.slug}` : "/",
-      );
+      hardRedirect(accepted.success ? landingAfterAccept(accepted.data) : "/");
     },
   });
 
