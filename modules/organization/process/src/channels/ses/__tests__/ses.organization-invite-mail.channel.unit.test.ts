@@ -60,6 +60,24 @@ describe("SesOrganizationInviteMailChannel", () => {
       expect(sent.map((content) => content.to)).toEqual(["one@acme.example", "two@acme.example"]);
       expect(sent[0]?.html).toContain("morgan@acme.example");
     });
+
+    /** @scenario "Each routed message's sender names its template" */
+    it("names the re-request's template on every administrator's mail", async () => {
+      const { channel, sent } = channelOver({ provider: "smtp" });
+      const request = {
+        organizationName: "Acme Corp",
+        invitedEmail: "morgan@acme.example",
+        membersSettingsUrl: "https://app.langwatch.test/settings/members",
+      };
+
+      await channel.sendInviteReRequest({ ...request, adminEmail: "one@acme.example" });
+      await channel.sendInviteReRequest({ ...request, adminEmail: "two@acme.example" });
+
+      expect(sent.map((content) => content.template)).toEqual([
+        "invite-re-request",
+        "invite-re-request",
+      ]);
+    });
   });
 
   describe("when no gateway is named", () => {

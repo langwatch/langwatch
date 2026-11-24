@@ -39,6 +39,11 @@ Feature: The app's product mail goes through Customer.io on LangWatch Cloud
       | automation-limit      |
 
   @unit
+  Scenario: Each routed message's sender names its template
+    When the app's own sender hands notification any of the ten routed messages
+    Then the message carries its template id, so the routing list can pick it out
+
+  @unit
   Scenario: Every other message stays on the own mailer on Cloud
     Given IS_SAAS is set and nurturing holds CUSTOMER_IO_APP_API_KEY
     When a message of any template off the list, or with no template, or with an attachment, or with an unsubscribe token, is sent
