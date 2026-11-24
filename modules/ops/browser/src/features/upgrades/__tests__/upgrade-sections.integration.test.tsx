@@ -621,6 +621,37 @@ describe("UpgradeReleaseSteps", () => {
 });
 
 describe("UpgradeStepDetail", () => {
+  describe("when the grace for writers before the roster holds the step", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario "A step held by the grace for writers before the roster says why and how long it waits" */
+    it("says in the drawer why it waits, how long, and the command that ends it", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-24T10:00:00.000Z"));
+      renderIn(
+        <UpgradeStepDetail
+          step={{
+            ...stepWith({
+              id: "dataset:move-content-to-object-storage",
+              mode: "background",
+              status: "pending",
+              statusLabel: "Waiting",
+              oldWritersGraceEndsAt: "2026-11-24T10:23:00.000Z",
+            }),
+            targets: [],
+            logTail: [],
+          }}
+        />,
+      );
+
+      const grace = screen.getByTestId("upgrade-step-grace");
+      expect(grace).toHaveTextContent("about 23 more minutes");
+      expect(grace).toHaveTextContent("pnpm task upgrade old-writers-gone");
+    });
+  });
+
   describe("when a failed data step carries a checkpoint report", () => {
     /** @scenario "The step drawer shows a step's error, fix and checkpoint, read-only" */
     it("shows its facts, its last error and its report, and offers no action", () => {

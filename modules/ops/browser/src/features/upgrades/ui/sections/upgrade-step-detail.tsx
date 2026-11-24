@@ -4,8 +4,14 @@ import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Alert, Heading, HStack, Stack, Table, Text } from "@langwatch/design-system/primitives";
 import { SummaryList, SummaryListItem } from "@langwatch/design-system/summary-list";
+import { nowEpochMs } from "@langwatch/time";
 
-import { modeLabel, releaseName, statusTone } from "../../model/upgrade-labels.ts";
+import {
+  modeLabel,
+  oldWritersGraceLine,
+  releaseName,
+  statusTone,
+} from "../../model/upgrade-labels.ts";
 import type { UpgradeStepDetailView, UpgradeTargetView } from "../../model/upgrade-view.ts";
 import { UpgradeStatusBadge } from "../elements/upgrade-status-badge.tsx";
 
@@ -52,6 +58,17 @@ export function UpgradeStepDetail({ step }: { step: UpgradeStepDetailView }) {
         </Text>
       </HStack>
       {step.description && <Text textStyle="sm">{step.description}</Text>}
+      {step.oldWritersGraceEndsAt && (
+        <Alert.Root status="info" data-testid="upgrade-step-grace">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Waiting for the older release to stop</Alert.Title>
+            <Alert.Description>
+              {oldWritersGraceLine({ endsAt: step.oldWritersGraceEndsAt, nowMs: nowEpochMs() })}
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      )}
       <SummaryList>
         <SummaryListItem label="Step">
           <InlineCode>{step.id}</InlineCode>
