@@ -15,7 +15,7 @@ export const DEFAULT_DECODE_LIMITS: SecurityLakeDecodeLimits = {
 };
 
 /** The error name of a file past a decode cap: a second read gives the same answer, so poison. */
-export const DECODE_LIMIT_ERROR = "DecodeLimitError";
+const DECODE_LIMIT_ERROR = "DecodeLimitError";
 
 function decodeLimitError(message: string): Error {
   const error = new Error(message);
