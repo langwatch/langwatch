@@ -31,9 +31,9 @@ function isOrganizationUserRole(role: string): role is OrganizationUserRole {
   return Object.hasOwn(SEAT_BY_ROLE, role);
 }
 
-/** The Customer.io seat name for a role. */
-function seatFor(role: OrganizationUserRole): string {
-  return SEAT_BY_ROLE[role];
+/** The person trait naming the seat a role holds; none for a role we cannot name. */
+export function seatTraitOf(role?: string): { seat?: string } {
+  return role && isOrganizationUserRole(role) ? { seat: SEAT_BY_ROLE[role] } : {};
 }
 
 /** The properties every join event carries. */
@@ -43,11 +43,10 @@ function joinProperties({
   role,
 }: Joined): Record<string, string> {
   // A role we cannot name is left out rather than guessed.
-  const seat = role && isOrganizationUserRole(role) ? seatFor(role) : undefined;
   return {
     organization_id: organizationId,
     organization_name: organizationName,
-    ...(seat ? { seat } : {}),
+    ...seatTraitOf(role),
   };
 }
 
@@ -102,10 +101,12 @@ export function fireInviteAccepted({
   traces: KnownTraces | null;
 }): CioBatchCall[] {
   const { userId } = signal;
+  const traits = {
+    ...(traces?.hasTraces ? knownTraceTraits(traces) : {}),
+    ...seatTraitOf(signal.role),
+  };
   return [
-    ...(traces?.hasTraces
-      ? [{ type: "identify" as const, userId, traits: knownTraceTraits(traces) }]
-      : []),
+    ...(Object.keys(traits).length > 0 ? [{ type: "identify" as const, userId, traits }] : []),
     ...joinedCalls({ joined: signal, event: "joined_via_invite" }),
   ];
 }
@@ -128,6 +129,7 @@ export function fireSsoAutoAdded({
       userId,
       traits: {
         ...knownTraceTraits(traces),
+        ...seatTraitOf(signal.role),
         has_evaluations: false,
         has_prompts: false,
         has_simulations: false,

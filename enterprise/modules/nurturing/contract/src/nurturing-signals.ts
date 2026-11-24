@@ -131,6 +131,8 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     projectId: id,
     /** The latest of the evaluations this signal counts; its type, score and verdict follow. */
     evaluationId: id,
+    /** The organization counted against; optional because a signal recorded before it was named is re-parsed. */
+    organizationId: id.optional(),
     evaluatorType: z.string().nullish(),
     score: z.number().nullish(),
     passed: z.boolean().nullish(),

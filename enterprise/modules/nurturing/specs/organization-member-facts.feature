@@ -162,6 +162,18 @@ Feature: An organization's session facts reach every active member in Customer.i
     Then none of the join events carries a seat property
 
   @unit
+  Scenario: A person who joins is identified with the seat they joined with
+    Given an invite_accepted or sso_auto_added signal for org-1 holding the role ADMIN, MEMBER, EXTERNAL or DEVELOPER
+    When the signal is delivered
+    Then Customer.io identifies the person once with seat admin, member, lite_member or developer
+
+  @unit
+  Scenario: A person who joins with no known role is identified with no seat
+    Given an invite_accepted or sso_auto_added signal for org-1 with no role, or one nurturing cannot name
+    When the signal is delivered
+    Then the person is identified with no seat
+
+  @unit
   Scenario: A join is tracked as joined_organization beside its own event
     Given an invite_accepted or sso_auto_added signal for org-1 from after joined_organization shipped
     When the signal is delivered

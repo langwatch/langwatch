@@ -61,6 +61,8 @@ export interface CioPersonTraits extends CioOrganizationUsageTraits {
   email: string;
   name: string;
   role: string;
+  /** The org seat (lite_member/member/admin/developer), not the sign-up `role` (job title). */
+  seat?: string;
   company_size: string;
   signup_usage: string;
   signup_solution: string;
@@ -167,6 +169,9 @@ export interface CioOrgTraits extends CioOrganizationUsageTraits {
   company_size: string;
   member_count: number;
   project_count: number;
+  has_evaluation_results?: boolean;
+  evaluation_count?: number;
+  first_evaluation_at?: number;
   onboarding_variant?: string;
   onboarding_paths?: string;
   onboarding_primary_path?: string;

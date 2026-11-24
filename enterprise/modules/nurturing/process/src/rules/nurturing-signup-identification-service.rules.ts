@@ -60,6 +60,7 @@ export function fireSignup({
       email,
       name,
       role: signUpData?.yourRole,
+      seat: "admin",
       company_size: signUpData?.companySize,
       signup_usage: signUpData?.usage,
       signup_solution: signUpData?.solution,

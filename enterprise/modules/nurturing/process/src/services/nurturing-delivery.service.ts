@@ -465,6 +465,18 @@ export class NurturingDeliveryService {
           },
         ]
       : [{ type: "identify", userId, traits: { evaluation_count: count, last_evaluation_at: at } }];
+    if (signal.organizationId) {
+      calls.push({
+        type: "group",
+        userId,
+        groupId: signal.organizationId,
+        traits: {
+          has_evaluation_results: true,
+          evaluation_count: count,
+          ...(signal.first ? { first_evaluation_at: at } : {}),
+        },
+      });
+    }
     calls.push({
       type: "track",
       userId,

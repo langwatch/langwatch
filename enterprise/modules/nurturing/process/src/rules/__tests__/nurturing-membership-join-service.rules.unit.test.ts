@@ -9,6 +9,7 @@ import {
   fireInviteAccepted,
   fireJoinedOrganization,
   fireSsoAutoAdded,
+  seatTraitOf,
 } from "../nurturing-membership-join-service.rules.ts";
 
 afterEach(() => vi.useRealTimers());
@@ -84,6 +85,53 @@ describe("joined_via_invite", () => {
       expect(inviteTrack()).not.toHaveProperty("properties.seat");
       expect(inviteTrack("OWNER")).not.toHaveProperty("properties.seat");
     });
+  });
+});
+
+describe("a person who joins", () => {
+  const identifies = (calls: ReturnType<typeof inviteCalls>) =>
+    calls.filter((call) => call.type === "identify");
+  const ssoCalls = (role?: string) =>
+    fireSsoAutoAdded({
+      signal: { kind: "sso_auto_added", ...joinSource, role },
+      traces: noTraces,
+    });
+
+  /** @scenario "A person who joins is identified with the seat they joined with" */
+  it("is identified once with the seat, by invite or by SSO", () => {
+    expect(identifies(inviteCalls("EXTERNAL"))).toEqual([
+      { type: "identify", userId: "user-1", traits: { seat: "lite_member" } },
+    ]);
+    expect(identifies(ssoCalls("ADMIN"))).toEqual([
+      { type: "identify", userId: "user-1", traits: expect.objectContaining({ seat: "admin" }) },
+    ]);
+  });
+
+  /** @scenario "A person who joins is identified with the seat they joined with" */
+  it("carries the seat on the one identify that also carries known traces", () => {
+    const calls = fireInviteAccepted({
+      signal: { kind: "invite_accepted", ...joinSource, role: "DEVELOPER" },
+      traces: { hasTraces: true, lastTraceAt: null },
+    });
+
+    expect(identifies(calls)).toEqual([
+      { type: "identify", userId: "user-1", traits: { has_traces: true, seat: "developer" } },
+    ]);
+  });
+
+  /** @scenario "A person who joins with no known role is identified with no seat" */
+  it("is identified with no seat, and an invite with no traces identifies no one", () => {
+    expect(identifies(inviteCalls())).toEqual([]);
+    expect(identifies(inviteCalls("OWNER"))).toEqual([]);
+    expect(identifies(ssoCalls())[0]).not.toHaveProperty("traits.seat");
+  });
+});
+
+describe("seatTraitOf", () => {
+  it("names the seat of a known role and nothing for any other", () => {
+    expect(seatTraitOf("MEMBER")).toEqual({ seat: "member" });
+    expect(seatTraitOf("OWNER")).toEqual({});
+    expect(seatTraitOf()).toEqual({});
   });
 });
 

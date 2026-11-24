@@ -149,6 +149,7 @@ export function seededAtRead({
 
 /** The organization a settled evaluation was counted against, as nurturing's own store holds it. */
 type CountedOrganization = Readonly<{
+  organizationId: string;
   adminUserId: string | null;
   seeded: boolean;
   evaluationCount: number;
@@ -168,7 +169,7 @@ export function evaluationCompletedSignal({
   count: number;
   organization: CountedOrganization;
 }>): NurturingSignal[] {
-  const { adminUserId, seeded, evaluationCount } = organization;
+  const { organizationId, adminUserId, seeded, evaluationCount } = organization;
   if (!adminUserId) return [];
   return [
     {
@@ -179,6 +180,7 @@ export function evaluationCompletedSignal({
       userId: adminUserId,
       projectId: latest.projectId,
       evaluationId: latest.evaluationId,
+      organizationId,
       evaluatorType: latest.evaluatorType,
       score: latest.score,
       passed: latest.passed,
