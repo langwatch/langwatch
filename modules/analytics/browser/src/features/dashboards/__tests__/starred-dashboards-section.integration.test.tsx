@@ -320,7 +320,7 @@ describe("the LLM Ops sidebar's Dashboards section", () => {
       await expect(draft.edit()).resolves.toBe("board-new");
 
       expect(inputsTo(calls, "boards.create")).toEqual([
-        { projectId: "proj-1", name: "Untitled dashboard 1" },
+        { projectId: "proj-1", name: "Untitled dashboard 1", homeProduct: "llm-ops" },
       ]);
       expect(inputsTo(calls, "boards.star")).toEqual([
         { projectId: "proj-1", star: { kind: "board", dashboardId: "board-new" } },

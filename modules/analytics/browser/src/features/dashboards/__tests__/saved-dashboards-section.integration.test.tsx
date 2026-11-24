@@ -242,7 +242,7 @@ describe("the Dashboards sidebar", () => {
 
       await waitFor(() =>
         expect(inputsTo(calls, "boards.create")).toEqual([
-          { projectId: "proj-1", name: "Refunds" },
+          { projectId: "proj-1", name: "Refunds", homeProduct: "llm-ops" },
         ]),
       );
       expect(inputsTo(calls, "boards.update")).toEqual([]);

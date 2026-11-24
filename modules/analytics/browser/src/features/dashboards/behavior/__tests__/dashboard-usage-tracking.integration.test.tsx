@@ -31,7 +31,7 @@ import { useBoardRange } from "../use-board-period.ts";
 import { useBoardWidgetEditor } from "../use-board-widget-editor.ts";
 import { useBoardWidgets } from "../use-board-widgets.ts";
 import { useDashboardViewed } from "../use-dashboard-viewed.ts";
-import { useDraftBoard } from "../use-draft-board.ts";
+import { restartStoredDraft, useDraftBoard } from "../use-draft-board.ts";
 import { useFavourites } from "../use-favourites.ts";
 import { useSavedDashboards } from "../use-saved-dashboards.ts";
 
@@ -120,6 +120,8 @@ const names = () =>
 
 beforeEach(() => {
   tracked.events.length = 0;
+  // A board stored by an earlier test is never the one a new draft writes to.
+  restartStoredDraft("proj-1");
 });
 afterEach(cleanup);
 
