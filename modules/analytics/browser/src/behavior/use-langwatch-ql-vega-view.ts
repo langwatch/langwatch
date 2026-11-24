@@ -175,10 +175,12 @@ function useReportedFailure({
     (error: unknown) => {
       const failure = lwqlRenderFailure(error);
       setState({ status: "failed", failure });
-      if (failure.rule === "loader.blocked" || reported.current.has(failure.message)) return;
-      reported.current.add(failure.message);
+      // The contract words every non-Error alike, so the thrown message is the identity.
+      const err = toError(error);
+      if (failure.rule === "loader.blocked" || reported.current.has(err.message)) return;
+      reported.current.add(err.message);
       reporting.current.analytics.captureException({
-        error: toError(error),
+        error: err,
         properties: { surface: "lwql_chart_embed", ...reporting.current.crashContext },
       });
     },

@@ -272,6 +272,11 @@ type LwqlProvisioningOperations = Readonly<{
   fillProjectKeys: (input: { dryRun: boolean }) => Promise<LwqlProjectKeyFillReport>;
 }>;
 
+/** Where a key run leaves the projects its scope resolved to, for its failed-run line. */
+interface ResolvedProjectIds {
+  projectIds: readonly string[] | undefined;
+}
+
 const NO_DRIFT: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], isKeyMapMissing: false };
 
 const lwqlLogger = createLogger("langwatch:analytics:lwql:provisioning");
@@ -878,17 +883,21 @@ export class AnalyticsModule
   ): Promise<LangWatchQLQueryResult> {
     // The caller, on its runs that answer and on those refused before the engine.
     const telemetry = keyRunTelemetry({ reach: input.reach, door: input.door ?? "rest_api" });
+    const resolved: ResolvedProjectIds = { projectIds: undefined };
     try {
-      return await this.#runLangWatchQLForKey({ ...input, telemetry });
+      return await this.#runLangWatchQLForKey({ ...input, telemetry, resolved });
     } catch (error) {
       this.#dependencies.runTelemetry.recordFailed({
         telemetry,
         sql: input.sql,
         error,
-        projectIds: langWatchQLRunProjectIds({
-          own: [...keyReachProjectIds({ reach: input.reach }), input.projectId],
-          named: input.projects,
-        }),
+        // A wide key names no project on its own, so the resolved scope speaks when it finished.
+        projectIds:
+          resolved.projectIds ??
+          langWatchQLRunProjectIds({
+            own: [...keyReachProjectIds({ reach: input.reach }), input.projectId],
+            named: input.projects,
+          }),
       });
       throw error;
     }
@@ -900,6 +909,7 @@ export class AnalyticsModule
         reach: LangWatchQLKeyReach;
         signal?: AbortSignal;
         telemetry: LangWatchQLRunTelemetry;
+        resolved: ResolvedProjectIds;
       } & LangWatchQLKeyStatementRequest
     >,
   ): Promise<LangWatchQLQueryResult> {
@@ -913,6 +923,7 @@ export class AnalyticsModule
           requireProjects: true,
           ...(wanted === undefined ? {} : { projects: wanted }),
         });
+    input.resolved.projectIds = projects.map(({ id }) => id);
     for (const project of projects) {
       await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
     }

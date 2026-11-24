@@ -16,15 +16,27 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import type * as Observability from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MemoryAnalyticsRepositories } from "../../repositories/memory/memory.analytics.repositories.ts";
 import { AnalyticsModule } from "../analytics.app.ts";
 import { analyticsTestSecrets } from "./analytics-secrets.fixture.ts";
+
+const logged = vi.hoisted(() => ({ errors: [] as { fields: unknown; message: string }[] }));
+
+vi.mock("@langwatch/observability", async (importActual) => {
+  const actual = await importActual<typeof Observability>();
+  const record = (fields: unknown, message: string) => logged.errors.push({ fields, message });
+  return {
+    ...actual,
+    createLogger: () => ({ info: record, warn: record, error: record, debug: () => void 0 }),
+  };
+});
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-123";
@@ -297,6 +309,28 @@ describe("AnalyticsModule.runLangWatchQLForKey", () => {
           projectId: "project-elsewhere",
         }),
       ).rejects.toMatchObject({ code: "project_not_found" });
+    });
+  });
+
+  describe("when an organisation-wide key runs over all projects and the engine fails", () => {
+    /** @scenario "Telemetry: a failed query is logged at its fault's level with the projects it ran over" */
+    it("names the projects its scope resolved to on the failed-run line", async () => {
+      logged.errors.length = 0;
+      const { app } = await appOver({
+        listed: [project("project-a"), project("project-b")],
+        grants: ["analytics:view"],
+      });
+
+      await expect(
+        app.runLangWatchQLForKey({
+          reach: { ...KEY, resolvedProject: undefined },
+          sql: "SELECT count() FROM analytics.traces",
+          projects: "all",
+        }),
+      ).rejects.toBeDefined();
+
+      const failed = logged.errors.find(({ message }) => message === "LangWatchQL failed");
+      expect(failed?.fields).toMatchObject({ projectIds: "project-a,project-b" });
     });
   });
 });

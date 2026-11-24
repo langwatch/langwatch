@@ -637,6 +637,42 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       expect(analytics.exceptions).toHaveLength(1);
     });
 
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports two different thrown strings as two exceptions", async () => {
+      vega.state.failWith = "first runtime refusal";
+      const analytics = new RecordingUiAnalytics();
+      const { rerender } = withChakra(reportingChart({ analytics }));
+      await waitFor(() => expect(analytics.exceptions).toHaveLength(1));
+
+      vega.state.failWith = "second runtime refusal";
+      rerender(
+        reportingChart({ analytics, spec: { ...(barOverQueryResult as object), height: 240 } }),
+      );
+
+      await waitFor(() => expect(analytics.exceptions).toHaveLength(2));
+      expect(
+        analytics.exceptions.map(({ error }) =>
+          String(error instanceof Error ? error.message : error),
+        ),
+      ).toEqual(["first runtime refusal", "second runtime refusal"]);
+    });
+
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports the same thrown string once when the chart fails again", async () => {
+      vega.state.failWith = "same runtime refusal";
+      const analytics = new RecordingUiAnalytics();
+      const { rerender } = withChakra(reportingChart({ analytics }));
+      await waitFor(() => expect(analytics.exceptions).toHaveLength(1));
+
+      rerender(
+        reportingChart({ analytics, spec: { ...(barOverQueryResult as object), height: 240 } }),
+      );
+
+      await waitFor(() => expect(vega.state.calls).toHaveLength(2));
+      await screen.findByTestId("lwql-chart-failure");
+      expect(analytics.exceptions).toHaveLength(1);
+    });
+
     /** @scenario "No renderer path performs network or file loading" */
     it("does not report a refused resource load as an exception", async () => {
       vega.state.failWith = new LangWatchQLVegaLoadBlockedError({
