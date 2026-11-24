@@ -246,7 +246,7 @@ var Prereqs = []Prereq{{
 	Requirement: PrereqRecommended,
 	After:       []string{"brew"},
 	Detail: "services/langyworker builds with `bun run scripts/build-binary.ts`\n" +
-		"    (bun >= 1.3.13). Without it the stack still comes up, minus Langy:\n" +
+		"    (bun >= 1.4.4). Without it the stack still comes up, minus Langy:\n" +
 		"    `haven up +langy` cannot build the worker, so Langy is off for that run.",
 	Candidates: []Candidate{{
 		Key:      "bun",
