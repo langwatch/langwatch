@@ -173,6 +173,17 @@ describe("ExperimentsFacade parity with the Python SDK", () => {
       expect(printed).not.toContain("0.0% pass rate");
     });
 
+    /** @scenario "The printed summary counts an evaluator's errored rows" */
+    it("prints how many rows an evaluator errored on", async () => {
+      const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const crashed = [
+        { evaluatorId: "ev_1", name: "exact_match", passed: 0, failed: 0, errored: 3, passRate: 0 },
+      ];
+      await exitCodeFor({ failedCells: 0, evaluators: crashed }, { exitOnFailure: false });
+      const printed = log.mock.calls.map((call) => String(call[0])).join("\n");
+      expect(printed).toContain("Errored: 3");
+    });
+
     /** @scenario "Turning exit off wins over the opt-in" */
     it("never exits with exitOnFailure false, even when opted in", async () => {
       const code = await exitCodeFor(

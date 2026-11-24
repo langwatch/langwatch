@@ -77,6 +77,12 @@ Feature: CI exit gate for platform experiment runs
     Then the evaluator shows "no verdicts" instead of a pass rate
 
   @unit
+  Scenario: The printed summary counts an evaluator's errored rows
+    Given a completed run with an evaluator that errored on every row
+    When the summary is printed
+    Then the evaluator shows how many rows errored
+
+  @unit
   Scenario: Turning exit off wins over the opt-in
     Given a completed run with 1 errored cell and 1 failed evaluation
     When the summary is printed with exit on failure off and fail on evaluator failures

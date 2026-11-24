@@ -33,6 +33,9 @@ function printEvaluators(summary: ExperimentSummary): void {
     if (evaluator.avgScore !== undefined) {
       console.log(`      Avg score: ${evaluator.avgScore.toFixed(2)}`);
     }
+    if (evaluator.errored) {
+      console.log(`      Errored: ${evaluator.errored}`);
+    }
   }
 }
 
