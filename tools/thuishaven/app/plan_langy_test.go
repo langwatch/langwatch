@@ -348,6 +348,20 @@ func TestEnsureLangyCLI(t *testing.T) {
 	})
 }
 
+func TestLangyCLIManualBuildCommand(t *testing.T) {
+	t.Run("restores the default bundle after the native build", func(t *testing.T) {
+		if !strings.HasPrefix(langyCLIManualBuildCommand, langyCLIBuildCommand+"; ") || !strings.HasSuffix(langyCLIManualBuildCommand, "; "+langyCLIRestoreBundleCommand) {
+			t.Fatalf("the hint must run the native build then restore the bundle, got %q", langyCLIManualBuildCommand)
+		}
+	})
+
+	t.Run("has no log redirect or exit capture to paste", func(t *testing.T) {
+		if strings.Contains(langyCLIManualBuildCommand, "rc=$?") || strings.Contains(langyCLIManualBuildCommand, "2>&1") {
+			t.Fatalf("the hint must be a plain command, got %q", langyCLIManualBuildCommand)
+		}
+	})
+}
+
 // @scenario "A Langy that cannot start leaves the app no dead agent address"
 func TestDropLocalLangyAgentLeavesNoAgentURL(t *testing.T) {
 	st := domain.Stack{Slug: "demo", Services: []domain.Service{{Name: "app", Port: 4000}, {Name: "langyagent", Port: 4123}}}
