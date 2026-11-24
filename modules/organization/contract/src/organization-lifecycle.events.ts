@@ -196,6 +196,26 @@ export type OrganizationMemberDepartmentChangedEventData = z.infer<
   typeof organizationMemberDepartmentChangedEventDataSchema
 >;
 
+export const ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE =
+  "lw.organization.member_role_changed" as const;
+export const ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_VERSION = "2026-11-24" as const;
+
+/** An admin changed a member's organization role; roles stay strings so unknown ones parse. */
+const organizationMemberRoleChangedEventDataSchemaDefinition = z.object({
+  ...envelope,
+  role: z.string(),
+  previousRole: z.string(),
+  changedByUserId: z.string().min(1).nullish(),
+});
+export interface OrganizationMemberRoleChangedEventDataSchema extends Named<
+  typeof organizationMemberRoleChangedEventDataSchemaDefinition
+> {}
+export const organizationMemberRoleChangedEventDataSchema: OrganizationMemberRoleChangedEventDataSchema =
+  organizationMemberRoleChangedEventDataSchemaDefinition;
+export type OrganizationMemberRoleChangedEventData = z.infer<
+  typeof organizationMemberRoleChangedEventDataSchema
+>;
+
 /** An organization now exists, on every creation path; peers seed their own defaults (§9). */
 const organizationCreatedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),

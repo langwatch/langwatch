@@ -424,3 +424,21 @@ Feature: Shared organization service
     When organization hears the fact from its own side
     Then it records no member removal for the deleted organisation
     And it still records the removal for every live organisation the fact names
+
+  @unit
+  Scenario: Changing a member's role records the new and previous role
+    Given a member holds an organization role
+    When an administrator changes it to another role
+    Then organization records the member_role_changed fact with the new role, the previous role and who changed it
+
+  @unit
+  Scenario: A role change to the role already held records nothing
+    Given a member holds an organization role
+    When an administrator sets the role they already hold
+    Then organization records no member_role_changed fact
+
+  @unit
+  Scenario: A role change whose record fails still stands
+    Given a member's role change has committed
+    When organization cannot record the member_role_changed fact
+    Then the failure is reported and the role change is not undone or raised

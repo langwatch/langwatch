@@ -13,6 +13,7 @@ function notices(
   recordSignedUp: { send: (data: RecordSignedUpCommandData) => Promise<void> },
   recordIntegrationMethodChosen: { send: (data: unknown) => Promise<void> } = idle,
   recordPersonalWorkspaceProvisioned: { send: (data: unknown) => Promise<void> } = idle,
+  recordMemberRoleChanged: { send: (data: unknown) => Promise<void> } = idle,
 ) {
   const reportError = vi.fn();
   const service = OrganizationLifecycleNoticeService.create({ reportError });
@@ -34,6 +35,7 @@ function notices(
     recordMemberEnabled: idle,
     recordMemberRemoved: idle,
     recordMemberDepartmentChanged: idle,
+    recordMemberRoleChanged,
   });
   return { service, reportError };
 }
@@ -74,6 +76,27 @@ describe("organization's lifecycle notices", () => {
     });
 
     expect(() => service.signedUp(signUp)).not.toThrow();
+    await vi.waitFor(() => expect(reportError).toHaveBeenCalledWith(failure));
+  });
+
+  /** @scenario "A role change whose record fails still stands" */
+  it("reports a failed role-change record and never throws into the committed change", async () => {
+    const failure = new Error("event store unavailable");
+    const { service, reportError } = notices(idle, idle, idle, {
+      send: async () => {
+        throw failure;
+      },
+    });
+
+    expect(() =>
+      service.memberRoleChanged({
+        organizationId: "org_acme",
+        userId: "user_ben",
+        role: "ADMIN",
+        previousRole: "MEMBER",
+        changedByUserId: "user_ana",
+      }),
+    ).not.toThrow();
     await vi.waitFor(() => expect(reportError).toHaveBeenCalledWith(failure));
   });
 

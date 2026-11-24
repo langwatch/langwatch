@@ -26,6 +26,7 @@ const mockAssertRoleChangeAllowed = vi.fn();
 const mockHoldsFullSeat = vi.fn(async () => true);
 const mockMemberDisabled = vi.fn();
 const mockMemberEnabled = vi.fn();
+const mockMemberRoleChanged = vi.fn();
 const mockCreateAndAssign = vi.fn();
 const mockGetProvisioningSummaryById = vi.fn();
 const mockStandingFor = vi.fn<OrganizationTestArrivals["standingFor"]>(async () => ({
@@ -99,6 +100,7 @@ describe("OrganizationMembershipService", () => {
   const seatNotices: OrganizationSeatRevocationNotice = {
     memberDisabled: mockMemberDisabled,
     memberEnabled: mockMemberEnabled,
+    memberRoleChanged: mockMemberRoleChanged,
   };
   const grantCache: OrganizationGrantCache = {
     invalidateOrganization: mockInvalidateOrganization,
@@ -498,6 +500,50 @@ describe("OrganizationMembershipService", () => {
     });
   });
 
+  describe("when a member's organization role is changed", () => {
+    const change = (role: OrganizationUserRole) =>
+      service.changeMemberRole({
+        caller: { type: "system" },
+        organizationId: "org-123",
+        userId: "user-456",
+        role,
+        currentUserId: "admin-789",
+      });
+
+    beforeEach(() => {
+      vi.mocked(mockRepo.getMembership).mockResolvedValue({
+        userId: "user-456",
+        organizationId: "org-123",
+        role: OrganizationUserRole.MEMBER,
+        disabledAt: null,
+        createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+        updatedAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+        user: { id: "user-456", name: null, email: null },
+      });
+      vi.mocked(mockRepo.updateMemberRole).mockResolvedValue({ teamsLeftWithoutAdmin: [] });
+    });
+
+    /** @scenario "Changing a member's role records the new and previous role" */
+    it("records the new and previous role, and who changed it", async () => {
+      await change(OrganizationUserRole.ADMIN);
+
+      expect(mockMemberRoleChanged).toHaveBeenCalledWith({
+        organizationId: "org-123",
+        userId: "user-456",
+        role: OrganizationUserRole.ADMIN,
+        previousRole: OrganizationUserRole.MEMBER,
+        changedByUserId: "admin-789",
+      });
+    });
+
+    /** @scenario "A role change to the role already held records nothing" */
+    it("records nothing when the role is the one already held", async () => {
+      await change(OrganizationUserRole.MEMBER);
+
+      expect(mockMemberRoleChanged).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a caller who lacks what a role change would confer", () => {
     const assertWithinCaller = vi.fn(async () => {
       throw new GrantExceedsCallerPermissionsError(["organization:manage"]);
@@ -864,6 +910,7 @@ describe("OrganizationMembershipService", () => {
             memberDisabled: () =>
               Promise.reject(new Error("organization_lifecycle is not registered in this process")),
             memberEnabled: async () => {},
+            memberRoleChanged: () => {},
           },
           grantCache,
           testArrivals,
