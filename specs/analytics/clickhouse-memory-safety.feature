@@ -189,7 +189,7 @@ Feature: ClickHouse Query Memory Safety Regression Tests
   Scenario: An Instant Evals key or sample pass picks its rows before reading the thread id
     Given a project whose traces span many parts and carry wide attribute maps
     And an Instant Evals statement projecting the thread id and an eval column
-    When the sample pass and the key pass run over it under a 200 MB memory cap
+    When the sample pass and the key pass run over it under a 100 MB memory cap
     Then both answer under the cap
     And they return the same keys the single read returns without a cap
     And the single read that projects the thread id for every trace exceeds the cap

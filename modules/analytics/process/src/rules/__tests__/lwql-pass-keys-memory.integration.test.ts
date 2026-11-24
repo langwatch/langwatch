@@ -16,14 +16,14 @@ import {
 import { langWatchQLPassSql } from "../langwatch-ql-pass-sql.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../lwql-view-catalog.rules.ts";
 
-const PARTS = 8;
+const PARTS = 3;
 /** Past one read block, so the view's in-order merge holds a full block of every part. */
 const ROWS_PER_PART = 66_000;
 /** Rows per insert block, so seeding never holds a large block on a shared server. */
 const INSERT_BLOCK_ROWS = "2000";
 const ATTRIBUTE_KEYS = 25;
-/** The single read peaked near 1.9 GiB on two million traces; the ids-first passes near 80 MiB. */
-const MEMORY_CAP_BYTES = "200000000";
+/** The single read peaked near 1.9 GiB on two million traces; ids-first passes near 32 MiB here. */
+const MEMORY_CAP_BYTES = "100000000";
 const SAMPLE_BUCKETS = 3;
 const START = "2026-08-01 00:00:00";
 /** A 14-day window inside the 60 days the traces span. */
