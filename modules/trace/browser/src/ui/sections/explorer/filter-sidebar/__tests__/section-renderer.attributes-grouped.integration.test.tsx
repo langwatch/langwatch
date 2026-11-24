@@ -6,7 +6,7 @@
  * @see specs/traces-v2/search.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { parse } from "@langwatch/trace-contract";
+import { buildFacetDisplayLookup, parse } from "@langwatch/trace-contract";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -45,6 +45,7 @@ const renderMetadataSection = async ({ query }: { query: string }) => {
       ast={ast}
       facetItemsByKey={new Map()}
       valueStateGetters={new Map()}
+      displayStates={buildFacetDisplayLookup(ast)}
       toggleFacet={vi.fn()}
       excludeFacet={vi.fn()}
       setRange={vi.fn()}

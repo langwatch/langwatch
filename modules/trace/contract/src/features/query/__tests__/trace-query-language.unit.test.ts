@@ -10,6 +10,7 @@ import {
   type OrGroup,
   type OrGroupAnalysis,
   describeAstProblem,
+  displayStateFor,
   getFacetValueState,
 } from "../trace-query-analysis.ts";
 import {
@@ -1048,6 +1049,18 @@ describe("buildFacetDisplayLookup", () => {
     ])("marks %s as before", (query, expected) => {
       expect(statesOf(query)).toEqual(expected);
     });
+  });
+});
+
+describe("displayStateFor", () => {
+  const lookup = buildFacetDisplayLookup(parse("NOT (status:error AND model:x)"));
+
+  it("reads a named row's state from the lookup", () => {
+    expect(displayStateFor({ lookup, field: "status", value: "error" })).toBe("grouped-exclude");
+  });
+
+  it("reads a row the query does not name as neutral", () => {
+    expect(displayStateFor({ lookup, field: "status", value: "ok" })).toBe("neutral");
   });
 });
 

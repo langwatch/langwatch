@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
-  buildFacetDisplayLookup,
+  displayStateFor,
   EVENT_METRICS_PREFIX,
   eventMetricValueLabel,
   type FacetDisplayState,
@@ -28,6 +28,8 @@ interface EventDrilldownProps {
   /** The event FacetItem (must carry eventMetrics). */
   item: FacetItem;
   ast: LiqeQuery;
+  /** What each row shows, built once per query by the sidebar (`buildFacetDisplayLookup`). */
+  displayStates: ReadonlyMap<string, FacetDisplayState>;
   /**
    * Toggle one top-level facet clause: `event.attribute.<metric key>` and, when the row
    * is inactive, the `event:<type>` anchor added ahead of it.
@@ -39,7 +41,12 @@ interface EventDrilldownProps {
  * Inline drilldown under an event-name row, rendered purely from `item.eventMetrics`
  * the discover endpoint already attached — no query of its own.
  */
-export const EventDrilldown: React.FC<EventDrilldownProps> = ({ item, ast, toggleFacet }) => {
+export const EventDrilldown: React.FC<EventDrilldownProps> = ({
+  item,
+  ast,
+  displayStates,
+  toggleFacet,
+}) => {
   const metrics = item.eventMetrics ?? [];
   if (metrics.length === 0) return null;
 
@@ -67,7 +74,7 @@ export const EventDrilldown: React.FC<EventDrilldownProps> = ({ item, ast, toggl
             eventType={item.value}
             eventActive={eventActive}
             metric={metric}
-            ast={ast}
+            displayStates={displayStates}
             toggleFacet={toggleFacet}
           />
         ))}
@@ -82,15 +89,14 @@ const MetricGroup: React.FC<{
    *  {@link EventDrilldown}. */
   eventActive: boolean;
   metric: EventMetricValues;
-  ast: LiqeQuery;
+  displayStates: EventDrilldownProps["displayStates"];
   toggleFacet: EventDrilldownProps["toggleFacet"];
-}> = ({ eventType, eventActive, metric, ast, toggleFacet }) => {
+}> = ({ eventType, eventActive, metric, displayStates, toggleFacet }) => {
   const field = `event.attribute.${metric.key}`;
   const displayKey = metric.key.startsWith(EVENT_METRICS_PREFIX)
     ? metric.key.slice(EVENT_METRICS_PREFIX.length)
     : metric.key;
   const maxCount = Math.max(...metric.values.map((v) => v.count), 0);
-  const displayStates = buildFacetDisplayLookup(ast);
 
   return (
     <VStack align="stretch" gap={0}>
@@ -104,7 +110,7 @@ const MetricGroup: React.FC<{
         {displayKey}
       </Text>
       {metric.values.map((v) => {
-        const state = displayStates.get(`${field}|${v.value}`) ?? "neutral";
+        const state = displayStateFor({ lookup: displayStates, field, value: v.value });
         return (
           <MetricValueRow
             key={v.value}

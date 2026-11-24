@@ -1,6 +1,6 @@
 import { Box } from "@langwatch/design-system/primitives";
 import {
-  buildFacetDisplayLookup,
+  displayStateFor,
   getFacetValueState,
   extractRangeValue,
   type FacetDisplayState,
@@ -28,6 +28,8 @@ interface SectionRendererProps {
   ast: LiqeQuery;
   facetItemsByKey: Map<string, FacetItem[]>;
   valueStateGetters: Map<string, (value: string) => FacetDisplayState>;
+  /** What each row shows, built once per query by the sidebar (`buildFacetDisplayLookup`). */
+  displayStates: ReadonlyMap<string, FacetDisplayState>;
   toggleFacet: ({ field, value }: { field: string; value: string }) => void;
   /** Force a categorical value to excluded / back to neutral — drives the
    * row's trailing exclude affordance. */
@@ -124,6 +126,7 @@ const CategoricalSectionRenderer: React.FC<
   ast,
   facetItemsByKey,
   valueStateGetters,
+  displayStates,
   toggleFacet,
   excludeFacet,
   toggleEvaluatorSubFilter,
@@ -146,7 +149,14 @@ const CategoricalSectionRenderer: React.FC<
   // row — verdict pills, score range, label flag — sourced from the `aggregates` the
   // discover endpoint already attached to each evaluator value. No second query.
   const eventActiveRowExtras = (item: FacetItem) =>
-    item.eventMetrics ? <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} /> : null;
+    item.eventMetrics ? (
+      <EventDrilldown
+        item={item}
+        ast={ast}
+        displayStates={displayStates}
+        toggleFacet={toggleFacet}
+      />
+    ) : null;
   const evaluatorActiveRowExtras = (item: FacetItem) =>
     item.aggregates ? (
       <EvaluatorDrilldown
@@ -193,7 +203,14 @@ const CategoricalSectionRenderer: React.FC<
           subject="event metric"
         />
       ),
-      below: isExpanded ? <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} /> : null,
+      below: isExpanded ? (
+        <EventDrilldown
+          item={item}
+          ast={ast}
+          displayStates={displayStates}
+          toggleFacet={toggleFacet}
+        />
+      ) : null,
     };
   };
   const evaluatorInactiveRowExtras = (
@@ -353,12 +370,20 @@ const RangeSectionRenderer: React.FC<
 
 const AttributesSectionRenderer: React.FC<
   SectionRendererProps & { section: Exclude<Section, { kind: "cat" | "range" }>; icon: LucideIcon }
-> = ({ section, ast, toggleFacet, onShiftToggle, onHide, dragHandleProps, icon }) => {
+> = ({
+  section,
+  ast,
+  displayStates,
+  toggleFacet,
+  onShiftToggle,
+  onHide,
+  dragHandleProps,
+  icon,
+}) => {
   // One component for trace/span/event/metadata attributes: the section data carries its own
   // filter prefix and key list, so the renderer doesn't need to know which flavour it's drawing.
   const { filterPrefix, keys, label, displayStripPrefix, emptyDocsHref } = section;
   const fieldFor = (attrKey: string) => `${filterPrefix}.${attrKey}`;
-  const displayStates = buildFacetDisplayLookup(ast);
   return (
     <AttributesSection
       title={label}
@@ -368,7 +393,7 @@ const AttributesSectionRenderer: React.FC<
       displayStripPrefix={displayStripPrefix}
       emptyDocsHref={emptyDocsHref}
       getValueState={(attrKey, value) =>
-        displayStates.get(`${fieldFor(attrKey)}|${value}`) ?? "neutral"
+        displayStateFor({ lookup: displayStates, field: fieldFor(attrKey), value })
       }
       getNoneActive={(attrKey) => getFacetValueState(ast, "none", fieldFor(attrKey)) === "include"}
       onToggleValue={(attrKey, value) => toggleFacet({ field: fieldFor(attrKey), value })}

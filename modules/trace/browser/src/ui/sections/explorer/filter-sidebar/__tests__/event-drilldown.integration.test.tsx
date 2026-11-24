@@ -6,7 +6,7 @@
 
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { EMPTY_AST, parse } from "@langwatch/trace-contract";
+import { buildFacetDisplayLookup, EMPTY_AST, parse } from "@langwatch/trace-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -35,7 +35,14 @@ const buildItem = ({
 });
 
 const renderDrilldown = ({ item = buildItem(), ast = EMPTY_AST, toggleFacet = vi.fn() } = {}) => {
-  renderWithDesignSystem(<EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} />);
+  renderWithDesignSystem(
+    <EventDrilldown
+      item={item}
+      ast={ast}
+      displayStates={buildFacetDisplayLookup(ast)}
+      toggleFacet={toggleFacet}
+    />,
+  );
   return { toggleFacet };
 };
 
@@ -230,6 +237,7 @@ describe("EventDrilldown", () => {
                 eventMetrics,
               }}
               ast={EMPTY_AST}
+              displayStates={new Map()}
               toggleFacet={vi.fn()}
             />,
           );
@@ -285,6 +293,7 @@ describe("EventDrilldown", () => {
           <EventDrilldown
             item={item}
             ast={useFilterStore.getState().ast}
+            displayStates={buildFacetDisplayLookup(useFilterStore.getState().ast)}
             toggleFacet={toggleFacet}
           />
         </DesignSystemProvider>

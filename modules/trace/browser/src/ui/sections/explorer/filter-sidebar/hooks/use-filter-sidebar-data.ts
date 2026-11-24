@@ -1,6 +1,7 @@
 import {
   analyzeOrGroups,
   buildFacetDisplayLookup,
+  displayStateFor,
   type FacetDisplayState,
   getFacetValues,
 } from "@langwatch/trace-contract";
@@ -423,7 +424,7 @@ export function useFilterSidebarData() {
     const getFor =
       (field: string) =>
       (value: string): FacetDisplayState =>
-        facetStateLookup.get(`${field}|${value}`) ?? "neutral";
+        displayStateFor({ lookup: facetStateLookup, field, value });
     const keys = [...categoricals.map((c) => c.key), ...discreteEligible.keys()];
     return new Map(keys.map((key) => [key, getFor(key)]));
   }, [categoricals, discreteEligible, facetStateLookup]);
@@ -462,6 +463,8 @@ export function useFilterSidebarData() {
     attributeSections,
     facetItems,
     getValueStates,
+    /** What each row shows, keyed by `${field}|${value}`: one walk of the query per change. */
+    displayStates: facetStateLookup,
     facetsLoading,
     descriptors,
     /** What the counts beside the values mean while a query is in flight. */

@@ -280,6 +280,19 @@ export function buildFacetDisplayLookup(ast: LiqeQuery): ReadonlyMap<string, Fac
   return map;
 }
 
+/** One row's display state from a lookup, neutral when the query does not name it. */
+export function displayStateFor({
+  lookup,
+  field,
+  value,
+}: {
+  lookup: ReadonlyMap<string, FacetDisplayState>;
+  field: string;
+  value: string;
+}): FacetDisplayState {
+  return lookup.get(`${field}|${value}`) ?? "neutral";
+}
+
 /** The explicit `field:[a TO b]` range on one Tag, or none when it is not one. */
 function extractExplicitRange(
   node: Extract<LiqeQuery, { type: "Tag" }>,
