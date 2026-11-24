@@ -48,8 +48,8 @@ func hasControl(s string) bool {
 
 // restMethod maps an HTTP+JSON method and path to its A2A method name, and
 // reports whether the pair is an A2A operation. Anything else is refused
-// before it reaches the upstream.
-func restMethod(httpMethod, rest string) (string, bool) {
+// before it reaches the upstream. escaped is rest as the caller sent it.
+func restMethod(httpMethod, rest, escaped string) (string, bool) {
 	get, post := httpMethod == http.MethodGet, httpMethod == http.MethodPost
 	task, isTask := strings.CutPrefix(rest, "/tasks/")
 	switch {
@@ -64,15 +64,20 @@ func restMethod(httpMethod, rest string) (string, bool) {
 	case get && rest == "/tasks":
 		return "ListTasks", true
 	case isTask:
-		return taskMethod(httpMethod, task)
+		// Segments map one to one, so the escaped text after the first is the task's.
+		_, escapedTask, _ := strings.Cut(strings.TrimPrefix(escaped, "/"), "/")
+		return taskMethod(httpMethod, task, escapedTask)
 	}
 	return fmt.Sprintf("%s %s", httpMethod, rest), false
 }
 
-// taskMethod maps the part after /tasks/ to its A2A method name.
-func taskMethod(httpMethod, task string) (string, bool) {
-	id, sub, hasSub := strings.Cut(task, "/")
-	id, verb, hasVerb := strings.Cut(id, ":")
+// taskMethod maps the part after /tasks/ to its A2A method name. The action
+// suffix is read from the escaped id, so an escaped colon (team%3A42) stays
+// part of the task id and only a literal one starts an action.
+func taskMethod(httpMethod, task, escapedTask string) (string, bool) {
+	_, sub, hasSub := strings.Cut(task, "/")
+	escapedID, _, _ := strings.Cut(escapedTask, "/")
+	id, verb, hasVerb := strings.Cut(escapedID, ":")
 	if id == "" || (hasVerb && hasSub) {
 		return httpMethod + " /tasks/" + task, false
 	}

@@ -27,6 +27,9 @@ export interface SearchFieldMeta {
 
 export type FacetState = "neutral" | "include" | "exclude";
 
+/** What a sidebar row shows: a term not every result must match is "grouped" (#9810). */
+export type FacetDisplayState = FacetState | "grouped";
+
 export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
   origin: {
     label: "Origin",
