@@ -2,6 +2,8 @@
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import type {
   RecordBudgetCrossingCommandData,
+  RecordUnbudgetedSpendCommandData,
+  RecordVkFirstRequestCommandData,
   RecordVkLifecycleCommandData,
 } from "@langwatch/gateway-contract";
 
@@ -12,7 +14,9 @@ import {
   isKeyOwnBudget,
   keyBudgetPeriodEndOf,
   keyBudgetThresholdSignal,
+  keyFirstRequestSignal,
   pickKeyRecipient,
+  spendWithoutBudgetSignal,
   virtualKeyCreatedSignal,
 } from "../rules/nurturing-gateway-facts.rules.ts";
 import { isLiveKey, isPersonKey } from "../rules/nurturing-virtual-key.rules.ts";
@@ -41,8 +45,8 @@ type Deliver = (signal: NurturingSignal) => Promise<void>;
 
 /**
  * Turns gateway's key facts into one person's signal, reading only nurturing's own copies: a
- * created person's key, and its budget's crossings. Machine-owned keys, unknown keys and keys
- * nobody can be found for send nothing.
+ * created person's key, its first request and its budget's crossings, and an organization's
+ * unbudgeted spend. Machine-owned keys, unknown keys and keys nobody can be found for send nothing.
  * Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
  */
 export class NurturingGatewayFactsService {
@@ -104,6 +108,52 @@ export class NurturingGatewayFactsService {
   }
 
   /**
+   * A live USER key's first request, told to whoever its creation was told to: the person a
+   * campaign waiting on the key's first use reads.
+   */
+  async keyFirstRequested({
+    data,
+    deliver,
+  }: Readonly<{ data: RecordVkFirstRequestCommandData; deliver: Deliver }>): Promise<void> {
+    const { virtual_key_id: virtualKeyId, organization_id: organizationId } = data;
+    const [key] = await this.dependencies.keys.findKey({ organizationId, virtualKeyId });
+    if (!key) {
+      this.dependencies.logger.warn(
+        { virtualKeyId, reason: "key_not_copied" },
+        "a key's first request names a key nurturing holds no copy of; nothing is sent",
+      );
+      return;
+    }
+    if (!isPersonKey(key.purpose) || !isLiveKey(key)) return;
+    const userId = await this.recipientOf({
+      organizationId,
+      virtualKeyId,
+      holders: [key.principalUserId, key.creatorUserId],
+    });
+    if (!userId) return this.noRecipient({ virtualKeyId, fact: "key_first_request" });
+    await deliver(keyFirstRequestSignal({ data, userId }));
+  }
+
+  /**
+   * An organization's week of spend on keys no budget applies to, told to its admin while they are
+   * a current member and not erased; the keys' holders are not told, the budget being the admin's.
+   */
+  async unbudgetedSpendRecorded({
+    data,
+    deliver,
+  }: Readonly<{ data: RecordUnbudgetedSpendCommandData; deliver: Deliver }>): Promise<void> {
+    const userId = await this.recipientOf({
+      organizationId: data.organization_id,
+      virtualKeyId: null,
+      holders: [],
+    });
+    if (!userId) {
+      return this.noRecipient({ virtualKeyId: null, fact: "gateway_spend_without_budget" });
+    }
+    await deliver(spendWithoutBudgetSignal({ data, userId }));
+  }
+
+  /**
    * The key's holder, its creator or the organization's admin, whoever is a current member and
    * not erased. An erased person is dropped before the choice, so is never warned of as passed
    * over: a raw fact still names them, and a join racing their erasure can leave a member row
@@ -115,7 +165,8 @@ export class NurturingGatewayFactsService {
     holders: named,
   }: Readonly<{
     organizationId: string;
-    virtualKeyId: string;
+    /** Null for an organization's fact, which names no one key. */
+    virtualKeyId: string | null;
     holders: readonly (string | null)[];
   }>): Promise<string | null> {
     const isSomeone = (userId: string | null): userId is string => userId !== null;
@@ -146,7 +197,7 @@ export class NurturingGatewayFactsService {
   private noRecipient({
     virtualKeyId,
     fact,
-  }: Readonly<{ virtualKeyId: string; fact: string }>): void {
+  }: Readonly<{ virtualKeyId: string | null; fact: string }>): void {
     this.dependencies.logger.debug(
       { virtualKeyId, fact, reason: "no_recipient" },
       "a gateway key fact finds no current member to tell, the admin included; nothing is sent",

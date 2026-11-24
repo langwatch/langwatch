@@ -1,4 +1,4 @@
-Feature: Customer.io hears when a person's gateway key is created and when its budget nears or hits its limit
+Feature: Customer.io hears when a person's gateway key is created, first used, and when its budget nears or hits its limit
   Gateway records a key's lifecycle and its budget's crossings as its own facts. Nurturing copies
   each key from the lifecycle facts and reads only its own copies (ADR-001): the key's name, the
   person it acts for, the person who created it, its purpose and its state. The copy is a peer map
@@ -7,6 +7,9 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
   fact: the key's holder if they are a current member of its organization, else its creator if
   they are, else the organization's admin if they are, else no one. Connect and Langy keys send
   nothing. A key no person holds or made goes to the organization's admin.
+  Gateway also records a key's first admitted request; the person told of the key's creation
+  is then identified with has_app_request true. On every sweep, gateway records an
+  organization's person keys that spent without a budget; its admin is told once a week at most.
 
   @unit
   Scenario: A created person's key sets has_virtual_key and sends virtual_key_created
@@ -63,6 +66,22 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
     When gateway records its crossing with the period end it computed
     Then budget_period_end is 31 March as an ISO-8601 UTC string
     And a TOTAL budget's crossing sends budget_period_end null
+
+  @unit
+  Scenario: A threshold crossing names the model the key spent most on
+    Given a copied USER key whose holder is a current member
+    And gateway's crossing names gpt-5-mini with 0.62 of the key's spend this period
+    When the crossing is delivered, then its breach, and the crossing again
+    Then each sends key_budget_threshold with key_top_model gpt-5-mini and key_top_model_share 62, a whole percent, beside every attribute sent before
+    And the redelivered crossing sends nothing more
+    And an even split sends gateway's model at 50
+
+  @unit
+  Scenario: A crossing that names no top model sends no top-model properties
+    Given a crossing whose top-model read failed in gateway, or one stored before gateway named a top model
+    When it is delivered
+    Then key_budget_threshold carries every attribute sent before
+    And neither key_top_model nor key_top_model_share is sent, not even as null
 
   @unit
   Scenario: A crossing of an organization, project or team budget sends nothing
@@ -298,6 +317,113 @@ Feature: Customer.io hears when a person's gateway key is created and when its b
     Given two people's erasures were recorded in Postgres, one of them twice
     When nurturing asks which of 2,500 people, those two among them, are erased
     Then it names only the two erased people, each once, reading at most 1,000 ids at a time
+
+  @unit
+  Scenario: A key's first request sets has_app_request on the person told of the key
+    Given a copied USER key whose holder is a current member
+    When gateway records the key's first request
+    Then Customer.io identifies the holder with has_app_request true
+    And no track is sent
+    And no further request on the key sends anything, gateway recording the first only
+
+  @unit
+  Scenario: A key's first request is told to whoever its creation was told to
+    Given a copied USER key whose holder and creator are each a current member, a disabled member or no member at all
+    When gateway records the key's first request
+    Then has_app_request goes to the holder, else the creator, else the organization's admin, as virtual_key_created did
+    And no one is identified when none of them is a current member
+
+  @unit
+  Scenario: A first request on a key nurturing does not tell of sends nothing
+    Given a CONNECT or LANGY key, a revoked or disabled key, or a key nurturing holds no copy of
+    When gateway records the key's first request
+    Then Customer.io receives no call
+    And the uncopied key logs a warning
+
+  @unit
+  Scenario: A key's first request delivered twice identifies once
+    Given a copied USER key's first-request fact
+    When it is delivered twice
+    Then Customer.io receives one has_app_request identify
+
+  @unit
+  Scenario: A refused has_app_request identify is retried
+    Given Customer.io refuses the first has_app_request identify
+    When the fact is delivered, then retried
+    Then the first delivery fails so its job is retried
+    And the retry sends the identify once
+
+  @integration
+  Scenario: A key's first request delivered twice identifies once over Redis claims
+    Given nurturing's delivery claims in Redis
+    When a key's first-request fact is delivered twice
+    Then Customer.io receives one has_app_request identify
+
+  @unit
+  Scenario: Unbudgeted spend sends gateway_spend_without_budget to the organization's admin
+    Given gateway records that an organization's person keys spent without a budget this week
+    When the fact is delivered
+    Then Customer.io tracks one gateway_spend_without_budget to the organization's admin
+    And it carries keys (name and spend of at most five), key_count, total_spend and organization_id, and no key id
+    And each spend and total_spend is a number rounded to cents
+    And its message id is "<organization>:unbudgeted:<ISO week>"
+
+  @unit
+  Scenario: Unbudgeted spend with no admin to tell sends nothing
+    Given the organization's copied admin is no current member, or it has no copied admin
+    When gateway's unbudgeted-spend fact is delivered
+    Then Customer.io receives no call
+    And the dropped fact is logged at debug level
+
+  @unit
+  Scenario: Unbudgeted spend delivered twice tracks once
+    Given an organization's unbudgeted-spend fact for one ISO week
+    When it is delivered twice
+    Then Customer.io receives one gateway_spend_without_budget
+    And the next week's fact sends again
+
+  @unit
+  Scenario: Two sweeps' facts in one ISO week send once
+    Given gateway records an organization's unbudgeted spend on two sweeps of one ISO week, with different spend and instants
+    When both facts are delivered
+    Then Customer.io receives one gateway_spend_without_budget, with the first fact's figures
+
+  @integration
+  Scenario: Unbudgeted spend delivered twice tracks once over Redis claims
+    Given nurturing's delivery claims in Redis
+    When an organization's unbudgeted-spend fact is delivered twice
+    Then Customer.io receives one gateway_spend_without_budget
+
+  # --- AC Coverage Map (gateway_spend_without_budget) ---
+  # "budgeted keys left out, $5 edge, top 5"     -> gateway's gateway-governance-events.feature
+  # "one track with the template's payload"      -> Scenario: Unbudgeted spend sends gateway_spend_without_budget to the organization's admin
+  # "no admin, no send"                          -> Scenario: Unbudgeted spend with no admin to tell sends nothing
+  # "redelivery once, memory and Redis"          -> Scenario: Unbudgeted spend delivered twice tracks once
+  #                                               -> Scenario: Unbudgeted spend delivered twice tracks once over Redis claims
+  # "at most weekly per organization"            -> Scenario: Two sweeps' facts in one ISO week send once
+  # "replay never sends"                         -> eventing/__tests__/nurturing-replay.no-send.unit.test.ts
+
+  # --- AC Coverage Map (key_top_model) ---
+  # AC 1: "62% on gpt-5-mini, every property"        -> Scenario: A threshold crossing names the model the key spent most on
+  # AC 2: "breach carries the figures"           -> Scenario: A threshold crossing names the model the key spent most on
+  # AC 3: "delivered twice, one track"           -> Scenario: A threshold crossing names the model the key spent most on
+  # AC 4: "50/50: first by name, 50"             -> Scenario: A threshold crossing names the model the key spent most on
+  #                                               -> gateway's gateway-governance-events.feature (the tie)
+  # AC 5: "model read fails: no properties"      -> Scenario: A crossing that names no top model sends no top-model properties
+  #                                               -> gateway's gateway-governance-events.feature (the failed read)
+  # AC 6: "stored before: as today"              -> Scenario: A crossing that names no top model sends no top-model properties
+  # AC 7: "keyless crossings send nothing"       -> Scenario: A crossing of an organization, project or team budget sends nothing
+  # AC 8: "one by-model read per crossing"       -> gateway's gateway-governance-events.feature
+
+  # --- AC Coverage Map (has_app_request) ---
+  # "one identify, no track"                     -> Scenario: A key's first request sets has_app_request on the person told of the key
+  # "same recipient as virtual_key_created"      -> Scenario: A key's first request is told to whoever its creation was told to
+  # "Connect, Langy, uncopied, revoked, disabled" -> Scenario: A first request on a key nurturing does not tell of sends nothing
+  # "redelivery once, memory and Redis"          -> Scenario: A key's first request delivered twice identifies once
+  #                                               -> Scenario: A key's first request delivered twice identifies once over Redis claims
+  # "refused call retries"                       -> Scenario: A refused has_app_request identify is retried
+  # "first request only, racing batches once"    -> gateway's gateway-governance-events.feature
+  # "replay never sends"                         -> eventing/__tests__/nurturing-replay.no-send.unit.test.ts
 
   # --- AC Coverage Map (langwatch/tasks#1200) ---
   # AC 1: "null purpose counts as USER"          -> unit only: nurturing-virtual-key.rules.unit.test.ts

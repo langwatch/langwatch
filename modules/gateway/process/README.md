@@ -1926,12 +1926,15 @@ Declared at `src/eventing/gateway-connect-managed-key.pipeline.ts:63`. Events: `
 
 ### Pipeline `governance_events_processing` (aggregate `governance_subject`)
 
-Declared at `src/eventing/gateway-governance-events.pipeline.ts:34`. Events: `gatewayVkLifecycleEventSchema`, `gatewayBudgetCrossingEventSchema`.
+Declared at `src/eventing/gateway-governance-events.pipeline.ts:54`. Events: `gatewayVkLifecycleEventSchema`, `gatewayBudgetCrossingEventSchema`, `gatewayVkFirstRequestEventSchema`, `gatewayUnbudgetedSpendEventSchema`.
 
-| Kind    | Name                   | Handles | Declared at                                             |
-| ------- | ---------------------- | ------- | ------------------------------------------------------- |
-| command | `recordVkLifecycle`    | –       | `src/eventing/gateway-governance-events.pipeline.ts:39` |
-| command | `recordBudgetCrossing` | –       | `src/eventing/gateway-governance-events.pipeline.ts:40` |
+| Kind            | Name                    | Handles                                                                                         | Declared at                                             |
+| --------------- | ----------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| command         | `recordVkLifecycle`     | –                                                                                               | `src/eventing/gateway-governance-events.pipeline.ts:64` |
+| command         | `recordBudgetCrossing`  | –                                                                                               | `src/eventing/gateway-governance-events.pipeline.ts:65` |
+| command         | `recordVkFirstRequest`  | –                                                                                               | `src/eventing/gateway-governance-events.pipeline.ts:66` |
+| command         | `recordUnbudgetedSpend` | –                                                                                               | `src/eventing/gateway-governance-events.pipeline.ts:67` |
+| process manager | `unbudgetedSpendSweep`  | every 6 h (`UNBUDGETED_SPEND_SWEEP_INTERVAL_MS = 6 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/gateway-governance-events.pipeline.ts:68` |
 
 ### Pipeline `gateway_instant_eval_judge_spend` (aggregate `global`)
 
@@ -1991,9 +1994,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                    | Declared at                            |
 | ------ | ----------------------------- | --------------------------------------- | -------------------------------------- |
-| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1179`          |
-| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1180`          |
-| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1181`          |
+| secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1183`          |
+| secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1184`          |
+| secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1185`          |
 | config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:27` |
 | config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:29` |
 | config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:31` |

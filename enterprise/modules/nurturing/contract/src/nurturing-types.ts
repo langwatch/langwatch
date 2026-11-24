@@ -116,6 +116,8 @@ export interface CioPersonTraits extends CioOrganizationUsageTraits {
   saw_langy_first_message?: boolean;
   // A gateway key was created for or by the person; only ever set true, so a revoke keeps it
   has_virtual_key?: boolean;
+  // A gateway key told to the person served its first request; only ever set true
+  has_app_request?: boolean;
 
   // Evaluation milestones
   has_evaluations: boolean;
@@ -228,7 +230,9 @@ export type CioEventName =
   | "self_hosted_license_sync_stale"
   | "virtual_key_created"
   /** A key's budget crossed its warn line or its limit; `budget_reached` tells them apart. */
-  | "key_budget_threshold";
+  | "key_budget_threshold"
+  /** An organization's person keys spent without a budget this week; to its admin, weekly. */
+  | "gateway_spend_without_budget";
 
 // ---------------------------------------------------------------------------
 // Batch call discriminated union

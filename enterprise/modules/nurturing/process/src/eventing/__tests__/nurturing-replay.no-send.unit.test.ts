@@ -26,7 +26,11 @@ import {
   replayProjectionsOf,
   sealPipelineDefinition,
 } from "@langwatch/eventing";
-import { GATEWAY_VK_LIFECYCLE_EVENT_TYPE } from "@langwatch/gateway-contract";
+import {
+  GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
+  GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
+  GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
+} from "@langwatch/gateway-contract";
 import {
   USER_ERASED_EVENT_TYPE as IDENTITY_USER_ERASED_EVENT_TYPE,
   USER_IDENTITY_AGGREGATE_TYPE,
@@ -65,7 +69,11 @@ import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nu
 import { utcDayOf } from "../../rules/nurturing-time.rules.ts";
 import { traceCountsOf } from "../../rules/nurturing-trace-day.rules.ts";
 import { buildNurturingProjectUsagePipeline } from "../nurturing-project-usage.pipeline.ts";
-import { lifecycleFact } from "./nurturing-gateway-facts.test-helpers.ts";
+import {
+  firstRequestFact,
+  lifecycleFact,
+  unbudgetedSpendFact,
+} from "./nurturing-gateway-facts.test-helpers.ts";
 import {
   ADMINS_STEP,
   AUTH_MEMBERS_STEP,
@@ -160,10 +168,13 @@ const projectFact = (type: string, projectId: string, data: Record<string, unkno
 /**
  * One owner fact for each of the seventeen lanes the deploy replays: the two erasure marks, the
  * key, the evaluation day, the plan, the organization, project and trace copies, and the two
- * trace-day folds.
+ * trace-day folds. Gateway's first-request and unbudgeted-spend facts sit in the log too: only a
+ * live subscriber reads them, so no step sends them.
  */
 function ownerLogs(): ReplayEvent[] {
   const gateway = lifecycleFact({ occurred_at: AT });
+  const firstRequest = firstRequestFact({ occurred_at: AT });
+  const unbudgeted = unbudgetedSpendFact({ occurred_at: AT });
   return [
     // User marks, identity marks.
     logged({
@@ -194,6 +205,22 @@ function ownerLogs(): ReplayEvent[] {
       tenantId: gateway.tenantId,
       version: "2026-07-31",
       data: gateway,
+    }),
+    logged({
+      type: GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
+      aggregateType: "governance_subject",
+      aggregateId: `vk:${firstRequest.virtual_key_id}`,
+      tenantId: firstRequest.tenantId,
+      version: "2026-07-31",
+      data: firstRequest,
+    }),
+    logged({
+      type: GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
+      aggregateType: "governance_subject",
+      aggregateId: `org:${unbudgeted.organization_id}`,
+      tenantId: unbudgeted.tenantId,
+      version: "2026-07-31",
+      data: unbudgeted,
     }),
     // Evaluation days.
     logged({

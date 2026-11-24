@@ -11,10 +11,15 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
+  fireGatewayKeySignal,
+  fireKeyBudgetThreshold,
   fireVirtualKeyCreated,
   isKeyOwnBudget,
+  type KeyBudgetThresholdSignal,
   keyBudgetPeriodEndOf,
+  keyFirstRequestSignal,
   type KeyRecipient,
+  keyTopModelOf,
   pickKeyRecipient,
   virtualKeyCreatedSignal,
 } from "../nurturing-gateway-facts.rules.ts";
@@ -263,6 +268,112 @@ describe("isKeyOwnBudget", () => {
         const keyless = crossing({ scope_type: scope, virtual_key_id: null });
 
         expect(isKeyOwnBudget(keyless), scope).toBe(false);
+      }
+    });
+  });
+});
+
+describe("fireKeyFirstRequest", () => {
+  const signal = keyFirstRequestSignal({
+    data: {
+      tenantId: "project-1",
+      organization_id: "org-1",
+      virtual_key_id: "vk_1",
+      occurred_at: 3_000,
+    },
+    userId: "user-holder",
+  });
+
+  describe("given a key's first request told to its holder", () => {
+    /** @scenario "A key's first request sets has_app_request on the person told of the key" */
+    it("is one identify setting has_app_request true, and no track", () => {
+      expect(fireGatewayKeySignal(signal)).toEqual([
+        { type: "identify", userId: "user-holder", traits: { has_app_request: true } },
+      ]);
+    });
+
+    it("is claimed once per key", () => {
+      expect(signal).toMatchObject({
+        kind: "key_first_request",
+        sourceEventId: "vk_1:first_request",
+      });
+    });
+  });
+});
+
+describe("keyTopModelOf", () => {
+  describe("given gateway's top model and its share of the spend", () => {
+    /** @scenario "A threshold crossing names the model the key spent most on" */
+    it("is the model with its share as a whole percent, rounded", () => {
+      expect(keyTopModelOf({ top_model: "gpt-5-mini", top_model_spend_share: 0.624 })).toEqual({
+        topModel: "gpt-5-mini",
+        topModelShare: 62,
+      });
+      expect(keyTopModelOf({ top_model: "gpt-5-mini", top_model_spend_share: 1 })).toEqual({
+        topModel: "gpt-5-mini",
+        topModelShare: 100,
+      });
+      expect(keyTopModelOf({ top_model: "gpt-5-mini", top_model_spend_share: 0.5 })).toEqual({
+        topModel: "gpt-5-mini",
+        topModelShare: 50,
+      });
+    });
+  });
+
+  describe("given a fact naming no model, or a model without its share", () => {
+    /** @scenario "A crossing that names no top model sends no top-model properties" */
+    it("is neither", () => {
+      expect(keyTopModelOf({})).toEqual({});
+      expect(keyTopModelOf({ top_model: null, top_model_spend_share: null })).toEqual({});
+      expect(keyTopModelOf({ top_model: "gpt-5-mini" })).toEqual({});
+      expect(keyTopModelOf({ top_model_spend_share: 0.62 })).toEqual({});
+    });
+  });
+});
+
+describe("fireKeyBudgetThreshold", () => {
+  const signal: KeyBudgetThresholdSignal = {
+    kind: "key_budget_threshold",
+    sourceEventId: "budget-1:threshold_crossed:1000000:vk_1",
+    tenantId: "project-1",
+    occurredAt: 5_000,
+    userId: "user-holder",
+    organizationId: "org-1",
+    virtualKeyId: "vk_1",
+    keyName: "Jane's key",
+    limitUsd: 100,
+    spentUsd: 84.5,
+    reached: false,
+    onBreach: "warn",
+    window: "month",
+    scopeType: "virtual_key",
+  };
+  const propertiesOf = (sent: KeyBudgetThresholdSignal) => {
+    const [call] = fireKeyBudgetThreshold(sent);
+    return call?.type === "track" ? call.properties : undefined;
+  };
+
+  describe("given a signal naming the key's top model", () => {
+    /** @scenario "A threshold crossing names the model the key spent most on" */
+    it("tracks key_top_model and key_top_model_share alongside every other property", () => {
+      expect(propertiesOf({ ...signal, topModel: "gpt-5-mini", topModelShare: 62 })).toMatchObject({
+        key_name: "Jane's key",
+        key_budget: 100,
+        key_spend: 84.5,
+        key_top_model: "gpt-5-mini",
+        key_top_model_share: 62,
+      });
+    });
+  });
+
+  describe("given a signal naming none", () => {
+    /** @scenario "A crossing that names no top model sends no top-model properties" */
+    it("leaves both properties out rather than sending null", () => {
+      for (const sent of [signal, { ...signal, topModel: null, topModelShare: null }]) {
+        const properties = propertiesOf(sent);
+
+        expect(properties).not.toHaveProperty("key_top_model");
+        expect(properties).not.toHaveProperty("key_top_model_share");
       }
     });
   });

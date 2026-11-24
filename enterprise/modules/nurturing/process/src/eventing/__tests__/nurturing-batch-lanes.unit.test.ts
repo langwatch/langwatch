@@ -31,6 +31,8 @@ function nurturingRecordingDeliveries() {
     forgetErasedUser: async () => undefined,
     virtualKeyCreated: async () => undefined,
     keyBudgetCrossed: async () => undefined,
+    keyFirstRequested: async () => undefined,
+    unbudgetedSpendRecorded: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<

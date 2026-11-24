@@ -20,6 +20,7 @@ import type {
   GatewayBudgetSpendRecord,
   GatewayBudgetSpendRepository,
   LedgerEventRow,
+  ModelSpend,
   PulledUsageRow,
   PulledUsageTotals,
   ScopeSpend,
@@ -224,6 +225,29 @@ export class MemoryGatewayBudgetSpendRepository implements GatewayBudgetSpendRep
     return [...spentByBucket.entries()]
       .map(([scopeId, nano]) => ({ scopeId, ...spentFromNano(nano) }))
       .toSorted((left, right) => (left.scopeId < right.scopeId ? -1 : 1));
+  }
+
+  async findModelSpendForTarget({
+    tenantIds,
+    target,
+  }: {
+    tenantIds: string[];
+    target: BudgetSpendTarget & { periodFloorMs: number };
+  }): Promise<ModelSpend[]> {
+    const tenants = new Set(tenantIds);
+    const spentByModel = new Map<string, bigint>();
+    for (const row of this.#successful()) {
+      if (
+        !tenants.has(row.tenantId) ||
+        row.window !== target.window ||
+        !matchesTarget(row, target) ||
+        row.occurredAtMs < target.periodFloorMs
+      ) {
+        continue;
+      }
+      spentByModel.set(row.model, (spentByModel.get(row.model) ?? 0n) + row.amountNanoUsd);
+    }
+    return [...spentByModel.entries()].map(([model, spentNanoUsd]) => ({ model, spentNanoUsd }));
   }
 
   async recentEventsForBudget(

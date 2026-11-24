@@ -106,6 +106,8 @@ function nurturingOverCopies() {
     forgetErasedUser: (input) => userErasure.forgetUser(input),
     virtualKeyCreated: async () => undefined,
     keyBudgetCrossed: async () => undefined,
+    keyFirstRequested: async () => undefined,
+    unbudgetedSpendRecorded: async () => undefined,
   });
   // The copies of project facts are maps on the usage host, writing the same rows the subscribers did.
   const usagePipeline = buildNurturingProjectUsagePipeline({

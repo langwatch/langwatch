@@ -40,3 +40,37 @@ export function computePeriodEndsAtMs({
   if (!GatewayWindow.isCyclicWindow(budget.window)) return null;
   return GatewayWindow.nextBoundaryFor({ budget, now }).epochMilliseconds;
 }
+
+/**
+ * The model a bucket spent most on, and its share of the bucket's spend from 0 to 1; or none,
+ * when nothing was spent or the winner carries no name.
+ */
+export type BucketTopModel =
+  | Readonly<{ outcome: "named"; model: string; share: number }>
+  | Readonly<{ outcome: "none" }>;
+
+/** Most spend first, then by name, so a redelivered crossing names the same model. */
+function byMostSpendThenName(
+  left: Readonly<{ model: string; spentNanoUsd: bigint }>,
+  right: Readonly<{ model: string; spentNanoUsd: bigint }>,
+): number {
+  if (left.spentNanoUsd !== right.spentNanoUsd) {
+    return left.spentNanoUsd > right.spentNanoUsd ? -1 : 1;
+  }
+  if (left.model === right.model) return 0;
+  return left.model < right.model ? -1 : 1;
+}
+
+/** The model with the most spend, ties to the first by name. */
+export function topModelOf(
+  spend: readonly Readonly<{ model: string; spentNanoUsd: bigint }>[],
+): BucketTopModel {
+  const total = spend.reduce((sum, { spentNanoUsd }) => sum + spentNanoUsd, 0n);
+  const [top] = spend.toSorted(byMostSpendThenName);
+  if (total <= 0n || !top?.model || top.spentNanoUsd <= 0n) return { outcome: "none" };
+  return {
+    outcome: "named",
+    model: top.model,
+    share: Math.min(1, Number(top.spentNanoUsd) / Number(total)),
+  };
+}

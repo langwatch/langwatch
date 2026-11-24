@@ -450,6 +450,35 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     scopeType: id,
     /** ISO-8601 UTC; null for a window that never rolls; absent when gateway named no end. */
     periodEnd: z.string().nullish(),
+    /** The model the key spent most on this period; absent when gateway named none. */
+    topModel: z.string().nullish(),
+    /** That model's share of the key's spend as a whole percent, 0 to 100; absent with it. */
+    topModelShare: z.number().nullish(),
+  }),
+  z.object({
+    /** A person's key served its first request. `sourceEventId` is the key and `first_request`. */
+    kind: z.literal("key_first_request"),
+    ...signalSource,
+    /** Whoever the key's creation goes to: its holder, else its creator, else the admin. */
+    userId: id,
+    organizationId: id,
+    virtualKeyId: id,
+  }),
+  z.object({
+    /**
+     * An organization's person keys spent without a budget this week. `sourceEventId` is
+     * `<organization>:unbudgeted:<ISO week>`, once per organization per week.
+     */
+    kind: z.literal("gateway_spend_without_budget"),
+    ...signalSource,
+    /** The organization's admin. */
+    userId: id,
+    organizationId: id,
+    /** The keys that spent most, most first, at most five. */
+    keys: z.array(z.object({ name: z.string(), spendUsd: z.number() })),
+    /** Every key that spent without a budget, named or not. */
+    keyCount: z.number().int().positive(),
+    totalSpendUsd: z.number(),
   }),
 ]);
 export interface NurturingSignalSchema extends Named<typeof nurturingSignalSchemaDefinition> {}

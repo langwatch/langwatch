@@ -8,6 +8,7 @@ import { ZodError } from "zod";
 
 import {
   recordBudgetCrossingCommandDataSchema,
+  recordVkFirstRequestCommandDataSchema,
   recordVkLifecycleCommandDataSchema,
   virtualKeyPurposeSchema,
 } from "../index.ts";
@@ -63,6 +64,20 @@ describe("gateway's governance facts", () => {
 
       expect(parsed).toMatchObject(storedCrossing);
       expect(parsed.period_ends_at_ms ?? null).toBeNull();
+      expect(parsed).not.toHaveProperty("top_model");
+      expect(parsed).not.toHaveProperty("top_model_spend_share");
+    });
+  });
+
+  describe("when a key budget's crossing names its top model", () => {
+    /** @scenario "A key budget's crossing names the model it spent most on" */
+    it("parses the model and its share, and refuses a share outside 0 to 1", () => {
+      const named = { ...storedCrossing, top_model: "gpt-5-mini", top_model_spend_share: 0.62 };
+
+      expect(recordBudgetCrossingCommandDataSchema.parse(named)).toMatchObject(named);
+      expect(() =>
+        recordBudgetCrossingCommandDataSchema.parse({ ...named, top_model_spend_share: 62 }),
+      ).toThrow(ZodError);
     });
   });
 
@@ -80,6 +95,23 @@ describe("gateway's governance facts", () => {
     it("refuses it, so a new purpose is a contract change rather than a silent USER", () => {
       expect(() =>
         recordVkLifecycleCommandDataSchema.parse({ ...storedLifecycle, purpose: "ROBOT" }),
+      ).toThrow(ZodError);
+    });
+  });
+
+  describe("when a key's first-request fact is read", () => {
+    /** @scenario "A key's first admitted request records one first-request fact" */
+    it("parses the key and its organization, and refuses one naming no key", () => {
+      const fact = {
+        tenantId: "proj_1",
+        organization_id: "org_1",
+        virtual_key_id: "vk_1",
+        occurred_at: 1_753_800_000_000,
+      };
+
+      expect(recordVkFirstRequestCommandDataSchema.parse(fact)).toEqual(fact);
+      expect(() =>
+        recordVkFirstRequestCommandDataSchema.parse({ ...fact, virtual_key_id: "" }),
       ).toThrow(ZodError);
     });
   });
