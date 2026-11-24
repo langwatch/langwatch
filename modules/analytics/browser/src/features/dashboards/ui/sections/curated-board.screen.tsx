@@ -1,11 +1,12 @@
 /**
- * `/<project>/dashboards/curated/<templateId>`: a From LangWatch board, a template live and
- * read-only, stored nowhere until "Duplicate to edit" or a widget picked for a new board
+ * `/<project>/dashboards/curated/<templateId>`: a From LangWatch board, a template live and stored
+ * nowhere. A member who may make boards gets every edit; the first asks, then makes their own copy
  * (dashboards-v2.feature). `organization-curated.screen.tsx` opens it at the organization level.
  */
 
 import { UiPageNotFound } from "@langwatch/browser/page-fallbacks";
-import { VStack } from "@langwatch/design-system/primitives";
+import { Button, VStack } from "@langwatch/design-system/primitives";
+import { LayoutTemplate } from "lucide-react";
 
 import {
   DashboardRefetchIntervalContext,
@@ -13,6 +14,7 @@ import {
 } from "../../../../behavior/use-dashboard-auto-refresh.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { DashboardRefreshedAtContext } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
+import { useAddTemplate } from "../../behavior/use-add-template.ts";
 import { useBlockPickerAddress } from "../../behavior/use-block-picker-address.ts";
 import { useBoardReader } from "../../behavior/use-board-access.ts";
 import { useBoardFromTemplate } from "../../behavior/use-board-from-template.ts";
@@ -20,6 +22,7 @@ import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.t
 import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
+import { useModifyCurated } from "../../behavior/use-modify-curated.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useStoreProject } from "../../behavior/use-store-project.ts";
 import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
@@ -33,14 +36,34 @@ import {
 import { BoardLangy } from "../../langy/ui/sections/board-langy.tsx";
 import { CURATED_SEGMENT } from "../../model/boards.ts";
 import { type CuratedBoard, curatedBoardById } from "../../model/curated-boards.ts";
+import { AddBlockCard } from "../blocks/blank-board.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
 import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
 import { LimitFailedWidgetsBanner } from "../blocks/limit-failed-widgets-banner.tsx";
+import { ModifyCuratedDialog } from "../blocks/modify-curated-dialog.tsx";
+import { AddWidgetButton } from "../elements/add-widget-button.tsx";
 import { BlockPickerDialog } from "./block-picker-dialog.tsx";
 import { CuratedWidgetsGrid } from "./curated-widgets-grid.tsx";
 import { DashboardsGate } from "./dashboards-gate.tsx";
+
+/** Makes the member's own board from the template this board shows, and opens it. */
+function UseTemplateButton({ isCreating, onClick }: { isCreating: boolean; onClick: () => void }) {
+  return (
+    <Button
+      size="sm"
+      variant="solid"
+      colorPalette="accent"
+      loading={isCreating}
+      loadingText="Adding…"
+      onClick={onClick}
+    >
+      <LayoutTemplate size={14} aria-hidden />
+      Use this template
+    </Button>
+  );
+}
 
 function OpenCuratedBoard({
   board,
@@ -89,10 +112,14 @@ function OpenCuratedBoard({
     storeProject: store.storeProject,
   });
   const existingNames = atOrganization ? store.namesInStore : saved.boards.map(({ name }) => name);
+  const storedAt = { atOrganization, storeProject: store.storeProject, existingNames };
+  const template = useAddTemplate(storedAt);
+  const modify = useModifyCurated({ board, ...storedAt });
   const picker = useBlockPickerAddress();
   const openPicker = () => {
     if (!picker.isOpen) picker.open();
   };
+  const addWidget = () => modify.request({ kind: "addWidget" });
 
   return (
     <BoardPage
@@ -101,12 +128,29 @@ function OpenCuratedBoard({
           name={board.name}
           description={board.job}
           isFromLangWatch
+          {...(mayCreate
+            ? {
+                onRename: (name: string) => modify.request({ kind: "rename", name }),
+                onDescribe: (description: string) =>
+                  modify.request({ kind: "describe", description }),
+              }
+            : {})}
           pointer={{
             boardKind: "template",
             boardId: board.templateId,
             widgetCount: board.widgets.length,
           }}
-          action={null}
+          action={
+            mayCreate ? (
+              <>
+                <AddWidgetButton onClick={addWidget} />
+                <UseTemplateButton
+                  isCreating={template.creatingId !== void 0}
+                  onClick={() => void template.add(board.card.board)}
+                />
+              </>
+            ) : null
+          }
           periodControl={
             <BoardPeriodControl
               range={range}
@@ -142,6 +186,7 @@ function OpenCuratedBoard({
               total={board.widgets.length}
             />
             <CuratedWidgetsGrid
+              key={modify.gridKey}
               projectId={projectId}
               projectSlug={saved.projectSlug}
               templateId={board.templateId}
@@ -168,7 +213,16 @@ function OpenCuratedBoard({
               onLimitFailureChange={({ widget, limited }) =>
                 limitFailedWidgets.report({ key: widget.key, limited })
               }
+              {...(mayCreate
+                ? {
+                    onEdit: ({ key }) => modify.request({ kind: "editWidget", key }),
+                    onDelete: ({ key }) => modify.request({ kind: "removeWidget", key }),
+                    onPlacementsCommit: (placements) =>
+                      modify.request({ kind: "move", placements }),
+                  }
+                : {})}
             />
+            {mayCreate && <AddBlockCard onClick={addWidget} />}
           </VStack>
         </DashboardRefreshedAtContext.Provider>
       </DashboardRefetchIntervalContext.Provider>
@@ -189,6 +243,12 @@ function OpenCuratedBoard({
           onClose={picker.close}
         />
       )}
+      <ModifyCuratedDialog
+        isOpen={modify.isAsking}
+        isModifying={modify.isModifying}
+        onConfirm={() => void modify.confirm()}
+        onCancel={modify.cancel}
+      />
     </BoardPage>
   );
 }

@@ -21,10 +21,15 @@ import { useFavourites } from "../../behavior/use-favourites.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { dashboardsPath, myDashboardId } from "../../model/boards.ts";
 import { CURATED_BOARDS } from "../../model/curated-boards.ts";
-import { type SidebarBoard, type StarredLink, starredLinks } from "../../model/sidebar-boards.ts";
+import {
+  isOpenStar,
+  type SidebarBoard,
+  type StarredLink,
+  starredLinks,
+} from "../../model/sidebar-boards.ts";
 import { AddDashboardRow } from "../blocks/add-dashboard-row.tsx";
 import { SavedDashboardRow } from "../blocks/saved-dashboard-row.tsx";
-import { SidebarLinkRow } from "../blocks/sidebar-link-row.tsx";
+import { SIDEBAR_ROW_ICON_SIZE, SidebarLinkRow } from "../blocks/sidebar-link-row.tsx";
 import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 
 /** Rows shown before the rest sit behind "All pinned (N)": the sidebar stays short. */
@@ -144,11 +149,12 @@ function PinnedBoardRow({ link, board }: { link: StarredLink; board: SidebarBoar
 /** The "⋮" menu with only Unpin: a From LangWatch board, or one the member only reads. */
 function PinnedStarRow({ link }: { link: StarredLink }) {
   const favourites = useFavourites();
+  const { params } = useAnalyticsHost().route();
   return (
     <SavedDashboardRow
       name={link.name}
       href={link.href}
-      isActive={false}
+      isActive={isOpenStar({ star: link.star, params })}
       icon={<PinnedIcon />}
       actions={{
         isStarred: favourites.isStarred(link.star),
@@ -162,7 +168,7 @@ function PinnedStarRow({ link }: { link: StarredLink }) {
 }
 
 function PinnedIcon() {
-  return <LayoutDashboard size={14} strokeWidth={1.9} aria-hidden />;
+  return <LayoutDashboard size={SIDEBAR_ROW_ICON_SIZE} strokeWidth={1.9} aria-hidden />;
 }
 
 /** The saved-dashboards row menu on a pinned board: what this member may do with it. */
@@ -188,7 +194,7 @@ function ManagedBoardRow({
       <SavedDashboardRow
         name={link.name}
         href={link.href}
-        isActive={false}
+        isActive={isOpenStar({ star: link.star, params: host.route().params })}
         icon={<PinnedIcon />}
         actions={{
           isStarred: favourites.isStarred(link.star),

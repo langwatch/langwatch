@@ -1,7 +1,7 @@
 /**
- * A new board filled and opened: from a template, "Duplicate" or "Duplicate to edit". Stored in
- * the project in view, or at the organization level in the store project, Only me unless a copy
- * keeps its source's scope (ADR-002). Nothing copies a board; a failure removes the half-made one.
+ * A new board filled and opened: from a template, a duplicate or a changed From LangWatch board.
+ * Stored in the project in view, or at org level in the store project, Only me unless a copy
+ * keeps its scope (ADR-002). Nothing copies a board; a failure removes the half-made one.
  */
 
 import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
@@ -27,6 +27,7 @@ import {
   templateBoardName,
 } from "../model/boards.ts";
 import type { CuratedBoard } from "../model/curated-boards.ts";
+import type { CuratedCopySource } from "../model/curated-edits.ts";
 import { dashboardCreated } from "../model/dashboard-usage-events.ts";
 import type { WidgetQuestion } from "../model/widget-questions.ts";
 import { catalogueSource } from "../model/widget-source.ts";
@@ -52,6 +53,9 @@ const fromCatalogue = (widget: BoardTemplateWidget) => catalogueSource(widget.ke
 
 /** Where a new board opens and what the org-level notice says. */
 type Opening = { dashboardId: string; title: string };
+
+/** The address a new board opens at, given its own and its widgets' ids in the source's order. */
+type Landing = (made: { path: string; widgetIds: readonly string[] }) => string;
 
 const duplicatedAs = (name: string) => `Duplicated as "${name}"`;
 
@@ -178,15 +182,16 @@ export function useBoardFromTemplate({
       }),
     );
     await client.dashboardWidgets.batchUpdateLayouts.mutate({ projectId, layouts });
+    return layouts.map(({ graphId }) => graphId);
   };
 
   /**
    * Opens the new board where it lives; an org-level one says so first, as it opens elsewhere.
    * One made at the organization level stays at `/dashboards/<id>` (ADR-002, decision 4).
    */
-  const open = ({ dashboardId, title }: Opening) => {
+  const open = ({ dashboardId, title, at }: Opening & { at: (path: string) => string }) => {
     if (atOrganization) host.succeeded({ title });
-    host.navigate(openingPath({ atOrganization, projectSlug, dashboardId }));
+    host.navigate(at(openingPath({ atOrganization, projectSlug, dashboardId })));
   };
 
   const createFrom = async ({
@@ -195,6 +200,7 @@ export function useBoardFromTemplate({
     fallbackTitle,
     made,
     titled = (name) => `Created "${name}"`,
+    landing = ({ path }) => path,
   }: {
     source: BoardSource;
     existingNames: readonly string[];
@@ -203,6 +209,7 @@ export function useBoardFromTemplate({
     made: UiAnalyticsEvent;
     /** What the org-level notice says once the board is made, given its name. */
     titled?: (name: string) => string;
+    landing?: Landing;
   }): Promise<CreatedBoard | undefined> => {
     if (creatingId !== void 0 || projectId === "") return void 0;
     setCreatingId(source.id);
@@ -220,7 +227,7 @@ export function useBoardFromTemplate({
       const { homeProduct } = source;
       const board = await makeBoard({ client, projectId, name, scope: asked, homeProduct });
       dashboardId = board.id;
-      await fill({
+      const widgetIds = await fill({
         description: source.description,
         widgets,
         widgetSource: source.widgetSource,
@@ -229,7 +236,11 @@ export function useBoardFromTemplate({
       analytics.track(made);
       // Re-read first, so the new board is listed by the time its address opens.
       await refresh();
-      open({ dashboardId, title: titled(board.name) });
+      open({
+        dashboardId,
+        title: titled(board.name),
+        at: (path) => landing({ path, widgetIds }),
+      });
       return { id: board.id, name: board.name, widgets };
     } catch (error) {
       host.failed({ error, fallbackTitle });
@@ -317,6 +328,33 @@ export function useBoardFromTemplate({
       titled: duplicatedAs,
     });
 
+  /**
+   * A From LangWatch board the member chose to change: their own board under its name, with the
+   * change already in `board`, opened where `landing` says so the change can go on there.
+   */
+  const modifyCurated = ({
+    board,
+    existingNames,
+    landing,
+  }: {
+    board: CuratedCopySource;
+    existingNames: readonly string[];
+    landing: Landing;
+  }) =>
+    createFrom({
+      source: {
+        id: board.templateId,
+        name: board.name,
+        description: board.job,
+        widgets: () => Promise.resolve([...board.widgets]),
+        widgetSource: fromCatalogue,
+      },
+      existingNames,
+      fallbackTitle: "Couldn't make your copy of the dashboard",
+      made: dashboardCreated({ createdFrom: "duplicate_curated", templateId: board.templateId }),
+      landing,
+    });
+
   /** A From LangWatch board's picked widget as a board of its own, named after the widget. */
   const createWithWidget = async ({
     question,
@@ -345,5 +383,12 @@ export function useBoardFromTemplate({
     return created !== void 0;
   };
 
-  return { creatingId, createFromTemplate, duplicateBoard, duplicateCurated, createWithWidget };
+  return {
+    creatingId,
+    createFromTemplate,
+    duplicateBoard,
+    duplicateCurated,
+    modifyCurated,
+    createWithWidget,
+  };
 }

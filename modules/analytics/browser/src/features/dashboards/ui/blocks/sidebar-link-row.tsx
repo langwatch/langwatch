@@ -12,6 +12,37 @@ import { opensElsewhere } from "../../../../ui/elements/analytics-link.tsx";
 import { InlineTextField } from "../elements/inline-text-field.tsx";
 import { revealsBoardMenu } from "./board-menu.tsx";
 
+/** The icon edge navigation's entries draw at the sidebar's compact density. */
+export const SIDEBAR_ROW_ICON_SIZE = 15;
+
+/**
+ * Navigation's own entry at the compact density the product sidebar draws (its side-menu-link
+ * and side-menu-density): 29px tall, 8px aside, 10px gap, bodySm, `nav.*` ink and fills. Matched
+ * by token, since analytics may not import navigation's browser package.
+ */
+export function sidebarRowLook({ isActive }: { isActive: boolean }) {
+  return {
+    display: "flex",
+    alignItems: "center",
+    height: "29px",
+    gap: 2.5,
+    paddingX: 2,
+    borderRadius: "lg",
+    textStyle: "bodySm",
+    fontWeight: isActive ? "medium" : "normal",
+    color: isActive ? "fg" : "nav.fg",
+    background: isActive ? "nav.bgActive" : "transparent",
+    textDecoration: "none",
+    transition: "background-color 0.15s ease-in-out",
+    _hover: { background: "nav.bgHover" },
+  } as const;
+}
+
+/** The icon's ink beside the name, as navigation inks its own entries' icons. */
+export function sidebarRowIconColor({ isActive }: { isActive: boolean }): string {
+  return isActive ? "fg" : "nav.fgMuted";
+}
+
 /** A row with a menu: it shows the menu, and the name gives up the menu's room while it shows. */
 const MENU_ROW = {
   css: {
@@ -90,19 +121,8 @@ function RowLink({
     <ChakraLink
       href={href}
       aria-current={isActive ? "page" : void 0}
-      display="flex"
-      alignItems="center"
-      gap={2}
       width="full"
-      borderRadius="lg"
-      paddingX={2}
-      paddingY="4px"
-      textStyle="bodySm"
-      color={isActive ? "fg" : "fg.subtle"}
-      fontWeight={isActive ? "medium" : void 0}
-      background={isActive ? "border" : void 0}
-      textDecoration="none"
-      _hover={{ color: "fg", background: isActive ? "border" : "border/50" }}
+      {...sidebarRowLook({ isActive })}
       onClick={(event) => {
         if (opensElsewhere(event)) return;
         event.preventDefault();
@@ -110,7 +130,14 @@ function RowLink({
       }}
     >
       {icon && (
-        <Box as="span" display="flex" flexShrink={0} title={iconTitle} aria-hidden>
+        <Box
+          as="span"
+          display="flex"
+          flexShrink={0}
+          color={sidebarRowIconColor({ isActive })}
+          title={iconTitle}
+          aria-hidden
+        >
           {icon}
         </Box>
       )}

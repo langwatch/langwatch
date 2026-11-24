@@ -18,6 +18,7 @@ import {
   StubAnalyticsHost,
   type StubAnalyticsHostOptions,
 } from "../../../testing.tsx";
+import { CURATED_BOARDS } from "../model/curated-boards.ts";
 import OrganizationBoardScreen from "../ui/sections/organization-board.screen.tsx";
 import { NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
 
@@ -195,13 +196,13 @@ describe("a board opened at /dashboards/<id>", () => {
         expect(screen.getByRole("button", { name: "Where does my money go?" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
         const start = within(screen.getByRole("region", { name: "Start from a template" }));
-        expect(start.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
-          `/${SHOP.slug}/dashboards/curated/release`,
-          `/${SHOP.slug}/dashboards/curated/data`,
-          `/${SHOP.slug}/dashboards/curated/breaks`,
+        expect(start.getAllByRole("button").map((card) => card.getAttribute("aria-label"))).toEqual(
+          CURATED_BOARDS.map(({ name }) => `Use ${name}`),
+        );
+        expect(start.getByRole("link", { name: "View all templates" })).toHaveAttribute(
+          "href",
           `/${SHOP.slug}/dashboards/templates`,
-        ]);
-        expect(start.getByRole("link", { name: "View all templates" })).toBeInTheDocument();
+        );
       });
     });
 

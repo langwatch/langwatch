@@ -4,14 +4,11 @@
  */
 
 import type { ChartAskSubject } from "@langwatch/analytics-contract/chart-frame-protocol";
-import { Box } from "@langwatch/design-system/primitives";
-import { GripVertical } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { useReadableProjects } from "../../../../behavior/use-readable-projects.ts";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import type { WidgetFace } from "../../../../model/dashboard-widget/widget-completeness.ts";
-import { CHART_GRID_DRAG_HANDLE_CLASS } from "../../../../ui/sections/chart-grid.tsx";
 import { DashboardWidgetFrameOverWindow } from "../../../dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
 import { useWidgetClipboard } from "../../behavior/use-widget-clipboard.ts";
 import { useWidgetCsvExport } from "../../behavior/use-widget-csv-export.ts";
@@ -32,6 +29,7 @@ import { NoSourcesPicked } from "../blocks/no-sources-picked.tsx";
 import { WidgetActionRow } from "../blocks/widget-action-row.tsx";
 import { WidgetCardShell, widgetBodyHeightPx } from "../blocks/widget-card-shell.tsx";
 import { WidgetMenu } from "../blocks/widget-menu.tsx";
+import { WidgetDragHandle } from "../elements/widget-drag-handle.tsx";
 
 /** What a card asks of Langy; every one of them is absent when Langy is not available. */
 export interface WidgetCardLangy {
@@ -129,22 +127,7 @@ export function BoardWidgetCard({
       }
       controls={
         <>
-          {onEdit && (
-            <Box
-              className={CHART_GRID_DRAG_HANDLE_CLASS}
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-              boxSize={6}
-              borderRadius="md"
-              cursor="grab"
-              color="fg.subtle"
-              title="Drag to move"
-              _hover={{ color: "fg", background: "bg.muted" }}
-            >
-              <GripVertical size={14} aria-hidden />
-            </Box>
-          )}
+          {onEdit && <WidgetDragHandle />}
           <WidgetMenu
             name={widget.name}
             disabled={isWriting}

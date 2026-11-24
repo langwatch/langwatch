@@ -189,6 +189,16 @@ Feature: Organization-wide Dashboards area
     And a seat that may create dashboards there but not update them is refused an Only me or Organization board, and nothing is written
     # Evidence: the quoted boards.create and boards.createAtScope answers, and the refusal
 
+  # Owner, 2026-11-24: Quick Search's "Create a dashboard" opens "the dialog already".
+  @integration
+  Scenario: The library opened to create a dashboard opens its create dialog
+    Given I may create a dashboard in "Shop"
+    When I open "/dashboards?new=1", as Quick Search's "Create a dashboard" does
+    Then the library shows with the create dialog open, and the address drops "?new=1" in place
+    And going back or refreshing does not open the dialog again
+    And creating the board opens it at "/dashboards/<id>"
+    # Evidence: screenshots of the dialog over the library and of the new board, and the address
+
   @integration
   Scenario: Delete, rename and duplicate from the library
     When I delete a board I may delete and confirm
@@ -746,6 +756,16 @@ Feature: Organization-wide Dashboards area
     And Rename edits the name in place in the row, and Enter saves it in the project that owns the board
     # Evidence: haven browser screenshots of a row at rest, hovered and with its menu open, and of
     # the open board's row at rest after a click, light and dark
+
+  # Owner, 2026-11-24: "when I'm on a dashboard page it doesn't really show as selected on the
+  # menu", and "why are dashboard menu items smaller and with less padding than other items?"
+  @integration
+  Scenario: The open board's sidebar row is marked as the page I am on
+    Given a board listed in a product's Dashboards section, or pinned in LLM Ops with the library off
+    When I open it at "/dashboards/<id>" or at "/shop/dashboards/<id>"
+    Then its row, and no other, is marked as the current page, filled as "Agent Testing" is
+    And every Dashboards row has the height, padding, text style and colours of the sidebar's own entries
+    # Evidence: screenshots of the open board's row beside "Agent Testing", light and dark
 
   @integration
   Scenario: The LLM Ops section ends with Browse templates

@@ -74,3 +74,19 @@ Feature: Quick Search reaches every product
     Given Dashboards is not reachable for me
     When I type "analytics" in Quick Search
     Then I see "Analytics" and no entry named "Dashboards"
+
+  # Owner, 2026-11-24: "Create a dashboard ... like the + we have for each section, and then
+  # opening up the dialog already on the new dashboard".
+  @integration
+  Scenario: Quick Search creates a dashboard where the Dashboards entry leads
+    Given Dashboards is reachable for me and the organization's Dashboards library is on
+    When I type "new dashboard", "create", "analytics" or "chart" in Quick Search
+    Then I see the action "Create a dashboard"
+    And choosing it opens "/dashboards?new=1", the library with its create dialog open
+
+  # The project's Dashboards page has no create dialog: it makes a blank board at once.
+  @integration
+  Scenario: No Create a dashboard in Quick Search without the library
+    Given the organization's Dashboards library is off, or Dashboards is not reachable for me
+    When I type "new dashboard" in Quick Search
+    Then there is no "Create a dashboard"
