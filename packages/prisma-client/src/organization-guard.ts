@@ -328,6 +328,9 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   AiToolEntry: {},
   GatewayBudget: {},
   GatewayConnectUpstream: {},
+  // projectId is null for an organization-wide target, so the row is bound by
+  // organizationId, never by projectId.
+  GatewayA2ATarget: {},
   // Per-bucket period boundaries for attributed-user templates. Bound by
   // organizationId, or by the parent budget (org-owned) through budgetId /
   // the compound unique key.
