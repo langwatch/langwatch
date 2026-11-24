@@ -145,7 +145,7 @@ home product is a column on `DashboardsV2` (decision 8, amended 2026-11-23).
    **Amended 2026-11-23, by the owner's direction to ship the full feature in one
    PR.** The home product is a column, `"DashboardsV2"."homeProduct" TEXT NOT NULL
 DEFAULT 'llm-ops'`, added by migration
-   `20261123120000_dashboards_v2_home_product`. It is not an event and projection,
+   `20261124130000_dashboards_v2_home_product`. It is not an event and projection,
    because the dashboard module has no eventing pipeline; the constant default
    homes every existing board in LLM Ops with no rewrite. The wording above about
    events, an aggregate and an absent row is superseded. Moves: an author's move
