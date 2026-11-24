@@ -78,7 +78,9 @@ The gateway forwards the body to the target's `upstreamUrl` and returns the upst
 
 The gateway serves both A2A bindings. The HTTP+JSON binding goes to the same prefix, for example `POST /a2a/billing/message:send`, which the gateway forwards to `message:send` under the upstream base URL.
 
-Fetch the Agent Card at `GET /a2a/billing/.well-known/agent-card.json`. The gateway fetches the card from the target's `cardUrl` and rewrites every interface URL to point at `/a2a/billing` on the gateway, so callers never learn the upstream address. It drops the card's signatures, which signed the upstream URLs it replaced and would no longer verify.
+Fetch the Agent Card at `GET /a2a/billing/.well-known/agent-card.json`. The gateway fetches the card from the target's `cardUrl` and points its `url` at `/a2a/billing` on the gateway. It keeps only the interfaces whose URL is the target's `upstreamUrl`, rewritten to the same gateway address, and removes the rest. It drops the card's signatures, which signed the upstream URLs it replaced and would no longer verify.
+
+Other card fields, such as `documentationUrl`, are returned as the upstream sent them and can still name the upstream host.
 
 The gateway builds those URLs only from its public base URL, never from the request's `Host` header. Without it the gateway refuses Agent Card fetches and extended-card calls with `a2a_public_url_unset` (HTTP 503, JSON-RPC `-32024`). Other A2A calls still work.
 
