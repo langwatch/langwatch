@@ -75,6 +75,9 @@ const (
 	ChangeKindCacheRuleCreated       = "CACHE_RULE_CREATED"
 	ChangeKindCacheRuleUpdated       = "CACHE_RULE_UPDATED"
 	ChangeKindCacheRuleDeleted       = "CACHE_RULE_DELETED"
+	ChangeKindA2ATargetCreated       = "A2A_TARGET_CREATED"
+	ChangeKindA2ATargetUpdated       = "A2A_TARGET_UPDATED"
+	ChangeKindA2ATargetDeleted       = "A2A_TARGET_DELETED"
 )
 
 // CacheChange is one cache-invalidation hint surfaced by ChangePoller.
@@ -1467,6 +1470,13 @@ func (s *Service) applyFeedChange(organizationID string, ch CacheChange, pending
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
 		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown, guard: []string{orgScope(organizationID)}})
+	case ChangeKindA2ATargetCreated, ChangeKindA2ATargetUpdated, ChangeKindA2ATargetDeleted:
+		// A2A targets ride every bundle of the organization (org-wide and
+		// project ones alike). The block switch must reach callers now, so a
+		// failed refetch never falls back to the bundle that still allowed it.
+		s.evictWhere(func(b *domain.Bundle) bool {
+			return b.OrganizationID == organizationID
+		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: false, guard: []string{orgScope(organizationID)}})
 	case ChangeKindVirtualKeyCreated:
 		// Nothing to evict: a key nobody has resolved yet is in no cache, on
 		// this node or any other. Named rather than left to the default so a

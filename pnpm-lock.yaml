@@ -188,6 +188,9 @@ catalogs:
     '@aws-sdk/client-ses':
       specifier: ^3.1080.0
       version: 3.1108.0
+    '@aws-sdk/client-sqs':
+      specifier: ^3.1108.0
+      version: 3.1108.0
     '@aws-sdk/s3-request-presigner':
       specifier: ^3.826.0
       version: 3.1108.0
@@ -455,6 +458,15 @@ catalogs:
     hono-openapi:
       specifier: ^1.3.1
       version: 1.3.1
+    hyparquet:
+      specifier: 1.32.0
+      version: 1.32.0
+    hyparquet-compressors:
+      specifier: ^1.1.3
+      version: 1.1.3
+    hyparquet-writer:
+      specifier: ^0.18.0
+      version: 0.18.0
     idb-keyval:
       specifier: ^6.3.0
       version: 6.3.0
@@ -3437,6 +3449,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: 'catalog:'
         version: 3.1108.0
+      '@aws-sdk/client-sqs':
+        specifier: 'catalog:'
+        version: 3.1108.0
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../../../modules/agent/contract
@@ -3563,6 +3578,12 @@ importers:
       hono-openapi:
         specifier: 'catalog:'
         version: 1.3.1(f84d9ff9cf7810df4834d1fd27590923)
+      hyparquet:
+        specifier: 'catalog:'
+        version: 1.32.0
+      hyparquet-compressors:
+        specifier: 'catalog:'
+        version: 1.1.3
       jsonpath-plus:
         specifier: 'catalog:'
         version: 10.4.0
@@ -3597,6 +3618,9 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../../packages/vitest-config
+      hyparquet-writer:
+        specifier: 'catalog:'
+        version: 0.18.0
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
@@ -26746,6 +26770,9 @@ packages:
   function-bind@1.1.2:
     resolution: {integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==}
 
+  fzstd@0.1.1:
+    resolution: {integrity: sha512-dkuVSOKKwh3eas5VkJy1AW1vFpet8TA/fGmVA5krThl8YcOVE/8ZIoEA1+U1vEn5ckxxhLirSdY837azmbaNHA==}
+
   gaxios@7.1.3:
     resolution: {integrity: sha512-YGGyuEdVIjqxkxVH1pUTMY/XtmmsApXrCVv5EU25iX6inEPbV+VakJfLealkBtJN69AQmh1eGOdCl9Sm1UP6XQ==}
     engines: {node: '>=18'}
@@ -26998,6 +27025,18 @@ packages:
   human-signals@8.0.1:
     resolution: {integrity: sha512-eKCa6bwnJhvxj14kZk5NCPc6Hb6BdsU9DZcOnmQKSnO1VKrfV0zCvtttPZUsBvjmNDn8rpcJfpwSYnHBjc95MQ==}
     engines: {node: '>=18.18.0'}
+
+  hyparquet-compressors@1.1.3:
+    resolution: {integrity: sha512-QqObpH8Vu1NKF5qzv7yWwgVso8sQE6irx0L5+WZ5QQ+xXnCQE5/X9K8hzYD6Z4wVjTmsMnZUO1vbutXLhU9AFQ==}
+
+  hyparquet-writer@0.18.0:
+    resolution: {integrity: sha512-1vDuEneasjp2yuk/OnLqli5aArzHQw8NYVbJD7ytpHZ3outmJaHHRcNbA7BiiFxonWGhwgPPWnVSsREv6LxE4A==}
+
+  hyparquet@1.32.0:
+    resolution: {integrity: sha512-SpkvdfgQjcdCJA+MTzo0WSreLLy/aLRYs3xetk1SsuFvq8vF+J/97OaRnZhf+p5Nx3J27i9FhSC0bJ5eQZG/7Q==}
+
+  hysnappy@1.1.1:
+    resolution: {integrity: sha512-/V9XcN2NtRyWjR4LYMfvnvasVVF8jbT/ej0eofBQjZel91E3D813FQ3mQC6gDSMMTCq/FJh28XHeyqr3I/oBRw==}
 
   iconv-lite@0.6.3:
     resolution: {integrity: sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==}
@@ -39098,6 +39137,8 @@ snapshots:
 
   function-bind@1.1.2: {}
 
+  fzstd@0.1.1: {}
+
   gaxios@7.1.3(supports-color@10.2.2):
     dependencies:
       extend: 3.0.2
@@ -39469,6 +39510,19 @@ snapshots:
       - supports-color
 
   human-signals@8.0.1: {}
+
+  hyparquet-compressors@1.1.3:
+    dependencies:
+      fzstd: 0.1.1
+      hysnappy: 1.1.1
+
+  hyparquet-writer@0.18.0:
+    dependencies:
+      hyparquet: 1.32.0
+
+  hyparquet@1.32.0: {}
+
+  hysnappy@1.1.1: {}
 
   iconv-lite@0.6.3:
     dependencies:

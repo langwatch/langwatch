@@ -169,6 +169,7 @@ export const prismaTableCatalogue = {
   "AiToolEntryTeam": "AiToolEntryTeam",
   "AiToolEntryDepartment": "AiToolEntryDepartment",
   "IngestionTemplate": "IngestionTemplate",
+  "GatewayA2ATarget": "GatewayA2ATarget",
   "GatewayConnectUpstream": "GatewayConnectUpstream",
   "GatewayTraceExportKey": "GatewayTraceExportKey",
   "GatewayBudget": "GatewayBudget",
@@ -2823,6 +2824,24 @@ export const prismaModelFieldCatalogue = {
     "createdById",
     "updatedById"
   ],
+  "GatewayA2ATarget": [
+    "id",
+    "organizationId",
+    "projectId",
+    "name",
+    "agentName",
+    "cardUrl",
+    "upstreamUrl",
+    "encryptedUpstreamHeaders",
+    "restrictToAllowList",
+    "allowedVirtualKeyIds",
+    "blocked",
+    "blockReason",
+    "createdById",
+    "createdAt",
+    "updatedAt",
+    "archivedAt"
+  ],
   "GatewayConnectUpstream": [
     "organizationId",
     "baseUrl",
@@ -4058,6 +4077,7 @@ export const prismaRelationCatalogue = {
   "IngestionTemplate": {
     "organization": "Organization"
   },
+  "GatewayA2ATarget": {},
   "GatewayConnectUpstream": {},
   "GatewayTraceExportKey": {},
   "GatewayBudget": {

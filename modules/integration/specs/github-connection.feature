@@ -64,6 +64,28 @@ Rule: Connection state is visible to members, managed by organization managers
     Then I see that the GitHub integration is unavailable on this instance
     And I am not offered an Install button
 
+  @integration
+  Scenario: Langy offers the local folder when GitHub is not set up on the instance
+    Given the instance has no GitHub App private key configured
+    When a Langy turn stops because it needs GitHub access
+    Then Langy says GitHub is not set up on this instance
+    And it offers to share a local folder instead
+    And it does not offer to install the GitHub App
+
+  @integration
+  Scenario: An organization admin is pointed at the GitHub App setup guide
+    Given the instance has no GitHub App private key configured
+    And I manage the organization
+    When Langy says GitHub is not set up on this instance
+    Then it links the self-hosting guide for setting up the GitHub App
+    And a member who does not manage the organization sees no such link
+
+  @unit
+  Scenario: Starting an installation on an instance without the GitHub App reads as a page
+    Given the instance has no GitHub App private key configured
+    When a browser opens the install address
+    Then it reads a page saying GitHub is not set up on this instance, not raw JSON
+
   # The install link is a deep link into the GitHub host built from the App
   # slug, so an instance holding an id and a key but no slug mints tokens
   # perfectly well and still has nowhere to send someone who clicks Connect.
