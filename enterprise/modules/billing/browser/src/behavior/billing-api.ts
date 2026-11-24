@@ -51,6 +51,8 @@ export type UsageRead = {
 export type OrganizationMemberRead = {
   userId: string;
   role: OrganizationUserRole;
+  /** A Lite membership that pays and takes no seat (ADR-205). */
+  billingOnly?: boolean;
   user: { id: string; name: string | null; email: string | null };
 };
 
@@ -59,6 +61,7 @@ export type PendingInviteRead = {
   id: string;
   email: string;
   role: OrganizationUserRole;
+  billingOnly?: boolean;
   status: string;
   displayStatus: string;
 };
