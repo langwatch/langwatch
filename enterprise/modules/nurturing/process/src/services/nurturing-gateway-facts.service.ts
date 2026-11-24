@@ -15,11 +15,11 @@ import {
   keyBudgetPeriodEndOf,
   keyBudgetThresholdSignal,
   keyFirstRequestSignal,
-  pickKeyRecipient,
   spendWithoutBudgetSignal,
   virtualKeyCreatedSignal,
 } from "../rules/nurturing-gateway-facts.rules.ts";
 import { isLiveKey, isPersonKey } from "../rules/nurturing-virtual-key.rules.ts";
+import { NurturingFactRecipientService } from "./nurturing-fact-recipient.service.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 
 type GatewayFactsDependencies = Readonly<{
@@ -54,7 +54,11 @@ export class NurturingGatewayFactsService {
     return new NurturingGatewayFactsService(dependencies);
   }
 
-  private constructor(private readonly dependencies: GatewayFactsDependencies) {}
+  private readonly recipients: NurturingFactRecipientService;
+
+  private constructor(private readonly dependencies: GatewayFactsDependencies) {
+    this.recipients = NurturingFactRecipientService.create(dependencies);
+  }
 
   /** Only a created USER key is told; a rotate, disable, enable or revoke only folds the copy. */
   async virtualKeyCreated({
@@ -153,37 +157,20 @@ export class NurturingGatewayFactsService {
     await deliver(spendWithoutBudgetSignal({ data, userId }));
   }
 
-  /**
-   * The key's holder, its creator or the organization's admin, whoever is a current member and
-   * not erased. An erased person is dropped before the choice, so is never warned of as passed
-   * over: a raw fact still names them, and a join racing their erasure can leave a member row
-   * until its re-check.
-   */
+  /** The key's holder, its creator or the organization's admin, whoever is a current member. */
   private async recipientOf({
     organizationId,
     virtualKeyId,
-    holders: named,
+    holders,
   }: Readonly<{
     organizationId: string;
     /** Null for an organization's fact, which names no one key. */
     virtualKeyId: string | null;
     holders: readonly (string | null)[];
   }>): Promise<string | null> {
-    const isSomeone = (userId: string | null): userId is string => userId !== null;
-    const admin = await this.dependencies.admins.adminOf({ organizationId });
-    const erased = new Set(
-      await this.dependencies.erasedUsers.findErased({ userIds: named.filter(isSomeone) }),
-    );
-    const holders = named.map((userId) =>
-      isSomeone(userId) && erased.has(userId) ? null : userId,
-    );
-    const userIds = [...holders, admin.kind === "admin" ? admin.userId : null].filter(isSomeone);
-    const memberships = await this.dependencies.members.findMembershipsOfUsers({ userIds });
-    const { recipient, passedOverWithoutRow } = pickKeyRecipient({
+    const { recipient, passedOverWithoutRow } = await this.recipients.recipientOf({
       organizationId,
-      holders,
-      memberships,
-      admin,
+      named: holders,
     });
     if (passedOverWithoutRow.length > 0) {
       this.dependencies.logger.warn(

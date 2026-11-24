@@ -24,6 +24,7 @@ import { NurturingCodingMilestonesService } from "../services/nurturing-coding-m
 import { NurturingCopiedProjectsService } from "../services/nurturing-copied-projects.service.ts";
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
 import { NurturingGatewayFactsService } from "../services/nurturing-gateway-facts.service.ts";
+import { NurturingGovernanceFactsService } from "../services/nurturing-governance-facts.service.ts";
 import { NurturingMemberFactsService } from "../services/nurturing-member-facts.service.ts";
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingOrganizationCreatedService } from "../services/nurturing-organization-created.service.ts";
@@ -105,6 +106,12 @@ export class NurturingModule implements NurturingApi {
       admins: memberFacts,
       logger: createLogger("langwatch:nurturing:gateway-facts"),
     });
+    const governanceFacts = NurturingGovernanceFactsService.create({
+      erasedUsers: repositories.erasedUsers,
+      members: repositories.members,
+      admins: memberFacts,
+      logger: createLogger("langwatch:nurturing:governance-facts"),
+    });
     const milestones = NurturingMilestonesService.create({
       milestones: repositories.milestones,
       projects: repositories.projects,
@@ -173,6 +180,8 @@ export class NurturingModule implements NurturingApi {
         keyBudgetCrossed: (input) => gatewayFacts.keyBudgetCrossed(input),
         keyFirstRequested: (input) => gatewayFacts.keyFirstRequested(input),
         unbudgetedSpendRecorded: (input) => gatewayFacts.unbudgetedSpendRecorded(input),
+        governanceSourceConnected: (input) => governanceFacts.sourceConnected(input),
+        governanceSourceLive: (input) => governanceFacts.sourceWentLive(input),
       }),
       delivery,
       organizationUsage,

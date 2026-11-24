@@ -505,7 +505,7 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     /** An organization connected a governance source. `sourceEventId` is `<source>:connected`. */
     kind: z.literal("governance_source_connected"),
     ...signalSource,
-    /** The person who created the source. */
+    /** The source's creator while a current member, else the organization's admin. */
     userId: id,
     organizationId: id,
     sourceId: id,
@@ -515,7 +515,7 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     /** A governance source took its first data. `sourceEventId` is `<source>:live`, once. */
     kind: z.literal("governance_source_live"),
     ...signalSource,
-    /** The person who created the source. */
+    /** The source's creator while a current member, else the organization's admin. */
     userId: id,
     organizationId: id,
     sourceId: id,

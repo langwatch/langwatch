@@ -440,7 +440,7 @@ export class IngestionSourceService {
   /** A disabled source is never stamped back to active; only its first data makes it live. */
   async recordEventReceived(source: GovernanceIngestionSource): Promise<void> {
     const at = Temporal.Instant.fromEpochMilliseconds(this.now());
-    const { wentLive } = await this.repository.recordEventReceived(source.id, at);
+    const { wentLive } = await this.repository.recordEventReceived(source, at);
     if (wentLive) this.facts.wentLive(source, at);
   }
 

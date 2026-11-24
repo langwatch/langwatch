@@ -8,8 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   fireGovernanceSourceSignal,
-  governanceSourceConnectedSignals,
-  governanceSourceLiveSignals,
+  governanceSourceSignal,
 } from "../nurturing-governance-facts.rules.ts";
 
 const FACT: IngestionSourceFactData = {
@@ -21,12 +20,22 @@ const FACT: IngestionSourceFactData = {
   occurredAt: 4_000,
 };
 
-describe("governanceSourceConnectedSignals", () => {
-  describe("given a source a person created", () => {
-    const [signal] = governanceSourceConnectedSignals({ data: FACT });
+const SOURCE_PROPERTIES = {
+  source_id: "source-1",
+  source_type: "claude_code",
+  organization_id: "org-1",
+};
+
+describe("governanceSourceSignal", () => {
+  describe("given a created source and its recipient", () => {
+    const signal = governanceSourceSignal({
+      kind: "governance_source_connected",
+      data: FACT,
+      userId: "user-creator",
+    });
 
     /** @scenario "A created source groups has_governance_source and tracks it to its creator" */
-    it("is one signal to the creator, claimed once per source", () => {
+    it("is one signal to the recipient, claimed once per source", () => {
       expect(signal).toEqual({
         kind: "governance_source_connected",
         sourceEventId: "source-1:connected",
@@ -41,8 +50,6 @@ describe("governanceSourceConnectedSignals", () => {
 
     /** @scenario "A created source groups has_governance_source and tracks it to its creator" */
     it("groups has_governance_source true, then tracks the event under the signal's id", () => {
-      if (!signal) throw new Error("no governance signal");
-
       expect(fireGovernanceSourceSignal(signal)).toEqual([
         {
           type: "group",
@@ -54,35 +61,22 @@ describe("governanceSourceConnectedSignals", () => {
           type: "track",
           userId: "user-creator",
           event: "governance_source_connected",
-          properties: {
-            source_id: "source-1",
-            source_type: "claude_code",
-            organization_id: "org-1",
-          },
+          properties: SOURCE_PROPERTIES,
           messageId: "source-1:connected",
         },
       ]);
     });
   });
 
-  describe("given a source no person created", () => {
-    /** @scenario "A governance source fact naming no person sends nothing" */
-    it("is no signal", () => {
-      expect(governanceSourceConnectedSignals({ data: { ...FACT, actorUserId: null } })).toEqual(
-        [],
-      );
+  describe("given a source's first data and its recipient", () => {
+    const signal = governanceSourceSignal({
+      kind: "governance_source_live",
+      data: FACT,
+      userId: "user-creator",
     });
-  });
-});
-
-describe("governanceSourceLiveSignals", () => {
-  describe("given a source's first data", () => {
-    const [signal] = governanceSourceLiveSignals({ data: FACT });
 
     /** @scenario "A source's first data groups has_governance_data and tracks it to its creator" */
     it("groups has_governance_data true, then tracks governance_source_live", () => {
-      if (!signal) throw new Error("no governance signal");
-
       expect(signal.sourceEventId).toBe("source-1:live");
       expect(fireGovernanceSourceSignal(signal)).toEqual([
         {
@@ -95,21 +89,23 @@ describe("governanceSourceLiveSignals", () => {
           type: "track",
           userId: "user-creator",
           event: "governance_source_live",
-          properties: {
-            source_id: "source-1",
-            source_type: "claude_code",
-            organization_id: "org-1",
-          },
+          properties: SOURCE_PROPERTIES,
           messageId: "source-1:live",
         },
       ]);
     });
   });
 
-  describe("given a source no person created", () => {
-    /** @scenario "A governance source fact naming no person sends nothing" */
-    it("is no signal", () => {
-      expect(governanceSourceLiveSignals({ data: { ...FACT, actorUserId: null } })).toEqual([]);
+  describe("given the organization's admin as the recipient", () => {
+    /** @scenario "A governance source fact naming no person goes to the organization's admin" */
+    it("is the admin's signal, under the same claim as the creator's would be", () => {
+      const signal = governanceSourceSignal({
+        kind: "governance_source_connected",
+        data: { ...FACT, actorUserId: null },
+        userId: "user-admin",
+      });
+
+      expect(signal).toMatchObject({ userId: "user-admin", sourceEventId: "source-1:connected" });
     });
   });
 });

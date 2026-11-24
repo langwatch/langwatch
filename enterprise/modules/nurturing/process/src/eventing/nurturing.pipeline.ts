@@ -23,6 +23,7 @@ import {
 import {
   INGESTION_SOURCE_CREATED_EVENT_TYPE,
   INGESTION_SOURCE_WENT_LIVE_EVENT_TYPE,
+  type IngestionSourceFactData,
   ingestionSourceFactDataSchema,
 } from "@langwatch/enterprise-governance-contract";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
@@ -137,10 +138,6 @@ import {
   appOpenedSignals,
   langyFirstMessageSeenSignal,
 } from "../rules/nurturing-app-opened.rules.ts";
-import {
-  governanceSourceConnectedSignals,
-  governanceSourceLiveSignals,
-} from "../rules/nurturing-governance-facts.rules.ts";
 import {
   insightFiledSignal,
   insightReaderSignal,
@@ -300,6 +297,16 @@ export function buildNurturingPipeline(deps: {
   /** An organization's weekly unbudgeted spend: its admin's signal. */
   unbudgetedSpendRecorded: (input: {
     data: RecordUnbudgetedSpendCommandData;
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** A governance source was created: its creator's signal, else its organization admin's. */
+  governanceSourceConnected: (input: {
+    data: IngestionSourceFactData;
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** A governance source took its first data: its creator's signal, else the admin's. */
+  governanceSourceLive: (input: {
+    data: IngestionSourceFactData;
     deliver: (signal: NurturingSignal) => Promise<void>;
   }) => Promise<void>;
 }): NurturingPipeline {
@@ -616,16 +623,15 @@ export function buildNurturingPipeline(deps: {
         data: recordUnbudgetedSpendCommandDataSchema,
         handle: (data) => deps.unbudgetedSpendRecorded({ data, deliver: deliverSignal }),
       })
-      // Governance's source facts name the person to tell, so no copy is read for a recipient.
       .withPeerSubscriber("governanceSourceConnected", {
         eventType: INGESTION_SOURCE_CREATED_EVENT_TYPE,
         data: ingestionSourceFactDataSchema,
-        handle: (data) => deliverEach(governanceSourceConnectedSignals({ data })),
+        handle: (data) => deps.governanceSourceConnected({ data, deliver: deliverSignal }),
       })
       .withPeerSubscriber("governanceSourceLive", {
         eventType: INGESTION_SOURCE_WENT_LIVE_EVENT_TYPE,
         data: ingestionSourceFactDataSchema,
-        handle: (data) => deliverEach(governanceSourceLiveSignals({ data })),
+        handle: (data) => deps.governanceSourceLive({ data, deliver: deliverSignal }),
       })
       .withPeerSubscriber("langyFirstMessageSeen", {
         eventType: LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE,

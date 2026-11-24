@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * What Customer.io is told of governance's ingestion-source facts: the organization learns it has
- * a source and then data, traits only ever set true, and the person who created the source gets
- * the event. A payload carries the source's id and type and the organization only: never its
- * name, configuration or secret. The fact names its person, so no copy is read.
+ * a source and then data, traits only ever set true, and one current member gets the event: the
+ * source's creator, else the organization's admin. A payload carries the source's id and type and
+ * the organization only: never its name, configuration or secret.
  * Spec: enterprise/modules/nurturing/specs/governance-facts.feature
  */
 import type { IngestionSourceFactData } from "@langwatch/enterprise-governance-contract";
@@ -15,8 +15,8 @@ import type {
   NurturingSignalOf,
 } from "@langwatch/enterprise-nurturing-contract";
 
-export type GovernanceSourceConnectedSignal = NurturingSignalOf<"governance_source_connected">;
-export type GovernanceSourceLiveSignal = NurturingSignalOf<"governance_source_live">;
+type GovernanceSourceConnectedSignal = NurturingSignalOf<"governance_source_connected">;
+type GovernanceSourceLiveSignal = NurturingSignalOf<"governance_source_live">;
 const GOVERNANCE_SOURCE_KINDS = ["governance_source_connected", "governance_source_live"] as const;
 
 export type GovernanceSourceSignal = NurturingSignalOf<(typeof GOVERNANCE_SOURCE_KINDS)[number]>;
@@ -28,12 +28,26 @@ export function isGovernanceSourceSignal(
   return (GOVERNANCE_SOURCE_KINDS as readonly string[]).includes(signal.kind);
 }
 
-/** What both signals carry from the fact, told to the person who created the source. */
-function sourceSignalFields(
-  data: IngestionSourceFactData,
-  userId: string,
-): Omit<GovernanceSourceSignal, "kind" | "sourceEventId"> {
+/** Each kind's claim on its source: a source is connected once and goes live once. */
+const SOURCE_EVENT_SUFFIX: Readonly<Record<GovernanceSourceSignal["kind"], string>> = {
+  governance_source_connected: "connected",
+  governance_source_live: "live",
+};
+
+/** A source fact as its recipient's signal, once per source and kind. */
+export function governanceSourceSignal({
+  kind,
+  data,
+  userId,
+}: Readonly<{
+  kind: GovernanceSourceSignal["kind"];
+  data: IngestionSourceFactData;
+  /** The source's creator while a current member, else the organization's admin. */
+  userId: string;
+}>): GovernanceSourceSignal {
   return {
+    kind,
+    sourceEventId: `${data.sourceId}:${SOURCE_EVENT_SUFFIX[kind]}`,
     tenantId: data.tenantId,
     occurredAt: data.occurredAt,
     userId,
@@ -41,34 +55,6 @@ function sourceSignalFields(
     sourceId: data.sourceId,
     sourceType: data.sourceType,
   };
-}
-
-/** A created source as its creator's signal, once per source. */
-export function governanceSourceConnectedSignals({
-  data,
-}: Readonly<{ data: IngestionSourceFactData }>): GovernanceSourceConnectedSignal[] {
-  if (data.actorUserId === null) return [];
-  return [
-    {
-      kind: "governance_source_connected",
-      sourceEventId: `${data.sourceId}:connected`,
-      ...sourceSignalFields(data, data.actorUserId),
-    },
-  ];
-}
-
-/** A source's first data as its creator's signal, once per source. */
-export function governanceSourceLiveSignals({
-  data,
-}: Readonly<{ data: IngestionSourceFactData }>): GovernanceSourceLiveSignal[] {
-  if (data.actorUserId === null) return [];
-  return [
-    {
-      kind: "governance_source_live",
-      sourceEventId: `${data.sourceId}:live`,
-      ...sourceSignalFields(data, data.actorUserId),
-    },
-  ];
 }
 
 /**
@@ -101,10 +87,8 @@ function companyTraitThenEvent({
   ];
 }
 
-/** The organization has a governance source; its creator is told they connected it. */
-export function fireGovernanceSourceConnected(
-  signal: GovernanceSourceConnectedSignal,
-): CioBatchCall[] {
+/** The organization has a governance source; its recipient is told it was connected. */
+function fireGovernanceSourceConnected(signal: GovernanceSourceConnectedSignal): CioBatchCall[] {
   return companyTraitThenEvent({
     signal,
     traits: { has_governance_source: true },
@@ -112,8 +96,8 @@ export function fireGovernanceSourceConnected(
   });
 }
 
-/** The organization has governance data; the source's creator is told it went live. */
-export function fireGovernanceSourceLive(signal: GovernanceSourceLiveSignal): CioBatchCall[] {
+/** The organization has governance data; its recipient is told the source went live. */
+function fireGovernanceSourceLive(signal: GovernanceSourceLiveSignal): CioBatchCall[] {
   return companyTraitThenEvent({
     signal,
     traits: { has_governance_data: true },

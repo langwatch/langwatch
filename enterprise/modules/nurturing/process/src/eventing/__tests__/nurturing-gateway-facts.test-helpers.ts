@@ -45,6 +45,7 @@ import {
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingGatewayFactsService } from "../../services/nurturing-gateway-facts.service.ts";
+import { NurturingGovernanceFactsService } from "../../services/nurturing-governance-facts.service.ts";
 import { NurturingMemberFactsService } from "../../services/nurturing-member-facts.service.ts";
 import { NurturingUserErasureService } from "../../services/nurturing-user-erasure.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
@@ -321,9 +322,9 @@ function recordingCustomerIo() {
 }
 
 /**
- * Nurturing as the app composes it for gateway's facts, over its own memory copies and a
- * recording Customer.io: the key copy's and member copy's subscribers, then every nurturing peer
- * lane on the type.
+ * Nurturing as the app composes it for gateway's and governance's facts, over its own memory
+ * copies and a recording Customer.io: the key copy's and member copy's subscribers, then every
+ * nurturing peer lane on the type.
  * `user-admin` is the organization's copied admin and a current member; `claims` may be
  * Redis-backed, and `organizationId` (org-1 by default) unique to a run that shares them.
  */
@@ -372,6 +373,12 @@ export async function gatewayFactsOver({
     admins: memberFacts,
     logger,
   });
+  const governanceFacts = NurturingGovernanceFactsService.create({
+    erasedUsers,
+    members,
+    admins: memberFacts,
+    logger,
+  });
   const userErasure = NurturingUserErasureService.create({
     personalProjects: MemoryNurturingPersonalProjectRepository.create(),
     organizations: milestones,
@@ -390,6 +397,8 @@ export async function gatewayFactsOver({
     keyBudgetCrossed: (input) => gatewayFacts.keyBudgetCrossed(input),
     keyFirstRequested: (input) => gatewayFacts.keyFirstRequested(input),
     unbudgetedSpendRecorded: (input) => gatewayFacts.unbudgetedSpendRecorded(input),
+    governanceSourceConnected: (input) => governanceFacts.sourceConnected(input),
+    governanceSourceLive: (input) => governanceFacts.sourceWentLive(input),
   });
   const toSubscribers = liveSubscribersOf(pipeline);
   // The key and member copies as the usage pipeline registers them: parse, then store.

@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @see specs/ai-gateway/governance/ingestion-sources.feature
  *
- * The received-event stamp on the real table: one conditional write, so a disable that lands
+ * The received-event stamp on the real table: conditional writes, so a disable that lands
  * while a batch is in flight is never overwritten back to active.
  */
 import { randomBytes } from "node:crypto";
@@ -58,7 +58,7 @@ describe.skipIf(!databaseUrl)("PrismaIngestionSourceRepository.recordEventReceiv
     it("makes it active and stamps the last event time", async () => {
       const id = await sourceWith("awaiting_first_event");
 
-      await repository.recordEventReceived(id, STAMPED_AT);
+      await repository.recordEventReceived({ id, status: "awaiting_first_event" }, STAMPED_AT);
 
       const stored = await prisma.ingestionSource.findUniqueOrThrow({ where: { id } });
       expect(stored.status).toBe("active");
@@ -69,13 +69,15 @@ describe.skipIf(!databaseUrl)("PrismaIngestionSourceRepository.recordEventReceiv
     it("says exactly one of racing stamps moved it live, and stamps every later one", async () => {
       const id = await sourceWith("awaiting_first_event");
       const later = Temporal.Instant.fromEpochMilliseconds(Date.parse("2026-11-13T11:00:00.000Z"));
+      // Every racing batch read the source before any stamp, so each tries the first-event write.
+      const asRead = { id, status: "awaiting_first_event" };
 
       const racing = await Promise.all([
-        repository.recordEventReceived(id, STAMPED_AT),
-        repository.recordEventReceived(id, STAMPED_AT),
-        repository.recordEventReceived(id, STAMPED_AT),
+        repository.recordEventReceived(asRead, STAMPED_AT),
+        repository.recordEventReceived(asRead, STAMPED_AT),
+        repository.recordEventReceived(asRead, STAMPED_AT),
       ]);
-      const after = await repository.recordEventReceived(id, later);
+      const after = await repository.recordEventReceived({ id, status: "active" }, later);
 
       expect(racing.filter(({ wentLive }) => wentLive)).toHaveLength(1);
       expect(after).toEqual({ wentLive: false });
@@ -89,7 +91,9 @@ describe.skipIf(!databaseUrl)("PrismaIngestionSourceRepository.recordEventReceiv
     it("leaves the source disabled and its last event time alone", async () => {
       const id = await sourceWith("disabled");
 
-      const stamp = await repository.recordEventReceived(id, STAMPED_AT);
+      // The batch was let in on the source as read before the disable.
+      const asRead = { id, status: "awaiting_first_event" };
+      const stamp = await repository.recordEventReceived(asRead, STAMPED_AT);
 
       expect(stamp).toEqual({ wentLive: false });
       const stored = await prisma.ingestionSource.findUniqueOrThrow({ where: { id } });

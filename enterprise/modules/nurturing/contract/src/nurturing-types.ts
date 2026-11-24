@@ -180,7 +180,10 @@ export interface CioOrgTraits extends CioOrganizationUsageTraits {
   first_evaluation_at?: number;
   /** A governance ingestion source was created; only ever set true. */
   has_governance_source?: boolean;
-  /** A governance source took its first data; only ever set true. */
+  /**
+   * A governance source took its first data; only ever set true. Pulled sources never record
+   * went-live, so it is never set for them.
+   */
   has_governance_data?: boolean;
   onboarding_variant?: string;
   onboarding_paths?: string;
@@ -244,9 +247,9 @@ export type CioEventName =
   | "key_budget_threshold"
   /** An organization's person keys spent without a budget this week; to its admin, weekly. */
   | "gateway_spend_without_budget"
-  /** A person created a governance ingestion source. */
+  /** A governance ingestion source was created; to its creator, else the organization's admin. */
   | "governance_source_connected"
-  /** A governance source the person created took its first data; once per source. */
+  /** A governance source took its first data; once per source, to its creator, else the admin. */
   | "governance_source_live";
 
 // ---------------------------------------------------------------------------

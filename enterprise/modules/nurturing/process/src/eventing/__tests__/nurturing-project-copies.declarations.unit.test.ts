@@ -110,6 +110,8 @@ describe("the five subscriber lanes the personal-project and traced-project maps
       keyBudgetCrossed: async () => undefined,
       keyFirstRequested: async () => undefined,
       unbudgetedSpendRecorded: async () => undefined,
+      governanceSourceConnected: async () => undefined,
+      governanceSourceLive: async () => undefined,
     });
 
     const lanes = (pipeline.globalProjections ?? []).map(({ name }) => name);

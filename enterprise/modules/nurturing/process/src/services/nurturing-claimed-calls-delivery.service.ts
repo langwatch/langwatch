@@ -4,19 +4,11 @@ import { createHash } from "node:crypto";
 import type { CioBatchCall } from "@langwatch/enterprise-nurturing-contract";
 
 import type { NurturingClaimRepository } from "../repositories/nurturing-claim.repository.ts";
-import {
-  fireGatewayKeySignal,
-  type GatewayKeySignal,
-} from "../rules/nurturing-gateway-facts.rules.ts";
-import {
-  fireGovernanceSourceSignal,
-  type GovernanceSourceSignal,
-  isGovernanceSourceSignal,
-} from "../rules/nurturing-governance-facts.rules.ts";
+import { type ClaimedSignal, fireClaimedSignal } from "../rules/nurturing-claimed-calls.rules.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
-type GatewayKeyDeliveryDependencies = Readonly<{
+type ClaimedCallsDeliveryDependencies = Readonly<{
   claims: NurturingClaimRepository;
   /** Rejects when Customer.io did not take the call, so the delivery fails and is retried. */
   customerIo: Pick<NurturingService, "batchOrThrow">;
@@ -35,24 +27,20 @@ function recipientDigestOf(userId: string): string {
  * all of them to a new person. A refused call gives back its claim and the signal's, then fails
  * the delivery so its job retries.
  */
-export class NurturingGatewayKeyDeliveryService {
-  static create(dependencies: GatewayKeyDeliveryDependencies): NurturingGatewayKeyDeliveryService {
-    return new NurturingGatewayKeyDeliveryService(dependencies);
+export class NurturingClaimedCallsDeliveryService {
+  static create(
+    dependencies: ClaimedCallsDeliveryDependencies,
+  ): NurturingClaimedCallsDeliveryService {
+    return new NurturingClaimedCallsDeliveryService(dependencies);
   }
 
-  private constructor(private readonly dependencies: GatewayKeyDeliveryDependencies) {}
+  private constructor(private readonly dependencies: ClaimedCallsDeliveryDependencies) {}
 
   async deliver({
     signal,
     deliveredClaim,
-  }: Readonly<{
-    signal: GatewayKeySignal | GovernanceSourceSignal;
-    deliveredClaim: string;
-  }>): Promise<void> {
-    const calls = isGovernanceSourceSignal(signal)
-      ? fireGovernanceSourceSignal(signal)
-      : fireGatewayKeySignal(signal);
-    for (const call of calls) {
+  }: Readonly<{ signal: ClaimedSignal; deliveredClaim: string }>): Promise<void> {
+    for (const call of fireClaimedSignal(signal)) {
       await this.sendOnce({ call, deliveredClaim });
     }
   }

@@ -33,6 +33,8 @@ function nurturingRecordingDeliveries() {
     keyBudgetCrossed: async () => undefined,
     keyFirstRequested: async () => undefined,
     unbudgetedSpendRecorded: async () => undefined,
+    governanceSourceConnected: async () => undefined,
+    governanceSourceLive: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<
