@@ -287,6 +287,19 @@ To follow an upgrade:
 
 The installation is in one of seven states: **Up to date**, **Finishing in background** (blocking steps done, background steps still running), **Behind** (this image declares steps the ledger has not run), **Never upgraded** (an empty ledger), **Upgrading**, **Rolled back** (an older version is running beside newer steps) and **Needs attention** (a step or run failed).
 
+### Steps that wait for older versions to stop
+
+Some background steps, such as the dataset moves, run only once no process of an older version can still write. A version from before the serving roster (3.20.x and older) never records itself, so after an upgrade from one of those the upgrade cannot see when its last pod stopped. Those steps then wait a fixed 30 minutes after the upgrade run finished. **Ops > Upgrades** shows such a step as **Waiting**, with the reason and the minutes left.
+
+To end the wait sooner, once every app and worker runs the new image:
+
+| Deployment | How |
+| --- | --- |
+| Helm | Set `app.migrations.oldWritersGoneHook: true`, and a post-upgrade Job records it after the rollout. Or run `kubectl exec deploy/<release>-app -- sh -c "cd /app/apps/tasks && pnpm -s task upgrade old-writers-gone"` yourself |
+| Docker Compose | `docker compose run --rm app sh -c "cd /app/apps/tasks && pnpm -s task upgrade old-writers-gone"` |
+
+Run it only when the old pods are gone: a step that starts while an old pod still writes can miss that pod's changes.
+
 ### Reading the console
 
 The upgrade logs as `langwatch:tasks:upgrade`. Every progress line carries four fields next to its message: `phase`, `waitingOn` (what it is blocked on, with a placeholder word when the run is not waiting), `elapsedMs` since the run began, and `next` (what you can do). A password, token or connection-string credential is masked in every line. These are the line families, in the order a run writes them:

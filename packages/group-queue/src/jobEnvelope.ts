@@ -15,7 +15,7 @@ import {
 import { errorText as errText, safeParseErrorText as safeParseErrText } from "./errors.ts";
 import { gqPayloadTooLargeTotal } from "./metrics.ts";
 import type { TenantId } from "./storage.ts";
-import type { BlobRef, TieredBlobStore } from "./tieredBlobStore.ts";
+import { type BlobRef, type TieredBlobStore, TransientBlobStoreError } from "./tieredBlobStore.ts";
 
 /**
  * zlib reports an over-limit result as ERR_BUFFER_TOO_LARGE (or an "output
@@ -92,6 +92,8 @@ function assertDecodeWithinCap(byteLength: number): void {
  * body; bodies above {@link INLINE_CEILING_BYTES} move to {@link TieredBlobStore}.
  */
 const ENVELOPE_PREFIX_V2 = "GQ2|";
+/** Read-only: 3.20.x staged GQ1 or bare JSON, and a rolling upgrade claims both (#9840). */
+const ENVELOPE_PREFIX_V1 = "GQ1|";
 /** The prefix is four ASCII bytes. */
 const ENVELOPE_PREFIX_LEN = 4;
 
@@ -120,13 +122,15 @@ export interface JobRoutingMeta {
   jobName: string | null;
 }
 
-type BodyEncoding = "j" | "gz" | "redis" | "s3";
+type BodyEncoding = "j" | "gz" | "redis" | "s3" | "ref";
 
 export interface EnvelopeHeader {
   v: number;
   e: BodyEncoding;
   /** Content-addressed tiered blob reference. */
   ref?: BlobRef;
+  /** GQ1 only: the id of a body offloaded to the queue's {@link JobBlobStore}. */
+  r?: string;
   /** GQ2 per-stage lease holder identity for this staged occupancy. */
   h?: string;
   /**
@@ -200,6 +204,16 @@ function routingHeader(jobData: Record<string, unknown>, version: number): Envel
   if (typeof jobData.__jobType === "string") header.t = jobData.__jobType;
   if (typeof jobData.__jobName === "string") header.n = jobData.__jobName;
   return header;
+}
+
+function routingOfHeader(header: EnvelopeHeader): Record<string, unknown> {
+  return { __pipelineName: header.p, __jobType: header.t, __jobName: header.n };
+}
+
+/** For the never-throwing readers: a bare-JSON value's fields, or none past the decode cap. */
+function readLegacyBareJson(value: string): Record<string, unknown> {
+  if (!value.startsWith("{") || value.length > MAX_BLOB_BYTES) return {};
+  return JSON.parse(value) as Record<string, unknown>;
 }
 
 function finalize(prefix: string, header: EnvelopeHeader, body: string): string {
@@ -299,7 +313,7 @@ export function readEnvelopeDescriptor(value: string): EnvelopeDescriptor {
     return {
       format: typeof header.e === "string" ? header.e : null,
       version: typeof header.v === "number" ? header.v : null,
-      blobId: safeBlobId(header.ref?.hash ?? null),
+      blobId: safeBlobId(header.ref?.hash ?? header.r ?? null),
     };
   } catch {
     return { format: null, version: null, blobId: null };
@@ -397,14 +411,81 @@ export async function encodeJobEnvelope<Destination>({
   );
 }
 
+/**
+ * A 3.20.x bare-JSON value: the whole job data, `__*` machinery inline, so it
+ * already has the shape {@link mergeMachinery} rebuilds. Anything that is not a
+ * JSON object stays the malformed envelope it was before (#9840).
+ */
+function decodeLegacyBareJson(value: string): Record<string, unknown> {
+  if (!value.startsWith("{")) throw unsupportedValue();
+  assertDecodeWithinCap(Buffer.byteLength(value, "utf8"));
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw unsupportedValue();
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw unsupportedValue();
+  }
+  return parsed as Record<string, unknown>;
+}
+
+const unsupportedValue = (): DecodeFailureError =>
+  new DecodeFailureError({
+    message: "Unsupported Group Queue value: expected a version 2 envelope",
+    reason: "malformed_envelope",
+  });
+
+/** A 3.20.x GQ1 body offloaded whole (machinery included) to the queue's blob keys. */
+async function decodeGq1Ref({
+  header,
+  blobs,
+  readMode,
+  tenant,
+}: {
+  header: EnvelopeHeader;
+  blobs?: JobBlobStore;
+  readMode: "get" | "peek";
+  tenant?: TenantId;
+}): Promise<Record<string, unknown>> {
+  if (typeof header.r !== "string" || header.r.length === 0) {
+    throw new DecodeFailureError({
+      message: "Malformed job envelope: ref body without a blob id",
+      reason: "malformed_envelope",
+    });
+  }
+  if (!blobs) {
+    throw new Error("Job envelope references an offloaded blob but no blob store was provided");
+  }
+  const id = header.r;
+  const data = await (readMode === "peek" ? blobs.peek({ id }) : blobs.get({ id })).catch(
+    (cause: unknown) => {
+      // A missing key is a null answer; a thrown read is the client, so the job retries.
+      throw new TransientBlobStoreError({ projectId: tenant, hash: id, cause });
+    },
+  );
+  if (!data) {
+    throw new DecodeFailureError({
+      message: "Job envelope blob is missing (deleted or expired)",
+      reason: "missing_blob",
+    });
+  }
+  return decodeBody(data);
+}
+
 export async function decodeJobEnvelope<Destination>({
   value,
   tieredBlobs,
+  blobs,
   readMode = "get",
   parsed,
+  tenant,
 }: {
   value: string;
   tieredBlobs?: TieredBlobStore<Destination>;
+  /** The queue's Redis blob keys, where a 3.20.x GQ1 `ref` body lives. */
+  blobs?: JobBlobStore;
   /**
    * `"get"` = worker hot path, refreshes the blob's backstop TTL. `"peek"` =
    * non-worker inspection (ops dashboard), does NOT refresh — so a repeatedly-
@@ -415,15 +496,13 @@ export async function decodeJobEnvelope<Destination>({
    * have already parsed the envelope (e.g. `EnvelopeBlobLifecycle.decode`) don't
    * pay for a second `Buffer.from` + `JSON.parse` on the hot path. */
   parsed?: { header: EnvelopeHeader; body: string };
+  /** The group's tenant, named by the transient error a failed GQ1 blob read becomes. */
+  tenant?: TenantId;
 }): Promise<Record<string, unknown>> {
-  if (!isEnvelope(value)) {
-    throw new DecodeFailureError({
-      message: "Unsupported Group Queue value: expected a version 2 envelope",
-      reason: "malformed_envelope",
-    });
-  }
+  if (!isEnvelope(value)) return decodeLegacyBareJson(value);
 
   const { header, body } = parsed ?? splitEnvelope(value);
+  if (header.e === "ref") return decodeGq1Ref({ header, blobs, readMode, tenant });
 
   // GQ2: content-addressed tiered blob.
   if (header.e === "redis" || header.e === "s3") {
@@ -456,22 +535,23 @@ export async function decodeJobEnvelope<Destination>({
   }
   const parsedBody =
     header.e === "gz" ? await decodeBody(Buffer.from(body, "base64")) : parseInlineBody(body);
-  return mergeMachinery(parsedBody, header);
+  // A GQ1 body already carries its machinery; only GQ2 lifted it into the header.
+  return header.v === 2 ? mergeMachinery(parsedBody, header) : parsedBody;
 }
 
 /**
- * Reads routing fields from the envelope header. Never throws.
+ * Reads routing fields from the envelope header, or from the body of a 3.20.x
+ * bare-JSON value. Never throws.
  */
 export function readJobRoutingMeta(value: string): JobRoutingMeta {
   try {
-    if (!isEnvelope(value)) {
-      return { pipelineName: null, jobType: null, jobName: null };
-    }
-    const { header } = splitEnvelope(value);
+    const fields = isEnvelope(value)
+      ? routingOfHeader(splitEnvelope(value).header)
+      : readLegacyBareJson(value);
     return {
-      pipelineName: typeof header.p === "string" ? header.p : null,
-      jobType: typeof header.t === "string" ? header.t : null,
-      jobName: typeof header.n === "string" ? header.n : null,
+      pipelineName: typeof fields.__pipelineName === "string" ? fields.__pipelineName : null,
+      jobType: typeof fields.__jobType === "string" ? fields.__jobType : null,
+      jobName: typeof fields.__jobName === "string" ? fields.__jobName : null,
     };
   } catch {
     return { pipelineName: null, jobType: null, jobName: null };
@@ -506,8 +586,10 @@ export function readJobPayloadBytes(value: string): number {
  */
 export function readJobAttempt(value: string): number | null {
   try {
-    if (!isEnvelope(value)) return null;
-    const machinery = (splitEnvelope(value).header.m ?? {}) as Record<string, unknown>;
+    // A 3.20.x bare-JSON value carries its attempt in the body; a GQ1 header has none.
+    const machinery = isEnvelope(value)
+      ? ((splitEnvelope(value).header.m ?? {}) as Record<string, unknown>)
+      : readLegacyBareJson(value);
     const attempt = machinery.__attempt;
     // Reported verbatim: this is a reader, and one that silently reshapes what
     // is stored cannot be used to check what was written. `__attempt` is lifted
@@ -626,7 +708,15 @@ export function readEnvelopeRetirement(value: string): {
 }
 
 export function isEnvelope(value: string): boolean {
-  return value.startsWith(ENVELOPE_PREFIX_V2);
+  return value.startsWith(ENVELOPE_PREFIX_V2) || value.startsWith(ENVELOPE_PREFIX_V1);
+}
+
+/** Each prefix admits only its own version's header and body encodings. */
+function isSupportedHeader({ value, header }: { value: string; header: EnvelopeHeader }): boolean {
+  if (value.startsWith(ENVELOPE_PREFIX_V1)) {
+    return header.v === 1 && ["j", "gz", "ref"].includes(header.e);
+  }
+  return header.v === 2 && ["j", "gz", "redis", "s3"].includes(header.e);
 }
 
 export function splitEnvelope(value: string): {
@@ -668,7 +758,7 @@ export function splitEnvelope(value: string): {
       reason: "malformed_envelope",
     });
   }
-  if (header.v !== 2 || !["j", "gz", "redis", "s3"].includes(header.e)) {
+  if (!isSupportedHeader({ value, header })) {
     throw new DecodeFailureError({
       message: "Malformed job envelope: unsupported version or body encoding",
       reason: "malformed_envelope",

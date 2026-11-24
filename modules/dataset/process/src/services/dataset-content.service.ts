@@ -102,12 +102,16 @@ export class DatasetContentService implements DatasetContent {
             byteSize: 0,
           }));
 
-    for (const offset of selected) {
-      const chunk = await storage.readChunk({
-        projectId: input.projectId,
-        datasetId: dataset.id,
-        index: offset.index,
-      });
+    const chunks = this.reads.chunksInOrder({
+      storage,
+      projectId: input.projectId,
+      datasetId: dataset.id,
+      indices: selected.map((offset) => offset.index),
+      offsets,
+    });
+    let at = 0;
+    for await (const chunk of chunks) {
+      const offset = selected[at++]!;
       chunk.forEach((line, index) => {
         const globalIndex = offset.startRow + index;
         if (globalIndex >= start && globalIndex < end) {
@@ -238,12 +242,16 @@ export class DatasetContentService implements DatasetContent {
       });
     }
 
-    const lines = await this.storage.readChunks({
+    const records: DatasetRecord[] = [];
+    for await (const lines of this.reads.chunksInOrder({
+      storage: this.storage,
       projectId,
       datasetId: dataset.id,
       chunkCount: dataset.chunkCount,
-    });
-    const records = lines.map((line) => toDatasetRecord(line, dataset));
+      offsets: readChunkOffsets(dataset.chunkOffsets),
+    })) {
+      for (const line of lines) records.push(toDatasetRecord(line, dataset));
+    }
     const selected = selectDatasetRecords(records, entrySelection);
     const bounded = limitDatasetRecordsByBytes(selected, limitBytes);
 
@@ -375,18 +383,19 @@ export class DatasetContentService implements DatasetContent {
     if (source.chunkCount === null) {
       throw new DatasetChunkCountMissingError(source.id);
     }
-    // One chunk in memory at a time, whatever the dataset's size.
+    // A bounded prefetch in memory at a time, whatever the dataset's size.
     const writer = StreamingChunkWriterService.create({
       storage: this.storage,
       projectId: targetProjectId,
       datasetId: target.id,
     });
-    for (let index = 0; index < source.chunkCount; index++) {
-      const rows = await this.storage.readChunk({
-        projectId: sourceProjectId,
-        datasetId: source.id,
-        index,
-      });
+    for await (const rows of this.reads.chunksInOrder({
+      storage: this.storage,
+      projectId: sourceProjectId,
+      datasetId: source.id,
+      chunkCount: source.chunkCount,
+      offsets: readChunkOffsets(source.chunkOffsets),
+    })) {
       for (const row of rows) await writer.push(toStoredEntry(row));
     }
     const written = await writer.finalize();

@@ -45,7 +45,10 @@ import {
   type UpgradeFailedRun,
   UPGRADE_RE_ASK_MS,
 } from "./serving-gate.ts";
-import { SERVING_ROSTER_TIMING } from "./serving-roster-timing.ts";
+import {
+  SERVING_ROSTER_PRE_ROSTER_GRACE_MS,
+  SERVING_ROSTER_TIMING,
+} from "./serving-roster-timing.ts";
 import { startTargetCatchUp } from "./target-catch-up.ts";
 import {
   redisTargetsCatchingUp,
@@ -56,9 +59,6 @@ import { createUpgradeGate, type UpgradeGate } from "./upgrade-gate.service.ts";
 
 /** Roster entries dead this long are deleted when a process records its own (plan F-10). */
 export const SERVING_ROSTER_PRUNE_AFTER_MS = 7 * 24 * 60 * 60_000;
-
-/** Writers before the roster count as present this long after the upgrade run (Round 47 E2). */
-export const SERVING_ROSTER_PRE_ROSTER_GRACE_MS = 30 * 60_000;
 
 /** A process with no database (the memory tier) has no installation to be behind. */
 const NO_LEDGER_GATE: UpgradeGate = {

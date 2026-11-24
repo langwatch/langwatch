@@ -406,6 +406,8 @@ export const TRANSIENT_REFUSAL_CODES = [
   // Kept through the mask so the refused organization reads why (T7-F3, Alex 2026-10-11).
   "private_dataplane_unavailable",
   "service_unavailable",
+  // A store 5xx or throttle: the client must read "retry", not an opaque fault (#9840).
+  "storage_unavailable",
   "upgrade_in_progress",
 ] as const satisfies readonly AppErrorCode[];
 

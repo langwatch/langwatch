@@ -208,6 +208,20 @@ Feature: Cloud upgrades run on deploy while old and new builds serve side by sid
     Then old writers are gone for step "trace:backfill-cost"
 
   @unit
+  Scenario: A step held by the grace for writers before the roster reads with the time the grace ends
+    Given the ledger was seeded from an existing installation and the upgrade run after it finished 7 minutes ago
+    And a background step "trace:backfill-cost" that needs old writers gone is pending
+    When the upgrade reader lists the steps
+    Then the step carries the end of the grace, 23 minutes from now
+    And a step that does not need old writers gone, or has settled, carries none
+
+  @unit
+  Scenario: A step reads no grace once old writers before the roster are asserted gone
+    Given the ledger was seeded from an existing installation and old writers before the roster are asserted gone
+    When the upgrade reader lists the steps
+    Then no step carries the end of a grace
+
+  @unit
   Scenario: A roster that reads the history of writers before the roster without a grace is refused
     When a serving roster is created over a ledger that reports that history and no grace
     Then creating it is refused with a range error

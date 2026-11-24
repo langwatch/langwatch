@@ -3,6 +3,7 @@ import { readableDate } from "@langwatch/time";
 
 import { statusTone } from "../../model/upgrade-labels.ts";
 import type { UpgradeStepView } from "../../model/upgrade-view.ts";
+import { OldWritersGraceNote } from "./old-writers-grace-note.tsx";
 import { UpgradeStatusBadge } from "./upgrade-status-badge.tsx";
 
 /** An old serving process by role, release (else image) and when it was last seen. */
@@ -22,9 +23,10 @@ function stepDetail(step: UpgradeStepView): string | null {
   return `Waiting on ${step.waitingOn.map(waitingWriterLabel).join(", ")}`;
 }
 
-/** The status badge, with progress or what the step waits on as one muted line under it. */
+/** The status badge, with progress or what the step waits on as muted lines under it. */
 export function UpgradeStepState({ step }: { step: UpgradeStepView }) {
   const detail = stepDetail(step);
+  const graceEndsAt = step.progress ? null : step.oldWritersGraceEndsAt;
   return (
     <Stack gap={1} align="start">
       <UpgradeStatusBadge label={{ label: step.statusLabel, tone: statusTone(step.status) }} />
@@ -33,6 +35,7 @@ export function UpgradeStepState({ step }: { step: UpgradeStepView }) {
           {detail}
         </Text>
       )}
+      {graceEndsAt && <OldWritersGraceNote endsAt={graceEndsAt} muted />}
     </Stack>
   );
 }

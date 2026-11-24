@@ -11,8 +11,8 @@ class Refusal extends HandledError {
 
 describe("isTransientRefusal", () => {
   /** @scenario "The transient allowlist is declared once" */
-  it("names exactly the seven refusal codes kept through the mask", () => {
-    expect(TRANSIENT_REFUSAL_CODES).toHaveLength(7);
+  it("names exactly the eight refusal codes kept through the mask", () => {
+    expect(TRANSIENT_REFUSAL_CODES).toHaveLength(8);
     expect(new Set(TRANSIENT_REFUSAL_CODES)).toEqual(
       new Set([
         "clickhouse_overloaded",
@@ -21,6 +21,7 @@ describe("isTransientRefusal", () => {
         "mcp_store_unavailable",
         "private_dataplane_unavailable",
         "service_unavailable",
+        "storage_unavailable",
         "upgrade_in_progress",
       ]),
     );

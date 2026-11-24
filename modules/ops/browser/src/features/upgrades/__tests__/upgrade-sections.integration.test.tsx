@@ -4,9 +4,9 @@
  * Specs: modules/ops/specs/upgrades.feature, modules/ops/specs/self-hosted-notices.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
   UpgradeRunDetailView,
@@ -65,6 +65,7 @@ function stepWith(overrides: Partial<UpgradeStepView>): UpgradeStepView {
     report: null,
     progress: null,
     waitingOn: [],
+    oldWritersGraceEndsAt: null,
     runId: null,
     startedAt: "2026-10-06T10:00:00.000Z",
     finishedAt: "2026-10-06T10:00:02.000Z",
@@ -442,6 +443,59 @@ describe("UpgradeStepsTab", () => {
       expect(row).toHaveTextContent("63%");
     });
 
+    describe("when the grace for writers before the roster holds the step", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      /** @scenario "A step held by the grace for writers before the roster says why and how long it waits" */
+      it("says it waits for the older release's processes, how long, and the command that ends it", () => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-11-24T10:00:00.000Z"));
+        const held = stepWith({
+          id: "dataset:move-content-to-object-storage",
+          mode: "background",
+          status: "pending",
+          statusLabel: "Waiting",
+          oldWritersGraceEndsAt: "2026-11-24T10:23:00.000Z",
+        });
+        renderStepsTab({ backgroundSteps: [held] });
+
+        const row = screen.getByTestId(
+          "upgrade-background-step-dataset:move-content-to-object-storage",
+        );
+        expect(row).toHaveTextContent("processes of the older release");
+        expect(row).toHaveTextContent("about 23 more minutes");
+        expect(row).toHaveTextContent("pnpm task upgrade old-writers-gone");
+        expect(row.textContent).not.toContain("`");
+        expect(row.textContent).not.toContain("30 minutes");
+      });
+
+      /** @scenario "The wait on the grace for writers before the roster counts down while the page stays open" */
+      it("counts the minutes down while the page stays open", () => {
+        vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+        vi.setSystemTime(new Date("2026-11-24T10:00:00.000Z"));
+        const held = stepWith({
+          id: "dataset:move-content-to-object-storage",
+          mode: "background",
+          status: "pending",
+          statusLabel: "Waiting",
+          oldWritersGraceEndsAt: "2026-11-24T10:23:00.000Z",
+        });
+        renderStepsTab({ backgroundSteps: [held] });
+        const row = screen.getByTestId(
+          "upgrade-background-step-dataset:move-content-to-object-storage",
+        );
+        expect(row).toHaveTextContent("about 23 more minutes");
+
+        act(() => {
+          vi.advanceTimersByTime(2 * 60_000);
+        });
+
+        expect(row).toHaveTextContent("about 21 more minutes");
+      });
+    });
+
     it("names the old serving processes a step waits on", () => {
       const waiting = {
         ...running,
@@ -593,6 +647,38 @@ describe("UpgradeReleaseSteps", () => {
 });
 
 describe("UpgradeStepDetail", () => {
+  describe("when the grace for writers before the roster holds the step", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario "A step held by the grace for writers before the roster says why and how long it waits" */
+    it("says in the drawer why it waits, how long, and the command that ends it", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-24T10:00:00.000Z"));
+      renderIn(
+        <UpgradeStepDetail
+          step={{
+            ...stepWith({
+              id: "dataset:move-content-to-object-storage",
+              mode: "background",
+              status: "pending",
+              statusLabel: "Waiting",
+              oldWritersGraceEndsAt: "2026-11-24T10:23:00.000Z",
+            }),
+            targets: [],
+            logTail: [],
+          }}
+        />,
+      );
+
+      const grace = screen.getByTestId("upgrade-step-grace");
+      expect(grace).toHaveTextContent("about 23 more minutes");
+      expect(grace).toHaveTextContent("pnpm task upgrade old-writers-gone");
+      expect(grace.textContent).not.toContain("`");
+    });
+  });
+
   describe("when a failed data step carries a checkpoint report", () => {
     /** @scenario "The step drawer shows a step's error, fix and checkpoint, read-only" */
     it("shows its facts, its last error and its report, and offers no action", () => {

@@ -17,13 +17,6 @@ export interface DatasetChunkRepository {
     maxBytes?: number;
   }): Promise<DatasetChunk[]>;
 
-  /** Every row, in order, driven by the Postgres-authoritative `chunkCount`. */
-  readChunks(params: {
-    projectId: string;
-    datasetId: string;
-    chunkCount: number;
-  }): Promise<unknown[]>;
-
   readChunk(params: { projectId: string; datasetId: string; index: number }): Promise<unknown[]>;
 
   /** One chunk's rows and the bytes storage handed over for them, for a scan bounded on bytes. */

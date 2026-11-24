@@ -3,6 +3,8 @@
  * section 7). The reader labels states and step statuses; this adds tones, the version and state
  * lines, and the page's grouping. Unknown values pass through raw in a neutral tone.
  */
+import { Temporal } from "@langwatch/time";
+
 import type { UpgradeStatusView, UpgradeVersionView } from "./upgrade-view.ts";
 
 export type UpgradeTone = "neutral" | "info" | "warning" | "danger" | "success";
@@ -320,4 +322,16 @@ export function summariseError(error: string): string {
 /** A status count's words: `not-needed` reads "not needed". */
 export function statusWords(status: string): string {
   return status.replaceAll("-", " ");
+}
+
+/** The command that records old writers gone, so a held step need not wait out the grace. */
+export const OLD_WRITERS_GONE_COMMAND = "pnpm task upgrade old-writers-gone";
+
+/** How long a step held by the grace for writers before the roster still waits (ADR-173). */
+export function oldWritersGraceLine({ endsAt, nowMs }: { endsAt: string; nowMs: number }): string {
+  const minutes = Math.ceil((Temporal.Instant.from(endsAt).epochMilliseconds - nowMs) / 60_000);
+  if (minutes <= 0) {
+    return "The wait for processes of the older release is over; the step starts on the next pass";
+  }
+  return `Waiting about ${minutes} more ${minutes === 1 ? "minute" : "minutes"} for processes of the older release to stop`;
 }

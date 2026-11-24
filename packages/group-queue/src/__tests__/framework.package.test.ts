@@ -85,9 +85,9 @@ describe("Group Queue framework contract", () => {
   });
 
   it("rejects stored values outside the canonical envelope", async () => {
-    await expect(
-      decodeJobEnvelope({ value: JSON.stringify({ id: "unsupported" }) }),
-    ).rejects.toThrow("expected a version 2 envelope");
+    await expect(decodeJobEnvelope({ value: "id=unsupported" })).rejects.toThrow(
+      "expected a version 2 envelope",
+    );
   });
 
   /** @scenario "Application policy is supplied before queue construction" */

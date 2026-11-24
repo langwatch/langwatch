@@ -230,7 +230,7 @@ describe("the single-file conversion step", () => {
 
       expect(await row(datasetId)).toMatchObject({ contentLayout: "postgres", useS3: true });
       expect(await oldFile(datasetId)).toEqual({ outcome: "found", text: '{"not":"an array"}' });
-      expect(args.saved).toEqual([]);
+      expect(args.saved.map((report) => report.afterProjectId)).toEqual([undefined]);
     });
   });
 
@@ -443,6 +443,103 @@ describe("the single-file conversion step", () => {
       await conversion.runStep(stepArgs());
 
       await expect(conversion.runStep(stepArgs())).resolves.toMatchObject({ converted: 0 });
+    });
+  });
+});
+
+describe("the single-file conversion report across attempts", () => {
+  describe("given a dataset in project_b fails to convert on the first attempt", () => {
+    /** @scenario "A conversion that retried reports every dataset it converted across its attempts" */
+    it("reports every dataset converted, and only the last attempt's problems", async () => {
+      const { repositories, conversion, projects, singleFile } = install();
+      projects.pages = (after) => ({
+        ids: ["project_a", "project_b", "project_c"].filter((id) => !after || id > after),
+        next: null,
+      });
+      await singleFile({ inProject: "project_a" });
+      await singleFile({ inProject: "project_b" });
+      const flaky = await singleFile({ inProject: "project_b" });
+      await singleFile({ inProject: "project_c", recordedCount: 10 });
+      const withLock = repositories.content.withDatasetLock.bind(repositories.content);
+      let failedOnce = false;
+      vi.spyOn(repositories.content, "withDatasetLock").mockImplementation((datasetId, work) => {
+        if (datasetId === flaky && !failedOnce) {
+          failedOnce = true;
+          throw new Error("store unavailable");
+        }
+        return withLock(datasetId, work);
+      });
+      let resumeFrom: MigrationStepReport | null = null;
+      const attempt = () => {
+        const args = stepArgs({ resumeFrom });
+        return conversion.runStep(args).finally(() => {
+          resumeFrom = args.saved.at(-1) ?? resumeFrom;
+        });
+      };
+
+      await expect(attempt()).rejects.toThrow(flaky);
+      expect(resumeFrom).toMatchObject({ afterProjectId: "project_a", converted: 3 });
+
+      const report = await attempt();
+      expect(report).toMatchObject({ converted: 4, oldFilesLeft: 4, failed: [] });
+      expect(report.wrongRecordedCount).toHaveLength(1);
+    });
+  });
+
+  describe("given project_b's next page read fails after both its datasets converted", () => {
+    /** @scenario "A conversion that retried reports every dataset it converted across its attempts" */
+    it("saves them before the error, so the retry reports all four", async () => {
+      const { repositories, conversion, projects, singleFile } = install();
+      projects.pages = (after) => ({
+        ids: ["project_a", "project_b", "project_c"].filter((id) => !after || id > after),
+        next: null,
+      });
+      await singleFile({ inProject: "project_a" });
+      await singleFile({ inProject: "project_b" });
+      await singleFile({ inProject: "project_b" });
+      await singleFile({ inProject: "project_c" });
+      const source = repositories.singleFileConversion;
+      const findIds = source.findSingleFileDatasetIds.bind(source);
+      const pageFailure = new Error("page read failed");
+      let failedOnce = false;
+      vi.spyOn(source, "findSingleFileDatasetIds").mockImplementation(async (input) => {
+        if (input.projectId === "project_b" && input.afterId && !failedOnce) {
+          failedOnce = true;
+          throw pageFailure;
+        }
+        return findIds(input);
+      });
+      let resumeFrom: MigrationStepReport | null = null;
+      const attempt = () => {
+        const args = stepArgs({ resumeFrom });
+        return conversion.runStep(args).finally(() => {
+          resumeFrom = args.saved.at(-1) ?? resumeFrom;
+        });
+      };
+
+      await expect(attempt()).rejects.toBe(pageFailure);
+      expect(resumeFrom).toMatchObject({ afterProjectId: "project_a", converted: 3 });
+
+      await expect(attempt()).resolves.toMatchObject({ converted: 4, failed: [] });
+    });
+  });
+
+  describe("given a checkpoint an older release saved, holding only its cursor", () => {
+    /** @scenario "A conversion that retried reports every dataset it converted across its attempts" */
+    it("resumes after it and counts from zero", async () => {
+      const { conversion, projects, singleFile } = install();
+      projects.pages = (after) => ({
+        ids: ["project_a", "project_b"].filter((id) => !after || id > after),
+        next: null,
+      });
+      await singleFile({ inProject: "project_a" });
+      await singleFile({ inProject: "project_b" });
+
+      const report = await conversion.runStep(
+        stepArgs({ resumeFrom: { afterProjectId: "project_a", converted: "lots" } }),
+      );
+
+      expect(report).toMatchObject({ converted: 1, wrongRecordedCount: [] });
     });
   });
 });

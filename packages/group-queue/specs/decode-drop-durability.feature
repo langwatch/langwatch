@@ -194,3 +194,48 @@ Feature: GroupQueue decode-drop durability and attribution
     Given a group carrying a recorded error from a previous failure
     When a worker claims the group and the staged job is dropped on decode failure
     Then the group's recorded error survives the drop
+
+  # --- Values staged by 3.20.x survive a rolling upgrade (#9840)
+  # 3.20.x staged bare JSON (envelope writes off) or GQ1; reads accept both, writes stay GQ2.
+
+  @unit
+  Scenario: A job staged by 3.20.1 as bare JSON decodes on the current worker
+    Given a value staged by 3.20.1 as bare JSON, its machinery as inline "__" keys
+    When the current worker decodes it
+    Then it yields the same job data a GQ2 envelope of that job yields
+    And its routing labels and retry attempt are read from the value
+
+  @unit
+  Scenario: A job staged by 3.20.1 as a GQ1 envelope decodes on the current worker
+    Given a value staged by 3.20.1 as a GQ1 envelope with a raw, gzip or offloaded body
+    When the current worker decodes it
+    Then it yields the job data the body carries
+    And its routing labels and payload size are read from the GQ1 header
+
+  @unit
+  Scenario: A stored value in no supported format is still dropped as malformed
+    Given a stored value that is neither a GQ1 or GQ2 envelope nor a JSON object
+    When the current worker decodes it
+    Then the decode fails as a malformed envelope
+
+  @unit
+  Scenario: A GQ1 job whose offloaded body cannot be read for a moment is retried, not dropped
+    Given a value staged by 3.20.1 as a GQ1 envelope whose body lives in the queue's blob keys
+    When the current worker decodes it and the read of the body fails
+    Then the decode fails as a transient blob-store error for the group's tenant, so the job retries
+    And a body that is gone is still a missing blob
+
+  @integration
+  Scenario: A job staged by 3.20.1 runs on the current worker instead of being dropped
+    Given a job a 3.20.1 worker staged as bare JSON or as a GQ1 envelope
+    When a current worker claims it
+    Then the handler receives the payload that was sent
+    And the job is counted under its pipeline, job type and job name
+    And the drop counter does not increment
+
+  @integration
+  Scenario: Dispatch reads the routing of a job staged by 3.20.1
+    Given a job a 3.20.1 worker staged as bare JSON or as a GQ1 envelope
+    And its lane is paused
+    When the dispatcher reaches its group
+    Then the group is parked under the paused lane instead of dispatched

@@ -4531,6 +4531,12 @@ const presentations = {
     describe: () =>
       "Nothing was read or saved. An administrator has to give this deployment's storage identity access to its files.",
   },
+  storage_unavailable: {
+    // fault: platform, retryable. The store answered a server fault or asked
+    // us to slow down; the same request usually works a moment later.
+    title: "Storage couldn't answer right now",
+    describe: () => "Storage could not answer. Try again in a moment.",
+  },
   export_failed: {
     // fault: platform. The export ran on our side and did not finish, so the
     // copy has to say nothing was changed — an export that half-worked is the

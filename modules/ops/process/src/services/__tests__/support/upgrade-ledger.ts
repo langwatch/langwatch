@@ -21,6 +21,7 @@ export function stepOf(
     logTail: [],
     progress: null,
     waitingOn: [],
+    oldWritersGraceEndsAt: null,
     runId: null,
     startedAt: null,
     finishedAt: null,

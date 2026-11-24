@@ -54,6 +54,7 @@ function failedStep(overrides: Record<string, unknown> = {}) {
     logTail: ["connecting to postgres", "retrying in 5s"],
     progress: null,
     waitingOn: [],
+    oldWritersGraceEndsAt: null,
     runId: null,
     startedAt: null,
     finishedAt: null,

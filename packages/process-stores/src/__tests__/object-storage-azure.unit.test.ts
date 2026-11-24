@@ -170,6 +170,42 @@ describe("given object storage on Azure Blob with an account key", () => {
     });
   });
 
+  describe("when Azure answers a server fault or asks to slow down", () => {
+    /** @scenario "A store that answers 5xx is a retryable storage_unavailable refusal" */
+    it("refuses every operation as storage_unavailable, retryable with status 503", async () => {
+      const operations = {
+        write: () =>
+          backend().write(at, text("hello"), { byteLength: 5, contentType: "text/plain" }),
+        read: () => backend().read(at),
+        exists: () => backend().exists(at),
+        remove: () => backend().remove(at),
+        probe: () => backend().probe(),
+      };
+      const answers = [
+        { status: 500, code: "InternalError" },
+        { status: 503, code: "ServerBusy" },
+        { status: 429, code: undefined },
+      ];
+
+      for (const answer of answers) {
+        status = answer.status;
+        errorCode = answer.code;
+        for (const [name, operation] of Object.entries(operations)) {
+          const refusal = await operation().then(
+            () => `${name} resolved`,
+            (error: unknown) => error,
+          );
+          expect(refusal, `${name} on ${answer.status}`).toMatchObject({
+            code: "storage_unavailable",
+            retryable: true,
+            httpStatus: 503,
+            fault: "platform",
+          });
+        }
+      }
+    });
+  });
+
   describe("when Azure refuses the identity's data access", () => {
     /** @scenario "An Azure refusal for missing data permissions names the role to grant" */
     it("refuses as permission denied for a mismatch or an authorization failure", async () => {

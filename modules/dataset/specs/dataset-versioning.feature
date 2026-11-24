@@ -326,6 +326,7 @@ Feature: Dataset version history
     And a dataset that has a slug keeps it
     And running the step again changes nothing
     And a dry run changes nothing and saves no checkpoint
+    And a step that retried reports every slug it filled across its attempts
 
   @unit
   Scenario: The first-version step runs after empty slugs are filled
