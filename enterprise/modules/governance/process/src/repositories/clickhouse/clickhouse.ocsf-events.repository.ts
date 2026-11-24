@@ -7,6 +7,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import { type GovernanceSeatReportRow, seatReportsOf } from "../../rules/ocsf-seat-report.rules.ts";
 import { OCSF_STORED_SCHEMA_VERSION } from "../governance.repositories.ts";
@@ -38,6 +39,27 @@ import type {
  * Migration: 00023_create_governance_ocsf_events.sql
  */
 const TABLE_NAME = "governance_ocsf_events" as const;
+
+/** One Security Lake caller row; ClickHouse sends its UInt64 columns as strings. */
+const securityLakeCallerRowSchema = z
+  .object({
+    Principal: z.string(),
+    Models: z.array(z.string()),
+    Regions: z.array(z.string()),
+    LastCallMs: z.coerce.number().finite(),
+    CallCount: z.coerce.number().finite(),
+  })
+  .transform((row): SecurityLakeCallerRow => ({
+    principalArn: row.Principal,
+    models: row.Models,
+    regions: row.Regions,
+    lastCallMs: row.LastCallMs,
+    callCount: row.CallCount,
+  }));
+
+const securityLakeCallerRowsSchema = z.array(securityLakeCallerRowSchema);
+
+const securityLakeEventCountRowsSchema = z.array(z.object({ Events: z.coerce.number().finite() }));
 
 /**
  * Rows per INSERT. A run's kept events arrive as one array and each carries
@@ -492,20 +514,7 @@ export class ClickHouseOcsfEventsRepository
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as {
-      Principal: string;
-      Models: string[];
-      Regions: string[];
-      LastCallMs: number | string;
-      CallCount: number | string;
-    }[];
-    return rows.map((row) => ({
-      principalArn: row.Principal,
-      models: row.Models,
-      regions: row.Regions,
-      lastCallMs: Number(row.LastCallMs),
-      callCount: Number(row.CallCount),
-    }));
+    return securityLakeCallerRowsSchema.parse(await result.json());
   }
 
   async countSecurityLakeEvents(input: { tenantId: string; sourceId: string }): Promise<number> {
@@ -525,7 +534,7 @@ export class ClickHouseOcsfEventsRepository
       },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as { Events: number | string }[];
-    return Number(rows[0]?.Events ?? 0);
+    const [row] = securityLakeEventCountRowsSchema.parse(await result.json());
+    return row?.Events ?? 0;
   }
 }

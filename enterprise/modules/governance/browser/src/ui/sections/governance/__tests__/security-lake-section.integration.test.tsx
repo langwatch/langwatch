@@ -189,6 +189,31 @@ describe("SecurityLakeSection", () => {
     ]);
   });
 
+  describe("given an organisation without the Enterprise plan", () => {
+    const withoutEnterprise = () =>
+      fakeGovernanceHost({
+        permissions: ["ingestionSources:view", "ingestionSources:manage"],
+        plan: { isEnterprise: false, isLoading: false },
+      });
+
+    /** @scenario "An organisation without Enterprise is not offered a Security Lake source to add" */
+    it("offers no Add Security Lake source and says the plan unlocks it", () => {
+      renderSection({ organizationId: "org_1", sources: [], host: withoutEnterprise() });
+
+      expect(
+        screen.queryByRole("button", { name: /Add Security Lake source/ }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("security-lake-enterprise-lock")).toBeInTheDocument();
+    });
+
+    /** @scenario "An organisation without Enterprise is not offered a Security Lake source to add" */
+    it("offers no Edit on a source it already has", () => {
+      renderSection({ organizationId: "org_1", sources: [lake], host: withoutEnterprise() });
+
+      expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    });
+  });
+
   it("says the callers and the source health could not be read instead of showing none", () => {
     calls.readFailure = new Error("network down");
     renderSection({ organizationId: "org_1", sources: [lake] });

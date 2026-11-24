@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { isMissingExternalIdError } from "./security-lake-credentials.rules.ts";
+
 const AWS_ERROR_CODE = /^[A-Za-z][A-Za-z0-9.]{0,63}$/;
 
 /**
@@ -12,7 +14,7 @@ export function describeAwsFailure(error: unknown): string {
   if (name === "MissingStaticAwsCredentialsError") {
     return "The source has no access key pair; add the access key ID and secret access key.";
   }
-  if (name === "MissingSecurityLakeExternalIdError" && error instanceof Error) return error.message;
+  if (isMissingExternalIdError(error)) return error.message;
   const code = name !== undefined && name !== "Error" && AWS_ERROR_CODE.test(name) ? name : null;
   return code === null ? "The AWS request failed." : `The AWS request failed with ${code}.`;
 }
