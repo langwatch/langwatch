@@ -30,7 +30,7 @@ echo "Done. Generated $(ls -1 $OUT_DIR/*.txt 2>/dev/null | wc -l) files in $OUT_
 # the langyagent image so the in-product assistant loads exactly what the
 # public skill directory publishes (see skills/_compiler/native.ts).
 echo "Generating native (opencode) skills..."
-node skills/_compiler/native.ts
+node skills/_compiler/native.ts --target native
 
 # Mirror the native set into the langyagent Go embed tree. The Dockerfile
 # overlays the same content at image build, so the committed copy only serves

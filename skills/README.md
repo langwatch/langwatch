@@ -47,22 +47,22 @@ skills/<name>/SKILL.mdx  +  skills/_shared/*.mdx
         │     docs-ci fails if those pages are stale.
         │
         ├─ 3. LANGY, THE IN-PRODUCT AGENT
-              _compiler/native.ts → _compiled/native/<slug>/SKILL.md (committed;
-              recipes flattened — opencode discovers skills one level deep)
-              → Dockerfile.langyagent COPYs _compiled/native/ into
-                services/langyagent/internal/assets/skills/ BEFORE `go build`
-              → //go:embed bakes the tree into the manager binary
-              → the worker pool materializes it to disk at startup and each
-                worker's $HOME/.config/opencode/skills symlinks to it
-              → the same image builds the CLI with LANGWATCH_SKILLS_RENDER=native,
-                so the bundled CLI (which Langy's bash tool can run) reads _compiled/native/
-
+        │     _compiler/native.ts --target native → _compiled/native/<slug>/SKILL.md
+        │     (committed; recipes flattened — opencode discovers skills one level deep)
+        │     → Dockerfile.langyagent COPYs _compiled/native/ into
+        │       services/langyagent/internal/assets/skills/ BEFORE `go build`
+        │     → //go:embed bakes the tree into the manager binary
+        │     → the worker pool materializes it to disk at startup and each
+        │       worker's $HOME/.config/opencode/skills symlinks to it
+        │     → opencode discovers each <slug>/SKILL.md as an invokable skill
+        │     → the same image builds the CLI with LANGWATCH_SKILLS_RENDER=native,
+        │       so the bundled CLI (which Langy's bash tool can run) reads _compiled/native/
+        │
         └─ 4. CLI `langwatch skills` BUNDLE
               _compiler/native.ts --target cli → _compiled/cli/<slug>/SKILL.md (committed)
               → sdks/typescript/scripts/generate-skills-bundle.mjs (default
                 LANGWATCH_SKILLS_RENDER=cli) → src/internal/generated/cli/skills.generated.ts
-              → the CLI binary embeds it; login steps are kept
-              → opencode discovers each <slug>/SKILL.md as an invokable skill.
+              → the CLI binary embeds it, login steps kept.
 ```
 
 Langy's native selection is a strict superset of the public selection, so what

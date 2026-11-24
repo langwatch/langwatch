@@ -3,7 +3,7 @@
  * drops the login steps, so only the Langy image, whose bash tool can run the CLI, sets it.
  */
 /** @type {readonly ["cli", "native"]} */
-export const RENDER_MODES = ["cli", "native"];
+const RENDER_MODES = ["cli", "native"];
 
 /**
  * Maps LANGWATCH_SKILLS_RENDER to its `_compiled/<mode>` directory name; unset means `cli`.

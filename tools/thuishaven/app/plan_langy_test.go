@@ -296,10 +296,10 @@ func TestEnsureLangyCLI(t *testing.T) {
 		}
 	})
 
-	t.Run("builds a missing CLI first", func(t *testing.T) {
+	t.Run("builds a missing CLI first, with the native skills render", func(t *testing.T) {
 		sup := &fakeSupervisor{}
 		run(t, sup, false, domain.LangyTierHostUnsafe)
-		if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "pnpm --filter langwatch build") {
+		if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "LANGWATCH_SKILLS_RENDER=native pnpm --filter langwatch build") {
 			t.Fatalf("expected one CLI build, got %v", sup.shells)
 		}
 	})

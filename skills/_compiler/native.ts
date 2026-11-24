@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Native skill generator: verbatim opencode SKILL.md files for the langyagent image,
- * or with `--target cli` the variant the CLI's `langwatch skills` bundle embeds.
+ * Native skill generator: with `--target native` (the default), verbatim opencode
+ * SKILL.md files for the langyagent image; with `--target cli`, the variant the
+ * CLI's `langwatch skills` bundle embeds.
  * Recipes flatten one level deep — see skills/_compiled/README.md for the pipeline.
  */
 import fs from "fs";
@@ -20,8 +21,10 @@ const __dirname = path.dirname(__filename);
 const skillsRoot = path.resolve(__dirname, "..");
 
 /**
- * Setup partials both renders leave out: both readers already run the CLI with
- * credentials available, so install and key-setup steps are moot.
+ * Setup partials both renders leave out, for a different reason per reader:
+ * - CLI bundle: its reader is already running the binary, so install steps are
+ *   moot, and the login partials it keeps carry the key guidance.
+ * - Langy: the image ships the CLI and Langy already holds a key.
  */
 const ALWAYS_EXCLUDED_PARTIALS = ["cli-setup", "projects-and-api-keys"];
 
@@ -39,13 +42,13 @@ const LOGIN_PARTIALS = [
 ];
 
 /** Which reader a render is for: Langy's image, or the CLI's embedded bundle. */
-export type NativeTarget = "langy" | "cli";
+export type NativeTarget = "native" | "cli";
 
 const TARGETS: Record<
   NativeTarget,
   { excluded: string[]; list: (skillsRoot: string) => PublishedSkill[]; outDir: string }
 > = {
-  langy: {
+  native: {
     excluded: [...ALWAYS_EXCLUDED_PARTIALS, ...LOGIN_PARTIALS],
     list: listNativeSkills,
     outDir: path.join(skillsRoot, "_compiled", "native"),
@@ -57,8 +60,8 @@ const TARGETS: Record<
   },
 };
 
-/** Renders one skill to a self-contained SKILL.md for the given target (Langy by default). */
-export function renderSkill(skill: PublishedSkill, target: NativeTarget = "langy"): string {
+/** Renders one skill to a self-contained SKILL.md for the given target (Langy's native render by default). */
+export function renderSkill(skill: PublishedSkill, target: NativeTarget = "native"): string {
   if (!fs.existsSync(skill.src)) {
     throw new Error(`Skill source not found: ${skill.src}`);
   }
@@ -72,14 +75,14 @@ export function targetOutput(target: NativeTarget): { skills: PublishedSkill[]; 
 
 function main() {
   const args = process.argv.slice(2);
-  let target: NativeTarget = "langy";
+  let target: NativeTarget = "native";
   let outOverride: string | undefined;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "--out") outOverride = path.resolve(args[++i]!);
     if (args[i] === "--target") {
       const value = args[++i];
-      if (value !== "langy" && value !== "cli") {
-        throw new Error(`--target must be "langy" or "cli", got ${value}`);
+      if (value !== "native" && value !== "cli") {
+        throw new Error(`--target must be "native" or "cli", got ${value}`);
       }
       target = value;
     }

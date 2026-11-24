@@ -157,7 +157,9 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 	}
 }
 
-const langyCLIBuildCommand = nxCacheEnv + "pnpm --filter langwatch build"
+// The build's prebuild re-runs generate; the native render keeps the login
+// steps out of the skills bundled into the CLI that Langy runs.
+const langyCLIBuildCommand = nxCacheEnv + "LANGWATCH_SKILLS_RENDER=native pnpm --filter langwatch build"
 
 // langyCLIEntry is the checkout's built CLI; langyCLIBinDir holds the
 // `langwatch` and `lw` shims that run it, first on the host tier's PATH.
