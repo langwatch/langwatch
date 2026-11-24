@@ -12,11 +12,12 @@ import type {
   CategoricalFacetResult,
   FacetValuesResult,
   Protections,
+  SpanAnalyticsFloor,
   TraceListRead,
 } from "@langwatch/trace-contract";
 import { TraceAttributeValuesWithheldError } from "@langwatch/trace-contract";
 
-import type { FacetCatalog } from "#features/facet/rules/trace-facet-registry.rules";
+import type { FacetCatalog, FacetTable } from "#features/facet/rules/trace-facet-registry.rules";
 
 import { createAttributeRedactor } from "../../../rules/trace-attribute-redaction.rules.ts";
 import {
@@ -26,6 +27,7 @@ import {
 import { TraceTtlCacheService } from "../../../services/trace-ttl-cache.service.ts";
 import type { TraceTopicNamingService } from "../../topic/services/trace-topic-naming.service.ts";
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
+import { batchedFacetSource } from "../rules/trace-facet-light-twin.rules.ts";
 
 const facetValuesLogger = createLogger("langwatch:app-layer:traces:trace-list-facet-values");
 
@@ -87,23 +89,35 @@ interface CachedFacetValues {
 
 const FACET_VALUES_CACHE = TraceTtlCacheService.create<CachedFacetValues>(FACET_VALUES_TTL_MS);
 
-export class TraceFacetValuesService {
-  private constructor(
-    private readonly repository: TraceListRead,
-    private readonly topicNaming: TraceTopicNamingService,
-    private readonly facets: FacetCatalog,
-  ) {}
+interface TraceFacetValuesDeps {
+  repository: TraceListRead;
+  topicNaming: TraceTopicNamingService;
+  facets: FacetCatalog;
+  /** Where span_analytics starts; a span facet's values read it inside that window. */
+  lightFloor?: (() => Promise<SpanAnalyticsFloor>) | undefined;
+}
 
-  static create({
-    repository,
-    topicNaming,
-    facets,
-  }: {
-    repository: TraceListRead;
-    topicNaming: TraceTopicNamingService;
-    facets: FacetCatalog;
-  }): TraceFacetValuesService {
-    return new TraceFacetValuesService(repository, topicNaming, facets);
+export class TraceFacetValuesService {
+  private readonly repository: TraceListRead;
+  private readonly topicNaming: TraceTopicNamingService;
+  private readonly facets: FacetCatalog;
+  private readonly lightFloor: (() => Promise<SpanAnalyticsFloor>) | undefined;
+
+  private constructor(deps: TraceFacetValuesDeps) {
+    this.repository = deps.repository;
+    this.topicNaming = deps.topicNaming;
+    this.facets = deps.facets;
+    this.lightFloor = deps.lightFloor;
+  }
+
+  static create(deps: TraceFacetValuesDeps): TraceFacetValuesService {
+    return new TraceFacetValuesService(deps);
+  }
+
+  /** The light twin's floor, or null when unknown: a failed read keeps the facet table. */
+  private async lightFloorFor(table: FacetTable): Promise<SpanAnalyticsFloor | null> {
+    if (!this.lightFloor || !this.facets.lightTwins?.[table]) return null;
+    return this.lightFloor().catch(() => null);
   }
 
   /**
@@ -270,12 +284,20 @@ export class TraceFacetValuesService {
 
     let result: CategoricalFacetResult;
     if (isExpressionCategorical(def)) {
+      const source = batchedFacetSource({
+        catalog: this.facets,
+        table: def.table,
+        categoricals: [def],
+        ranges: [],
+        floor: await this.lightFloorFor(def.table),
+        fromMs: params.timeRange.from,
+      });
       result = await this.repository.findCategoricalFacet({
         authorization: params.authorization,
         timeRange: params.timeRange,
-        table: def.table,
-        timeColumn: this.facets.timeColumns[def.table],
-        facetExpression: def.expression,
+        table: source.table,
+        timeColumn: source.timeColumn,
+        facetExpression: source.expressionOf(def),
         limit: params.limit,
         offset: params.offset,
         prefix: params.prefix,

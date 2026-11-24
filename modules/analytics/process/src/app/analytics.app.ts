@@ -75,7 +75,13 @@ import {
   type ScopedSecrets,
 } from "@langwatch/secrets";
 import { toEpochMs, type Instant } from "@langwatch/time";
-import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
+import {
+  filtersReadSpanType,
+  type SpanAnalyticsFloor,
+  TraceApi,
+  type Trace,
+  TRACE_FILTER_EXAMPLES,
+} from "@langwatch/trace-contract";
 
 import type { AnalyticsChannels } from "../channels/analytics.channels.ts";
 import { lwqlHydrationKeyCap } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
@@ -144,6 +150,7 @@ import {
   DEFAULT_LWQL_DATABASE,
   LangWatchQLService as LangWatchQLServiceClass,
 } from "../services/langwatch-ql.service.ts";
+import { SpanAnalyticsFloorReadService } from "../services/span-analytics-floor-read.service.ts";
 import { WorkbenchProtectionsService } from "../services/workbench-protections.service.ts";
 import {
   convergeLwqlAccessModel,
@@ -187,6 +194,8 @@ type AnalyticsFilterOptionsLookup = Readonly<{
       endDate: number;
       scope?: { conditions: string[]; params: Record<string, unknown> };
       authorization: Authorization;
+      /** Where span_analytics is complete, for a span-type picker or scope. */
+      spanAnalyticsFloor?: SpanAnalyticsFloor;
     }>,
   ): Promise<AnalyticsFilterOption[]>;
 }>;
@@ -512,6 +521,9 @@ export class AnalyticsModule
         overloadErrorFactory: new OverloadedRefusal(),
       }),
       maxMembers: setup.config.langwatchQl.aggregateMaxMembers,
+      spanAnalyticsFloor: SpanAnalyticsFloorReadService.create({
+        read: () => setup.dependencies.traces.getSpanAnalyticsFloor(),
+      }),
       tripwire: LoggingAnalyticsTripwireService.create({
         isEnabled: (projectId) =>
           setup.dependencies.featureFlags.isEnabled(ANALYTICS_READ_TRIPWIRE_FLAG, {
@@ -638,6 +650,7 @@ export class AnalyticsModule
   #runScope: LangWatchQLRunScopeService;
   #protections: WorkbenchProtectionsService;
   #validationReport: LangWatchQLValidationReportService;
+  #spanAnalyticsFloor: SpanAnalyticsFloorReadService;
 
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
@@ -663,6 +676,9 @@ export class AnalyticsModule
     this.#publicBaseUrl = publicBaseUrl;
     this.#widgetAccess = DashboardWidgetAccessService.create(dependencies);
     this.#hydration = dependencies.hydration;
+    this.#spanAnalyticsFloor = SpanAnalyticsFloorReadService.create({
+      read: () => dependencies.traces.getSpanAnalyticsFloor(),
+    });
   }
 
   /** Who owns the LangWatchQL access model now; the reconvergence watch probes this. */
@@ -747,7 +763,7 @@ export class AnalyticsModule
    * — never by the field's own selection, or the picker could only re-offer what's already
    * chosen. Forgetting this exclusion wouldn't fail; it would quietly narrow the answer.
    */
-  filterOptions(
+  async filterOptions(
     request: AnalyticsFilterOptionsRequest,
     { authorization }: { authorization: Authorization },
   ): Promise<AnalyticsFilterOption[]> {
@@ -760,11 +776,15 @@ export class AnalyticsModule
     const scopeFilters = Object.fromEntries(
       Object.entries(request.filters ?? {}).filter(([name]) => name !== request.field),
     );
+    const floorField = await this.#spanAnalyticsFloor.floorFieldFor(
+      request.field === "spans.type" || filtersReadSpanType(scopeFilters),
+    );
     // Trace owns the filter grammar because it owns the tables the scope reads. The picker
     // reads through the proof's fence, so the scope names no tenant of its own.
     const scope = this.#dependencies.traces.translateLegacyFilters({
       filters: scopeFilters,
       fenced: true,
+      ...floorField,
     });
 
     return this.#dependencies.filterOptions.getFilterOptions({
@@ -777,6 +797,7 @@ export class AnalyticsModule
       endDate: request.endDate,
       scope,
       authorization,
+      ...floorField,
     });
   }
 
