@@ -155,10 +155,8 @@ describe("given a member opens a From LangWatch board", () => {
       openCurated({ templateId: "data" });
 
       expect(
-        await screen.findByRole("heading", { name: "Can I trust my numbers?" }),
+        screen.getByText("How much of my traffic is tests, not real users?"),
       ).toBeInTheDocument();
-      expect(screen.getByText("Is my data complete?")).toBeInTheDocument();
-      expect(screen.getByText("Which of my traces are noise?")).toBeInTheDocument();
       expect(screen.queryByText("Not built yet")).toBeNull();
     });
   });

@@ -356,6 +356,7 @@ function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoa
             <BlockPickerDialog
               board={subject}
               period={period}
+              {...startingPickerKind(board.homeProduct)}
               onAddWidgets={boardWidgets.addQuestionWidgets}
               onSkip={() => {
                 editor.open({ widget: null, withLangy: false, closing: [WIDGET_PICKER_QUERY_KEY] });
@@ -429,4 +430,9 @@ export default function DashboardBoardScreen() {
       <Board />
     </DashboardsGate>
   );
+}
+
+/** A Coding agents board opens "Add a widget" on its coding-agent widgets. */
+function startingPickerKind(homeProduct: DashboardHomeProduct): { startingAgentKind?: "coding" } {
+  return homeProduct === "me" ? { startingAgentKind: "coding" } : {};
 }

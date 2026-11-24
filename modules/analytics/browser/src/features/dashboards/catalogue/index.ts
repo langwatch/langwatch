@@ -3,6 +3,7 @@
 export { preloadedTemplatesFor } from "./model/catalogue-boards.ts";
 export { GALLERY_TEMPLATES, stackWidgets } from "./model/catalogue-gallery.ts";
 export {
+  CODING_PICKER_QUESTIONS,
   PICKER_QUESTIONS,
   PICKER_SECTIONS,
   type PickerBranch,
@@ -12,6 +13,11 @@ export {
   pickerSections,
   pickerWidgets,
 } from "./model/catalogue-picker.ts";
+export {
+  CODING_PICKER_RANKING,
+  PICKER_RANKING,
+  RETIRED_PICKER_WIDGETS,
+} from "./model/picker-ranking.ts";
 export { CATALOGUE_WIDGET_BUILDS, type CatalogueWidgetBuild } from "./widgets/index.ts";
 export {
   catalogueWidgetActions,

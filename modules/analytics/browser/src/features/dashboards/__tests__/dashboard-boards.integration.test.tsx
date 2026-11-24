@@ -13,7 +13,13 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
-import { AGENT_KIND_CHIP_LABELS, PICKER_QUESTIONS, PICKER_SECTIONS } from "../catalogue/index.ts";
+import {
+  AGENT_KIND_CHIP_LABELS,
+  CODING_PICKER_QUESTIONS,
+  PICKER_QUESTIONS,
+  PICKER_SECTIONS,
+  pickerSections,
+} from "../catalogue/index.ts";
 import { boardSubject } from "../langy/model/board-langy.ts";
 import { BlockPickerDialog } from "../ui/sections/block-picker-dialog.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
@@ -303,6 +309,9 @@ function openBoard({
 const callsTo = (server: ReturnType<typeof inMemoryServer>, path: string) =>
   server.state.calls.filter((call) => call.path === path);
 
+/** The one region "All" lists every widget in. */
+const ALL_WIDGETS = ["All widgets"];
+
 /** The picker's regions, by the name each section carries. */
 async function pickerRegions() {
   const dialog = await screen.findByRole("dialog");
@@ -416,20 +425,24 @@ describe("a member's board", () => {
 
     describe("when the member browses every section", () => {
       /** @scenario "AC12 Only working questions are offered" */
-      /** @scenario "AC16 The picker offers every catalogue widget that has code, grouped by the question tree" */
-      it("lists every built widget in its own section, and no Blocks section", async () => {
+      /** @scenario "AC16 The picker offers every catalogue widget that has code, most asked-about first" */
+      it("lists every built widget in one ranked list, each tagged with its branch", async () => {
         openPicker();
 
         const dialog = await screen.findByRole("dialog");
-        for (const section of PICKER_SECTIONS) {
-          const listed = within(within(dialog).getByRole("region", { name: section.title }));
-          expect(listed.getAllByRole("button")).toHaveLength(section.questions.length);
-          for (const { question } of section.questions) {
-            const row = listed.getByRole("button", { name: new RegExp(escape(question)) });
-            expect(row, question).toBeEnabled();
-          }
+        expect(await pickerRegions()).toEqual(ALL_WIDGETS);
+        const rows = within(
+          within(dialog).getByRole("region", { name: "All widgets" }),
+        ).getAllByRole("button");
+        expect(rows.map((row) => row.getAttribute("data-widget"))).toEqual(
+          PICKER_QUESTIONS.map(({ id }) => id),
+        );
+        for (const [index, { question, branch }] of PICKER_QUESTIONS.entries()) {
+          expect(rows[index], question).toBeEnabled();
+          expect(rows[index]?.querySelector("[data-branch-tag]")?.textContent, question).toBe(
+            branch.title,
+          );
         }
-        expect(await pickerRegions()).toEqual(PICKER_SECTIONS.map(({ title }) => title));
         expect(within(dialog).queryByRole("region", { name: "Blocks" })).toBeNull();
       });
     });
@@ -513,10 +526,10 @@ describe("a member's board", () => {
           permissions,
         });
 
-        expect(await pickerRegions()).toEqual(PICKER_SECTIONS.map(({ title }) => title));
+        expect(await pickerRegions()).toEqual(ALL_WIDGETS);
         // One role query for the whole list: a named query per question timed out in CI.
         const rows = within(screen.getByRole("dialog")).getAllByRole("button");
-        for (const { question } of PICKER_SECTIONS.flatMap(({ questions }) => questions)) {
+        for (const { question } of PICKER_QUESTIONS) {
           expect(
             rows.find((button) => button.textContent?.includes(question)),
             question,
@@ -578,19 +591,31 @@ describe("a member's board", () => {
         expect(chip({ row: "Categories", name: "Grow" })).toBeInTheDocument();
         const types = within(screen.getByRole("group", { name: "Agent types" }));
         expect(types.getByRole("button", { name: /^Voice agent\s*\d+$/ })).toBeInTheDocument();
-        expect(types.queryByRole("button", { name: /^Coding agent/ })).toBeNull();
+        expect(
+          types.getByRole("button", {
+            name: new RegExp(`^Coding agent\\s*${CODING_PICKER_QUESTIONS.length}$`),
+          }),
+        ).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "I'll build it myself" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Ask Langy" })).toBeInTheDocument();
         expect(dialog.textContent).not.toMatch(/\bblocks?\b/i);
       });
 
-      /** @scenario "AC134 Picker filters: sections are branches in tree order, coloured by trunk" */
-      it("marks each branch section with its trunk, the trunks in order", async () => {
+      /** @scenario "AC134 Picker filters: a category lists its branches as sections, the best-ranked first" */
+      it("lists a picked category's branches as sections, the best-ranked first", async () => {
+        const user = userEvent.setup();
         openPicker();
+        const protect = PICKER_QUESTIONS.filter(({ trunk }) => trunk === "Protect");
 
-        const regions = within(await screen.findByRole("dialog")).getAllByRole("region");
-        expect(regions.map((region) => region.getAttribute("data-trunk"))).toEqual(
-          PICKER_SECTIONS.map(({ trunk }) => trunk),
+        await screen.findByRole("dialog");
+        await user.click(chip({ row: "Categories", name: "Protect" }));
+
+        expect(await pickerRegions()).toEqual(
+          pickerSections({ questions: protect }).map(({ title }) => title),
+        );
+        const regions = within(screen.getByRole("dialog")).getAllByRole("region");
+        expect(regions.every((region) => region.getAttribute("data-trunk") === "Protect")).toBe(
+          true,
         );
       });
     });
@@ -659,7 +684,42 @@ describe("a member's board", () => {
         for (const kind of made.madeFor) {
           expect(row(made.id)).toHaveTextContent(AGENT_KIND_CHIP_LABELS[kind]);
         }
-        expect(row(general.id)?.textContent).toBe(`${general.question}${general.why}`);
+        expect(row(general.id)?.textContent).toBe(
+          `${general.question}${general.branch.title}${general.why}`,
+        );
+      });
+    });
+
+    describe("given the picker opens on a Coding agents board", () => {
+      /** @scenario "Finder: Add a widget offers coding-agent widgets only under the Coding agent chip" */
+      it("starts on the Coding agent chip, listing its built widgets in their own order", async () => {
+        const host = new StubAnalyticsHost({ flags: LANGY_ON, permissions: LANGY_MEMBER });
+        renderDashboards({
+          element: (
+            <BlockPickerDialog
+              board={boardSubject({ board: { id: "board-1", name: "My tokens" }, widgets: [] })}
+              period={{
+                periodStart: Date.UTC(2026, 8, 1),
+                periodEnd: Date.UTC(2026, 8, 8),
+                granularitySeconds: 86_400,
+              }}
+              startingAgentKind="coding"
+              onAddWidgets={() => Promise.resolve(true)}
+              onSkip={() => void 0}
+              onClose={() => void 0}
+            />
+          ),
+          host,
+        });
+
+        await screen.findByRole("dialog");
+        expect(chip({ row: "Agent types", name: AGENT_KIND_CHIP_LABELS.coding })).toHaveAttribute(
+          "aria-pressed",
+          "true",
+        );
+        expect(rowButtons().map((row) => row.getAttribute("data-widget"))).toEqual(
+          CODING_PICKER_QUESTIONS.map(({ id }) => id),
+        );
       });
     });
 
@@ -742,7 +802,7 @@ describe("a member's board", () => {
         ).toBeInTheDocument();
         await user.click(screen.getByRole("button", { name: "Clear search and filters" }));
 
-        expect(await pickerRegions()).toEqual(PICKER_SECTIONS.map(({ title }) => title));
+        expect(await pickerRegions()).toEqual(ALL_WIDGETS);
         expect(pickerSearch()).toHaveValue("");
       });
     });

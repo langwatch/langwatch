@@ -61,7 +61,7 @@ describe("given the Can I trust my numbers? widgets", () => {
       "labels",
       "outcome",
     ]);
-    expect(unlocks.get("cost")).toContain("What is my agent spending?");
+    expect(unlocks.get("cost")).toContain("How much is my agent costing me?");
     expect(unlocks.get("cost")).not.toContain("Is my data complete?");
   });
 

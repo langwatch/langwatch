@@ -243,16 +243,18 @@ Feature: Dashboards v2 polish and bring-your-own-AI
       or its focus template for that kind, preloaded
     And coding agents get the six personal boards preloaded instead
     And the library's own templates are in the gallery only
-    # Decision (2026-10-07): the prototype names the Cockpit board "Agent health"; "Flight deck"
-    # is the org-wide board, future scope
+    # Decision (2026-10-07): "Flight deck" is the org-wide board, future scope
+    # Owner, 2026-11-24: templates are renamed in plain words; "Agent health" is now "My agent at a glance"
 
   @unit @integration
-  Scenario: AC16 The picker offers every catalogue widget that has code, grouped by the question tree
-    Given the picker is open on a board
-    Then each branch of the question tree with a built widget is a section, in tree order
-    And each section lists its built widgets by the question they answer
+  Scenario: AC16 The picker offers every catalogue widget that has code, most asked-about first
+    Given the picker is open on a board with "All" picked
+    Then every built widget is in one list, ranked by how many teams ask that question, so
+      "Is my agent doing its job?" comes first and the categories are mixed
+    And each row shows its question, what it shows, and a small tag naming its branch of the question tree
     And picking one stores it on the board under that question, as AC12 describes
     # Decision (2026-10-07): a catalogue widget without code is not listed at all
+    # Owner, 2026-11-24: the list is ranked by what customers need most, not grouped by category
 
   @unit
   Scenario: AC17 Only what is built is offered
@@ -1719,9 +1721,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then a widget matches on its question, its line, its Langy prompt, its branch or its agent kinds, ignoring case
 
   @unit @integration
-  Scenario: AC134 Picker filters: sections are branches in tree order, coloured by trunk
-    Given the picker
-    Then each branch of the question tree is a section, in tree order, so the trunks run Grow, Protect, Profit, Trust
+  Scenario: AC134 Picker filters: a category lists its branches as sections, the best-ranked first
+    Given the picker with a category picked
+    Then each branch of that category with a widget left is a section, the one holding the
+      best-ranked widget first, and each section lists its widgets in rank order
     And each section heading's icon and each row's icon take the trunk's colour, as in the templates finder
 
   @integration
@@ -1756,6 +1759,20 @@ Feature: Dashboards v2 polish and bring-your-own-AI
 
   @integration
   Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy
+  @unit
+  Scenario: AC139 Picker copy: a widget is named by its question in plain words
+    Given the widgets "Add a widget" offers
+    Then each one's name is the question it answers and its line says what it shows, in words a
+      member with no LangWatch knowledge reads: day or week, request, conversation, automatic check
+    And neither says trace, span, bucket, percentile, evaluator, judge, metadata or LangWatchQL
+    And the prompt Langy is drafted with starts with that same question
+
+  @unit
+  Scenario: AC139b Picker copy: a retired widget is not offered, and saved boards still draw it
+    Given "How long are my agent's conversations?" is no longer offered in "Add a widget"
+    Then the picker does not list it under any chip
+    And a board that already holds it still draws it from its stored code
+
     Given Langy is on for the project and the member may start a conversation
     When the member adds a ready template to this project
     Then the new board is made and opened
@@ -2492,6 +2509,6 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 160-165: "Sidebar, My dashboard and From LangWatch" (langwatch/tasks#911; changed on 2026-10-08: My dashboard starts pinned) → Scenario: AC160 The dashboards area lands on My dashboard; Scenario: AC160b A member with no My dashboard gets one made, pinned for them; Scenario: AC160c A member who unpins My dashboard keeps it unpinned; Scenario: AC161 The sidebar lists Your dashboards, Pinned and From LangWatch in order; Scenario: AC161b Your dashboards: My dashboard first, then the team's unpinned boards by name; Scenario: AC161c Pinned shows only when the member has pins, in their own order; Scenario: AC162 The '+' on Your dashboards makes a blank board at once; Scenario: AC163 My dashboard cannot be deleted; Scenario: AC164 From LangWatch folds only when the member clicks it; Scenario: AC165 A pin can point at a From LangWatch board
   # Boards, From LangWatch and Langy drafts (langwatch/tasks#911) → the "Boards:", "From LangWatch:" and "Langy drafts:" scenarios
   # AC 120-126: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate; Scenario: AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period; Scenario: AC124b Chart asks: a clickable bar is a keyboard-reachable button with a name; Scenario: AC124c Chart asks: a chart with nothing to investigate offers no click; Scenario: AC125 Widget actions: a problem widget offers its declared actions under the chart; Scenario: AC125b Widget actions: each action drafts its own prompt about the widget; Scenario: AC125c Widget actions: a widget that declares no actions shows no action row; Scenario: AC126 Widget asks on a new board store the board first
-  # AC 130-138: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: sections are branches in tree order, coloured by trunk; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for
+  # AC 130-139: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: a category lists its branches as sections, the best-ranked first; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for; Scenario: AC139 Picker copy: a widget is named by its question in plain words; Scenario: AC139b Picker copy: a retired widget is not offered, and saved boards still draw it
   # AC 240-241: "What a card says: names, not internal ids, and a sources line only when it informs" (owner, 2026-11-24) → Scenario: AC240 Card sources line: a widget counting only the default application source shows no sources line; Scenario: AC240b Card sources line: a widget whose views keep no origin shows no sources line; Scenario: AC240c Card sources line: a widget counting more or other sources than the default names them; Scenario: AC241 Widget labels: the test pass rate widget names each suite by its own name; Scenario: AC241b Widget labels: a managed prompt version reads as its prompt handle and number; Scenario: AC241c Widget labels: a scenario or a topic with no name reads as unnamed, never as its id
   # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board

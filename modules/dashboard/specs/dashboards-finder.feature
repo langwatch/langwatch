@@ -51,10 +51,12 @@ Feature: Dashboards finder: templates and widgets filed by what the member wants
     When the member picks a category in the templates finder
     Then the header shows the category, the question it answers and what its templates are for
 
-  @unit
-  Scenario: Finder: Add a widget leaves out coding-agent widgets
+  @unit @integration
+  Scenario: Finder: Add a widget offers coding-agent widgets only under the Coding agent chip
     Given "Add a widget"
-    Then no widget made for coding agents, or reading coding-agent traces, is listed
+    Then no widget made for coding agents, or reading coding-agent traces, is listed under "All"
+    And the "Coding agent" chip lists the built ones, spend first, in the coding agents area's order
+    And the picker opened on a Coding agents board starts on that chip
 
   @unit
   Scenario: Copy: no question, title or category says a bare it
