@@ -4,7 +4,7 @@
  * Specs: modules/ops/specs/upgrades.feature, modules/ops/specs/self-hosted-notices.feature
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -469,6 +469,30 @@ describe("UpgradeStepsTab", () => {
         expect(row).toHaveTextContent("pnpm task upgrade old-writers-gone");
         expect(row.textContent).not.toContain("`");
         expect(row.textContent).not.toContain("30 minutes");
+      });
+
+      /** @scenario "The wait on the grace for writers before the roster counts down while the page stays open" */
+      it("counts the minutes down while the page stays open", () => {
+        vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+        vi.setSystemTime(new Date("2026-11-24T10:00:00.000Z"));
+        const held = stepWith({
+          id: "dataset:move-content-to-object-storage",
+          mode: "background",
+          status: "pending",
+          statusLabel: "Waiting",
+          oldWritersGraceEndsAt: "2026-11-24T10:23:00.000Z",
+        });
+        renderStepsTab({ backgroundSteps: [held] });
+        const row = screen.getByTestId(
+          "upgrade-background-step-dataset:move-content-to-object-storage",
+        );
+        expect(row).toHaveTextContent("about 23 more minutes");
+
+        act(() => {
+          vi.advanceTimersByTime(2 * 60_000);
+        });
+
+        expect(row).toHaveTextContent("about 21 more minutes");
       });
     });
 
