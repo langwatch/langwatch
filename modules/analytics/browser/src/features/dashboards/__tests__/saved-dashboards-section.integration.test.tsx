@@ -51,7 +51,7 @@ type Star =
   | { kind: "board"; dashboard: ReturnType<typeof board> }
   | { kind: "template"; templateId: string };
 
-/** The member starred Latency, then the Release check template. */
+/** The member starred Latency, then the Ready to ship? template. */
 const STARS: Star[] = [
   { kind: "board", dashboard: LATENCY },
   { kind: "template", templateId: "release" },
@@ -136,11 +136,8 @@ describe("the Dashboards sidebar", () => {
       renderSection();
 
       expect(await namesIn("Your dashboards")).toEqual(["My dashboard", "Costs", "Weekly review"]);
-      expect(await namesIn("Pinned dashboards")).toEqual(["Latency", "Release check"]);
-      expect(await namesIn("From LangWatch")).toEqual([
-        "Can I trust my numbers?",
-        "Where my agent breaks",
-      ]);
+      expect(await namesIn("Pinned dashboards")).toEqual(["Latency", "Ready to ship?"]);
+      expect(await namesIn("From LangWatch")).toEqual(["Fix missing data", "Errors and failures"]);
       expect(screen.queryByRole("link", { name: /Browse templates/ })).toBeNull();
       expect(screen.queryByText("All dashboards")).toBeNull();
     });
@@ -163,7 +160,7 @@ describe("the Dashboards sidebar", () => {
       renderSection({ openPath: "curated/data" });
 
       const data = within(await listNamed("From LangWatch")).getByRole("link", {
-        name: /Can I trust my numbers\?/,
+        name: /Fix missing data/,
       });
       expect(data).toHaveAttribute("href", "/test-project/dashboards/curated/data");
       expect(data).toHaveAttribute("aria-current", "page");
@@ -312,7 +309,7 @@ describe("the Dashboards sidebar", () => {
       const { user, calls, host } = renderSection();
       const data = within(await listNamed("From LangWatch"))
         .getAllByRole("listitem")
-        .find((item) => item.textContent?.includes("Can I trust my numbers?"));
+        .find((item) => item.textContent?.includes("Fix missing data"));
 
       await user.click(within(data!).getByRole("button", { name: "Pin dashboard" }));
 
@@ -391,7 +388,7 @@ describe("the Dashboards sidebar", () => {
       const { user } = renderSection();
       const starred = within(await listNamed("Pinned dashboards"));
 
-      await user.click(starred.getByRole("button", { name: "Actions for Release check" }));
+      await user.click(starred.getByRole("button", { name: "Actions for Ready to ship?" }));
       await screen.findByRole("menuitem", { name: "Duplicate to edit" });
 
       expect(menuItemNames()).toEqual(["Unpin", "Move up", "Move down", "Duplicate to edit"]);
@@ -411,9 +408,9 @@ describe("the Dashboards sidebar", () => {
         expect(screen.queryByRole("menuitem", { name: "Move Latency up" })).toBeNull(),
       );
 
-      await user.click(screen.getByRole("button", { name: "Actions for Release check" }));
+      await user.click(screen.getByRole("button", { name: "Actions for Ready to ship?" }));
       expect(
-        await screen.findByRole("menuitem", { name: "Move Release check down" }),
+        await screen.findByRole("menuitem", { name: "Move Ready to ship? down" }),
       ).toHaveAttribute("aria-disabled", "true");
     });
 
@@ -422,8 +419,8 @@ describe("the Dashboards sidebar", () => {
       const { user, calls } = renderSection();
       const starred = within(await listNamed("Pinned dashboards"));
 
-      await user.click(starred.getByRole("button", { name: "Actions for Release check" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Move Release check up" }));
+      await user.click(starred.getByRole("button", { name: "Actions for Ready to ship?" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Move Ready to ship? up" }));
 
       await waitFor(() =>
         expect(inputsTo(calls, "boards.reorderStars")).toEqual([
@@ -444,10 +441,10 @@ describe("the Dashboards sidebar", () => {
         stars: [{ kind: "board", dashboard: MINE }, ...STARS],
       });
       const starred = within(await listNamed("Pinned dashboards"));
-      expect(await namesIn("Pinned dashboards")).toEqual(["Latency", "Release check"]);
+      expect(await namesIn("Pinned dashboards")).toEqual(["Latency", "Ready to ship?"]);
 
-      await user.click(starred.getByRole("button", { name: "Actions for Release check" }));
-      await user.click(await screen.findByRole("menuitem", { name: "Move Release check up" }));
+      await user.click(starred.getByRole("button", { name: "Actions for Ready to ship?" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Move Ready to ship? up" }));
 
       await waitFor(() =>
         expect(inputsTo(calls, "boards.reorderStars")).toEqual([
@@ -485,13 +482,13 @@ describe("the Dashboards sidebar", () => {
       const { user, calls } = renderSection();
 
       await user.click(
-        await screen.findByRole("button", { name: "Actions for Where my agent breaks" }),
+        await screen.findByRole("button", { name: "Actions for Errors and failures" }),
       );
       await user.click(await screen.findByRole("menuitem", { name: "Duplicate to edit" }));
 
       await waitFor(() =>
         expect(inputsTo(calls, "boards.create")).toEqual([
-          { projectId: "proj-1", name: "Where my agent breaks (copy)" },
+          { projectId: "proj-1", name: "Errors and failures (copy)" },
         ]),
       );
     });

@@ -237,10 +237,10 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then no widget appears on more than one of those boards
 
   @unit
-  Scenario: AC15c The prototype's boards are the starter set, under the Agent health name
+  Scenario: AC15c The prototype's boards are the starter set, under the My agent at a glance name
     Given the dashboards catalogue
-    Then the default template is named "Agent health" and every application agent kind gets it,
-      or its focus template for that kind, preloaded
+    Then the default template is named "My agent at a glance" and every application agent kind
+      gets it preloaded, adapted to that kind where it has widgets of its own for it
     And coding agents get the six personal boards preloaded instead
     And the library's own templates are in the gallery only
     # Decision (2026-10-07): "Flight deck" is the org-wide board, future scope
@@ -676,12 +676,17 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then they see the not-found page
 
   @unit @integration
-  Scenario: AC101 Templates library: every ready template is listed by trunk
+  Scenario: AC101 Templates library: All lists one template per job, most needed first
     Given the member opens the templates finder with no search and no filters
     Then they see "Dashboard templates" and a one-line introduction
-    And every template that can be made today is listed once, in sections Grow, Protect, Profit and Trust
-    And inside each section each template comes before its focus templates
-    And each section header carries its trunk's colour
+    And every template that can be made today is listed once in one grid, with no category
+      headings, ranked by how many teams need it, so "My agent at a glance" comes first and the
+      categories are mixed
+    And no template is listed twice for different agent kinds
+    When the member picks a category
+    Then that category's templates are listed under its heading, in the same order, the heading
+      in its trunk's colour
+    # Owner, 2026-11-24: "All" is ranked by what customers need most, not grouped by category
 
   @unit
   Scenario: AC102 Templates library: search matches name, job, widget questions and agent kinds
@@ -723,7 +728,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then each card shows, in order: the name, what the board is for, a short preview with
       the number of widgets in a pill over its bottom-right corner, then one footer row
     And the footer row holds "Add to this project" on the left, and on the right the agent type
-      a focus template is made for, then the category as a coloured icon badge named by its hover
+      the template is made for, then the category as a coloured icon badge named by its hover
     And a card shows no status
     And the footer has one height on every card, so the buttons line up across a row
     # Owner, 2026-10-08: no empty space above the button
@@ -1309,7 +1314,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC161 The sidebar lists Your dashboards, Pinned and From LangWatch in order
     When the member looks at the Dashboards sidebar
     Then they see "Your dashboards" with a "+", then Pinned, then From LangWatch
-    And From LangWatch holds Release check, "Can I trust my numbers?" and Where my agent breaks
+    And From LangWatch holds "Ready to ship?", "Fix missing data" and "Errors and failures"
     And the sidebar has no Browse templates item; a new board offers the templates
 
   @unit @integration
@@ -1331,6 +1336,13 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And it is named "Untitled dashboard <n>" and listed under "Your dashboards" while it is open
     And the new board offers "Or start from a template"
     But no dashboard is stored yet
+
+  @integration
+  Scenario: AC162h The product sidebar lists the new board while it is open
+    Given the member opened a new board in a project
+    When the project's sidebar shows its Dashboards section
+    Then the new board is listed first, by its "Untitled dashboard <n>" name, as the page in view
+    And once it is stored, or the member leaves it unedited, that row is gone
 
   @integration
   Scenario: AC162b Leaving a new board unedited stores nothing
@@ -1474,7 +1486,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: From LangWatch: every widget on a template board has code
     Given the From LangWatch boards
     Then every widget on them runs its own query, and none is a placeholder
-    And "Can I trust my numbers?" shows data health, cost accuracy, noise and evaluation coverage
+    And "Fix missing data" shows data health, cost accuracy, noise and evaluation coverage
 
   @integration
   Scenario: From LangWatch: Duplicate to edit makes an own board named after the template
@@ -1747,18 +1759,6 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then the picker says no widget matches and offers Skip to write one with Langy
     And clearing the search and filters lists every widget again
 
-  @unit @integration
-  Scenario: AC138 Picker filters: a row names the agent types its widget is made for
-    Given a widget made for three agent types or fewer
-    Then its row names those agent types after its question
-    And a general widget's row names none
-
-  # ---------------------------------------------------------------------------
-  # Product direction: templates and widgets hand off to Langy; alerts and reports are actions
-  # ---------------------------------------------------------------------------
-
-  @integration
-  Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy
   @unit
   Scenario: AC139 Picker copy: a widget is named by its question in plain words
     Given the widgets "Add a widget" offers
@@ -1773,6 +1773,18 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then the picker does not list it under any chip
     And a board that already holds it still draws it from its stored code
 
+  @unit @integration
+  Scenario: AC138 Picker filters: a row names the agent types its widget is made for
+    Given a widget made for three agent types or fewer
+    Then its row names those agent types after its question
+    And a general widget's row names none
+
+  # ---------------------------------------------------------------------------
+  # Product direction: templates and widgets hand off to Langy; alerts and reports are actions
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy
     Given Langy is on for the project and the member may start a conversation
     When the member adds a ready template to this project
     Then the new board is made and opened
@@ -1840,6 +1852,11 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And a board renamed away from the template's name no longer counts as added
     # Decision: no board column records its template and adding one needs a migration, so the
     # board is matched by the name it was made with
+
+  @unit
+  Scenario: AC145b Template card: a board made under a template's former name still counts as added
+    Given this project has a board named "Agent health", made before the template was renamed
+    Then the "My agent at a glance" card shows "Added", linking to that board
 
   @integration
   Scenario: Template card: the category icon names its category and description on hover and focus
@@ -2476,8 +2493,8 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 12: "A picked question adds its widget and seeds Langy" (added by langwatch/tasks#911: the picker adds widgets and drafts Langy, no longer only asks) → Scenario: AC12 A picked question adds its widget and seeds Langy; Scenario: AC12b Without Langy a picked question still adds its widget; Scenario: AC12c A failed add takes the widget off again and does not seed Langy
   # AC 13: "An empty widget tells a quiet period from a missing source" (added by langwatch/tasks#911: no rows no longer means not connected) → Scenario: AC13 A quiet period does not ask the member to connect a source; Scenario: AC13b A source that was never set up shows its setup step; Scenario: AC13c Every template widget checks its own source
   # AC 14: "Reviewer thumbs are named as reviewer thumbs" (added by langwatch/tasks#911: the annotations table holds reviewer thumbs, not user feedback) → Scenario: AC14 Reviewer thumbs are named as reviewer thumbs
-  # AC 15: "One catalogue of widgets and templates, from the dashboards library" (added by langwatch/tasks#911: the library is the guide for what to build) → Scenario: AC15 Every widget answers a question from the question tree; Scenario: AC15b A project's preloaded boards never repeat a widget; Scenario: AC15c The prototype's boards are the starter set, under the Agent health name
-  # AC 16: "The picker offers the catalogue" (added by langwatch/tasks#911: the picker moves from answer shapes to the question tree) → Scenario: AC16 The picker offers every catalogue widget that has code, grouped by the question tree
+  # AC 15: "One catalogue of widgets and templates, from the dashboards library" (added by langwatch/tasks#911: the library is the guide for what to build) → Scenario: AC15 Every widget answers a question from the question tree; Scenario: AC15b A project's preloaded boards never repeat a widget; Scenario: AC15c The prototype's boards are the starter set, under the My agent at a glance name
+  # AC 16: "The picker offers the catalogue" (added by langwatch/tasks#911: the picker moves from answer shapes to the question tree; changed 2026-11-24: one list ranked by what customers ask most) → Scenario: AC16 The picker offers every catalogue widget that has code, most asked-about first
   # AC 17: "Everything is listed, coming soon until built" (changed by langwatch/tasks#911 on 2026-10-07: only what is built is offered) → Scenario: AC17 Only what is built is offered
   # AC 18: "Default Langy prompts" (added by langwatch/tasks#911) → Scenario: AC18 Every widget and template carries a default Langy prompt
   # AC 40: "Answer quality: how conversations ended" → Scenario: AC40 Answer quality: How conversations ended reads the app's outcome first, then the judge
@@ -2492,7 +2509,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 49: "What users ask: asked again" → Scenario: AC49 What users ask: Asked again shows misread conversations and returning users
   # AC 60-71: "Where my agent breaks" and "Release check" widgets are built from the prototype's cards → Scenario: AC60 to Scenario: AC71
   # AC 80-93: "The boards preloaded for one agent kind are built" (By customer, Call quality, Field accuracy, Outputs users keep, Risk sign-off) → Scenario: AC80 By customer: the board groups by the first key the traces carry; Scenario: AC80b By customer: no grouping key says what to send; Scenario: AC81 By customer: conversations by customer with each one's share; Scenario: AC82 By customer: one row per customer with pass rate, the period before and AI cost; Scenario: AC83 By customer: pass rate on the newest prompt version against the one before; Scenario: AC84 By customer: spend by customer, top six; Scenario: AC85 Call quality: reply time by stage; Scenario: AC86 Call quality: calls not ended and repeated sentences; Scenario: AC87 Field accuracy: accuracy per field and document type; Scenario: AC88 Field accuracy: share sent to human review; Scenario: AC89 Outputs users keep: drop-off after generation; Scenario: AC90 Risk sign-off: sign-off status; Scenario: AC91 Risk sign-off: policy checks with their margin; Scenario: AC92 Risk sign-off: review queue; Scenario: AC93 Risk sign-off: change log
-  # AC 100-106: "Templates library" (AC100 retired: the sidebar has no Browse templates item; a new board offers the templates) → Scenario: AC100b Templates library: the library is behind the dashboards gate; Scenario: AC101 Templates library: every ready template is listed by trunk; Scenario: AC102 Templates library: search matches name, job, widget questions and agent kinds; Scenario: AC103 Templates library: one category chip and one agent-type chip narrow the finder; Scenario: AC104 Templates library: the search and filters are kept in the address; Scenario: AC105 Templates library: no match says so and offers to clear the filters; Scenario: AC106 Templates library: a template creates a board for the whole project
+  # AC 100-106: "Templates library" (AC100 retired: the sidebar has no Browse templates item; a new board offers the templates) → Scenario: AC100b Templates library: the library is behind the dashboards gate; Scenario: AC101 Templates library: All lists one template per job, most needed first; Scenario: AC102 Templates library: search matches name, job, widget questions and agent kinds; Scenario: AC103 Templates library: one category chip and one agent-type chip narrow the finder; Scenario: AC104 Templates library: the search and filters are kept in the address; Scenario: AC105 Templates library: no match says so and offers to clear the filters; Scenario: AC106 Templates library: a template creates a board for the whole project
   # AC 110-113: "Widget description: the description moves from the stored code to an info tip on the card" → Scenario: AC110 Widget description: a built widget carries its description, not in its code; Scenario: AC111 Widget description: the card shows the description behind an info icon; Scenario: AC112 Widget description: a widget without a description has no info icon; Scenario: AC113 Widget description: the description is stored and kept when the code is edited
   # AC 114-116: "Widget fit: a short card keeps its empty face usable" → Scenario: AC114 Widget fit: the empty face fits a short card; Scenario: AC115 Widget fit: a widget is never shorter than its title and one-row empty face; Scenario: AC116 Widget fit: every built widget is at least the minimum height
   # AC 107c-107e: "Templates library: cards like the prototype" (changed by langwatch/tasks#911 on 2026-10-07: compact cards with no labels, so AC107e is gone; the finder's own scenarios are in dashboards-finder.feature) → Scenario: AC107c Templates library: each card reads like the prototype's; Scenario: AC107d Templates library: a card previews the template's real board
@@ -2511,4 +2528,4 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   # AC 120-126: "Ask Langy: hand any widget to Langy with a ready draft" → Scenario: AC120 Ask Langy: each widget card offers Ask Langy only when Langy is available; Scenario: AC120b Ask Langy: every widget on every board has Ask Langy, From LangWatch boards included; Scenario: AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period; Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback; Scenario: AC123 Ask Langy: the prompt is stored on built widgets and kept on edit and duplicate; Scenario: AC124 Chart asks: clicking a bar or a point drafts Langy about that category and the period; Scenario: AC124b Chart asks: a clickable bar is a keyboard-reachable button with a name; Scenario: AC124c Chart asks: a chart with nothing to investigate offers no click; Scenario: AC125 Widget actions: a problem widget offers its declared actions under the chart; Scenario: AC125b Widget actions: each action drafts its own prompt about the widget; Scenario: AC125c Widget actions: a widget that declares no actions shows no action row; Scenario: AC126 Widget asks on a new board store the board first
   # AC 130-139: "Picker filters: 'Add a widget' narrows like the templates finder" → Scenario: AC130 Picker filters: the picker offers the finder's search and chips; Scenario: AC131 Picker filters: chips narrow the widgets by category and agent type; Scenario: AC132 Picker filters: each chip counts the widgets it would show; Scenario: AC133 Picker filters: search matches the question, line, prompt, branch and agent kinds; Scenario: AC134 Picker filters: a category lists its branches as sections, the best-ranked first; Scenario: AC135 Picker filters: a widget picked from a filtered list is added and drafts its Langy prompt; Scenario: AC136 Picker filters: the filters reset when the picker closes; Scenario: AC137 Picker filters: no match says so and offers to clear the search and filters; Scenario: AC138 Picker filters: a row names the agent types its widget is made for; Scenario: AC139 Picker copy: a widget is named by its question in plain words; Scenario: AC139b Picker copy: a retired widget is not offered, and saved boards still draw it
   # AC 240-241: "What a card says: names, not internal ids, and a sources line only when it informs" (owner, 2026-11-24) → Scenario: AC240 Card sources line: a widget counting only the default application source shows no sources line; Scenario: AC240b Card sources line: a widget whose views keep no origin shows no sources line; Scenario: AC240c Card sources line: a widget counting more or other sources than the default names them; Scenario: AC241 Widget labels: the test pass rate widget names each suite by its own name; Scenario: AC241b Widget labels: a managed prompt version reads as its prompt handle and number; Scenario: AC241c Widget labels: a scenario or a topic with no name reads as unnamed, never as its id
-  # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board
+  # AC 140-145: "Product direction: templates and widgets hand off to Langy; alerts and reports are widget actions" → Scenario: AC140 Template pick: the new board opens with the template's report drafted in Langy; Scenario: AC140b Template pick: without Langy the board is made and nothing is drafted; Scenario: AC141 Picker add: a picked widget drafts its own prompt with the widget, as Ask Langy does; Scenario: AC142 Widget menu: Set an alert drafts Langy to alert on that widget; Scenario: AC143 Widget menu: Send as a report drafts Langy to schedule that widget; Scenario: AC143b Widget menu: without Langy the menu offers no alert or report; Scenario: AC144 Template card: the primary button reads Add to this project; Scenario: AC145 Template card: a template already added shows Added, linking to its board; Scenario: AC145b Template card: a board made under a template's former name still counts as added

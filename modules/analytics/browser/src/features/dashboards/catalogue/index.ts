@@ -1,7 +1,7 @@
 /** The dashboards catalogue: the question tree, every widget and every template. */
 
 export { preloadedTemplatesFor } from "./model/catalogue-boards.ts";
-export { GALLERY_TEMPLATES, stackWidgets } from "./model/catalogue-gallery.ts";
+export { GALLERY_TEMPLATES, GALLERY_VARIANTS, stackWidgets } from "./model/catalogue-gallery.ts";
 export {
   CODING_PICKER_QUESTIONS,
   PICKER_QUESTIONS,
@@ -26,7 +26,6 @@ export {
 } from "./model/widget-implementations.ts";
 export {
   AGENT_KIND_CHIP_LABELS,
-  AGENT_KIND_FOCUS_LABELS,
   AGENT_KIND_LABELS,
   AGENT_KINDS,
   PERSONA_LABELS,
@@ -48,7 +47,12 @@ export {
   CATALOGUE_TEMPLATES,
   type CatalogueTemplate,
   focusTemplateId,
+  TEMPLATE_VARIANTS,
+  type TemplateArea,
+  templateArea,
+  templateForKind,
   templateSetupNeeds,
+  templatesInArea,
   templateWidgetGaps,
 } from "./model/catalogue-templates.ts";
 export {

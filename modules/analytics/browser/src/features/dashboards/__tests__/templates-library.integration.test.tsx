@@ -124,16 +124,30 @@ describe("the templates finder", () => {
   });
 
   describe("given no search and no filters", () => {
-    /** @scenario "AC101 Templates library: every ready template is listed by trunk" */
-    it("lists every ready template once, under its trunk, in trunk order", () => {
+    /** @scenario "AC101 Templates library: All lists one template per job, most needed first" */
+    it("lists every ready template once in one grid, most needed first, with no headings", () => {
       openLibrary();
 
       expect(screen.getByRole("heading", { level: 1, name: "Dashboard templates" })).toBeVisible();
-      const regions = screen.getAllByRole("region");
+      const grid = screen.getByRole("region", { name: "All templates" });
+      expect(within(grid).queryAllByRole("heading", { level: 2 })).toEqual([]);
+      const cards = screen.getAllByRole("article");
+      expect(cards.map((card) => card.getAttribute("data-template"))).toEqual(
+        POOL.map(({ board }) => board.id),
+      );
+      expect(cards[0]?.getAttribute("aria-label")).toBe("My agent at a glance");
+    });
+
+    /** @scenario "AC101 Templates library: All lists one template per job, most needed first" */
+    it("lists a picked category under its heading, in the same order", () => {
+      openLibrary({ query: { trunk: "Protect" } });
+
+      const [section, ...others] = screen.getAllByRole("region");
+      expect(others).toEqual([]);
+      expect(within(section!).getByRole("heading", { level: 2 }).textContent).toBe("Protect");
       expect(
-        regions.map((region) => within(region).getByRole("heading", { level: 2 }).textContent),
-      ).toEqual(templateSections({ templates: POOL }).map(({ key }) => key));
-      expect(screen.getAllByRole("article")).toHaveLength(POOL.length);
+        screen.getAllByRole("article").map((card) => card.getAttribute("data-template")),
+      ).toEqual(POOL.filter(({ trunk }) => trunk === "Protect").map(({ board }) => board.id));
     });
 
     /** @scenario "AC103 Templates library: one category chip and one agent-type chip narrow the finder" */
@@ -193,16 +207,17 @@ describe("the templates finder", () => {
   });
 
   describe("given an address with an agent type picked", () => {
-    /** @scenario "Finder: an agent-type chip finds only the templates made for that type" */
+    /**
+     * @scenario "Finder: an agent-type chip finds only the templates made for that type"
+     * @scenario "Finder: a template adapts to the agent kind instead of listing a copy per kind"
+     */
     it("lists only the templates made for that type, each naming it in its footer", () => {
       openLibrary({ query: { agent: "voice" } });
 
       const voice = finderPool({ agentKind: "voice" });
       const cards = screen.getAllByRole("article");
       expect(cards.map((card) => card.getAttribute("aria-label"))).toEqual(
-        templateSections({ templates: voice }).flatMap(({ items }) =>
-          items.map(({ board }) => board.name),
-        ),
+        voice.map(({ board }) => board.name),
       );
       for (const card of cards) {
         expect(within(card).getByText(AGENT_KIND_CHIP_LABELS.voice)).toBeInTheDocument();

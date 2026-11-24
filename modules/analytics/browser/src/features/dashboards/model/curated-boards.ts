@@ -15,7 +15,7 @@ import { TEMPLATE_LIBRARY, type LibraryTemplate } from "./template-library.ts";
 
 /**
  * The one From LangWatch list, in order; every surface follows it (the sidebar group and
- * the empty board's cards). Release check, then "Can I trust my numbers?", then where it breaks.
+ * the empty board's cards). Ready to ship?, then Fix missing data, then Errors and failures.
  */
 export const CURATED_TEMPLATE_IDS = ["release", "data", "breaks"] as const;
 

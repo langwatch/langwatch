@@ -1,7 +1,7 @@
 /**
- * `/[project]/dashboards/templates`: the templates finder. A picked category turns the header
- * into its question and pitch; an agent-type chip shows only the templates made for that type.
- * Adding one makes a board for the whole project and drafts its report in Langy (AC140).
+ * `/[project]/dashboards/templates`: the templates finder, one ranked grid under "All". A category
+ * turns the header into its question and pitch; an agent-type chip shows the templates made for
+ * that type, adapted to it. Adding one makes a project board and drafts its report (AC140).
  */
 
 import { Box, Button, Grid, Heading, Text, VStack } from "@langwatch/design-system/primitives";
@@ -104,11 +104,58 @@ function TrunkSection({
           {section.items.length}
         </Text>
       </Box>
-      {/* Columns follow the page's own width: one on a phone, up to three on a wide screen. */}
-      <Grid templateColumns="repeat(auto-fill, minmax(min(100%, 340px), 1fr))" gap={5}>
-        {section.items.map(renderCard)}
-      </Grid>
+      <CardGrid templates={section.items} renderCard={renderCard} />
     </VStack>
+  );
+}
+
+/** Columns follow the page's own width: one on a phone, up to three on a wide screen. */
+function CardGrid({
+  templates,
+  renderCard,
+}: {
+  templates: readonly LibraryTemplate[];
+  renderCard: (template: LibraryTemplate) => ReactNode;
+}) {
+  return (
+    <Grid templateColumns="repeat(auto-fill, minmax(min(100%, 340px), 1fr))" gap={5}>
+      {templates.map(renderCard)}
+    </Grid>
+  );
+}
+
+/** A picked category's section, or under "All" one grid with no headings. */
+function TemplateResults({
+  templates,
+  byTrunk,
+  renderCard,
+}: {
+  templates: readonly LibraryTemplate[];
+  byTrunk: boolean;
+  renderCard: (template: LibraryTemplate) => ReactNode;
+}) {
+  if (!byTrunk) {
+    return <TemplateGrid label="All templates" templates={templates} renderCard={renderCard} />;
+  }
+  return templateSections({ templates }).map((section) => (
+    <TrunkSection key={section.key} section={section} renderCard={renderCard} />
+  ));
+}
+
+/** "All": one grid, one template per job, most needed first, with no category headings. */
+function TemplateGrid({
+  label,
+  templates,
+  renderCard,
+}: {
+  label: string;
+  templates: readonly LibraryTemplate[];
+  renderCard: (template: LibraryTemplate) => ReactNode;
+}) {
+  return (
+    <Box as="section" aria-label={label}>
+      <CardGrid templates={templates} renderCard={renderCard} />
+    </Box>
   );
 }
 
@@ -143,7 +190,10 @@ export function TemplatesLibrary({ atOrganization = false }: { atOrganization?: 
   };
   const addedHref = ({ board }: LibraryTemplate) => {
     if (atOrganization) return void 0;
-    const dashboardId = boardFromTemplateId({ templateName: board.name, boards: saved.boards });
+    const dashboardId = boardFromTemplateId({
+      templateNames: [board.name, ...(board.formerNames ?? [])],
+      boards: saved.boards,
+    });
     return dashboardId && dashboardsPath({ projectSlug: saved.projectSlug, dashboardId });
   };
   const renderCard = (template: LibraryTemplate) => (
@@ -208,9 +258,11 @@ export function TemplatesLibrary({ atOrganization = false }: { atOrganization?: 
           )}
         </VStack>
       ) : (
-        templateSections({ templates: shown }).map((section) => (
-          <TrunkSection key={section.key} section={section} renderCard={renderCard} />
-        ))
+        <TemplateResults
+          templates={shown}
+          byTrunk={Boolean(filters.trunk)}
+          renderCard={renderCard}
+        />
       )}
     </VStack>
   );

@@ -380,7 +380,7 @@ describe("a member's board", () => {
         const user = userEvent.setup();
         const { host } = openBoard({ server: inMemoryServer({ boards: OWN_BOARDS }) });
 
-        await user.click(await screen.findByRole("link", { name: "Release check" }));
+        await user.click(await screen.findByRole("link", { name: "Ready to ship?" }));
 
         expect(host.navigations).toEqual(["/test-project/dashboards/curated/release"]);
       });

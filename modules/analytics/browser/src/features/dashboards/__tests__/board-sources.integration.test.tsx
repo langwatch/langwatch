@@ -580,7 +580,7 @@ describe("given a From LangWatch board", () => {
       });
       const widgets = curatedBoardById("release")?.widgets ?? [];
       renderDashboards({ element: <CuratedBoardScreen />, host, answer: server.answer });
-      await screen.findByRole("heading", { name: "Release check" });
+      await screen.findByRole("heading", { name: "Ready to ship?" });
       for (const frame of screen.getAllByTestId("sandboxed-frame")) {
         const widget = widgets.find(
           ({ definition }) => definition.code === frames.get(frame)?.code,
@@ -615,7 +615,7 @@ describe("given a From LangWatch board's widget card", () => {
     });
     const widgets = curatedBoardById("release")?.widgets ?? [];
     renderDashboards({ element: <CuratedBoardScreen />, host, answer: server.answer });
-    await screen.findByRole("heading", { name: "Release check" });
+    await screen.findByRole("heading", { name: "Ready to ship?" });
     const frame = screen.getAllByTestId("sandboxed-frame")[0]!;
     const widget = widgets.find(({ definition }) => definition.code === frames.get(frame)?.code)!;
 

@@ -205,7 +205,7 @@ describe("given a member opens a From LangWatch board", () => {
       });
       renderDashboards({ element: <CuratedBoardScreen />, host, answer: server.answer });
       const widgets = curatedBoardById("release")?.widgets ?? [];
-      await screen.findByRole("heading", { name: "Release check" });
+      await screen.findByRole("heading", { name: "Ready to ship?" });
       await everyFrameRuns({
         queryNameOf: ({ code }) =>
           widgets.find(({ definition }) => definition.code === code)?.definition.queries[0]?.name,
