@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import type { UpgradePostgres } from "../../ports.ts";
 import type { PreRosterHistory } from "../../serving-roster/pre-roster.ts";
 import type { UpgradeImage } from "../reader.schema.ts";
 import { createUpgradeReader } from "../reader.service.ts";
@@ -26,10 +27,10 @@ const image: UpgradeImage = {
 };
 
 /** A ledger whose run table exists and holds no step rows: every step is one the image declares. */
-const ledgerWithRuns = {
-  query: async (text: string) =>
+const ledgerWithRuns: UpgradePostgres = {
+  query: async <Row extends object>(text: string) =>
     text.includes("to_regclass") && text.includes('AS "step"')
-      ? { rows: [{ step: false, run: true, lease: false, target: false, roster: false }] }
+      ? { rows: [{ step: false, run: true, lease: false, target: false, roster: false } as Row] }
       : { rows: [] },
 };
 
