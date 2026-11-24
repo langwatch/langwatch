@@ -358,7 +358,7 @@ Feature: Demo-seed scope-guard, runner, entry point: single dev-and-prod path
     And the CLI bootstrap only fires when `import.meta.url` matches `process.argv[1]`
 
   # ─────────────────────────────────────────────────────────────────────
-  # seedHeavyUsage: per-persona /me/usage + /gateway/usage chart fixture
+  # seedHeavyUsage: per-persona /coding-agents/usage + /gateway/usage chart fixture
   # ─────────────────────────────────────────────────────────────────────
 
   @bdd @demo-seed @actions @heavy-usage @persona-resolution
@@ -394,7 +394,7 @@ Feature: Demo-seed scope-guard, runner, entry point: single dev-and-prod path
     When the action invokes `runSeedHeavyUsage` for that persona
     Then `trace_summaries` rows are written
     And no `gateway_budget_ledger_events` rows are written for that persona
-    So that `/me/usage` (which reads trace_summaries) stays populated
+    So that `/coding-agents/usage` (which reads trace_summaries) stays populated
 
   @bdd @demo-seed @actions @heavy-usage @dry-run
   Scenario: Dry-run with personas resolved returns skipped with row + persona count

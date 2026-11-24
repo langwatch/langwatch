@@ -22,6 +22,7 @@ import {
   instantEvalTranscriptRenderTokens,
 } from "@langwatch/instant-eval-judge-contract";
 import { Temporal, type Instant } from "@langwatch/time";
+import { type SpanAnalyticsFloor, spanAnalyticsSourceOf } from "@langwatch/trace-contract";
 
 import {
   clickHouseDateTime64,
@@ -232,6 +233,8 @@ interface TargetTemplate {
    * ClickHouse resolves a WHERE identifier against the SELECT aliases first.
    */
   readonly filterTraceColumn?: string;
+  /** `conditions` answered from the light span view, used when its floor covers the window. */
+  readonly lightConditions?: (database: string) => readonly string[];
 }
 
 const TEMPLATES: Readonly<Record<InstantEvalTarget, TargetTemplate>> = {
@@ -274,6 +277,13 @@ const TEMPLATES: Readonly<Record<InstantEvalTarget, TargetTemplate>> = {
     timeColumn: "StartTime",
     projection: ["TraceId", "SpanId", "StartTime AS OccurredAt"],
     conditions: ["SpanAttributes['langwatch.span.type'] = 'llm'"],
+    // The type from span_metrics, a column there: reading it from SpanAttributes opens the whole
+    // attribute map, captured inputs and outputs included, for every span in the window.
+    lightConditions: (database) => [
+      `(TraceId, SpanId) IN (\n    SELECT TraceId, SpanId\n    FROM ${database}.span_metrics\n` +
+        `    WHERE ${windowConditions("StartTime").join("\n      AND ")}\n` +
+        `      AND SpanType = 'llm'\n  )`,
+    ],
     orderBy: "TraceId, SpanId",
     text: () => "llm_messages_span(TraceId, SpanId)",
     filterPlacement: "trace-subquery",
@@ -406,6 +416,7 @@ export function expandInstantEvalShorthand({
   now,
   filter,
   selection,
+  spanAnalyticsFloor,
 }: {
   readonly shorthand: InstantEvalShorthandInput;
   /** The database the LangWatchQL views live in. */
@@ -419,6 +430,8 @@ export function expandInstantEvalShorthand({
    * keeps these ids and nothing else.
    */
   readonly selection?: readonly string[];
+  /** Where span_analytics is complete from; none, or a floor after the start, keeps the map. */
+  readonly spanAnalyticsFloor?: SpanAnalyticsFloor | null;
 }): ExpandedInstantEvalShorthand {
   const template = TEMPLATES[shorthand.target];
   const budget = textBudgetFor(shorthand.questions);
@@ -431,7 +444,16 @@ export function expandInstantEvalShorthand({
   const { start, end } = instantEvalShorthandWindow({ shorthand, now });
   const applied = selection ? null : (filter ?? null);
 
-  const conditions = [...windowConditions(template.timeColumn), ...template.conditions];
+  const light =
+    template.lightConditions !== undefined &&
+    spanAnalyticsSourceOf({ floor: spanAnalyticsFloor, windowStartMs: start.epochMilliseconds })
+      .kind === "span_analytics";
+  const conditions = [
+    ...windowConditions(template.timeColumn),
+    ...(light && template.lightConditions
+      ? template.lightConditions(database)
+      : template.conditions),
+  ];
   if (selection) {
     conditions.push(
       `${template.filterTraceColumn ?? "TraceId"} IN ({${INSTANT_EVAL_SELECTION_PARAMETER}:Array(String)})`,

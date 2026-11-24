@@ -78,14 +78,19 @@ type checkKey struct {
 // newer run of the same workflow supersedes an older one (concurrency cancels
 // it, or a re-run replaces it), so the older run must not fail the wait. A run
 // whose suite is not in suiteWorkflow keys on its suite and is never merged
-// with another suite's run.
+// with another suite's run. A cancelled run from an older suite of its workflow
+// is dropped even when the newer suite has no check of that name (a matrix job
+// cancelled before it expanded keeps its unexpanded name).
 func latest(runs []checkRun, suiteWorkflow map[int64]int64) []checkRun {
 	newest := map[checkKey]checkRun{}
+	newestSuite := map[checkKey]int64{}
 	var order []checkKey
 	for _, run := range runs {
 		key := checkKey{app: run.App.ID, name: run.Name}
 		if workflow, ok := suiteWorkflow[run.CheckSuite.ID]; ok {
 			key.workflow = workflow
+			workflowKey := checkKey{app: run.App.ID, workflow: workflow}
+			newestSuite[workflowKey] = max(newestSuite[workflowKey], run.CheckSuite.ID)
 		} else {
 			key.suite = run.CheckSuite.ID
 		}
@@ -99,7 +104,13 @@ func latest(runs []checkRun, suiteWorkflow map[int64]int64) []checkRun {
 	}
 	kept := make([]checkRun, 0, len(order))
 	for _, key := range order {
-		kept = append(kept, newest[key])
+		run := newest[key]
+		workflowKey := checkKey{app: key.app, workflow: key.workflow}
+		if key.workflow != 0 && run.Conclusion == "cancelled" &&
+			run.CheckSuite.ID < newestSuite[workflowKey] {
+			continue
+		}
+		kept = append(kept, run)
 	}
 
 	return kept

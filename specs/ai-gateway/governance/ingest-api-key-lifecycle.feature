@@ -538,8 +538,8 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   Scenario: An ingest key only writes to its bound project
     Given ben has personal project "personal-ben" with his own ingestion key
     When jane fires 5 traces with her key and ben fires 3 with his
-    Then jane's /me/traces shows her 5 (bound to "personal-jane")
-    And ben's /me/traces shows his 3 (bound to "personal-ben")
+    Then jane's /<personal project slug>/traces shows her 5 (bound to "personal-jane")
+    And ben's /<personal project slug>/traces shows his 3 (bound to "personal-ben")
     And neither key can write into the other's project
 
   # ---------------------------------------------------------------------------

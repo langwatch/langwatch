@@ -90,6 +90,7 @@ export const prismaTableCatalogue = {
   "LangyTurnRequest": "LangyTurnRequest",
   "LangyActiveTurn": "LangyActiveTurn",
   "LangyConversationTurnProjection": "LangyConversationTurnProjection",
+  "LangyPullRequest": "LangyPullRequest",
   "LangyMessageProjection": "LangyMessageProjection",
   "ProjectSecret": "ProjectSecret",
   "TriggerSent": "TriggerSent",
@@ -105,6 +106,7 @@ export const prismaTableCatalogue = {
   "TraceEditOverlay": "TraceEditOverlay",
   "TraceIngestSourceBilling": "TraceIngestSourceBilling",
   "RetentionPolicy": "RetentionPolicy",
+  "RetentionApplyStatus": "RetentionApplyStatus",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
   "InstantEvalJudgeProject": "InstantEvalJudgeProject",
   "InstantEvalJudgeUsageBilling": "InstantEvalJudgeUsageBilling",
@@ -167,6 +169,7 @@ export const prismaTableCatalogue = {
   "AiToolEntryTeam": "AiToolEntryTeam",
   "AiToolEntryDepartment": "AiToolEntryDepartment",
   "IngestionTemplate": "IngestionTemplate",
+  "GatewayA2ATarget": "GatewayA2ATarget",
   "GatewayConnectUpstream": "GatewayConnectUpstream",
   "GatewayTraceExportKey": "GatewayTraceExportKey",
   "GatewayBudget": "GatewayBudget",
@@ -1671,6 +1674,7 @@ export const prismaModelFieldCatalogue = {
     "PendingHandoffTurnId",
     "RunToken",
     "ArchivedAt",
+    "CiFollowUpsInARow",
     "CreatedAt",
     "UpdatedAt",
     "OccurredAt",
@@ -1723,6 +1727,16 @@ export const prismaModelFieldCatalogue = {
     "AcceptedAt",
     "LastEventId",
     "ProjectionVersion"
+  ],
+  "LangyPullRequest": [
+    "id",
+    "projectId",
+    "RepositoryFullName",
+    "PrNumber",
+    "ConversationId",
+    "UserId",
+    "OpenedAt",
+    "SourceEventId"
   ],
   "LangyMessageProjection": [
     "id",
@@ -1900,6 +1914,22 @@ export const prismaModelFieldCatalogue = {
     "retentionDays",
     "createdAt",
     "updatedAt"
+  ],
+  "RetentionApplyStatus": [
+    "id",
+    "organizationId",
+    "scopeType",
+    "scopeId",
+    "changedAt",
+    "appliedAt",
+    "raisedAt",
+    "shortenedAt",
+    "createdAt",
+    "updatedAt",
+    "occurredAt",
+    "acceptedAt",
+    "lastEventId",
+    "projectionVersion"
   ],
   "DataPrivacyPolicy": [
     "id",
@@ -2211,6 +2241,8 @@ export const prismaModelFieldCatalogue = {
     "parameters",
     "simulatorModel",
     "judgeModel",
+    "traceQuietPeriodMs",
+    "traceWaitTimeoutMs",
     "maxTurns",
     "minTurns",
     "fields",
@@ -2254,6 +2286,8 @@ export const prismaModelFieldCatalogue = {
     "labels",
     "simulatorModel",
     "judgeModel",
+    "traceQuietPeriodMs",
+    "traceWaitTimeoutMs",
     "kind",
     "scope",
     "fields",
@@ -2789,6 +2823,24 @@ export const prismaModelFieldCatalogue = {
     "updatedAt",
     "createdById",
     "updatedById"
+  ],
+  "GatewayA2ATarget": [
+    "id",
+    "organizationId",
+    "projectId",
+    "name",
+    "agentName",
+    "cardUrl",
+    "upstreamUrl",
+    "encryptedUpstreamHeaders",
+    "restrictToAllowList",
+    "allowedVirtualKeyIds",
+    "blocked",
+    "blockReason",
+    "createdById",
+    "createdAt",
+    "updatedAt",
+    "archivedAt"
   ],
   "GatewayConnectUpstream": [
     "organizationId",
@@ -3767,6 +3819,7 @@ export const prismaRelationCatalogue = {
   "LangyTurnRequest": {},
   "LangyActiveTurn": {},
   "LangyConversationTurnProjection": {},
+  "LangyPullRequest": {},
   "LangyMessageProjection": {},
   "ProjectSecret": {
     "project": "Project",
@@ -3823,6 +3876,7 @@ export const prismaRelationCatalogue = {
   },
   "TraceIngestSourceBilling": {},
   "RetentionPolicy": {},
+  "RetentionApplyStatus": {},
   "DataPrivacyPolicy": {},
   "InstantEvalJudgeProject": {},
   "InstantEvalJudgeUsageBilling": {},
@@ -4023,6 +4077,7 @@ export const prismaRelationCatalogue = {
   "IngestionTemplate": {
     "organization": "Organization"
   },
+  "GatewayA2ATarget": {},
   "GatewayConnectUpstream": {},
   "GatewayTraceExportKey": {},
   "GatewayBudget": {
