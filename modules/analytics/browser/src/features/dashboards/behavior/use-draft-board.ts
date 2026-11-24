@@ -229,7 +229,14 @@ async function applyEdit({
     .catch((error: unknown) => host.failed({ error, fallbackTitle: "Couldn't pin the dashboard" }));
 }
 
-/** Makes the board with the edit, then moves the address to it if the draft is still open. */
+/** Whether the draft `at` was taken from is still the one held, not one a later "+" opened. */
+const isHeld = (at: DraftState) => useDraftStore.getState().generation === at.generation;
+
+/**
+ * Makes the board with the edit, then writes the rest onto it. The board is the draft's from the
+ * moment it exists: a refused description is reported, never a reason to store a second board.
+ * A store a later "+" overtook leaves that newer draft and its address alone.
+ */
 async function storeDraft({
   writer,
   edit,
@@ -248,17 +255,21 @@ async function storeDraft({
       ? await utils.client.boards.create.mutate(made)
       : await utils.client.boards.createAtScope.mutate({ ...made, scope: at.scope });
   analytics.track(dashboardCreated({ createdFrom: "blank" }));
+  if (isHeld(at)) useDraftStore.setState({ savedId: created.id });
+  // A cleared description stays cleared; a pin taken off while this ran is not written.
+  const description = edit.description === void 0 ? at.description : edit.description;
+  const pin = (at.pin || edit.pin === true) && (!isHeld(at) || useDraftStore.getState().pin);
   await applyEdit({
     writer,
     dashboardId: created.id,
-    // A new board has no description, so only one typed before it was stored is written.
-    edit: { description: edit.description ?? at.description ?? void 0, pin: at.pin || edit.pin },
-  });
-  useDraftStore.setState({ savedId: created.id });
+    edit: { description: description ?? void 0, pin },
+  }).catch((error: unknown) =>
+    host.failed({ error, fallbackTitle: "Couldn't save the description" }),
+  );
   await refreshLists(writer);
-  // Only while the draft is still on screen: a member who moved on stays where they went.
+  // Only while this draft is still on screen: a member who moved on stays where they went.
   const route = host.route();
-  if (route.params.dashboardId === DRAFT_SEGMENT) {
+  if (isHeld(at) && route.params.dashboardId === DRAFT_SEGMENT) {
     const path = storedBoardPath({ writer, at, dashboardId: created.id });
     host.navigate(withQueryString({ path, query: route.query }), { replace: true });
   }
@@ -286,8 +297,11 @@ function materialiseDraft({ writer, edit }: { writer: DraftWriter; edit: DraftEd
   }
   const saving = storeDraft({ writer, edit, at });
   useDraftStore.setState({ saving });
-  // The caller reports the refusal; the draft stays to be stored by the next edit.
-  saving.catch(() => useDraftStore.setState({ saving: void 0 }));
+  // The caller reports the refusal; the draft stays to be stored by the next edit. A newer
+  // draft's own store is never dropped by this one failing.
+  saving.catch(() => {
+    if (useDraftStore.getState().saving === saving) useDraftStore.setState({ saving: void 0 });
+  });
   return saving;
 }
 
@@ -330,5 +344,9 @@ export function useDraftBoard({ takenNames }: { takenNames: readonly string[] })
     /** The board this draft became, while the screen still shows it as the draft's. */
     savedId: held.savedId,
     materialise: (edit: DraftEdit = {}): Promise<string> => materialiseDraft({ writer, edit }),
+    /** Takes the pin off a draft not stored yet; it stores nothing. */
+    unpin: () => {
+      if (useDraftStore.getState().projectId === projectId) useDraftStore.setState({ pin: false });
+    },
   };
 }

@@ -11,6 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
+import { useStartDraft } from "../behavior/use-draft-board.ts";
 import { FROM_LANGWATCH_ABOUT } from "../model/curated-boards.ts";
 import { SavedDashboardsSection } from "../ui/sections/saved-dashboards-section.tsx";
 import { HOME_BOARD, NO_PROCEDURES, renderDashboards } from "./render-dashboards.test-helpers.tsx";
@@ -258,6 +259,53 @@ describe("the Dashboards sidebar", () => {
         ]),
       );
       expect(inputsTo(calls, "boards.create")).toHaveLength(1);
+    });
+  });
+
+  describe("given a new board opened to be pinned once stored", () => {
+    /** Presses a "+" that opens a new board pinned, as the Pinned group's does. */
+    function PinnedPlus() {
+      const startDraft = useStartDraft();
+      return (
+        <button
+          type="button"
+          onClick={() =>
+            startDraft({ projectId: "proj-1", projectSlug: "test-project", pin: true })
+          }
+        >
+          New pinned dashboard
+        </button>
+      );
+    }
+
+    /** @scenario "AC162d Renaming, describing or pinning a new board stores it with that edit" */
+    it("takes the pin off when unpinned, storing nothing, and stores the board unpinned later", async () => {
+      const host = new StubAnalyticsHost({ flags: { release_dashboards: true } });
+      const { calls, answer } = project({});
+      renderDashboards({
+        element: (
+          <>
+            <PinnedPlus />
+            <SavedDashboardsSection openPath="new" />
+          </>
+        ),
+        host,
+        answer,
+      });
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      await listNamed("Your dashboards");
+      await user.click(screen.getByRole("button", { name: "New pinned dashboard" }));
+      const draftLink = await screen.findByRole("link", { name: "Untitled dashboard 1" });
+
+      await user.click(within(draftLink).getByRole("button", { name: "Unpin dashboard" }));
+
+      expect(within(draftLink).getByRole("button", { name: "Pin dashboard" })).toBeInTheDocument();
+      expect(inputsTo(calls, "boards.create")).toEqual([]);
+      await user.click(screen.getByRole("button", { name: "Actions for Untitled dashboard 1" }));
+      await user.click(await screen.findByRole("menuitem", { name: /Rename/ }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard name" }), "!{Enter}");
+      await waitFor(() => expect(inputsTo(calls, "boards.create")).toHaveLength(1));
+      expect(inputsTo(calls, "boards.star")).toEqual([]);
     });
   });
 

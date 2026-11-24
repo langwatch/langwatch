@@ -7,6 +7,7 @@
  */
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
+import { Toaster, toaster } from "@langwatch/design-system/toaster";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
@@ -104,6 +105,8 @@ function inMemoryServer({
   widgets = [],
   refuseWidgetCreate = false,
   refuseBoardCreates = 0,
+  refuseBoardUpdates = 0,
+  holdBoardCreates = false,
 }: {
   boards: Board[];
   widgets?: Widget[];
@@ -111,8 +114,14 @@ function inMemoryServer({
   refuseWidgetCreate?: boolean;
   /** How many `boards.create` calls the server turns away before it makes one. */
   refuseBoardCreates?: number;
+  /** How many `boards.update` calls the server turns away before it takes one. */
+  refuseBoardUpdates?: number;
+  /** Holds every `boards.create` answer until the test releases them. */
+  holdBoardCreates?: boolean;
 }) {
   let boardCreatesLeftToRefuse = refuseBoardCreates;
+  let boardUpdatesLeftToRefuse = refuseBoardUpdates;
+  const heldCreates: (() => void)[] = [];
   const state = {
     boards: boards.map((board) => ({ ...board })),
     widgets: [...widgets],
@@ -133,19 +142,27 @@ function inMemoryServer({
           boardCreatesLeftToRefuse -= 1;
           return Promise.reject(new UiProcedureRefusal("resource_limit_exceeded", 403));
         }
-        const created: Board = {
-          ...HOME_BOARD,
-          id: `board-new-${state.boards.length + 1}`,
-          name: String(input.name),
-          description: null,
-          createdById: "user-1",
-          isStarred: false,
-          updatedAt: new Date("2026-01-01"),
+        const make = () => {
+          const created: Board = {
+            ...HOME_BOARD,
+            id: `board-new-${state.boards.length + 1}`,
+            name: String(input.name),
+            description: null,
+            createdById: "user-1",
+            isStarred: false,
+            updatedAt: new Date("2026-01-01"),
+          };
+          state.boards.push(created);
+          return { ...created };
         };
-        state.boards.push(created);
-        return Promise.resolve({ ...created });
+        if (!holdBoardCreates) return Promise.resolve(make());
+        return new Promise((resolve) => heldCreates.push(() => resolve(make())));
       }
       case "boards.update": {
+        if (boardUpdatesLeftToRefuse > 0) {
+          boardUpdatesLeftToRefuse -= 1;
+          return Promise.reject(new UiProcedureRefusal("dashboard_not_found", 404));
+        }
         const updated = board(input.dashboardId);
         if (input.name !== void 0) updated.name = input.name as string;
         if (input.description !== void 0) updated.description = input.description as string | null;
@@ -214,7 +231,11 @@ function inMemoryServer({
         return NO_PROCEDURES(call);
     }
   };
-  return { state, answer };
+  /** Answers the held `boards.create` calls, in the order they came. */
+  const releaseBoardCreates = () => {
+    for (const release of heldCreates.splice(0)) release();
+  };
+  return { state, answer, releaseBoardCreates };
 }
 
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -1472,6 +1493,149 @@ describe("a member's board", () => {
         id: "board-new-3",
         description: "Refunds",
       });
+    });
+
+    /** @scenario "AC162d Renaming, describing or pinning a new board stores it with that edit" */
+    it("keeps the board it stored when the description is refused, and stores no second one", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS, refuseBoardUpdates: 1 });
+      const { host } = openBoard({ server, dashboardId: "new" });
+
+      await user.click(await screen.findByRole("button", { name: "Add a description" }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "Q{Enter}");
+      await waitFor(() => expect(host.failures).toHaveLength(1));
+      expect(host.failures[0]?.fallbackTitle).toBe("Couldn't save the description");
+      expect(host.replacements).toEqual(["/test-project/dashboards/board-new-3"]);
+
+      await user.click(screen.getByRole("button", { name: "Q" }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "R{Enter}");
+
+      await waitFor(() => expect(callsTo(server, "boards.update")).toHaveLength(2));
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+      expect(server.state.boards.at(-1)).toMatchObject({ id: "board-new-3", description: "QR" });
+    });
+
+    /** @scenario "AC162f A refused store keeps the new board open" */
+    it("stores the board with no description when the member cleared it after a refusal", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS, refuseBoardCreates: 1 });
+      const { host } = openBoard({ server, dashboardId: "new" });
+
+      await user.click(await screen.findByRole("button", { name: "Add a description" }));
+      await user.type(
+        screen.getByRole("textbox", { name: "Dashboard description" }),
+        "Refunds{Enter}",
+      );
+      await waitFor(() => expect(host.failures).toHaveLength(1));
+
+      await user.click(screen.getByRole("button", { name: "Refunds" }));
+      await user.clear(screen.getByRole("textbox", { name: "Dashboard description" }));
+      await user.keyboard("{Enter}");
+
+      await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(2));
+      await waitFor(() => expect(host.replacements).toHaveLength(1));
+      expect(callsTo(server, "boards.update")).toEqual([]);
+      expect(server.state.boards.at(-1)).toMatchObject({ id: "board-new-3", description: null });
+    });
+
+    /** @scenario "AC162c A new board's first widget stores it once" */
+    it("adds one widget when Save is pressed again while the board is being stored", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = inMemoryServer({ boards: OWN_BOARDS, holdBoardCreates: true });
+      openBoard({ server, dashboardId: "new", query: { editWidget: "new" } });
+      const drawer = await screen.findByRole("dialog");
+
+      await user.click(within(drawer).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(1));
+      fireEvent.click(within(drawer).getByRole("button", { name: "Save" }));
+      server.releaseBoardCreates();
+
+      await waitFor(() => expect(callsTo(server, "dashboardWidgets.updateLayout")).toHaveLength(1));
+      expect(callsTo(server, "dashboardWidgets.create")).toHaveLength(1);
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+    });
+
+    /** @scenario "AC162g Opening the new board's address again starts a new unsaved board" */
+    it("leaves a new board opened while the last one was being stored unsaved, where it is", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS, holdBoardCreates: true });
+      const { host } = openBoard({ server, dashboardId: "new", withSidebar: true });
+      await user.click(await screen.findByRole("button", { name: "Add a description" }));
+      await user.type(screen.getByRole("textbox", { name: "Dashboard description" }), "Q{Enter}");
+      await waitFor(() => expect(callsTo(server, "boards.create")).toHaveLength(1));
+
+      await user.click(screen.getByRole("button", { name: "New dashboard" }));
+      server.releaseBoardCreates();
+
+      await waitFor(() => expect(callsTo(server, "boards.update")).toHaveLength(1));
+      // The stored board is listed once the lists are read again, the new draft still open.
+      await waitFor(() =>
+        expect(screen.getAllByRole("link").map((row) => row.getAttribute("href"))).toContain(
+          "/test-project/dashboards/board-new-3",
+        ),
+      );
+      expect(host.replacements).toEqual([]);
+      expect(screen.getByRole("button", { name: "Add a description" })).toBeInTheDocument();
+      const open = screen
+        .getAllByRole("link")
+        .filter((row) => row.getAttribute("aria-current") === "page");
+      expect(open.map((row) => row.getAttribute("href"))).toEqual(["/test-project/dashboards/new"]);
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+    });
+
+    /** @scenario "Undo: Undo puts the board back as it was, on the server" */
+    it("undoes a widget added to a new board on that board, after another new board opened", async () => {
+      // Toasts the earlier tests offered stay queued in the one toaster; start from none.
+      toaster.remove();
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const host = new StubAnalyticsHost({
+        flags: FLAG_ON,
+        route: { params: { dashboardId: "new" }, query: { editWidget: "new" } },
+      });
+      renderDashboards({
+        element: (
+          <>
+            <SavedDashboardsSection openPath="new" />
+            <DashboardBoardScreen />
+            <Toaster />
+          </>
+        ),
+        host,
+        answer: server.answer,
+      });
+      const drawer = await screen.findByRole("dialog");
+      await user.click(within(drawer).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(callsTo(server, "dashboardWidgets.updateLayout")).toHaveLength(1));
+
+      fireEvent.click(screen.getByRole("button", { name: "New dashboard", hidden: true }));
+      fireEvent.click(await screen.findByRole("button", { name: "Undo", hidden: true }));
+
+      await waitFor(() => expect(callsTo(server, "dashboardWidgets.delete")).toHaveLength(1));
+      expect(server.state.widgets).toEqual([]);
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+      toaster.remove();
+    });
+
+    /** @scenario "AC162e Asking Langy on a new board stores it first" */
+    it("stores the board before the widget editor's Langy ask, which names the stored board", async () => {
+      const user = userEvent.setup();
+      const server = inMemoryServer({ boards: OWN_BOARDS });
+      const { host } = openBoard({
+        server,
+        dashboardId: "new",
+        query: { addBlock: "open" },
+        flags: LANGY_ON,
+        permissions: LANGY_MEMBER,
+      });
+
+      await user.click(await screen.findByRole("button", { name: "I'll build it myself" }));
+
+      await waitFor(() => expect(host.langyAsks).toHaveLength(1));
+      expect(callsTo(server, "boards.create")).toHaveLength(1);
+      const refs = host.langyAsks[0]?.context.map(({ ref }) => ref).join(" ");
+      expect(refs).toContain("(id board-new-3)");
+      expect(refs).not.toContain("(id new)");
     });
 
     /** @scenario "AC162g Opening the new board's address again starts a new unsaved board" */

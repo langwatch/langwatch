@@ -191,10 +191,10 @@ function DraftRow({
       isActive
       actions={{
         isStarred: draft.board.isStarred,
+        // Pinning stores the board; unpinning a board not stored yet only takes the pin off.
         onToggleStar: () => {
-          if (!draft.board.isStarred) {
-            store({ edit: { pin: true }, fallbackTitle: "Couldn't pin the dashboard" });
-          }
+          if (draft.board.isStarred) draft.unpin();
+          else store({ edit: { pin: true }, fallbackTitle: "Couldn't pin the dashboard" });
         },
         isRenaming,
         rename: { onStart: () => onRenaming(true) },
