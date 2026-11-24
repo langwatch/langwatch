@@ -92,7 +92,6 @@ describe("the dashboard tRPC declarations", () => {
         ["delete", "mutation", "analytics:delete"],
         ["setScope", "mutation", "analytics:update"],
         ["scopeImpact", "query", "analytics:view"],
-        ["scopeProjects", "query", "analytics:view"],
         ["listStarred", "query", "analytics:view"],
         ["star", "mutation", "analytics:view"],
         ["unstar", "mutation", "analytics:view"],
