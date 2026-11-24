@@ -8,7 +8,6 @@
 import { createHash } from "node:crypto";
 
 import type { LangWatchQLConnection } from "../../../repositories/langwatch-ql-executor.repository.ts";
-import type { LwqlPostgresViewFound } from "../../../repositories/langwatch-ql-postgres.repository.ts";
 import type { LwqlCollectionState } from "../../../repositories/langwatch-ql-provisioning.repository.ts";
 import { flooredViewName, flooredViewNames } from "../../../rules/lwql-dedup-floor.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
@@ -38,6 +37,7 @@ import {
   type LwqlPostgresSettings,
   NO_COLLECTION_STATE,
 } from "./langwatch-ql-collection-binding.service.ts";
+import type { LwqlPostgresGap } from "./langwatch-ql-postgres-gaps.service.ts";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
   LangWatchQLPostgresMappingService,
@@ -85,12 +85,6 @@ interface LwqlClickHouseDrift {
   readonly objects: readonly string[];
   /** The key map was among them, so a converge that repairs it is followed by a fill. */
   readonly isKeyMapMissing: boolean;
-}
-
-/** An approved view the check repairs: created when absent, then granted to the reader. */
-export interface LwqlPostgresGap {
-  readonly view: string;
-  readonly absent: boolean;
 }
 
 /**
@@ -407,14 +401,6 @@ export class LangWatchQLSelfProvisioningService {
   /** The approved views the reader role must select from. */
   approvedPostgresViews(): string[] {
     return postgresViews.approvedViewNames();
-  }
-
-  /** Each approved view absent, or present but not selectable by the reader. */
-  findPostgresGaps({ found }: { found: readonly LwqlPostgresViewFound[] }): LwqlPostgresGap[] {
-    const byName = new Map(found.map((view) => [view.view, view]));
-    return this.approvedPostgresViews()
-      .filter((view) => byName.get(view)?.granted !== true)
-      .map((view) => ({ view, absent: !byName.has(view) }));
   }
 
   /** A failed statement echoes its DDL, which embeds passwords; every logged error passes here. */

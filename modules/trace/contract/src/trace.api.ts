@@ -4,6 +4,7 @@ import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
 import type { TraceAgentSeen } from "./features/analytics/trace-agent-traffic.ts";
+import type { TraceManagedPromptVersionFloor } from "./features/analytics/trace-managed-prompt-version-floor.ts";
 import type {
   TraceAttributedRecency,
   TraceAttributedSpendComparison,
@@ -234,6 +235,11 @@ export interface TraceApi extends TraceOtlpIngestApi {
   renderTraceMessages(input: { trace: Trace; side: TraceMessagesSide }): Promise<string | null>;
   /** Where the span widgets' history starts, from the span_analytics replay's recorded since. */
   getSpanAnalyticsFloor(): Promise<SpanAnalyticsFloor>;
+  /**
+   * Where `LastUsedPromptVersionId` is known from, read from the managed prompt version replay's
+   * ledger row. Read-only; a failed step or an unreadable ledger answers `unknown`, never throws.
+   */
+  getManagedPromptVersionFloor(): Promise<TraceManagedPromptVersionFloor>;
   /** One named span's chat messages as JSON, and whether the trace holds it. */
   renderSpanMessages(input: { trace: Trace; spanId: string }): Promise<TraceRenderedSpanMessages>;
   /** The whole trace as one JSON object, spans included. */

@@ -108,7 +108,8 @@ describe("given the By customer widgets", () => {
     expect(sql.units).toContain("coalesce(nullIf(t.version, ''), t.managed, '')");
     expect(sql.units).toContain("FROM trace_evaluation_metrics");
     expect(sql.change).toContain("MetadataPromptVersion != ''");
-    expect(sql.change).toContain("LastUsedPromptVersionId != ''");
+    expect(sql.change).toContain("argMaxIf(LastUsedPromptVersionId, UpdatedAt, OccurredAt >= ");
+    expect(sql.change).toContain("AND managed != ''");
     for (const text of [sql.units, sql.change]) expect(text).not.toContain("Attributes[");
     expect(code).toContain('row.version === last.version ? "after"');
     expect(code).toContain("No new prompt version started in this period.");

@@ -36,6 +36,7 @@ import {
   type LangWatchQLJudgementCall,
   type LangWatchQLSchema,
   type LangWatchQLSpanDataFloor,
+  type LangWatchQLManagedPromptVersionFloor,
   type LangWatchQLService,
   type LangWatchQLKeyStatementRequest,
   type LangWatchQLTextHydrationInput,
@@ -1119,6 +1120,11 @@ export class AnalyticsModule
   /** Where span_metrics' history starts, from trace's span_analytics replay (ADR-006). */
   async spanDataFloor(): Promise<LangWatchQLSpanDataFloor> {
     return this.#dependencies.traces.getSpanAnalyticsFloor();
+  }
+
+  /** Where LastUsedPromptVersionId is known from, from trace's managed prompt version replay. */
+  async managedPromptVersionFloor(): Promise<LangWatchQLManagedPromptVersionFloor> {
+    return this.#dependencies.traces.getManagedPromptVersionFloor();
   }
 
   /** The projects a card's editor may offer this member. */
