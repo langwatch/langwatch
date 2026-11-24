@@ -291,7 +291,7 @@ export class TestAuthzApi implements AuthzApi {
   hasProjectPermission = unsupported<AuthzApi["hasProjectPermission"]>("hasProjectPermission");
   resolveGrantId = unsupported<AuthzApi["resolveGrantId"]>("resolveGrantId");
   listBraids = unsupported<AuthzApi["listBraids"]>("listBraids");
-  listBraidsForScreen = unsupported<AuthzApi["listBraidsForScreen"]>("listBraidsForScreen");
+  assertBraidsReleased = unsupported<AuthzApi["assertBraidsReleased"]>("assertBraidsReleased");
   getOrganizationPolicyForScreen = unsupported<AuthzApi["getOrganizationPolicyForScreen"]>(
     "getOrganizationPolicyForScreen",
   );
@@ -305,6 +305,7 @@ export class TestAuthzApi implements AuthzApi {
     unsupported<AuthzApi["recordBraidedSpansView"]>("recordBraidedSpansView");
   getOrganizationPolicy = unsupported<AuthzApi["getOrganizationPolicy"]>("getOrganizationPolicy");
   setBraidsPolicy = unsupported<AuthzApi["setBraidsPolicy"]>("setBraidsPolicy");
+  setBraidsEnabled = unsupported<AuthzApi["setBraidsEnabled"]>("setBraidsEnabled");
   listOrganizationBraids =
     unsupported<AuthzApi["listOrganizationBraids"]>("listOrganizationBraids");
   countProjectMembersHolding = unsupported<AuthzApi["countProjectMembersHolding"]>(

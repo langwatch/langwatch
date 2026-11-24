@@ -1276,6 +1276,7 @@ export interface LwqlPrismaRows {
     readonly PendingHandoffTurnId: "String?";
     readonly RunToken: "String?";
     readonly ArchivedAt: "Float?";
+    readonly CiFollowUpsInARow: "Int";
     readonly CreatedAt: "Float";
     readonly UpdatedAt: "Float";
     readonly OccurredAt: "Float";
@@ -1328,6 +1329,16 @@ export interface LwqlPrismaRows {
     readonly AcceptedAt: "Float";
     readonly LastEventId: "String";
     readonly ProjectionVersion: "String";
+  };
+  readonly LangyPullRequest: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly RepositoryFullName: "String";
+    readonly PrNumber: "Int";
+    readonly ConversationId: "String";
+    readonly UserId: "String";
+    readonly OpenedAt: "Float";
+    readonly SourceEventId: "String";
   };
   readonly LangyMessageProjection: {
     readonly id: "String";
@@ -1476,6 +1487,22 @@ export interface LwqlPrismaRows {
     readonly retentionDays: "Int";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+  };
+  readonly RetentionApplyStatus: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly scopeType: "RetentionPolicyScopeType";
+    readonly scopeId: "String";
+    readonly changedAt: "Float?";
+    readonly appliedAt: "Float?";
+    readonly raisedAt: "Float?";
+    readonly shortenedAt: "Float?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
   };
   readonly DataPrivacyPolicy: {
     readonly id: "String";
@@ -1736,11 +1763,16 @@ export interface LwqlPrismaRows {
     readonly parameters: "Json?";
     readonly simulatorModel: "String?";
     readonly judgeModel: "String?";
+    readonly traceQuietPeriodMs: "Int?";
+    readonly traceWaitTimeoutMs: "Int?";
     readonly maxTurns: "Int?";
     readonly minTurns: "Int?";
     readonly fields: "Json?";
     readonly callerVoice: "Json?";
     readonly testSuiteId: "String?";
+    readonly kind: "String";
+    readonly redTeam: "Json?";
+    readonly sourceTemplateId: "String?";
     readonly version: "Int";
     readonly lastUpdatedById: "String?";
     readonly archivedAt: "DateTime?";
@@ -1771,10 +1803,14 @@ export interface LwqlPrismaRows {
     readonly labels: "String[]";
     readonly simulatorModel: "String?";
     readonly judgeModel: "String?";
+    readonly traceQuietPeriodMs: "Int?";
+    readonly traceWaitTimeoutMs: "Int?";
     readonly kind: "String";
     readonly scope: "Json?";
     readonly fields: "Json?";
     readonly evaluators: "Json?";
+    readonly templateId: "String?";
+    readonly templateVersion: "Int?";
     readonly archivedAt: "DateTime?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
@@ -1824,6 +1860,11 @@ export interface LwqlPrismaRows {
     readonly seatRepairFlaggedAt: "DateTime?";
     readonly seatLineLeaseToken: "String?";
     readonly seatLineLeaseUntil: "DateTime?";
+    readonly paymentRecoveryInvoiceId: "String?";
+    readonly paymentRecoveryStartedAt: "DateTime?";
+    readonly paymentRecoveryNoticeDay: "Int?";
+    readonly overPlanSince: "DateTime?";
+    readonly overPlanEndedAt: "DateTime?";
   };
   readonly Invoice: {
     readonly id: "String";
@@ -1876,8 +1917,22 @@ export interface LwqlPrismaRows {
   readonly AuthzOrganizationPolicy: {
     readonly organizationId: "String";
     readonly braidsOrganizationAdminsOnly: "Boolean";
+    readonly braidsEnabled: "Boolean";
     readonly updatedByUserId: "String";
     readonly updatedAt: "DateTime";
+  };
+  readonly AuthzBraidWrite: {
+    readonly organizationId: "String";
+    readonly commandId: "String";
+    readonly grantId: "String";
+    readonly readerProjectId: "String";
+    readonly ownerProjectId: "String";
+    readonly termsKey: "String";
+    readonly condition: "Json";
+    readonly expiresAt: "DateTime?";
+    readonly replacesGrantId: "String?";
+    readonly createdByUserId: "String?";
+    readonly createdAt: "DateTime";
   };
   readonly RoleBinding: {
     readonly id: "String";
@@ -2236,6 +2291,24 @@ export interface LwqlPrismaRows {
     readonly updatedAt: "DateTime";
     readonly createdById: "String?";
     readonly updatedById: "String?";
+  };
+  readonly GatewayA2ATarget: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly projectId: "String?";
+    readonly name: "String";
+    readonly agentName: "String";
+    readonly cardUrl: "String";
+    readonly upstreamUrl: "String";
+    readonly encryptedUpstreamHeaders: "String?";
+    readonly restrictToAllowList: "Boolean";
+    readonly allowedVirtualKeyIds: "String[]";
+    readonly blocked: "Boolean";
+    readonly blockReason: "String?";
+    readonly createdById: "String";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+    readonly archivedAt: "DateTime?";
   };
   readonly GatewayConnectUpstream: {
     readonly organizationId: "String";
@@ -2662,6 +2735,78 @@ export interface LwqlPrismaRows {
   readonly AgentRegistryBaseline: {
     readonly organizationId: "String";
     readonly baselinedAt: "DateTime";
+  };
+  readonly AgentStopPlanTarget: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly agentId: "String";
+    readonly position: "Int";
+    readonly label: "String";
+    readonly target: "Json";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly AgentStopPlan: {
+    readonly organizationId: "String";
+    readonly agentId: "String";
+    readonly version: "Int";
+    readonly updatedAt: "DateTime";
+  };
+  readonly GovernanceAwsConnection: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly name: "String";
+    readonly accessKeyId: "String?";
+    readonly encryptedSecretAccessKey: "String?";
+    readonly roleArn: "String?";
+    readonly encryptedExternalId: "String?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly AgentStop: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly agentId: "String";
+    readonly agentName: "String";
+    readonly status: "String";
+    readonly severity: "String";
+    readonly approval: "String";
+    readonly trigger: "String";
+    readonly reason: "String";
+    readonly requestedByUserId: "String?";
+    readonly requestedByApiKeyId: "String?";
+    readonly decidedByUserId: "String?";
+    readonly decidedByApiKeyId: "String?";
+    readonly restoredByUserId: "String?";
+    readonly restoredByApiKeyId: "String?";
+    readonly targets: "Json";
+    readonly requestedAt: "DateTime";
+    readonly decidedAt: "DateTime?";
+    readonly quarantinedAt: "DateTime?";
+    readonly restoreRequestedAt: "DateTime?";
+    readonly restoredAt: "DateTime?";
+    readonly lastAppliedEventId: "String";
+    readonly lastAcceptedAt: "BigInt";
+    readonly lastOccurredAt: "BigInt";
+    readonly projectionVersion: "String";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly AgentStopClaim: {
+    readonly organizationId: "String";
+    readonly agentId: "String";
+    readonly stopId: "String";
+    readonly claimedAt: "DateTime";
+    readonly sentAt: "DateTime?";
+    readonly decision: "String?";
+    readonly decisionTakenAt: "DateTime?";
+  };
+  readonly AgentStopTargetPriorState: {
+    readonly organizationId: "String";
+    readonly stopId: "String";
+    readonly targetId: "String";
+    readonly wasStopped: "Boolean";
+    readonly recordedAt: "DateTime";
   };
   readonly IdentityMatch: {
     readonly id: "String";

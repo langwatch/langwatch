@@ -3,6 +3,7 @@
 
 import type { BraidConditionCompileResult } from "@langwatch/authz-contract/braid-condition-compiler";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { generate } from "@langwatch/ksuid";
 import { traceClient } from "@langwatch/trace-client";
 import { useEffect, useState } from "react";
 
@@ -185,13 +186,31 @@ function refusalOf(error: unknown): string | undefined {
   return code ? SAVE_REFUSALS[code] : undefined;
 }
 
+/**
+ * The command id a save sends: the same terms resend the last one, so a retry saves one braid
+ * (ADR-201 §1); changed terms mint a new one.
+ */
+function commandFor({
+  previous,
+  key,
+}: {
+  previous: { key: string; id: string } | null;
+  key: string;
+}): { key: string; id: string } {
+  if (previous?.key === key) return previous;
+  return { key, id: generate("braidcommand").toString() };
+}
+
 export function useSaveBraid({
   projectId,
   braidId,
+  readerName,
   onSaved,
 }: {
   projectId: string;
   braidId: string | undefined;
+  /** The project the braid goes into, named by the confirmation. */
+  readerName: string | undefined;
   onSaved: () => void;
 }) {
   const host = useAuthzHost();
@@ -202,12 +221,24 @@ export function useSaveBraid({
       void utils.authz.listBraids.invalidate();
       void utils.authz.listOrganizationBraids.invalidate();
       host.succeeded({
-        title: braidId ? "Braid saved" : "Braid created",
+        title: braidId ? "Braid saved" : `Braided into ${readerName ?? "the project"}`,
         description: "The change is in the audit log.",
       });
       onSaved();
     },
     onError: (error: unknown) => {
+      // The write is durable and lands once the grant projection catches up: never invite a retry.
+      if (readHandledError(error)?.code === "authz_grant_not_confirmed") {
+        void utils.authz.listBraids.invalidate();
+        void utils.authz.listOrganizationBraids.invalidate();
+        host.succeeded({
+          title: "The braid is being saved",
+          description:
+            "It appears in the list within a few minutes. There is no need to save it again.",
+        });
+        onSaved();
+        return;
+      }
       const said = refusalOf(error);
       if (said) setRefusal(said);
       else host.failed({ error, fallbackTitle: "Couldn't save the braid" });
@@ -215,6 +246,7 @@ export function useSaveBraid({
   };
   const creation = authzApi.authz.createBraid.useMutation(handlers);
   const change = authzApi.authz.changeBraid.useMutation(handlers);
+  const [command, setCommand] = useState<{ key: string; id: string } | null>(null);
   return {
     refusal,
     isSaving: creation.isPending || change.isPending,
@@ -222,8 +254,14 @@ export function useSaveBraid({
       if (!draft.readerProjectId) return;
       setRefusal(null);
       const terms = termsOf({ projectId, draft, nowMs });
-      if (braidId) change.mutate({ ...terms, braidId });
-      else creation.mutate(terms);
+      // Keyed on the end as chosen, not its instant, so a relative end never mints a new command.
+      const { expiresAtMs: _instant, ...chosen } = terms;
+      const key = JSON.stringify({ ...chosen, ends: draft.ends, braidId });
+      const next = commandFor({ previous: command, key });
+      setCommand(next);
+      const commandId = next.id;
+      if (braidId) change.mutate({ ...terms, braidId, commandId });
+      else creation.mutate({ ...terms, commandId });
     },
   };
 }

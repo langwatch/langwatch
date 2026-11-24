@@ -141,6 +141,10 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
   const setup = await import("./subscription-test-setup.ts");
   return {
     billingApi: {
+      dataRetention: {
+        getOrganizationStorageEstimate: { useQuery: () => ({ data: undefined, isError: false }) },
+        getOrganizationRetention: { useQuery: () => ({ data: undefined, isError: false }) },
+      },
       limits: { getUsage: { useQuery: () => setup.mockGetUsage() } },
       plan: { getActivePlan: { useQuery: () => setup.mockGetActivePlan() } },
       organization: {
@@ -957,11 +961,32 @@ describe("<SubscriptionPage/> buying seats", () => {
 
       fireEvent.click(screen.getByTestId("drawer-seats-stepper-plus"));
 
-      const confirm = lastButton("Add 1 seat · €29/mo");
+      const confirm = lastButton("Add 1 seat");
       expect(confirm).toBeDisabled();
       expect(screen.getByTestId("seat-drawer-price-failed")).toHaveTextContent(
         "The price for this change did not load.",
       );
+    });
+
+    /** @scenario "The seat drawer explains a held price with the failed payment" */
+    it("names the failed payment when the price is held for it", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      mockPreviewProration.mockImplementation(() => ({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: { code: "seats_held_for_payment", httpStatus: 409 },
+      }));
+      renderPage();
+      await openManageSeats();
+
+      fireEvent.click(screen.getByTestId("drawer-seats-stepper-plus"));
+
+      expect(lastButton("Add 1 seat")).toBeDisabled();
+      expect(screen.queryByTestId("seat-change-summary")).toBeNull();
+      const note = screen.getByTestId("seat-drawer-price-failed");
+      expect(note).toHaveTextContent("A payment failed, so seats can't be added.");
+      expect(note).toHaveTextContent("Update the card on the billing page");
     });
 
     /** @scenario "A charge the payment provider refuses keeps the confirm open and invites nobody" */

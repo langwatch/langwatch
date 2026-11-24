@@ -46,6 +46,7 @@ export * from "./features/query/trace-langwatch-ql-filter.ts";
 export * from "./features/query/trace-query-analysis.ts";
 export * from "./features/query/trace-query-ast.ts";
 export * from "./features/query/trace-custom-metadata-conditions.ts";
+export * from "./features/query/span-analytics-source.ts";
 export * from "./features/query/trace-query-evaluator-group.ts";
 export * from "./features/query/trace-query-examples.ts";
 export * from "./features/query/trace-query-grammar.ts";
@@ -119,6 +120,7 @@ export {
   type NormalizedLink,
   type NormalizedSpan,
   type NormalizedSpanSchema,
+  type OwnedSpan,
 } from "./trace.spans.ts";
 export {
   ADD_ANNOTATION_COMMAND_TYPE,
@@ -187,6 +189,12 @@ export {
   TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
   TRACE_SUMMARY_PROJECTION_VERSIONS,
   isStorageAnchoredVersion,
+  A2A_V0_METHODS,
+  A2A_V1_METHODS,
+  a2aSpanNameMatch,
+  isA2aSpanName,
+  isAgentCallSpanName,
+  type A2aSpanNameMatch,
   type TraceProcessingCommandType,
   type TraceProcessingEventType,
 } from "./trace.constants.ts";

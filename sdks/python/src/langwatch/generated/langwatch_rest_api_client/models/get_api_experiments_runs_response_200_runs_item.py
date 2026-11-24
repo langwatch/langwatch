@@ -34,6 +34,8 @@ class GetApiExperimentsRunsResponse200RunsItem:
         progress (float | None | Unset):
         total (float | None | Unset):
         concurrency (int | None | Unset): Cells the run executed at once. Null for a run that recorded none.
+        repeat (int | None | Unset): How many times the run repeated every dataset row. Run row `r * repeat + k` is
+            repetition `k` of dataset row `r`. Null for a run that ran each row once.
     """
 
     experiment_id: str
@@ -44,6 +46,7 @@ class GetApiExperimentsRunsResponse200RunsItem:
     progress: float | None | Unset = UNSET
     total: float | None | Unset = UNSET
     concurrency: int | None | Unset = UNSET
+    repeat: int | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_experiments_runs_response_200_runs_item_workflow_version_type_0 import (
@@ -82,6 +85,12 @@ class GetApiExperimentsRunsResponse200RunsItem:
         else:
             concurrency = self.concurrency
 
+        repeat: int | None | Unset
+        if isinstance(self.repeat, Unset):
+            repeat = UNSET
+        else:
+            repeat = self.repeat
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -99,6 +108,8 @@ class GetApiExperimentsRunsResponse200RunsItem:
             field_dict["total"] = total
         if concurrency is not UNSET:
             field_dict["concurrency"] = concurrency
+        if repeat is not UNSET:
+            field_dict["repeat"] = repeat
 
         return field_dict
 
@@ -167,6 +178,15 @@ class GetApiExperimentsRunsResponse200RunsItem:
 
         concurrency = _parse_concurrency(d.pop("concurrency", UNSET))
 
+        def _parse_repeat(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        repeat = _parse_repeat(d.pop("repeat", UNSET))
+
         get_api_experiments_runs_response_200_runs_item = cls(
             experiment_id=experiment_id,
             run_id=run_id,
@@ -176,6 +196,7 @@ class GetApiExperimentsRunsResponse200RunsItem:
             progress=progress,
             total=total,
             concurrency=concurrency,
+            repeat=repeat,
         )
 
         return get_api_experiments_runs_response_200_runs_item

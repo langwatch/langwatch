@@ -55,6 +55,20 @@ test("imports an installed package", () => {
 });
 `;
 
+const COPY_PROBE = `import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { where } from "../../shared/helper";
+
+test("keeps a forks copy that names its own checkout", () => {
+  expect(where).toBe("file");
+  const copies = readdirSync(process.env.TMPDIR, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => readFileSync(join(entry.parentPath, entry.name), "utf8"));
+  const own = copies.find((code) => code.includes("keeps a forks copy that names its own checkout"));
+  expect(own).toContain(join(process.env.CHECKOUT_ROOT, "shared/helper"));
+});
+`;
+
 interface CheckoutRun {
   results: Record<string, { status: string; failureMessages: string[] }>;
   cacheLog: string;
@@ -202,15 +216,23 @@ describe("the shared fs module cache", () => {
   describe("given a suite with fsModuleCache off", () => {
     /** @scenario "A suite with fsModuleCache off is untouched" */
     it("imports the workspace file and the installed package", async () => {
-      const offRoot = checkout("off", { "shared/helper.ts": HELPER }, false);
+      const offRoot = checkout(
+        "off",
+        { "shared/helper.ts": HELPER, "pkg/src/copy.test.ts": COPY_PROBE },
+        false,
+      );
+      // the copies live under the run's temporary folder until the run ends, so the
+      // child test reads its own copy while it runs
+      const offTmp = join(base, "off-tmp");
+      mkdirSync(offTmp, { recursive: true });
 
-      const off = await runVitest(offRoot, "file");
+      const off = await runVitest(offRoot, "file", cacheDir, { TMPDIR: offTmp });
 
       const probeCopy = [...off.cacheLog.matchAll(/\[write\] (\S+) is cached in (\S+)/g)].find(
         ([, id]) => id === join(offRoot, "pkg/src/probe.test.ts"),
       )?.[2];
       expect(probeCopy).toBeDefined();
-      expect(readFileSync(probeCopy as string, "utf8")).toContain(join(offRoot, "shared/helper"));
+      expect(off.results["keeps a forks copy that names its own checkout"]?.status).toBe("passed");
       expect(off.results["imports the helper this checkout has"]?.status).toBe("passed");
       expect(off.results["imports an installed package"]?.status).toBe("passed");
     }, 60_000);
@@ -242,7 +264,7 @@ describe("the shared fs module cache", () => {
 
       const moved = await runVitest(movedRoot, "directory");
 
-      expect(moved.cacheLog).toContain("doesn't exist here, re-transforming");
+      expect(moved.cacheLog).toContain("which no longer resolves to");
       expect(moved.results["imports the helper this checkout has"]?.status).toBe("passed");
     }, 60_000);
   });

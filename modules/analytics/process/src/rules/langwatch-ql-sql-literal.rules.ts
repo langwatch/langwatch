@@ -11,6 +11,14 @@
  */
 export const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+/** `value` when it matches `SAFE_IDENTIFIER`; `role` names the rejected name in the error. */
+export function assertSafeIdentifier({ value, role }: { value: string; role: string }): string {
+  if (!SAFE_IDENTIFIER.test(value)) {
+    throw new Error(`lwql: ${role} must match ${String(SAFE_IDENTIFIER)}, got "${value}"`);
+  }
+  return value;
+}
+
 /** ClickHouse string literal: backslash-escaped, single quotes doubled out. */
 export function clickHouseLiteral(value: string): string {
   return `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;

@@ -410,10 +410,51 @@ export function queryNamesFacet({
   return named;
 }
 
+/** What a subtree holds: terms on the facet, terms on anything else, an OR joining the two. */
+interface FacetReach {
+  facet: boolean;
+  other: boolean;
+  mixed: boolean;
+}
+
+/** Under a NOT, AND acts as OR (De Morgan), so `NOT (facet AND other)` is mixed too (#9806). */
+function facetReach({
+  node,
+  facetKey,
+  negated = false,
+}: {
+  node: LiqeQuery;
+  facetKey: string;
+  negated?: boolean;
+}): FacetReach {
+  switch (node.type) {
+    case "Tag": {
+      const facet = tagBelongsToFacet(node, facetKey);
+      return { facet, other: !facet, mixed: false };
+    }
+    case "UnaryOperator": {
+      const isNeg = node.operator === "NOT" || node.operator === "-";
+      return facetReach({ node: node.operand, facetKey, negated: negated !== isNeg });
+    }
+    case "ParenthesizedExpression":
+      return facetReach({ node: node.expression, facetKey, negated });
+    case "LogicalExpression": {
+      const left = facetReach({ node: node.left, facetKey, negated });
+      const right = facetReach({ node: node.right, facetKey, negated });
+      const facet = left.facet || right.facet;
+      const other = left.other || right.other;
+      const actsAsOr = (node.operator.operator === "OR") !== negated;
+      return { facet, other, mixed: left.mixed || right.mixed || (actsAsOr && facet && other) };
+    }
+    default:
+      return { facet: false, other: false, mixed: false };
+  }
+}
+
 /**
- * The query with every term on the facet's own field removed, so the facet
- * keeps counting its other values while the rest of the query applies. A
- * query that only named this facet becomes empty.
+ * The query without the facet's own terms, so the facet keeps counting its other values; empty
+ * when only this facet was named. When an OR joins those terms to others, dropping them would
+ * change what the rest means, so the whole query stays.
  */
 export function queryWithoutFacet({
   queryText,
@@ -423,6 +464,8 @@ export function queryWithoutFacet({
   facetKey: string;
 }): string {
   if (!queryText.trim()) return "";
-  const next = filterAST(parse(queryText), (node) => !tagBelongsToFacet(node, facetKey));
+  const ast = parse(queryText);
+  if (facetReach({ node: ast, facetKey }).mixed) return queryText;
+  const next = filterAST(ast, (node) => !tagBelongsToFacet(node, facetKey));
   return isEmptyAST(next) ? "" : serialize(next);
 }

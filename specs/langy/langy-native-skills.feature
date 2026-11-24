@@ -58,6 +58,14 @@ Feature: Langy loads its skills from the canonical skill directory
     When the assistant uses any skill
     Then it does not instruct me to install the LangWatch CLI
 
+  # Langy already holds a session key, so the public skills' login partials
+  # are left out of its render; this pins that none of their copy comes back.
+  @unit
+  Scenario: No skill Langy ships tells the reader to sign in or set up a key
+    Given the set of skills Langy ships with
+    When each one is rendered
+    Then none of them tells the reader to run langwatch login, sign in or set up an API key
+
   # ---------------------------------------------------------------------------
   # Langy-only skills coexist with the canonical ones
   # ---------------------------------------------------------------------------

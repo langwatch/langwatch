@@ -2,7 +2,9 @@
  * The completeness report a windowed LangWatchQL result carries, built by one extra aggregate
  * over the same view, window and tenants as the statement.
  * @see modules/analytics/specs/analytics-query-completeness.feature
+ * @see specs/lwql/dedup-floor.feature
  */
+import { LangWatchQLUnavailableError } from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -41,6 +43,7 @@ const ROOT_SPANS_SQL =
 const PRESENT_COST =
   "countIf(`UnpricedSpanCount` = 0 AND (`TotalCost` IS NOT NULL OR empty(`Models`))) AS f0";
 const SPAN_COST_SQL = `SELECT sum(Cost) AS cost FROM analytics.spans ${SPAN_PERIOD}`;
+const TRACE_METRICS_SQL = `SELECT count() AS n FROM analytics.trace_metrics ${PERIOD}`;
 const ROLLUP_SQL =
   "SELECT sum(TraceCount) AS n FROM analytics.trace_metrics_by_minute " +
   "WHERE BucketStart >= {dashboard_context_period_start:DateTime} " +
@@ -200,11 +203,61 @@ describe("LangWatchQLService completeness", () => {
       const [statement, report] = executor.requests;
       expect(report?.tenantCapability).toBe(statement?.tenantCapability);
       expect(report?.sql).toContain("FROM analytics.traces");
+      expect(report?.sql).not.toContain("__floor");
       expect(report?.sql).toContain("countIf(`UnpricedSpanCount` > 0)");
       expect(report?.parameters).toMatchObject({
         completeness_window_start: "2026-02-01 00:00:00",
         completeness_window_end: "2026-02-04 00:00:00",
       });
+    });
+  });
+
+  describe("given a windowed statement over trace_metrics, which has a floored twin", () => {
+    /** @scenario "A completeness report on a floored view reads its floored twin" */
+    it("reads the report from trace_metrics__floor, from the window's start", async () => {
+      const { executor, result } = run({ sql: TRACE_METRICS_SQL, answers: [[], [{ n: 4 }]] });
+
+      const { completeness } = await result;
+
+      const report = executor.requests[1]?.sql;
+      expect(report).toContain(
+        "FROM analytics.trace_metrics__floor(lwql_floor = " +
+          "toTimeZone(toDateTime64(({completeness_window_start:DateTime}), 3), timezone())) " +
+          "AS trace_metrics",
+      );
+      expect(report).toContain(
+        "WHERE `OccurredAt` >= {completeness_window_start:DateTime} " +
+          "AND `OccurredAt` < {completeness_window_end:DateTime}",
+      );
+      expect(completeness).toMatchObject({ state: "complete", unit: "traces", total: 4 });
+    });
+
+    /** @scenario "A completeness report on a floored view reads its floored twin" */
+    it("reads the report as written when the twin is not provisioned yet, and still reports", async () => {
+      const { executor, result } = run({
+        sql: TRACE_METRICS_SQL,
+        answers: [[], new LangWatchQLUnavailableError(), [{ n: 4 }]],
+      });
+
+      const { completeness } = await result;
+
+      expect(executor.requests).toHaveLength(3);
+      expect(executor.requests[1]?.sql).toContain("trace_metrics__floor(");
+      expect(executor.requests[2]?.sql).toContain("FROM analytics.trace_metrics AS trace_metrics");
+      expect(executor.requests[2]?.sql).not.toContain("__floor");
+      expect(completeness).toMatchObject({ state: "complete", total: 4 });
+    });
+  });
+
+  describe("given a windowed statement over traces, which has no floored twin", () => {
+    /** @scenario "A completeness report on a floored view reads its floored twin" */
+    it("reads the report from traces as written, in one request", async () => {
+      const { executor, result } = run({ sql: COST_SQL, answers: [[], [{ n: 0 }]] });
+      await result;
+
+      expect(executor.requests).toHaveLength(2);
+      expect(executor.requests[1]?.sql).toContain("FROM analytics.traces AS traces WHERE");
+      expect(executor.requests[1]?.sql).not.toContain("__floor");
     });
   });
 

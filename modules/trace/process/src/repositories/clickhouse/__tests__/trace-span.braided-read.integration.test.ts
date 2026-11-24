@@ -49,6 +49,7 @@ function spanRow(input: {
   offsetMs: number;
   updatedOffsetMs?: number;
   attributes?: Record<string, string>;
+  parentSpanId?: string;
 }) {
   const start = new Date(base + input.offsetMs);
   return {
@@ -56,7 +57,7 @@ function spanRow(input: {
     TenantId: input.tenantId,
     TraceId: input.traceId ?? traceId,
     SpanId: input.spanId,
-    ParentSpanId: null,
+    ParentSpanId: input.parentSpanId ?? null,
     ParentTraceId: null,
     ParentIsRemote: null,
     Sampled: 1,
@@ -93,7 +94,13 @@ beforeAll(async () => {
   const web = { orchestrator: "web" };
   for (const row of [
     spanRow({ tenantId: reader, spanId: "reader-root", offsetMs: 0 }),
-    spanRow({ tenantId: owner, spanId: "owner-web", offsetMs: 10, attributes: web }),
+    spanRow({
+      tenantId: owner,
+      spanId: "owner-web",
+      parentSpanId: "reader-root",
+      offsetMs: 10,
+      attributes: web,
+    }),
     spanRow({
       tenantId: owner,
       spanId: "owner-app",
@@ -110,7 +117,13 @@ beforeAll(async () => {
       name: "payments_agent",
       offsetMs: -120_000,
     }),
-    spanRow({ tenantId: search, spanId: "search-web", offsetMs: 60, attributes: web }),
+    spanRow({
+      tenantId: search,
+      spanId: "search-web",
+      parentSpanId: "reader-root",
+      offsetMs: 60,
+      attributes: web,
+    }),
     spanRow({
       tenantId: search,
       spanId: "search-app",
@@ -147,6 +160,7 @@ beforeAll(async () => {
     spanRow({
       tenantId: owner,
       spanId: "shared",
+      parentSpanId: "paged-root",
       traceId: pagingTraceId,
       offsetMs: 10,
       attributes: web,

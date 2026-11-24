@@ -116,9 +116,10 @@ func NormalizeMirrorTier(v string) MirrorTier {
 // reuse legitimately arrives with no key (the live worker already has one in its
 // env), whereas a spawn without a key would produce a worker that cannot call
 // LangWatch at all. Rather than let that worker boot broken, Acquire refuses with
-// ErrCredentialsRequired and the control plane mints and retries.
+// ErrCredentialsRequired and the control plane mints and retries. A blank key
+// counts as none: it would boot a CLI that tells the user to log in.
 func (c Credentials) Spawnable() bool {
-	return c.LangwatchAPIKey != ""
+	return strings.TrimSpace(c.LangwatchAPIKey) != ""
 }
 
 // CredentialSignature is a stable fingerprint of the credential capabilities a

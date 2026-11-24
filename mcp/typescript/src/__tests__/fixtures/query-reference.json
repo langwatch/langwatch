@@ -8883,7 +8883,7 @@
         {
           "name": "analytics.ai_tool_entries",
           "description": "Org-scoped catalog of AI tools surfaced on the personal home portal (/me) and managed by org admins at /governance/tool-catalog.",
-          "grain": "one row per (TenantId, AiToolEntryId); an organization-scoped row appears once per project",
+          "grain": "one row per (AiToolEntryId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "AiToolEntryId",
@@ -9032,7 +9032,7 @@
         {
           "name": "analytics.ai_tool_entry_departments",
           "description": "Per-department scope binding for AiToolEntry.",
-          "grain": "one row per (TenantId, AiToolEntryDepartmentId); a row reached through its parent appears once per project",
+          "grain": "one row per (AiToolEntryDepartmentId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "AiToolEntryDepartmentId",
@@ -9080,7 +9080,7 @@
         {
           "name": "analytics.ai_tool_entry_teams",
           "description": "Per-team scope binding for AiToolEntry.",
-          "grain": "one row per (TenantId, AiToolEntryTeamId); a team-scoped row appears once per project",
+          "grain": "one row per (AiToolEntryTeamId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "AiToolEntryTeamId",
@@ -9290,8 +9290,8 @@
         },
         {
           "name": "analytics.annotation_queue_scores",
-          "description": "Rows of the AnnotationQueueScores table, one row per (TenantId, AnnotationQueueId, AnnotationScoreId); a row reached through its parent appears once per project.",
-          "grain": "one row per (TenantId, AnnotationQueueId, AnnotationScoreId); a row reached through its parent appears once per project",
+          "description": "Rows of the AnnotationQueueScores table, one row per (AnnotationQueueId, AnnotationScoreId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (AnnotationQueueId, AnnotationScoreId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "AnnotationQueueId",
@@ -9647,7 +9647,7 @@
         {
           "name": "analytics.anomaly_alerts",
           "description": "Persisted anomaly detection.",
-          "grain": "one row per (TenantId, AnomalyAlertId); an organization-scoped row appears once per project",
+          "grain": "one row per (AnomalyAlertId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "AnomalyAlertId",
@@ -9799,7 +9799,7 @@
         {
           "name": "analytics.anomaly_rules",
           "description": "Admin-defined anomaly detection rule.",
-          "grain": "one row per (TenantId, AnomalyRuleId); an organization-scoped row appears once per project",
+          "grain": "one row per (AnomalyRuleId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "AnomalyRuleId",
@@ -10674,8 +10674,8 @@
         },
         {
           "name": "analytics.data_privacy_policies",
-          "description": "Rows of the DataPrivacyPolicy table, one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project.",
-          "grain": "one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project",
+          "description": "Rows of the DataPrivacyPolicy table, one row per (DataPrivacyPolicyId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (DataPrivacyPolicyId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "DataPrivacyPolicyId",
@@ -11008,7 +11008,7 @@
         {
           "name": "analytics.department_membership_histories",
           "description": "One dated person → department link.",
-          "grain": "one row per (TenantId, DepartmentMembershipHistoryId); an organization-scoped row appears once per project",
+          "grain": "one row per (DepartmentMembershipHistoryId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "DepartmentMembershipHistoryId",
@@ -11080,7 +11080,7 @@
         {
           "name": "analytics.departments",
           "description": "A department is a single-valued accounting dimension, separate from RBAC, for rolling up AI spend by org unit (Engineering, Marketing,...).",
-          "grain": "one row per (TenantId, DepartmentId); an organization-scoped row appears once per project",
+          "grain": "one row per (DepartmentId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "DepartmentId"
@@ -11142,7 +11142,7 @@
         {
           "name": "analytics.discovered_agents",
           "description": "A non-human actor (a bot, agent or automation) discovered from a connected source, with the provider-native metadata the source published.",
-          "grain": "one row per (TenantId, DiscoveredAgentId); an organization-scoped row appears once per project",
+          "grain": "one row per (DiscoveredAgentId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "DiscoveredAgentId",
@@ -11241,7 +11241,7 @@
         {
           "name": "analytics.discovered_persons",
           "description": "A name-text seen on a provider's cost or audit rows: \"the provider told us someone called m.silva exists\".",
-          "grain": "one row per (TenantId, DiscoveredPersonId); an organization-scoped row appears once per project",
+          "grain": "one row per (DiscoveredPersonId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "DiscoveredPersonId"
@@ -11437,7 +11437,7 @@
         {
           "name": "analytics.erased_identifier_suppressions",
           "description": "Hashes of erased identifiers - the do-not-reimport list.",
-          "grain": "one row per (TenantId, ErasedIdentifierSuppressionId); an organization-scoped row appears once per project",
+          "grain": "one row per (ErasedIdentifierSuppressionId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "ErasedIdentifierSuppressionId"
@@ -11844,8 +11844,8 @@
         },
         {
           "name": "analytics.gateway_budget_bucket_boundaries",
-          "description": "Rows of the GatewayBudgetBucketBoundary table, one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project.",
-          "grain": "one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project",
+          "description": "Rows of the GatewayBudgetBucketBoundary table, one row per (GatewayBudgetBucketBoundaryId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (GatewayBudgetBucketBoundaryId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "GatewayBudgetBucketBoundaryId",
@@ -11916,8 +11916,8 @@
         },
         {
           "name": "analytics.gateway_budget_ledgers",
-          "description": "Rows of the GatewayBudgetLedger table, one row per (TenantId, GatewayBudgetLedgerId); a row reached through its parent appears once per project.",
-          "grain": "one row per (TenantId, GatewayBudgetLedgerId); a row reached through its parent appears once per project",
+          "description": "Rows of the GatewayBudgetLedger table, one row per (GatewayBudgetLedgerId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (GatewayBudgetLedgerId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "GatewayBudgetLedgerId",
@@ -12057,8 +12057,8 @@
         },
         {
           "name": "analytics.gateway_budgets",
-          "description": "Rows of the GatewayBudget table, one row per (TenantId, GatewayBudgetId); an organization-scoped row appears once per project.",
-          "grain": "one row per (TenantId, GatewayBudgetId); an organization-scoped row appears once per project",
+          "description": "Rows of the GatewayBudget table, one row per (GatewayBudgetId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (GatewayBudgetId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "GatewayBudgetId",
@@ -12263,8 +12263,8 @@
         },
         {
           "name": "analytics.gateway_cache_rules",
-          "description": "Rows of the GatewayCacheRule table, one row per (TenantId, GatewayCacheRuleId); an organization-scoped row appears once per project.",
-          "grain": "one row per (TenantId, GatewayCacheRuleId); an organization-scoped row appears once per project",
+          "description": "Rows of the GatewayCacheRule table, one row per (GatewayCacheRuleId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (GatewayCacheRuleId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "GatewayCacheRuleId",
@@ -12817,7 +12817,7 @@
         {
           "name": "analytics.github_branch_pull_request_checks",
           "description": "The per-branch bookkeeping behind pull-request mapping: when a branch was last looked up on GitHub, how many pull requests it resolved to, and when it may be asked about again.",
-          "grain": "one row per (TenantId, GithubBranchPullRequestCheckId); an organization-scoped row appears once per project",
+          "grain": "one row per (GithubBranchPullRequestCheckId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "GithubBranchPullRequestCheckId"
@@ -12937,7 +12937,7 @@
         {
           "name": "analytics.github_installations",
           "description": "The organization's GitHub connection: a GitHub App installation mapped to a LangWatch organization.",
-          "grain": "one row per (TenantId, GithubInstallationId); an organization-scoped row appears once per project",
+          "grain": "one row per (GithubInstallationId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "GithubInstallationId",
@@ -13040,7 +13040,7 @@
         {
           "name": "analytics.github_pull_requests",
           "description": "A pull request discovered through the organization's GitHub connection and mapped to the branch it was opened from, so a coding-agent session that knows only its branch can name the pull request it produced.",
-          "grain": "one row per (TenantId, GithubPullRequestId); an organization-scoped row appears once per project",
+          "grain": "one row per (GithubPullRequestId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "GithubPullRequestId"
@@ -13204,7 +13204,7 @@
         {
           "name": "analytics.governance_tenant_histories",
           "description": "Every tenant id this organization has ever written governance rows under, appended on first use and never pruned.",
-          "grain": "one row per (TenantId, GovernanceTenantHistoryId); an organization-scoped row appears once per project",
+          "grain": "one row per (GovernanceTenantHistoryId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "GovernanceTenantHistoryId"
@@ -13250,7 +13250,7 @@
         {
           "name": "analytics.identity_match_suggestions",
           "description": "Match candidates a background job computed and a human has yet to confirm.",
-          "grain": "one row per (TenantId, IdentityMatchSuggestionId); an organization-scoped row appears once per project",
+          "grain": "one row per (IdentityMatchSuggestionId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "IdentityMatchSuggestionId",
@@ -13314,7 +13314,7 @@
         {
           "name": "analytics.identity_matches",
           "description": "A dated link from an external account to a platform user, opened when the match holds and closed when it stops being true.",
-          "grain": "one row per (TenantId, IdentityMatchId); an organization-scoped row appears once per project",
+          "grain": "one row per (IdentityMatchId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "IdentityMatchId",
@@ -13692,7 +13692,7 @@
         {
           "name": "analytics.ingestion_sources",
           "description": "Per-platform fleet configuration that connects a closed SaaS product's audit / OTel / S3 stream to LangWatch's Activity Monitor.",
-          "grain": "one row per (TenantId, IngestionSourceId); a team-scoped row appears once per project",
+          "grain": "one row per (IngestionSourceId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "IngestionSourceId",
@@ -13890,7 +13890,7 @@
         {
           "name": "analytics.ingestion_templates",
           "description": "Admin/platform-curated catalog row for upstream OTLP normalization.",
-          "grain": "one row per (TenantId, IngestionTemplateId); an organization-scoped row appears once per project",
+          "grain": "one row per (IngestionTemplateId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "IngestionTemplateId",
@@ -14299,6 +14299,14 @@
               "name": "ArchivedAt",
               "type": "Nullable(Float64)",
               "description": "ArchivedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CiFollowUpsInARow",
+              "type": "Int32",
+              "description": "Messages CI started on a pull request since the person last wrote.",
               "unit": null,
               "gates": [],
               "available": true
@@ -14742,8 +14750,8 @@
         },
         {
           "name": "analytics.model_default_config_scopes",
-          "description": "Rows of the ModelDefaultConfigScope table, one row per (TenantId, ModelDefaultConfigScopeId); a row reached through its parent appears once per project.",
-          "grain": "one row per (TenantId, ModelDefaultConfigScopeId); a row reached through its parent appears once per project",
+          "description": "Rows of the ModelDefaultConfigScope table, one row per (ModelDefaultConfigScopeId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (ModelDefaultConfigScopeId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "ModelDefaultConfigScopeId",
@@ -14806,8 +14814,8 @@
         },
         {
           "name": "analytics.model_default_configs",
-          "description": "Rows of the ModelDefaultConfig table, one row per (TenantId, ModelDefaultConfigId); an organization-scoped row appears once per project.",
-          "grain": "one row per (TenantId, ModelDefaultConfigId); an organization-scoped row appears once per project",
+          "description": "Rows of the ModelDefaultConfig table, one row per (ModelDefaultConfigId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (ModelDefaultConfigId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "ModelDefaultConfigId",
@@ -14871,8 +14879,8 @@
         },
         {
           "name": "analytics.model_provider_scopes",
-          "description": "Rows of the ModelProviderScope table, one row per (TenantId, ModelProviderScopeId); a row reached through its parent appears once per project.",
-          "grain": "one row per (TenantId, ModelProviderScopeId); a row reached through its parent appears once per project",
+          "description": "Rows of the ModelProviderScope table, one row per (ModelProviderScopeId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (ModelProviderScopeId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "ModelProviderScopeId",
@@ -14935,8 +14943,8 @@
         },
         {
           "name": "analytics.model_providers",
-          "description": "Rows of the ModelProvider table, one row per (TenantId, ModelProviderId); an organization-scoped row appears once per project.",
-          "grain": "one row per (TenantId, ModelProviderId); an organization-scoped row appears once per project",
+          "description": "Rows of the ModelProvider table, one row per (ModelProviderId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (ModelProviderId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "ModelProviderId"
@@ -16166,8 +16174,8 @@
         },
         {
           "name": "analytics.prompt_tags",
-          "description": "Rows of the PromptTag table, one row per (TenantId, PromptTagId); an organization-scoped row appears once per project.",
-          "grain": "one row per (TenantId, PromptTagId); an organization-scoped row appears once per project",
+          "description": "Rows of the PromptTag table, one row per (PromptTagId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (PromptTagId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "PromptTagId",
@@ -16438,8 +16446,8 @@
         },
         {
           "name": "analytics.retention_policies",
-          "description": "Rows of the RetentionPolicy table, one row per (TenantId, RetentionPolicyId); an organization-scoped row appears once per project.",
-          "grain": "one row per (TenantId, RetentionPolicyId); an organization-scoped row appears once per project",
+          "description": "Rows of the RetentionPolicy table, one row per (RetentionPolicyId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (RetentionPolicyId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "RetentionPolicyId",
@@ -16519,8 +16527,8 @@
         },
         {
           "name": "analytics.routing_policies",
-          "description": "Rows of the RoutingPolicy table, one row per (TenantId, RoutingPolicyId); an organization-scoped row appears once per project.",
-          "grain": "one row per (TenantId, RoutingPolicyId); an organization-scoped row appears once per project",
+          "description": "Rows of the RoutingPolicy table, one row per (RoutingPolicyId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (RoutingPolicyId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "RoutingPolicyId",
@@ -16645,8 +16653,8 @@
         },
         {
           "name": "analytics.routing_policy_scopes",
-          "description": "Rows of the RoutingPolicyScope table, one row per (TenantId, RoutingPolicyScopeId); a row reached through its parent appears once per project.",
-          "grain": "one row per (TenantId, RoutingPolicyScopeId); a row reached through its parent appears once per project",
+          "description": "Rows of the RoutingPolicyScope table, one row per (RoutingPolicyScopeId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (RoutingPolicyScopeId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "RoutingPolicyScopeId",
@@ -17008,6 +17016,22 @@
               "available": true
             },
             {
+              "name": "TraceQuietPeriodMs",
+              "type": "Nullable(Int32)",
+              "description": "TraceQuietPeriodMs",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceWaitTimeoutMs",
+              "type": "Nullable(Int32)",
+              "description": "TraceWaitTimeoutMs",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
               "name": "MaxTurns",
               "type": "Nullable(Int32)",
               "description": "MaxTurns",
@@ -17037,6 +17061,24 @@
               "name": "CallerVoice",
               "type": "Nullable(String)",
               "description": "CallerVoice",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            },
+            {
+              "name": "Kind",
+              "type": "String",
+              "description": "Kind",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "RedTeam",
+              "type": "Nullable(String)",
+              "description": "RedTeam",
               "unit": null,
               "gates": [
                 "output"
@@ -17346,7 +17388,8 @@
           "grain": "one row per SimulationSuiteId",
           "joinKeys": [
             "TenantId",
-            "SimulationSuiteId"
+            "SimulationSuiteId",
+            "TemplateId"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -17444,6 +17487,22 @@
               "available": true
             },
             {
+              "name": "TraceQuietPeriodMs",
+              "type": "Nullable(Int32)",
+              "description": "TraceQuietPeriodMs",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceWaitTimeoutMs",
+              "type": "Nullable(Int32)",
+              "description": "TraceWaitTimeoutMs",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
               "name": "Kind",
               "type": "String",
               "description": "Kind",
@@ -17479,6 +17538,22 @@
               "gates": [
                 "output"
               ],
+              "available": true
+            },
+            {
+              "name": "TemplateId",
+              "type": "Nullable(String)",
+              "description": "TemplateId",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TemplateVersion",
+              "type": "Nullable(Int32)",
+              "description": "TemplateVersion",
+              "unit": null,
+              "gates": [],
               "available": true
             },
             {
@@ -18334,8 +18409,8 @@
         },
         {
           "name": "analytics.virtual_key_scopes",
-          "description": "Rows of the VirtualKeyScope table, one row per (TenantId, VirtualKeyScopeId); a row reached through its parent appears once per project.",
-          "grain": "one row per (TenantId, VirtualKeyScopeId); a row reached through its parent appears once per project",
+          "description": "Rows of the VirtualKeyScope table, one row per (VirtualKeyScopeId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (VirtualKeyScopeId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "VirtualKeyScopeId",
@@ -18398,8 +18473,8 @@
         },
         {
           "name": "analytics.virtual_keys",
-          "description": "Rows of the VirtualKey table, one row per (TenantId, VirtualKeyId); an organization-scoped row appears once per project.",
-          "grain": "one row per (TenantId, VirtualKeyId); an organization-scoped row appears once per project",
+          "description": "Rows of the VirtualKey table, one row per (VirtualKeyId), counted once across the projects read, under the lowest project id.",
+          "grain": "one row per (VirtualKeyId), counted once across the projects read, under the lowest project id",
           "joinKeys": [
             "TenantId",
             "VirtualKeyId",

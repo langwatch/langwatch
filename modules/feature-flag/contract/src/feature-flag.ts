@@ -177,7 +177,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: true,
     description:
-      "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). On by default; switch it off fleet-wide or per organization. A run on an own key is never metered or capped. Off, the column offers LangWatch Evals Preview only, new picks of any other model are refused, and a project that already picked one skips its Instant Evals as not configured; it is never moved onto the billed LangWatch model.",
+      "Lets an organization run Instant Evals on its own decision model and key, picked in the Instant Evals column of Default models (ADR-182). On by default; switch it off fleet-wide or per organization. A run on an own key is not metered by LangWatch and skips the free budget, but a gateway budget set to block still applies. Off, the column offers LangWatch Evals Preview only, new picks of any other model are refused, and a project that already picked one skips its Instant Evals as not configured; it is never moved onto the billed LangWatch model.",
   },
   {
     key: "instant_evals_hosted_disabled",
@@ -328,6 +328,13 @@ export const FEATURE_FLAGS = [
       "Opens the Dashboards area (/[project]/dashboards): the Agent Flight Deck and the member's own boards, as a product in the product switcher and saved-dashboards list (spec: modules/dashboard/specs/dashboards-v1.feature). With release_lwql_workbench also on, members build and edit widgets on boards. While it is on, Langy offers its dashboard-widgets skill instead of lwql-charts. Default off; while off the area answers not-found and the sidebar shows no entry. Legacy analytics is untouched either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards.",
   },
   {
+    key: "release_dashboards_in_every_product",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      'Shows the Dashboards section in the Gateway and Coding agents sidebars as well as in LLM Ops (spec: modules/navigation/specs/product-sidebars.feature). Those pages are about no project, so the section is titled "Dashboards · <project>" and works in the project LLM Ops would open: it lists the boards pinned there, and its "+" and menus offer what the member\'s grants in that project allow. Needs release_dashboards and analytics:view in that project; with no project for LLM Ops to open there is no section. Governance shows no Dashboards section either way. Default off; while off only LLM Ops shows the Dashboards section. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards_in_every_product.',
+  },
+  {
     key: "release_insights",
     scope: "PRODUCT",
     defaultValue: false,
@@ -337,9 +344,9 @@ export const FEATURE_FLAGS = [
   {
     key: "release_braids",
     scope: "PRODUCT",
-    defaultValue: false,
+    defaultValue: true,
     description:
-      "Opens braid management (spec: modules/authz/specs/braids-release-flag.feature): the project and organisation Braids settings pages and their settings entry, and every procedure behind them, which creates, changes and lists braids, sets who may braid, and issues, rotates and lists braid signing keys. Default off. Enable it per organisation, never by a project rule: organisation-wide procedures ask it for the organisation and project ones for the project, and the two must agree. While off both pages answer not-found, the entry is hidden and those procedures refuse with braids_not_enabled; removing a braid and revoking a signing key still work, since both only narrow access. Braids that already exist keep applying either way: trace reads still show braided spans, signed calls are still verified and braided reads are still audited. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_braids.",
+      "Kill switch for braid management (spec: modules/authz/specs/braids-release-flag.feature). Default on (Alex, 2026-11-18): each organisation still turns Braids on in its own Braids settings, which an organisation admin on Enterprise changes. Switch it off per organisation, never by a project rule: organisation-wide procedures ask it for the organisation and project ones for the project, and the two must agree. While off both Braids pages list existing braids with Remove, an organisation admin can still turn the organisation's Braids setting off, the settings entry shows only while braids exist, and the procedures that create, change and list braid targets, set who may braid or turn Braids on, and issue, rotate and list braid signing keys refuse with braids_not_enabled; removing a braid and revoking a signing key still work, since both only narrow access. The flag alone pauses nothing: braids that already exist keep applying (trace reads show braided spans, signed calls are verified, braided reads are audited) until the organisation's own Braids setting is off, which pauses them. Switch it off for an organisation through the operator store.",
   },
   {
     key: "release_ui_comparison_leaderboard_enabled",

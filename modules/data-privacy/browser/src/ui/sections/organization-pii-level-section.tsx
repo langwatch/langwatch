@@ -35,12 +35,14 @@ function useOptimisticPick(stored: string | undefined) {
 /** Strict at a price, or replacing Custom, asks first; a free organization is never asked. */
 export function OrganizationPiiLevelSection({
   free,
+  licensed = false,
   host,
   projectId,
   snapshot,
   onSaved,
 }: {
   free: boolean;
+  licensed?: boolean;
   host: DataPrivacyHostApi;
   projectId: string;
   snapshot: DataPrivacySnapshot;
@@ -87,6 +89,7 @@ export function OrganizationPiiLevelSection({
           entityCount: storedPii.entities.length,
         })}
         free={free}
+        licensed={licensed}
         canWrite={snapshot.available.organization !== null}
         isSaving={setForScope.isPending}
         onPick={(level) => (confirmationFor(level) ? setAsking(level) : void save(level))}

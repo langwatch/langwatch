@@ -504,12 +504,14 @@ describe("seatEventSubscription", () => {
           organizationId: "org_1",
           newTotalSeats: 8,
         });
+        const previewed = stripeSubscriptions.previews[0]!.change;
+        // The confirmation carries the quote's instant, as the screen sends it.
         await service.updateSeatEventItems({
           organizationId: "org_1",
           totalMembers: 8,
+          quotedAt: previewed.prorationDate!,
         });
 
-        const previewed = stripeSubscriptions.previews[0]!.change;
         const applied = stripeSubscriptions.updates[0]!.change;
 
         expect(previewed).toEqual(applied);
@@ -1163,6 +1165,23 @@ describe("seatEventSubscription", () => {
 
         expect(stripeSubscriptions.checkoutSessions[0]?.request).toEqual(
           expect.objectContaining({ currency: "eur" }),
+        );
+      });
+
+      /** @scenario "The pending subscription keeps the picked retention" */
+      it("records the picked retention on the pending subscription", async () => {
+        await service.createSeatEventCheckout({
+          organizationId: "org_1",
+          customerId: "cus_1",
+          baseUrl: "https://app.test",
+          currency: "EUR" as any,
+          billingInterval: "monthly",
+          membersToAdd: 2,
+          retentionDays: 182,
+        });
+
+        expect(subscriptions.createPendingSeatCheckout).toHaveBeenCalledWith(
+          expect.objectContaining({ organizationId: "org_1", maxRetentionDays: 182 }),
         );
       });
     });

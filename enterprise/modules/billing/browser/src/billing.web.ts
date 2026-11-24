@@ -8,6 +8,7 @@ import { defineBrowserModule } from "@langwatch/browser";
 import {
   ContactSalesToken,
   LicenseBillingSectionToken,
+  PaymentRecoveryBannerToken,
   SeatProrationPreviewToken,
 } from "@langwatch/enterprise-billing-client";
 import { billingWebConfigSchema } from "@langwatch/enterprise-billing-contract";
@@ -49,6 +50,11 @@ export const billingWeb = defineBrowserModule("billing")
   .lends(ContactSalesToken, {
     load: async () => ({
       default: (await import("./ui/sections/contact-sales/index.ts")).ContactSalesBlock,
+    }),
+  })
+  .lends(PaymentRecoveryBannerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/payment-recovery-banner.tsx")).PaymentRecoveryBanner,
     }),
   })
   .lends(SeatProrationPreviewToken, {

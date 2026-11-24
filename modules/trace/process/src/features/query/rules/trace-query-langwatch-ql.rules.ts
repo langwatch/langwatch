@@ -22,6 +22,7 @@ import {
   numericComparisonHandler,
   stringEqualityHandler,
 } from "./trace-query-translators.rules.ts";
+import { hintForUnknownTraceFilterField } from "./trace-query-unknown-field.rules.ts";
 import {
   TRACE_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
@@ -201,7 +202,14 @@ function handlerFor(name: string): FieldHandler {
     const field = NUMBER_FIELDS[name];
     if (field) return numericComparisonHandler(field.expression, field.param);
   }
-  throw new FilterFieldUnknownError(name, [...LANGWATCH_QL_TRACE_FILTER_FIELDS]);
+  throw new FilterFieldUnknownError(
+    name,
+    [...LANGWATCH_QL_TRACE_FILTER_FIELDS],
+    hintForUnknownTraceFilterField({
+      field: name,
+      knownFields: [...LANGWATCH_QL_TRACE_FILTER_FIELDS],
+    }),
+  );
 }
 
 /** `status:error` only: telling ok from warning needs a column the view lacks. */

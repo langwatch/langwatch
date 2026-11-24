@@ -11,6 +11,7 @@ import type {
 } from "@langwatch/analytics-contract";
 import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
+import type { AuthzOwnStanding, AuthzOwnStandingInput } from "@langwatch/authz-contract";
 import type {
   boardTrpc,
   dashboardTrpc,
@@ -309,6 +310,12 @@ type BorrowedProcedures = {
   monitors: {
     getAllForProject: {
       query: { input: ProjectScope; output: AnalyticsMonitorSummary[] };
+    };
+  };
+  authz: {
+    /** The reader's own permissions at a scope, resolved by the server (custom roles too). */
+    effectivePermissions: {
+      query: { input: AuthzOwnStandingInput; output: AuthzOwnStanding };
     };
   };
 };
