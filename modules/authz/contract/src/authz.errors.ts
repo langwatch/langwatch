@@ -238,6 +238,20 @@ export class AuthzBillingOnlyNoAccessError extends HandledError {
   }
 }
 
+/** Billing is the whole of a Billing-only membership (ADR-205): removing it takes nothing away. */
+export class AuthzBillingOnlyKeepsBillingError extends HandledError {
+  declare readonly code: "billing_only_keeps_billing";
+
+  constructor() {
+    super(
+      "billing_only_keeps_billing",
+      "A Billing-only member always holds Billing; remove them, or move them to a seat role first.",
+      { httpStatus: 409, fault: "customer", ...remediation("billing_only_keeps_billing") },
+    );
+    this.name = "AuthzBillingOnlyKeepsBillingError";
+  }
+}
+
 export class AuthzDeveloperSeatNoSharedAccessError extends HandledError {
   declare readonly code: "developer_seat_no_shared_access";
 

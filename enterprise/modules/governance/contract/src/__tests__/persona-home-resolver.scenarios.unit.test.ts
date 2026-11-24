@@ -20,6 +20,7 @@ const baseInput: PersonaResolverInput = {
   isEnterprise: false,
   hasGovernanceUi: true,
   firstProjectSlug: null,
+  planHome: null,
 };
 
 const withPersonalKey = { ...baseInput.setupState, hasPersonalVKs: true };

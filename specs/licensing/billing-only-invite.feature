@@ -37,6 +37,20 @@ Feature: Billing-only invite
     Then they land on the plan page
     And they are not shown "Waiting for team access"
 
+  Scenario: The home page sends someone who only pays to the plan page
+    Given a Billing-only member
+    When the home page decides where they go, with the coding-agents page on or off, an organization intent set, a home pinned elsewhere, or other members using coding agents
+    Then they go to the plan page: Plan and billing on Cloud, the licence page when self-hosted
+    And a page they opened before on this device does not take them elsewhere
+    And everyone who is not Billing only keeps their usual home
+
+  Scenario: Billing cannot be taken from a Billing-only member
+    Given a Billing-only member
+    When an admin turns their Billing off
+    Then it is refused with billing_only_keeps_billing
+    And they still hold Billing
+    And the person drawer shows Billing on and locked, and says to remove them or move them to a seat
+
   Scenario: A Billing-only member is given no team, project or personal workspace
     Given a Billing-only member
     When their invite is accepted, an admin grants them a team or project, or a system write does

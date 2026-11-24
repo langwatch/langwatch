@@ -346,6 +346,7 @@ export class AuthzModule implements AuthzApi {
     const billingRoles = AuthzBillingRoleService.create({
       grants: repositories.billingGrants,
       standings: repositories.userStandings,
+      memberships: repositories.bindings,
       ledger,
       permissions,
       newGrantId: newAuthzGrantId,
