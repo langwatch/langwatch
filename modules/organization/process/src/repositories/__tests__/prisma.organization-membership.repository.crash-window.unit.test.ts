@@ -236,6 +236,7 @@ describe("given an admin being demoted to member", () => {
         userId: "user_a",
         organizationId: "org_1",
         role: OrganizationUserRole.ADMIN,
+        billingOnly: false,
       });
       roleBindingFindMany.mockResolvedValue([{ id: "binding_1" }]);
       changeBindingRole.mockRejectedValue(new Error("ledger unavailable"));
@@ -256,8 +257,9 @@ describe("given an admin being demoted to member", () => {
           organizationId: "org_1",
           userId: "user_a",
           role: OrganizationUserRole.MEMBER,
+          billingOnly: false,
         },
-        data: { role: OrganizationUserRole.ADMIN },
+        data: { role: OrganizationUserRole.ADMIN, billingOnly: false },
       });
     });
   });

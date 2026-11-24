@@ -3253,7 +3253,7 @@ const presentations = {
     // The Billing-only person reaches the plan and invoices, never a project (ADR-205).
     title: "A Billing-only member joins no team",
     describe: () =>
-      "Billing only covers the plan, the card and the invoices. Invite them with a seat role to give them a team.",
+      "Billing only covers the plan, the card and the invoices. To give them a team, invite them with a seat role, or change a current member's role to a seat role first.",
   },
   billing_plan_price_missing: {
     // fault: platform. The plan the customer picked has no price set up on our

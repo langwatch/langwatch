@@ -111,7 +111,6 @@ export class SeatHoldService {
     const { memberships } = this.dependencies;
     if (input.standing.role !== "EXTERNAL")
       return classifyMemberType(input.standing.role, undefined);
-    if (input.standing.billingOnly) return "BillingOnly";
     const teamIds = await memberships.findSharedTeamIds({ organizationId: input.organizationId });
     const customRoleIds = customRoleIdsOf({
       bindings: await memberships.findTeamGrants({ ...input, teamIds }),
@@ -128,6 +127,7 @@ export class SeatHoldService {
     return classifyMemberType(
       input.standing.role,
       permissions.length > 0 ? permissions : undefined,
+      { billingOnly: input.standing.billingOnly === true },
     );
   }
 

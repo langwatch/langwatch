@@ -36,7 +36,8 @@ const registry = {
   billing_only_no_team_access: {
     tips: [
       "Send the Billing-only invite with no `teams` and no `teamIds`",
-      "To give the person a team, invite them with a seat role instead, which uses a seat",
+      "For someone not yet in the organization who needs a team, invite them with a seat role instead, which uses a seat",
+      "For a current Billing-only member, change their organization role to a seat role first, then add them to the team",
     ],
   },
   projects_unreadable: {

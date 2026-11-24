@@ -2367,6 +2367,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
 
       return {
         role: currentMember.role,
+        billingOnly: currentMember.billingOnly,
         fullSeatSince: currentMember.fullSeatSince,
         hold: previousHold,
         seatColumns,
@@ -2404,8 +2405,9 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   /**
-   * Puts back the role, the seat date and the hold a role change replaced, only while the
-   * membership still stands as that change left it, so a later change is never undone.
+   * Puts back the role, the Billing-only flag, the seat date and the hold a role change
+   * replaced, only while the membership still stands as that change left it, so a later
+   * change is never undone.
    */
   private async restoreRoleAndSeat({
     organizationId,
@@ -2420,13 +2422,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     actorUserId: string | null;
     previous: {
       role: OrganizationUserRole;
+      billingOnly: boolean;
       fullSeatSince: Date | null;
       hold: Prisma.SeatHoldGetPayload<object> | null;
       seatColumns: { fullSeatSince?: Date | null };
     };
   }): Promise<void> {
     const seatMoved = "fullSeatSince" in previous.seatColumns;
-    if (previous.role === role && !seatMoved) return;
+    if (previous.role === role && !previous.billingOnly && !seatMoved) return;
     await this.prisma.$transaction(async (tx) => {
       // The seat and its hold go back with the role, so the changes recorded with them are undone.
       await this.seatChanges.movingMember({
@@ -2441,10 +2444,12 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
               organizationId,
               userId,
               role,
+              billingOnly: false,
               ...(seatMoved ? { fullSeatSince: previous.seatColumns.fullSeatSince ?? null } : {}),
             },
             data: {
               role: previous.role,
+              billingOnly: previous.billingOnly,
               ...(seatMoved ? { fullSeatSince: previous.fullSeatSince } : {}),
             },
           });

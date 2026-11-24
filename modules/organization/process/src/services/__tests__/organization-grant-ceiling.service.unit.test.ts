@@ -90,7 +90,7 @@ describe("given a grant write nobody answers for", () => {
 
 describe("given a Billing-only invite's grant", () => {
   const billingGrant = {
-    role: "EXTERNAL",
+    role: "VIEWER",
     scopeType: "ORGANIZATION",
     scopeId: ORGANIZATION_ID,
     billing: true,

@@ -173,7 +173,7 @@ export class BillingOnlyNoTeamAccessError extends HandledError {
   constructor() {
     super(
       "billing_only_no_team_access",
-      "A Billing-only member joins no team; invite them with a seat role to give them one.",
+      "A Billing-only member joins no team; give them a seat role first.",
       { httpStatus: 409, fault: "customer", ...remediation("billing_only_no_team_access") },
     );
     this.name = "BillingOnlyNoTeamAccessError";

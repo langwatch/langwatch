@@ -285,7 +285,14 @@ export class OrganizationInvitationDoorService {
     // An invitation targets an address, so a session carrying none cannot be
     // matched to one at all.
     if (!by.email) throw new SignedInAddressRequiredError();
-    if (invite.status === "ACCEPTED") throw new InviteAlreadyAcceptedError();
+    if (invite.status === "ACCEPTED") {
+      // The acceptor retrying after a failed grant tail repairs it; the grant command ids
+      // make the repair idempotent.
+      if (invite.acceptedByUserId === by.id) {
+        await this.deps.invitations.apply({ userId: by.id, invite });
+      }
+      throw new InviteAlreadyAcceptedError();
+    }
     if (this.deps.invitations.displayStatus(invite) === "EXPIRED") throw new InviteExpiredError();
     if (invite.status !== "PENDING") throw new InviteNotReadyForAcceptanceError();
 

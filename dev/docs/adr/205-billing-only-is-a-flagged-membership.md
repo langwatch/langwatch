@@ -37,7 +37,9 @@ We will:
 2. Classify an `EXTERNAL` holder with `billingOnly` as `BillingOnly`, a member type no pool
    counts or caps. The invite cap check skips it on every plan, Free included.
 3. On acceptance, copy the flag to the membership and grant Billing through `AuthzApi.setBillingRole`
-   (source `invite`), idempotent on the invite id, so a retried accept repairs.
+   (source `invite`), idempotent on the invite id. If the grant fails after the membership
+   commits, the person who accepted clicks Join again on the same link: the invitation door
+   re-applies the grants for its acceptor before it answers `invite_already_accepted`.
 4. Refuse a team for a Billing-only invite. Any role change clears the flag, so the new role is
    metered as usual.
 5. Offer Billing only on the invite procedure, as `billingOnly: true` on one invite. The invite always names a person by address; there is no group or key form.
