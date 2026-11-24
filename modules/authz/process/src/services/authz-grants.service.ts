@@ -190,6 +190,10 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     const { repository } = this.options;
     await this.guards.assertScopeBelongsToOrganization({ where, organizationId });
     await this.guards.assertRoleUsable({ role, organizationId });
+    await this.bindingWriter.assertNoBillingOnlyPrincipal({
+      organizationId,
+      userIds: who.type === "user" ? [who.id] : [],
+    });
 
     const row = grantWriteRow({
       bindingId: this.options.newBindingId(),

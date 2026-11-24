@@ -67,7 +67,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   memberCount.mockResolvedValue(2);
   memberDelete.mockResolvedValue(undefined);
-  memberUpdate.mockResolvedValue({ updatedAt: ROLE_WRITTEN_AT });
+  memberUpdate.mockResolvedValue({ updatedAt: ROLE_WRITTEN_AT, departmentId: null });
   memberUpdateMany.mockResolvedValue({ count: 1 });
   teamFindMany.mockResolvedValue([]);
   teamUpdateMany.mockResolvedValue({ count: 0 });
@@ -259,7 +259,10 @@ describe("given an admin being demoted to member", () => {
           userId: "user_a",
           role: OrganizationUserRole.MEMBER,
           billingOnly: false,
-          updatedAt: ROLE_WRITTEN_AT,
+          OR: [
+            { updatedAt: ROLE_WRITTEN_AT },
+            { updatedAt: { gt: ROLE_WRITTEN_AT }, OR: [{ departmentId: { not: null } }] },
+          ],
         },
         data: { role: OrganizationUserRole.ADMIN, billingOnly: false },
       });

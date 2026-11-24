@@ -62,6 +62,7 @@ describe.skipIf(!DB_URL)(
     let adminUserId: string;
     let payerUserId: string;
     let movedPayerUserId: string;
+    let departmentPayerUserId: string;
 
     beforeAll(async () => {
       organizationId = (
@@ -71,6 +72,9 @@ describe.skipIf(!DB_URL)(
       payerUserId = (await prisma.user.create({ data: { email: `payer-${ns}@acme.test` } })).id;
       movedPayerUserId = (
         await prisma.user.create({ data: { email: `moved-payer-${ns}@acme.test` } })
+      ).id;
+      departmentPayerUserId = (
+        await prisma.user.create({ data: { email: `department-payer-${ns}@acme.test` } })
       ).id;
       await prisma.organizationUser.createMany({
         data: [
@@ -87,6 +91,12 @@ describe.skipIf(!DB_URL)(
             role: OrganizationUserRole.EXTERNAL,
             billingOnly: true,
           },
+          {
+            userId: departmentPayerUserId,
+            organizationId,
+            role: OrganizationUserRole.EXTERNAL,
+            billingOnly: true,
+          },
         ],
       });
     });
@@ -95,8 +105,12 @@ describe.skipIf(!DB_URL)(
       await cleanupTestRows(prisma, [
         ["organizationSeatLease", { organizationId }],
         ["organizationUser", { organizationId }],
+        ["department", { organizationId }],
         ["organization", { id: organizationId }],
-        ["user", { id: { in: [adminUserId, payerUserId, movedPayerUserId] } }],
+        [
+          "user",
+          { id: { in: [adminUserId, payerUserId, movedPayerUserId, departmentPayerUserId] } },
+        ],
       ]);
       await prisma.$disconnect();
     });
@@ -146,6 +160,42 @@ describe.skipIf(!DB_URL)(
           where: { userId_organizationId: { userId: payerUserId, organizationId } },
         });
         expect(reread).toMatchObject({ role: OrganizationUserRole.MEMBER, billingOnly: false });
+      });
+    });
+
+    describe("given only a department edit lands before the correction fails", () => {
+      it("still restores Billing only and keeps the department", async () => {
+        const departmentId = (
+          await prisma.department.create({ data: { organizationId, name: `Finance ${ns}` } })
+        ).id;
+        writeDuringLedgerCall = async () => {
+          await repository.assignMemberDepartment({
+            organizationId,
+            userId: departmentPayerUserId,
+            departmentId,
+          });
+        };
+
+        await expect(
+          repository.updateMemberRole({
+            caller: { type: "system" },
+            organizationId,
+            userId: departmentPayerUserId,
+            role: OrganizationUserRole.MEMBER,
+            effectiveTeamRoleUpdates: [],
+            currentUserId: adminUserId,
+          }),
+        ).rejects.toThrow(LEDGER_DOWN);
+        writeDuringLedgerCall = async () => {};
+
+        const reread = await prisma.organizationUser.findUnique({
+          where: { userId_organizationId: { userId: departmentPayerUserId, organizationId } },
+        });
+        expect(reread).toMatchObject({
+          role: OrganizationUserRole.EXTERNAL,
+          billingOnly: true,
+          departmentId,
+        });
       });
     });
 

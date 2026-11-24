@@ -558,15 +558,16 @@ function useMemberAccessEditor({
   };
 
   useEffect(() => {
-    // A Developer seat (ADR-171) holds nothing shared: every staged row goes,
-    // the way the save deletes every stored one.
-    if (pendingRole === OrganizationUserRole.DEVELOPER) {
+    // Developer (ADR-171) and Billing only (ADR-205) hold nothing shared: every
+    // staged row and draft goes, the way the save deletes every stored one.
+    if (pendingSeat === OrganizationUserRole.DEVELOPER || pendingSeat === BILLING_ONLY_SEAT) {
       setPendingGrantAdditions([]);
+      setHasDraftGrant(false);
       return;
     }
-    if (pendingRole !== OrganizationUserRole.EXTERNAL) return;
+    if (pendingSeat !== OrganizationUserRole.EXTERNAL) return;
     setPendingGrantAdditions(stagedRowsForLiteSeat);
-  }, [pendingRole]);
+  }, [pendingSeat]);
 
   // A role change moves the member between full and Lite seats, so seat usage is re-read too.
   const refreshAccessQueries = () =>
@@ -581,7 +582,8 @@ function useMemberAccessEditor({
     ]);
 
   const handleSave = async () => {
-    const uncommitted = grantInputRef.current?.flush() ?? null;
+    const uncommitted =
+      pendingSeat === BILLING_ONLY_SEAT ? null : (grantInputRef.current?.flush() ?? null);
     const additions = newGrantAdditions({
       staged: uncommitted ? [...pendingGrantAdditions, uncommitted] : pendingGrantAdditions,
       held: directGrants.data ?? [],

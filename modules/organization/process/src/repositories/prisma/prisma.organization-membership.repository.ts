@@ -318,6 +318,25 @@ async function landedInTime(write: () => Promise<unknown>): Promise<boolean> {
   }
 }
 
+/** What the role change left on the row: when it wrote, and the department it found. */
+type WrittenMembership = { at: Date; departmentId: string | null };
+
+/**
+ * The row is as the role change left it, or only its department moved since: a department
+ * edit takes no seat lock and moves `updatedAt`, but undoes nothing the change wrote.
+ */
+function untouchedSinceOrDepartmentOnly(
+  written: WrittenMembership,
+): Prisma.OrganizationUserWhereInput {
+  const departmentMoved: Prisma.OrganizationUserWhereInput[] =
+    written.departmentId === null
+      ? [{ departmentId: { not: null } }]
+      : [{ departmentId: null }, { departmentId: { not: written.departmentId } }];
+  return {
+    OR: [{ updatedAt: written.at }, { updatedAt: { gt: written.at }, OR: departmentMoved }],
+  };
+}
+
 /** Puts the row and seat hold back as the role change found them, unless a later write moved on. */
 async function restoreMembershipRow({
   tx,
@@ -334,7 +353,7 @@ async function restoreMembershipRow({
   previous: {
     role: OrganizationUserRole;
     billingOnly: boolean;
-    writtenAt: Date | null;
+    written: WrittenMembership | null;
     fullSeatSince: Date | null;
     hold: Prisma.SeatHoldGetPayload<object> | null;
     seatColumns: { fullSeatSince?: Date | null };
@@ -347,7 +366,7 @@ async function restoreMembershipRow({
       userId,
       role,
       billingOnly: false,
-      ...(previous.writtenAt ? { updatedAt: previous.writtenAt } : {}),
+      ...(previous.written ? untouchedSinceOrDepartmentOnly(previous.written) : {}),
       ...(seatMoved ? { fullSeatSince: previous.seatColumns.fullSeatSince ?? null } : {}),
     },
     data: {
@@ -2310,7 +2329,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       });
 
       const seatMoves = input.seat !== undefined && input.seat.kind !== "unchanged";
-      let writtenAt: Date | null = null;
+      let written: WrittenMembership | null = null;
       const previousHold = seatMoves
         ? await tx.seatHold.findUnique({
             where: { organizationId_userId: { organizationId, userId } },
@@ -2329,13 +2348,13 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
             userId,
             seat: input.seat,
           });
-          const written = await tx.organizationUser.update({
+          const row = await tx.organizationUser.update({
             where: { userId_organizationId: { userId, organizationId } },
             // Any role change ends Billing only; the new role is metered (ADR-205).
             data: { role, billingOnly: false, ...columns },
-            select: { updatedAt: true },
+            select: { updatedAt: true, departmentId: true },
           });
-          writtenAt = written.updatedAt;
+          written = { at: row.updatedAt, departmentId: row.departmentId };
           return columns;
         },
       });
@@ -2415,7 +2434,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       return {
         role: currentMember.role,
         billingOnly: currentMember.billingOnly,
-        writtenAt,
+        written,
         fullSeatSince: currentMember.fullSeatSince,
         hold: previousHold,
         seatColumns,
@@ -2471,8 +2490,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     previous: {
       role: OrganizationUserRole;
       billingOnly: boolean;
-      /** When the change being reverted wrote the row; a later write moves it on. */
-      writtenAt: Date | null;
+      written: WrittenMembership | null;
       fullSeatSince: Date | null;
       hold: Prisma.SeatHoldGetPayload<object> | null;
       seatColumns: { fullSeatSince?: Date | null };

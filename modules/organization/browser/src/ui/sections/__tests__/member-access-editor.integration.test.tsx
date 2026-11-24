@@ -789,6 +789,22 @@ describe("<MemberAccessEditor/>", () => {
         });
       });
     });
+    describe("when the admin stages a grant on a Lite Member seat, then picks Billing only again", () => {
+      /** @scenario "A Billing-only member is given no team, project or personal workspace" */
+      it("drops the staged grant and leaves nothing to save", () => {
+        renderEditor({ memberRole: OrganizationUserRole.EXTERNAL, memberBillingOnly: true });
+
+        fireEvent.click(screen.getByTestId("org-role-field"));
+        fireEvent.click(screen.getByTestId("stub-add-binding"));
+        expect(screen.getByRole("button", { name: /^save$/i })).not.toBeDisabled();
+
+        mockNextSeat.current = BILLING_ONLY_SEAT;
+        fireEvent.click(screen.getByTestId("org-role-field"));
+
+        expect(screen.getByTestId("billing-only-no-access")).toBeTruthy();
+        expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+      });
+    });
   });
 
   describe("given a member who is not Billing only", () => {
