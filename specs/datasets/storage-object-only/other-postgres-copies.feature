@@ -86,6 +86,12 @@ Feature: Copies of dataset rows outside the records table are removed or moved
       And an upload staged for one of its datasets is removed too
       And the objects go before the rows that name them, so a failed erasure can be run again
 
+    @unit
+    Scenario: An erasure logs each dataset whose objects it removed
+      Given a project with a dataset holding a staged upload
+      When the project's stored dataset content is erased
+      Then one log line names the project, the dataset, how many versions were removed and whether a staged upload was
+
   Rule: Queries and reports stop counting on the records table
 
     # becomes @unit

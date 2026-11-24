@@ -2,6 +2,8 @@
  * Erasure of what a project's datasets keep in object storage. Postgres rows are what point at
  * these objects, so this runs before an erasure deletes them; every removal is idempotent.
  */
+import { createLogger, type Logger } from "@langwatch/observability";
+
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetSingleFileRepository } from "../repositories/dataset-single-file.repository.ts";
 import type { DatasetVersionContentRepository } from "../repositories/dataset-version-content.repository.ts";
@@ -9,6 +11,7 @@ import type { DatasetVersionRepository } from "../repositories/dataset-version.r
 import type { DatasetRepository } from "../repositories/dataset.repository.ts";
 
 const PAGE_SIZE = 100;
+const defaultLogger = createLogger("langwatch:dataset:content-erase");
 
 type DatasetContentEraseServiceOptions = {
   datasets: DatasetRepository;
@@ -16,6 +19,7 @@ type DatasetContentEraseServiceOptions = {
   versions: DatasetVersionRepository;
   versionContent: DatasetVersionContentRepository;
   singleFiles: DatasetSingleFileRepository;
+  logger?: Pick<Logger, "info">;
 };
 
 export class DatasetContentEraseService {
@@ -59,7 +63,8 @@ export class DatasetContentEraseService {
   /** Whatever the layout says, every kind is removed: a converted dataset may keep its old file. */
   private async eraseDataset(key: { projectId: string; datasetId: string }): Promise<void> {
     const { chunks, versions, versionContent, singleFiles, datasets } = this.options;
-    for (const version of await versions.findAll(key)) {
+    const savedVersions = await versions.findAll(key);
+    for (const version of savedVersions) {
       await versionContent.deleteChunks({
         ...key,
         versionId: version.id,
@@ -76,5 +81,9 @@ export class DatasetContentEraseService {
     if (dataset?.stagingKey) {
       await chunks.removeStagedUpload({ projectId: key.projectId, stagingKey: dataset.stagingKey });
     }
+    (this.options.logger ?? defaultLogger).info(
+      { ...key, versions: savedVersions.length, stagedUpload: Boolean(dataset?.stagingKey) },
+      "Erased a dataset's stored content",
+    );
   }
 }
