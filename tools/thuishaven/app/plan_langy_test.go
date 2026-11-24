@@ -346,18 +346,17 @@ func TestEnsureLangyCLI(t *testing.T) {
 			t.Fatalf("container tier built or wrote shims: %v", sup.shells)
 		}
 	})
-}
 
-func TestLangyCLIManualBuildCommand(t *testing.T) {
-	t.Run("restores the default bundle after the native build", func(t *testing.T) {
-		if !strings.HasPrefix(langyCLIManualBuildCommand, langyCLIBuildCommand+"; ") || !strings.HasSuffix(langyCLIManualBuildCommand, "; "+langyCLIRestoreBundleCommand) {
-			t.Fatalf("the hint must run the native build then restore the bundle, got %q", langyCLIManualBuildCommand)
+	// The failure hint is the only place a developer learns the manual build
+	// command, so it must be the plain command, not the log-redirected shell.
+	t.Run("failed build prints a plain manual build hint", func(t *testing.T) {
+		sup := &fakeSupervisor{err: errors.New("build boom")}
+		out := captureStdout(t, func() { run(t, sup, missing, domain.LangyTierHostUnsafe) })
+		if !strings.Contains(out, langyCLIBuildCommand) || !strings.Contains(out, langyCLIRestoreBundleCommand) {
+			t.Fatalf("the hint must name the native build and the bundle restore, got %q", out)
 		}
-	})
-
-	t.Run("has no log redirect or exit capture to paste", func(t *testing.T) {
-		if strings.Contains(langyCLIManualBuildCommand, "rc=$?") || strings.Contains(langyCLIManualBuildCommand, "2>&1") {
-			t.Fatalf("the hint must be a plain command, got %q", langyCLIManualBuildCommand)
+		if strings.Contains(out, "rc=$?") || strings.Contains(out, "exit $rc") || strings.Contains(out, "2>&1") {
+			t.Fatalf("the hint must be a plain command with no exit capture, got %q", out)
 		}
 	})
 }
