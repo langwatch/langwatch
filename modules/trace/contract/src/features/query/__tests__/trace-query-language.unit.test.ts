@@ -982,7 +982,20 @@ describe("buildFacetDisplayLookup", () => {
     ])("leaves it grouped, signed as a click reads it, when %s uses it both ways", (query) => {
       expect(statesOf(query)["status|error"]).toBe("grouped-include");
     });
+  });
 
+  describe("given a term the query both negates as required and names plainly", () => {
+    it.each([
+      ["NOT status:error AND (status:error OR model:x)", "grouped-include"],
+      ["(status:error OR model:x) AND NOT status:error", "grouped-include"],
+      ["status:error AND NOT status:error", "include"],
+      ["NOT status:error AND status:error", "include"],
+    ])("signs it in %s as a click reads it, %s", (query, state) => {
+      expect(statesOf(query)["status|error"]).toBe(state);
+    });
+  });
+
+  describe("when a row's display state is read beside the state its click reads", () => {
     it.each([
       "NOT (status:error AND model:x)",
       "status:error OR model:x",
@@ -990,13 +1003,26 @@ describe("buildFacetDisplayLookup", () => {
       "(NOT status:error AND model:a) OR (status:error AND model:b)",
       "NOT status:error OR (status:error AND model:x)",
       "NOT (model:a AND model:b)",
-    ])("signs each grouped term in %s the way a click reads it", (query) => {
+      "NOT status:error AND (status:error OR model:x)",
+      "(status:error OR model:x) AND NOT status:error",
+      "status:error AND NOT status:error",
+      "NOT (evaluator:abc AND evaluatorVerdict:fail)",
+      "status:error AND NOT (status:error AND model:x)",
+      "NOT ((status:error OR model:x) AND user:u1)",
+      "status:error AND model:x",
+      "NOT (status:error OR model:x)",
+      "status:error OR status:warning",
+      "(NOT status:error AND model:a) OR (NOT status:error AND model:b)",
+    ])("gives every marked term of %s the sign its click reads", (query) => {
       const ast = parse(query);
       for (const [key, state] of buildFacetDisplayLookup(ast)) {
-        if (state !== "grouped-include" && state !== "grouped-exclude") continue;
         const [field = "", value = ""] = key.split("|");
         const clickState = getFacetValueState(ast, field, value);
-        expect(state === "grouped-exclude").toBe(clickState === "exclude");
+        expect(clickState).not.toBe("neutral");
+        expect({ key, negated: state === "exclude" || state === "grouped-exclude" }).toEqual({
+          key,
+          negated: clickState === "exclude",
+        });
       }
     });
   });
