@@ -44,6 +44,7 @@ import {
   fireSsoAutoAdded,
 } from "../rules/nurturing-membership-join-service.rules.ts";
 import {
+  fireEvaluationCompany,
   fireEvaluationCompleted,
   fireFirstTraceIntegrated,
   fireSimulationRunFinished,
@@ -159,7 +160,7 @@ export class NurturingDeliveryService {
     await this.parts.joinedOrganization?.deliver(signal);
     const deliveredClaim = `nurturing:${key}`;
     if (!(await this.deps.claims.claim(deliveredClaim, DELIVERED_WINDOW_SECONDS))) return;
-    this.sendEvaluationCompany(signal);
+    this.sendCustomerIoCalls(fireEvaluationCompany(signal));
     if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
     const memberBatch = await this.memberBatchOf({ signal, deliveredClaim });
     await this.toCustomerIo(signal, deliveredClaim);
@@ -471,27 +472,6 @@ export class NurturingDeliveryService {
         ]),
       )
       .catch(reportFailure);
-  }
-
-  /**
-   * The Company's evaluation facts, sent before the debounce: the person-level update is
-   * debounced per tenant, but a skipped batch must still keep the organization's count current.
-   */
-  private sendEvaluationCompany(signal: NurturingSignal): void {
-    if (signal.kind !== "evaluation_completed" || !signal.organizationId) return;
-    const count = signal.organizationEvaluationCount;
-    this.sendCustomerIoCalls([
-      {
-        type: "group",
-        userId: signal.userId,
-        groupId: signal.organizationId,
-        traits: {
-          has_evaluation_results: true,
-          evaluation_count: count,
-          ...(signal.first ? { first_evaluation_at: unixSecondsOf(signal.occurredAt) } : {}),
-        },
-      },
-    ]);
   }
 
   /** Main's self-hosted CRM: traits on the organization, then one event per raised signal. */

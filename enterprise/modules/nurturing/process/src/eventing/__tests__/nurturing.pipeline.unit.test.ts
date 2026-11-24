@@ -96,6 +96,11 @@ describe("RecordNurturingSignalCommand", () => {
   });
 });
 
+/** The request URL as a string, whichever shape fetch was handed. */
+function urlOf(input: string | URL | Request): string {
+  return input instanceof Request ? input.url : input.toString();
+}
+
 /** Nurturing's pipeline over memory PostHog and a recording Customer.io, as the app composes it. */
 function nurturingOverMemoryPostHog(users: UserApi = createApiFixture<UserApi>({})) {
   const posthog = MemoryPostHogChannel.create();
@@ -260,7 +265,7 @@ describe("nurturing's memberRoleChanged peer subscriber", () => {
 
       expect(customerIoFetch).toHaveBeenCalledTimes(2);
       const sent = customerIoFetch.mock.calls.map(([url, init]) => ({
-        path: String(url).replace(/^.*(?=\/(identify|group)$)/, ""),
+        path: urlOf(url).replace(/^.*(?=\/(identify|group)$)/, ""),
         body: typeof init?.body === "string" ? JSON.parse(init.body) : init?.body,
       }));
       expect(sent).toContainEqual({
@@ -310,7 +315,7 @@ describe("nurturing's memberAdmitted peer subscriber", () => {
 
       expect(customerIoFetch).toHaveBeenCalledTimes(2);
       const sent = customerIoFetch.mock.calls.map(([url, init]) => ({
-        path: String(url).replace(/^.*(?=\/(identify|group)$)/, ""),
+        path: urlOf(url).replace(/^.*(?=\/(identify|group)$)/, ""),
         body: typeof init?.body === "string" ? JSON.parse(init.body) : init?.body,
       }));
       expect(sent).toContainEqual({
