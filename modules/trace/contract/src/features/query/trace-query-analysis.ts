@@ -239,6 +239,32 @@ function markDisplayStates({
 }
 
 /**
+ * The signed keys (`+field|value`, `-field|value`) every result of a subtree must match: both
+ * sides of an AND, only what both sides of an OR share (NOT swaps them, as in `markDisplayStates`).
+ */
+function requiredSignedKeys({ node, negated }: { node: LiqeQuery; negated: boolean }): Set<string> {
+  switch (node.type) {
+    case "Tag":
+      return new Set(rowKeysNamedBy(node).map((key) => `${negated ? "-" : "+"}${key}`));
+    case "UnaryOperator":
+      return requiredSignedKeys({
+        node: node.operand,
+        negated: negated !== isNegation(node.operator),
+      });
+    case "ParenthesizedExpression":
+      return requiredSignedKeys({ node: node.expression, negated });
+    case "LogicalExpression": {
+      const left = requiredSignedKeys({ node: node.left, negated });
+      const right = requiredSignedKeys({ node: node.right, negated });
+      if ((node.operator.operator === "OR") === negated) return new Set([...left, ...right]);
+      return new Set([...left].filter((key) => right.has(key)));
+    }
+    default:
+      return new Set();
+  }
+}
+
+/**
  * What each sidebar row shows, keyed by `${field}|${value}`. A term keeps include or exclude only
  * when every result must match it; one a group makes optional is "grouped" (#9810). Display only:
  * clicks still read `getFacetValueState`.
@@ -246,6 +272,9 @@ function markDisplayStates({
 export function buildFacetDisplayLookup(ast: LiqeQuery): ReadonlyMap<string, FacetDisplayState> {
   const map = new Map<string, FacetDisplayState>();
   markDisplayStates({ node: ast, negated: false, grouped: false, map });
+  for (const signed of requiredSignedKeys({ node: ast, negated: false })) {
+    map.set(signed.slice(1), signed.startsWith("-") ? "exclude" : "include");
+  }
   return map;
 }
 

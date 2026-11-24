@@ -934,6 +934,46 @@ describe("buildFacetDisplayLookup", () => {
     });
   });
 
+  describe("given a term every branch of a group requires", () => {
+    it.each([
+      [
+        "(status:error AND model:a) OR (status:error AND model:b)",
+        { "status|error": "include", "model|a": "grouped", "model|b": "grouped" },
+      ],
+      [
+        "(NOT status:error AND model:a) OR (NOT status:error AND model:b)",
+        { "status|error": "exclude", "model|a": "grouped", "model|b": "grouped" },
+      ],
+      [
+        "NOT (status:error OR model:a) OR NOT (status:error OR model:b)",
+        { "status|error": "exclude", "model|a": "grouped", "model|b": "grouped" },
+      ],
+      [
+        "NOT ((status:error OR model:a) AND (status:error OR model:b))",
+        { "status|error": "exclude", "model|a": "grouped", "model|b": "grouped" },
+      ],
+      [
+        "user:u1 AND ((status:error AND model:a) OR (status:error AND model:b))",
+        {
+          "user|u1": "include",
+          "status|error": "include",
+          "model|a": "grouped",
+          "model|b": "grouped",
+        },
+      ],
+    ])("keeps it marked in %s", (query, expected) => {
+      expect(statesOf(query)).toEqual(expected);
+    });
+
+    it("leaves it grouped when the branches require it with opposite signs", () => {
+      expect(statesOf("(status:error AND model:a) OR (NOT status:error AND model:b)")).toEqual({
+        "status|error": "grouped",
+        "model|a": "grouped",
+        "model|b": "grouped",
+      });
+    });
+  });
+
   describe("given terms every result must match", () => {
     /** @scenario "Values every result must match keep their include or exclude mark" */
     it.each([
