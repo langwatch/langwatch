@@ -38,6 +38,11 @@ const reportedSurface = (entry: ChartFrameLogEntry) => {
   return undefined;
 };
 
+const MAX_CRASH_TITLE_LENGTH = 200;
+
+/** Widget author text may quote trace values, so a crash report keeps its first line, cut short. */
+const crashTitle = (text: string) => (text.split("\n")[0] ?? "").slice(0, MAX_CRASH_TITLE_LENGTH);
+
 export function useFrameDiagnostic({
   /** Identifies one run of the code (code and retry attempt); a change clears the last error. */
   resetKey,
@@ -73,7 +78,7 @@ export function useFrameDiagnostic({
     reported.current.add(entry.text);
     // A string, not an Error: the host's stack would point at this file, not the widget.
     reporting.current.analytics.captureException({
-      error: entry.text,
+      error: surface === "dashboard_widget_frame" ? crashTitle(entry.text) : entry.text,
       properties: { surface, ...reporting.current.crashContext },
     });
   }, []);

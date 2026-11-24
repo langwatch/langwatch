@@ -44,6 +44,25 @@ describe("redactCrashText", () => {
 });
 
 describe("redactCrashError", () => {
+  describe("given a 200 KB digit-free message and stack", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("redacts a huge digit-free crash quickly, still masking a token near the start", () => {
+      const huge = `token=abc123 ${"a".repeat(200_000)}`;
+      const error = new Error(huge);
+      error.stack = huge;
+
+      const startedAt = performance.now();
+      const redacted = redactCrashError(error);
+      const elapsedMs = performance.now() - startedAt;
+
+      expect(elapsedMs).toBeLessThan(200);
+      expect(redacted.message.startsWith("token=[redacted] ")).toBe(true);
+      expect(redacted.message.length).toBeLessThanOrEqual(500 + " [truncated]".length);
+      expect(redacted.stack?.startsWith("token=[redacted] ")).toBe(true);
+      expect(redacted.stack?.length).toBeLessThanOrEqual(4_000 + " [truncated]".length);
+    });
+  });
+
   describe("given an error whose message and stack carry a token", () => {
     /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
     it("keeps its name and frames and masks the token in both", () => {

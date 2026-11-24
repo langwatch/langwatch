@@ -211,6 +211,42 @@ describe("given a placed dashboard widget whose frame reports an error", () => {
     });
   });
 
+  describe("when the crash text runs over several lines", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports only the first line", () => {
+      const analytics = new RecordingUiAnalytics();
+      renderWithDesignSystem(reportingWidget(analytics));
+
+      act(() => {
+        lastFrameProps().onLog({
+          level: "error",
+          source: "lw.error",
+          text: "Render error: x is undefined\n  at row value secret-ish",
+        });
+      });
+
+      expect(analytics.exceptions[0]?.error).toBe("Render error: x is undefined");
+    });
+  });
+
+  describe("when the crash text is one very long line", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports at most 200 characters", () => {
+      const analytics = new RecordingUiAnalytics();
+      renderWithDesignSystem(reportingWidget(analytics));
+
+      act(() => {
+        lastFrameProps().onLog({
+          level: "error",
+          source: "lw.error",
+          text: `Render error: ${"x".repeat(500)}`,
+        });
+      });
+
+      expect(String(analytics.exceptions[0]?.error).length).toBeLessThanOrEqual(200);
+    });
+  });
+
   describe("when the frame's own libraries do not load", () => {
     /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
     it("reports it under the frame's load surface", () => {

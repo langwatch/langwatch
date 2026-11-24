@@ -22,10 +22,19 @@ const MASKS: readonly (readonly [RegExp, string])[] = [
   [/(?=[A-Za-z0-9+_-]*\d)[A-Za-z0-9+_-]{40,}={0,2}/g, "[redacted]"],
 ];
 
+// The base64 mask is quadratic on long digit-free text, so masking only sees a bounded prefix.
+// The margin keeps a token that straddles the limit whole enough to be masked.
+const PRE_CUT_MARGIN = 256;
+
 /** The text with tokens, emails and long encoded runs masked, then cut to `limit`. */
 export function redactCrashText({ text, limit }: { text: string; limit: number }): string {
-  const masked = MASKS.reduce((current, [pattern, mask]) => current.replace(pattern, mask), text);
-  return masked.length > limit ? masked.slice(0, limit) + TRUNCATED : masked;
+  const bounded = text.slice(0, limit + PRE_CUT_MARGIN);
+  const wasCut = bounded.length < text.length;
+  const masked = MASKS.reduce(
+    (current, [pattern, mask]) => current.replace(pattern, mask),
+    bounded,
+  );
+  return wasCut || masked.length > limit ? masked.slice(0, limit) + TRUNCATED : masked;
 }
 
 /** A copy of the crash, message and stack redacted; a string becomes an Error with no stack. */
