@@ -41,6 +41,11 @@ declare const window: {
 const DEFAULT_HEIGHT = "100%";
 const MIN_FILL_HEIGHT_PX = 120;
 
+/** The floor a filling chart keeps; a height the widget passes is kept as given. */
+function fillFloor(height: number | string): { minHeight?: number } {
+  return height === DEFAULT_HEIGHT ? { minHeight: MIN_FILL_HEIGHT_PX } : {};
+}
+
 /** Resolved by the host before crossing the opaque iframe boundary. */
 function token(name: string): string {
   const value = window.LW?.dashboardContext?.colors?.[name];
@@ -762,7 +767,7 @@ export function AreaTimeseries({
       { style: { flex: 1, minHeight: 0 } },
       h(
         R.ResponsiveContainer,
-        { width: "100%", height: "100%", minHeight: MIN_FILL_HEIGHT_PX },
+        { width: "100%", height: "100%", ...fillFloor(height) },
         h(
           R.ComposedChart,
           { data: rows, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
@@ -862,7 +867,7 @@ export function StackedBars({
       { style: { flex: 1, minHeight: 0 } },
       h(
         R.ResponsiveContainer,
-        { width: "100%", height: "100%", minHeight: MIN_FILL_HEIGHT_PX },
+        { width: "100%", height: "100%", ...fillFloor(height) },
         h(
           R.BarChart,
           { data, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
@@ -933,7 +938,7 @@ export function GroupedBars({
       { style: { flex: 1, minHeight: 0 } },
       h(
         R.ResponsiveContainer,
-        { width: "100%", height: "100%", minHeight: MIN_FILL_HEIGHT_PX },
+        { width: "100%", height: "100%", ...fillFloor(height) },
         h(
           R.BarChart,
           { data, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
@@ -1000,7 +1005,7 @@ export function ProjectionBars({
 
   return h(
     R.ResponsiveContainer,
-    { width: "100%", height, minHeight: MIN_FILL_HEIGHT_PX },
+    { width: "100%", height, ...fillFloor(height) },
     h(
       R.BarChart,
       { data, margin: { top: 6, right: 8, bottom: 0, left: 0 } },
@@ -1095,7 +1100,7 @@ export function Donut({
       { style: { flex: 1, minHeight: 0, position: "relative", width: "100%" } },
       h(
         R.ResponsiveContainer,
-        { width: "100%", height: "100%", minHeight: MIN_FILL_HEIGHT_PX },
+        { width: "100%", height: "100%", ...fillFloor(height) },
         h(
           R.PieChart,
           {},

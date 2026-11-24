@@ -384,8 +384,10 @@ describe("given a recorded answer that carries a timeseries card", () => {
   it("draws the chart, never the missing-renderer line", () => {
     renderMessage(assistantMessage({ parts: [timeseries], metadata: recorded }));
 
+    const [frame] = derivedFrames();
     expect(derivedFrames()).toHaveLength(1);
     expect(screen.getByText("Hours saved per day")).toBeDefined();
+    expect(frame?.querySelector(".recharts-responsive-container")).not.toBeNull();
     expect(screen.queryByText("No chart renderer configured.")).toBeNull();
   });
 });

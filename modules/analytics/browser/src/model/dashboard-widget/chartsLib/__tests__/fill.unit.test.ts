@@ -108,4 +108,23 @@ describe("a chart with no height", () => {
 
     expect(area.props?.style).toMatchObject({ height: 180 });
   });
+
+  /** @scenario "AC262 Langy widgets: a prebuilt chart with no height fills its card" */
+  it("keeps a passed height below the floor, without the fill floor", () => {
+    const area = root(AreaTimeseries({ data: rows, x: "day", series: "traces", height: 80 }));
+    const projection = root(
+      ProjectionBars({
+        data: rows,
+        x: "day",
+        y: "traces",
+        projectionFrom: "2026-11-02 00:00:00",
+        height: 80,
+      }),
+    );
+
+    expect(area.props?.style).toMatchObject({ height: 80 });
+    expect(containers(area)[0]?.props).not.toHaveProperty("minHeight");
+    expect(containers(projection)[0]?.props).toMatchObject({ height: 80 });
+    expect(containers(projection)[0]?.props).not.toHaveProperty("minHeight");
+  });
 });
