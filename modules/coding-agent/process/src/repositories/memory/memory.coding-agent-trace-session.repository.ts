@@ -32,18 +32,22 @@ export class MemoryCodingAgentTraceSessionRepository extends CodingAgentTraceSes
     );
   }
 
-  async findLatestBySessionId(input: {
+  async findRecentBySessionId(input: {
     tenantId: string;
     sessionId: string;
     fromMs: number;
     toMs: number;
-  }): Promise<CodingAgentTraceSessionRecord | null> {
-    let latest: CodingAgentTraceSessionRecord | null = null;
-    for (const record of this.memory.traceSessions.values()) {
-      if (record.tenantId !== input.tenantId || record.sessionId !== input.sessionId) continue;
-      if (record.occurredAtMs < input.fromMs || record.occurredAtMs > input.toMs) continue;
-      if (latest === null || record.occurredAtMs > latest.occurredAtMs) latest = record;
-    }
-    return latest;
+    limit: number;
+  }): Promise<CodingAgentTraceSessionRecord[]> {
+    return [...this.memory.traceSessions.values()]
+      .filter(
+        (record) =>
+          record.tenantId === input.tenantId &&
+          record.sessionId === input.sessionId &&
+          record.occurredAtMs >= input.fromMs &&
+          record.occurredAtMs <= input.toMs,
+      )
+      .toSorted((a, b) => b.occurredAtMs - a.occurredAtMs || a.traceId.localeCompare(b.traceId))
+      .slice(0, input.limit);
   }
 }

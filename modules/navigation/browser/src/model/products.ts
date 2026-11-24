@@ -1,5 +1,6 @@
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+import { CODING_AGENTS_PATH, RETIRED_PERSONAL_PATH } from "@langwatch/user-contract";
 import {
   Boxes,
   Building2,
@@ -53,11 +54,11 @@ export const PRODUCTS: readonly ProductDefinition[] = [
   },
   {
     id: "me",
-    label: "Me",
+    label: "Coding agents",
     pitch: "Track your coding assistants",
     icon: UserRound,
     scopeKind: "personal",
-    homeHref: () => "/me",
+    homeHref: () => CODING_AGENTS_PATH,
     gates: [{ flag: "release_ui_ai_governance_enabled", closesPages: true }],
   },
   {
@@ -129,7 +130,7 @@ export function isOrganizationScopedProduct(id: ProductId | null): boolean {
 /**
  * Whether an address is a top-level base or sits under it, matched on the
  * segment boundary — a plain `startsWith` would read a project slug like
- * "metadata" as the Me product, since slugs aren't reserved names.
+ * "metadata" as the old /me address, since slugs aren't reserved names.
  */
 export function isPathUnder({ pathname, base }: { pathname: string; base: string }): boolean {
   return pathname === base || pathname.startsWith(`${base}/`);
@@ -141,7 +142,14 @@ export function isPathUnder({ pathname, base }: { pathname: string; base: string
  * through this, so a null keeps the previous product remembered.
  */
 export function productFromPathname(pathname: string): ProductId | null {
-  if (isPathUnder({ pathname, base: "/me" })) return "me";
+  // The legacy /me address is still this product for the one render its
+  // redirect to /coding-agents takes, so landing memory is not overwritten.
+  if (
+    isPathUnder({ pathname, base: CODING_AGENTS_PATH }) ||
+    isPathUnder({ pathname, base: RETIRED_PERSONAL_PATH })
+  ) {
+    return "me";
+  }
   if (isPathUnder({ pathname, base: "/gateway" })) return "gateway";
   if (isPathUnder({ pathname, base: "/governance" })) return "governance";
   const nonProductPrefixes = [

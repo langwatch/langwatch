@@ -374,6 +374,72 @@ describe("<SuiteFormDrawer/>", () => {
     });
   });
 
+  describe("given a run plan saved with a judge trace wait", () => {
+    beforeEach(() => {
+      mocks.mockDrawerParams = { suiteId: "suite_1" };
+      mocks.mockGetByIdData = makeSuiteConfig({
+        traceQuietPeriodMs: 12_000,
+        traceWaitTimeoutMs: null,
+      });
+    });
+
+    /** @scenario "The judge settings show the trace wait inputs in seconds" */
+    it("opens the advanced judge settings on the stored values, in seconds", () => {
+      renderWithDesignSystem(<SuiteFormDrawer />);
+
+      expect((screen.getByLabelText("Quiet period") as HTMLInputElement).value).toBe("12");
+      const wait = screen.getByLabelText("Max trace wait") as HTMLInputElement;
+      expect(wait.value).toBe("");
+      expect(wait.placeholder).toBe("30");
+    });
+
+    describe("when the max trace wait is set to 90 seconds and saved", () => {
+      it("sends both settings in milliseconds", async () => {
+        const user = userEvent.setup();
+        renderWithDesignSystem(<SuiteFormDrawer />);
+
+        await user.type(screen.getByLabelText("Max trace wait"), "90");
+        await user.click(screen.getByRole("button", { name: /^Save$/i }));
+
+        expect(mocks.mockUpdateMutate).toHaveBeenCalledTimes(1);
+        const payload = mocks.mockUpdateMutate.mock.calls[0]![0];
+        expect(payload.traceQuietPeriodMs).toBe(12_000);
+        expect(payload.traceWaitTimeoutMs).toBe(90_000);
+      });
+    });
+
+    describe("when the quiet period is cleared and saved", () => {
+      it("sends it as unset", async () => {
+        const user = userEvent.setup();
+        renderWithDesignSystem(<SuiteFormDrawer />);
+
+        await user.clear(screen.getByLabelText("Quiet period"));
+        await user.click(screen.getByRole("button", { name: /^Save$/i }));
+
+        const payload = mocks.mockUpdateMutate.mock.calls[0]![0];
+        expect(payload.traceQuietPeriodMs).toBeNull();
+        expect(payload.traceWaitTimeoutMs).toBeNull();
+      });
+    });
+
+    describe("when the quiet period is out of range", () => {
+      it("refuses the save and says why under the input", async () => {
+        const user = userEvent.setup();
+        renderWithDesignSystem(<SuiteFormDrawer />);
+
+        const quiet = screen.getByLabelText("Quiet period");
+        await user.clear(quiet);
+        await user.type(quiet, "61");
+        await user.click(screen.getByRole("button", { name: /^Save$/i }));
+
+        expect(mocks.mockUpdateMutate).not.toHaveBeenCalled();
+        expect(
+          screen.getByText("Quiet period must be between 0 and 60 seconds"),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("given the scenario search box", () => {
     describe("when a search query is typed", () => {
       it("filters the visible scenarios", async () => {

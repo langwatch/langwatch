@@ -5,9 +5,9 @@
  */
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
-import { screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost, type StubAnalyticsHostOptions } from "../../../testing.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
@@ -64,6 +64,9 @@ function hostOpening({
     ...options,
   });
 }
+
+// Unmounting disposes each chart frame, whose heartbeat timer would otherwise outlive jsdom.
+afterEach(cleanup);
 
 describe("the Dashboards screens", () => {
   describe("given the release_dashboards flag is off for the project", () => {

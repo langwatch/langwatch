@@ -96,6 +96,26 @@ interface SendInput {
 }
 
 describe("given the dashboard widget REST family", () => {
+  describe("when a widget is created without a size", () => {
+    /** @scenario "A dashboard widget created without a size lands four columns by five board rows" */
+    it("is four columns by five rows", async () => {
+      const key = mountKey();
+
+      const created = await key.create({
+        name: "Traces",
+        code: CODE,
+        queries: [{ name: "t", sql: SQL }],
+      });
+
+      // Literal on purpose: a constant-derived expectation would follow a regression.
+      expect({
+        status: created.status,
+        colSpan: created.json.colSpan,
+        rowSpan: created.json.rowSpan,
+      }).toEqual({ status: 201, colSpan: 4, rowSpan: 5 });
+    });
+  });
+
   describe("when a widget is created with an invalid parameter declaration", () => {
     /** @scenario "Creating a widget over the API refuses a reserved or prototype parameter name" */
     it.each(["dashboard_context_since", "__proto__"])(

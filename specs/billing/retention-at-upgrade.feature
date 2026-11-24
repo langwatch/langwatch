@@ -19,6 +19,12 @@ Feature: Data retention choice in the Growth upgrade dialog
     And the dialog says "You can change the retention period anytime"
 
   @unit
+  Scenario: The data retention comes after the price
+    Then the dialog shows the full seats first
+    And then the monthly price with the included events and the invite line
+    And then the data retention picker with "You can change the retention period anytime"
+
+  @unit
   Scenario: A shorter retention is included too
     When the administrator picks "30 days"
     Then the dialog says "Included in Growth"

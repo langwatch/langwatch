@@ -2,7 +2,7 @@
  * LangWatchQL analytics SQL — the identifier guard.
  * @see ../services/langwatch-ql-access-model.service.ts — the access model, as statements
  */
-import { SAFE_IDENTIFIER } from "../rules/langwatch-ql-sql-literal.rules.ts";
+import { assertSafeIdentifier } from "../rules/langwatch-ql-sql-literal.rules.ts";
 
 /**
  * Column-name shape, which unlike a table name may carry dots. ClickHouse's nested columns are
@@ -24,11 +24,7 @@ export class LangWatchQLSqlTextService {
    * than only that one was.
    */
   assertIdentifier(value: string, role: string): string {
-    if (!SAFE_IDENTIFIER.test(value)) {
-      throw new Error(`lwql: ${role} must match ${String(SAFE_IDENTIFIER)}, got "${value}"`);
-    }
-
-    return value;
+    return assertSafeIdentifier({ value, role });
   }
 
   /**

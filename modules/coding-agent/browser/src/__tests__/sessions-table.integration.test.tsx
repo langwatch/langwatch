@@ -16,7 +16,7 @@ const { queryImpls, utils } = vi.hoisted(() => ({
       conversationContext: { fetch: vi.fn(), prefetch: vi.fn() },
     },
     codingAgents: {
-      lastTurn: { fetch: vi.fn() },
+      lastTurn: { fetch: vi.fn(), prefetch: vi.fn() },
     },
   },
 }));
@@ -305,20 +305,20 @@ describe("the personal Sessions table", () => {
   });
 
   describe("given a session whose agent never generated a title", () => {
-    /** @scenario "A session with no title reads as untitled" */
-    it("names it as an untitled session and still says where it ran", () => {
+    /** @scenario "A session with no title is named by its agent and the day it started" */
+    it("names it by its agent and start day and still says where it ran", () => {
       pinSessions([sessionRow({ title: null })]);
 
       renderTable();
 
-      expect(screen.getByText("Untitled session")).toBeInTheDocument();
+      expect(screen.getByText(/^Claude Code session · \w{3} \d{1,2}/)).toBeInTheDocument();
       expect(screen.getByText("acme/widgets · feat/git-context")).toBeInTheDocument();
     });
   });
 
   describe("given a pi session, whose spans carry no prompt and no title", () => {
-    /** @scenario "A pi session falls back to untitled rather than to a span name" */
-    it("names it as an untitled session, never after a span name or pi's session id", () => {
+    /** @scenario "A pi session falls back to its agent's name rather than to a span name" */
+    it("names it by its agent, never after a span name or pi's session id", () => {
       const sessionId = "0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
       pinSessions([
         sessionRow({
@@ -332,7 +332,7 @@ describe("the personal Sessions table", () => {
 
       renderTable();
 
-      expect(screen.getByText("Untitled session")).toBeInTheDocument();
+      expect(screen.getByText(/^pi session/)).toBeInTheDocument();
       expect(screen.queryByText(/pi\.harness|pi\.ai\.request/)).not.toBeInTheDocument();
       expect(screen.queryByText(sessionId)).not.toBeInTheDocument();
     });
@@ -644,9 +644,9 @@ describe("the personal Sessions table", () => {
 
       await user.hover(screen.getByText("Link sessions to pull requests"));
 
-      expect(utils.traces.conversationContext.prefetch).toHaveBeenCalledWith({
+      expect(utils.codingAgents.lastTurn.prefetch).toHaveBeenCalledWith({
         projectId: "proj-personal",
-        conversationId: "session-1",
+        sessionId: "session-1",
       });
     });
 
@@ -695,6 +695,31 @@ describe("the personal Sessions table", () => {
         sessionId: "session-1",
       });
       expect(host.recording.infos).toEqual([]);
+    });
+
+    /** @scenario "The replay opens on the session's newest stored turn, not the first page of its history" */
+    it("opens the session's newest stored trace over the last turn of the first conversation page", async () => {
+      utils.codingAgents.lastTurn.fetch.mockResolvedValue({
+        traceId: "trace-newest",
+        occurredAtMs: LONG_AGO + 90_000,
+      });
+      const user = userEvent.setup();
+      renderTable();
+
+      await user.click(screen.getByText("Link sessions to pull requests"));
+
+      await waitFor(() =>
+        expect(writtenQueries()).toEqual([
+          {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": "trace-newest",
+            "drawer.t": String(LONG_AGO + 90_000),
+            "drawer.mode": "terminal",
+            "drawer.projectId": "proj-personal",
+          },
+        ]),
+      );
+      expect(utils.traces.conversationContext.fetch).not.toHaveBeenCalled();
     });
 
     /** @scenario "A session link opens that session's terminal replay" */
@@ -957,10 +982,9 @@ describe("the group project's Sessions table", () => {
 
       await user.hover(screen.getByText("Session from member B"));
 
-      expect(utils.traces.conversationContext.prefetch).toHaveBeenCalledWith({
-        projectId: "proj-group",
-        conversationId: "shared",
-        tenantId: "member-b",
+      expect(utils.codingAgents.lastTurn.prefetch).toHaveBeenCalledWith({
+        projectId: "member-b",
+        sessionId: "shared",
       });
     });
   });

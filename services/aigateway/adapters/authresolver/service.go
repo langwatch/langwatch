@@ -75,6 +75,9 @@ const (
 	ChangeKindCacheRuleCreated       = "CACHE_RULE_CREATED"
 	ChangeKindCacheRuleUpdated       = "CACHE_RULE_UPDATED"
 	ChangeKindCacheRuleDeleted       = "CACHE_RULE_DELETED"
+	ChangeKindA2ATargetCreated       = "A2A_TARGET_CREATED"
+	ChangeKindA2ATargetUpdated       = "A2A_TARGET_UPDATED"
+	ChangeKindA2ATargetDeleted       = "A2A_TARGET_DELETED"
 )
 
 // CacheChange is one cache-invalidation hint surfaced by ChangePoller.
@@ -195,7 +198,14 @@ type orgCursor struct {
 	// answered (zero until the first one); the fail-closed rule reads it from
 	// request goroutines.
 	polledAt atomic.Int64
+	// pending lists the keys denied from pages since the backlog began;
+	// the page that ends it promotes them (revocation.go, promotePending).
+	pending map[string]struct{}
 }
+
+// changeFeedPageSize is the most events one /changes answer carries: the
+// control plane's CHANGES_PAGE. A full page means more are waiting.
+const changeFeedPageSize = 500
 
 func newOrgCursor() *orgCursor {
 	return &orgCursor{since: "0"}
@@ -732,6 +742,9 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 			case <-ctx.Done():
 			}
 		}
+	}
+	if errors.Is(err, errPendingDenial) {
+		return s.reaskVoided(ctx, key, h)
 	}
 	if errors.Is(err, domain.ErrAuthUpstream) {
 		s.countRefusal(answer.bundle.VirtualKeyID, refusalFailClosed)
@@ -1345,19 +1358,38 @@ func (s *Service) orgChangeFeedLoop(ctx context.Context, orgID string, cursor *o
 }
 
 // pollOrgChanges runs one long poll for an org and applies what it returns.
+// A page's denials stay pending while it is applied, and past it while it is
+// full (a replay or a reconnect), until a shorter page or an empty poll ends
+// the backlog: a later event may still re-enable the key.
 func (s *Service) pollOrgChanges(ctx context.Context, orgID string, cursor *orgCursor) error {
 	changes, nextRev, err := s.changePoller.PollChanges(ctx, orgID, cursor.since)
 	if err != nil {
 		return err
 	}
+	backlog := len(changes) >= changeFeedPageSize
 	for _, ch := range changes {
-		s.applyChange(orgID, ch)
+		if deniesKey(ch.Kind) && ch.VirtualKeyID != "" {
+			cursor.notePending(ch.VirtualKeyID)
+		}
+		s.applyFeedChange(orgID, ch, true)
+	}
+	if !backlog && len(cursor.pending) > 0 {
+		s.promotePending(cursor.pending)
+		cursor.pending = nil
 	}
 	if nextRev != "" {
 		cursor.since = nextRev
 	}
 	cursor.polledAt.Store(monoStamp(0))
 	return nil
+}
+
+// notePending records a key denied from a change-feed page.
+func (c *orgCursor) notePending(vkID string) {
+	if c.pending == nil {
+		c.pending = map[string]struct{}{}
+	}
+	c.pending[vkID] = struct{}{}
 }
 
 // isStopping reports, without blocking, whether the service is shutting down.
@@ -1394,42 +1426,19 @@ func (s *Service) waitUnlessStopping(ctx context.Context, d time.Duration) bool 
 // label per branch collapsed distinct kinds onto one word, and a delete
 // that logs "updated" is worse than no label at all.
 func (s *Service) applyChange(organizationID string, ch CacheChange) {
+	s.applyFeedChange(organizationID, ch, false)
+}
+
+// applyFeedChange is applyChange for an event read from a change-feed page
+// when pending is set: its denial is pending (revocation.go, denyPending).
+func (s *Service) applyFeedChange(organizationID string, ch CacheChange, pending bool) {
 	keepLastKnown := !revokesKey(ch.Kind)
-	if ch.Kind == ChangeKindVirtualKeyEnabled && ch.VirtualKeyID != "" {
-		s.clearDenial(ch.VirtualKeyID, "re_enable")
-	}
-	if deniesKey(ch.Kind) && ch.VirtualKeyID != "" {
-		// Deny before evicting: a refresh racing this event either finds the
-		// denial when its answer is gated, or is evicted below.
-		s.deny(ch.VirtualKeyID, ch.Kind)
-	}
+	// Deny before evicting: a refresh racing this event either finds the
+	// denial when its answer is gated, or is evicted below.
+	s.applyDenial(ch, pending)
 	switch ch.Kind {
 	case ChangeKindProviderBindingUpdated:
-		// The control plane emits ModelProvider.id. Config materialization puts
-		// that same ID in Credential.ID; ProviderID is only the provider type
-		// (for example "openai") and is not a cache invalidation join key.
-		//
-		// Matching on the id alone only reaches bundles that already carry
-		// the provider. A provider that was just created, enabled, or granted
-		// a wider scope is in no bundle yet, yet it can join the chain of any
-		// key in its organization, so every bundle of the polled organization
-		// is evicted too. Without that, a key keeps answering
-		// model_provider_not_bound for the new provider until the 60 second
-		// ETag revalidation catches up.
-		if ch.ModelProviderID == "" {
-			return
-		}
-		s.evictWhere(func(b *domain.Bundle) bool {
-			if organizationID != "" && b.OrganizationID == organizationID {
-				return true
-			}
-			for _, c := range b.Config.Credentials {
-				if c.ID == ch.ModelProviderID {
-					return true
-				}
-			}
-			return false
-		}, evictScope{reason: evictReason(ch.Kind), target: ch.ModelProviderID, keepLastKnown: keepLastKnown, guard: providerGuard(organizationID, ch.ModelProviderID)})
+		s.evictForProvider(organizationID, ch, keepLastKnown)
 	case ChangeKindBudgetUpdated:
 		// Every debit emits this, so evicting would put a control-plane round
 		// trip in front of the project's next request. The cached bundle keeps
@@ -1461,6 +1470,13 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
 		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown, guard: []string{orgScope(organizationID)}})
+	case ChangeKindA2ATargetCreated, ChangeKindA2ATargetUpdated, ChangeKindA2ATargetDeleted:
+		// A2A targets ride every bundle of the organization (org-wide and
+		// project ones alike). The block switch must reach callers now, so a
+		// failed refetch never falls back to the bundle that still allowed it.
+		s.evictWhere(func(b *domain.Bundle) bool {
+			return b.OrganizationID == organizationID
+		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: false, guard: []string{orgScope(organizationID)}})
 	case ChangeKindVirtualKeyCreated:
 		// Nothing to evict: a key nobody has resolved yet is in no cache, on
 		// this node or any other. Named rather than left to the default so a
@@ -1478,6 +1494,48 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 			zap.String("kind", ch.Kind),
 			zap.String("organization_id", organizationID),
 		)
+	}
+}
+
+// evictForProvider evicts the bundles a provider change reaches.
+func (s *Service) evictForProvider(organizationID string, ch CacheChange, keepLastKnown bool) {
+	// The control plane emits ModelProvider.id. Config materialization puts
+	// that same ID in Credential.ID; ProviderID is only the provider type
+	// (for example "openai") and is not a cache invalidation join key.
+	//
+	// Matching on the id alone only reaches bundles that already carry
+	// the provider. A provider that was just created, enabled, or granted
+	// a wider scope is in no bundle yet, yet it can join the chain of any
+	// key in its organization, so every bundle of the polled organization
+	// is evicted too. Without that, a key keeps answering
+	// model_provider_not_bound for the new provider until the 60 second
+	// ETag revalidation catches up.
+	if ch.ModelProviderID == "" {
+		return
+	}
+	s.evictWhere(func(b *domain.Bundle) bool {
+		if organizationID != "" && b.OrganizationID == organizationID {
+			return true
+		}
+		for _, c := range b.Config.Credentials {
+			if c.ID == ch.ModelProviderID {
+				return true
+			}
+		}
+		return false
+	}, evictScope{reason: evictReason(ch.Kind), target: ch.ModelProviderID, keepLastKnown: keepLastKnown, guard: providerGuard(organizationID, ch.ModelProviderID)})
+}
+
+// applyDenial records or lifts the denial a key event carries.
+func (s *Service) applyDenial(ch CacheChange, pending bool) {
+	switch {
+	case ch.VirtualKeyID == "":
+	case ch.Kind == ChangeKindVirtualKeyEnabled:
+		s.clearDenial(ch.VirtualKeyID, "re_enable")
+	case deniesKey(ch.Kind) && pending:
+		s.denyPending(ch.VirtualKeyID, ch.Kind)
+	case deniesKey(ch.Kind):
+		s.deny(ch.VirtualKeyID, ch.Kind)
 	}
 }
 

@@ -5,7 +5,7 @@
 
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
-import { type ScopeAssignment } from "@langwatch/data-retention-contract";
+import { type ScopeAssignment, type StoredApplyStatus } from "@langwatch/data-retention-contract";
 import { Card } from "@langwatch/design-system/card";
 import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -58,6 +58,7 @@ import {
   type RetentionScopeGroup,
 } from "../../model/retention-grouping.ts";
 import { retentionRemovalPreviewQuery } from "../../model/retention-removal-preview.ts";
+import { storedApplyLabel } from "../../model/stored-retention-copy.ts";
 import { AddOverrideDrawer, type RetentionEditTarget } from "../blocks/add-override-drawer.tsx";
 import { ApplyStoredRetentionDialog } from "../blocks/apply-stored-retention-dialog.tsx";
 import { RemoveScopeConfirmDialog } from "../blocks/remove-scope-confirm-dialog.tsx";
@@ -367,6 +368,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
             ruleCount={snapshot.rules.length}
             defaultDays={snapshot.effective.traces}
             scopeGroups={scopeGroups}
+            storedApply={snapshot.storedApply}
             canWrite={canWrite}
             onAdd={() => setDrawerOpen(true)}
             onEdit={openEditForGroup}
@@ -474,6 +476,8 @@ type RetentionPolicyListProps = {
   /** With no policies written, the effective value is the deployment's platform default. */
   defaultDays: number;
   scopeGroups: RetentionScopeGroup[];
+  /** Per scope with a recorded change, whether that change reached stored data. */
+  storedApply: readonly StoredApplyStatus[];
   canWrite: boolean;
   onAdd: () => void;
   onEdit: (group: RetentionScopeGroup) => void;
@@ -485,11 +489,15 @@ function RetentionPolicyList({
   ruleCount,
   defaultDays,
   scopeGroups,
+  storedApply,
   canWrite,
   onAdd,
   onEdit,
   onRemove,
 }: RetentionPolicyListProps) {
+  const applyByScope = new Map(
+    storedApply.map((status) => [`${status.scopeType}:${status.scopeId}`, status]),
+  );
   if (ruleCount === 0) {
     return (
       <NoDataInfoBlock
@@ -523,12 +531,14 @@ function RetentionPolicyList({
         <ListTable.Row>
           <ListTable.ColumnHeader>Scope</ListTable.ColumnHeader>
           <ListTable.ColumnHeader>Policy</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Stored data</ListTable.ColumnHeader>
           <ListTable.ActionHeader />
         </ListTable.Row>
       </ListTable.Header>
       <ListTable.Body>
         {scopeGroups.map((group) => {
           const Icon = SCOPE_ICON[group.scopeType];
+          const applied = applyByScope.get(`${group.scopeType}:${group.scopeId}`);
           return (
             <ListTable.Row key={`${group.scopeType}:${group.scopeId}`}>
               <ListTable.Cell>
@@ -543,6 +553,17 @@ function RetentionPolicyList({
                 </HStack>
               </ListTable.Cell>
               <ListTable.Cell>{renderPolicyValue(group.byCategory)}</ListTable.Cell>
+              <ListTable.Cell>
+                {applied && (
+                  <Text
+                    fontSize="sm"
+                    color={applied.status === "applied" ? "fg.muted" : "orange.fg"}
+                    data-testid="stored-apply-status"
+                  >
+                    {storedApplyLabel(applied)}
+                  </Text>
+                )}
+              </ListTable.Cell>
               <ListTable.ActionCell>
                 {canWrite && (
                   <Menu.Root>

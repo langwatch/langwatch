@@ -13478,6 +13478,15 @@
           "documentation": ""
         },
         {
+          "name": "CiFollowUpsInARow",
+          "columnName": "ciFollowUpsInARow",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Messages CI started on a pull request since the person last wrote."
+        },
+        {
           "name": "CreatedAt",
           "columnName": "createdAt",
           "type": "Float",
@@ -13920,6 +13929,88 @@
           "isList": false,
           "isOptional": false,
           "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "LangyPullRequest",
+      "tableName": "LangyPullRequest",
+      "documentation": "One pull request Langy opened, from the answer whose `gh pr create` printed it. Finished\nchecks look it up by repository and number to wake the conversation; the daily pull request\ncap counts a person's rows by day. Rebuilt by a projection replay.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "RepositoryFullName",
+          "columnName": "repositoryFullName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "`owner/repo`, lowercased: GitHub matches repository names without case."
+        },
+        {
+          "name": "PrNumber",
+          "columnName": "prNumber",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "ConversationId",
+          "columnName": "conversationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "UserId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The conversation's owner, who opened it through Langy."
+        },
+        {
+          "name": "OpenedAt",
+          "columnName": "openedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "When the answer that opened it was recorded (epoch ms)."
+        },
+        {
+          "name": "SourceEventId",
+          "columnName": "sourceEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The agent_responded event it came from."
         }
       ]
     },
@@ -15637,6 +15728,142 @@
           "name": "updatedAt",
           "columnName": "updatedAt",
           "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "RetentionApplyStatus",
+      "tableName": "RetentionApplyStatus",
+      "documentation": "",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "scopeType",
+          "columnName": "scopeType",
+          "type": "RetentionPolicyScopeType",
+          "kind": "enum",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "scopeId",
+          "columnName": "scopeId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "changedAt",
+          "columnName": "changedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "appliedAt",
+          "columnName": "appliedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "raisedAt",
+          "columnName": "raisedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "shortenedAt",
+          "columnName": "shortenedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "occurredAt",
+          "columnName": "occurredAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "acceptedAt",
+          "columnName": "acceptedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastEventId",
+          "columnName": "lastEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
@@ -18650,6 +18877,24 @@
           "documentation": ""
         },
         {
+          "name": "traceQuietPeriodMs",
+          "columnName": "traceQuietPeriodMs",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "traceWaitTimeoutMs",
+          "columnName": "traceWaitTimeoutMs",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
           "name": "maxTurns",
           "columnName": "maxTurns",
           "type": "Int",
@@ -19056,6 +19301,24 @@
           "name": "judgeModel",
           "columnName": "judgeModel",
           "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "traceQuietPeriodMs",
+          "columnName": "traceQuietPeriodMs",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "traceWaitTimeoutMs",
+          "columnName": "traceWaitTimeoutMs",
+          "type": "Int",
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
@@ -24222,6 +24485,160 @@
           "name": "updatedById",
           "columnName": "updatedById",
           "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "GatewayA2ATarget",
+      "tableName": "GatewayA2ATarget",
+      "documentation": "",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "agentName",
+          "columnName": "agentName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "cardUrl",
+          "columnName": "cardUrl",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "upstreamUrl",
+          "columnName": "upstreamUrl",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "encryptedUpstreamHeaders",
+          "columnName": "encryptedUpstreamHeaders",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "restrictToAllowList",
+          "columnName": "restrictToAllowList",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "allowedVirtualKeyIds",
+          "columnName": "allowedVirtualKeyIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "blocked",
+          "columnName": "blocked",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "blockReason",
+          "columnName": "blockReason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdById",
+          "columnName": "createdById",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "archivedAt",
+          "columnName": "archivedAt",
+          "type": "DateTime",
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
@@ -30336,7 +30753,10 @@
         "CACHE_RULE_UPDATED",
         "CACHE_RULE_DELETED",
         "ROUTING_POLICY_UPDATED",
-        "ROUTING_POLICY_DELETED"
+        "ROUTING_POLICY_DELETED",
+        "A2A_TARGET_CREATED",
+        "A2A_TARGET_UPDATED",
+        "A2A_TARGET_DELETED"
       ]
     },
     {

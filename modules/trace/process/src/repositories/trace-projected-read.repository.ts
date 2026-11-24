@@ -21,6 +21,10 @@ export type TraceSpanPage = {
 export type TraceIngestLagSample = {
   p95LagMs: number;
   sampleCount: number;
+  /** p95 over traces of the longest silence between two span arrivals in one trace. */
+  p95ArrivalGapMs: number | null;
+  /** Traces with two or more spans, the ones an arrival gap is measured on. */
+  arrivalGapSampleCount: number;
 };
 
 /** The single projected Trace persistence boundary. */

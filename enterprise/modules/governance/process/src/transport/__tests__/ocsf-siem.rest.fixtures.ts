@@ -183,7 +183,10 @@ export async function buildApi({
         findLiveNonGovernanceIdsByOrganization: async () => PROJECTS,
       }),
       auth: createApiFixture<AuthApi>(),
-      entitlements: createApiFixture<EntitlementApi>(),
+      entitlements: createApiFixture<EntitlementApi>({
+        getActivePlan: async () =>
+          ({ type: planType }) as Awaited<ReturnType<EntitlementApi["getActivePlan"]>>,
+      }),
       organizations: createApiFixture<OrganizationApi>(),
       permissions: createApiFixture<AuthzApi>(),
       scim: createApiFixture<ScimApi>(),
@@ -258,7 +261,7 @@ export async function buildApi({
   const seatReports = () =>
     repositories.ocsfEvents.findLatestSeatReports({ tenantId: TENANT, actionName: "seat_report" });
 
-  return { get, post, seed, audits, seatReports, hono };
+  return { get, post, seed, audits, seatReports, hono, repositories };
 }
 
 export type Page = {

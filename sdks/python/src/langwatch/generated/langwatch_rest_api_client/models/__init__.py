@@ -2381,6 +2381,117 @@ from .get_api_governance_registry_schema_response_500 import GetApiGovernanceReg
 from .get_api_governance_registry_schema_response_500_fault import GetApiGovernanceRegistrySchemaResponse500Fault
 from .get_api_governance_registry_schema_response_500_meta import GetApiGovernanceRegistrySchemaResponse500Meta
 from .get_api_governance_registry_schema_response_500_trace import GetApiGovernanceRegistrySchemaResponse500Trace
+from .get_api_governance_security_lake_sources_by_id_health_response_200 import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse200,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_200_health import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse200Health,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_200_health_poison_item import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse200HealthPoisonItem,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_400 import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse400,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_400_fault import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse400Fault,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_400_meta import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse400Meta,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_400_trace import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse400Trace,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_401 import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse401,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_401_fault import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse401Fault,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_401_meta import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse401Meta,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_401_trace import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse401Trace,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_403 import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse403,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_403_fault import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse403Fault,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_403_meta import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse403Meta,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_403_trace import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse403Trace,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_500 import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse500,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_500_fault import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse500Fault,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_500_meta import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse500Meta,
+)
+from .get_api_governance_security_lake_sources_by_id_health_response_500_trace import (
+    GetApiGovernanceSecurityLakeSourcesByIdHealthResponse500Trace,
+)
+from .get_api_governance_security_lake_sources_by_id_response_200 import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse200,
+)
+from .get_api_governance_security_lake_sources_by_id_response_200_sources_item import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse200SourcesItem,
+)
+from .get_api_governance_security_lake_sources_by_id_response_400 import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse400,
+)
+from .get_api_governance_security_lake_sources_by_id_response_400_fault import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse400Fault,
+)
+from .get_api_governance_security_lake_sources_by_id_response_400_meta import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse400Meta,
+)
+from .get_api_governance_security_lake_sources_by_id_response_400_trace import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse400Trace,
+)
+from .get_api_governance_security_lake_sources_by_id_response_401 import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse401,
+)
+from .get_api_governance_security_lake_sources_by_id_response_401_fault import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse401Fault,
+)
+from .get_api_governance_security_lake_sources_by_id_response_401_meta import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse401Meta,
+)
+from .get_api_governance_security_lake_sources_by_id_response_401_trace import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse401Trace,
+)
+from .get_api_governance_security_lake_sources_by_id_response_403 import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse403,
+)
+from .get_api_governance_security_lake_sources_by_id_response_403_fault import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse403Fault,
+)
+from .get_api_governance_security_lake_sources_by_id_response_403_meta import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse403Meta,
+)
+from .get_api_governance_security_lake_sources_by_id_response_403_trace import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse403Trace,
+)
+from .get_api_governance_security_lake_sources_by_id_response_500 import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse500,
+)
+from .get_api_governance_security_lake_sources_by_id_response_500_fault import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse500Fault,
+)
+from .get_api_governance_security_lake_sources_by_id_response_500_meta import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse500Meta,
+)
+from .get_api_governance_security_lake_sources_by_id_response_500_trace import (
+    GetApiGovernanceSecurityLakeSourcesByIdResponse500Trace,
+)
 from .get_api_graphs_by_id_response_200 import GetApiGraphsByIdResponse200
 from .get_api_graphs_by_id_response_200_filters_type_0 import GetApiGraphsByIdResponse200FiltersType0
 from .get_api_graphs_by_id_response_200_graph import GetApiGraphsByIdResponse200Graph
@@ -3042,6 +3153,11 @@ from .get_api_traces_facets_response_401 import GetApiTracesFacetsResponse401
 from .get_api_traces_facets_response_403 import GetApiTracesFacetsResponse403
 from .get_api_traces_facets_response_422 import GetApiTracesFacetsResponse422
 from .get_api_traces_facets_response_500 import GetApiTracesFacetsResponse500
+from .get_api_traces_settle_settings_response_200 import GetApiTracesSettleSettingsResponse200
+from .get_api_traces_settle_settings_response_400 import GetApiTracesSettleSettingsResponse400
+from .get_api_traces_settle_settings_response_401 import GetApiTracesSettleSettingsResponse401
+from .get_api_traces_settle_settings_response_422 import GetApiTracesSettleSettingsResponse422
+from .get_api_traces_settle_settings_response_500 import GetApiTracesSettleSettingsResponse500
 from .get_api_triggers_by_id_fires_response_200 import GetApiTriggersByIdFiresResponse200
 from .get_api_triggers_by_id_fires_response_200_fires_item import GetApiTriggersByIdFiresResponse200FiresItem
 from .get_api_triggers_by_id_fires_response_404 import GetApiTriggersByIdFiresResponse404
@@ -4589,6 +4705,85 @@ from .patch_api_governance_ingestion_templates_by_id_ottl_rules_response_422 imp
 )
 from .patch_api_governance_ingestion_templates_by_id_ottl_rules_response_500 import (
     PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500,
+)
+from .patch_api_governance_security_lake_sources_by_id_body import PatchApiGovernanceSecurityLakeSourcesByIdBody
+from .patch_api_governance_security_lake_sources_by_id_body_config import (
+    PatchApiGovernanceSecurityLakeSourcesByIdBodyConfig,
+)
+from .patch_api_governance_security_lake_sources_by_id_body_config_sources_item import (
+    PatchApiGovernanceSecurityLakeSourcesByIdBodyConfigSourcesItem,
+)
+from .patch_api_governance_security_lake_sources_by_id_body_credentials import (
+    PatchApiGovernanceSecurityLakeSourcesByIdBodyCredentials,
+)
+from .patch_api_governance_security_lake_sources_by_id_body_status import (
+    PatchApiGovernanceSecurityLakeSourcesByIdBodyStatus,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_200 import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse200,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_200_sources_item import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse200SourcesItem,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_400 import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse400,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_400_fault import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse400Fault,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_400_meta import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse400Meta,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_400_trace import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse400Trace,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_401 import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse401,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_401_fault import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse401Fault,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_401_meta import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse401Meta,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_401_trace import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse401Trace,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_403 import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse403,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_403_fault import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse403Fault,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_403_meta import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse403Meta,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_403_trace import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse403Trace,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_422 import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse422,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_422_fault import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse422Fault,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_422_meta import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse422Meta,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_422_trace import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse422Trace,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_500 import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse500,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_500_fault import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse500Fault,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_500_meta import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse500Meta,
+)
+from .patch_api_governance_security_lake_sources_by_id_response_500_trace import (
+    PatchApiGovernanceSecurityLakeSourcesByIdResponse500Trace,
 )
 from .patch_api_graphs_by_id_body import PatchApiGraphsByIdBody
 from .patch_api_graphs_by_id_body_filters import PatchApiGraphsByIdBodyFilters
@@ -7643,6 +7838,129 @@ from .post_api_governance_registry_ard_search_response_500_fault import (
 from .post_api_governance_registry_ard_search_response_500_meta import PostApiGovernanceRegistryArdSearchResponse500Meta
 from .post_api_governance_registry_ard_search_response_500_trace import (
     PostApiGovernanceRegistryArdSearchResponse500Trace,
+)
+from .post_api_governance_security_lake_sources_body import PostApiGovernanceSecurityLakeSourcesBody
+from .post_api_governance_security_lake_sources_body_config import PostApiGovernanceSecurityLakeSourcesBodyConfig
+from .post_api_governance_security_lake_sources_body_config_sources_item import (
+    PostApiGovernanceSecurityLakeSourcesBodyConfigSourcesItem,
+)
+from .post_api_governance_security_lake_sources_body_credentials import (
+    PostApiGovernanceSecurityLakeSourcesBodyCredentials,
+)
+from .post_api_governance_security_lake_sources_by_id_test_body import PostApiGovernanceSecurityLakeSourcesByIdTestBody
+from .post_api_governance_security_lake_sources_by_id_test_body_config import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestBodyConfig,
+)
+from .post_api_governance_security_lake_sources_by_id_test_body_config_sources_item import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestBodyConfigSourcesItem,
+)
+from .post_api_governance_security_lake_sources_by_id_test_body_credentials import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestBodyCredentials,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_200 import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse200,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_400 import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse400,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_400_fault import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse400Fault,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_400_meta import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse400Meta,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_400_trace import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse400Trace,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_401 import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse401,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_401_fault import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse401Fault,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_401_meta import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse401Meta,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_401_trace import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse401Trace,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_403 import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse403,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_403_fault import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse403Fault,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_403_meta import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse403Meta,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_403_trace import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse403Trace,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_500 import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse500,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_500_fault import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse500Fault,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_500_meta import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse500Meta,
+)
+from .post_api_governance_security_lake_sources_by_id_test_response_500_trace import (
+    PostApiGovernanceSecurityLakeSourcesByIdTestResponse500Trace,
+)
+from .post_api_governance_security_lake_sources_response_200 import PostApiGovernanceSecurityLakeSourcesResponse200
+from .post_api_governance_security_lake_sources_response_200_sources_item import (
+    PostApiGovernanceSecurityLakeSourcesResponse200SourcesItem,
+)
+from .post_api_governance_security_lake_sources_response_400 import PostApiGovernanceSecurityLakeSourcesResponse400
+from .post_api_governance_security_lake_sources_response_400_fault import (
+    PostApiGovernanceSecurityLakeSourcesResponse400Fault,
+)
+from .post_api_governance_security_lake_sources_response_400_meta import (
+    PostApiGovernanceSecurityLakeSourcesResponse400Meta,
+)
+from .post_api_governance_security_lake_sources_response_400_trace import (
+    PostApiGovernanceSecurityLakeSourcesResponse400Trace,
+)
+from .post_api_governance_security_lake_sources_response_401 import PostApiGovernanceSecurityLakeSourcesResponse401
+from .post_api_governance_security_lake_sources_response_401_fault import (
+    PostApiGovernanceSecurityLakeSourcesResponse401Fault,
+)
+from .post_api_governance_security_lake_sources_response_401_meta import (
+    PostApiGovernanceSecurityLakeSourcesResponse401Meta,
+)
+from .post_api_governance_security_lake_sources_response_401_trace import (
+    PostApiGovernanceSecurityLakeSourcesResponse401Trace,
+)
+from .post_api_governance_security_lake_sources_response_403 import PostApiGovernanceSecurityLakeSourcesResponse403
+from .post_api_governance_security_lake_sources_response_403_fault import (
+    PostApiGovernanceSecurityLakeSourcesResponse403Fault,
+)
+from .post_api_governance_security_lake_sources_response_403_meta import (
+    PostApiGovernanceSecurityLakeSourcesResponse403Meta,
+)
+from .post_api_governance_security_lake_sources_response_403_trace import (
+    PostApiGovernanceSecurityLakeSourcesResponse403Trace,
+)
+from .post_api_governance_security_lake_sources_response_422 import PostApiGovernanceSecurityLakeSourcesResponse422
+from .post_api_governance_security_lake_sources_response_422_fault import (
+    PostApiGovernanceSecurityLakeSourcesResponse422Fault,
+)
+from .post_api_governance_security_lake_sources_response_422_meta import (
+    PostApiGovernanceSecurityLakeSourcesResponse422Meta,
+)
+from .post_api_governance_security_lake_sources_response_422_trace import (
+    PostApiGovernanceSecurityLakeSourcesResponse422Trace,
+)
+from .post_api_governance_security_lake_sources_response_500 import PostApiGovernanceSecurityLakeSourcesResponse500
+from .post_api_governance_security_lake_sources_response_500_fault import (
+    PostApiGovernanceSecurityLakeSourcesResponse500Fault,
+)
+from .post_api_governance_security_lake_sources_response_500_meta import (
+    PostApiGovernanceSecurityLakeSourcesResponse500Meta,
+)
+from .post_api_governance_security_lake_sources_response_500_trace import (
+    PostApiGovernanceSecurityLakeSourcesResponse500Trace,
 )
 from .post_api_graphs_body import PostApiGraphsBody
 from .post_api_graphs_body_filters import PostApiGraphsBodyFilters
@@ -12203,6 +12521,43 @@ __all__ = (
     "GetApiGovernanceRegistrySchemaResponse500Fault",
     "GetApiGovernanceRegistrySchemaResponse500Meta",
     "GetApiGovernanceRegistrySchemaResponse500Trace",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse200",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse200Health",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse200HealthPoisonItem",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse400",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse400Fault",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse400Meta",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse400Trace",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse401",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse401Fault",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse401Meta",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse401Trace",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse403",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse403Fault",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse403Meta",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse403Trace",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse500",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse500Fault",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse500Meta",
+    "GetApiGovernanceSecurityLakeSourcesByIdHealthResponse500Trace",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse200",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse200SourcesItem",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse400",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse400Fault",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse400Meta",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse400Trace",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse401",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse401Fault",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse401Meta",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse401Trace",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse403",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse403Fault",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse403Meta",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse403Trace",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse500",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse500Fault",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse500Meta",
+    "GetApiGovernanceSecurityLakeSourcesByIdResponse500Trace",
     "GetApiGraphsByIdResponse200",
     "GetApiGraphsByIdResponse200FiltersType0",
     "GetApiGraphsByIdResponse200Graph",
@@ -12560,6 +12915,11 @@ __all__ = (
     "GetApiTracesFacetsResponse403",
     "GetApiTracesFacetsResponse422",
     "GetApiTracesFacetsResponse500",
+    "GetApiTracesSettleSettingsResponse200",
+    "GetApiTracesSettleSettingsResponse400",
+    "GetApiTracesSettleSettingsResponse401",
+    "GetApiTracesSettleSettingsResponse422",
+    "GetApiTracesSettleSettingsResponse500",
     "GetApiTriggersByIdFiresResponse200",
     "GetApiTriggersByIdFiresResponse200FiresItem",
     "GetApiTriggersByIdFiresResponse404",
@@ -13376,6 +13736,33 @@ __all__ = (
     "PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse401",
     "PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse422",
     "PatchApiGovernanceIngestionTemplatesByIdOttlRulesResponse500",
+    "PatchApiGovernanceSecurityLakeSourcesByIdBody",
+    "PatchApiGovernanceSecurityLakeSourcesByIdBodyConfig",
+    "PatchApiGovernanceSecurityLakeSourcesByIdBodyConfigSourcesItem",
+    "PatchApiGovernanceSecurityLakeSourcesByIdBodyCredentials",
+    "PatchApiGovernanceSecurityLakeSourcesByIdBodyStatus",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse200",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse200SourcesItem",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse400",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse400Fault",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse400Meta",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse400Trace",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse401",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse401Fault",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse401Meta",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse401Trace",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse403",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse403Fault",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse403Meta",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse403Trace",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse422",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse422Fault",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse422Meta",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse422Trace",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse500",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse500Fault",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse500Meta",
+    "PatchApiGovernanceSecurityLakeSourcesByIdResponse500Trace",
     "PatchApiGraphsByIdBody",
     "PatchApiGraphsByIdBodyFilters",
     "PatchApiGraphsByIdBodyGraph",
@@ -14762,6 +15149,53 @@ __all__ = (
     "PostApiGovernanceRegistryArdSearchResponse500Fault",
     "PostApiGovernanceRegistryArdSearchResponse500Meta",
     "PostApiGovernanceRegistryArdSearchResponse500Trace",
+    "PostApiGovernanceSecurityLakeSourcesBody",
+    "PostApiGovernanceSecurityLakeSourcesBodyConfig",
+    "PostApiGovernanceSecurityLakeSourcesBodyConfigSourcesItem",
+    "PostApiGovernanceSecurityLakeSourcesBodyCredentials",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestBody",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestBodyConfig",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestBodyConfigSourcesItem",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestBodyCredentials",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse200",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse400",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse400Fault",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse400Meta",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse400Trace",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse401",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse401Fault",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse401Meta",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse401Trace",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse403",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse403Fault",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse403Meta",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse403Trace",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse500",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse500Fault",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse500Meta",
+    "PostApiGovernanceSecurityLakeSourcesByIdTestResponse500Trace",
+    "PostApiGovernanceSecurityLakeSourcesResponse200",
+    "PostApiGovernanceSecurityLakeSourcesResponse200SourcesItem",
+    "PostApiGovernanceSecurityLakeSourcesResponse400",
+    "PostApiGovernanceSecurityLakeSourcesResponse400Fault",
+    "PostApiGovernanceSecurityLakeSourcesResponse400Meta",
+    "PostApiGovernanceSecurityLakeSourcesResponse400Trace",
+    "PostApiGovernanceSecurityLakeSourcesResponse401",
+    "PostApiGovernanceSecurityLakeSourcesResponse401Fault",
+    "PostApiGovernanceSecurityLakeSourcesResponse401Meta",
+    "PostApiGovernanceSecurityLakeSourcesResponse401Trace",
+    "PostApiGovernanceSecurityLakeSourcesResponse403",
+    "PostApiGovernanceSecurityLakeSourcesResponse403Fault",
+    "PostApiGovernanceSecurityLakeSourcesResponse403Meta",
+    "PostApiGovernanceSecurityLakeSourcesResponse403Trace",
+    "PostApiGovernanceSecurityLakeSourcesResponse422",
+    "PostApiGovernanceSecurityLakeSourcesResponse422Fault",
+    "PostApiGovernanceSecurityLakeSourcesResponse422Meta",
+    "PostApiGovernanceSecurityLakeSourcesResponse422Trace",
+    "PostApiGovernanceSecurityLakeSourcesResponse500",
+    "PostApiGovernanceSecurityLakeSourcesResponse500Fault",
+    "PostApiGovernanceSecurityLakeSourcesResponse500Meta",
+    "PostApiGovernanceSecurityLakeSourcesResponse500Trace",
     "PostApiGraphsBody",
     "PostApiGraphsBodyFilters",
     "PostApiGraphsBodyGraph",

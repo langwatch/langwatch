@@ -538,6 +538,8 @@ async function gatewayPreflight({
   if (exceeded) {
     process.stderr.write(
       renderBudgetExceeded(exceeded, {
+        // /me is kept so the link works on servers with and without the /coding-agents route,
+        // which redirect /me.
         fallbackUrl: `${cfg.control_plane_url}/me/budget/request`,
       }),
     );

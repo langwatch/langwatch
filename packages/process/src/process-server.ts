@@ -109,6 +109,7 @@ export class ProcessServer implements ProcessBoot {
     const storage = (this.config.stores as StoresConfig | undefined)?.objectStorage;
     return {
       production: this.production,
+      publicBaseUrl: this.settings.baseHost,
       assetOrigin: assetBaseOrigin(normalizeAssetBase(config.assetBase)),
       ...(storage
         ? {
