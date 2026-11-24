@@ -1,8 +1,10 @@
-import type {
-  GovernanceIngestionSource,
-  NormalizedPullEvent,
-  PulledUsageObservedEventData,
-  PullResult,
+import {
+  type GovernanceIngestionSource,
+  type NormalizedPullEvent,
+  type PulledUsageObservedEventData,
+  type PullResult,
+  SECURITY_LAKE_ADAPTER_ID,
+  SECURITY_LAKE_SOURCE_TYPE,
 } from "@langwatch/enterprise-governance-contract";
 import { DispatchError } from "@langwatch/eventing";
 import type {
@@ -25,6 +27,7 @@ import {
   IngestionPullDeadlineExceededError,
   IngestionPullWorkerConfiguration,
   IngestionPullWorkerService,
+  SECURITY_LAKE_ADAPTER_REFUSED_MESSAGE,
 } from "../../features/ingestion-pull/services/ingestion-pull-worker.service.ts";
 import {
   type PulledUsageRateReader,
@@ -173,6 +176,7 @@ class FakeRates implements PulledUsageRateReader {
 
 function worker(input: {
   runOnce: () => Promise<PullResult>;
+  adapterId?: string;
   deadlineMs?: number;
   source?: GovernanceIngestionSource | null;
   entitlement?: boolean | Error;
@@ -185,7 +189,7 @@ function worker(input: {
 }) {
   const registry = PullerRegistryService.create();
   registry.register({
-    id: "test",
+    id: input.adapterId ?? "test",
     validateConfig: (config) => config,
     runOnce: input.runOnce,
   });
@@ -457,6 +461,17 @@ describe("IngestionPullWorkerService", () => {
       expect.stringContaining("another organization"),
       expect.objectContaining({ traceProjectId: "trace-project" }),
     );
+  });
+
+  it("counts the events an adapter wrote itself, so the source reads as receiving events", async () => {
+    const { service } = worker({
+      runOnce: async () => ({ events: [], writtenCount: 9, cursor: "next", errorCount: 0 }),
+    });
+
+    await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toMatchObject({
+      nextCursor: "next",
+      eventCount: 9,
+    });
   });
 
   it("keeps the audit path and priced usage on the same durable retry boundary", async () => {
@@ -971,6 +986,54 @@ describe("given a pull the provider refuses", () => {
       await expect(service.run({ sourceId: "source-1", cursor: null })).rejects.toBe(failure);
       expect(diagnostics.error).toHaveBeenCalledTimes(1);
       expect(diagnostics.capture).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given a source of another type whose pull adapter is the Security Lake reader", () => {
+  const securityLakeRead = vi.fn(async () => ({ events: [], cursor: "read", errorCount: 0 }));
+  const sourceOf = (sourceType: string) =>
+    ingestionSource({
+      sourceType,
+      parserConfig: { adapter: SECURITY_LAKE_ADAPTER_ID, credentials: {} },
+    });
+
+  describe("when its scheduled pull runs", () => {
+    /** @scenario The scheduled pull refuses the Security Lake reader for a source of another type */
+    it("refuses the run and never runs the reader", async () => {
+      securityLakeRead.mockClear();
+      const { service, sink } = worker({
+        adapterId: SECURITY_LAKE_ADAPTER_ID,
+        runOnce: securityLakeRead,
+        source: sourceOf("otel_generic"),
+      });
+
+      const error = await service
+        .run({ sourceId: "source-1", cursor: null })
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(DispatchError);
+      expect(error).toMatchObject({
+        retryable: false,
+        customerMessage: SECURITY_LAKE_ADAPTER_REFUSED_MESSAGE,
+      });
+      expect(securityLakeRead).not.toHaveBeenCalled();
+      expect(sink.rowWritten).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the source is a Security Lake source", () => {
+    it("runs the reader", async () => {
+      securityLakeRead.mockClear();
+      const { service } = worker({
+        adapterId: SECURITY_LAKE_ADAPTER_ID,
+        runOnce: securityLakeRead,
+        source: sourceOf(SECURITY_LAKE_SOURCE_TYPE),
+      });
+
+      await service.run({ sourceId: "source-1", cursor: null });
+
+      expect(securityLakeRead).toHaveBeenCalledTimes(1);
     });
   });
 });

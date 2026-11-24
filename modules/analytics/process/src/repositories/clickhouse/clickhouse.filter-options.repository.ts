@@ -8,7 +8,10 @@ import {
   type FindFilterOptionsInput,
 } from "../filter-options.repository.ts";
 import { clickHouseFilters } from "./clickhouse.filter-definitions.mapper.ts";
-import { buildScopeConditions } from "./clickhouse.filter-query-helpers.mapper.ts";
+import {
+  buildScopeConditions,
+  spanTypeOptionsParams,
+} from "./clickhouse.filter-query-helpers.mapper.ts";
 import type { SupportedClickHouseFilterDefinition } from "./clickhouse.filter-shapes.mapper.ts";
 import { translatingQueryFailures } from "./clickhouse.query-error-translation.mapper.ts";
 
@@ -54,6 +57,7 @@ export class FilterOptionsClickHouseRepository extends FilterOptionsRepository {
           startDate: input.startDate,
           endDate: input.endDate,
           ...scopeParams,
+          ...spanTypeOptionsParams(input),
         },
       }),
     );

@@ -56,6 +56,7 @@ export abstract class TraceAttributedRollupRepository {
     matches: readonly TraceAttributeMatch[];
     valueKey: string;
     values: readonly string[];
+    valuePrefixes?: readonly string[];
     sinceMs: number;
   }): Promise<{ value: string; count: number }[]>;
   abstract findAttributedTracesBefore(input: {

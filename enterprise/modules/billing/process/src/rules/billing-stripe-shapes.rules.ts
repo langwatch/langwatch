@@ -26,6 +26,10 @@ export type BillingSubscriptionItem = Readonly<{
   interval: string | null;
   /** Units billed on this line; absent where a caller did not read it. */
   quantity?: number | null;
+  /** The price's lookup key, which Stripe moves to a replacement price on a re-price. */
+  lookupKey?: string | null;
+  /** The catalogue name in the price's `langwatch_key` metadata, which stays on the old price. */
+  langwatchKey?: string | null;
 }>;
 
 /** The accrued amount at which the provider invoices mid-cycle, and whether that moves the anchor. */

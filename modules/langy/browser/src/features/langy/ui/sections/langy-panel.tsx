@@ -718,6 +718,7 @@ function LangyPanel({
                         failure={failure}
                         organizationId={organizationId}
                         onGithubConnected={onGithubConnected}
+                        onShareLocalFolder={askCodeAccessAgain}
                       />
                     )}
                   </LangyConversationScroller>

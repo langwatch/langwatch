@@ -27,6 +27,7 @@ let githubInstallations: {
   installationId: string;
   accountLogin: string;
 }[] = [];
+let githubConfigured = true;
 let sessionUser: LangyHostUser | undefined;
 let namesAskerFlag = false;
 const writeText = vi.fn((_text: string) => Promise.resolve());
@@ -131,7 +132,7 @@ vi.mock("../../../../../behavior/langy-api.ts", () => ({
     github: {
       getConnectionStatus: {
         useQuery: () => ({
-          data: { installations: githubInstallations },
+          data: { configured: githubConfigured, installations: githubInstallations },
           isLoading: false,
           refetch: vi.fn(),
         }),
@@ -157,6 +158,7 @@ beforeEach(() => {
   Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
   workspaceReadEnabled.length = 0;
   githubInstallations = [{ installationId: "i1", accountLogin: "acme" }];
+  githubConfigured = true;
   // The local-folder pick persists per browser, so one test's click would
   // otherwise open the next test's card already waiting.
   localStorage.clear();
@@ -622,5 +624,21 @@ describe("given the first message of a conversation whose record is not written 
 
     expect(workspaceReadEnabled.at(-1)).toBe(true);
     expect(screen.getByText("How should I reach your code?")).toBeDefined();
+  });
+});
+
+describe("given an instance with no GitHub App configured", () => {
+  beforeEach(() => {
+    workspaceData = ASKING;
+    githubConfigured = false;
+    githubInstallations = [];
+  });
+
+  /** @scenario "Langy offers the local folder when GitHub is not set up on the instance" */
+  it("offers only the local folder, never the GitHub install", () => {
+    renderCard();
+
+    expect(screen.getByText("Share local folder")).toBeDefined();
+    expect(screen.queryByText("Connect to GitHub")).toBeNull();
   });
 });

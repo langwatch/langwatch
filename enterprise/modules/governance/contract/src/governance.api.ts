@@ -124,6 +124,15 @@ import type {
   OcsfIngestRequest,
   OcsfIngestResponse,
 } from "./features/ocsf/ocsf-siem.ts";
+import type {
+  SecurityLakeConnectionTest,
+  SecurityLakeConnectionTestInput,
+  SecurityLakeSource,
+  SecurityLakeSourceCreateInput,
+  SecurityLakeCallers,
+  SecurityLakeSourceHealth,
+  SecurityLakeSourceUpdateInput,
+} from "./features/ocsf/security-lake.ts";
 import type { PersonaResolution } from "./features/personal/persona-home.ts";
 import type { GovernanceBudgetOverviewForUser } from "./features/personal/personal-budget-overview.ts";
 import type {
@@ -619,6 +628,22 @@ export interface GovernanceRestApi {
   ingestOcsfEvents(
     input: OcsfIngestRequest & { organizationId: string },
   ): Promise<OcsfIngestResponse>;
+  securityLakeSourceCreate(
+    input: SecurityLakeSourceCreateInput & { organizationId: string; actorUserId: string | null },
+  ): Promise<SecurityLakeSource>;
+  securityLakeSourceUpdate(
+    input: SecurityLakeSourceUpdateInput & { id: string; organizationId: string },
+  ): Promise<SecurityLakeSource>;
+  /** The source with the external id LangWatch generated, for the trust policy. */
+  securityLakeSourceGet(input: { id: string; organizationId: string }): Promise<SecurityLakeSource>;
+  securityLakeSourceTest(
+    input: SecurityLakeConnectionTestInput & { id: string; organizationId: string },
+  ): Promise<SecurityLakeConnectionTest>;
+  securityLakeSourceHealth(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<SecurityLakeSourceHealth>;
+  securityLakeCallersWithoutTraces(input: { organizationId: string }): Promise<SecurityLakeCallers>;
 }
 
 /** The window and cursor every OCSF export stream takes. */
