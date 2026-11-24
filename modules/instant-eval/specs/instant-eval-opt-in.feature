@@ -26,7 +26,8 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     by the flag alone, which is how one that asked gets them, and a switch thrown before it was on
     an enterprise plan no longer counts;
   - an install that does not judge through LangWatch, which has judging turned off or is a
-    development checkout with its own key, is released by the operator's release flag.
+    development checkout with its own key, is released by the operator's release flag, which is
+    on by default off LangWatch Cloud, so only an operator who switched it off holds it back.
 
   Rule: The offer depends on the plan, the deployment, and whether the member may throw the switch
 

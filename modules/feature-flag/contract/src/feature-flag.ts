@@ -169,8 +169,9 @@ export const FEATURE_FLAGS = [
     key: "release_instant_evals",
     scope: "PRODUCT",
     defaultValue: false,
+    selfHostedDefaultValue: true,
     description:
-      "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. On the hosted service this releases an enterprise organization only: a self-serve one is released by switching them on itself from the search bar, whatever this says. A self-hosted install that judges through Connect is released by a license that names Instant Evals alone, and this never releases it; only a development checkout that judges with its own key still needs this. A deployment with no classifier configured keeps them unavailable either way.",
+      "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default on LangWatch Cloud; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. On the hosted service this releases an enterprise organization only: a self-serve one is released by switching them on itself from the search bar, whatever this says. On by default on a self-hosted install, which needs nothing from this flag: one that judges through Connect is released by a license that names Instant Evals alone, and this never releases it; a project on its own decision model is released by that model alone; only an install that judges with its own classifier key, such as a development checkout, reads it, and an operator can still switch it off there. A deployment with no classifier configured keeps LangWatch's model unavailable either way.",
   },
   {
     key: "release_instant_evals_own_decision_model",
@@ -198,8 +199,9 @@ export const FEATURE_FLAGS = [
     key: "release_lwql_workbench",
     scope: "PRODUCT",
     defaultValue: false,
+    selfHostedDefaultValue: true,
     description:
-      "Gates the whole LangWatchQL surface — the Custom query workbench UI and the analytics.lwql tRPC endpoints — while it is experimental. Off by default; enable per project or organization via a targeting rule, or globally via the operator store.",
+      "Gates the whole LangWatchQL surface: the Custom query workbench UI, the analytics.lwql tRPC endpoints and building widgets on a dashboard. Off by default on LangWatch Cloud, where targeting rules and the operator store roll it out. On by default on a self-hosted install; an operator switches it off per project or organization with a targeting rule. An install whose LangWatchQL backend is not provisioned refuses each query by name (lwql_not_provisioned) instead of running it.",
   },
   {
     key: "release_ui_ai_gateway_menu_enabled",
