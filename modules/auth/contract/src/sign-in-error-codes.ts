@@ -15,12 +15,12 @@ export const normalizeSignInErrorCode = (error: string | null | undefined): stri
   if (error === "email_does_not_match" || error === "email_doesn't_match") {
     return "DIFFERENT_EMAIL_NOT_ALLOWED";
   }
+  // A link from Settings with a provider account another user holds: not a wrong-method sign-in.
+  if (error === "account_already_linked_to_different_user") {
+    return "ACCOUNT_LINKED_TO_ANOTHER_USER";
+  }
   // The SSO plugin's OIDC callback redirects with the sign-in refusal's raw, spaced string.
-  if (
-    error === "account_already_linked_to_different_user" ||
-    error === "account_not_linked" ||
-    error === "account not linked"
-  ) {
+  if (error === "account_not_linked" || error === "account not linked") {
     return "OAuthAccountNotLinked";
   }
   return error;
@@ -45,6 +45,8 @@ export type CutoverSignInErrorCode = (typeof CUTOVER_SIGN_IN_ERROR_CODES)[number
 export const STABLE_AUTH_ERRORS = [
   "OAuthAccountNotLinked",
   "DIFFERENT_EMAIL_NOT_ALLOWED",
+  // The provider account is another user's: only disconnecting it there changes the outcome.
+  "ACCOUNT_LINKED_TO_ANOTHER_USER",
   "SSO_PROVIDER_NOT_ALLOWED",
   // Stable: what has to change is an administrator's decision, not the attempt.
   "LINK_NEEDS_APPROVAL",
