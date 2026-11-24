@@ -127,6 +127,33 @@ describe("a person who joins", () => {
   });
 });
 
+describe("a person who joins, linked to the organization", () => {
+  const groupOf = (calls: ReturnType<typeof inviteCalls>) =>
+    calls.find((call) => call.type === "group");
+
+  /** @scenario "A person who joins is linked to the organization with the seat they joined with" */
+  it("carries the seat on the group call, by invite or by SSO", () => {
+    const sso = fireSsoAutoAdded({
+      signal: { kind: "sso_auto_added", ...joinSource, role: "ADMIN" },
+      traces: noTraces,
+    });
+
+    expect(groupOf(inviteCalls("EXTERNAL"))).toMatchObject({
+      groupId: "org-1",
+      traits: { name: "Acme Corp", relationshipAttributes: { seat: "lite_member" } },
+    });
+    expect(groupOf(sso)).toMatchObject({
+      traits: { name: "Acme Corp", relationshipAttributes: { seat: "admin" } },
+    });
+  });
+
+  /** @scenario "A person who joins is linked to the organization with the seat they joined with" */
+  it("sends no relationship seat for a role we cannot name", () => {
+    expect(groupOf(inviteCalls())).not.toHaveProperty("traits.relationshipAttributes");
+    expect(groupOf(inviteCalls("OWNER"))).not.toHaveProperty("traits.relationshipAttributes");
+  });
+});
+
 describe("seatTraitOf", () => {
   it("names the seat of a known role and nothing for any other", () => {
     expect(seatTraitOf("MEMBER")).toEqual({ seat: "member" });

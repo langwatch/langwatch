@@ -77,6 +77,17 @@ describe("fireSignup", () => {
         });
       });
 
+      /** @scenario "A founder who signs up is linked to their organization as admin" */
+      it("decides to link the founder to their organization as admin", () => {
+        const calls = fireSignup(SIGNUP);
+
+        expect(calls[1]).toMatchObject({
+          type: "group",
+          groupId: "org-1",
+          traits: { name: "Acme Corp", relationshipAttributes: { seat: "admin" } },
+        });
+      });
+
       /** @scenario "New signup tracks signed_up event" */
       it("decides to track a signed_up event carrying the sign-up answers", () => {
         const calls = fireSignup({

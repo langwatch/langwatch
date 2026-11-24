@@ -58,9 +58,19 @@ function joinedCalls({
   joined: Joined;
   event: "joined_via_invite" | "joined_via_sso";
 }): CioBatchCall[] {
-  const { userId, organizationId, organizationName } = joined;
+  const { userId, organizationId, organizationName, role } = joined;
+  const { seat } = seatTraitOf(role);
   return [
-    { type: "group", userId, groupId: organizationId, traits: { name: organizationName } },
+    {
+      type: "group",
+      userId,
+      groupId: organizationId,
+      // The person-level seat is last-write-wins across organizations; this one is per org.
+      traits: {
+        name: organizationName,
+        ...(seat ? { relationshipAttributes: { seat } } : {}),
+      },
+    },
     { type: "track", userId, event, properties: joinProperties(joined) },
   ];
 }

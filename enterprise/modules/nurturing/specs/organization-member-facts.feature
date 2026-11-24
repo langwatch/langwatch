@@ -180,6 +180,19 @@ Feature: An organization's session facts reach every active member in Customer.i
     Then the person is identified with no seat
 
   @unit
+  Scenario: A person who joins is linked to the organization with the seat they joined with
+    Given an invite_accepted or sso_auto_added signal for org-1 holding the role ADMIN, MEMBER, EXTERNAL or DEVELOPER
+    When the signal is delivered
+    Then Customer.io groups the person into org-1 with relationshipAttributes seat admin, member, lite_member or developer
+    And a role nurturing cannot name sends no relationship seat
+
+  @unit
+  Scenario: A founder who signs up is linked to their organization as admin
+    Given a signed_up signal for a new organization org-1
+    When the signal is delivered
+    Then Customer.io groups the founder into org-1 with relationshipAttributes seat admin
+
+  @unit
   Scenario: A join is tracked as joined_organization beside its own event
     Given an invite_accepted or sso_auto_added signal for org-1 from after joined_organization shipped
     When the signal is delivered

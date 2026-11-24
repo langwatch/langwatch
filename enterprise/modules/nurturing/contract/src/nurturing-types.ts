@@ -250,7 +250,10 @@ export type CioBatchCall =
       type: "group";
       userId: string;
       groupId: string;
-      traits?: Partial<CioOrgTraits>;
+      traits?: Partial<CioOrgTraits> & {
+        /** The person's seat in this organization, per the Pipelines group spec. */
+        relationshipAttributes?: { seat?: string };
+      };
     };
 
 /**

@@ -93,6 +93,7 @@ export function fireSignup({
         name: organizationName,
         ...pickDefined({ company_size: signUpData?.companySize }),
         plan: "free",
+        relationshipAttributes: { seat: "admin" },
       },
     },
     {
