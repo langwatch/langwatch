@@ -12,6 +12,7 @@ import {
   pickInstantEvalJudgementRoutedSpend,
   pickInstantEvalRoutedSpend,
   instantEvalSkipped,
+  instantEvalTierOf,
   type InstantEvalClassification,
   type InstantEvalJudgeAnswer,
   type InstantEvalJudgeCall,
@@ -258,6 +259,7 @@ export class InstantEvalJudgeService {
     inputTokens: number;
     costNanoUsd: number | undefined;
   }): Promise<number> {
+    const routed = pickInstantEvalJudgementRoutedSpend({ inputTokens, costNanoUsd });
     const { priceUsd, fact } = instantEvalJudgeSpendPricedOf({
       organizationId,
       projectId,
@@ -267,10 +269,10 @@ export class InstantEvalJudgeService {
       }),
       inputTokens,
       occurredAt: this.deps.now().epochMilliseconds,
-      // The judge call's only caller is an LLM-judge evaluator (ADR-174 decision 25).
-      tier: "evals",
+      // An LLM judge's call: Evals Preview's rate when routed, Instant Preview's when not.
+      tier: instantEvalTierOf({ caller: "llm_judge", routed }),
       ...this.pricing(),
-      routed: this.priced(pickInstantEvalJudgementRoutedSpend({ inputTokens, costNanoUsd })),
+      routed: this.priced(routed),
     });
     await this.record({ fact });
     return priceUsd;
@@ -293,6 +295,7 @@ export class InstantEvalJudgeService {
     occurredAt,
   }: InstantEvalJudgeSpendRecord): Promise<void> {
     if (!isInstantEvalSpendBillable({ inputTokens, costNanoUsd })) return;
+    const routed = pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens });
     const { fact } = instantEvalJudgeSpendPricedOf({
       organizationId,
       projectId,
@@ -301,9 +304,10 @@ export class InstantEvalJudgeService {
       occurredAt,
       requests,
       runId,
-      tier: "instant",
+      // Instant Evals stays on Instant Preview's rate, routed or not.
+      tier: instantEvalTierOf({ caller: "instant_eval", routed }),
       ...this.pricing(),
-      routed: this.priced(pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens })),
+      routed: this.priced(routed),
     });
     await this.deps.recordSpendPriced(fact);
   }

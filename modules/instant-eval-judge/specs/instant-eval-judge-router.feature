@@ -231,7 +231,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
   Scenario: A routed judgement is priced from the summed cost of every call
     Given a routed judge call whose legs cost a known amount
     When it is priced
-    Then the priced fact carries that cost times the markup when that is above the Evals tier's rate, under the router's model and rate
+    Then the priced fact carries that cost times the markup when that is above Evals Preview's rate, under the router's model and rate
 
   @unit
   Scenario: A decision-model leg is billed for its output tokens too

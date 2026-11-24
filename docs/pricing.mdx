@@ -36,10 +36,12 @@ Each plan includes a base volume of events stored for a default window. For exam
 
 Instant Evals are priced separately from events, per input token sent to the judge. Output is free. Prices are in USD, excluding VAT, which is added on your invoice.
 
-| What is judged                                   | Price                                |
-| ------------------------------------------------ | ------------------------------------ |
-| Instant Evals runs and judged queries            | **$0.30 per million input tokens**   |
-| An LLM-as-a-Judge evaluator using Instant Evals  | **$0.60 per million input tokens**   |
+| Model           | What uses it                                                                  | Price                              |
+| --------------- | ----------------------------------------------------------------------------- | ---------------------------------- |
+| Instant Preview | Instant Evals runs and judged queries, and an LLM-as-a-Judge evaluator on it  | **$0.30 per million input tokens** |
+| Evals Preview   | An LLM-as-a-Judge evaluator on the LLM judge router, where it is available    | **$0.60 per million input tokens** |
+
+The price follows the model that judges, not what asked for the judgement: an LLM-as-a-Judge evaluator on Instant Preview pays the Instant Preview rate.
 
 A judged call is never priced below 1.3 times what it costs LangWatch to judge. When that amount is higher than the rate, which can happen on a long or hard call, the call is charged that amount instead, so a bill can come out slightly above the rate. Judging ten thousand conversations of average size with Instant Evals costs about $3.20.
 

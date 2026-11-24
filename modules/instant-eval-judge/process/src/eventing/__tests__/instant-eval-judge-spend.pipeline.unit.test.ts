@@ -85,7 +85,7 @@ describe("given the judge's spend pipeline", () => {
         requestId: "request-1",
         inputTokens: 500,
         occurredAt: NOW,
-        tier: "evals",
+        tier: "instant",
       });
       expect(answer).toMatchObject({ outcome: "judged", priceUsd });
       await vi.waitFor(async () =>
@@ -125,7 +125,7 @@ describe("given the judge's spend pipeline", () => {
         requestId: "request-1",
         inputTokens: 500,
         occurredAt: NOW,
-        tier: "evals",
+        tier: "instant",
       });
 
       await append(fact);
@@ -145,7 +145,7 @@ describe("the priced fact", () => {
       requestId: "request-1",
       inputTokens: 500,
       occurredAt: NOW,
-      tier: "evals",
+      tier: "instant",
     });
     const [event] = new RecordInstantEvalJudgeSpendPricedCommand().handle({
       tenantId: ORGANIZATION_ID,

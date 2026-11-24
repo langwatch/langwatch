@@ -27,9 +27,27 @@ export const INSTANT_EVAL_SPEND_MODEL = "langwatch-instant-preview";
  */
 export const INSTANT_EVAL_REQUEST_TYPE = "instant_eval";
 
-/** Instant: Instant Evals runs, pages and judged queries. Evals: an LLM-judge evaluator's call. */
+/**
+ * The tier is the product model. Instant: Instant Preview, so Instant Evals runs, pages and judged
+ * queries, routed or not, and an LLM judge on Instant Preview. Evals: Evals Preview, the judge
+ * router, so an LLM judge's routed call.
+ */
 export const INSTANT_EVAL_TIERS = ["instant", "evals"] as const;
 export type InstantEvalTier = (typeof INSTANT_EVAL_TIERS)[number];
+
+/** Who asked for the judgement: Instant Evals itself, or an LLM-judge evaluator. */
+export type InstantEvalSpendCaller = "instant_eval" | "llm_judge";
+
+/** The one rule for a spend's tier: Evals only for an LLM judge's routed call, else Instant. */
+export function instantEvalTierOf({
+  caller,
+  routed,
+}: {
+  caller: InstantEvalSpendCaller;
+  routed: InstantEvalRoutedSpend | undefined;
+}): InstantEvalTier {
+  return caller === "llm_judge" && routed ? "evals" : "instant";
+}
 
 /** The published customer rates, USD per million input tokens before VAT; output is free. */
 export const INSTANT_EVAL_PUBLISHED_RATES: Readonly<Record<InstantEvalTier, number>> = {

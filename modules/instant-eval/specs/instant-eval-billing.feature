@@ -408,5 +408,5 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
     Scenario: The pricing page states the published rates before VAT
       Given the Instant tier's and the Evals tier's published rates
       When the pricing page and the Instant Evals cost page are read
-      Then each states 0.30 USD per million input tokens for Instant Evals and 0.60 USD for an LLM judge
+      Then each states 0.30 USD per million input tokens for Instant Preview and 0.60 USD for Evals Preview, the LLM judge router
       And each says the rates exclude VAT and our cost times 1.3 is the floor

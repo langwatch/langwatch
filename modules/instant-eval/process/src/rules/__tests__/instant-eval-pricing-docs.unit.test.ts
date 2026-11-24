@@ -20,15 +20,22 @@ const COST_PAGE = fileURLToPath(
 
 const { instant, evals } = INSTANT_EVAL_PUBLISHED_RATES;
 
+/** One line that names the model and then its rate, so a rate cannot drift to the other model. */
+function modelAtRate({ model, rate }: { model: string; rate: string }): RegExp {
+  return new RegExp(`${model}[^\\n]*${rate.replace(/[$.]/g, "\\$&")} per million input tokens`);
+}
+
 describe("given the Instant tier's and the Evals tier's published rates", () => {
   describe("when the pricing page is read", () => {
     /** @scenario "The pricing page states the published rates before VAT" */
-    it("states both rates per million input tokens, before VAT, with the cost floor", () => {
+    it("states each model's rate per million input tokens, before VAT, with the cost floor", () => {
       const page = readFileSync(PRICING_PAGE, "utf8");
 
       expect(page).toContain("## Instant Evals");
-      expect(page).toContain(`$${instant.toFixed(2)} per million input tokens`);
-      expect(page).toContain(`$${evals.toFixed(2)} per million input tokens`);
+      expect(page).toMatch(
+        modelAtRate({ model: "Instant Preview", rate: `$${instant.toFixed(2)}` }),
+      );
+      expect(page).toMatch(modelAtRate({ model: "Evals Preview", rate: `$${evals.toFixed(2)}` }));
       expect(page).toContain("excluding VAT");
       expect(page).toContain(`${INSTANT_EVAL_PRICING.markup} times`);
     });
@@ -36,11 +43,15 @@ describe("given the Instant tier's and the Evals tier's published rates", () => 
 
   describe("when the Instant Evals cost page is read", () => {
     /** @scenario "The pricing page states the published rates before VAT" */
-    it("states both rates per million input tokens, before VAT, with the cost floor", () => {
+    it("states each model's rate per million input tokens, before VAT, with the cost floor", () => {
       const page = readFileSync(COST_PAGE, "utf8");
 
-      expect(page).toContain(`${instant.toFixed(2)} USD per million input tokens`);
-      expect(page).toContain(`${evals.toFixed(2)} USD per million input tokens`);
+      expect(page).toMatch(
+        modelAtRate({ model: "Instant Preview", rate: `${instant.toFixed(2)} USD` }),
+      );
+      expect(page).toMatch(
+        modelAtRate({ model: "Evals Preview", rate: `${evals.toFixed(2)} USD` }),
+      );
       expect(page).toContain("excluding VAT");
       expect(page).toContain(`${INSTANT_EVAL_PRICING.markup} times`);
     });

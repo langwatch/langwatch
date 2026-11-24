@@ -265,7 +265,7 @@ describe("spent cost", () => {
     const spent = { inputTokens: 5_000, costNanoUsd: 3_000_000, routedInputTokens: 5_000 };
 
     expect(instantEvalSpentCostUsd(spent)).toBe(0.003);
-    // $0.003 at the 1.3 markup, above 5,000 tokens at the Evals tier's $0.60 per million.
+    // $0.003 at the 1.3 markup, above 5,000 tokens at Evals Preview's $0.60 per million.
     expect(instantEvalSpentPriceUsd({ ...spent, tier: "evals" })).toBe(0.0039);
   });
 

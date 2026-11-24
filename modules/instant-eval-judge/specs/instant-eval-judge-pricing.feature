@@ -14,10 +14,19 @@ Feature: What the Instant Evals judge costs us, and what the customer is charged
   and unrouted calls is billed correctly.
 
   The customer price has one rule (ADR-174 decision 25): the input tokens at the tier's published
-  rate, output free, or our cost times 1.3 when that is higher, so no call loses money. The Instant
-  tier is Instant Evals runs, pages and judged queries, at 0.30 USD per million input tokens. The
-  Evals tier is an LLM-judge evaluator's judge call, at 0.60 USD per million. Rates are before VAT.
+  rate, output free, or our cost times 1.3 when that is higher, so no call loses money. The tier
+  is the product model, never the caller alone. The Instant tier is Instant Preview, at 0.30 USD
+  per million input tokens: Instant Evals runs, pages and judged queries, routed or not, and an
+  LLM-judge evaluator's call on Instant Preview. The Evals tier is Evals Preview, the judge router,
+  at 0.60 USD per million: an LLM-judge evaluator's routed call. Rates are before VAT.
   A row or call is priced as a whole: a run's rate and floor are its summed tokens and cost.
+
+  @unit
+  Scenario: The tier follows the product model, not the routed flag alone
+    Given an Instant Evals spend, routed or not, an unrouted LLM-judge call and a routed LLM-judge call
+    When each one's tier is chosen
+    Then the Instant Evals spend and the unrouted LLM-judge call are on the Instant tier, Instant Preview
+    And only the routed LLM-judge call is on the Evals tier, Evals Preview
 
   @unit
   Scenario: The cost is the tokens at the classifier's published rate
@@ -33,36 +42,44 @@ Feature: What the Instant Evals judge costs us, and what the customer is charged
     And it names no route table backend id
 
   @unit
-  Scenario: An Instant tier call is priced at 0.30 USD per million input tokens
+  Scenario: Instant Evals and an LLM judge on Instant Preview are priced at 0.30 USD per million input tokens
     Given an Instant Evals run of 1,000,000 input tokens that cost us 0.042 USD
-    When it is priced
-    Then the price is 0.30 USD, not the cost times 1.3 of 0.0546 USD
+    And an unrouted LLM-judge call on Instant Preview of 1,000,000 input tokens that cost us 0.042 USD
+    When each is priced
+    Then each price is 0.30 USD, not the cost times 1.3 of 0.0546 USD
 
   @unit
-  Scenario: An Evals tier call is priced at 0.60 USD per million input tokens
-    Given an LLM-judge evaluator's judge call of 1,000,000 input tokens that cost us 0.042 USD
+  Scenario: A routed Instant Evals run stays at 0.30 USD per million input tokens
+    Given an Instant Evals run or page of 1,000,000 input tokens whose routed calls cost us 0.005 USD
+    When it is priced
+    Then the price is 0.30 USD, the Instant Preview rate, not the Evals Preview rate
+    And its priced fact is stamped instant_eval_judge_router@instant0.3+<route version>x1.3
+
+  @unit
+  Scenario: An LLM judge routed through Evals Preview is priced at 0.60 USD per million input tokens
+    Given an LLM-judge call routed through Evals Preview of 1,000,000 input tokens whose routed calls cost us 0.042 USD
     When it is priced
     Then the price is 0.60 USD
 
   @unit
   Scenario: A call whose cost times 1.3 is above the rate is priced at that floor
-    Given an Evals tier judge call of 1,000,000 input tokens whose routed calls cost us 0.50 USD
-    And an Instant tier run of 1,000,000 input tokens whose routed calls cost us 0.25 USD
+    Given a routed LLM-judge call of 1,000,000 input tokens whose routed calls cost us 0.50 USD
+    And a routed Instant Evals run of 1,000,000 input tokens whose routed calls cost us 0.25 USD
     When each is priced
     Then the judge call is 0.65 USD and the run is 0.325 USD
 
   @unit
   Scenario: Output tokens are free at the published rate
-    Given an Evals tier judge call of 500 input tokens that also reported 200 output tokens
-    And a routed Evals tier judge call of 1,000,000 input tokens whose calls, output included, cost us 0.20 USD
+    Given an unrouted LLM-judge call of 500 input tokens that also reported 200 output tokens
+    And a routed LLM-judge call of 1,000,000 input tokens whose calls, output included, cost us 0.20 USD
     When each is priced
-    Then the first is 0.0003 USD and the second 0.60 USD: input tokens at the rate, output at nothing
+    Then the first is 0.00015 USD and the second 0.60 USD: input tokens at the rate, output at nothing
 
   @unit
   Scenario: The rate version names the tier's rate and the floor
-    Given an unrouted Instant tier run, an unrouted Evals tier judge call and a routed Evals tier judge call
+    Given an unrouted Instant Evals run, an unrouted LLM-judge call and a routed LLM-judge call
     When their priced facts are built
-    Then they are stamped instant_eval@instant0.3+0.042x1.3, instant_eval@evals0.6+0.042x1.3 and instant_eval_judge_router@evals0.6+<route version>x1.3
+    Then they are stamped instant_eval@instant0.3+0.042x1.3, instant_eval@instant0.3+0.042x1.3 and instant_eval_judge_router@evals0.6+<route version>x1.3
     And a row written under an older rate version keeps the stamp and the price it was written with
 
   @unit

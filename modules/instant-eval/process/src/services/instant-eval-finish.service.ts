@@ -8,6 +8,7 @@ import type { InstantEvalOutcome } from "@langwatch/instant-eval-contract";
 import type { InstantEvalPricing } from "@langwatch/instant-eval-judge-contract";
 import {
   instantEvalPriceUsd,
+  instantEvalTierOf,
   isInstantEvalSpendBillable,
   pickInstantEvalRoutedSpend,
   instantEvalSpentCostUsd,
@@ -157,7 +158,15 @@ export class InstantEvalFinishService {
 
     return {
       costUsd,
-      priceUsd: instantEvalPriceUsd({ costUsd, inputTokens, tier: "instant", pricing }),
+      priceUsd: instantEvalPriceUsd({
+        costUsd,
+        inputTokens,
+        tier: instantEvalTierOf({
+          caller: "instant_eval",
+          routed: pickInstantEvalRoutedSpend({ costNanoUsd, routedInputTokens }),
+        }),
+        pricing,
+      }),
     };
   }
 }

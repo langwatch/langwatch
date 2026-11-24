@@ -262,8 +262,8 @@ describe("given a judge call on LangWatch cloud", () => {
   describe("when a free organization at $0.99 makes a call priced $0.05", () => {
     /** @scenario "A judge call that crosses one dollar is recorded in full" */
     it("records the whole price, past the dollar", async () => {
-      // $0.05 at the Evals tier's $0.60 per million input tokens.
-      const inputTokens = 83_334;
+      // $0.05 at Instant Preview's $0.30 per million input tokens: an unrouted LLM judge.
+      const inputTokens = 166_667;
       const { service, recorded, repositories, seed } = harness({
         spentNanoUsd: (99n * NANO_PER_USD) / 100n,
         classify: async () => answered(inputTokens),
@@ -341,7 +341,7 @@ describe("given a judge call the classifier answers", () => {
         requestId: "minted-1",
         inputTokens: 500,
         occurredAt: NOW,
-        tier: "evals",
+        tier: "instant",
       });
       expect(answer).toMatchObject({ outcome: "judged", priceUsd: expected.priceUsd });
       expect(recorded).toEqual([expected.fact]);
@@ -349,21 +349,21 @@ describe("given a judge call the classifier answers", () => {
   });
 
   describe("when it classified one million input tokens", () => {
-    /** @scenario "An Evals tier call is priced at 0.60 USD per million input tokens" */
+    /** @scenario "Instant Evals and an LLM judge on Instant Preview are priced at 0.30 USD per million input tokens" */
     /** @scenario "The rate version names the tier's rate and the floor" */
-    it("prices the LLM-judge call at the Evals tier's 0.60 USD and stamps that rate", async () => {
+    it("prices an unrouted LLM-judge call at Instant Preview's 0.30 USD and stamps that rate", async () => {
       const { service, recorded, seed } = harness({ classify: async () => answered(1_000_000) });
       await seed();
 
       const answer = await service.judge(call);
 
-      expect(answer).toMatchObject({ outcome: "judged", priceUsd: 0.6 });
+      expect(answer).toMatchObject({ outcome: "judged", priceUsd: 0.3 });
       expect(recorded[0]).toMatchObject({
         model: "langwatch-instant-preview",
-        rateVersion: "instant_eval@evals0.6+0.042x1.3",
+        rateVersion: "instant_eval@instant0.3+0.042x1.3",
         inputTokens: 1_000_000,
         costNanoUsd: 42_000_000,
-        priceNanoUsd: 600_000_000,
+        priceNanoUsd: 300_000_000,
       });
     });
   });
@@ -513,9 +513,9 @@ describe("given an Instant Evals run's spend, for a project the judge has not le
   });
 
   describe("when it read one million input tokens", () => {
-    /** @scenario "An Instant tier call is priced at 0.30 USD per million input tokens" */
+    /** @scenario "Instant Evals and an LLM judge on Instant Preview are priced at 0.30 USD per million input tokens" */
     /** @scenario "The rate version names the tier's rate and the floor" */
-    it("prices the run at the Instant tier's 0.30 USD and stamps that rate", async () => {
+    it("prices an unrouted run at Instant Preview's 0.30 USD and stamps that rate", async () => {
       const { service, recorded } = harness();
 
       await service.recordSpend({ ...record, inputTokens: 1_000_000 });
@@ -719,8 +719,9 @@ describe("given a judge call that carries a route", () => {
 
     const answer = await service.judge(call);
 
-    // 500 tokens at the Evals tier's $0.60 per million; output is never priced.
-    expect(answer).toMatchObject({ outcome: "judged", priceUsd: 0.0003 });
+    // 500 tokens at Instant Preview's $0.30 per million, above the 27,300 nano-USD floor.
+    // Output is never priced.
+    expect(answer).toMatchObject({ outcome: "judged", priceUsd: 0.00015 });
     expect(recorded).toEqual([
       {
         tenantId: ORGANIZATION_ID,
@@ -729,15 +730,16 @@ describe("given a judge call that carries a route", () => {
         projectId: PROJECT_ID,
         requestId: "minted-1",
         model: "langwatch-instant-preview",
-        rateVersion: "instant_eval@evals0.6+0.042x1.3",
+        rateVersion: "instant_eval@instant0.3+0.042x1.3",
         inputTokens: 500,
-        priceNanoUsd: 300_000,
+        priceNanoUsd: 150_000,
         costNanoUsd: 21_000,
       },
     ]);
   });
 
   /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  /** @scenario "A routed Instant Evals run stays at 0.30 USD per million input tokens" */
   it("records a run's routed spend from its summed cost", async () => {
     const { service, recorded } = harness();
 
@@ -752,7 +754,8 @@ describe("given a judge call that carries a route", () => {
       occurredAt: NOW,
     });
 
-    // Ten tokens at the Instant tier's $0.30 per million is above 500 nano-USD times 1.3.
+    // A run stays on Instant Preview's rate when routed: ten tokens at $0.30 per million is above
+    // 500 nano-USD times 1.3.
     expect(recorded[0]).toMatchObject({
       costNanoUsd: 500,
       priceNanoUsd: 3_000,
@@ -761,7 +764,8 @@ describe("given a judge call that carries a route", () => {
   });
 
   /** @scenario "A call whose cost times 1.3 is above the rate is priced at that floor" */
-  it("prices a routed run whose cost times 1.3 is above the Instant tier's rate at that floor", async () => {
+  /** @scenario "A routed Instant Evals run stays at 0.30 USD per million input tokens" */
+  it("prices a routed run whose cost times 1.3 is above Instant Preview's rate at that floor", async () => {
     const { service, recorded } = harness();
 
     await service.recordSpend({
@@ -802,7 +806,7 @@ describe("given a judge call that carries a route", () => {
       model: "langwatch-judge",
       inputTokens: 1000,
       costNanoUsd: 5000,
-      // The 1,000 paid input tokens at the Evals tier's rate, above the cost times the markup.
+      // The 1,000 paid input tokens at Evals Preview's rate, above the cost times the markup.
       priceNanoUsd: 600_000,
     });
   });
@@ -827,7 +831,7 @@ describe("given a judge call that carries a route", () => {
       "minted-1",
       `instantevaljudge_${requestKey}`,
     ]);
-    // Both rows are kept: the stopped legs' 1,000 tokens at the Evals rate, and the full call.
+    // Both rows are kept: the stopped legs' 1,000 tokens at the Evals Preview rate, and the call.
     const { spendNanoUsd } = await repositories.spend.getTotal({ organizationId: ORGANIZATION_ID });
     expect(spendNanoUsd).toBe(BigInt(600_000 + 1_000_000_000 * INSTANT_EVAL_PRICING.markup));
   });
@@ -860,7 +864,9 @@ describe("given a judge call that carries a route", () => {
   });
 
   /** @scenario "A routed judgement with a cost of zero is still routed" */
-  it("prices a routed call that cost nothing at the Evals rate, under the router's model and rate", async () => {
+  /** @scenario "An LLM judge routed through Evals Preview is priced at 0.60 USD per million input tokens" */
+  /** @scenario "The rate version names the tier's rate and the floor" */
+  it("prices a routed call that cost nothing at Evals Preview's rate, under the router's model and rate", async () => {
     const { service, recorded, seed } = harness({ routeUsdPerMillion: 0 });
     await seed();
 

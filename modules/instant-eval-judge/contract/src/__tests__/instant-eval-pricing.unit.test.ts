@@ -15,6 +15,7 @@ import {
   instantEvalPriceUsd,
   instantEvalRateVersion,
   instantEvalSpentPriceUsd,
+  instantEvalTierOf,
   pickInstantEvalRoutedSpend,
   toNanoUsdPrecision,
 } from "../instant-eval-pricing.ts";
@@ -54,24 +55,62 @@ describe("given a response from the classifier", () => {
 });
 
 describe("given the published rates (ADR-174 decision 25)", () => {
-  describe("when an Instant tier call of one million input tokens is priced", () => {
-    /** @scenario "An Instant tier call is priced at 0.30 USD per million input tokens" */
+  describe("when the tier of a spend is chosen", () => {
+    const routed = { costNanoUsd: 0, routedInputTokens: 1 };
+
+    /** @scenario "The tier follows the product model, not the routed flag alone" */
+    it("is Instant for Instant Evals, routed or not, and for an unrouted LLM judge", () => {
+      expect(instantEvalTierOf({ caller: "instant_eval", routed: undefined })).toBe("instant");
+      expect(instantEvalTierOf({ caller: "instant_eval", routed })).toBe("instant");
+      expect(instantEvalTierOf({ caller: "llm_judge", routed: undefined })).toBe("instant");
+    });
+
+    /** @scenario "The tier follows the product model, not the routed flag alone" */
+    it("is Evals only for an LLM judge routed through Evals Preview", () => {
+      expect(instantEvalTierOf({ caller: "llm_judge", routed })).toBe("evals");
+    });
+  });
+
+  describe("when Instant Evals or an unrouted LLM judge reads one million input tokens", () => {
+    /** @scenario "Instant Evals and an LLM judge on Instant Preview are priced at 0.30 USD per million input tokens" */
     it("is 0.30 USD, not the cost times 1.3", () => {
       const costUsd = instantEvalCostUsd({ inputTokens: 1_000_000 });
 
       expect(costUsd).toBe(0.042);
       expect(INSTANT_EVAL_PUBLISHED_RATES.instant).toBe(0.3);
-      expect(instantEvalPriceUsd({ costUsd, inputTokens: 1_000_000, tier: "instant" })).toBe(0.3);
+      for (const caller of ["instant_eval", "llm_judge"] as const) {
+        const tier = instantEvalTierOf({ caller, routed: undefined });
+        expect(instantEvalPriceUsd({ costUsd, inputTokens: 1_000_000, tier })).toBe(0.3);
+      }
     });
   });
 
-  describe("when an Evals tier call of one million input tokens is priced", () => {
-    /** @scenario "An Evals tier call is priced at 0.60 USD per million input tokens" */
+  describe("when a routed Instant Evals run reads one million input tokens", () => {
+    /** @scenario "A routed Instant Evals run stays at 0.30 USD per million input tokens" */
+    it("is 0.30 USD, not Evals Preview's rate", () => {
+      const spent = {
+        inputTokens: 1_000_000,
+        costNanoUsd: 5_000_000,
+        routedInputTokens: 1_000_000,
+      };
+      const tier = instantEvalTierOf({ caller: "instant_eval", routed: spent });
+
+      expect(instantEvalSpentPriceUsd({ ...spent, tier })).toBe(0.3);
+    });
+  });
+
+  describe("when an LLM judge routed through Evals Preview reads one million input tokens", () => {
+    /** @scenario "An LLM judge routed through Evals Preview is priced at 0.60 USD per million input tokens" */
     it("is 0.60 USD", () => {
+      const spent = {
+        inputTokens: 1_000_000,
+        costNanoUsd: 42_000_000,
+        routedInputTokens: 1_000_000,
+      };
+      const tier = instantEvalTierOf({ caller: "llm_judge", routed: spent });
+
       expect(INSTANT_EVAL_PUBLISHED_RATES.evals).toBe(0.6);
-      expect(instantEvalPriceUsd({ costUsd: 0.042, inputTokens: 1_000_000, tier: "evals" })).toBe(
-        0.6,
-      );
+      expect(instantEvalSpentPriceUsd({ ...spent, tier })).toBe(0.6);
     });
   });
 

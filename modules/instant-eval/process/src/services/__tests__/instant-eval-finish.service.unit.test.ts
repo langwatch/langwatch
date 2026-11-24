@@ -75,7 +75,7 @@ describe("given a run that judged rows", () => {
     });
 
     /** @scenario "The estimate is priced by the same rule as the run" */
-    /** @scenario "An Instant tier call is priced at 0.30 USD per million input tokens" */
+    /** @scenario "Instant Evals and an LLM judge on Instant Preview are priced at 0.30 USD per million input tokens" */
     it("prices a run that read 10,700,000 input tokens at 3.21 USD, as its estimate did", async () => {
       const { service } = finishing();
 
@@ -190,6 +190,7 @@ describe("given a routed run", () => {
   });
 
   /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  /** @scenario "A routed Instant Evals run stays at 0.30 USD per million input tokens" */
   it("hands a routed run that cost nothing to the judge as routed, so its tokens cost nothing", async () => {
     const { service, recorded } = finishing();
 
@@ -276,7 +277,7 @@ describe("given a routed page that reported after its run finished", () => {
       routedInputTokens: 1_000_000,
     });
 
-    // One million input tokens at the Instant tier's rate, above the cost times the markup.
+    // A routed page stays on Instant Preview's rate: one million input tokens, above the floor.
     expect(spend).toEqual({ costUsd: 0.005, priceUsd: 0.3 });
     expect(recorded).toEqual([
       {

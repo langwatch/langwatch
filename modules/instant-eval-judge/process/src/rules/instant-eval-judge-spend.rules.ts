@@ -57,7 +57,7 @@ export function instantEvalJudgeSpendPricedOf({
   /** A run's or query's classifications; a judge call is one and leaves it out. */
   requests?: number | undefined;
   runId?: string | undefined;
-  /** Evals for an LLM-judge evaluator's judge call, Instant for a run's or query's spend. */
+  /** The model's tier, from `instantEvalTierOf`: Evals only for an LLM judge's routed call. */
   tier: InstantEvalTier;
   pricing?: InstantEvalPricing;
   /**

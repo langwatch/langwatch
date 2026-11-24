@@ -8,8 +8,10 @@
 import { InstantEvalDecisionModelKeyInvalidError } from "@langwatch/instant-eval-contract";
 import {
   instantEvalSpentPriceUsd,
+  instantEvalTierOf,
   isInstantEvalSpendBillable,
   NANO_USD_PER_USD,
+  pickInstantEvalRoutedSpend,
 } from "@langwatch/instant-eval-judge-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -334,7 +336,11 @@ export class InstantEvalJudgePageService {
     const costNanoUsd = Math.round(costUsd * NANO_USD_PER_USD);
     if (!isInstantEvalSpendBillable({ inputTokens: tokens, costNanoUsd })) return 0;
     const { pricing } = this.judge;
-    return instantEvalSpentPriceUsd({ inputTokens: tokens, costNanoUsd, tier: "instant", pricing });
+    const tier = instantEvalTierOf({
+      caller: "instant_eval",
+      routed: pickInstantEvalRoutedSpend({ costNanoUsd }),
+    });
+    return instantEvalSpentPriceUsd({ inputTokens: tokens, costNanoUsd, tier, pricing });
   }
 
   /** The page's texts, judged, with a cancel or the lease able to stop it. */
