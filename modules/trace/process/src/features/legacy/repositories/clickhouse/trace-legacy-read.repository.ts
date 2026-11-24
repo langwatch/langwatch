@@ -30,12 +30,13 @@ import type {
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
+  SpanAnalyticsFloor,
   TraceDateField,
   TraceSummaryListOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
 } from "@langwatch/trace-contract";
-import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
+import { isStorageAnchoredVersion, latestTraceVersionOnly } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
@@ -694,7 +695,8 @@ function buildLatestVersionOnly(scrollStart: number | undefined): string {
     scrollStart !== undefined
       ? " AND UpdatedAt <= fromUnixTimestamp64Milli({scrollStart:UInt64})"
       : "";
-  return ` AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries WHERE TenantId = {tenantId:String} AND UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})${scrollSnapshotBound} GROUP BY TenantId, TraceId)`;
+  const where = `TenantId = {tenantId:String} AND UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})${scrollSnapshotBound}`;
+  return ` AND ${latestTraceVersionOnly({ where, alias: "ts" })}`;
 }
 
 /** Stored-span rows as the joined read selects them. */
@@ -837,11 +839,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   private translateFilters(
     filters: Record<string, unknown>,
     window: { startDate: number; endDate: number },
+    spanAnalyticsFloor: SpanAnalyticsFloor | null,
   ): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean } {
     if (Object.keys(filters).length === 0) {
       return { conditions: [], params: {}, hasUnsupportedFilters: false };
     }
-    return translateLegacyFilters({ filters, window });
+    return translateLegacyFilters({ filters, window, spanAnalyticsFloor });
   }
 
   private async resolveClient(projectId: string): Promise<TraceClickHouseClient> {
@@ -1449,12 +1452,14 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     options,
     retentionDays,
     ownRead,
+    spanAnalyticsFloor = null,
   }: {
     input: GetAllTracesForProjectInput;
     protections: Protections;
     options: GetAllTracesForProjectOptions;
     retentionDays: RetentionDaysProvider | undefined;
     ownRead: Authorization;
+    spanAnalyticsFloor?: SpanAnalyticsFloor | null;
   }): Promise<TraceLegacyPage> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getAllTracesForProject",
@@ -1494,10 +1499,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             conditions: legacyFilterConditions,
             params: legacyFilterParams,
             hasUnsupportedFilters,
-          } = this.translateFilters(input.filters ?? {}, {
-            startDate: input.startDate,
-            endDate: input.endDate,
-          });
+          } = this.translateFilters(
+            input.filters ?? {},
+            { startDate: input.startDate, endDate: input.endDate },
+            spanAnalyticsFloor,
+          );
 
           if (hasUnsupportedFilters) {
             throw new Error("Filters contain unsupported fields for ClickHouse");

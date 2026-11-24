@@ -30,6 +30,7 @@
   "dependencies": {
     "@aws-sdk/client-bedrock-agent": "catalog:",
     "@aws-sdk/client-s3": "catalog:",
+    "@aws-sdk/client-sqs": "catalog:",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
@@ -72,6 +73,8 @@
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
+    "hyparquet": "catalog:",
+    "hyparquet-compressors": "catalog:",
     "jsonpath-plus": "catalog:",
     "zod": "catalog:"
   },
@@ -85,6 +88,7 @@
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/trace-process": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
+    "hyparquet-writer": "catalog:",
     "nanoid": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

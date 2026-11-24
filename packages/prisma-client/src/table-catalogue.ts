@@ -106,6 +106,7 @@ export const prismaTableCatalogue = {
   "TraceEditOverlay": "TraceEditOverlay",
   "TraceIngestSourceBilling": "TraceIngestSourceBilling",
   "RetentionPolicy": "RetentionPolicy",
+  "RetentionApplyStatus": "RetentionApplyStatus",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
   "InstantEvalJudgeProject": "InstantEvalJudgeProject",
   "InstantEvalJudgeUsageBilling": "InstantEvalJudgeUsageBilling",
@@ -168,6 +169,7 @@ export const prismaTableCatalogue = {
   "AiToolEntryTeam": "AiToolEntryTeam",
   "AiToolEntryDepartment": "AiToolEntryDepartment",
   "IngestionTemplate": "IngestionTemplate",
+  "GatewayA2ATarget": "GatewayA2ATarget",
   "GatewayConnectUpstream": "GatewayConnectUpstream",
   "GatewayTraceExportKey": "GatewayTraceExportKey",
   "GatewayBudget": "GatewayBudget",
@@ -1914,6 +1916,22 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt"
   ],
+  "RetentionApplyStatus": [
+    "id",
+    "organizationId",
+    "scopeType",
+    "scopeId",
+    "changedAt",
+    "appliedAt",
+    "raisedAt",
+    "shortenedAt",
+    "createdAt",
+    "updatedAt",
+    "occurredAt",
+    "acceptedAt",
+    "lastEventId",
+    "projectionVersion"
+  ],
   "DataPrivacyPolicy": [
     "id",
     "organizationId",
@@ -2806,6 +2824,24 @@ export const prismaModelFieldCatalogue = {
     "updatedAt",
     "createdById",
     "updatedById"
+  ],
+  "GatewayA2ATarget": [
+    "id",
+    "organizationId",
+    "projectId",
+    "name",
+    "agentName",
+    "cardUrl",
+    "upstreamUrl",
+    "encryptedUpstreamHeaders",
+    "restrictToAllowList",
+    "allowedVirtualKeyIds",
+    "blocked",
+    "blockReason",
+    "createdById",
+    "createdAt",
+    "updatedAt",
+    "archivedAt"
   ],
   "GatewayConnectUpstream": [
     "organizationId",
@@ -3841,6 +3877,7 @@ export const prismaRelationCatalogue = {
   },
   "TraceIngestSourceBilling": {},
   "RetentionPolicy": {},
+  "RetentionApplyStatus": {},
   "DataPrivacyPolicy": {},
   "InstantEvalJudgeProject": {},
   "InstantEvalJudgeUsageBilling": {},
@@ -4041,6 +4078,7 @@ export const prismaRelationCatalogue = {
   "IngestionTemplate": {
     "organization": "Organization"
   },
+  "GatewayA2ATarget": {},
   "GatewayConnectUpstream": {},
   "GatewayTraceExportKey": {},
   "GatewayBudget": {

@@ -188,6 +188,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   OrganizationAccessNotice: {},
   OrganizationSeatLease: {},
+  // One row per retention scope; read by organizationId, written by row id.
+  RetentionApplyStatus: {},
   // "Which personal teams does this person own" is a READ bounded by the named owner: a personal
   // team has exactly one. Any other Team query, and every write, still names its organization.
   Team: {
@@ -326,6 +328,9 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   AiToolEntry: {},
   GatewayBudget: {},
   GatewayConnectUpstream: {},
+  // projectId is null for an organization-wide target, so the row is bound by
+  // organizationId, never by projectId.
+  GatewayA2ATarget: {},
   // Per-bucket period boundaries for attributed-user templates. Bound by
   // organizationId, or by the parent budget (org-owned) through budgetId /
   // the compound unique key.

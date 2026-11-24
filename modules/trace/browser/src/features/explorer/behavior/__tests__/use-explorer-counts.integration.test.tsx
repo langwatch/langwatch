@@ -39,11 +39,17 @@ vi.mock("../use-session-groups.ts", () => ({
   SESSIONS_MAX_PAGE_SIZE: 100,
 }));
 
-import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
+import type { ExplorerInstantEvalProgress } from "@langwatch/instant-eval-contract";
+import { instantEvalRunKey, queryWithoutInstantEvalChips } from "@langwatch/trace-contract";
+
+import { useExplorerStore, useFilterStore } from "../../../../behavior/explorer.store.ts";
+import { useInstantEvalRunStore } from "../../../instant-eval/behavior/instant-eval-run.store.ts";
 import { useExplorerCounts } from "../use-explorer-counts.ts";
 
 beforeEach(() => {
   useExplorerStore.setState({ grouping: "flat" });
+  useFilterStore.setState({ debouncedQueryText: "", evalRuns: {} });
+  useInstantEvalRunStore.setState({ runs: {}, stoppedByUser: {}, quiet: {}, settled: {} });
 });
 
 describe("useExplorerCounts", () => {
@@ -90,4 +96,64 @@ describe("useExplorerCounts", () => {
       });
     });
   });
+
+  describe("given a NOT eval chip with no run behind it", () => {
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("counts none of the rows it lists, since none was judged", () => {
+      useFilterStore.setState({ debouncedQueryText: 'NOT eval.trace:"the user is annoyed"' });
+      const { result } = renderHook(() => useExplorerCounts());
+      expect(result.current).toMatchObject({ totalHits: 0, pageTraceIds: [], summary: "0 traces" });
+    });
+
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("counts the rows of a bare chip never typed here, as it may name an evaluator", () => {
+      useFilterStore.setState({ debouncedQueryText: "NOT eval:my_evaluator" });
+      const { result } = renderHook(() => useExplorerCounts());
+      expect(result.current).toMatchObject({ totalHits: 1234, pageTraceIds: ["t-1", "t-2"] });
+    });
+
+    /** @scenario "A pending chip under NOT is not judged yet" */
+    it("shows no counters of another chip's run that is still judging", () => {
+      const window = { from: 1_000, to: 2_000 };
+      const queryText = 'eval.trace:"a" AND NOT eval.trace:"b"';
+      const keyOfA = instantEvalRunKey({
+        question: "a",
+        target: "traces",
+        otherQuery: queryWithoutInstantEvalChips(queryText),
+        window,
+      });
+      useFilterStore.setState({
+        debouncedQueryText: queryText,
+        debouncedTimeRange: window,
+        evalRuns: { [keyOfA]: "run-a" },
+      });
+      useInstantEvalRunStore.setState({
+        runs: { "run-a": judgingRun({ id: "run-a", matched: 12 }) },
+      });
+      const { result } = renderHook(() => useExplorerCounts());
+      expect(result.current).toMatchObject({
+        totalHits: 0,
+        instantEval: null,
+        summary: "0 traces",
+      });
+    });
+  });
 });
+
+function judgingRun(
+  overrides: Partial<ExplorerInstantEvalProgress> = {},
+): ExplorerInstantEvalProgress {
+  return {
+    id: "run-1",
+    status: "running",
+    total: 100,
+    progress: 40,
+    matched: 0,
+    failed: 0,
+    skipped: 0,
+    error: null,
+    priceUsd: 0.01,
+    finishedAtMs: null,
+    ...overrides,
+  };
+}

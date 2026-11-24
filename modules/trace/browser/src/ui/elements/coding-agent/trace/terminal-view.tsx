@@ -29,6 +29,7 @@ import {
   type CodeModeScriptResult,
   isCodeModePoll,
   isCodeModeScript,
+  isMetadataOnlySession,
   readCodeModeScript,
   readCodeModeScriptResults,
 } from "../../../../model/coding-agent/trace/terminal-code-mode.ts";
@@ -671,6 +672,7 @@ export const TerminalView = memo(function TerminalView({
     () => buildContextMarkers({ entries, visibleIndices, historyComplete }),
     [entries, visibleIndices, historyComplete],
   );
+  const metadataOnly = isMetadataOnlySession(entries);
   const dividersAtVisibleIndex = useMemo(
     () => forwardDividersToVisible({ turnDividers, entries, visibleIndices }),
     [turnDividers, entries, visibleIndices],
@@ -740,6 +742,11 @@ export const TerminalView = memo(function TerminalView({
               content to replay. The totals below are real.
             </Text>
           )}
+          {metadataOnly && (
+            <Text {...CELL} color={TERMINAL_TOKENS.faint}>
+              This agent sends metadata only, so its prompts, scripts and output are not recorded
+            </Text>
+          )}
           {visibleIndices.map((fullIndex) => {
             const divider = dividersAtVisibleIndex?.get(fullIndex);
             return (
@@ -754,7 +761,11 @@ export const TerminalView = memo(function TerminalView({
                   data-row-key={rowKeys?.[fullIndex]}
                   ref={(node: HTMLDivElement | null) => setRowRef(fullIndex, node)}
                 >
-                  <EntryLine entry={entries[fullIndex]!} toolSpans={toolSpans} />
+                  <EntryLine
+                    entry={entries[fullIndex]!}
+                    toolSpans={toolSpans}
+                    metadataOnly={metadataOnly}
+                  />
                 </Box>
               </Fragment>
             );
@@ -1232,7 +1243,16 @@ function gradientColorAt(index: number, length: number): string {
   return stops[stopIndex] ?? stops[stops.length - 1]!;
 }
 
-function EntryLine({ entry, toolSpans }: { entry: TranscriptEntry; toolSpans: ToolSpanIndex }) {
+function EntryLine({
+  entry,
+  toolSpans,
+  metadataOnly,
+}: {
+  entry: TranscriptEntry;
+  toolSpans: ToolSpanIndex;
+  /** The session says once that it carries no content, so its rows don't repeat it. */
+  metadataOnly: boolean;
+}) {
   switch (entry.kind) {
     case "system_prompt":
       return <SystemContextLine text={entry.text} chars={entry.chars} />;
@@ -1241,7 +1261,13 @@ function EntryLine({ entry, toolSpans }: { entry: TranscriptEntry; toolSpans: To
     case "assistant_message":
       return <AssistantLine text={entry.text} />;
     case "tool":
-      return <ToolEntryLine entry={entry} ran={toolSpans.get(entry.spanId) ?? null} />;
+      return (
+        <ToolEntryLine
+          entry={entry}
+          ran={toolSpans.get(entry.spanId) ?? null}
+          metadataOnly={metadataOnly}
+        />
+      );
     case "tool_rejected":
       return <RejectedLine name={entry.name} outcome={entry.outcome} byUser={entry.byUser} />;
     case "note":
@@ -1401,9 +1427,19 @@ function AssistantLine({ text }: { text: string | null }) {
 
 type ToolEntry = Extract<TranscriptEntry, { kind: "tool" }>;
 
-function ToolEntryLine({ entry, ran }: { entry: ToolEntry; ran: TerminalToolSpan | null }) {
+function ToolEntryLine({
+  entry,
+  ran,
+  metadataOnly,
+}: {
+  entry: ToolEntry;
+  ran: TerminalToolSpan | null;
+  metadataOnly: boolean;
+}) {
   const name = ran?.toolName ?? entry.name;
-  if (isCodeModeScript(name)) return <CodeScriptCall entry={entry} ran={ran} />;
+  if (isCodeModeScript(name)) {
+    return <CodeScriptCall entry={entry} ran={ran} metadataOnly={metadataOnly} />;
+  }
   const failed = ran?.isError ?? entry.failed;
   if (isCodeModePoll(name) && !failed)
     return (
@@ -1420,13 +1456,21 @@ function ToolEntryLine({ entry, ran }: { entry: ToolEntry; ran: TerminalToolSpan
  * collapsed until opened. The calls it made follow as their own rows; the span's duration is
  * left out because the CLI logs the call as soon as the script starts.
  */
-function CodeScriptCall({ entry, ran }: { entry: ToolEntry; ran: TerminalToolSpan | null }) {
+function CodeScriptCall({
+  entry,
+  ran,
+  metadataOnly,
+}: {
+  entry: ToolEntry;
+  ran: TerminalToolSpan | null;
+  metadataOnly: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
   const script = readCodeModeScript(entry.input);
   const results = readCodeModeScriptResults(ran?.output ?? entry.output) ?? [];
   const isError = ran?.isError ?? entry.failed;
   const canExpand = script.code !== null || results.length > 0;
-  const linesLabel = codeScriptSizeLabel(script);
+  const linesLabel = codeScriptSizeLabel({ script, metadataOnly });
   const toggleLabel = expanded ? "(click to hide)" : "(click to show)";
 
   const heading = (
@@ -1481,11 +1525,21 @@ function CodeScriptCall({ entry, ran }: { entry: ToolEntry; ran: TerminalToolSpa
   );
 }
 
-/** The full script's size: its line count, or its length when only its start was recorded. */
-function codeScriptSizeLabel(script: ReturnType<typeof readCodeModeScript>): string {
+/**
+ * The full script's size: its line count, or its length when only its start was recorded.
+ * Nothing in a metadata-only session, whose top line already says no script was recorded.
+ */
+function codeScriptSizeLabel({
+  script,
+  metadataOnly,
+}: {
+  script: ReturnType<typeof readCodeModeScript>;
+  metadataOnly: boolean;
+}): string {
   if (script.cutFromChars !== null) {
     return ` · ${script.cutFromChars.toLocaleString("en-GB")} characters`;
   }
+  if (script.lineCount === null && metadataOnly) return "";
   return script.lineCount === null
     ? " · script not recorded"
     : ` · ${lineCountLabel(script.lineCount)}`;

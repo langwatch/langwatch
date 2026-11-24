@@ -13,6 +13,10 @@ import { type Instant, nowInstant, toDate } from "@langwatch/time";
 import { EVENT_LOG_RETENTION_CLASSIFICATION } from "../../rules/event-log-retention.rules.ts";
 import { idIndexCategories } from "../../rules/id-index-categories.rules.ts";
 import type {
+  RetentionDriftWindow,
+  StoredRetentionStamp,
+} from "../../rules/retention-drift.rules.ts";
+import type {
   ClickHouseTarget,
   KeepForeverRewrite,
   RetroactiveRetentionRepository,
@@ -84,6 +88,22 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
         item.ageDays > input.retentionDays &&
         (item.retentionDays === 0 || item.retentionDays > input.retentionDays),
     ).length;
+  }
+
+  /** Sampled stamps keyed `project/category`; tests set them. */
+  readonly sampledStamps = new Map<string, StoredRetentionStamp[]>();
+  /** Projects whose sample read fails as an unreachable server would; tests set them. */
+  readonly refuseSampleFor = new Set<string>();
+
+  async sampleStoredRetention(input: {
+    projectId: string;
+    category: RetentionCategory;
+    windows: readonly RetentionDriftWindow[];
+  }): Promise<StoredRetentionStamp[]> {
+    if (this.refuseSampleFor.has(input.projectId)) {
+      throw new Error(`Stored rows of ${input.projectId} could not be read`);
+    }
+    return this.sampledStamps.get(`${input.projectId}/${input.category}`) ?? [];
   }
 
   async triggerUpdate(input: {
