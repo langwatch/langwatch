@@ -30,8 +30,6 @@ describe("HTTP trace context propagation", () => {
   let echoServer: Awaited<ReturnType<typeof createOtelEchoServer>>;
 
   beforeAll(async () => {
-    // A real TracerProvider with an in-memory exporter, registered globally
-    // with the async context manager and the W3C propagators.
     exporter = new InMemorySpanExporter();
     provider = new TracerProvider({
       spanProcessors: [new SimpleSpanProcessor({ exporter })],

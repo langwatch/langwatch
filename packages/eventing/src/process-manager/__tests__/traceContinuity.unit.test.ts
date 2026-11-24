@@ -41,8 +41,6 @@ describe("process-manager trace continuity", () => {
     provider = new TracerProvider({
       spanProcessors: [new SimpleSpanProcessor({ exporter })],
     });
-    // Registers the global tracer provider, the AsyncLocalStorage context
-    // manager, and the composite W3C trace-context + baggage propagator.
     trace.setGlobalTracerProvider(provider);
     context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
     propagation.setGlobalPropagator(
