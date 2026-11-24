@@ -62,14 +62,14 @@ class GlobalTracer implements Tracer {
     optionsOrFn: SpanOptions | F,
     contextOrFn?: Context | F,
     fn?: F,
-  ): ReturnType<F> | undefined {
+  ): ReturnType<F> {
     const tracer = this.current();
     if (typeof optionsOrFn === "function") return tracer.startActiveSpan(name, optionsOrFn);
     if (typeof contextOrFn === "function") {
       return tracer.startActiveSpan(name, optionsOrFn, contextOrFn);
     }
     if (contextOrFn && fn) return tracer.startActiveSpan(name, optionsOrFn, contextOrFn, fn);
-    return undefined;
+    throw new Error("Expected a span callback as the last argument");
   }
 }
 
