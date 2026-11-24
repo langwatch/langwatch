@@ -104,16 +104,16 @@ export class GatewayA2aTargetService {
     });
   }
 
-  /** Header values stay sealed: every list ends at the DTO, which shows header names only. */
+  /** Unseals headers: the DTO every list ends at names them, and drops their values. */
   list(organizationId: string): Promise<GatewayA2aTargetResource[]> {
-    return this.repository.findAll(organizationId, { headers: false });
+    return this.repository.findAll(organizationId);
   }
 
   listForProject(input: {
     organizationId: string;
     projectId: string;
   }): Promise<GatewayA2aTargetResource[]> {
-    return this.repository.findByProject(input, { headers: false });
+    return this.repository.findByProject(input);
   }
 
   async updateForProject(
