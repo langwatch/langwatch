@@ -58,6 +58,13 @@ describe("fireSignup", () => {
         });
       });
 
+      /** @scenario "A founder who signs up is identified with seat admin" */
+      it("decides to identify the founder with seat admin", () => {
+        const calls = fireSignup(SIGNUP);
+
+        expect(calls[0]).toMatchObject({ type: "identify", traits: { seat: "admin" } });
+      });
+
       /** @scenario "New signup associates user with organization via group call" */
       it("decides to associate them with their organization by name", () => {
         const calls = fireSignup({ ...SIGNUP, signUpData: { companySize: "11-50" } });

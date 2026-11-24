@@ -150,6 +150,12 @@ Feature: An organization's session facts reach every active member in Customer.i
     And the person is tracked joined_via_sso and joined_organization
 
   @unit
+  Scenario: A founder who signs up is identified with seat admin
+    Given a person signing up and creating the first organization
+    When the sign-up is identified
+    Then Customer.io identifies the person with seat admin
+
+  @unit
   Scenario: A join event carries the seat the person joined with
     Given an invite_accepted or sso_auto_added signal for org-1 holding the role ADMIN, MEMBER, EXTERNAL or DEVELOPER
     When the signal is delivered
