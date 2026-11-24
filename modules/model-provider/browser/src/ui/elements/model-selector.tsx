@@ -18,7 +18,9 @@ import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type BuiltInModel,
+  canonicalModelId,
   type GroupedModelOptions,
+  findSelectedOptions,
   isServedOnlyAsBuiltIn,
   modelSelectionFrom,
   type ModelOption,
@@ -65,7 +67,7 @@ export const useModelSelectionOptions = ({
     ...(builtInModels ? { builtInModels } : {}),
   });
 
-  const modelOption = selectOptions.find((opt) => opt.value === model);
+  const [modelOption] = findSelectedOptions({ options: selectOptions, model });
 
   // THE LOCAL DEV ESCAPE HATCH DID NOT TRAVEL. It read `import.meta.env.PROD`,
   // and a reusable package may not read the environment (ADR-101) — the same
@@ -341,7 +343,7 @@ function ConfigureModelsAction({ size }: { size: SelectorSize }) {
 }
 
 export function ModelSelector({
-  model,
+  model: storedModel,
   options,
   onChange,
   size = "md",
@@ -370,12 +372,15 @@ export function ModelSelector({
   /** Models LangWatch serves itself, listed first even with no provider configured. */
   builtInModels?: readonly BuiltInModel[];
 }) {
-  const { selectOptions, groupedByProvider, isEmpty, isLoading } = useModelSelectionOptions({
+  const { groupedByProvider, isEmpty, isLoading, modelOption } = useModelSelectionOptions({
     options,
-    model,
+    model: storedModel,
     mode,
     builtInModels,
   });
+  const selectedItem = modelOption;
+  // The select holds the option's own id, so a legacy stored id still shows as picked.
+  const model = selectedItem?.value ?? canonicalModelId(storedModel);
 
   // ALL hooks must run unconditionally — keep the empty-state early
   // return *after* every hook below so we don't violate React's rules
@@ -390,8 +395,6 @@ export function ModelSelector({
   const modelCollection = createListCollection({
     items: allFilteredModels,
   });
-
-  const selectedItem = selectOptions.find((option) => option.value === model);
 
   // Model might not be in the list if it's a custom model or unknown
   const isUnknown = !selectedItem;

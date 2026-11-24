@@ -1240,7 +1240,7 @@ The **Default Models** section on the same page sets the model each feature uses
 
 Click **Add config**, pick the scopes and the models. A project config beats a team config, which beats an organization config. A feature that no config names inherits from the wider scope.
 
-The **Instant Evals** column takes only decision models: LangWatch Evals Preview, the default, or one on your own key. See [Run Instant Evals on your own decision model](/features/instant-evals/own-model).
+The **Instant Evals** column takes only decision models: LangWatch Instant (preview), the default, or one on your own key. See [Run Instant Evals on your own decision model](/features/instant-evals/own-model).
 
 <Frame>
 <img src="/images/platform/model-providers-default-models.png" alt="The Default Models section with one config and the Add config button" />
@@ -5075,7 +5075,7 @@ Spend events, spend summaries and the webhook endpoints are an Enterprise capabi
 
 An outcome that arrives after settlement is recorded as `success` or `error`. A `success` event is never downgraded.
 
-An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `langwatch-evals-preview` (or `langwatch-judge` for a routed LLM judge; older events carry `jev`), an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count.
+An [Instant Eval](/api-reference/instant-evals/running-an-instant-eval) query or run is also one spend event, recorded as `success` with no `admitted` step before it. It carries `request_type: "instant_eval"`, model `langwatch-instant-preview` (or `langwatch-judge` for a routed LLM judge; older events carry `langwatch-evals-preview` or `jev`), an empty virtual key and no provider; `usage.input_tokens` is what the judge read, `cost` is the customer price, and `metadata` holds the request count.
 
 A run's event id starts with `instanteval_` followed by the run id, so a run finished twice is one event. Budgets debit it like any other spend.
 
@@ -45652,13 +45652,13 @@ keywords: langwatch, instant evals, decision model, own key, bring your own key,
 description: Run Instant Evals on a decision model in your own provider account, set up Azure, and read the rows your model cannot judge.
 ---
 
-## LangWatch Evals Preview or your own model
+## LangWatch Instant (preview) or your own model
 
-Instant Evals run on **LangWatch Evals Preview** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
+Instant Evals run on **LangWatch Instant (preview)** by default, billed as in [Limits and cost](/features/instant-evals/limits-and-cost). You can pick a decision model in your own provider account instead, per organization, team or project. Your provider then bills you for each row, and LangWatch does not.
 
 ## The models you can pick
 
-The picker is one list: LangWatch's **Evals Preview** first, then the models on your own keys. Each row shows its provider's logo and a title. OpenAI's and Azure's `gpt-6-luna` both read **Decisions API**, and the logo tells them apart. The other titles name the provider and the model. A model whose provider has no key yet is listed but greyed out, with a line saying which key to add.
+The picker is one list: **LangWatch Instant (preview)** first, then the models on your own keys. Each row shows its provider's logo and a title. OpenAI's and Azure's `gpt-6-luna` both read **Decisions API**, and the logo tells them apart. The other titles name the provider and the model. A model whose provider has no key yet is listed but greyed out, with a line saying which key to add.
 
 | Provider to add       | Model in the picker             | What the provider needs                                                                          |
 | --------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -45691,7 +45691,7 @@ The picker is one list: LangWatch's **Evals Preview** first, then the models on 
     <Frame>
       <img
         src="/images/instant-evals/own-model-picker.png"
-        alt="Edit default models drawer for the ACME organization, with the Instant Evals picker open: Evals Preview first, then Decisions API on OpenAI ticked, then models whose provider has no key yet"
+        alt="Edit default models drawer for an organization, with the Instant Evals picker open: LangWatch Instant (preview) first, then Decisions API on Azure OpenAI ticked, then models whose provider has no key yet"
       />
     </Frame>
   </Step>
@@ -45743,7 +45743,7 @@ Without the deployment, every row is skipped as `classifier_not_configured`.
 
 ## When your model cannot answer
 
-A run on your own model never falls back to LangWatch Evals Preview. Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. When the key is refused for every row of a page, the run fails with `instant_eval_decision_model_key_invalid` instead, so it does not read as a run where no row matched. List skipped rows with `langwatch instant-eval results <run-id> --status skipped`.
+A run on your own model never falls back to LangWatch Instant (preview). Rows it cannot judge are marked `skipped` with the reason in `error`, and the run carries on. When the key is refused for every row of a page, the run fails with `instant_eval_decision_model_key_invalid` instead, so it does not read as a run where no row matched. List skipped rows with `langwatch instant-eval results <run-id> --status skipped`.
 
 | `error`                           | Why                                                                                                         | Fix                                                                         |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -45758,8 +45758,8 @@ Rate limits and outages are retried before the row is skipped. Refused keys and 
 
 - **Cost.** Your provider bills you. LangWatch does not, and the [free budget](/features/instant-evals/limits-and-cost#the-free-budget) does not apply.
 - **Limits.** The [row, question and text limits](/features/instant-evals/limits-and-cost#limits) still apply.
-- **Data.** Each row's text and your questions go to your provider, under your agreement with it. LangWatch Evals Preview never sees them.
-- **Search bar.** Still runs on LangWatch Evals Preview.
+- **Data.** Each row's text and your questions go to your provider, under your agreement with it. LangWatch Instant (preview) never sees them.
+- **Search bar.** Still runs on LangWatch Instant (preview).
 
 ---
 
