@@ -9,7 +9,7 @@ import type {
 /**
  * The trace-day folds' version. A row of another version is left out of the read and makes its
  * fold throw (no re-fold path), so a bump needs a replay first. Migration
- * `20261123120000_nurturing_project_trace_day_count` seeds its rows at this value; a bump leaves
+ * `20261124120005_nurturing_project_trace_day_count` seeds its rows at this value; a bump leaves
  * that migration as it is.
  */
 export const NURTURING_TRACE_DAY_PROJECTION_VERSION = "2026-11-23" as const;
