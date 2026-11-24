@@ -11,7 +11,7 @@ import {
   isTerminalFailure,
   readCliErrorDocument,
 } from "@langwatch/handled-error/langwatch-handled-error";
-import { explainHandledError, isTipForPeople } from "@langwatch/handled-error/presentation";
+import { explainHandledError, supplementalTips } from "@langwatch/handled-error/presentation";
 import { parseCliJson } from "@langwatch/langy-contract";
 
 import { LIMIT_TYPE_LABELS } from "../../../../model/limit-type-labels.ts";
@@ -391,7 +391,7 @@ function platformSentence(domain: LangWatchHandledErrorShape): string {
     traceId: undefined,
     reasons: serializedReasons(domain.reasons),
   });
-  if (!copy.isRegistered) return domain.message;
+  if (!copy.isRegistered) return copy.title;
   return copy.description !== "" ? copy.description : copy.title;
 }
 
@@ -553,7 +553,7 @@ function buildDomainPresentation({
   const { message, detail, limit, remediationApplies } = describeFailure({ domain, toolName });
   // The CLI's own text for Langy's key tells the reader to log in, so it never reaches them.
   const keepsRaw = credentialFault({ code: domain.code, toolName }) !== "sandbox";
-  const tips = (domain.suggestions ?? []).filter(isTipForPeople);
+  const tips = supplementalTips({ tips: domain.suggestions ?? [], description: message });
 
   return {
     title: `${title} failed`,
@@ -567,7 +567,7 @@ function buildDomainPresentation({
     ...(isTerminalFailure(domain) ? { terminal: true } : {}),
     // The platform's own next steps (ADR-045's remediation channel), shown as written —
     // paraphrasing them here would put the card out of step with the docs they are
-    // pinned to. A step pointing at `meta` is for an API caller, so it is left out.
+    // pinned to. A step pointing at `meta` (for API callers) or repeating the message is left out.
     ...(remediationApplies && tips.length ? { tips } : {}),
     ...(remediationApplies && docsUrl ? { docsUrl } : {}),
     ...(traceId ? { traceId } : {}),
