@@ -307,11 +307,12 @@ function memoryStep({
     return commit(input);
   });
   const findIds = repository.findPostgresDatasetIds.bind(repository);
+  const pageFailure = new Error("page read failed");
   let pageFailedOnce = false;
   vi.spyOn(repository, "findPostgresDatasetIds").mockImplementation(async (input) => {
     if (input.projectId === failNextPageOf && input.afterId && !pageFailedOnce) {
       pageFailedOnce = true;
-      throw new Error("page read failed");
+      throw pageFailure;
     }
     return findIds(input);
   });
@@ -341,7 +342,7 @@ function memoryStep({
       dryRun: false,
       signal: new AbortController().signal,
     });
-  return { migration, ledger, attempt };
+  return { migration, ledger, attempt, pageFailure };
 }
 
 describe("DatasetMigrationService report across attempts", () => {
@@ -364,9 +365,12 @@ describe("DatasetMigrationService report across attempts", () => {
   describe("given project_b's next page read fails after both its datasets moved", () => {
     /** @scenario "A move that retried reports every dataset it moved across its attempts" */
     it("saves the two moved datasets before the error, so the retry reports all six", async () => {
-      const { ledger, attempt } = memoryStep({ failCommitOf: "none", failNextPageOf: "project_b" });
+      const { ledger, attempt, pageFailure } = memoryStep({
+        failCommitOf: "none",
+        failNextPageOf: "project_b",
+      });
 
-      await expect(attempt()).rejects.toThrow("page read failed");
+      await expect(attempt()).rejects.toBe(pageFailure);
       expect(ledger.report).toMatchObject({ afterProjectId: "project_a", migrated: 4 });
 
       await expect(attempt()).resolves.toMatchObject({ migrated: 6, failed: 0 });

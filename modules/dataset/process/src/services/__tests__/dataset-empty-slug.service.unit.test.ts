@@ -209,14 +209,15 @@ describe("when a slug write throws partway through a project", () => {
     stored({ id: "a", name: "First", slug: "" });
     stored({ id: "boom", name: "Boom", slug: "" });
     const fill = datasets.fillEmptySlug.bind(datasets);
+    const failure = new Error("slug write failed");
     let broken = true;
     vi.spyOn(datasets, "fillEmptySlug").mockImplementation(async (input) => {
-      if (input.id === "boom" && broken) throw new Error("slug write failed");
+      if (input.id === "boom" && broken) throw failure;
       return fill(input);
     });
 
     const saved: MigrationStepReport[] = [];
-    await expect(run({ saved })).rejects.toThrow("slug write failed");
+    await expect(run({ saved })).rejects.toBe(failure);
     expect(saved.at(-1)).toMatchObject({ filled: 1 });
 
     broken = false;

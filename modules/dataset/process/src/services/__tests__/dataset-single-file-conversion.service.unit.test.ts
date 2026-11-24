@@ -500,11 +500,12 @@ describe("the single-file conversion report across attempts", () => {
       await singleFile({ inProject: "project_c" });
       const source = repositories.singleFileConversion;
       const findIds = source.findSingleFileDatasetIds.bind(source);
+      const pageFailure = new Error("page read failed");
       let failedOnce = false;
       vi.spyOn(source, "findSingleFileDatasetIds").mockImplementation(async (input) => {
         if (input.projectId === "project_b" && input.afterId && !failedOnce) {
           failedOnce = true;
-          throw new Error("page read failed");
+          throw pageFailure;
         }
         return findIds(input);
       });
@@ -516,7 +517,7 @@ describe("the single-file conversion report across attempts", () => {
         });
       };
 
-      await expect(attempt()).rejects.toThrow("page read failed");
+      await expect(attempt()).rejects.toBe(pageFailure);
       expect(resumeFrom).toMatchObject({ afterProjectId: "project_a", converted: 3 });
 
       await expect(attempt()).resolves.toMatchObject({ converted: 4, failed: [] });
