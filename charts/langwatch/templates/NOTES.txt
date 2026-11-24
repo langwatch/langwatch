@@ -393,9 +393,9 @@ CreateContainerConfigError; `kubectl describe pod` names the missing key.
 8. LangWatchQL (LWQL) — governed analytics SQL
 ──────────────────────────────────────────────────────────────────────
 {{- if .Values.lwql.enabled }}
-The `release_lwql_workbench` feature flag still gates the HTTP endpoint —
-until it is on for a project, queries are refused with `lwql_not_enabled`
-while the backend objects sit ready.
+The `release_lwql_workbench` feature flag gates the HTTP endpoint. It is on
+by default on a self-hosted install; where an operator switches it off for a
+project, queries are refused with `lwql_not_enabled`.
 
 The application owns the LangWatchQL access model in code. How it reaches
 ClickHouse depends on the posture:

@@ -2292,8 +2292,8 @@ clickhouse:
 # identity (langwatch_lwql), the <database>_profile settings profile
 # (langwatch_profile by default), the tenant row policies, the lwql_postgres
 # named collection and the caller-facing views.
-# The `release_lwql_workbench` feature flag still gates the HTTP endpoint; the
-# backend objects exist regardless.
+# The `release_lwql_workbench` feature flag gates the HTTP endpoint and is on by
+# default on a self-hosted install; the backend objects exist regardless.
 #
 # One rule, one owner (issue #8258): the APPLICATION owns the access model in
 # code. How it reaches ClickHouse depends on the posture:
@@ -2317,7 +2317,7 @@ clickhouse:
 # it converges the identities with.
 ## @section LangWatchQL (LWQL)
 lwql:
-  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Delivered as rendered config to every pod on chart-managed ClickHouse (default), or via SQL DDL on bring-your-own ClickHouse (LWQL_ACCESS_MODEL_MODE=sql). The feature flag still gates the endpoint.
+  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Delivered as rendered config to every pod on chart-managed ClickHouse (default), or via SQL DDL on bring-your-own ClickHouse (LWQL_ACCESS_MODEL_MODE=sql). The feature flag, on by default on a self-hosted install, gates the endpoint.
   enabled: true
   ## @param lwql.imagePullSecrets [array] Pull secrets for the app image the access-render Job runs. That Job uses its own ServiceAccount, so secrets on the namespace default ServiceAccount do not reach it (same reason app.storedObjects.localFilesystem.serializeUpgradesPullSecrets exists).
   imagePullSecrets: []
