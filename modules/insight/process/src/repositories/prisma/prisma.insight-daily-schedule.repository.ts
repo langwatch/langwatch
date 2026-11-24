@@ -11,20 +11,41 @@ import {
   type InsightOnSchedule,
   onScheduleFromState,
 } from "../../rules/insight-daily-schedule-row.rules.ts";
+import {
+  type InsightRunInFlightState,
+  NO_RUN_STARTED,
+} from "../../rules/insight-run-in-flight.rules.ts";
 import type { InsightDailyScheduleRepository } from "../insight-daily-schedule.repository.ts";
 import {
   dailyScheduleStateFromRow,
   type InsightDailyScheduleRow,
 } from "./prisma.insight-daily-schedule.mapper.ts";
+import {
+  type InsightRunInFlightRow,
+  runInFlightStateFromRow,
+} from "./prisma.insight-run-in-flight.mapper.ts";
 
-/** The run rows, plus the raw SQL a read across projects needs. */
-type InsightDailyScheduleDatabase = PrismaModelClient<"InsightDailyScheduleProjection"> &
+/** Each schedule's run in flight row by its id; a schedule with none reads `NO_RUN_STARTED`. */
+function startedBySchedule(
+  rows: readonly InsightRunInFlightRow[],
+): (scheduleId: string) => InsightRunInFlightState {
+  const byId = new Map(rows.map((row) => [row.id, runInFlightStateFromRow(row)]));
+  return (scheduleId) => byId.get(scheduleId) ?? NO_RUN_STARTED;
+}
+
+/** The run rows and their run in flight rows, plus the raw SQL a read across projects needs. */
+type InsightDailyScheduleDatabase = PrismaModelClient<
+  "InsightDailyScheduleProjection" | "InsightRunInFlightProjection"
+> &
   Pick<PrismaClient, "$queryRaw">;
 
 /** The run rows one person reads: each of their queries carries `projectId` and the person. */
 export class PrismaInsightDailyScheduleRepository implements InsightDailyScheduleRepository {
   /** Declared, not inherited: the model-scoped client carries no `$queryRaw`. */
-  static readonly tables = prismaTables("InsightDailyScheduleProjection");
+  static readonly tables = prismaTables(
+    "InsightDailyScheduleProjection",
+    "InsightRunInFlightProjection",
+  );
 
   static create({
     prisma,
@@ -46,8 +67,21 @@ export class PrismaInsightDailyScheduleRepository implements InsightDailySchedul
     const rows = await this.database.insightDailyScheduleProjection.findMany({
       where: { projectId, userId },
     });
+    if (rows.length === 0) return [];
+    // Its own table, read apart: the run in flight row orders runs (ADR-004).
+    const startedOf = startedBySchedule(
+      await this.database.insightRunInFlightProjection.findMany({
+        where: { projectId, id: { in: rows.map((row) => row.id) } },
+      }),
+    );
     return rows
-      .map((row) => dailyRunFromState({ id: row.id, state: dailyScheduleStateFromRow(row) }))
+      .map((row) =>
+        dailyRunFromState({
+          id: row.id,
+          state: dailyScheduleStateFromRow(row),
+          started: startedOf(row.id),
+        }),
+      )
       .toSorted(byNewestRun);
   }
 
@@ -63,7 +97,15 @@ export class PrismaInsightDailyScheduleRepository implements InsightDailySchedul
     const rows = await this.database.insightDailyScheduleProjection.findMany({
       where: { id: scheduleId, projectId, userId },
     });
-    return rows.map((row) => dailyRunSettingFromState(dailyScheduleStateFromRow(row)));
+    if (rows.length === 0) return [];
+    // Its own table, read apart: a run in flight is folded by its own projection (ADR-004).
+    const started = await this.database.insightRunInFlightProjection.findFirst({
+      where: { id: scheduleId, projectId },
+    });
+    const startedState = started ? runInFlightStateFromRow(started) : NO_RUN_STARTED;
+    return rows.map((row) =>
+      dailyRunSettingFromState(dailyScheduleStateFromRow(row), startedState),
+    );
   }
 
   async findOnPage({
@@ -125,12 +167,28 @@ export class PrismaInsightDailyScheduleRepository implements InsightDailySchedul
         SKIP_TENANT_CHECK: true,
       })}
     `;
+    const startedOf = startedBySchedule(await this.runsInFlightOf(rows.map(({ id }) => id)));
     return rows.flatMap((row) =>
       decidedScheduleFromState({
         scheduleId: row.id,
         projectId: row.projectId,
         state: dailyScheduleStateFromRow(row),
+        started: startedOf(row.id),
       }),
     );
+  }
+
+  /** The run in flight rows of schedules in any project, by their ids, for the operator's list. */
+  private async runsInFlightOf(scheduleIds: string[]): Promise<InsightRunInFlightRow[]> {
+    if (scheduleIds.length === 0) return [];
+    return this.database.$queryRaw<InsightRunInFlightRow[]>`
+      SELECT *
+      FROM "InsightRunInFlightProjection"
+      WHERE "id" = ANY(${scheduleIds}::text[])
+      ${skipTenantCheck({
+        // The operator's list acts for no person: its schedules span every project.
+        SKIP_TENANT_CHECK: true,
+      })}
+    `;
   }
 }

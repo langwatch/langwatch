@@ -6,20 +6,18 @@
  */
 
 import { buildIntentAccessor } from "@langwatch/eventing";
-import type {
-  InsightRunSettledEventData,
-  InsightScheduleConfiguredEventData,
+import {
+  INSIGHT_DAILY_RUN_LEASE_MS,
+  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
+  type InsightRunSettledEventData,
+  type InsightScheduleConfiguredEventData,
 } from "@langwatch/insight-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { dailyScheduleId } from "../../rules/insight-daily-run.rules.ts";
 import { dailyScheduleMinute } from "../../rules/insight-daily-schedule.rules.ts";
-import {
-  INSIGHT_DAILY_RUN_LEASE_MS,
-  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
-  runBoardIntentSchema,
-} from "../insight-daily-run.intent.ts";
+import { runBoardIntentSchema } from "../insight-daily-run.intent.ts";
 import {
   INITIAL_INSIGHT_DAILY_RUN_STATE,
   type InsightDailyRunState,
@@ -156,7 +154,14 @@ describe("given a schedule that is on and its slot is due", () => {
       {
         intentType: "runBoard",
         messageKey: `run:slot:${slot}`,
-        payload: { ...SCHEDULE, maxInsights: 3, runId: `slot:${slot}`, slot, skippedDaysBefore: 0 },
+        payload: {
+          ...SCHEDULE,
+          maxInsights: 3,
+          runId: `slot:${slot}`,
+          slot,
+          skippedDaysBefore: 0,
+          since: slot + 2_000,
+        },
       },
     ]);
     // The same intent a request writes, but for the run's name.
@@ -244,7 +249,8 @@ describe("given a scheduled run that never recorded an outcome", () => {
     expect(next.intents?.[0]?.payload).toMatchObject({
       runId: `slot:${second}`,
       slot: second,
-      supersedes: { runId: `slot:${first}`, slot: first },
+      since: second,
+      supersedes: { runId: `slot:${first}`, slot: first, since: first },
     });
     expect(next.state.pendingRun).toEqual({ runId: `slot:${second}`, since: second, slot: second });
   });

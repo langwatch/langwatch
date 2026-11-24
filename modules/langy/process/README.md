@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable, callable Langy capability shared by process transports.
 
-Peers call these through the token, declared at `../contract/src/langy.api.ts:299`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/langy.api.ts:301`; nothing else in this package is public.
 
 #### `ingestInternalTurnResult`
 

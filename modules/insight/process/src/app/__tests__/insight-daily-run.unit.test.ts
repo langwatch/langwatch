@@ -84,6 +84,10 @@ async function run(scope: RunScope = {}) {
 const runsOf = (userId = MEMBER) => installed.app.findDailyRuns({ projectId: PROJECT, userId });
 const insightsOf = (userId = MEMBER) => installed.app.findInsights({ projectId: PROJECT, userId });
 
+/** The person's own setting on the board, as Run now reads it. */
+const settingOf = (userId = MEMBER) =>
+  installed.app.getDailyRunSetting({ projectId: PROJECT, userId, board: BOARD });
+
 /** How the person's last run on the board ended. */
 async function lastRunOf(scope: { userId?: string; board?: InsightRunBoard } = {}) {
   const id = installed.scheduleIdOf(scope);
@@ -136,6 +140,7 @@ describe("given a member with analytics:view and a board with widgets", () => {
           idempotencyKey: `insight-daily-run:${installed.scheduleIdOf()}:${runId}`,
           text: expect.stringContaining('Dashboard: "Costs" (id "dashboard-1")'),
           title: expect.stringMatching(/^Daily insights - Costs - \d{4}-\d{2}-\d{2}$/),
+          isExemptFromRateLimit: true,
         },
       ]);
       expect(installed.langy.waits).toEqual([
@@ -148,6 +153,17 @@ describe("given a member with analytics:view and a board with widgets", () => {
         }),
       ]);
       expect(await installed.runEventsOf()).toEqual([RUN_REQUESTED, RUN_STARTED, RUN_SETTLED]);
+    });
+
+    /** @scenario "A settled run keeps when it started on the board's row" */
+    it("reads when the run's turn started beside how it ended", async () => {
+      const before = nowInstant().epochMilliseconds;
+      await run();
+
+      const { lastRun } = await settingOf();
+
+      expect(lastRun?.startedAt).toBeGreaterThanOrEqual(before);
+      expect(lastRun?.startedAt).toBeLessThanOrEqual(lastRun?.at ?? 0);
     });
 
     /** @scenario "A run for one person changes nothing another person reads" */
@@ -400,6 +416,7 @@ describe("given the board a run is asked for", () => {
 
     expect(await lastRunOf()).toMatchObject({ outcome: "skipped", reason: "board_empty" });
     expect(installed.langy.starts).toEqual([]);
+    expect((await settingOf()).lastRun).not.toHaveProperty("startedAt");
   });
 
   /** @scenario "A From LangWatch board is skipped with its own reason" */
@@ -1070,7 +1087,7 @@ describe("given delivery at least once", () => {
     const runIds = (await installed.intentsOf()).map(
       ({ payload }) => (payload as { runId: string }).runId,
     );
-    expect(answer).toEqual({ requestId: expect.any(String) });
+    expect(answer).toEqual({ requestId: expect.any(String), requestedAt: expect.any(Number) });
     expect(runIds).toEqual([inFlight.runId]);
     expect(runIds).not.toContain(answer.requestId);
   });
@@ -1116,5 +1133,22 @@ describe("given the run's row", () => {
       "Costs",
       "Latency",
     ]);
+  });
+});
+
+describe("given a project whose unattended turns reached their window", () => {
+  describe("when an Insights run asks Langy for its turn", () => {
+    /** @scenario "An Insights run is not held to the unattended window" */
+    it("starts the turn, marked as not counted, and files what Langy found", async () => {
+      installed.world.langy.isWindowFull = true;
+      installed.world.langy.answer = TWO_FINDINGS;
+
+      await run();
+
+      expect(installed.langy.starts).toEqual([
+        expect.objectContaining({ isExemptFromRateLimit: true }),
+      ]);
+      expect(await lastRunOf()).toMatchObject({ outcome: "filed", filedCount: 2 });
+    });
   });
 });

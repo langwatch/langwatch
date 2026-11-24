@@ -7,7 +7,6 @@
 import type { StateProjectionDefinition, StateProjectionStore } from "@langwatch/eventing";
 import {
   INSIGHT_DAILY_RUN_EVENT_TYPES,
-  INSIGHT_DAILY_RUN_SETTING_EVENT_TYPES,
   INSIGHT_DAILY_SCHEDULE_PROJECTION_VERSION,
   type InsightRunBoard,
   type InsightRunMaxInsights,
@@ -146,7 +145,12 @@ export function createInsightDailyScheduleProjection(deps: {
   return {
     name: "insightDailySchedule",
     version: INSIGHT_DAILY_SCHEDULE_PROJECTION_VERSION,
-    eventTypes: INSIGHT_DAILY_RUN_SETTING_EVENT_TYPES,
+    // A run's start is the run in flight row's (`insight-run-in-flight.projection.ts`).
+    eventTypes: [
+      INSIGHT_DAILY_RUN_EVENT_TYPES.CONFIGURED,
+      INSIGHT_DAILY_RUN_EVENT_TYPES.TURNED_OFF,
+      INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED,
+    ],
     init: () => INITIAL_INSIGHT_DAILY_SCHEDULE_STATE,
     apply: applyInsightDailyRunEvent,
     store: deps.store,

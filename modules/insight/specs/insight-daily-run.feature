@@ -595,10 +595,156 @@ Feature: The daily insights run
       And a run that replaces no other names none
 
     @unit
+    Scenario: A run's start and its outcome share one queue per schedule
+      Given the daily run pipeline
+      When its commands that record a run's start and its outcome are registered
+      Then both serialize on the schedule, with no lane of their own
+
+    @unit
     Scenario: A settled run keeps its first outcome
       Given a run recorded as filed
       When the same run is settled again as failed
       Then the run's row still reads filed
+
+  Rule: Runs are ordered by when the schedule's process started them
+    Each run carries when the process started it. A slot is no such order: an operator's run is
+    for the moment it was asked, and a late wake keeps its earlier slot. A run an older worker
+    carried has no start, and is ordered by its slot, which is never after its start.
+
+    @unit
+    Scenario: Two runs that carry their start are ordered by it, whatever their slots
+      Given two runs that carry their start, the later one for an earlier slot
+      When they are compared
+      Then the one that started later is the newer
+
+    @unit
+    Scenario: A run's slot is never after its start
+      Given an operator's run, one on a clock behind the request's, and a late wake's run
+      When the schedule's process starts each
+      Then each run's start is at or after its slot
+
+    @unit
+    Scenario: A run that carries no start is ordered by its slot against the other's start
+      Given a run that started an hour after its slot and carries its start
+      And a run that carries no start, for a slot three hours after that run's
+      When they are compared
+      Then the one that carries no start is the newer
+      And one that carries no start, for a slot before that run's start, is the older
+
+    @unit
+    Scenario: Two runs that carry no start are ordered by their slot
+      Given two runs that carry no start
+      When they are compared
+      Then the one for the later slot is the newer
+
+    @unit
+    Scenario: Two runs that started at the same instant are ordered by their run id
+      Given two runs that started at the same instant, for different slots
+      When they are compared
+      Then the one with the greater run id is the newer, the same way each time
+
+    @unit
+    Scenario: A late wake's run after an operator's run shows in flight and as the last run
+      Given an operator's run that settled
+      And the day's wake that came late, so its run is for an earlier slot than the operator's
+      When the wake's run starts, and then files
+      Then it is the run in flight while it runs
+      And its filed outcome is the last run
+
+    @unit
+    Scenario: The run's row counts the skipped days the schedule's process counts
+      Given a scheduled run that was skipped
+      And an operator's run that was skipped, then a late wake's run that was skipped
+      When the run's row and the schedule's process fold the three outcomes
+      Then both count 2 skipped days
+
+    @unit
+    Scenario: A repeated outcome of a replaced run leaves the newer run as the last run
+      Given a run that recorded the run it replaced as lost, and then filed
+      When the replaced run's outcome is recorded again
+      Then the last run still reads the newer run's filed outcome
+      And no run is in flight
+
+    @unit
+    Scenario: A late outcome of an older run leaves the newer run in flight
+      Given a run that recorded the run it replaced as lost, and started
+      When an even older run's outcome arrives late
+      Then the newer run is still in flight
+      And the last run is still the lost run
+
+    @unit
+    Scenario: A late start of an older run names no run in flight
+      Given a newer run that started and settled after an older one
+      When the older run's start is recorded after the newer run's events
+      Then no run is in flight
+
+    @unit
+    Scenario: A lost run's own late outcome, once recorded as lost, leaves the row
+      Given an operator's run handed over before runs carried their start, and lost
+      And a late wake's run for an earlier slot that recorded it as lost, and started
+      When the lost run's own outcome, which carries no start, arrives late
+      Then the late wake's run is still in flight
+      And the last run is still the lost run
+
+    @unit
+    Scenario: A run that started after the slot of one that carries none is taken
+      Given an operator's run that carries no start and settled, for a later slot
+      When a late wake's run that carries its start starts, for an earlier slot, and files
+      Then it is the run in flight while it runs
+      And its filed outcome is the last run
+
+    @unit
+    Scenario: A later run that carries no start is taken after one that carries its start
+      Given a late wake's run that carries its start and settled
+      When an operator's later run that an older worker carried without its start starts
+      And it files
+      Then it is the run in flight while it runs
+      And its filed outcome is the last run
+
+    @unit
+    Scenario: A lost run's outcome that carries no start is ordered by its run's own start
+      Given an operator's run that settled
+      And a late wake's run for an earlier slot that started after it
+      When an older worker records the wake's run as lost, without its start
+      Then the wake's run's timeout is the last run
+      And the run in flight row keeps the wake's run's start as its newest
+
+    @unit
+    Scenario: A lost run's outcome that lands after its replacement started is the last run
+      Given a run that settled, a run that was lost, and the run that replaced it, started
+      When the outcome the replacing run recorded for the lost run lands after that start
+      Then the lost run's timeout is the last run
+      And the replacing run is still in flight, until its own outcome is the last run
+
+    @unit
+    Scenario: A run started from process state an older release kept is taken
+      Given a run in flight row whose newest run carries its start, and was lost
+      And the schedule's process state as an older release kept it, its pending run with no slot
+      When the process starts the next run, which records the lost run, and it files
+      Then the lost run is handed over with its start as its slot
+      And the run in flight row takes the next run in flight, and then as the last run
+
+    @unit
+    Scenario: A board with no run in flight row reads its last run from the run's row
+      Given a run's row whose last run filed
+      And no run in flight row, as on every board before Run now
+      When its person reads the setting
+      Then the last run is the run's row's
+
+    @unit
+    Scenario: A run in flight row with only a start reads its last run from the run's row
+      Given a run's row whose last run filed
+      And a run in flight row that took a newer run's start and no outcome yet
+      When its person reads the setting
+      Then the last run is the run's row's
+      And the newer run is in flight
+
+    @unit
+    Scenario: The setting, the run list and the operator's list read the same last run
+      Given a run's row whose last run filed
+      And a run in flight row that took a newer run's outcome
+      When the setting, the person's run list and the operator's list read the board
+      Then all three read the run in flight row's last run
 
   Rule: A run's events belong to one schedule
 
@@ -926,6 +1072,45 @@ Feature: The daily insights run
       And the person reads the new run's outcome
 
     @unit
+    Scenario: A run handed on to a newer run before its turn records no start
+      Given a newer run took the run over before it asked Langy anything
+      When the run is carried out
+      Then it records neither its start nor its outcome
+      And the turn it opened is stopped
+
+    @unit
+    Scenario: A run handed on to a newer run during its turn files nothing
+      Given a newer run took the run over after Langy answered with a finding
+      When the run is carried out
+      Then nothing is filed for the board
+      And no outcome is recorded for the run
+
+    @unit
+    Scenario: A run handed on to a newer run before its outcome records no outcome
+      Given a newer run took the run over while its turn ran
+      When the run ends
+      Then its start is recorded
+      And no outcome is recorded for it
+
+    @unit
+    Scenario: A run the schedule still waits on records its start and its outcome
+      Given the schedule's process still waits on the run
+      When the run is carried out
+      Then its start and its outcome are recorded
+
+    @unit
+    Scenario: A run whose schedule cannot be read still records its outcome
+      Given the schedule's process cannot be read when the run ends
+      When the run ends
+      Then its outcome is recorded as failed with the reason timeout
+
+    @unit
+    Scenario: A replacement handed on records nothing for the run it replaced
+      Given a run that replaces a lost one, and a newer run took it over
+      When the run is carried out
+      Then the lost run is not recorded either
+
+    @unit
     Scenario: An operator's run leaves the schedule's wake armed
       Given a schedule that is on
       When an operator's run is requested and settles before the slot
@@ -1145,3 +1330,272 @@ Feature: The daily insights run
       When the member turns it on
       Then the control goes back to off
       And the member is told it could not be turned on
+
+  Rule: A person can run their board's insights now
+    Run now asks for the same run the schedule asks for, so it files into the same inbox.
+    Insights runs have no rate limit for now: what is worth running is not known yet.
+
+    @integration
+    Scenario: Run now is in the dropdown of a board that is on
+      Given a member turned the daily run on for a stored board with widgets
+      When they open the dropdown in the board's header
+      Then it offers Run now
+
+    @integration
+    Scenario: Run now is offered only on a board a run can read
+      Given a board that is on, and a member who may ask Langy
+      When they open the dropdown in the board's header
+      Then a stored board with widgets offers Run now
+      And a From LangWatch board does not, since a run on it always ends skipped with template_board
+      And a board with no widgets does not, since a run on it always ends skipped with board_empty
+      And a board whose widgets have not loaded does not, until they have
+      And a member who may not ask Langy is offered no Run now
+
+    @integration
+    Scenario: Run now asks for a run and opens Langy on it
+      Given a board that is on, with no run in flight
+      When the member chooses Run now
+      Then a run is requested for them on that board
+      And once the run has started, the Langy panel opens on the run's conversation
+
+    @integration
+    Scenario: Run now opens Langy when the start's hint arrives before its run is stored
+      Given a board that is on, with no run in flight
+      And the member chose Run now
+      When the hint that the run started reaches the board before the run is stored
+      Then the board reads no more on a timer, and the member is told nothing
+      And the Langy panel opens on the run's conversation once a later hint's read shows it
+
+    @integration
+    Scenario: Run now waits for the run it asked for, not one that settled before the click
+      Given a board that is on, with no run in flight
+      And a scheduled run settled before the board read it
+      When the member chooses Run now
+      Then the board shows that run as the last run and keeps waiting
+      And the Langy panel opens only once the run that Run now asked for has started
+
+    @integration
+    Scenario: Run now follows a run that started after the click
+      Given a board that is on, with no run in flight
+      And the member chose Run now
+      When another run starts first, from another tab or the schedule, so the request starts none
+      Then the board follows that run instead of waiting for a run that never comes
+      And it compares the run's start with the time the server recorded the request
+      And the Langy panel opens on that run's conversation
+
+    @integration
+    Scenario: Run now waits past a lost run settled before its own starts
+      Given a board that is on, whose run in flight is lost
+      And the member chose Run now
+      When the worker records the lost run as timed out, with no conversation, before it starts theirs
+      Then the board keeps waiting instead of taking the lost run for theirs
+      And the Langy panel opens on their run's conversation once it starts
+
+    @unit
+    Scenario: Run now waits past a run that started before the click and settled after it
+      Given a board that is on, whose run in flight is lost but still alive
+      And the member chose Run now
+      When that run settles in Langy, with its conversation, after the click
+      Then the board compares the run's start, not its settle, with the time the request was recorded
+      And it keeps waiting instead of taking that run for theirs
+      And a run whose outcome was stored before starts were kept reads its settle time as its start
+
+    @unit
+    Scenario: Run now on a board whose run is already going follows that run
+      Given a board that is on, whose run is in flight before the page shows it
+      When the member chooses Run now
+      Then no run is requested
+      And Run now answers the id of the run in flight, so the board follows that run
+
+    @integration
+    Scenario: A run in flight is opened, not started again
+      Given a board that is on, with a run in flight
+      When the member opens the dropdown
+      Then it says a run is going and offers to open it in Langy, not Run now
+      And opening it opens the Langy panel on the run's conversation
+
+    @integration
+    Scenario: A refused Run now says so
+      Given a board that is on, and a server that refuses the request
+      When the member chooses Run now
+      Then the member is told the run could not be started
+      And the dropdown offers Run now again
+
+    @integration
+    Scenario: A requested run that ends with no conversation says how it ended
+      Given a board that is on, and the member chose Run now
+      When the run they asked for settles with no conversation
+      Then the member is told how it ended, or why it did not start, in plain words
+      And no Langy panel opens and no failure is shown
+      And the dropdown offers Run now again
+
+    @integration
+    Scenario: The deadline follows a run its last read finds
+      Given a board that is on, and the member chose Run now
+      And the board has read no run for as long as a run can last
+      When the deadline reads the board once more and that read shows the run
+      Then the spinner ended when the deadline fired, before the read answered
+      And the Langy panel opens on the run's conversation, or the member is told how it ended
+      And the member is not told the run's start could not be confirmed
+
+    @integration
+    Scenario: The deadline read is replaced by a later hint's read
+      Given a board that is on, and the member chose Run now
+      And the board has read no run for as long as a run can last
+      When the deadline fires its read and that read never answers
+      Then the spinner ends at expiry, and no failure, no notice and no Langy panel is shown
+      And when a later hint's read replaces it and shows the run, Langy opens once on the run
+
+    @integration
+    Scenario: A read that lands a run's lifetime after the deadline gives no verdict
+      Given a board that is on, and the member chose Run now
+      And the deadline fired its read and that read never answered
+      When a later hint's read answers more than a run's lifetime after the deadline
+      Then no failure, no notice and no Langy panel is shown, whatever that read shows
+
+    @integration
+    Scenario: A run that started after the deadline gives no verdict
+      Given a board that is on, and the member chose Run now
+      And the deadline fired its read and that read never answered
+      When a later hint's read, inside a run's lifetime, shows a scheduled run that started after the deadline
+      Then no failure, no notice and no Langy panel is shown
+
+    @integration
+    Scenario: The deadline says the start is unconfirmed when its last read finds none
+      Given a board that is on, and the member chose Run now
+      And the board has read no run for as long as a run can last
+      When the deadline reads the board once more and that read shows no run
+      Then the member is told once that the run's start could not be confirmed
+      And that a run already going still delivers its insights
+      And no failure is shown
+      And the dropdown offers Run now again
+
+    @integration
+    Scenario: A run that took the request unseen leaves the deadline unconfirmed, not failed
+      Given a board that is on, with a run already going that the board could not yet see
+      And the member chose Run now, so the request was dropped for that run
+      And that run has a conversation in Langy
+      When the deadline's read shows only that run, which started before the request and settled
+      Then the member is told once that the run's start could not be confirmed
+      And no failure is shown and no Langy panel opens
+
+    @integration
+    Scenario: The deadline does not move when the page's host is rebuilt
+      Given a board that is on, and the member chose Run now
+      When the page's address changes before the deadline
+      Then the member is told once, at the same time as if it had not changed
+      And the message goes through the page as it is by then
+
+    @integration
+    Scenario: Turning the run off after the deadline fired drops the verdict its read owes
+      Given a board that is on, and the member chose Run now
+      And the deadline fired and its read has not answered
+      When they turn the run off and then that read answers
+      Then no Langy panel opens, no notice is shown and no failure is shown
+
+    @integration
+    Scenario: Leaving the board after the deadline fired drops the verdict its read owes
+      Given a board that is on, and the member chose Run now
+      And the deadline fired and its read has not answered
+      When they leave the board and then that read answers with the run
+      Then no Langy panel opens, no notice is shown and no failure is shown
+
+    @integration
+    Scenario: A second Run now drops the verdict the earlier deadline read owes
+      Given a board that is on, and the member chose Run now
+      And the deadline fired and its read has not answered
+      When they choose Run now again and then the earlier read answers
+      Then nothing is shown for the earlier request
+
+    @integration
+    Scenario: The deadline says so once when its last read fails
+      Given a board that is on, and the member chose Run now
+      And the board has read no run for as long as a run can last
+      When the deadline reads the board once more and that read fails
+      Then the member is told once that the run's start could not be confirmed
+      And the board reads no more
+
+    @integration
+    Scenario: A run that shows after the deadline gave up opens nothing and says nothing
+      Given the member was told the start of a run they asked for could not be confirmed
+      When a later read shows that run in flight, or settled with no conversation
+      Then no Langy panel opens and the member is told nothing more
+      And the dropdown shows the run as any run on the board
+
+    @integration
+    Scenario: Turning the run off ends the wait for a requested run
+      Given a board that is on, and the member chose Run now
+      When they turn the run off before the run shows
+      Then no Langy panel opens and nothing is said when the run shows, or at the deadline
+      And turning it on again shows no run starting, and offers Run now
+
+    @integration
+    Scenario: Turning the run off ends the wait even when the write is refused
+      Given a board that is on, and the member chose Run now
+      When they turn the run off and the server refuses the write
+      Then no Langy panel opens and no notice is shown when the run shows, or at the deadline
+      And no failure is shown for the run, only the refused turn-off's own
+
+    @integration
+    Scenario: Turning the run off before Run now answers ends the wait
+      Given a board that is on, and the member chose Run now
+      When they turn the run off before the server answers Run now
+      Then no Langy panel opens, no notice and no failure is shown when Run now answers, when the run shows, or at the deadline
+      And if the server then refuses Run now, no failure is shown for it either
+
+    @integration
+    Scenario: Starting a run still shows after the last widget is deleted
+      Given a board that is on, and the member chose Run now
+      When the board loses its last widget before the run shows
+      Then the dropdown still says a run is starting
+      And it offers no Run now
+
+    @unit
+    Scenario: A started run names its conversation on the board's row
+      Given a run was requested for a board
+      When the run starts
+      Then the board's row names the run's conversation as the run in flight
+      And once the run settles the row names no run in flight
+
+    @unit
+    Scenario: A settled run keeps when it started on the board's row
+      Given a run was requested for a board
+      When the run's turn starts and the run then settles
+      Then the schedule's run in flight row keeps when its turn started as the last run's start
+      And it names no run in flight
+      And a retried attempt's later start leaves the run's first start on the row
+      And a later run that never reached Langy names no start and no run in flight
+      And a schedule with no run in flight row names no start, read by its settle time
+
+    @unit
+    Scenario: A run that settles after a newer run started keeps its own start
+      Given a run whose turn started, and a newer run whose turn started before it settled
+      When the older run then settles
+      Then the last run's start is when the older run's own turn started
+      And not when the process started that run, nor when the newer run's turn started
+
+    @integration
+    Scenario: Run now asks for analytics:view and langy:create
+      Given a member without analytics:view or without langy:create
+      When they ask to run a board now
+      Then the request is refused as forbidden and no run is requested
+
+    @integration
+    Scenario: Run now is refused on an aggregate project, and with the flag off
+      Given an aggregate project, or a project with release_insights off
+      When a member asks to run a board now
+      Then the request is refused and no run is requested
+
+    @unit
+    Scenario: Run now is refused on a board that is not on
+      Given a member whose daily run on a board is off, or never decided
+      When they ask to run that board now
+      Then the request is refused with validation_error and no run is requested
+      And the refusal tells them to turn the board's daily insights on first
+      And an operator's run of the same board is still requested
+
+    @unit
+    Scenario: An Insights run is not held to the unattended window
+      Given a project whose unattended turns reached their window
+      When an Insights run asks Langy for its turn
+      Then the turn starts

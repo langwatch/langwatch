@@ -14,6 +14,8 @@ import {
 } from "@langwatch/eventing";
 import {
   INSIGHT_DAILY_RUN_EVENT_TYPES,
+  INSIGHT_DAILY_RUN_LEASE_MS,
+  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
   INSIGHT_DAILY_RUN_PIPELINE_NAME,
   INSIGHT_DAILY_SCHEDULE_AGGREGATE_TYPE,
 } from "@langwatch/insight-contract";
@@ -28,6 +30,7 @@ import {
 
 import type { InsightModule } from "../app/insight.app.ts";
 import type { InsightRepositories } from "../repositories/insight.repositories.ts";
+import type { InsightRunInFlightState } from "../rules/insight-run-in-flight.rules.ts";
 import type { InsightDailyRunAuditService } from "../services/insight-daily-run-audit.service.ts";
 import type { InsightDailyScheduleCleanupService } from "../services/insight-daily-schedule-cleanup.service.ts";
 import {
@@ -48,8 +51,6 @@ import {
 } from "./insight-daily-run.events.ts";
 import {
   INSIGHT_DAILY_RUN_INTENT,
-  INSIGHT_DAILY_RUN_LEASE_MS,
-  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
   type InsightDailyRunExecutor,
   runBoardIntent,
   runBoardIntentSchema,
@@ -84,9 +85,11 @@ import {
   createInsightDailyScheduleProjection,
   type InsightDailyScheduleState,
 } from "./insight-daily-schedule.projection.ts";
+import { createInsightRunInFlightProjection } from "./insight-run-in-flight.projection.ts";
 
 interface InsightDailyRunPipelineDeps {
   scheduleStore: StateProjectionStore<InsightDailyScheduleState>;
+  runInFlightStore: StateProjectionStore<InsightRunInFlightState>;
   runs: InsightDailyRunExecutor;
   reconcile: InsightDailyScheduleReconciler;
   audit: Pick<InsightDailyRunAuditService, "recordSettled">;
@@ -103,12 +106,14 @@ const defineInsightDailyRunPipeline = (deps: InsightDailyRunPipelineDeps) =>
   })
     .withEvents(INSIGHT_DAILY_RUN_EVENT_SCHEMAS)
     .withPostgresProjection(createInsightDailyScheduleProjection({ store: deps.scheduleStore }))
+    .withPostgresProjection(createInsightRunInFlightProjection({ store: deps.runInFlightStore }))
     .withCommand("configureSchedule", ConfigureInsightScheduleCommand)
     .withCommand("turnOffSchedule", TurnOffInsightScheduleCommand)
     .withCommand("requestScheduleRearm", RequestInsightScheduleRearmCommand)
     .withCommand("requestRun", RequestInsightRunCommand)
-    .withCommand("recordRunStarted", RecordInsightRunStartedCommand)
-    .withCommand("settleRun", SettleInsightRunCommand)
+    // One queue per schedule for both: a lost run's outcome lands before its replacement's start.
+    .withCommand("recordRunStarted", RecordInsightRunStartedCommand, { serializeByAggregate: true })
+    .withCommand("settleRun", SettleInsightRunCommand, { serializeByAggregate: true })
     // One line per run, in its own lane: a slow audit log holds no run back.
     .withEventSubscriber("dailyRunAudit", {
       events: [INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED],

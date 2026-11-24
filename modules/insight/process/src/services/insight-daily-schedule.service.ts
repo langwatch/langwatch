@@ -1,9 +1,12 @@
 import type { DashboardApi } from "@langwatch/dashboard-contract";
+import { ValidationError } from "@langwatch/handled-error";
 import {
   type ConfigureInsightDailyRunInput,
   configureInsightDailyRunInputSchema,
+  INSIGHT_DAILY_RUN_EXPIRY_MS,
   type InsightBoardDailyRunScope,
   type InsightDailyRun,
+  type InsightDailyRunRequested,
   type InsightDailyRunSetting,
   type InsightRunBoard,
   type RequestInsightDailyRunInput,
@@ -20,6 +23,8 @@ import { UNDECIDED_DAILY_RUN_SETTING } from "../rules/insight-daily-schedule-row
 import type { InsightDailyRunCommandsService } from "./insight-daily-run-commands.service.ts";
 
 type Reader = { userId: string };
+
+const DAILY_RUN_NOT_ON = "Turn this board's daily insights on before running them now.";
 
 type InsightDailyScheduleMembers = Readonly<{
   schedules: InsightDailyScheduleRepository;
@@ -40,41 +45,66 @@ export class InsightDailyScheduleService {
   }
 
   /**
-   * Records the request and answers its id. The id names no run: the schedule's process starts
-   * one for it only when none is in flight for the board, and the worker decides that later.
+   * Records the request and answers its id and time. The id names no run: the schedule's process
+   * starts one for it only when none is in flight for the board, and the worker decides that later.
    */
-  async requestRun(input: RequestInsightDailyRunInput): Promise<{ requestId: string }> {
+  async requestRun(input: RequestInsightDailyRunInput): Promise<InsightDailyRunRequested> {
     const { projectId, userId, board, maxInsights } =
       requestInsightDailyRunInputSchema.parse(input);
     const requestId = generate(KSUID_RESOURCES.INSIGHT_RUN).toString();
+    const requestedAt = nowInstant().epochMilliseconds;
     await this.members.commands.requestRun({
       tenantId: projectId,
-      occurredAt: nowInstant().epochMilliseconds,
+      occurredAt: requestedAt,
       scheduleId: dailyScheduleId({ projectId, userId, board }),
       userId,
       board,
       requestId,
       maxInsights,
     });
-    return { requestId };
+    return { requestId, requestedAt };
+  }
+
+  /**
+   * Run now, as the person asks it: refused unless their run on the board is on. A run already
+   * in flight answers its own id and requests nothing, since the process would start none; the
+   * caller follows that run. An operator's run is asked through {@link requestRun}.
+   */
+  async runNow(input: RequestInsightDailyRunInput): Promise<InsightDailyRunRequested> {
+    const { state, runInFlight } = await this.getSetting(input);
+    // The presentation reads `formErrors`, so the caller is told what to do, not only the code.
+    if (state !== "on") {
+      throw new ValidationError(DAILY_RUN_NOT_ON, { meta: { formErrors: [DAILY_RUN_NOT_ON] } });
+    }
+    if (runInFlight !== null) {
+      return { requestId: runInFlight.runId, requestedAt: nowInstant().epochMilliseconds };
+    }
+    return this.requestRun(input);
   }
 
   findForUser(input: { projectId: string; userId: string }): Promise<InsightDailyRun[]> {
     return this.members.schedules.findForUser(input);
   }
 
-  /** The person's own setting on the board; a board they never decided on reads `undecided`. */
+  /**
+   * The person's own setting on the board; a board they never decided on reads `undecided`. A
+   * run that started longer ago than a run may take is lost, so it is no run in flight.
+   */
   async getSetting({
     projectId,
     userId,
     board,
   }: InsightBoardDailyRunScope & Reader): Promise<InsightDailyRunSetting> {
-    const [setting] = await this.members.schedules.findSetting({
+    const [setting = UNDECIDED_DAILY_RUN_SETTING] = await this.members.schedules.findSetting({
       projectId,
       userId,
       scheduleId: dailyScheduleId({ projectId, userId, board }),
     });
-    return setting ?? UNDECIDED_DAILY_RUN_SETTING;
+    const { runInFlight } = setting;
+    const isLost =
+      runInFlight !== null &&
+      nowInstant().epochMilliseconds - runInFlight.startedAt >= INSIGHT_DAILY_RUN_EXPIRY_MS;
+    return isLost ? { ...setting, runInFlight: null } : setting;
   }
 
   /**

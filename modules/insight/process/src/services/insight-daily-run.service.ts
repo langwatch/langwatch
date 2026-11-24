@@ -6,6 +6,7 @@
  */
 
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import type { ProcessStore } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import type {
   InsightEntry,
@@ -25,6 +26,10 @@ import type {
   InsightDailyRunExecutor,
   RunBoardIntent,
 } from "../eventing/insight-daily-run.intent.ts";
+import {
+  INSIGHT_DAILY_RUN_PROCESS_NAME,
+  insightDailyRunStateSchema,
+} from "../eventing/insight-daily-run.process.ts";
 import type { InsightRepository } from "../repositories/insight.repository.ts";
 import { type CheckedFinding, checkRunAnswer } from "../rules/insight-daily-run-answer.rules.ts";
 import { buildDailyRunBrief } from "../rules/insight-daily-run-brief.rules.ts";
@@ -138,10 +143,17 @@ type InsightDailyRunMembers = Readonly<{
 }>;
 
 export class InsightDailyRunService implements InsightDailyRunExecutor {
+  #instances: Pick<ProcessStore, "findByRef"> | undefined;
+
   private constructor(private readonly members: InsightDailyRunMembers) {}
 
   static create(members: InsightDailyRunMembers): InsightDailyRunService {
     return new InsightDailyRunService(members);
+  }
+
+  /** The process store of the process that hosts the pipeline, lent when it is built. */
+  connect(instances: Pick<ProcessStore, "findByRef">): void {
+    this.#instances = instances;
   }
 
   /**
@@ -208,9 +220,13 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
   }
 
   private async start(input: RunInput, ready: ReadyRun): Promise<StartedTurn | RunEnd> {
-    const { projectId, userId, scheduleId, runId, slot } = input;
+    const { projectId, userId, scheduleId, runId, slot, since } = input;
     const turn = await this.askLangy(input, ready);
     if ("outcome" in turn) return turn;
+    if (await this.isHandedOn(input)) {
+      await this.stop({ projectId, userId, ...turn });
+      return failed("timeout", turn.conversationId);
+    }
     await this.members.runCommands.recordRunStarted({
       tenantId: projectId,
       occurredAt: nowInstant().epochMilliseconds,
@@ -219,6 +235,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       board: ready.board,
       runId,
       slot,
+      since,
       ...turn,
     });
     return turn;
@@ -246,6 +263,8 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
           window: windows.window,
           timezone: RUN_TIMEZONE,
         }),
+        // No rate limit on Insights runs for now: what is worth running is not known yet.
+        isExemptFromRateLimit: true,
       });
     } catch (error) {
       const refusal = START_REFUSALS[codeOf(error)];
@@ -304,6 +323,9 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       slot,
     });
     const acts = decideRunFindings({ findings, insights });
+    // Taken over during the turn: its replacement files for the board, and its outcome is not
+    // recorded either (settle asks the same).
+    if (await this.isHandedOn(input)) return failed("timeout", conversationId);
     const write = { input, ready, source: { conversationId, messageId: settlement.messageId } };
     for (const act of acts) {
       if (act.kind === "renew") await this.renew({ ...write, ...act });
@@ -375,6 +397,31 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     });
   }
 
+  /**
+   * Whether the schedule's process no longer waits on this run: a newer run took it over and
+   * records it as lost, or its outcome is on the record. Recording its start or outcome now
+   * would name it the newest after a newer run; a replay keeps the first outcome and would not.
+   */
+  private async isHandedOn({ projectId, scheduleId, runId }: RunInput): Promise<boolean> {
+    // No store lent, or no instance: nothing says the run was handed on.
+    if (!this.#instances) return false;
+    // A failed read must not skip the outcome: it is recorded as if nothing handed it on.
+    let pendingRunId: string | undefined;
+    try {
+      const instance = await this.#instances.findByRef({
+        ref: { processName: INSIGHT_DAILY_RUN_PROCESS_NAME, projectId, processKey: scheduleId },
+      });
+      if (instance === null) return false;
+      pendingRunId = insightDailyRunStateSchema.parse(instance.state).pendingRun?.runId;
+    } catch (error) {
+      logger.warn({ error, projectId, scheduleId, runId }, "could not read the run's process");
+      return false;
+    }
+    if (pendingRunId === runId) return false;
+    logger.warn({ projectId, scheduleId, runId }, "daily run was handed on; recording nothing");
+    return true;
+  }
+
   /** Best effort: the run's outcome is recorded whether or not the turn could be stopped. */
   private async stop(turn: StartedTurn & { projectId: string; userId: string }): Promise<void> {
     try {
@@ -385,12 +432,13 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
   }
 
   /**
-   * The run this one replaces never recorded an outcome, so it is recorded as lost before this
-   * run's own. A repeat records it once: the outcome is keyed by the run it names.
+   * The run this one replaces is recorded as lost first, with its own start. A repeat once the
+   * process folded this run's outcome is skipped; one before is an older run's, which the run in
+   * flight row drops. Rare trade: a takeover after the 60-minute expiry leaves it unrecorded.
    */
   private async settleSuperseded(input: RunInput): Promise<void> {
     const { projectId, scheduleId, userId, board, supersedes } = input;
-    if (!supersedes) return;
+    if (!supersedes || (await this.isHandedOn(input))) return;
     await this.members.runCommands.settleRun({
       tenantId: projectId,
       occurredAt: nowInstant().epochMilliseconds,
@@ -417,7 +465,8 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     end: RunEnd;
     startedAt: number;
   }): Promise<void> {
-    const { projectId, scheduleId, userId, runId, slot, skippedDaysBefore } = input;
+    if (await this.isHandedOn(input)) return;
+    const { projectId, scheduleId, userId, runId, slot, since, skippedDaysBefore } = input;
     const { board = input.board, ...result } = end;
     const envelope = { tenantId: projectId, scheduleId, userId, board };
     const settledAt = nowInstant().epochMilliseconds;
@@ -426,6 +475,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       occurredAt: settledAt,
       runId,
       slot,
+      since,
       ...result,
       // A run's outcome is stored once (its command is keyed by the run), so the first one is new.
       idLayout: "v2",
