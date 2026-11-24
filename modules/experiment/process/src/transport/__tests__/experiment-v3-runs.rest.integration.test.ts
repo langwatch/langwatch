@@ -528,9 +528,16 @@ describe("POST /api/experiments/:slug/run", () => {
   });
 
   describe("when the body names no concurrency", () => {
-    /** @scenario "A run call that names no concurrency uses the deployment's default" */
-    it("plans the run with the deployment's concurrency", async () => {
-      const { request, starts } = await harness({ experiments: found(savedState()), redis: true });
+    /** @scenario "A run call that names no concurrency gets its share of the project cell budget" */
+    it("plans the run with the idle project's whole cell budget, not the fallback", async () => {
+      const { request, starts } = await harness({
+        experiments: found(savedState()),
+        redis: true,
+        concurrency: ExperimentRunConcurrencyService.create({
+          activity: MemoryExperimentRunActivityRepository.create(),
+          config: { runConcurrency: 3, projectCellBudget: 10 },
+        }),
+      });
 
       const response = await request("/checkout-eval/run", runOf("{}"));
 
