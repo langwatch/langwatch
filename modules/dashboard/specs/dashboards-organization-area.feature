@@ -854,3 +854,13 @@ Feature: Organization-wide Dashboards area
     Then that project's slug becomes its name and id token, as minting gives a project today
     And a second run changes nothing, every other project keeps its slug, and with no such project the step does nothing
     # Evidence: the step's report on the first and the second run
+
+  # Until that background step has run, the router gives "/dashboards", "/dashboards/<one segment>"
+  # and "/dashboards/curated/<id>" to the organization's area; every deeper address is the project's.
+  @integration
+  Scenario: A project still holding the dashboards slug keeps its deeper pages
+    Given I read a project whose slug is still "dashboards", before "project:reslug-reserved-dashboards" has run
+    When I open one of its pages below the area's own addresses, such as "/dashboards/messages/<trace id>", with the area's flag on or off
+    Then the page opens in LLM Ops with its project chip, as before this change, and not as a not-found page or the Dashboards area
+    And a board of that project at "/dashboards/dashboards/<id>" stays a project board in that project's Dashboards area
+    # Evidence: the shell drawing the page with the flag off and on

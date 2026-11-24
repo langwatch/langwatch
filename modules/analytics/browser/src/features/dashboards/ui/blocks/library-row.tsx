@@ -1,7 +1,6 @@
 /**
  * One row of the `/dashboards` library: the board's name linking to it, who sees it, its owner
- * and the board's "⋮" menu (`board-menu.tsx`) with what this member may do. A From LangWatch
- * row reads "Read-only" and "LangWatch", and offers "Duplicate to edit" and a Move it cannot do.
+ * and the board's "⋮" menu (`board-menu.tsx`) with what this member may do.
  */
 
 import { Box, Grid, HStack, Link as ChakraLink, Text } from "@langwatch/design-system/primitives";
