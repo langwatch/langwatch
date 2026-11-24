@@ -236,6 +236,30 @@ Feature: An organization's session facts reach every active member in Customer.i
     Then the first is tracked joined_organization and the second is not
 
   @unit
+  Scenario: A role change tells Customer.io the person's new seat
+    Given a member_role_changed signal for user-1 of org-1 holding the role ADMIN, MEMBER, EXTERNAL or DEVELOPER
+    When the signal is delivered
+    Then Customer.io identifies the person once with seat admin, member, lite_member or developer
+
+  @unit
+  Scenario: A role change groups the person into the organization
+    Given a member_role_changed signal for user-1 of org-1
+    When the signal is delivered
+    Then Customer.io groups user-1 into org-1
+
+  @unit
+  Scenario: A role change to a role with no seat sends no seat
+    Given a member_role_changed signal for user-1 of org-1 holding a role nurturing cannot name
+    When the signal is delivered
+    Then the person is not identified, and is still grouped into org-1
+
+  @unit
+  Scenario: A redelivered role change is sent once
+    Given the organization recorded a member_role_changed fact for user-1
+    When the same fact is delivered twice
+    Then Customer.io receives one identify and one group call
+
+  @unit
   Scenario: A large organization's members go out in batches of one hundred
     Given org-1 has 250 active members
     When a trace_received signal of project-1 is delivered

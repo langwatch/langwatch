@@ -189,6 +189,16 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     role: z.string().optional(),
   }),
   z.object({
+    /** An admin moved a member to another seat: the person's seat is told, never a join. */
+    kind: z.literal("member_role_changed"),
+    ...signalSource,
+    userId: id,
+    organizationId: id,
+    /** The OrganizationUserRole now held; a plain string so an unknown role still parses. */
+    role: z.string(),
+    previousRole: z.string().optional(),
+  }),
+  z.object({
     kind: z.literal("sso_auto_added"),
     ...signalSource,
     userId: id,

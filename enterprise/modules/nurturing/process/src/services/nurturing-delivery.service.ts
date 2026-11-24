@@ -36,6 +36,7 @@ import {
 } from "../rules/nurturing-member-facts.rules.ts";
 import {
   fireInviteAccepted,
+  fireMemberRoleChanged,
   fireSsoAutoAdded,
 } from "../rules/nurturing-membership-join-service.rules.ts";
 import {
@@ -292,6 +293,8 @@ export class NurturingDeliveryService {
           ...signal,
           callsFor: (traces) => fireInviteAccepted({ signal, traces }),
         });
+      case "member_role_changed":
+        return this.sendCustomerIoCalls(fireMemberRoleChanged(signal));
       case "sso_auto_added":
         return this.sendWithTraces({
           ...signal,
