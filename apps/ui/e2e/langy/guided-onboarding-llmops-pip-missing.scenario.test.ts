@@ -44,7 +44,10 @@ const model = guidedHarnessModel();
 /** The budget of a run that installs an SDK, edits code and starts the agent. */
 const LONG_RUN_TIMEOUT_MS = 2_700_000;
 
-/** The rung the ladder reaches first when nothing above it exists, and the one that works. */
+/**
+ * The first prescribed rung for this folder, and the spelling this terminal
+ * lacks: the next rung, `python -m pip`, is the one that works.
+ */
 const MISSING = "python3";
 
 /**

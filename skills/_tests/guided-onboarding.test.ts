@@ -1052,10 +1052,30 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).toContain(
         "The interpreter's pip never runs before the named manager or the folder's own interpreter.",
       );
+      expect(rendered).toContain(
+        "Bare `pip` and `pip3` are not rungs: when the workspace facts name pip as the package manager, that is the interpreter's pip, `.venv/bin/python -m pip` when `.venv` exists, else `python3 -m pip` then `python -m pip`.",
+      );
       const tracing = renderSkill(listNativeSkills(skillsRoot).find((s) => s.slug === "tracing")!);
       expect(tracing).toContain(
         "the manager the workspace facts name is its first rung: `uv add langwatch` when the facts name uv, the folder has a `uv.lock` or `.venv/pyvenv.cfg` carries a `uv =` line",
       );
+      expect(tracing).toContain(
+        "Bare `pip` and `pip3` are not rungs: when the workspace facts name pip as the package manager, that is the interpreter's `-m pip`, the rungs above.",
+      );
+      const ladderStart = tracing.indexOf("The rungs after it, in order:\n\n");
+      expect(ladderStart).toBeGreaterThan(-1);
+      const rungs = tracing.slice(ladderStart).split("\n\n")[1]!.split("\n");
+      expect(rungs).toEqual([
+        "- Otherwise `.venv/bin/python -m pip install langwatch` when `.venv` exists.",
+        "- Only then `python3 -m pip install langwatch`, `python -m pip install langwatch`.",
+      ]);
+      // Anywhere in either skill, not just the list: a bare rung could be
+      // added in prose. `pip install langwatch --upgrade` is a different
+      // string, so it does not trip this.
+      for (const skill of [rendered, tracing]) {
+        expect(skill).not.toContain("`pip install langwatch`");
+        expect(skill).not.toContain("`pip3 install langwatch`");
+      }
     });
 
     /** @scenario "A missing pip climbs the install ladder before it asks" */

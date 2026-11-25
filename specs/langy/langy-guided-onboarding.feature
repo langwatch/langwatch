@@ -726,7 +726,9 @@ Feature: Langy guides the first setup after sign-up
       Then the install ladder starts with the manager the workspace facts name
       And uv is that manager when the facts name it, the folder has a uv.lock, or the virtual environment was made by uv
       And the interpreter's pip spellings come only after the named manager and the folder's own interpreter
+      And bare pip and pip3 are not rungs: facts that name pip mean the interpreter's -m pip
       And the tracing skill says the same
+      And the tracing skill's rungs after the named manager are .venv/bin/python -m pip, then python3 -m pip and python -m pip, with no bare pip or pip3 rung
 
     @unit
     Scenario: A missing pip climbs the install ladder before it asks
@@ -935,12 +937,12 @@ Feature: Langy guides the first setup after sign-up
       And nothing Langy says calls the folder unmanaged
 
     @e2e
-    Scenario: Every missing rung is tried once, and the ladder still installs
-      Given a shared folder whose manifest is requirements.txt, with no lock file and no virtual environment
-      And a terminal where uv, pip and pip3 each answer command not found and exit 127
+    Scenario: Only the last rung is left, and the ladder still installs through it
+      Given a shared folder whose manifest is requirements.txt, with no lock file and no virtual environment, so the facts name pip
+      And a terminal where python3, uv, pip and pip3 each answer command not found and exit 127, while python -m pip works
       When Langy runs the llmops path
-      Then each missing spelling is tried at most once and never asked again
-      And the install goes through the interpreter's own -m pip
+      Then Langy tries python3 -m pip at most once and installs through python -m pip, the last rung on the ladder
+      And uv, pip and pip3, which are not rungs for this folder, are never tried as an install
       And the manifest names langwatch and the interpreter can import it
       And the question offering to install uv is never asked
 

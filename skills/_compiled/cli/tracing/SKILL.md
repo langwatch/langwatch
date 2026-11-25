@@ -50,6 +50,8 @@ For Python, a ladder, stopping at the first that works, and the manager the work
 - Otherwise `.venv/bin/python -m pip install langwatch` when `.venv` exists.
 - Only then `python3 -m pip install langwatch`, `python -m pip install langwatch`.
 
+Bare `pip` and `pip3` are not rungs: when the workspace facts name pip as the package manager, that is the interpreter's `-m pip`, the rungs above.
+
 A command not found (exit 127) moves to the next rung, never a retry: it is a missing spelling, never a missing capability. When no rung exists, ask before giving up: "Install uv for me" or "I'll set up Python myself".
 For TypeScript: `npm install langwatch` when no lockfile names another manager, `pnpm add langwatch`, `yarn add langwatch` or `bun add langwatch` by the lockfile; a 127 on the named manager falls back to `npm`.
 `uv add` and the JavaScript managers write the manifest themselves. A pip install writes nothing, so add the package to the project's own requirements file (`requirements.txt`, or the file the folder uses, such as `requirements/base.txt`) yourself: `<interpreter> -m pip show langwatch`, with the interpreter of the rung that worked, gives the version, and the line is `langwatch==<installed version>`, pinned the way the file pins its other packages and unpinned when it pins none of them.
