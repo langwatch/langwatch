@@ -130,6 +130,12 @@ function categoryTool(question: InstantEvalCategoryQuestion): EvaluationTool {
 
 const MAX_OUTPUT_TOKENS = 8_000;
 
+/**
+ * A reasoning model counts its reasoning against the output cap, so an effort other than `none`
+ * gets the room OpenAI advises reserving for reasoning (25,000) plus the answer's.
+ */
+const REASONING_MAX_OUTPUT_TOKENS = 32_000;
+
 /** One LLM leg's messages and the tool it is forced to call. */
 interface InstantEvalLlmJudgePrompt {
   readonly system: string;
@@ -197,7 +203,7 @@ function categoryList(question: InstantEvalCategoryQuestion): string {
 
 /**
  * The request body. A reasoning effort goes on OpenAI Responses alone, and only when the backend
- * sets one: unset, the body is the one sent before the field existed.
+ * sets one, with a reasoning-sized output cap: unset, the body is the one sent before.
  */
 export function instantEvalLlmJudgeBodyOf({
   wire,
@@ -227,7 +233,10 @@ export function instantEvalLlmJudgeBodyOf({
       { role: "developer", content: system },
       { role: "user", content: user },
     ],
-    max_output_tokens: MAX_OUTPUT_TOKENS,
+    max_output_tokens:
+      reasoningEffort && reasoningEffort !== "none"
+        ? REASONING_MAX_OUTPUT_TOKENS
+        : MAX_OUTPUT_TOKENS,
     ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
     store: false,
     tools: [{ type: "function", ...tool, strict: false }],
@@ -249,6 +258,8 @@ const anthropicResponseSchema = z.object({
 });
 
 const openAiResponseSchema = z.object({
+  status: z.string().optional(),
+  incomplete_details: z.object({ reason: z.string().optional() }).nullish(),
   output: z.array(
     z.object({ type: z.string(), name: z.string().optional(), arguments: z.string().optional() }),
   ),
@@ -259,9 +270,12 @@ const openAiResponseSchema = z.object({
 
 type Reading =
   | Readonly<{ outcome: "value"; value: InstantEvalLlmJudgeValue }>
-  | Readonly<{ outcome: "none" }>;
+  | Readonly<{ outcome: "none"; stoppedBy?: string }>;
 
-/** What one LLM answer said: a value, or none, and the tokens it billed either way. */
+/**
+ * What one LLM answer said: a value, or none, and the tokens it billed either way. An OpenAI
+ * answer the provider marked incomplete names why in `stoppedBy` (e.g. `max_output_tokens`).
+ */
 type InstantEvalLlmJudgeReading = Reading & Readonly<{ inputTokens: number; outputTokens: number }>;
 
 const UNREADABLE: InstantEvalLlmJudgeReading = { outcome: "none", inputTokens: 0, outputTokens: 0 };
@@ -289,7 +303,13 @@ export function readInstantEvalLlmJudgeAnswer({
     (item) => item.type === "function_call" && item.name === TOOL_NAME,
   );
   const input = argumentsOf(call?.arguments);
-  return { ...valueOf({ input, question }), ...usageOf(parsed.data.usage) };
+  const reading = valueOf({ input, question });
+  const { status, incomplete_details } = parsed.data;
+  const stoppedBy =
+    reading.outcome === "none" && status === "incomplete"
+      ? (incomplete_details?.reason ?? "incomplete")
+      : undefined;
+  return { ...reading, ...(stoppedBy ? { stoppedBy } : {}), ...usageOf(parsed.data.usage) };
 }
 
 function argumentsOf(raw: string | undefined): unknown {

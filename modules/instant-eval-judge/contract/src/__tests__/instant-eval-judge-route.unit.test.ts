@@ -203,6 +203,21 @@ describe("judge route table", () => {
     });
 
     /** @scenario "A reasoning effort is sent only when the backend sets one" */
+    it.each(["none", "minimal", "low", "medium", "high"])(
+      "takes the effort %s that the provider names",
+      (effort) => {
+        const parsed = instantEvalJudgeRouteTableSchema.parse(
+          gatedTable({
+            backends: {
+              "llm-b": { kind: "openai_responses", model: "m", reasoningEffort: effort },
+            },
+          }),
+        );
+        expect(parsed.backends["llm-b"]?.reasoningEffort).toBe(effort);
+      },
+    );
+
+    /** @scenario "A reasoning effort is sent only when the backend sets one" */
     it("refuses an effort the provider does not name", () => {
       const table = gatedTable({
         backends: { "llm-b": { kind: "openai_responses", model: "m", reasoningEffort: "max" } },

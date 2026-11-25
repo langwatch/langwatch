@@ -31,8 +31,11 @@ const INSTANT_EVAL_JUDGE_BACKEND_KINDS = [
 ] as const;
 export type InstantEvalJudgeBackendKind = (typeof INSTANT_EVAL_JUDGE_BACKEND_KINDS)[number];
 
-/** The reasoning effort an OpenAI Responses backend may be asked for; unset, the model's own. */
-const INSTANT_EVAL_JUDGE_REASONING_EFFORTS = ["none", "low", "medium", "high"] as const;
+/**
+ * The reasoning effort an OpenAI Responses backend may be asked for; unset, the model's own.
+ * Which values a model takes is the provider's, not checked here (ADR-190 decision 12).
+ */
+const INSTANT_EVAL_JUDGE_REASONING_EFFORTS = ["none", "minimal", "low", "medium", "high"] as const;
 export type InstantEvalJudgeReasoningEffort = (typeof INSTANT_EVAL_JUDGE_REASONING_EFFORTS)[number];
 
 /** The kinds that take a reasoning effort on the wire. */
