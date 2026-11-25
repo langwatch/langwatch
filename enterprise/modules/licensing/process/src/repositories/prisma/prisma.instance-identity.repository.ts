@@ -1,6 +1,7 @@
 import type { InstanceIdentity, PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, type Instant, toDate } from "@langwatch/time";
 
+import { isUniqueViolation } from "../../rules/issued-license.rules.ts";
 import type {
   InstanceIdentityRecord,
   InstanceIdentityRepository,
@@ -76,8 +77,9 @@ export class PrismaInstanceIdentityRepository implements InstanceIdentityReposit
   }
 
   /**
-   * One statement on the fixed key, which Prisma runs as Postgres's native
-   * `INSERT ... ON CONFLICT (id) DO UPDATE`: racing first writes land on one row.
+   * An upsert on the fixed key. Prisma does not always run it as one native
+   * `ON CONFLICT` statement, so a racing first write that loses the insert
+   * updates the row the winner created.
    */
   private async upsertRow({
     instanceIdIfMissing,
@@ -86,11 +88,16 @@ export class PrismaInstanceIdentityRepository implements InstanceIdentityReposit
     instanceIdIfMissing: string;
     data: RowWrite;
   }): Promise<void> {
-    await this.prisma.instanceIdentity.upsert({
-      where: { id: ROW_ID },
-      create: { id: ROW_ID, instanceId: instanceIdIfMissing, ...data },
-      update: data,
-    });
+    try {
+      await this.prisma.instanceIdentity.upsert({
+        where: { id: ROW_ID },
+        create: { id: ROW_ID, instanceId: instanceIdIfMissing, ...data },
+        update: data,
+      });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      await this.prisma.instanceIdentity.update({ where: { id: ROW_ID }, data });
+    }
   }
 }
 
