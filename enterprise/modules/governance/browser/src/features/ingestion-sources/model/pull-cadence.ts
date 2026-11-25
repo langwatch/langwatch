@@ -78,6 +78,9 @@ export const PULL_ADAPTER_FOR_SOURCE: Partial<Record<GovernanceSourceType, strin
   claude_compliance: "claude_compliance",
   anthropic_admin: "anthropic_admin",
   databricks_genie: "databricks_genie",
+  aws_bedrock_agents: "aws_bedrock_agents",
+  gcp_vertex_agent_engine: "gcp_vertex_agent_engine",
+  ard_registry: "ard_registry",
   http_custom: "http_polling",
 };
 
@@ -95,6 +98,9 @@ export const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
   claude_compliance: "*/15 * * * *",
   anthropic_admin: "0 * * * *",
   databricks_genie: "*/15 * * * *",
+  aws_bedrock_agents: "0 * * * *",
+  gcp_vertex_agent_engine: "0 * * * *",
+  ard_registry: "0 * * * *",
   http_polling: "*/15 * * * *",
 };
 

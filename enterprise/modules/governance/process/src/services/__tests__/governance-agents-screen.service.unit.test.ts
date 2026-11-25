@@ -8,6 +8,9 @@ import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { GovernanceAgentsScreenService } from "../../features/agents/services/governance-agents-screen.service.ts";
+import type { RegistryDraft } from "../../features/registry/rules/registry-entry.rules.ts";
+import { planRegistryChanges } from "../../features/registry/rules/registry-reconcile.rules.ts";
+import { MemoryAgentRegistryRepository } from "../../repositories/memory/memory.agent-registry.repository.ts";
 import { MemoryDiscoveredAgentRepository } from "../../repositories/memory/memory.discovered-agent.repository.ts";
 import { MemoryDiscoveredPeopleStore } from "../../repositories/memory/memory.discovered-people.store.ts";
 
@@ -30,7 +33,15 @@ const connectedAgent: Agent = {
   lastSeenAt: new Date("2026-09-09T11:00:00.000Z"),
 };
 
-async function setup({ projectIds }: { projectIds: string[] }) {
+async function setup({
+  projectIds,
+  registry = MemoryAgentRegistryRepository.create(),
+  registryPageSize,
+}: {
+  projectIds: string[];
+  registry?: MemoryAgentRegistryRepository;
+  registryPageSize?: number;
+}) {
   const asked: { projectIds: string[] }[] = [];
   const discoveredAgents = MemoryDiscoveredAgentRepository.create(
     MemoryDiscoveredPeopleStore.create(),
@@ -65,9 +76,48 @@ async function setup({ projectIds }: { projectIds: string[] }) {
       ],
     }),
     discoveredAgents,
+    registry,
     logger,
+    registryPageSize,
   });
-  return { service, asked };
+  return { service, asked, discoveredAgents };
+}
+
+function registryDraft(overrides: Partial<RegistryDraft> & Pick<RegistryDraft, "sourceKey">) {
+  return {
+    source: "langwatch",
+    management: "managed",
+    shadow: false,
+    dormant: false,
+    platform: null,
+    labels: {},
+    owner_label: null,
+    kind: "connected",
+    name: "support-copilot",
+    description: null,
+    source_version: null,
+    project_id: "project-1",
+    environment: null,
+    owner: null,
+    endpoints: [],
+    model: null,
+    instructions: null,
+    capabilities: [],
+    tools: [],
+    firstSeenAt: NOW,
+    lastSeenAt: NOW,
+    ...overrides,
+  } satisfies RegistryDraft;
+}
+
+async function holdInRegistry(registry: MemoryAgentRegistryRepository, drafts: RegistryDraft[]) {
+  let next = 0;
+  await registry.applyChanges({
+    organizationId: ORGANIZATION_ID,
+    plan: (stored) =>
+      planRegistryChanges({ stored, drafts, now: NOW, newId: () => `agentreg_${++next}` }),
+    baselineAt: NOW,
+  });
 }
 
 describe("GovernanceAgentsScreenService", () => {
@@ -99,6 +149,77 @@ describe("GovernanceAgentsScreenService", () => {
 
       expect(asked).toEqual([]);
       expect(rows.map((row) => row.source)).toEqual(["databricks"]);
+    });
+  });
+
+  describe("given a governed, a shadow and a dormant agent in the registry", () => {
+    /** @scenario "The inventory shows each agent's posture" */
+    it("gives each row its posture and lists the traced-only agent as a traffic row", async () => {
+      const registry = MemoryAgentRegistryRepository.create();
+      const { service, discoveredAgents } = await setup({ projectIds: ["project-1"], registry });
+      const [listed] = await discoveredAgents.findByOrganization({
+        organizationId: ORGANIZATION_ID,
+      });
+      await holdInRegistry(registry, [
+        registryDraft({ sourceKey: "langwatch:agent-1" }),
+        registryDraft({
+          sourceKey: `discovered:${listed?.id}`,
+          source: "aws",
+          management: "discovered",
+          name: "revenue-analyst",
+          project_id: null,
+          dormant: true,
+          platform: "aws_bedrock",
+          model: { provider: null, model: "anthropic.claude-sonnet-5", parameters: {} },
+        }),
+        registryDraft({
+          sourceKey: "traffic:project-1:pricing-bot",
+          source: "traffic",
+          management: "observed",
+          name: "pricing-bot",
+          shadow: true,
+          model: { provider: "openai", model: "gpt-5", parameters: {} },
+        }),
+      ]);
+
+      const rows = await service.listAgents({ organizationId: ORGANIZATION_ID, now: NOW });
+
+      expect(rows.map((row) => [row.name, row.source, row.posture, row.platform])).toEqual([
+        ["support-copilot", "custom", "governed", null],
+        ["revenue-analyst", "databricks", "dormant", "aws_bedrock"],
+        ["pricing-bot", "traffic", "shadow", null],
+      ]);
+      expect(rows[1]).toMatchObject({ models: ["anthropic.claude-sonnet-5"] });
+      expect(rows[2]).toMatchObject({ models: ["gpt-5"], lastActiveMinutesAgo: 0 });
+    });
+  });
+
+  describe("given more active registry entries than one registry page holds", () => {
+    it("reads every page, so no traced agent drops off the list", async () => {
+      const registry = MemoryAgentRegistryRepository.create();
+      const { service } = await setup({ projectIds: [], registry, registryPageSize: 2 });
+      await holdInRegistry(
+        registry,
+        ["a", "b", "c", "d", "e"].map((name) =>
+          registryDraft({
+            sourceKey: `traffic:project-1:${name}`,
+            source: "traffic",
+            management: "observed",
+            name,
+            shadow: true,
+          }),
+        ),
+      );
+
+      const rows = await service.listAgents({ organizationId: ORGANIZATION_ID, now: NOW });
+
+      expect(rows.filter((row) => row.source === "traffic").map((row) => row.name)).toEqual([
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+      ]);
     });
   });
 });

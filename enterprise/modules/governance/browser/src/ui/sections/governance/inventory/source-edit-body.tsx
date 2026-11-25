@@ -14,6 +14,9 @@ import { TraceDestinationField } from "../../../../features/ingestion-sources/ui
 import { EnterpriseOttlEditor as OttlEditor } from "../../../../features/ottl/ui/sections/ottl-editor.connected.tsx";
 import type { DestinationContext, Source } from "../ingestion-source-forms.ts";
 import { AdvancedSettingsGroup } from "./advanced-settings-group.tsx";
+import { AgentListingTest } from "./agent-listing-test.tsx";
+import { isCloudAgentSourceType } from "./cloud-agent-pull-config.ts";
+import { cloudAgentCustomControl } from "./cloud-agent-source-controls.tsx";
 import { ParserConfigFields } from "./parser-config-fields.tsx";
 import { lockedParserKeys } from "./source-edit-rules.ts";
 import { isEditablePullSource } from "./source-submission.ts";
@@ -66,7 +69,9 @@ function PullConfigEditFields({
   onPullScheduleChange,
   hasPulled,
   destinationField,
+  organizationId,
 }: {
+  organizationId: string;
   sourceType: SourceType;
   parserConfig: Record<string, string>;
   onParserConfigChange: (next: Record<string, string>) => void;
@@ -92,6 +97,7 @@ function PullConfigEditFields({
       onChange={onParserConfigChange}
       mode="edit"
       readOnlyKeys={lockedKeys.length > 0 ? lockedKeys : undefined}
+      renderCustomControl={cloudAgentCustomControl({ organizationId })}
       // Same group, same order as the create drawer: the two forms edit the
       // same source and must not disagree about where a setting lives.
       advancedExtras={
@@ -189,11 +195,19 @@ export function SourceEditBody({
           onPullScheduleChange={form.setPullSchedule}
           hasPulled={hasPulled}
           destinationField={destinationField}
+          organizationId={organizationId}
         />
       ) : (
         // A source type this form builds no adapter config for still has a
         // destination to place, and no parser fields to hang the group off.
         destinationField && <AdvancedSettingsGroup>{destinationField}</AdvancedSettingsGroup>
+      )}
+
+      {isCloudAgentSourceType(source.sourceType) && (
+        <AgentListingTest
+          organizationId={organizationId}
+          target={{ kind: "saved", sourceId: source.id }}
+        />
       )}
 
       <OttlEditor
