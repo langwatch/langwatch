@@ -27,12 +27,14 @@ import { useBoardAccess } from "../../behavior/use-board-access.ts";
 import { useBoardDescription } from "../../behavior/use-board-description.ts";
 import { useBoardEditor } from "../../behavior/use-board-editor.ts";
 import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
+import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
 import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
+import { useOrganizationLibraryOpen } from "../../behavior/use-organization-library-open.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useBoardLangyChip, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
 import {
@@ -52,6 +54,7 @@ import { BoardDataSourceLabel } from "../blocks/board-data-source-label.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
+import { BoardProjectChip } from "../blocks/board-project-chip.tsx";
 import { BoardScopeControl } from "../blocks/board-scope-control.tsx";
 import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
 import { LimitFailedWidgetsBanner } from "../blocks/limit-failed-widgets-banner.tsx";
@@ -67,6 +70,38 @@ import { ProjectBoardUnavailable } from "./project-board-unavailable.tsx";
 /** A Gateway or Governance board reads the organization's data, not a project's (ADR-002, D2). */
 const ORGANIZATION_DATA_HOMES: readonly DashboardHomeProduct[] = ["gateway", "governance"];
 
+/** The header's project slot: the data label with the organization area on, else main's chip. */
+function projectSlot({
+  organizationArea,
+  readsOrganization,
+  projectName,
+  projects,
+}: {
+  organizationArea: boolean;
+  readsOrganization: boolean;
+  projectName: string | undefined;
+  projects: ReturnType<typeof useBoardProjects>;
+}) {
+  return organizationArea
+    ? dataSourceLabel({ readsOrganization, projectName })
+    : sharedProjectChip(projects);
+}
+
+/** The header's project chip, present only on a board shared across projects. */
+function sharedProjectChip(projects: ReturnType<typeof useBoardProjects>) {
+  if (!projects.isShared) return {};
+  return {
+    project: (
+      <BoardProjectChip
+        current={projects.current}
+        ownerProject={projects.ownerProject}
+        projects={projects.projects}
+        onPick={projects.openIn}
+      />
+    ),
+  };
+}
+
 /** The header's read-only "Data from <project>"; a board reading the organization names none. */
 function dataSourceLabel({
   readsOrganization,
@@ -80,8 +115,15 @@ function dataSourceLabel({
 }
 
 /** Renames from the title, or undefined where the reader may not: asked in the project that
- * owns the board, as the library and sidebar menus ask it. */
-function useBoardTitleRename(board: SavedBoard): ((name: string) => void) | undefined {
+ * owns the board, as the library and sidebar menus ask it. Off with the organization area: main
+ * has no inline rename. */
+function useBoardTitleRename({
+  board,
+  organizationArea,
+}: {
+  board: SavedBoard;
+  organizationArea: boolean;
+}): ((name: string) => void) | undefined {
   const host = useAnalyticsHost();
   const edits = useLibraryBoardEdits();
   const mayRename = mayRenameBoard({
@@ -92,7 +134,7 @@ function useBoardTitleRename(board: SavedBoard): ((name: string) => void) | unde
       permission: "analytics:update",
     }),
   });
-  if (!mayRename) return void 0;
+  if (!organizationArea || !mayRename) return void 0;
   return (name) =>
     edits.renameBoard({ board: { ...board, project: { id: board.projectId } }, name });
 }
@@ -105,6 +147,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   const { access, names } = useBoardAccess(board);
   const { canEdit } = access;
   const scope = useBoardScope();
+  const projects = useBoardProjects({ board });
   const boardWidgets = useBoardWidgets({
     dashboardId: board.id,
     isOwnedElsewhere: !access.isHome,
@@ -151,7 +194,8 @@ function OpenBoard({ board }: { board: SavedBoard }) {
   };
   const isEmpty = boardWidgets.status === "success" && widgets.length === 0;
   const isMyDashboard = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
-  const renameBoard = useBoardTitleRename(board);
+  const organizationArea = useOrganizationLibraryOpen().isOpen;
+  const renameBoard = useBoardTitleRename({ board, organizationArea });
   const templates = templateLinks({
     projectSlug: saved.projectSlug,
     homeProduct: board.homeProduct,
@@ -181,7 +225,12 @@ function OpenBoard({ board }: { board: SavedBoard }) {
               widgetCount: boardWidgets.status === "success" ? widgets.length : void 0,
             }}
             action={canEdit ? <AddWidgetButton onClick={openPicker} /> : null}
-            {...dataSourceLabel({ readsOrganization, projectName: host.project()?.name })}
+            {...projectSlot({
+              organizationArea,
+              readsOrganization,
+              projectName: host.project()?.name,
+              projects,
+            })}
             periodControl={
               <BoardPeriodControl
                 range={range}

@@ -10,7 +10,7 @@ import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilit
 import { type UiLend, uiDeclarations } from "@langwatch/browser-host/declarations";
 import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -20,6 +20,7 @@ vi.mock(import("@langwatch/design-system/color-mode"), async (importOriginal) =>
   getRawColorValue: () => "#123456",
 }));
 
+import type { AnalyticsHostProject } from "../../../model/analytics-host.ts";
 import { ANALYTICS_MEMBER_PERMISSIONS, StubAnalyticsHost } from "../../../testing.tsx";
 import { curatedBoardById } from "../model/curated-boards.ts";
 import CuratedBoardScreen from "../ui/sections/curated-board.screen.tsx";
@@ -63,19 +64,31 @@ const LENT: UiLend = {
   load: () => Promise.resolve({ default: LentProbe }),
 };
 
+const SHOP = { id: "proj-1", slug: "test-project", name: "Test Project", hasFirstMessage: true };
+const OWNER = { id: "proj-owner", slug: "owner-abc", name: "Owner" };
+
 function openScreen({
   element,
   params,
   lends,
+  board = {},
+  organizationArea,
+  project,
 }: {
   element: ReactElement;
   params: Record<string, string>;
   lends: readonly UiLend[];
+  /** Fields of the stored board that differ from the default board. */
+  board?: Record<string, unknown>;
+  /** The organization's Dashboards area flag, answered once given; unanswered when absent. */
+  organizationArea?: boolean;
+  project?: AnalyticsHostProject;
 }) {
   const host = new StubAnalyticsHost({
     flags: { release_dashboards: true },
     permissions: [...ANALYTICS_MEMBER_PERMISSIONS],
     route: { params, query: {} },
+    ...(project ? { project } : {}),
   });
   const services = {
     ...createUiHostServicesFromHost({
@@ -90,7 +103,15 @@ function openScreen({
     ),
     host,
     answer: (call: UiProcedureCall) => {
-      if (call.path === "boards.getAll") return Promise.resolve([{ ...BOARD }]);
+      if (call.path === "featureFlag.isEnabledForEachOrganization") {
+        return organizationArea === undefined
+          ? NO_PROCEDURES(call)
+          : Promise.resolve({ enabledByOrganizationId: { "org-1": organizationArea } });
+      }
+      if (call.path === "boards.scopeProjects") {
+        return Promise.resolve({ ownerProject: OWNER, projects: [OWNER, SHOP] });
+      }
+      if (call.path === "boards.getAll") return Promise.resolve([{ ...BOARD, ...board }]);
       if (call.path === "boards.listStarred") return Promise.resolve([]);
       if (call.path === "dashboardWidgets.list") return Promise.resolve(WIDGETS);
       return NO_PROCEDURES(call);
@@ -146,6 +167,59 @@ describe("given no module lends an action to the board header", () => {
 
       expect(await screen.findByRole("heading", { name: "Release check" })).toBeInTheDocument();
       expect(screen.queryByLabelText("Lent action")).toBeNull();
+    });
+  });
+});
+
+describe("given the organization's Dashboards area is off", () => {
+  describe("when a member opens a stored board", () => {
+    /** @scenario "With the flag off, a board's title has no inline rename, as on main" */
+    it("draws the title with no rename control", async () => {
+      openScreen({
+        element: <DashboardBoardScreen />,
+        params: { dashboardId: "board-1" },
+        lends: [],
+        organizationArea: false,
+      });
+
+      const heading = await screen.findByRole("heading", { name: "Weekly review" });
+      expect(within(heading).queryByRole("button")).toBeNull();
+    });
+  });
+
+  describe("when a member opens an Organization board in a project", () => {
+    /** @scenario "With the flag off, an Organization board keeps the Project chip, as on main" */
+    it("shows the Project chip in place of the data label", async () => {
+      openScreen({
+        element: <DashboardBoardScreen />,
+        params: { dashboardId: "board-1" },
+        lends: [],
+        board: { scope: "ORGANIZATION", projectId: OWNER.id },
+        organizationArea: false,
+        project: SHOP,
+      });
+
+      expect(
+        await screen.findByRole("button", { name: `Project: ${SHOP.name}` }),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText(/^Data from /)).toBeNull();
+    });
+  });
+
+  describe("when the organization's Dashboards area is on", () => {
+    /** @scenario "An Organization board in a project reads its data from a label, not a chip" */
+    it("shows the data label, and no Project chip", async () => {
+      openScreen({
+        element: <DashboardBoardScreen />,
+        params: { dashboardId: "board-1" },
+        lends: [],
+        board: { scope: "ORGANIZATION", projectId: OWNER.id },
+        organizationArea: true,
+        project: SHOP,
+      });
+
+      expect(await screen.findByLabelText(`Data from ${SHOP.name}`)).toBeVisible();
+      expect(screen.queryByRole("button", { name: /^Project:/ })).toBeNull();
     });
   });
 });

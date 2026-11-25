@@ -160,6 +160,17 @@ export const dashboardScopeImpactSchema: DashboardScopeImpactSchema =
   dashboardScopeImpactSchemaDefinition;
 export type DashboardScopeImpact = z.infer<typeof dashboardScopeImpactSchema>;
 
+/** The projects this reader can open an Organization board under, and the one that owns it. */
+const dashboardScopeProjectsSchemaDefinition = z
+  .object({ ownerProject: dashboardProjectSchema, projects: z.array(dashboardProjectSchema) })
+  .strict();
+export interface DashboardScopeProjectsSchema extends Named<
+  typeof dashboardScopeProjectsSchemaDefinition
+> {}
+export const dashboardScopeProjectsSchema: DashboardScopeProjectsSchema =
+  dashboardScopeProjectsSchemaDefinition;
+export type DashboardScopeProjects = z.infer<typeof dashboardScopeProjectsSchema>;
+
 /**
  * A member's own default board, made the first time they open Dashboards. No column marks it, so
  * the name and its creator do; it starts Only me and in its creator's stars

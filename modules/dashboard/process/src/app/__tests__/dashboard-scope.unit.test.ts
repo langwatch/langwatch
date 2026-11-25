@@ -140,6 +140,8 @@ function operations({
       app.setDashboardScope({ projectId, dashboardId, viewer: member, scope: "PROJECT" }),
     scopeImpact: ({ dashboardId }) =>
       app.getDashboardScopeImpact({ projectId, dashboardId, viewer: member }),
+    scopeProjects: ({ dashboardId }) =>
+      app.listDashboardScopeProjects({ projectId, dashboardId, viewer: member }),
     listBoardWidgets: ({ dashboardId }) => app.listDashboardWidgets({ ...as, dashboardId }),
     addWidget: ({ dashboardId }) => app.createDashboardWidget({ ...WIDGET, ...as, dashboardId }),
     readWidget: ({ widgetId }) => app.getDashboardWidget({ ...as, id: widgetId }),
@@ -724,6 +726,73 @@ describe("board scope on the server", () => {
         home: [[target.dashboardId], target.dashboardId],
         sibling: [[target.dashboardId], target.dashboardId],
       });
+    });
+  });
+
+  describe("given an Organization board and the projects of its organization", () => {
+    /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
+    it("lists the organization's projects the reader can open, by name, and names the owner", async () => {
+      const { app, target } = await boardAt("ORGANIZATION");
+
+      const projects = await app.listDashboardScopeProjects({
+        projectId: SIBLING,
+        dashboardId: target.dashboardId,
+        viewer: TEAMMATE,
+      });
+
+      expect(projects).toEqual({
+        ownerProject: { id: HOME, name: `Project ${HOME}`, slug: `slug-${HOME}` },
+        projects: [
+          { id: HOME, name: `Project ${HOME}`, slug: `slug-${HOME}` },
+          { id: SIBLING, name: `Project ${SIBLING}`, slug: `slug-${SIBLING}` },
+        ],
+      });
+    });
+
+    /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
+    it("leaves out a project the reader cannot open, and still names the owner", async () => {
+      const { app } = appWith({ openProjectIds: [SIBLING] });
+      const shared = await app.createBoard({
+        projectId: HOME,
+        name: "Reports",
+        createdById: AUTHOR.userId,
+      });
+      await app.setDashboardScope({
+        projectId: HOME,
+        dashboardId: shared.id,
+        viewer: AUTHOR,
+        scope: "ORGANIZATION",
+      });
+
+      const projects = await app.listDashboardScopeProjects({
+        projectId: SIBLING,
+        dashboardId: shared.id,
+        viewer: TEAMMATE,
+      });
+
+      expect({
+        owner: projects.ownerProject.id,
+        open: projects.projects.map(({ id }) => id),
+      }).toEqual({ owner: HOME, open: [SIBLING] });
+    });
+
+    /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
+    it("has no such list for a Project or an Only me board", async () => {
+      const project = await boardAt("PROJECT");
+      const own = await boardAt("PRIVATE");
+      const asked = ({ app, target }: typeof project) =>
+        codeOf(
+          app.listDashboardScopeProjects({
+            projectId: HOME,
+            dashboardId: target.dashboardId,
+            viewer: AUTHOR,
+          }),
+        );
+
+      expect([await asked(project), await asked(own)]).toEqual([
+        "dashboard_not_found",
+        "dashboard_not_found",
+      ]);
     });
   });
 });

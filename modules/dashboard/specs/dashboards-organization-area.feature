@@ -50,6 +50,36 @@ Feature: Organization-wide Dashboards area
     # Evidence: one screenshot per address and sidebar above with the flag off, each paired
     # with the base commit's screenshot of the same address
 
+  @integration
+  Scenario: With the flag off, a board's title has no inline rename, as on main
+    Given "the organization's Dashboards area" is off for "Acme"
+    When I open a stored board in "Shop"
+    Then its title is drawn with no rename control
+    # Evidence: the rendered title with no button in it
+
+  @integration
+  Scenario: With the flag off, an Organization board keeps the Project chip, as on main
+    Given "the organization's Dashboards area" is off for "Acme"
+    When I open an Organization board in "Shop"
+    Then the header shows the Project chip "Project: Shop" and no "Data from" label
+    # Evidence: the chip's aria-label in the rendered header
+
+  @integration
+  Scenario: An Organization board in a project reads its data from a label, not a chip
+    Given "the organization's Dashboards area" is on for "Acme"
+    When I open an Organization board in "Shop"
+    Then the header shows "Data from Shop" and no Project chip
+    # Evidence: the label's aria-label in the rendered header
+
+  @integration
+  Scenario: With the flag off, a From LangWatch board is read-only, as on main
+    Given "the organization's Dashboards area" is off for "Acme"
+    And I may create dashboards in "Shop"
+    When I open "/shop/dashboards/curated/<id>"
+    Then the board shows its widgets with no "Add a widget", no "Use this template", no title or description edit, and no widget edit, drag or delete
+    And no copy-on-change dialog can open
+    # Evidence: the quoted tRPC calls, with no dashboards or dashboardWidgets write
+
   # ---- The Coding agents rename: page titles (draft AC4; S0) ----
   @integration @unimplemented
   Scenario: Every Coding agents page title says Coding agents

@@ -142,6 +142,16 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
       }),
     )
 
+    .procedure("scopeProjects")
+    .withPermission("analytics:view")
+    .handle(async ({ app, input, actor }) =>
+      app.listDashboardScopeProjects({
+        projectId: input.projectId,
+        dashboardId: input.dashboardId,
+        viewer: { userId: actor.id },
+      }),
+    )
+
     .procedure("listStarred")
     .withPermission("analytics:view")
     .handle(async ({ app, input, actor }) =>

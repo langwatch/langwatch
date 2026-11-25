@@ -87,8 +87,11 @@ function scopeServer({
   boards,
   widgets = [],
   otherStars = 0,
+  organizationArea = false,
 }: {
   boards: Board[];
+  /** The organization's Dashboards area flag; off unless a scenario turns it on. */
+  organizationArea?: boolean;
   widgets?: ReturnType<typeof widget>[];
   otherStars?: number;
 }) {
@@ -146,7 +149,9 @@ function scopeServer({
       }
       // The organization's Dashboards area is off, so a missing board reads as AC183's page.
       case "featureFlag.isEnabledForEachOrganization":
-        return Promise.resolve({ enabledByOrganizationId: {} });
+        return Promise.resolve({
+          enabledByOrganizationId: organizationArea ? { "org-1": true } : {},
+        });
       default:
         return NO_PROCEDURES(call);
     }
@@ -499,7 +504,7 @@ describe("a board's scope in the browser", () => {
 
     /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
     it("says whose data is on screen, read-only, with no project to switch to", async () => {
-      open({ server: scopeServer({ boards: [spend] }) });
+      open({ server: scopeServer({ boards: [spend], organizationArea: true }) });
 
       const label = await screen.findByLabelText("Data from Test Project");
 
@@ -511,10 +516,10 @@ describe("a board's scope in the browser", () => {
   describe("given a Project board", () => {
     /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
     it("says its own project's data is on screen, read-only", async () => {
-      open({ server: scopeServer({ boards: [WEEKLY] }) });
+      open({ server: scopeServer({ boards: [WEEKLY], organizationArea: true }) });
       await screen.findByRole("button", { name: "Scope: Project" });
 
-      expect(screen.getByLabelText("Data from Test Project")).toBeVisible();
+      expect(await screen.findByLabelText("Data from Test Project")).toBeVisible();
       expect(screen.queryByRole("button", { name: /^Project:/ })).toBeNull();
     });
   });
@@ -538,7 +543,10 @@ describe("a board's scope in the browser", () => {
   describe("given the address of a board the server does not list for this member", () => {
     /** @scenario "AC183 A board the reader may not open is not available" */
     it("says the dashboard is not available, and why it may be", async () => {
-      open({ server: scopeServer({ boards: [WEEKLY] }), dashboardId: "board-private" });
+      open({
+        server: scopeServer({ boards: [WEEKLY] }),
+        dashboardId: "board-private",
+      });
 
       expect(
         await screen.findByRole("heading", { name: BOARD_UNAVAILABLE.title }),
