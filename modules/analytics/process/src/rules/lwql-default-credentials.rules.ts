@@ -158,7 +158,7 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function setupFailureOf(error: unknown): LwqlSetupFailure | undefined {
+function classifyChainLink(error: unknown): LwqlSetupFailure | { readonly kind: "unrecognised" } {
   const failure = error as { code?: unknown; meta?: { code?: unknown } } | null;
   const message = messageOf(error);
   const clickHouseCode = Number(failure?.code);
@@ -189,7 +189,7 @@ function setupFailureOf(error: unknown): LwqlSetupFailure | undefined {
       reason: `the PostgreSQL user has no permission to ${grant} (CREATEROLE)`,
     };
   }
-  return undefined;
+  return { kind: "unrecognised" };
 }
 
 /** Classifies a provisioning failure: a missing grant, a missing settings prefix, or other. */
@@ -202,8 +202,8 @@ export function classifyLwqlSetupFailure({
   summary: string;
 }): LwqlSetupFailure {
   for (const link of errorChain(error)) {
-    const failure = setupFailureOf(link);
-    if (failure) return failure;
+    const failure = classifyChainLink(link);
+    if (failure.kind !== "unrecognised") return failure;
   }
   return { kind: "other", store: "unknown", reason: `provisioning failed (${summary})` };
 }
