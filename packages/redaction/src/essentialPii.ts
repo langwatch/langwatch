@@ -580,7 +580,7 @@ function collectRecognizerSpans({
 /**
  * Phone-number pass via libphonenumber-js, kept separate from
  * `collectRecognizerSpans` (different match shape). By far the most expensive
- * check here, so `ENOUGH_DIGITS_FOR_A_NUMBER` gates it before it ever runs.
+ * check here, so `ENOUGH_DIGITS_FOR_A_NUMBER` and `PHONE_SHAPED` gate it.
  */
 
 /**
@@ -589,6 +589,34 @@ function collectRecognizerSpans({
  * library's own allowance), so the gate only ever errs toward running the check.
  */
 const ENOUGH_DIGITS_FOR_A_NUMBER = /\d(?:[^0-9A-Za-z]{0,4}\d){5}/;
+
+/** libphonenumber-js's `VALID_PUNCTUATION` and `PLUS_CHARS` (source/constants.js), unexported. */
+const PHONE_PUNCTUATION =
+  "-\u2010-\u2015\u2212\u30FC\uFF0D\uFF0F/\uFF0E. \u00A0\u00AD\u200B\u2060\u3000" +
+  "()\uFF08\uFF09\uFF3B\uFF3D\\[\\]~\u2053\u223C\uFF5E";
+const PHONE_PLUS = "+\uFF0B";
+const PHONE_GAP = `[${PHONE_PUNCTUATION}]{0,4}`;
+const digitRun = (count: number) => `\\p{Nd}(?:${PHONE_GAP}\\p{Nd}){${count - 1}}`;
+/** One digit value in each script the library reads: ASCII, fullwidth, Arabic-Indic, Persian. */
+const digitOf = (value: number) =>
+  `[${value}${String.fromCharCode(0xff10 + value, 0x660 + value, 0x6f0 + value)}]`;
+const ledBy = (values: number[], rest: number) =>
+  values.map(digitOf).join(PHONE_GAP) + PHONE_GAP + digitRun(rest);
+
+/**
+ * Where the library can find a valid number (default US): `+` and six digits, ten digits, `011`
+ * and six, or Canada's seven-digit `310`, joined only by its punctuation, never `:` or letters,
+ * so dates, clock times and ids skip the scan. Proof: essentialPii.phoneGate.unit.test.ts.
+ */
+const PHONE_SHAPED = new RegExp(
+  [
+    `[${PHONE_PLUS}][${PHONE_PUNCTUATION}${PHONE_PLUS}]{0,9}${digitRun(6)}`,
+    digitRun(10),
+    ledBy([0, 1, 1], 6),
+    ledBy([3, 1, 0], 4),
+  ].join("|"),
+  "u",
+);
 
 function collectPhoneSpans({
   text,
@@ -603,7 +631,7 @@ function collectPhoneSpans({
 }): Span[] {
   if (isIdentifierShaped) return [];
   if (allowed && !allowed.has("PHONE_NUMBER")) return [];
-  if (!ENOUGH_DIGITS_FOR_A_NUMBER.test(text)) return [];
+  if (!ENOUGH_DIGITS_FOR_A_NUMBER.test(text) || !PHONE_SHAPED.test(text)) return [];
   const spans: Span[] = [];
   try {
     for (const phone of findPhoneNumbersInText(text, {
