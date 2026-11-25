@@ -18,6 +18,8 @@ export type LangyDraftImage = Readonly<{
   attachment?: LangyAttachment;
   /** What went wrong, for a failed thumbnail. */
   error?: string;
+  /** Starts the upload again; only an upload that failed has one, never a refused file. */
+  retry?: () => void;
 }>;
 
 interface LangyComposerImagesState {

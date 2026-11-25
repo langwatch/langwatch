@@ -1,6 +1,6 @@
 import { Box, chakra, Spinner, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { CircleAlert, Image as ImageIcon, X } from "lucide-react";
+import { CircleAlert, Image as ImageIcon, RotateCw, X } from "lucide-react";
 
 const THUMB_SIZE = "52px";
 
@@ -9,16 +9,20 @@ function ThumbFace({
   src,
   failed,
   error,
+  onRetry,
 }: {
   name: string;
   src?: string;
   failed: boolean;
   error?: string;
+  onRetry?: () => void;
 }) {
   if (failed) {
     return (
       <Box display="flex" alignItems="center" gap={2} height="full" paddingX={2.5} color="red.fg">
-        <CircleAlert size={15} aria-hidden />
+        <Box display="inline-flex" flexShrink={0}>
+          <CircleAlert size={15} aria-hidden />
+        </Box>
         <Box minWidth={0}>
           <Text textStyle="xs" fontWeight="medium" truncate>
             {name}
@@ -27,6 +31,7 @@ function ThumbFace({
             {error ?? "Couldn't attach this image"}
           </Text>
         </Box>
+        {onRetry ? <RetryUploadButton name={name} onRetry={onRetry} /> : null}
       </Box>
     );
   }
@@ -47,6 +52,32 @@ function ThumbFace({
       borderRadius="9px"
       display="block"
     />
+  );
+}
+
+function RetryUploadButton({ name, onRetry }: { name: string; onRetry: () => void }) {
+  return (
+    <chakra.button
+      type="button"
+      aria-label={`Try uploading ${name} again`}
+      onClick={onRetry}
+      flexShrink={0}
+      display="inline-flex"
+      alignItems="center"
+      gap={1}
+      paddingX={1.5}
+      height="22px"
+      borderRadius="md"
+      color="red.fg"
+      cursor="pointer"
+      textStyle="2xs"
+      fontWeight="medium"
+      _hover={{ background: "red.muted" }}
+      _focusVisible={{ outline: "2px solid", outlineColor: "orange.focusRing" }}
+    >
+      <RotateCw size={11} aria-hidden />
+      Retry
+    </chakra.button>
   );
 }
 
@@ -101,6 +132,7 @@ export function LangyImageThumb({
   status,
   error,
   onRemove,
+  onRetry,
 }: {
   name: string;
   /** The image to draw: the local file while it uploads, or the stored file once sent. */
@@ -108,6 +140,8 @@ export function LangyImageThumb({
   status: "uploading" | "ready" | "failed";
   error?: string;
   onRemove?: () => void;
+  /** Shown on a failed upload that can be tried again. */
+  onRetry?: () => void;
 }) {
   const failed = status === "failed";
   const thumb = (
@@ -125,7 +159,7 @@ export function LangyImageThumb({
       borderColor={failed ? "red.emphasized" : "border.emphasized"}
       background={failed ? "red.subtle" : "bg.muted"}
     >
-      <ThumbFace name={name} src={src} failed={failed} error={error} />
+      <ThumbFace name={name} src={src} failed={failed} error={error} onRetry={onRetry} />
       {status === "uploading" ? <UploadingVeil name={name} /> : null}
       {onRemove ? <RemoveImageButton name={name} onRemove={onRemove} /> : null}
     </Box>

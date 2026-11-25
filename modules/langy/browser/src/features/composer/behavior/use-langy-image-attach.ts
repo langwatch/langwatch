@@ -74,6 +74,12 @@ async function uploadInto({
     images.update(key, {
       status: "failed",
       error: describeError({ error, fallbackTitle: "The image didn't upload" }),
+      retry: () => {
+        useLangyComposerImages
+          .getState()
+          .update(key, { status: "uploading", error: undefined, retry: undefined });
+        void uploadInto({ key, file, uploadImage });
+      },
     });
   }
 }

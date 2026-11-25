@@ -118,6 +118,46 @@ describe("given the Langy composer is open", () => {
       ]);
       expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
     });
+
+    /** @scenario A failed upload can be tried again from its thumbnail */
+    it("uploads the image again when Retry is pressed and opens Send once it is stored", async () => {
+      const uploadImage = vi
+        .fn<(file: File) => Promise<LangyAttachment>>()
+        .mockRejectedValueOnce(new Error("network down"))
+        .mockImplementation(async (file) => attachmentOf(file));
+      renderComposer({ uploadImage });
+      fireEvent.change(textarea(), { target: { value: "look" } });
+      const image = new File(["PNG!"], "chart.png", { type: "image/png" });
+      await act(async () => {
+        fireEvent.paste(textarea(), { clipboardData: { files: [image] } });
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Try uploading chart.png again" }));
+      });
+
+      expect(uploadImage).toHaveBeenCalledTimes(2);
+      expect(useLangyComposerImages.getState().images).toEqual([
+        expect.objectContaining({ fileName: "chart.png", status: "ready" }),
+      ]);
+      expect(screen.queryByRole("button", { name: /Try uploading/ })).toBeNull();
+      expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();
+    });
+
+    /** @scenario A failed upload can be tried again from its thumbnail */
+    it("offers no Retry for a file Langy refused, only its remove button", async () => {
+      renderComposer();
+      const pdf = new File(["%PDF"], "report.pdf", { type: "application/pdf" });
+      await act(async () => {
+        fireEvent.paste(textarea(), { clipboardData: { files: [pdf] } });
+      });
+
+      expect(useLangyComposerImages.getState().images).toEqual([
+        expect.objectContaining({ fileName: "report.pdf", status: "failed" }),
+      ]);
+      expect(screen.queryByRole("button", { name: /Try uploading/ })).toBeNull();
+      expect(screen.getByRole("button", { name: "Remove report.pdf" })).toBeTruthy();
+    });
   });
 
   describe("when it renders", () => {

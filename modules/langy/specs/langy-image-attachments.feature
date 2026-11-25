@@ -67,6 +67,13 @@ Feature: Images attached to a Langy message reach the model
     Then the thumbnail shows that it failed
     And the message cannot be sent until the failed image is removed
 
+  @integration
+  Scenario: A failed upload can be tried again from its thumbnail
+    Given the person pasted an image whose upload failed
+    When they press Retry on its thumbnail
+    Then the image uploads again and the message can be sent once it is stored
+    And a file Langy refused shows no Retry, only its remove button
+
   @unit
   Scenario: A confirmed image becomes a file part of the sent message
     Given an image whose upload was confirmed

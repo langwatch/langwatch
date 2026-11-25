@@ -989,6 +989,7 @@ function ComposerImagesRow() {
           status={image.status}
           error={image.error}
           onRemove={() => removeImage(image.key)}
+          onRetry={image.retry}
         />
       ))}
     </HStack>
