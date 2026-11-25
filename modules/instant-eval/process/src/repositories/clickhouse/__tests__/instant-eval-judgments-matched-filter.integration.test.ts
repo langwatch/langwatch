@@ -28,11 +28,11 @@ const tenantId = `${randomUUID()}-matched`;
 const runId = "run-matched";
 const now = Date.now();
 
-const QUESTION_IDS: Record<"boolean" | "score" | "category", string> = {
+const QUESTION_IDS = {
   boolean: "resolved",
   score: "quality",
   category: "sentiment",
-};
+} as const;
 
 function judgment({
   traceId,
@@ -41,7 +41,7 @@ function judgment({
   passed,
 }: {
   traceId: string;
-  kind: "boolean" | "score" | "category";
+  kind: keyof typeof QUESTION_IDS;
   status: InstantEvalJudgmentRecord["Status"];
   passed: number | null;
 }): InstantEvalJudgmentRecord {
@@ -100,7 +100,7 @@ async function traceIdsOf({
 function matchedFilterCases(repository: () => InstantEvalJudgmentsRepository): void {
   describe("when the results are read with matches excluded", () => {
     /** @scenario "Results narrowed to non-matches keep the skipped and failed judgements" */
-    it("returns the yes or no judgements that did not pass with every skipped and failed one", async () => {
+    it("returns non-matches with every skipped and failed judgement, and the matches", async () => {
       const unmatched = await traceIdsOf({
         repository: repository(),
         narrowing: { matched: false },
