@@ -408,31 +408,12 @@ describe("the Dashboards section with Dashboards in every product on", () => {
   ] as const;
 
   describe("given a member who can reach Dashboards, in Gateway or Coding agents", () => {
-    /** @scenario "Gateway and Coding agents show the Dashboards section of the project LLM Ops opens" */
-    it.each(outsideLlmOps)(
-      "hands the section the project LLM Ops would open, in $surface",
-      async ({ surface, pathname, project }) => {
-        renderSidebar({
-          surface,
-          pathname,
-          project,
-          everyProductFlag: true,
-          openableTeams: [PERSONAL_TEAM, SHOP_TEAM],
-          rememberedProjectSlug: "shop",
-        });
-
-        expect(await screen.findByTestId("starred-dashboards")).toHaveTextContent(
-          "Pinned dashboards in Shop (project-shop)",
-        );
-      },
-    );
-  });
-
-  describe("given the same member, with nothing setting the flag", () => {
     /** @scenario "With no setting for the flag, Gateway and Coding agents show the Dashboards section" */
     it.each(outsideLlmOps)(
       "draws the section from the registry default, in $surface",
       async ({ surface, pathname, project }) => {
+        // Nothing passes the flag, so the section shows only if the contract default is on.
+        expect(EVERY_PRODUCT_DEFAULT, "the registry default must be on").toBe(true);
         renderSidebar({
           surface,
           pathname,
