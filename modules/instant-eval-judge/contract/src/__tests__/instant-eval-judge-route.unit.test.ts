@@ -202,20 +202,25 @@ describe("judge route table", () => {
       );
     });
 
-    /** @scenario "A reasoning effort is sent only when the backend sets one" */
-    it.each(["none", "minimal", "low", "medium", "high"])(
-      "takes the effort %s that the provider names",
-      (effort) => {
-        const parsed = instantEvalJudgeRouteTableSchema.parse(
-          gatedTable({
-            backends: {
-              "llm-b": { kind: "openai_responses", model: "m", reasoningEffort: effort },
+    /** @scenario "A backend that reasons waits long enough to write its output cap" */
+    it("refuses an effort on a backend whose timeout is below the floor, naming both", () => {
+      const parsed = instantEvalJudgeRouteTableSchema.safeParse(
+        gatedTable({
+          backends: {
+            "llm-b": {
+              kind: "openai_responses",
+              model: "m",
+              reasoningEffort: "high",
+              timeoutMs: 299_999,
             },
-          }),
-        );
-        expect(parsed.backends["llm-b"]?.reasoningEffort).toBe(effort);
-      },
-    );
+          },
+        }),
+      );
+      expect(parsed.success).toBe(false);
+      expect(JSON.stringify(parsed.error?.issues)).toContain(
+        "backend llm-b: reasoningEffort high needs a timeoutMs of at least 300000",
+      );
+    });
 
     /** @scenario "A reasoning effort is sent only when the backend sets one" */
     it("refuses an effort the provider does not name", () => {
@@ -364,6 +369,49 @@ describe("judge route table", () => {
       ).toThrow(ConfigParseError);
     });
   });
+});
+
+describe("given an OpenAI Responses backend that sets a reasoning effort", () => {
+  /** @scenario "A reasoning effort is sent only when the backend sets one" */
+  it.each(["none", "minimal", "low", "medium", "high"])(
+    "takes the effort %s that the provider names",
+    (effort) => {
+      const parsed = instantEvalJudgeRouteTableSchema.parse(
+        gatedTable({
+          backends: {
+            "llm-b": { kind: "openai_responses", model: "m", reasoningEffort: effort },
+          },
+        }),
+      );
+      expect(parsed.backends["llm-b"]?.reasoningEffort).toBe(effort);
+    },
+  );
+
+  /** @scenario "A backend that reasons waits long enough to write its output cap" */
+  it.each([
+    ["high", undefined, 300_000],
+    ["minimal", undefined, 300_000],
+    ["none", undefined, 30_000],
+    [undefined, undefined, 30_000],
+    ["high", 400_000, 400_000],
+  ] as const)(
+    "gives effort %s with timeout %s a timeout of %i ms",
+    (effort, timeoutMs, expected) => {
+      const parsed = instantEvalJudgeRouteTableSchema.parse(
+        gatedTable({
+          backends: {
+            "llm-b": {
+              kind: "openai_responses",
+              model: "m",
+              ...(effort ? { reasoningEffort: effort } : {}),
+              ...(timeoutMs ? { timeoutMs } : {}),
+            },
+          },
+        }),
+      );
+      expect(parsed.backends["llm-b"]?.timeoutMs).toBe(expected);
+    },
+  );
 });
 
 describe("given a gated entry", () => {

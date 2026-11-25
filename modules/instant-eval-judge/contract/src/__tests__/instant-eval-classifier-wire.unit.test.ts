@@ -318,6 +318,26 @@ describe("given a score question that names its levels", () => {
   });
 
   /** @scenario "The gate reads a frozen framing of the case" */
+  it("reads a whole level name before a label it shares, and no level from a shared label", () => {
+    const risk: InstantEvalQuestion = {
+      ...difficulty,
+      range: { min: 0, max: 1 },
+      levels: ["risk: low", "risk: high"],
+    };
+    const readRisk = (probabilities: Record<string, number>) =>
+      readClassifierVerdicts({
+        questions: [risk],
+        response: classifierResponseSchema.parse({
+          answers: { difficulty: { type: "score", probabilities } },
+        }),
+      })[0]?.score;
+
+    expect(readRisk({ "risk: high": 1 })).toBe(1);
+    expect(readRisk({ " Risk: Low": 1 })).toBe(0);
+    expect(readRisk({ risk: 1 })).toBeUndefined();
+  });
+
+  /** @scenario "The gate reads a frozen framing of the case" */
   it("refuses to send names whose range is not 0 to the last level index", () => {
     expect(() => toClassifierQuestions([{ ...difficulty, range: { min: 1, max: 10 } }])).toThrow(
       /range must be 0 to 2, not 1 to 10/,

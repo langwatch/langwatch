@@ -286,7 +286,8 @@ describe("HttpInstantEvalLlmJudgeChannel, given a backend's reasoning effort", (
   });
 
   /** @scenario "A reasoning effort is sent only when the backend sets one" */
-  it("skips an answer stopped at the output cap before its call, billing its tokens", async () => {
+  it("skips an answer stopped at the output cap before its call, billing and naming it", async () => {
+    const warned: unknown[][] = [];
     agent
       .get("https://api.openai.com")
       .intercept({ path: "/v1/responses", method: "POST" })
@@ -297,7 +298,11 @@ describe("HttpInstantEvalLlmJudgeChannel, given a backend's reasoning effort", (
         usage: { input_tokens: 500, output_tokens: 32_000 },
       });
 
-    const answer = await llm().judge({ ...request("openai_responses"), reasoningEffort: "high" });
+    const answer = await HttpInstantEvalLlmJudgeChannel.create({
+      keys: { openai_responses: "lw-openai" },
+      dispatcher: agent,
+      logger: { warn: (...args: unknown[]) => void warned.push(args) },
+    }).judge({ ...request("openai_responses"), reasoningEffort: "high" });
 
     expect(answer).toEqual({
       outcome: "skipped",
@@ -305,6 +310,12 @@ describe("HttpInstantEvalLlmJudgeChannel, given a backend's reasoning effort", (
       inputTokens: 500,
       outputTokens: 32_000,
     });
+    expect(warned).toEqual([
+      [
+        expect.objectContaining({ stoppedBy: "max_output_tokens", reasoningEffort: "high" }),
+        "Instant Evals LLM leg stopped before its evaluation call",
+      ],
+    ]);
   });
 
   /** @scenario "A reasoning effort is sent only when the backend sets one" */

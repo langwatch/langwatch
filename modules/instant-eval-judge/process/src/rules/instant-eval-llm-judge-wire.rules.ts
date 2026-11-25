@@ -5,13 +5,15 @@
  * @see modules/instant-eval-judge/specs/instant-eval-judge-router.feature
  */
 
-import type {
-  InstantEvalBooleanQuestion,
-  InstantEvalCategoryQuestion,
-  InstantEvalJudgeJob,
-  InstantEvalJudgeReasoningEffort,
-  InstantEvalQuestion,
-  InstantEvalScoreQuestion,
+import {
+  INSTANT_EVAL_JUDGE_REASONING_MAX_OUTPUT_TOKENS,
+  isInstantEvalJudgeReasoning,
+  type InstantEvalBooleanQuestion,
+  type InstantEvalCategoryQuestion,
+  type InstantEvalJudgeJob,
+  type InstantEvalJudgeReasoningEffort,
+  type InstantEvalQuestion,
+  type InstantEvalScoreQuestion,
 } from "@langwatch/instant-eval-judge-contract";
 import { z } from "zod";
 
@@ -130,12 +132,6 @@ function categoryTool(question: InstantEvalCategoryQuestion): EvaluationTool {
 
 const MAX_OUTPUT_TOKENS = 8_000;
 
-/**
- * A reasoning model counts its reasoning against the output cap, so an effort other than `none`
- * gets the room OpenAI advises reserving for reasoning (25,000) plus the answer's.
- */
-const REASONING_MAX_OUTPUT_TOKENS = 32_000;
-
 /** One LLM leg's messages and the tool it is forced to call. */
 interface InstantEvalLlmJudgePrompt {
   readonly system: string;
@@ -233,10 +229,9 @@ export function instantEvalLlmJudgeBodyOf({
       { role: "developer", content: system },
       { role: "user", content: user },
     ],
-    max_output_tokens:
-      reasoningEffort && reasoningEffort !== "none"
-        ? REASONING_MAX_OUTPUT_TOKENS
-        : MAX_OUTPUT_TOKENS,
+    max_output_tokens: isInstantEvalJudgeReasoning(reasoningEffort)
+      ? INSTANT_EVAL_JUDGE_REASONING_MAX_OUTPUT_TOKENS
+      : MAX_OUTPUT_TOKENS,
     ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
     store: false,
     tools: [{ type: "function", ...tool, strict: false }],

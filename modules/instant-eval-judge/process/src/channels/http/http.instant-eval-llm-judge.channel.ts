@@ -5,7 +5,7 @@
  */
 
 import type { InstantEvalSkipReason } from "@langwatch/instant-eval-judge-contract";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { type Dispatcher, fetch as undiciFetch } from "undici";
 
 import { prepareInstantEvalText } from "../../rules/instant-eval-classifier-text.rules.ts";
@@ -22,7 +22,10 @@ import type {
   InstantEvalLlmJudgeRequest,
 } from "../instant-eval-llm-judge.channel.ts";
 
-const logger = createLogger("langwatch:instant-evals:llm-judge");
+const defaultLogger: Logger = createLogger("langwatch:instant-evals:llm-judge");
+
+/** The one level the leg logs at, injected so a test can read what a failure was named. */
+type InstantEvalLlmJudgeLogger = Pick<Logger, "warn">;
 
 const ENDPOINTS: Record<InstantEvalLlmJudgeWire, string> = {
   anthropic_messages: "https://api.anthropic.com/v1/messages",
@@ -40,17 +43,20 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
   private constructor(
     private readonly keys: Keys,
     private readonly dispatcher: Dispatcher | undefined,
+    private readonly logger: InstantEvalLlmJudgeLogger,
   ) {}
 
   /** A wire with no key skips as not configured; `dispatcher` is a suite's stand-in socket. */
   static create({
     keys,
     dispatcher,
+    logger = defaultLogger,
   }: {
     keys: Keys;
     dispatcher?: Dispatcher;
+    logger?: InstantEvalLlmJudgeLogger;
   }): HttpInstantEvalLlmJudgeChannel {
-    return new HttpInstantEvalLlmJudgeChannel(keys, dispatcher);
+    return new HttpInstantEvalLlmJudgeChannel(keys, dispatcher, logger);
   }
 
   isConfigured(wire: InstantEvalLlmJudgeWire): boolean {
@@ -95,7 +101,7 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
     const reading = readInstantEvalLlmJudgeAnswer({ wire, body: parsed, question });
     const { inputTokens, outputTokens } = reading;
     if (reading.outcome === "none") {
-      logger.warn(
+      this.logger.warn(
         { wire, kind: question.kind, stoppedBy: reading.stoppedBy, reasoningEffort },
         reading.stoppedBy
           ? "Instant Evals LLM leg stopped before its evaluation call"
@@ -115,7 +121,7 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
     reason: InstantEvalSkipReason;
     status?: number;
   }): InstantEvalLlmJudgeAnswer {
-    logger.warn({ wire, reason, status }, "Instant Evals LLM leg did not answer");
+    this.logger.warn({ wire, reason, status }, "Instant Evals LLM leg did not answer");
     return skipped(reason);
   }
 }
