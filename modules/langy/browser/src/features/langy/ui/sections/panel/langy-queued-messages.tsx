@@ -117,7 +117,8 @@ export function LangyQueuedMessages({
       {paused ? (
         <HStack alignSelf="flex-end" gap={2}>
           <Text textStyle="xs" color="fg.muted">
-            The last turn didn't finish, so these weren't sent.
+            The last turn didn't finish, so {queued.length === 1 ? "this wasn't" : "these weren't"}{" "}
+            sent.
           </Text>
           <Button size="xs" colorPalette="orange" onClick={onSendNow}>
             Send now
