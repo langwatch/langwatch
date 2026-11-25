@@ -6,8 +6,10 @@
 import { createHash } from "node:crypto";
 
 import {
+  classifierResponseSchema,
   INSTANT_EVAL_JUDGE_GATE_QUESTIONS,
   type InstantEvalJudgeGateQuestionName,
+  readClassifierVerdicts,
   toClassifierQuestions,
 } from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
@@ -106,6 +108,28 @@ describe("given every gate question the contract names", () => {
       expect(question.range).toEqual({ min: 0, max: levelCount - 1 });
     },
   );
+});
+
+describe("given the hosted classifier's answer to the gate question as the reference stored it", () => {
+  /** @scenario "The gate reads a frozen framing of the case" */
+  it("reads the same difficulty the reference read from it, over the question's named levels", () => {
+    const question = instantEvalJudgeGateQuestionOf({ name: "difficulty_v1", id: "difficulty" });
+    const response = classifierResponseSchema.parse({
+      answers: {
+        difficulty: {
+          type: "score",
+          probabilities: { "0": 0.3, "1": 0.49, "2": 0.17, "3": 0.03, "4": 0.01 },
+        },
+      },
+    });
+    const [verdict] = readClassifierVerdicts({ questions: [question], response });
+    // The reference's own read of this answer: 0.96, so the hard branch at a 0.75 threshold.
+    expect(verdict?.score).toBeCloseTo(0.96, 10);
+    expect(instantEvalJudgeGateBranchOf({ verdict, easyBelow: 0.75 })).toEqual({
+      branch: "hard",
+      hasScore: true,
+    });
+  });
 });
 
 describe("instantEvalJudgeGateBranchOf", () => {
