@@ -71,7 +71,7 @@ export function ResizeHandle({
 
   return (
     <Box
-      role="separator"
+      as="hr"
       aria-label={label}
       aria-orientation="vertical"
       aria-valuenow={value}
@@ -84,6 +84,9 @@ export function ResizeHandle({
       right="-3px"
       bottom={0}
       width="6px"
+      height="auto"
+      margin={0}
+      borderWidth={0}
       zIndex={2}
       cursor="col-resize"
       touchAction="none"
