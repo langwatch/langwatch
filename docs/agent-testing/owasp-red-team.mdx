@@ -9,6 +9,8 @@ description: Run one multi-turn attack per OWASP risk against your agent as pyte
 
 The OWASP pack is a set of multi-turn [red team](/agent-testing/red-teaming) tests, one per OWASP risk, that you add to your agent's test suite. You get a pytest or vitest file per language, judged against your agent's own rules, so you can show your security team where the agent stands on the OWASP Top 10 for LLM Applications and the OWASP Top 10 for Agentic Applications.
 
+To run the same OWASP lists from the platform without code, create a suite from a pack in the template gallery. See [Red Team Templates](/agent-testing/red-team-templates).
+
 ## What the pack covers
 
 | OWASP id | Title | What the attacker tries |
@@ -70,7 +72,9 @@ npx vitest run --config tests/owasp/owasp.vitest.config.ts      # TypeScript
 
 Add `-k LLM01` (pytest) or `-t LLM01` (vitest) to run one id.
 
-The pack calls live models, so keep it out of your default test run and CI. For pytest, add `-m "not agent_test"` to your default options (`addopts` under `[tool.pytest.ini_options]`); `-m agent_test` on the command line overrides it. For vitest, the pack file `owasp-pack.redteam.ts` does not end in `.test.ts`, so the default include skips it and only `owasp.vitest.config.ts` runs it. `OWASP_TURNS` sets the attacker's turns per attack: 10 when unset or empty, 30 before a release. A value that is not a whole number of at least 1 stops the run.
+The pack calls live models, so keep it out of your default test run and CI. For pytest, add `-m "not agent_test"` to your default options (`addopts` under `[tool.pytest.ini_options]`); `-m agent_test` on the command line overrides it. For vitest, the pack file `owasp-pack.redteam.ts` does not end in `.test.ts`, so the default include skips it and only `owasp.vitest.config.ts` runs it.
+
+`OWASP_TURNS` sets the attacker's turns per attack: 10 when unset or empty, 30 before a release. A value that is not a whole number of at least 1 stops the run.
 
 To read the results:
 
