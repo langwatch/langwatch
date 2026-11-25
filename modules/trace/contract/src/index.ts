@@ -10,6 +10,7 @@ export * from "./features/attribute/trace-name-resolution.ts";
 export * from "./features/attribute/trace-origin-hoisting.ts";
 export * from "./features/ingest/trace-storage-anchor.ts";
 export * from "./features/attribute/trace-summary-attribute-values.ts";
+export * from "./features/ingest/derive-trace-conversation-id.ts";
 export * from "./features/ingest/derive-trace-origin.ts";
 export * from "./features/ingest/derive-trace-status.ts";
 export * from "./trace.ts";
