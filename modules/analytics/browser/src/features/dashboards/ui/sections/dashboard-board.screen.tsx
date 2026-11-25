@@ -6,10 +6,7 @@
  */
 
 import { UiPageLoading, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
-import {
-  DEFAULT_DASHBOARD_HOME_PRODUCT,
-  type DashboardHomeProduct,
-} from "@langwatch/dashboard-contract";
+import type { DashboardHomeProduct } from "@langwatch/dashboard-contract";
 import { Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { useEffect } from "react";
@@ -31,7 +28,6 @@ import { useBoardAccess } from "../../behavior/use-board-access.ts";
 import { useBoardEditor } from "../../behavior/use-board-editor.ts";
 import { type UnsavedBoard, useBoardHeaderEdits } from "../../behavior/use-board-header-edits.ts";
 import { useBoardPeriod, useBoardRange } from "../../behavior/use-board-period.ts";
-import { useBoardProjects } from "../../behavior/use-board-projects.ts";
 import { useBoardScope } from "../../behavior/use-board-scope.ts";
 import { useBoardWidgets } from "../../behavior/use-board-widgets.ts";
 import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
@@ -43,7 +39,6 @@ import {
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
 import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
-import { useOrganizationLibraryOpen } from "../../behavior/use-organization-library-open.ts";
 import { type SavedBoard, useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import {
   UnsavedBoardProvider,
@@ -69,7 +64,6 @@ import { BoardDataSourceLabel } from "../blocks/board-data-source-label.tsx";
 import { BoardHeader } from "../blocks/board-header.tsx";
 import { BoardPage } from "../blocks/board-page.tsx";
 import { BoardPeriodControl } from "../blocks/board-period-control.tsx";
-import { BoardProjectChip } from "../blocks/board-project-chip.tsx";
 import { BoardScopeControl } from "../blocks/board-scope-control.tsx";
 import { EmptyWidgetsBanner } from "../blocks/empty-widgets-banner.tsx";
 import { LimitFailedWidgetsBanner } from "../blocks/limit-failed-widgets-banner.tsx";
@@ -85,38 +79,6 @@ import { ProjectBoardUnavailable } from "./project-board-unavailable.tsx";
 /** A Gateway or Governance board reads the organization's data, not a project's (ADR-002, D2). */
 const ORGANIZATION_DATA_HOMES: readonly DashboardHomeProduct[] = ["gateway", "governance"];
 
-/** The header's project slot: the data label with the organization area on, else main's chip. */
-function projectSlot({
-  organizationArea,
-  readsOrganization,
-  projectName,
-  projects,
-}: {
-  organizationArea: boolean;
-  readsOrganization: boolean;
-  projectName: string | undefined;
-  projects: ReturnType<typeof useBoardProjects>;
-}) {
-  return organizationArea
-    ? dataSourceLabel({ readsOrganization, projectName })
-    : sharedProjectChip(projects);
-}
-
-/** The header's project chip, present only on a board shared across projects. */
-function sharedProjectChip(projects: ReturnType<typeof useBoardProjects>) {
-  if (!projects.isShared) return {};
-  return {
-    project: (
-      <BoardProjectChip
-        current={projects.current}
-        ownerProject={projects.ownerProject}
-        projects={projects.projects}
-        onPick={projects.openIn}
-      />
-    ),
-  };
-}
-
 /** The header's read-only "Data from <project>"; a board reading the organization names none. */
 function dataSourceLabel({
   readsOrganization,
@@ -130,16 +92,13 @@ function dataSourceLabel({
 }
 
 /** Renames from the title, or undefined where the reader may not: asked in the project that
- * owns the board, as the library and sidebar menus ask it. Off with the organization area: main
- * has no inline rename. */
+ * owns the board, as the library and sidebar menus ask it. */
 function useBoardTitleRename({
   board,
   unsaved,
-  organizationArea,
 }: {
   board: SavedBoard;
   unsaved: UnsavedBoard | undefined;
-  organizationArea: boolean;
 }): ((name: string) => void) | undefined {
   const host = useAnalyticsHost();
   const edits = useLibraryBoardEdits();
@@ -151,7 +110,7 @@ function useBoardTitleRename({
       permission: "analytics:update",
     }),
   });
-  if (!organizationArea || !mayRename) return void 0;
+  if (!mayRename) return void 0;
   // A draft's new name is its first edit: it stores the board under that name.
   if (unsaved) {
     return (name) =>
@@ -186,18 +145,9 @@ function unsavedLangy(unsaved: UnsavedBoard | undefined) {
   return unsaved && { draftId: DRAFT_SEGMENT, storedBoardId: unsaved.materialise };
 }
 
-/** Whether the board reads the organization, and its empty-board templates. Off with the
- * organization area, every board keeps main's project scope and LLM Ops templates. */
-function boardDataHome({
-  board,
-  organizationArea,
-  projectSlug,
-}: {
-  board: SavedBoard;
-  organizationArea: boolean;
-  projectSlug: string;
-}) {
-  const homeProduct = organizationArea ? board.homeProduct : DEFAULT_DASHBOARD_HOME_PRODUCT;
+/** Whether the board reads the organization, and its empty-board templates. */
+function boardDataHome({ board, projectSlug }: { board: SavedBoard; projectSlug: string }) {
+  const { homeProduct } = board;
   return {
     readsOrganization: ORGANIZATION_DATA_HOMES.includes(homeProduct),
     templates: templateLinks({ projectSlug, homeProduct }),
@@ -206,18 +156,15 @@ function boardDataHome({
 
 function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoard }) {
   const host = useAnalyticsHost();
-  const organizationArea = useOrganizationLibraryOpen().isOpen;
   const projectId = host.project()?.id ?? "";
   const saved = useSavedDashboards();
   const { readsOrganization, templates } = boardDataHome({
     board,
-    organizationArea,
     projectSlug: saved.projectSlug,
   });
   const { access, names } = useBoardAccess(board);
   const { canEdit } = access;
   const scope = useBoardScope();
-  const projects = useBoardProjects({ board });
   const boardWidgets = useBoardWidgets({
     dashboardId: board.id,
     isOwnedElsewhere: !access.isHome,
@@ -265,7 +212,7 @@ function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoa
   };
   const isEmpty = boardWidgets.status === "success" && widgets.length === 0;
   const isMyDashboard = myDashboardId({ boards: [board], userId: host.userId() }) === board.id;
-  const renameBoard = useBoardTitleRename({ board, unsaved, organizationArea });
+  const renameBoard = useBoardTitleRename({ board, unsaved });
   const fromTemplate = useAddTemplate({ existingNames: saved.boards.map(({ name }) => name) });
 
   return (
@@ -287,12 +234,7 @@ function OpenBoard({ board, unsaved }: { board: SavedBoard; unsaved?: UnsavedBoa
             onDescribe={canEdit && !isMyDashboard ? saveDescription : void 0}
             {...boardPointer({ board, unsaved, boardWidgets })}
             action={canEdit ? <AddWidgetButton onClick={openPicker} /> : null}
-            {...projectSlot({
-              organizationArea,
-              readsOrganization,
-              projectName: host.project()?.name,
-              projects,
-            })}
+            {...dataSourceLabel({ readsOrganization, projectName: host.project()?.name })}
             periodControl={
               <BoardPeriodControl
                 range={range}

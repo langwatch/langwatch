@@ -1010,8 +1010,7 @@ describe("the product-switcher top bar", () => {
       });
     });
 
-    /** @scenario "With the flag off, the Dashboards area is as it was" */
-    it("names Dashboards in the switcher and keeps the project chip on a board, the area off", () => {
+    it("names Dashboards in the switcher and keeps the project chip, the library shut", () => {
       renderShell({
         readings: { ...dashboardsReadings, pathname: "/demo/dashboards/agent-flight-deck" },
       });
@@ -1027,17 +1026,12 @@ describe("the product-switcher top bar", () => {
       orgFlags = {
         ...orgFlags,
         release_dashboards: { org_1: true },
-        release_dashboards_organization_area: { org_1: true },
       };
       resolvedBoards = { "agent-flight-deck": { homeProduct: "llm-ops", scope: "ORGANIZATION" } };
       renderShell({
         readings: {
           ...dashboardsReadings,
           pathname: "/demo/dashboards/agent-flight-deck",
-          flags: {
-            ...dashboardsReadings.flags,
-            release_dashboards_organization_area: { enabled: true, isLoading: false },
-          },
         },
       });
 
@@ -1277,19 +1271,14 @@ describe("the organization's Dashboards library at /dashboards", () => {
     flags: {
       ...BASE_READINGS.flags,
       release_dashboards: { enabled: true, isLoading: false },
-      release_dashboards_organization_area: { enabled: true, isLoading: false },
     },
     notFound: <div data-testid="not-found" />,
   };
   const releasedTo = (organizations: Record<string, boolean>) => {
-    orgFlags = {
-      ...orgFlags,
-      release_dashboards: organizations,
-      release_dashboards_organization_area: organizations,
-    };
+    orgFlags = { ...orgFlags, release_dashboards: organizations };
   };
 
-  describe("when both flags are on for the organization", () => {
+  describe("when Dashboards is on for the organization", () => {
     /** @scenario "The library shows only the organization in the top bar" */
     it("draws the page with the organization and no project chip, Dashboards current", () => {
       releasedTo({ org_1: true });
@@ -1321,31 +1310,10 @@ describe("the organization's Dashboards library at /dashboards", () => {
     });
   });
 
-  describe("when the organization has the new flag off", () => {
-    /** @scenario "With the flag off, /dashboards forwards to my project as before" */
-    it("forwards to the reader's project, as the address did before, drawing no page", async () => {
-      replaceMock.mockReset();
-      orgFlags = {
-        ...orgFlags,
-        release_dashboards: { org_1: true },
-        release_dashboards_organization_area: { org_1: false },
-      };
-      renderShell({ readings: libraryReadings });
-
-      await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/demo"));
-      expect(screen.queryByTestId("not-found")).toBeNull();
-      expect(screen.queryByTestId("page-body")).toBeNull();
-    });
-  });
-
   describe("when Dashboards is off for the organization", () => {
     /** @scenario "Dashboards off in every project" */
     it("answers not-found from the organization's flags, whatever the project in view says", () => {
-      orgFlags = {
-        ...orgFlags,
-        release_dashboards: { org_1: false },
-        release_dashboards_organization_area: { org_1: true },
-      };
+      orgFlags = { ...orgFlags, release_dashboards: { org_1: false } };
       renderShell({ readings: libraryReadings });
 
       expect(screen.getByTestId("not-found")).toBeInTheDocument();
@@ -1416,18 +1384,11 @@ describe("a page of a project still holding the slug dashboards", () => {
     notFound: <div data-testid="not-found" />,
   };
 
-  describe.each([
-    { state: "off", isAreaOn: false },
-    { state: "on", isAreaOn: true },
-  ])("when the organization's area flag is $state", ({ isAreaOn }) => {
+  describe("when Dashboards is on for the organization", () => {
     /** @scenario A project still holding the dashboards slug keeps its deeper pages */
     it("draws the project's page in LLM Ops with its project chip, not a not-found page", () => {
       replaceMock.mockReset();
-      orgFlags = {
-        ...orgFlags,
-        release_dashboards: { org_1: true },
-        release_dashboards_organization_area: { org_1: isAreaOn },
-      };
+      orgFlags = { ...orgFlags, release_dashboards: { org_1: true } };
       renderShell({ readings: projectPageReadings });
 
       expect(screen.queryByTestId("not-found")).toBeNull();
@@ -1447,15 +1408,10 @@ describe("a board with the organization's library released", () => {
     flags: {
       ...BASE_READINGS.flags,
       release_dashboards: { enabled: true, isLoading: false },
-      release_dashboards_organization_area: { enabled: true, isLoading: false },
     },
   };
   const releaseLibrary = () => {
-    orgFlags = {
-      ...orgFlags,
-      release_dashboards: { org_1: true },
-      release_dashboards_organization_area: { org_1: true },
-    };
+    orgFlags = { ...orgFlags, release_dashboards: { org_1: true } };
   };
   const productLabel = () => screen.getByRole("button", { name: "Switch product" });
 

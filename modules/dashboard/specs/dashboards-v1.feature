@@ -25,15 +25,6 @@ Feature: Dashboards v1
     Then they get the not-found page with no product sidebar around it
     And a project page still draws in its own chrome
 
-  @integration
-  Scenario: AC3 Sidebar matches the reference
-    Given the release_dashboards flag is on for the project
-    And Dashboards in every product is off
-    When the member looks at the Dashboards product sidebar at /[project]/dashboards
-    Then they see "Your dashboards" with My dashboard first, then Pinned when they have pins,
-      then From LangWatch, each board with a menu
-    And the sidebar shows nothing else besides Quick Search
-
   # Switch-over: where Dashboards opens, the Analytics entry leads to Dashboards and the
   # legacy pages stay at /[project]/analytics, with a banner pointing to Dashboards (AC20).
   @integration
@@ -430,7 +421,7 @@ Feature: Dashboards v1
   # --- AC Coverage Map ---
   # AC 1: "Flag off hides the area" → Scenario: AC1 Flag off hides the area
   # AC 2: "Landing" (changed again by langwatch/tasks#911: /dashboards lands on My dashboard) -> dashboards-v2.feature Scenario: AC160 The dashboards area lands on My dashboard
-  # AC 3: "Sidebar matches the reference" (changed by langwatch/tasks#911: Your dashboards, Pinned, From LangWatch; no Browse templates item) -> Scenario: AC3 Sidebar matches the reference
+  # AC 3: "Sidebar matches the reference" -> removed 2026-11-25 with the area's flags; the library sidebar is dashboards-organization-area.feature "The Dashboards sidebar at org level"
   # AC 3b: "The Analytics entry leads to Dashboards" -> Scenario: AC3b The Analytics entry opens Dashboards when the project can reach them
   # AC 3c: "Legacy analytics offers Dashboards" -> Scenario: AC3c The legacy Analytics page offers Dashboards when the flag is on
   # AC 3d: "Flag off shows no banner" -> Scenario: AC3d The legacy Analytics page shows no banner when the flag is off

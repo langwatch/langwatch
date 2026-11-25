@@ -1,11 +1,11 @@
 /**
- * Whether the organization's Dashboards area opens: both its flags on for the organization,
+ * Whether the organization's Dashboards area opens: Dashboards on for the organization,
  * decided by the rule the navigation shell uses (ADR-002), so a page or a link to `/dashboards`
- * never disagrees with the shell. Loading until the organization and both flags answer.
+ * never disagrees with the shell. Loading until the organization and the flag answer.
  */
 
 import {
-  ORGANIZATION_DASHBOARDS_FLAGS,
+  ORGANIZATION_DASHBOARDS_FLAG,
   ORGANIZATION_DASHBOARDS_FLAGS_STALE_TIME_MS,
   organizationDashboardsArea,
 } from "@langwatch/analytics-client";
@@ -28,16 +28,11 @@ export function useOrganizationLibraryOpen({
     staleTime: ORGANIZATION_DASHBOARDS_FLAGS_STALE_TIME_MS,
     refetchOnWindowFocus: false,
   };
-  const [organizationAreaFlag, dashboardsFlag] = ORGANIZATION_DASHBOARDS_FLAGS;
-  const organizationArea = analyticsApi.featureFlag.isEnabledForEachOrganization.useQuery(
-    { flag: organizationAreaFlag, organizationIds },
-    options,
-  );
   const dashboards = analyticsApi.featureFlag.isEnabledForEachOrganization.useQuery(
-    { flag: dashboardsFlag, organizationIds },
+    { flag: ORGANIZATION_DASHBOARDS_FLAG, organizationIds },
     options,
   );
   if (!enabled) return { isOpen: false, isLoading: false };
-  const area = organizationDashboardsArea({ organizationId, organizationArea, dashboards });
+  const area = organizationDashboardsArea({ organizationId, dashboards });
   return { isOpen: area === "open", isLoading: area === "loading" };
 }

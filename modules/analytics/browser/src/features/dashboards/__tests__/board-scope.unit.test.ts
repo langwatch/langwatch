@@ -13,8 +13,6 @@ import {
   DASHBOARD_SCOPES,
   fromOrganizationLabel,
   guestBadgeLabel,
-  PROJECT_CHIP,
-  projectMenuNote,
   SCOPE_LABEL,
   SCOPE_MENU,
   scopeChangedNote,
@@ -153,29 +151,6 @@ describe("what the sidebar says of a board's scope", () => {
   /** @scenario "AC181 Sidebar: scope marks and the organization's group" */
   it("names the group of other projects' boards after the organization", () => {
     expect(fromOrganizationLabel("Acme")).toBe("From Acme");
-  });
-});
-
-describe("what the Project chip says", () => {
-  /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
-  it("says whose data the board shows, one project at a time, and tags the owner", () => {
-    expect(PROJECT_CHIP).toEqual({
-      name: "Project",
-      menuHint: "Whose data this dashboard shows. One project at a time.",
-      ownerTag: "owner",
-    });
-  });
-
-  /** @scenario "AC182 Organization board: the Project chip says whose data it shows" */
-  it("keeps who can edit apart from whose data is shown", () => {
-    const note = (isHere: boolean, canOpenOwner: boolean) =>
-      projectMenuNote({ owner: "Checkout", isHere, canOpenOwner });
-
-    expect([note(true, true), note(false, true), note(false, false)]).toEqual([
-      "Checkout owns this dashboard, so it is edited here.",
-      "Checkout owns this dashboard. Choose it to edit the dashboard.",
-      "Checkout owns this dashboard. You do not have access to that project.",
-    ]);
   });
 });
 

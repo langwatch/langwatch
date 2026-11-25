@@ -18,63 +18,36 @@ const failed: OrganizationFlagRead = { isLoading: false, isError: true };
 
 describe("organizationDashboardsArea", () => {
   describe("when the organization has not resolved", () => {
-    it("answers loading, not shut, even with both flags answered on", () => {
+    it("answers loading, not shut, even with the flag answered on", () => {
       expect(
-        organizationDashboardsArea({
-          organizationId: void 0,
-          organizationArea: answered(true),
-          dashboards: answered(true),
-        }),
+        organizationDashboardsArea({ organizationId: void 0, dashboards: answered(true) }),
       ).toBe("loading");
     });
 
-    it("answers loading with neither flag asked yet", () => {
+    it("answers loading with the flag not asked yet", () => {
       expect(
-        organizationDashboardsArea({
-          organizationId: void 0,
-          organizationArea: { isLoading: false },
-          dashboards: { isLoading: false },
-        }),
+        organizationDashboardsArea({ organizationId: void 0, dashboards: { isLoading: false } }),
       ).toBe("loading");
     });
   });
 
   describe("when the organization has resolved", () => {
-    it("answers loading while either flag is still being read", () => {
+    it("answers loading while the flag is still being read", () => {
       expect(
-        organizationDashboardsArea({
-          organizationId: ORGANIZATION_ID,
-          organizationArea: answered(true),
-          dashboards: pending,
-        }),
+        organizationDashboardsArea({ organizationId: ORGANIZATION_ID, dashboards: pending }),
       ).toBe("loading");
     });
 
-    it("answers open with both flags on for the organization", () => {
+    it("answers open with Dashboards on for the organization", () => {
       expect(
-        organizationDashboardsArea({
-          organizationId: ORGANIZATION_ID,
-          organizationArea: answered(true),
-          dashboards: answered(true),
-        }),
+        organizationDashboardsArea({ organizationId: ORGANIZATION_ID, dashboards: answered(true) }),
       ).toBe("open");
-    });
-
-    it("answers legacy with the area's own flag off", () => {
-      expect(
-        organizationDashboardsArea({
-          organizationId: ORGANIZATION_ID,
-          organizationArea: answered(false),
-          dashboards: answered(true),
-        }),
-      ).toBe("legacy");
     });
 
     it("answers closed with Dashboards off", () => {
       expect(
         organizationDashboardsArea({
           organizationId: ORGANIZATION_ID,
-          organizationArea: answered(true),
           dashboards: answered(false),
         }),
       ).toBe("closed");
@@ -84,7 +57,6 @@ describe("organizationDashboardsArea", () => {
       expect(
         organizationDashboardsArea({
           organizationId: ORGANIZATION_ID,
-          organizationArea: answered(true),
           dashboards: { data: { enabledByOrganizationId: { "org-2": true } }, isLoading: false },
         }),
       ).toBe("closed");
@@ -92,11 +64,7 @@ describe("organizationDashboardsArea", () => {
 
     it("reads a failed read with no answer held as off, so a refused reader never waits", () => {
       expect(
-        organizationDashboardsArea({
-          organizationId: ORGANIZATION_ID,
-          organizationArea: answered(true),
-          dashboards: failed,
-        }),
+        organizationDashboardsArea({ organizationId: ORGANIZATION_ID, dashboards: failed }),
       ).toBe("closed");
     });
 
@@ -104,7 +72,6 @@ describe("organizationDashboardsArea", () => {
       expect(
         organizationDashboardsArea({
           organizationId: ORGANIZATION_ID,
-          organizationArea: answered(true),
           dashboards: { ...answered(true), isError: true },
         }),
       ).toBe("open");
