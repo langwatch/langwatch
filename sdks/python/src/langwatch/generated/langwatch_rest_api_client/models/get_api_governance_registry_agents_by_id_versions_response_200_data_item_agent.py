@@ -17,6 +17,7 @@ from ..models.get_api_governance_registry_agents_by_id_versions_response_200_dat
 from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_status import (
     GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentStatus,
 )
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_endpoints_item import (
@@ -51,11 +52,6 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent:
         description (None | str):
         status (GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentStatus):
         shadow (bool):
-        dormant (bool):
-        posture (GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentPosture):
-        platform (None | str):
-        labels (GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentLabels):
-        owner_label (None | str):
         version (int):
         source_version (None | str):
         project_id (None | str):
@@ -70,6 +66,11 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent:
         last_seen_at (None | str):
         updated_at (str):
         removed_at (None | str):
+        dormant (bool | Unset):
+        posture (GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentPosture | Unset):
+        platform (None | str | Unset):
+        labels (GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentLabels | Unset):
+        owner_label (None | str | Unset):
     """
 
     id: str
@@ -80,11 +81,6 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent:
     description: None | str
     status: GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentStatus
     shadow: bool
-    dormant: bool
-    posture: GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentPosture
-    platform: None | str
-    labels: GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentLabels
-    owner_label: None | str
     version: int
     source_version: None | str
     project_id: None | str
@@ -99,6 +95,11 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent:
     last_seen_at: None | str
     updated_at: str
     removed_at: None | str
+    dormant: bool | Unset = UNSET
+    posture: GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentPosture | Unset = UNSET
+    platform: None | str | Unset = UNSET
+    labels: GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentLabels | Unset = UNSET
+    owner_label: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent_model_type_0 import (
@@ -124,18 +125,6 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent:
         status = self.status.value
 
         shadow = self.shadow
-
-        dormant = self.dormant
-
-        posture = self.posture.value
-
-        platform: None | str
-        platform = self.platform
-
-        labels = self.labels.to_dict()
-
-        owner_label: None | str
-        owner_label = self.owner_label
 
         version = self.version
 
@@ -185,6 +174,28 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent:
         removed_at: None | str
         removed_at = self.removed_at
 
+        dormant = self.dormant
+
+        posture: str | Unset = UNSET
+        if not isinstance(self.posture, Unset):
+            posture = self.posture.value
+
+        platform: None | str | Unset
+        if isinstance(self.platform, Unset):
+            platform = UNSET
+        else:
+            platform = self.platform
+
+        labels: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.labels, Unset):
+            labels = self.labels.to_dict()
+
+        owner_label: None | str | Unset
+        if isinstance(self.owner_label, Unset):
+            owner_label = UNSET
+        else:
+            owner_label = self.owner_label
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -197,11 +208,6 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent:
                 "description": description,
                 "status": status,
                 "shadow": shadow,
-                "dormant": dormant,
-                "posture": posture,
-                "platform": platform,
-                "labels": labels,
-                "owner_label": owner_label,
                 "version": version,
                 "source_version": source_version,
                 "project_id": project_id,
@@ -218,6 +224,16 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent:
                 "removed_at": removed_at,
             }
         )
+        if dormant is not UNSET:
+            field_dict["dormant"] = dormant
+        if posture is not UNSET:
+            field_dict["posture"] = posture
+        if platform is not UNSET:
+            field_dict["platform"] = platform
+        if labels is not UNSET:
+            field_dict["labels"] = labels
+        if owner_label is not UNSET:
+            field_dict["owner_label"] = owner_label
 
         return field_dict
 
@@ -260,26 +276,6 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent:
         status = GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentStatus(d.pop("status"))
 
         shadow = d.pop("shadow")
-
-        dormant = d.pop("dormant")
-
-        posture = GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentPosture(d.pop("posture"))
-
-        def _parse_platform(data: object) -> None | str:
-            if data is None:
-                return data
-            return cast(None | str, data)
-
-        platform = _parse_platform(d.pop("platform"))
-
-        labels = GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentLabels.from_dict(d.pop("labels"))
-
-        def _parse_owner_label(data: object) -> None | str:
-            if data is None:
-                return data
-            return cast(None | str, data)
-
-        owner_label = _parse_owner_label(d.pop("owner_label"))
 
         version = d.pop("version")
 
@@ -387,6 +383,40 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent:
 
         removed_at = _parse_removed_at(d.pop("removed_at"))
 
+        dormant = d.pop("dormant", UNSET)
+
+        _posture = d.pop("posture", UNSET)
+        posture: GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentPosture | Unset
+        if isinstance(_posture, Unset):
+            posture = UNSET
+        else:
+            posture = GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentPosture(_posture)
+
+        def _parse_platform(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        platform = _parse_platform(d.pop("platform", UNSET))
+
+        _labels = d.pop("labels", UNSET)
+        labels: GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentLabels | Unset
+        if isinstance(_labels, Unset):
+            labels = UNSET
+        else:
+            labels = GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgentLabels.from_dict(_labels)
+
+        def _parse_owner_label(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        owner_label = _parse_owner_label(d.pop("owner_label", UNSET))
+
         get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent = cls(
             id=id,
             source=source,
@@ -396,11 +426,6 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent:
             description=description,
             status=status,
             shadow=shadow,
-            dormant=dormant,
-            posture=posture,
-            platform=platform,
-            labels=labels,
-            owner_label=owner_label,
             version=version,
             source_version=source_version,
             project_id=project_id,
@@ -415,6 +440,11 @@ class GetApiGovernanceRegistryAgentsByIdVersionsResponse200DataItemAgent:
             last_seen_at=last_seen_at,
             updated_at=updated_at,
             removed_at=removed_at,
+            dormant=dormant,
+            posture=posture,
+            platform=platform,
+            labels=labels,
+            owner_label=owner_label,
         )
 
         return get_api_governance_registry_agents_by_id_versions_response_200_data_item_agent
