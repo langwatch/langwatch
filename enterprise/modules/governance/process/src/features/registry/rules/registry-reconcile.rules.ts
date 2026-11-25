@@ -85,15 +85,13 @@ const legacyFieldsSchema = z.object({
  * A stored entry or event payload as the entry schema reads it now. A row written before the
  * posture fields existed reads as what it was: not dormant, no platform, labels or owner tag.
  */
+export const storedRegistryEntrySchema = z
+  .looseObject({ shadow: z.boolean(), ...legacyFieldsSchema.shape })
+  .transform((record) => ({ ...record, posture: registryPostureOf(record) }))
+  .pipe(agentRegistryEntrySchema);
+
 export function storedRegistryEntryOf(value: unknown): AgentRegistryEntry {
-  const record = z.record(z.string(), z.unknown()).parse(value);
-  const added = legacyFieldsSchema.parse(record);
-  const shadow = z.boolean().parse(record.shadow);
-  return agentRegistryEntrySchema.parse({
-    ...record,
-    ...added,
-    posture: registryPostureOf({ shadow, dormant: added.dormant }),
-  });
+  return storedRegistryEntrySchema.parse(value);
 }
 
 /**
@@ -277,8 +275,15 @@ function planObserved(
   const candidate = { ...observed, last_seen_at: lastSeenAt };
   const fingerprint = registryFingerprint(candidate);
   const row = { id: held.id, sourceKey: held.sourceKey, fingerprint, isNew: false };
-  const baseline = dormancyBaselineOf({ held, candidate, row });
-  if (baseline) return baseline;
+  if (isDormancyBaseline({ held, candidate })) {
+    const entry: AgentRegistryEntry = {
+      ...previous,
+      dormant: true,
+      posture: registryPostureOf({ shadow: previous.shadow, dormant: true }),
+      last_seen_at: candidate.last_seen_at,
+    };
+    return { writes: [{ ...row, fingerprint: registryFingerprint(entry), entry }], events: [] };
+  }
 
   if (fingerprint === held.fingerprint && previous.status === "active") {
     if (candidate.last_seen_at === previous.last_seen_at) return { writes: [], events: [] };
@@ -307,26 +312,21 @@ function planObserved(
  * change: written with the flag and its fingerprint, same version, no event, so a deploy versions
  * and announces no agent for a dormancy it never saw happen.
  */
-function dormancyBaselineOf({
+function isDormancyBaseline({
   held,
   candidate,
-  row,
 }: {
   held: StoredRegistryEntry;
   candidate: AgentRegistryEntry;
-  row: Omit<RegistryEntryWrite, "entry">;
-}): RegistryChangeSet | null {
+}): boolean {
   const previous = held.entry;
-  if (held.dormancyBaselined !== false || previous.status !== "active") return null;
-  if (!candidate.dormant || previous.dormant) return null;
-  if (registryFingerprint({ ...candidate, dormant: false }) !== held.fingerprint) return null;
-  const entry: AgentRegistryEntry = {
-    ...previous,
-    dormant: true,
-    posture: registryPostureOf({ shadow: previous.shadow, dormant: true }),
-    last_seen_at: candidate.last_seen_at,
-  };
-  return { writes: [{ ...row, fingerprint: registryFingerprint(entry), entry }], events: [] };
+  return (
+    held.dormancyBaselined === false &&
+    previous.status === "active" &&
+    candidate.dormant &&
+    !previous.dormant &&
+    registryFingerprint({ ...candidate, dormant: false }) === held.fingerprint
+  );
 }
 
 /** Whether another reconcile committed to these rows after `readAt`. */

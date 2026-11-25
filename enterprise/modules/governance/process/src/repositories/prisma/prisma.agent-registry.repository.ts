@@ -17,6 +17,7 @@ import { z } from "zod";
 import {
   registryEventOf,
   storedRegistryEntryOf,
+  storedRegistryEntrySchema,
   type RegistryChangeSet,
   type StoredRegistryEntry,
 } from "../../features/registry/rules/registry-reconcile.rules.ts";
@@ -33,22 +34,9 @@ const logger = createLogger("langwatch:governance:prisma-agent-registry-reposito
 const REGISTRY_TRANSACTION_TIMEOUT_MS = 30_000;
 const REGISTRY_TRANSACTION_MAX_WAIT_MS = 10_000;
 
-/** A stored entry read as this release reads it; one it cannot read fails the parse, never throws. */
-const storedEntrySchema = z.unknown().transform((value, ctx) => {
-  try {
-    return storedRegistryEntryOf(value);
-  } catch (error) {
-    if (!(error instanceof z.ZodError)) throw error;
-    for (const issue of error.issues) {
-      ctx.addIssue({ code: "custom", message: issue.message, path: issue.path });
-    }
-    return z.NEVER;
-  }
-});
-
 const eventPayloadSchema = z.object({
   tool: z.string().nullable(),
-  agent: storedEntrySchema,
+  agent: storedRegistryEntrySchema,
 });
 
 type EventRow = {
@@ -143,7 +131,7 @@ function entryOf(value: Prisma.JsonValue): AgentRegistryEntry {
 /** A list skips an entry this release cannot read (a newer release's source) instead of failing. */
 function readableEntriesOf(rows: { id: string; entry: Prisma.JsonValue }[]): AgentRegistryEntry[] {
   return rows.flatMap((row) => {
-    const parsed = storedEntrySchema.safeParse(row.entry);
+    const parsed = storedRegistryEntrySchema.safeParse(row.entry);
     if (parsed.success) return [parsed.data];
     logger.warn(
       { entryId: row.id, paths: parsed.error.issues.map((issue) => issue.path.join(".")) },
