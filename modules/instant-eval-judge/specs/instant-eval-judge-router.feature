@@ -178,6 +178,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When the call is routed
     Then the gate is asked once per question, since it reads the question as the task
     And the easy question is answered by the primary and the other by the escalation, side by side
+    And the judgement's limiter wait is the longest gate send's and the longer branch's, never their sum
 
   @unit
   Scenario: A kind the table does not route takes today's classifier call
