@@ -129,6 +129,11 @@ export class MemoryEvaluationRunRepository extends EvaluationRunRepository {
     };
   }
 
+  /** Every stored run of one project, for the memory twins that fold over runs. */
+  findTenantRuns({ tenantId }: { tenantId: string }): EvaluationRunData[] {
+    return this.#tenantRuns(tenantId);
+  }
+
   #tenantRuns(tenantId: string): EvaluationRunData[] {
     return [...this.#runs.entries()]
       .filter(([key]) => key.startsWith(`${tenantId}\u0000`))

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Everything the auth module does for a caller: the signed-in browser session, and the signed-out front door that stands before they have one — one interface because it is one module, meeting at the same person.
 
-Peers call these through the token, declared at `../contract/src/auth.api.ts:106`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/auth.api.ts:107`; nothing else in this package is public.
 
 #### `offersPasskeys`
 
@@ -94,6 +94,14 @@ Whether this person has registered at least one passkey.
 
 ```typescript
 hasPasskey(input: { userId: string }): Promise<boolean>;
+```
+
+#### `findSignInFacts`
+
+The accounts behind exactly one address, matched the way sign-in matches it: ids, method codes, counts, flags and times for a staff investigation (ADR-202). Empty when there is none.
+
+```typescript
+findSignInFacts(input: Readonly<{ email: string }>): Promise<SignInFacts[]>;
 ```
 
 #### `passkeyAssertionOptions`
@@ -970,7 +978,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                                          |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:289`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:291`                            |
 | secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:80` |
 | secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:81` |
 | secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:82` |
@@ -980,7 +988,7 @@ Run by the tasks process, before serve.
 | secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:86` |
 | secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:87` |
 | secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:88` |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:292`                            |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:294`                            |
 | config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:40`                  |
 | config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:42`                  |
 | config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:43`                  |

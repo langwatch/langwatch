@@ -1,6 +1,7 @@
 export * from "./api-key.ts";
 export * from "./api-key.errors.ts";
 export * from "./api-key.list.ts";
+export * from "./api-key.facts.ts";
 export * from "./api-key.api.ts";
 export * from "./api-key.tokens.ts";
 export * from "./api-key.names.ts";

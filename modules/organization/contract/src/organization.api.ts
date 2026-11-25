@@ -59,6 +59,7 @@ import type {
   UpdateOrganizationTeamWithMembersInput,
 } from "./features/team/team.ts";
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
+import type { OrganizationOpsSnapshot } from "./organization-ops.ts";
 import type {
   PendingInvitationForCaller,
   PendingInvitationsByEmail,
@@ -977,6 +978,11 @@ export interface OrganizationApi {
   findForOperators(
     input: Readonly<{ organizationIds: readonly string[] }>,
   ): Promise<OrganizationOperatorSummary[]>;
+  /**
+   * One organization for a staff investigation: ids, counts and its creation time, never a name,
+   * slug or address (ADR-202, ops functions). Throws `OrganizationNotFoundError`.
+   */
+  getOpsSnapshot(input: Readonly<{ organizationId: string }>): Promise<OrganizationOpsSnapshot>;
 }
 
 export const OrganizationApi = moduleApi<OrganizationApi>()("organization");

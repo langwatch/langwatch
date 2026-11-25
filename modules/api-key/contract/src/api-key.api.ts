@@ -10,6 +10,7 @@ import type {
   MintDocsSessionKeyInput,
   RevokeDocsSessionKeysInput,
 } from "./api-key.docs-session.ts";
+import type { ApiKeyFacts, ApiKeyFactsInput } from "./api-key.facts.ts";
 import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";
 import type { CliSessionRevocationCause } from "./api-key.revocation-cause.ts";
 import type { MintAgentSandboxKeyInput, MintRunKeyInput } from "./api-key.run-key.ts";
@@ -176,6 +177,11 @@ export interface ApiKeyApi {
   markUsed(input: ApiKeyIdInput): void;
   list(input: ApiKeyListInput): Promise<ApiKey[]>;
   listAll(input: ApiKeyListAllInput): Promise<ApiKey[]>;
+  /**
+   * Every key of the organization, system, revoked and staff keys included, as ids, kinds, reach
+   * and times only (ADR-202 ops functions). Live keys first, capped at `API_KEY_FACTS_LIMIT`.
+   */
+  findKeyFactsForOrganization(input: ApiKeyFactsInput): Promise<ApiKeyFacts[]>;
   /**
    * The keys a credential may list: a member's own, or every key in the
    * organization for a service key that holds `organization:manage`.

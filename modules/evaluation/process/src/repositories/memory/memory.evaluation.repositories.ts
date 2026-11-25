@@ -1,10 +1,13 @@
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { memoryObjectStorage } from "@langwatch/process-stores";
 
+import { evaluatorErrorCodeOf } from "../../rules/evaluator-error-code.rules.ts";
 import type { EvaluationAnalyticsFoldCacheRepository } from "../evaluation-analytics-fold-cache.repository.ts";
 import type { EvaluationRepositories } from "../evaluation.repositories.ts";
 import {
   MonitorPerformanceRepository,
+  type EvaluatorOutcomeRow,
+  type EvaluatorOutcomeRowQuery,
   type MonitorPerformanceBucket,
 } from "../monitor-performance.repository.ts";
 import { ObjectStorageEvaluationLangevalsStagingRepository } from "../object-storage/object-storage.evaluation-langevals-staging.repository.ts";
@@ -13,18 +16,51 @@ import { MemoryEvaluationInputRepository } from "./memory.evaluation-input.repos
 import { MemoryEvaluationRunRepository } from "./memory.evaluation-run.repository.ts";
 import { MemoryMonitorErrorRateRepository } from "./memory.monitor-error-rate.repository.ts";
 
-/** The trend over no traces: nothing in this module writes the rows it folds. */
+/** The trend over no traces; outcome counts fold over the memory runs. */
 class MemoryMonitorPerformanceRepository extends MonitorPerformanceRepository {
-  static create(): MemoryMonitorPerformanceRepository {
-    return new MemoryMonitorPerformanceRepository();
+  static create({
+    runs,
+  }: {
+    runs: MemoryEvaluationRunRepository;
+  }): MemoryMonitorPerformanceRepository {
+    return new MemoryMonitorPerformanceRepository(runs);
   }
 
-  private constructor() {
+  private constructor(private readonly runs: MemoryEvaluationRunRepository) {
     super();
   }
 
   async findBuckets(): Promise<MonitorPerformanceBucket[]> {
     return [];
+  }
+
+  async findOutcomeRows(input: EvaluatorOutcomeRowQuery): Promise<EvaluatorOutcomeRow[]> {
+    const rows = new Map<string, EvaluatorOutcomeRow>();
+    for (const run of this.runs.findTenantRuns({ tenantId: input.tenantId })) {
+      const scheduledAt = run.scheduledAt ?? run.createdAt;
+      if (scheduledAt < input.since || scheduledAt >= input.until) continue;
+      const isError = run.status === "error";
+      const errorCode = isError ? evaluatorErrorCodeOf(run.error) : "";
+      const key = `${run.evaluatorId}\u0000${errorCode}`;
+      const row = rows.get(key) ?? {
+        evaluatorId: run.evaluatorId,
+        evaluatorType: run.evaluatorType,
+        errorCode,
+        runs: 0,
+        errors: 0,
+        skipped: 0,
+        lastErrorAt: null,
+      };
+      row.runs += 1;
+      if (run.status === "skipped") row.skipped += 1;
+      if (isError) {
+        row.errors += 1;
+        const settledAt = run.completedAt ?? run.updatedAt;
+        row.lastErrorAt = Math.max(row.lastErrorAt ?? 0, settledAt);
+      }
+      rows.set(key, row);
+    }
+    return [...rows.values()].slice(0, input.limit);
   }
 }
 
@@ -45,10 +81,11 @@ export class MemoryEvaluationRepositories {
   static readonly requires = [] as const;
 
   static create(): EvaluationRepositories {
+    const runs = MemoryEvaluationRunRepository.create();
     return {
       costs: MemoryEvaluationCostRepository.create(),
-      runs: MemoryEvaluationRunRepository.create(),
-      monitorPerformance: MemoryMonitorPerformanceRepository.create(),
+      runs,
+      monitorPerformance: MemoryMonitorPerformanceRepository.create({ runs }),
       analyticsFoldCache: MemoryEvaluationAnalyticsFoldCacheRepository.create(),
       monitorErrorRates: MemoryMonitorErrorRateRepository.create(),
       inputs: MemoryEvaluationInputRepository.create(),

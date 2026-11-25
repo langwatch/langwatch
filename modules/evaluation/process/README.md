@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The complete callable Evaluation capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/evaluation.api.ts:54`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/evaluation.api.ts:55`; nothing else in this package is public.
 
 #### `listEvaluators`
 
@@ -112,6 +112,14 @@ The seven-day trend of every monitor the project has; none when it has no monito
 
 ```typescript
 findMonitorPerformance(input: MonitorPerformanceForProjectInput): Promise<OnlineEvaluationPerformance[]>;
+```
+
+#### `countEvaluatorOutcomes`
+
+Online evaluator runs scheduled in `[since, until)` per project: counts and codes only.
+
+```typescript
+countEvaluatorOutcomes(input: EvaluatorOutcomeCountQuery): Promise<EvaluatorOutcomeCount[]>;
 ```
 
 #### `runEvaluator`

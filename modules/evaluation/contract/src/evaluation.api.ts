@@ -29,6 +29,7 @@ import type {
   ExecuteEvaluationCommand,
   UpsertEvaluationRunCommand,
 } from "./evaluation.commands.ts";
+import type { EvaluatorOutcomeCount, EvaluatorOutcomeCountQuery } from "./evaluation.ops.ts";
 import type {
   MonitorPerformanceForProjectInput,
   MonitorPerformanceQuery,
@@ -80,6 +81,8 @@ export interface EvaluationApi {
   findMonitorPerformance(
     input: MonitorPerformanceForProjectInput,
   ): Promise<OnlineEvaluationPerformance[]>;
+  /** Online evaluator runs scheduled in `[since, until)` per project: counts and codes only. */
+  countEvaluatorOutcomes(input: EvaluatorOutcomeCountQuery): Promise<EvaluatorOutcomeCount[]>;
 
   // The public evaluation doors: the evaluate paths reach the same capability
   // every other caller does.

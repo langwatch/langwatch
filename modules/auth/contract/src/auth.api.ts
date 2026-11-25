@@ -34,6 +34,7 @@ import type {
   SignUpVerificationRequest,
 } from "./front-door.responses.ts";
 import type { PasskeyAssertionOptions, PasskeyAssertionResponse } from "./passkey-assertion.ts";
+import type { SignInFacts } from "./sign-in-facts.ts";
 import type {
   ReleaseHeldAccountResult,
   SaveSignInSecurityInput,
@@ -145,6 +146,11 @@ export interface AuthApi {
   stopImpersonation(input: { sessionId: string }): Promise<void>;
   /** Whether this person has registered at least one passkey. */
   hasPasskey(input: { userId: string }): Promise<boolean>;
+  /**
+   * The accounts behind exactly one address, matched the way sign-in matches it: ids, method
+   * codes, counts, flags and times for a staff investigation (ADR-202). Empty when there is none.
+   */
+  findSignInFacts(input: Readonly<{ email: string }>): Promise<SignInFacts[]>;
   /**
    * The WebAuthn request options for this person's own passkeys over a caller-chosen base64url
    * challenge, user verification required. Refuses `unknown_credential` when they hold none.

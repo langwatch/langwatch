@@ -136,6 +136,14 @@ A tenant policy, for a caller who may manage experiments in that scope.
 setExperimentTenantPolicyForCaller(input: ExperimentTenantPolicyForCaller): Promise<void>;
 ```
 
+#### `findEnabledFlagsForOrganization`
+
+The keys of every flag that resolves on for one organization, sorted: a staff investigation read (ADR-202). Resolved with organization context only, so user, email and percentage rules never match; experiment enrolment is not applied.
+
+```typescript
+findEnabledFlagsForOrganization(input: Readonly<{ organizationId: string }>): Promise<string[]>;
+```
+
 ## REST transport
 
 None: this module declares no REST family.

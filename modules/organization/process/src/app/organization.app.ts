@@ -27,10 +27,12 @@ import {
   AuditTrailDeniedError,
   isOrganizationApiCustomRole,
   LiteMemberViewerOnlyError,
+  OrganizationNotFoundError,
   OrganizationApi,
   type OrganizationIdPage,
   type OrganizationOperatorSummary,
   type OrganizationIdPageInput,
+  type OrganizationOpsSnapshot,
   type OrganizationUsageCount,
   type OrganizationApiCreateInvitationsInput,
   type OrganizationInviteCreated,
@@ -1187,6 +1189,30 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     organizationIds: readonly string[];
   }): Promise<OrganizationOperatorSummary[]> {
     return this.#operatorDirectory.find(input);
+  }
+
+  /** Ids, counts and a creation time only: the snapshot a staff investigation reads (ADR-202). */
+  async getOpsSnapshot(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationOpsSnapshot> {
+    const { organizationId } = input;
+    const row = await this.#operatorDirectory.findRow({ organizationId });
+    if (!row) throw new OrganizationNotFoundError(organizationId);
+    const [members, invites, teams, projectIds] = await Promise.all([
+      this.listMembers({ organizationId, includeDisabled: true, limit: 1 }),
+      this.listPendingInvitations({ organizationId }),
+      this.listTeams({ organizationId, page: 1, limit: 1 }),
+      this.#dependencies.organizations.listProjectIds(organizationId),
+    ]);
+    return {
+      organizationId,
+      createdAt: row.createdAt.epochMilliseconds,
+      membersCount: members.totalCount,
+      pendingInvitesCount: invites.filter(({ displayStatus }) => displayStatus === "PENDING")
+        .length,
+      teamsCount: teams.pagination.total,
+      projectIds: projectIds.toSorted(),
+    };
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<OrganizationUsageCount> {

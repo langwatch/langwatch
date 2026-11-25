@@ -89,6 +89,7 @@ export type {
 } from "./ops.api.ts";
 export * from "./features/dashboard/ops-dashboard.ts";
 export * from "./features/queue/ops-queue.ts";
+export * from "./features/queue/ops-tenant-queue.ts";
 export * from "./features/event-log/ops-replay.ts";
 export * from "./features/process/ops-process.ts";
 export * from "./features/dashboard/ops-latency.ts";

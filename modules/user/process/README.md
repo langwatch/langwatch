@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Portable User use cases exposed to process peers and transports.
 
-Peers call these through the token, declared at `../contract/src/user.api.ts:57`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/user.api.ts:58`; nothing else in this package is public.
 
 #### `findById`
 
@@ -136,6 +136,14 @@ The account holding an address, matched on its stored lower-cased form, however 
 
 ```typescript
 findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
+```
+
+#### `findSignInAccounts`
+
+The accounts behind one address, matched the way sign-in matches it, as ids, method codes, flags and times only (ADR-202). Empty when there is none or the text is no address.
+
+```typescript
+findSignInAccounts(input: Readonly<{ email: string }>): Promise<UserSignInAccount[]>;
 ```
 
 #### `create`

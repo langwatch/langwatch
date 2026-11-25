@@ -158,6 +158,9 @@ class MemoryApiKeys extends ApiKeyRepository {
       this.rows.filter((row) => row.organizationId === organizationId && row.revokedAt === null),
     );
   }
+  findEveryKeyInOrganization({ organizationId }: { organizationId: string }): Promise<ApiKeyRow[]> {
+    return Promise.resolve(this.rows.filter((row) => row.organizationId === organizationId));
+  }
   update(input: ApiKeyUpdateRecord): Promise<ApiKeyRow> {
     const row = this.rows.find((candidate) => candidate.id === input.id);
     if (!row) throw new Error("missing");

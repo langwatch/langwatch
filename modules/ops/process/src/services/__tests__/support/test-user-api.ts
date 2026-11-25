@@ -18,6 +18,9 @@ export class TestUserApi implements UserApi {
   findSignedInSince: UserApi["findSignedInSince"] = (input) =>
     this.overrides.findSignedInSince?.(input) ?? this.unimplemented("findSignedInSince");
 
+  findSignInAccounts: UserApi["findSignInAccounts"] = (input) =>
+    this.overrides.findSignInAccounts?.(input) ?? this.unimplemented("findSignInAccounts");
+
   hasAccountOnDomain: UserApi["hasAccountOnDomain"] = (input) =>
     this.overrides.hasAccountOnDomain?.(input) ?? this.unimplemented("hasAccountOnDomain");
 

@@ -39,6 +39,7 @@ export class TestApiKeyService implements ApiKeyApi {
   isOrgAdminApiKey = unsupported<ApiKeyApi["isOrgAdminApiKey"]>();
   list = unsupported<ApiKeyApi["list"]>();
   listAll = unsupported<ApiKeyApi["listAll"]>();
+  findKeyFactsForOrganization = unsupported<ApiKeyApi["findKeyFactsForOrganization"]>();
   listForCaller = unsupported<ApiKeyApi["listForCaller"]>();
   listCallerBindings = unsupported<ApiKeyApi["listCallerBindings"]>();
   listGrantablePermissions = unsupported<ApiKeyApi["listGrantablePermissions"]>();

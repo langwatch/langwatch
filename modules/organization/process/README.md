@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:275`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:276`; nothing else in this package is public.
 
 #### `createAndAssign`
 
@@ -1156,6 +1156,14 @@ The same summaries for these ids; an id with no organization is left out.
 
 ```typescript
 findForOperators(input: Readonly<{ organizationIds: readonly string[] }>): Promise<OrganizationOperatorSummary[]>;
+```
+
+#### `getOpsSnapshot`
+
+One organization for a staff investigation: ids, counts and its creation time, never a name, slug or address (ADR-202, ops functions). Throws `OrganizationNotFoundError`.
+
+```typescript
+getOpsSnapshot(input: Readonly<{ organizationId: string }>): Promise<OrganizationOpsSnapshot>;
 ```
 
 ## REST transport
@@ -2587,7 +2595,7 @@ Declared at `src/eventing/seat-peak.pipeline.ts:66`. Events: `seatChangedEventSc
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:340`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:342`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:18` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:19` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:20` |

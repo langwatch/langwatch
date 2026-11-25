@@ -266,6 +266,9 @@ import {
   type OpsFeatureFlagTarget,
   type OpsFindFeatureFlagTargetsInput,
   type OpsSearchFeatureFlagTargetsInput,
+  tenantQueueCountInputSchema,
+  type TenantQueueCount,
+  type TenantQueueCountInput,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup, ResourceOwnership, ServerRole } from "@langwatch/process";
@@ -1468,6 +1471,11 @@ export class OpsModule implements OpsApi {
   }
   listAllQueueDlqGroups(): Promise<OpsQueueDlqGroupWithQueue[]> {
     return this.#dependencies.ops.listAllQueueDlqGroups();
+  }
+  countQueueGroupsForTenants(input: TenantQueueCountInput): Promise<TenantQueueCount[]> {
+    return this.#dependencies.ops.countQueueGroupsForTenants(
+      tenantQueueCountInputSchema.parse(input),
+    );
   }
   pauseQueuePipeline(input: PauseQueuePipelineInput): Promise<void> {
     return this.#dependencies.ops.pauseQueuePipeline(input);

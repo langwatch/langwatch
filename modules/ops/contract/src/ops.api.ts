@@ -119,6 +119,7 @@ import type {
   OpsQueueReapedStrandedGroups,
   OpsQueueReconcileOutcome,
 } from "./features/queue/ops-queue.ts";
+import type { TenantQueueCount, TenantQueueCountInput } from "./features/queue/ops-tenant-queue.ts";
 import type {
   BugReport,
   BugReportListing,
@@ -510,6 +511,11 @@ export interface OpsApi {
   reconcileQueuePending(input: ReconcileQueuePendingInput): Promise<OpsQueueReconcileOutcome>;
   readQueuePendingDrift(input: ReadQueuePendingDriftInput): Promise<number>;
   listParkedQueueTenants(input: ListParkedQueueTenantsInput): Promise<OpsParkedTenantsPage>;
+  /**
+   * Per queue, how many groups of these tenants wait, are blocked, active, parked or dead
+   * lettered (ADR-202 ops functions): counts and one time, never a key, payload or error text.
+   */
+  countQueueGroupsForTenants(input: TenantQueueCountInput): Promise<TenantQueueCount[]>;
   /** Whether this identity holds `ops:view` at the platform: the platform-operator grant. */
   isAdmin(identity: AdminIdentity): Promise<boolean>;
   assertDestructiveOperator(operator: OpsOperator | null, confirmation: string | undefined): void;

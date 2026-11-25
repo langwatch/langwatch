@@ -59,6 +59,9 @@ import {
   type RotateSigningKeyInput,
   type SigningKey,
   type VerifyBraidSignatureInput,
+  apiKeyFactsInputSchema,
+  type ApiKeyFacts,
+  type ApiKeyFactsInput,
 } from "@langwatch/api-key-contract";
 import { ImpersonationCannotMintCredentialError } from "@langwatch/authorization";
 import { AuthzApi, newAuthzGrantId } from "@langwatch/authz-contract";
@@ -410,6 +413,9 @@ export class ApiKeyModule implements ApiKeyApi, ApiKeyProjectsDoorApi, ApiKeyOrg
   }
   async listAll(input: { organizationId: string }): Promise<ApiKey[]> {
     return this.#service.listAll(input);
+  }
+  async findKeyFactsForOrganization(input: ApiKeyFactsInput): Promise<ApiKeyFacts[]> {
+    return this.#service.findKeyFactsForOrganization(apiKeyFactsInputSchema.parse(input));
   }
   async listForCaller(input: ApiKeyCredentialCheck): Promise<ApiKey[]> {
     return this.#service.listForCaller(input);

@@ -105,6 +105,7 @@ export const prismaTableCatalogue = {
   "PinnedTrace": "PinnedTrace",
   "TraceEditOverlay": "TraceEditOverlay",
   "TraceIngestSourceBilling": "TraceIngestSourceBilling",
+  "TracePlanLimitRefusal": "TracePlanLimitRefusal",
   "RetentionPolicy": "RetentionPolicy",
   "RetentionApplyStatus": "RetentionApplyStatus",
   "DataPrivacyPolicy": "DataPrivacyPolicy",
@@ -1925,6 +1926,12 @@ export const prismaModelFieldCatalogue = {
     "recordedAt",
     "updatedAt"
   ],
+  "TracePlanLimitRefusal": [
+    "projectId",
+    "day",
+    "refusals",
+    "updatedAt"
+  ],
   "RetentionPolicy": [
     "id",
     "organizationId",
@@ -3610,6 +3617,7 @@ export const prismaModelFieldCatalogue = {
     "requesterId",
     "ownerUserId",
     "scopes",
+    "functions",
     "organizationId",
     "organizationName",
     "reason",
@@ -3642,6 +3650,9 @@ export const prismaModelFieldCatalogue = {
     "method",
     "path",
     "operation",
+    "functionName",
+    "functionInput",
+    "rowCount",
     "permissions",
     "organizationId",
     "projectId",
@@ -4071,6 +4082,7 @@ export const prismaRelationCatalogue = {
     "updatedBy": "User"
   },
   "TraceIngestSourceBilling": {},
+  "TracePlanLimitRefusal": {},
   "RetentionPolicy": {},
   "RetentionApplyStatus": {},
   "DataPrivacyPolicy": {},

@@ -22,6 +22,7 @@ import {
   type RuleEvaluationContext,
   type FeatureFlagTarget,
   FeatureFlagExperimentUnavailableError,
+  UnknownFeatureFlagError,
   UnknownFeatureFlagExperimentError,
 } from "@langwatch/feature-flag-contract";
 import { toDate } from "@langwatch/time";
@@ -403,6 +404,45 @@ export class FeatureFlagService {
       ...context,
       organizationCreatedAt: await this.organizationAges.findCreatedAt(context.organizationId),
     };
+  }
+
+  /**
+   * Every registered, stored or configured key that resolves on for the organization, sorted.
+   * A stored key the registry no longer knows is left out: nothing in the product reads it.
+   */
+  async findEnabledFlagsForOrganization(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<string[]> {
+    const stored = await this.repository.findAll();
+    const candidates = new Set<string>([
+      ...this.registry.definitions.map(({ key }) => key),
+      ...stored.map(({ key }) => key),
+      ...this.config.overrides.keys(),
+      ...this.config.forceEnabled,
+    ]);
+    const target = { kind: "organization" as const, organizationId: input.organizationId };
+    const resolved = await Promise.all(
+      [...candidates]
+        .filter((key) => this.isRegistered(key))
+        .map(async (key) => ({
+          key,
+          enabled: await this.isEnabled(key as FeatureFlagKey, target),
+        })),
+    );
+    return resolved
+      .filter(({ enabled }) => enabled)
+      .map(({ key }) => key)
+      .toSorted();
+  }
+
+  private isRegistered(key: string): boolean {
+    try {
+      this.registry.getDefinition(key);
+      return true;
+    } catch (error) {
+      if (error instanceof UnknownFeatureFlagError) return false;
+      throw error;
+    }
   }
 
   async listOperatorCatalogue(): Promise<OperatorFeatureFlagCatalogue> {

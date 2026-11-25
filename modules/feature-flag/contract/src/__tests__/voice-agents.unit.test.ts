@@ -32,6 +32,7 @@ function fakeFeatureFlags(isEnabledMock: FeatureFlagApi["isEnabled"]): FeatureFl
     listExperimentsForCaller: unused("listExperimentsForCaller"),
     setExperimentEnrolmentForCaller: unused("setExperimentEnrolmentForCaller"),
     setExperimentTenantPolicyForCaller: unused("setExperimentTenantPolicyForCaller"),
+    findEnabledFlagsForOrganization: unused("findEnabledFlagsForOrganization"),
   };
 }
 

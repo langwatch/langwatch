@@ -4,6 +4,7 @@ import type { TraceBraidReadsRepository } from "../features/braid/repositories/t
 import type { TraceEditOverlayRepository } from "../features/edit-overlay/repositories/trace-edit-overlay.repository.ts";
 import type { TraceExportSlotRepository } from "../features/export/repositories/trace-export-slot.repository.ts";
 import type { TraceIngestSourceBillingRepository } from "../features/ingestion/repositories/trace-ingest-source-billing.repository.ts";
+import type { TracePlanLimitRefusalsRepository } from "../features/ingestion/repositories/trace-plan-limit-refusals.repository.ts";
 import type { TraceRateLimitRepository } from "../features/ingestion/repositories/trace-rate-limit.repository.ts";
 import type { TraceLegacyReadRepository } from "../features/legacy/repositories/trace-legacy-read.repository.ts";
 import type { TraceClusteringSampleRepository } from "../features/topic/repositories/trace-clustering-sample.repository.ts";
@@ -47,6 +48,8 @@ export interface TraceRepositories {
   readonly editOverlay: TraceEditOverlayRepository;
   /** Governance's coding-assistant billing fact as trace folded it; read at OTLP ingest. */
   readonly ingestSourceBilling: TraceIngestSourceBillingRepository;
+  /** The ingestion doors' plan-limit refusals per project and day, for staff investigations. */
+  readonly planLimitRefusals: TracePlanLimitRefusalsRepository;
   readonly summaryProjection: TraceSummaryProjectionRepository;
   readonly analyticsProjection: TraceAnalyticsProjectionRepository;
   readonly analyticsRollup: TraceAnalyticsRollupRepository;

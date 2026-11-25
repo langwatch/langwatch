@@ -1481,6 +1481,12 @@ export interface LwqlPrismaRows {
     readonly recordedAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
+  readonly TracePlanLimitRefusal: {
+    readonly projectId: "String";
+    readonly day: "DateTime";
+    readonly refusals: "Int";
+    readonly updatedAt: "DateTime";
+  };
   readonly RetentionPolicy: {
     readonly id: "String";
     readonly organizationId: "String";
@@ -3051,6 +3057,7 @@ export interface LwqlPrismaRows {
     readonly requesterId: "String";
     readonly ownerUserId: "String";
     readonly scopes: "String[]";
+    readonly functions: "String[]";
     readonly organizationId: "String?";
     readonly organizationName: "String?";
     readonly reason: "String";
@@ -3083,6 +3090,9 @@ export interface LwqlPrismaRows {
     readonly method: "String";
     readonly path: "String";
     readonly operation: "String";
+    readonly functionName: "String?";
+    readonly functionInput: "String?";
+    readonly rowCount: "Int?";
     readonly permissions: "String[]";
     readonly organizationId: "String?";
     readonly projectId: "String?";

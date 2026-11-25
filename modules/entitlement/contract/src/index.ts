@@ -42,6 +42,7 @@ export {
   type PlanNextStepSchema,
 } from "./plan-next-step.ts";
 export * from "./usage.ts";
+export * from "./usage-limits.ts";
 export * from "./usage.events.ts";
 export * from "./entitlement.errors.ts";
 export * from "./plan-limit.errors.ts";

@@ -4014,6 +4014,16 @@ model TraceIngestSourceBilling {
   @@id([organizationId, sourceType])
 }
 
+/// Ingestion batches refused for the plan limit, one row per project and UTC day, owned by trace.
+model TracePlanLimitRefusal {
+  projectId String
+  day       DateTime @db.Date
+  refusals  Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([projectId, day])
+}
+
 enum RetentionPolicyScopeType {
   ORGANIZATION
   TEAM
@@ -8242,6 +8252,8 @@ model StaffAccessRequest {
   requesterId          String
   ownerUserId          String
   scopes               String[]
+  /// The ops functions the approval named; the passkey signed this list.
+  functions            String[]  @default([])
   organizationId       String?
   organizationName     String?
   reason               String
@@ -8280,6 +8292,10 @@ model StaffAccessEvent {
   method         String
   path           String
   operation      String
+  /// The ops function called, its input as JSON, and how many rows it answered.
+  functionName   String?
+  functionInput  String?
+  rowCount       Int?
   permissions    String[]
   organizationId String?
   projectId      String?
