@@ -29,6 +29,7 @@ import {
 import type { RegistryDraft } from "../../../features/registry/rules/registry-entry.rules.ts";
 import { planRegistryChanges } from "../../../features/registry/rules/registry-reconcile.rules.ts";
 import { AgentRegistryService } from "../../../features/registry/services/agent-registry.service.ts";
+import { MemoryAgentRegistrySettingsRepository } from "../../memory/memory.agent-registry-settings.repository.ts";
 import { MemoryGovernanceRepositories } from "../../memory/memory.governance.repositories.ts";
 import { PrismaAgentRegistryRepository } from "../prisma.agent-registry.repository.ts";
 
@@ -47,6 +48,10 @@ function draft(name: string): RegistryDraft {
     source: "langwatch",
     management: "managed",
     shadow: false,
+    dormant: false,
+    platform: null,
+    labels: {},
+    owner_label: null,
     kind: "connected",
     name,
     description: null,
@@ -328,6 +333,92 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
     });
   });
 
+  describe("given a governed, a shadow, a dormant and a pre-posture entry", () => {
+    /** @scenario "The registry list filters by posture" */
+    it("filters by posture, reading an entry stored without the posture fields as governed", async () => {
+      const organizationId = newOrganization();
+      await reconcile({
+        organizationId,
+        drafts: [
+          draft("governed"),
+          { ...draft("shadow"), source: "traffic", management: "observed", shadow: true },
+          { ...draft("dormant"), dormant: true },
+          draft("legacy"),
+        ],
+        at: "2026-11-10T00:00:00Z",
+      });
+      const legacy = await prisma().agentRegistryEntry.findFirstOrThrow({
+        where: { organizationId, sourceKey: "langwatch:legacy" },
+        select: { id: true, entry: true },
+      });
+      const {
+        dormant: _dormant,
+        posture: _posture,
+        platform: _platform,
+        labels: _labels,
+        owner_label: _ownerLabel,
+        ...stored
+      } = legacy.entry as Record<string, unknown>;
+      await prisma().agentRegistryEntry.updateMany({
+        where: { organizationId, id: legacy.id },
+        data: { entry: JSON.parse(JSON.stringify(stored)) },
+      });
+
+      const names = async (posture: "governed" | "shadow" | "dormant") =>
+        (await repository().listEntries({ organizationId, limit: 10, posture })).entries
+          .map((entry) => `${entry.name}:${entry.posture}`)
+          .toSorted();
+
+      expect(await names("governed")).toEqual(["governed:governed", "legacy:governed"]);
+      expect(await names("shadow")).toEqual(["shadow:shadow"]);
+      expect(await names("dormant")).toEqual(["dormant:dormant"]);
+    });
+  });
+
+  describe("given an entry a release before the dormant flag stored", () => {
+    /** @scenario "An entry stored before dormancy existed turns dormant without a new version" */
+    it("stores its first dormancy at the same version and appends no event", async () => {
+      const organizationId = newOrganization();
+      await reconcile({ organizationId, drafts: [draft("idle")], at: "2026-11-10T00:00:00Z" });
+      const row = await prisma().agentRegistryEntry.findFirstOrThrow({
+        where: { organizationId, sourceKey: "langwatch:idle" },
+        select: { id: true, entry: true },
+      });
+      const {
+        dormant: _dormant,
+        posture: _posture,
+        platform: _platform,
+        labels: _labels,
+        owner_label: _ownerLabel,
+        ...stored
+      } = row.entry as Record<string, unknown>;
+      await prisma().agentRegistryEntry.updateMany({
+        where: { organizationId, id: row.id },
+        data: { entry: JSON.parse(JSON.stringify(stored)) },
+      });
+      const eventsBefore = await prisma().agentRegistryEvent.count({ where: { organizationId } });
+
+      const appended = await reconcile({
+        organizationId,
+        drafts: [{ ...draft("idle"), dormant: true }],
+        at: "2026-12-20T00:00:00Z",
+      });
+
+      expect(appended).toEqual([]);
+      const entry = await repository().getEntry({ organizationId, id: row.id });
+      expect([entry.version, entry.dormant, entry.posture]).toEqual([1, true, "dormant"]);
+      await expect(prisma().agentRegistryEvent.count({ where: { organizationId } })).resolves.toBe(
+        eventsBefore,
+      );
+      const next = await reconcile({
+        organizationId,
+        drafts: [{ ...draft("idle"), dormant: true }],
+        at: "2026-12-21T00:00:00Z",
+      });
+      expect(next).toEqual([]);
+    });
+  });
+
   describe("given an event another release wrote with a type this release does not know", () => {
     /** @scenario An event another release wrote with a type this release does not know is left out of the feed and versions */
     it("leaves it out of the feed, the versions and the undelivered events, and pages past it", async () => {
@@ -458,6 +549,7 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
       const processStore = InMemoryProcessStore.createForTesting();
       const registry = AgentRegistryService.create({
         registry: repository(),
+        settings: MemoryAgentRegistrySettingsRepository.create(),
         discoveredAgents: MemoryGovernanceRepositories.create().discoveredAgents,
         agents: createApiFixture({}),
         projects: createApiFixture({}),

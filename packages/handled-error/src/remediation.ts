@@ -704,7 +704,9 @@ const registry = {
     docsPath: "/governance/kill-switch",
   },
   governance_aws_connection_not_found: {
-    tips: ["Create the AWS connection on the Agents page before naming it in a stop plan"],
+    tips: [
+      "Create the AWS connection on the Agents page before naming it in a stop plan or an AWS agent source",
+    ],
     docsPath: "/governance/kill-switch",
   },
   agent_offline: {
