@@ -571,7 +571,9 @@ describe("nurturing's onboardingVariantAssigned peer subscriber", () => {
           },
         },
       ]);
-      const bodies = customerIoFetch.mock.calls.map(([, init]) => String(init?.body));
+      const bodies = customerIoFetch.mock.calls.map(([, init]) =>
+        typeof init?.body === "string" ? init.body : "",
+      );
       expect(bodies).toHaveLength(2);
       for (const body of bodies) {
         expect(body).toContain('"onboarding_variant":"guided"');

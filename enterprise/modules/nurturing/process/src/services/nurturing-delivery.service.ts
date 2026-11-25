@@ -7,7 +7,6 @@ import type {
 } from "@langwatch/enterprise-nurturing-contract";
 import type { UsageReportReceivedEventData } from "@langwatch/enterprise-saas-contract";
 import type { GuidedOnboardingTurnFailedEventData } from "@langwatch/langy-contract";
-import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { PostHogChannel } from "../channels/posthog.channel.ts";
@@ -29,7 +28,6 @@ import {
   fireGuidedOnboardingPaths,
   fireGuidedOnboardingProgress,
   fireGuidedTurnFailedPostHog,
-  fireOnboardingVariantAssigned,
   postHogUuidFor,
 } from "../rules/nurturing-guided-onboarding-service.rules.ts";
 import {
@@ -59,8 +57,10 @@ import { firePromptCreated } from "../rules/nurturing-prompt-creation-service.ru
 import { fireSignup } from "../rules/nurturing-signup-identification-service.rules.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 import { NurturingClaimedCallsDeliveryService } from "./nurturing-claimed-calls-delivery.service.ts";
+import { NurturingCustomerIoSenderService } from "./nurturing-customer-io-sender.service.ts";
 import { NurturingErasedPeopleService } from "./nurturing-erased-people.service.ts";
 import type { NurturingGuidedOnboardingBackfillService } from "./nurturing-guided-onboarding-backfill.service.ts";
+import { NurturingGuidedOnboardingDeliveryService } from "./nurturing-guided-onboarding-delivery.service.ts";
 import { NurturingJoinedOrganizationService } from "./nurturing-joined-organization.service.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import { NurturingOwnCodingDeliveryService } from "./nurturing-own-coding-delivery.service.ts";
@@ -68,19 +68,10 @@ import { NurturingPlanSyncService } from "./nurturing-plan-sync.service.ts";
 import { NurturingPostHogDeliveryService } from "./nurturing-posthog-delivery.service.ts";
 import type { NurturingService } from "./nurturing.service.ts";
 
-const nurturingLogger = createLogger("langwatch:nurturing");
+const reportFailure = NurturingCustomerIoSenderService.reportFailure;
 
 /** Well under Customer.io's 500KB per batch: one member's identify is a few hundred bytes. */
 const MEMBER_BATCH_SIZE = 100;
-
-/**
- * Where a fire-and-forget lifecycle signal's failure goes. Warn rather than error, and
- * swallowed rather than rethrown: the caller has already done the thing the customer asked
- * for, and a Customer.io outage is not the customer's problem.
- */
-function reportFailure(error: unknown): void {
-  nurturingLogger.warn({ error }, "a lifecycle signal could not be delivered");
-}
 
 /** The same traits for each of these people. */
 type MemberBatch = Readonly<{ userIds: readonly string[]; traits: Partial<CioPersonTraits> }>;
@@ -119,11 +110,14 @@ export class NurturingDeliveryService {
       claimedCalls: NurturingClaimedCallsDeliveryService | undefined;
       planSync: NurturingPlanSyncService;
       erasedPeople: NurturingErasedPeopleService;
+      customerIoSender: NurturingCustomerIoSenderService | undefined;
+      guidedOnboarding: NurturingGuidedOnboardingDeliveryService | undefined;
     }>,
   ) {}
 
   static create(deps: NurturingDeliveryService["deps"]): NurturingDeliveryService {
     const { claims, customerIo, posthog } = deps;
+    const customerIoSender = customerIo && NurturingCustomerIoSenderService.create(customerIo);
     return new NurturingDeliveryService(deps, {
       postHogDelivery: posthog && NurturingPostHogDeliveryService.create(posthog),
       ownCodingDelivery:
@@ -143,6 +137,13 @@ export class NurturingDeliveryService {
         members: deps.members,
       }),
       erasedPeople: NurturingErasedPeopleService.create(deps.erasedUsers),
+      customerIoSender,
+      guidedOnboarding:
+        customerIoSender &&
+        NurturingGuidedOnboardingDeliveryService.create({
+          sender: customerIoSender,
+          backfill: deps.guidedBackfill,
+        }),
     });
   }
 
@@ -171,7 +172,7 @@ export class NurturingDeliveryService {
     this.toPostHogSafely(signal);
     await this.identifyCodingAgentMembers(signal);
     await this.parts.ownCodingDelivery?.deliver(signal);
-    await this.deps.guidedBackfill?.deliver(signal);
+    await this.parts.guidedOnboarding?.deliver(signal);
     if (memberBatch) this.identifyInBatches(memberBatch);
   }
 
@@ -320,25 +321,7 @@ export class NurturingDeliveryService {
 
   /** Runs a rule's decision against the configured Customer.io sink, one call at a time. */
   private sendCustomerIoCalls(calls: CioBatchCall[]): void {
-    const nurturing = this.deps.customerIo;
-    if (!nurturing) return;
-    for (const call of calls) {
-      switch (call.type) {
-        case "identify":
-          void nurturing
-            .identifyUser({ userId: call.userId, traits: call.traits })
-            .catch(reportFailure);
-          break;
-        case "track":
-          void nurturing.trackEvent(call).catch(reportFailure);
-          break;
-        case "group":
-          void nurturing
-            .groupUser({ userId: call.userId, groupId: call.groupId, traits: call.traits })
-            .catch(reportFailure);
-          break;
-      }
-    }
+    this.parts.customerIoSender?.send(calls);
   }
 
   private async toCustomerIo(signal: NurturingSignal, deliveredClaim: string): Promise<void> {
@@ -396,8 +379,6 @@ export class NurturingDeliveryService {
         return this.sendCustomerIoCalls(fireGuidedOnboardingPaths(signal));
       case "guided_onboarding_progress":
         return this.sendCustomerIoCalls(fireGuidedOnboardingProgress(signal));
-      case "onboarding_variant_assigned":
-        return this.sendCustomerIoCalls(fireOnboardingVariantAssigned(signal));
       case "subscription_changed":
         // A failed change gives its claim back and fails the delivery, so the job's retry sends it.
         return this.parts.planSync.planChanged(signal).catch((error: unknown) =>
