@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * @see modules/ops/specs/admin-user-sort.feature
+ * @see modules/ops/specs/instance-admin-user-sort.feature
  */
 import { screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
