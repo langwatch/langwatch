@@ -265,6 +265,7 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
       "tour_skipped",
       "tour_replayed",
       "path_completed",
+      "start_chosen",
     ]),
     payload: z.record(z.string(), z.union([z.string(), z.array(z.string()), z.number()])),
     state: guidedOnboardingStateSchema,

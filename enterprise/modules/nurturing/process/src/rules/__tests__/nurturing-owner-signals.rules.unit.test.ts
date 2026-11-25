@@ -64,6 +64,28 @@ describe("guidedOnboardingSignal", () => {
   });
 });
 
+describe("guidedOnboardingSignal for Langy's governance start", () => {
+  describe("when guided onboarding records the call start", () => {
+    /** @scenario "Langy's start choice reaches nurturing as a guided progress signal" */
+    it("raises a progress signal carrying the start and the state that holds it", () => {
+      const state = { ...recorded.state, langyStart: "call" as const };
+
+      expect(
+        guidedOnboardingSignal({
+          aggregateId: "org-1",
+          data: { ...recorded, event: "start_chosen", payload: { start: "call" }, state },
+        }),
+      ).toMatchObject({
+        kind: "guided_onboarding_progress",
+        sourceEventId: "org-1:start_chosen:1700000000000",
+        event: "start_chosen",
+        payload: { start: "call" },
+        state: { langyStart: "call" },
+      });
+    });
+  });
+});
+
 describe("guidedOnboardingSignal for the steps only PostHog is told of", () => {
   it("raises a provider skip and a tour replay as progress, with the current path", () => {
     for (const event of ["provider_skipped", "tour_replayed"] as const) {

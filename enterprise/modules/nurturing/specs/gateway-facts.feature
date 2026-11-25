@@ -7,9 +7,11 @@ Feature: Customer.io hears when a person's gateway key is created, first used, a
   fact: the key's holder if they are a current member of its organization, else its creator if
   they are, else the organization's admin if they are, else no one. Connect and Langy keys send
   nothing. A key no person holds or made goes to the organization's admin.
-  Gateway also records a key's first admitted request; the person told of the key's creation
-  is then identified with has_app_request true. On every sweep, gateway records an
-  organization's person keys that spent without a budget; its admin is told once a week at most.
+  Gateway also records a key's first admitted request, once; the person told of the key's
+  creation is then identified with has_app_request true. A first request that arrives before
+  the key's copy is retried a bounded number of times, so it waits for the copy and never loops.
+  On every sweep, gateway records an organization's person keys that spent without a budget;
+  its admin is told once a week at most.
 
   @unit
   Scenario: A created person's key sets has_virtual_key and sends virtual_key_created
@@ -335,10 +337,29 @@ Feature: Customer.io hears when a person's gateway key is created, first used, a
 
   @unit
   Scenario: A first request on a key nurturing does not tell of sends nothing
-    Given a CONNECT or LANGY key, a revoked or disabled key, or a key nurturing holds no copy of
+    Given a CONNECT or LANGY key, or a revoked or disabled key
     When gateway records the key's first request
     Then Customer.io receives no call
-    And the uncopied key logs a warning
+
+  @unit
+  Scenario: A first request before the key's copy is retried until the copy lands
+    Given a current member's USER key whose first request arrives before nurturing copies the key
+    When the first-request fact is delivered
+    Then the delivery fails so its job is retried, gateway recording a key's first request only once
+    And once the copy lands, the retry identifies the holder with has_app_request true
+
+  @unit
+  Scenario: A first request on a key nurturing never copies ends unsent after its retries
+    Given a key whose lifecycle copy never reached nurturing, such as a lost or failed copy
+    When its first-request fact is delivered and retried
+    Then each delivery before the last of its bounded attempts fails so its job is retried
+    And the last attempt sends nothing and logs an error, so the job ends instead of looping
+
+  @unit
+  Scenario: A first request with no delivery attempt counts as the first and is retried
+    Given a current member's USER key whose first request arrives before nurturing copies the key
+    When the first-request fact is delivered with no delivery attempt
+    Then the delivery fails as the first attempt, so its job is retried and sends nothing
 
   @unit
   Scenario: A key's first request delivered twice identifies once
@@ -418,7 +439,9 @@ Feature: Customer.io hears when a person's gateway key is created, first used, a
   # --- AC Coverage Map (has_app_request) ---
   # "one identify, no track"                     -> Scenario: A key's first request sets has_app_request on the person told of the key
   # "same recipient as virtual_key_created"      -> Scenario: A key's first request is told to whoever its creation was told to
-  # "Connect, Langy, uncopied, revoked, disabled" -> Scenario: A first request on a key nurturing does not tell of sends nothing
+  # "Connect, Langy, revoked, disabled"          -> Scenario: A first request on a key nurturing does not tell of sends nothing
+  # "copy not yet landed retries"                -> Scenario: A first request before the key's copy is retried until the copy lands
+  # "never-copied key ends, bounded"             -> Scenario: A first request on a key nurturing never copies ends unsent after its retries
   # "redelivery once, memory and Redis"          -> Scenario: A key's first request delivered twice identifies once
   #                                               -> Scenario: A key's first request delivered twice identifies once over Redis claims
   # "refused call retries"                       -> Scenario: A refused has_app_request identify is retried

@@ -51,7 +51,7 @@ Feature: PostHog guided onboarding events
     Then exactly one "onboarding_variant_assigned" event is tracked for that user with variant "guided" and the organization id
     And it carries a uuid derived from the organization and the assignment time as its timestamp, so PostHog keeps one even after the delivery claim expires
     And the person property onboarding_variant is set to "guided"
-    And Customer.io receives nothing
+    And Customer.io is told the variant once, on the person and the organization, with no path
 
   @unit
   Scenario: the variant assignment is the exposure of the experiment
@@ -96,6 +96,11 @@ Feature: PostHog guided onboarding events
     Then a "guided_onboarding_path_begun" event is tracked with path governance
     Given a guided onboarding event "path_completed" for governance
     Then a "guided_onboarding_path_completed" event is tracked with path governance
+
+  @unit
+  Scenario: choosing Langy's start is tracked with the start
+    Given a guided onboarding event "start_chosen" with the start call
+    Then a "guided_onboarding_start_chosen" event is tracked for the user with start call
 
   @unit
   Scenario: attaching a conversation tracks nothing
