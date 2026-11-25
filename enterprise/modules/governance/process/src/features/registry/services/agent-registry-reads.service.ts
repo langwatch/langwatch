@@ -4,6 +4,7 @@ import {
   type AgentRegistryEntry,
   type AgentRegistryEventPage,
   type AgentRegistryPage,
+  type AgentRegistryPosture,
   type AgentRegistryStatus,
   type ArdManifest,
   type ArdSearchRequest,
@@ -64,12 +65,14 @@ export class AgentRegistryReadsService {
     cursor,
     updatedSince,
     status,
+    posture,
   }: {
     organizationId: string;
     limit: number;
     cursor?: string;
     updatedSince?: string;
     status?: AgentRegistryStatus;
+    posture?: AgentRegistryPosture;
   }): Promise<AgentRegistryPage> {
     const { entries, hasMore, last } = await this.deps.registry.listEntries({
       organizationId,
@@ -77,6 +80,7 @@ export class AgentRegistryReadsService {
       ...(cursor ? { after: decodeCursor(cursor) } : {}),
       ...(updatedSince ? { updatedSince: Temporal.Instant.from(updatedSince) } : {}),
       ...(status ? { status } : {}),
+      ...(posture ? { posture } : {}),
     });
     return {
       data: entries,

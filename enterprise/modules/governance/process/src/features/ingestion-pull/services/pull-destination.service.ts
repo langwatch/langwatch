@@ -1,8 +1,11 @@
+import { createSsrfUrlValidator, type SsrfUrlValidator } from "@langwatch/egress";
 import {
+  ARD_REGISTRY_ADAPTER_ID,
   DATABRICKS_GENIE_ADAPTER_ID,
   GovernanceValidationError,
 } from "@langwatch/enterprise-governance-contract";
 
+import { ardManifestUrl } from "../../agents/rules/ard-registry-entries.rules.ts";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
   isEnvironmentOrigin,
@@ -28,14 +31,49 @@ export class PullDestinationService {
   private constructor(
     private readonly configuredBase: string | undefined,
     private readonly dataverseEnvironmentBase: string | undefined,
+    private readonly validateUrl: SsrfUrlValidator,
   ) {}
 
-  /** Each base is the one extra address its destination may be (a dev stand-in). */
+  /**
+   * Each base is the one extra address its destination may be (a dev stand-in). `validateUrl` is
+   * the outbound address fence pulls go through; its default refuses only cloud metadata.
+   */
   static create({
     configuredBase,
     dataverseEnvironmentBase,
-  }: { configuredBase?: string; dataverseEnvironmentBase?: string } = {}): PullDestinationService {
-    return new PullDestinationService(configuredBase, dataverseEnvironmentBase);
+    validateUrl = createSsrfUrlValidator({ blockLocal: false, allowedHosts: [] }),
+  }: {
+    configuredBase?: string;
+    dataverseEnvironmentBase?: string;
+    validateUrl?: SsrfUrlValidator;
+  } = {}): PullDestinationService {
+    return new PullDestinationService(configuredBase, dataverseEnvironmentBase, validateUrl);
+  }
+
+  /** A customer-named listing address (an ARD registry, its search) must pass the address fence. */
+  async assertListingAddressesAllowed(
+    parserConfig: Record<string, unknown> | null | undefined,
+  ): Promise<void> {
+    if (parserConfig?.adapter !== ARD_REGISTRY_ADAPTER_ID) return;
+    const addresses: string[] = [];
+    if (typeof parserConfig.registryUrl === "string") {
+      try {
+        addresses.push(ardManifestUrl({ registryUrl: parserConfig.registryUrl }));
+      } catch {
+        refuseListingAddress("Registry address must be a domain or an https URL.");
+      }
+    }
+    if (typeof parserConfig.searchUrl === "string") addresses.push(parserConfig.searchUrl);
+
+    for (const address of addresses) {
+      try {
+        await this.validateUrl(address);
+      } catch {
+        refuseListingAddress(
+          "This address is not reachable from LangWatch: it does not resolve, or it points at a private, loopback or cloud metadata address.",
+        );
+      }
+    }
   }
 
   /**
@@ -157,4 +195,8 @@ export class PullDestinationService {
 
     return suffixes.length === 0 ? (last ?? "") : `${suffixes.join(", ")} or ${last}`;
   }
+}
+
+function refuseListingAddress(message: string): never {
+  throw new GovernanceValidationError(message, { formErrors: [message] });
 }
