@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { execAndPipe, logFileName } from "../../src/services/_pipe-to-bus.ts";
-import type { EventBus } from "../../src/services/event-bus.ts";
+import { EventBus } from "../../src/services/event-bus.ts";
 
 const UPLOAD_ARTIFACT_REFUSED = /["*:<>?|\r\n]/;
 
@@ -31,7 +31,7 @@ describe("execAndPipe", () => {
 
   it("writes a prepare step's output to a file name without a colon", async () => {
     dir = mkdtempSync(join(tmpdir(), "pipe-to-bus-"));
-    const bus = { emit: () => undefined } as unknown as EventBus;
+    const bus = new EventBus();
     await execAndPipe({
       bus,
       service: "prepare:langevals",
