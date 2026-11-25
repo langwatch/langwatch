@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   auditCatalog,
   blockingFindings,
+  findMultiUnitModels,
   findUnpricedModels,
   isPricedElsewhere,
   pricedUnits,
@@ -196,6 +197,7 @@ describe("blockingFindings", () => {
         source: "litellm",
       },
     ],
+    multiUnit: [],
     drift: [
       {
         modelId: "elevenlabs/eleven_multilingual_v2",
@@ -248,6 +250,7 @@ describe("renderAuditMarkdown", () => {
   const empty = {
     unpriced: [],
     unitMismatch: [],
+    multiUnit: [],
     drift: [],
     crossSource: [],
     overriding: [],
@@ -364,6 +367,7 @@ describe("withoutAcceptedCrossSource", () => {
     const report = {
       unpriced: [],
       unitMismatch: [],
+      multiUnit: [],
       drift: [],
       crossSource: [
         row("inception/mercury-2.5", "inputCostPerToken"),
@@ -441,5 +445,64 @@ describe("auditCatalog, image rates", () => {
     expect(report.drift).toEqual([]);
     expect(report.unitMismatch).toEqual([]);
     expect(report.unpriced).toEqual([]);
+  });
+});
+
+describe("auditCatalog, a model priced in two units", () => {
+  const diarize = model("openai/gpt-4o-transcribe-diarize", {
+    inputCostPerToken: 2.5e-6,
+    outputCostPerToken: 1e-5,
+    inputCostPerSecond: 1e-4,
+  });
+
+  /** @scenario "The audit blocks on an entry priced in two units" */
+  it("blocks on it, whatever the baseline accepts", () => {
+    const report = auditCatalog({
+      overlay: {},
+      generated: { [diarize.id]: diarize },
+      upstream: {},
+    });
+    expect(report.multiUnit).toEqual([
+      { modelId: "openai/gpt-4o-transcribe-diarize", units: ["second", "token"] },
+    ]);
+    const baseline: AuditBaseline = {
+      unitMismatch: { "openai/gpt-4o-transcribe-diarize": "accepted" },
+      unpriced: { "openai/gpt-4o-transcribe-diarize": "accepted" },
+    };
+    expect(blockingFindings(report, baseline)).toEqual([
+      "two units: openai/gpt-4o-transcribe-diarize prices second+token, a request would be charged twice",
+    ]);
+    expect(renderAuditMarkdown(report, blockingFindings(report, baseline))).toContain(
+      "Priced in more than one unit (1)",
+    );
+  });
+
+  it("checks the entry in force, so an overlay that fixes the unit clears it", () => {
+    const fixed = model(diarize.id, { inputCostPerToken: 2.5e-6, outputCostPerToken: 1e-5 });
+    const report = auditCatalog({
+      overlay: { [diarize.id]: fixed },
+      generated: { [diarize.id]: diarize },
+      upstream: {},
+    });
+    expect(report.multiUnit).toEqual([]);
+  });
+
+  it("does not count cache or audio token rates as a second unit", () => {
+    const tokensOnly = model("openai/gpt-audio", {
+      inputCostPerToken: 2.5e-6,
+      audioCostPerToken: 4e-5,
+      inputCacheReadPerToken: 1e-6,
+    });
+    expect(findMultiUnitModels({ [tokensOnly.id]: tokensOnly })).toEqual([]);
+  });
+
+  it("counts an audio output token rate against a per-second rate", () => {
+    const audioOut = model("openai/speech-out", {
+      audioOutputCostPerToken: 1.2e-5,
+      inputCostPerSecond: 1e-4,
+    });
+    expect(findMultiUnitModels({ [audioOut.id]: audioOut })).toEqual([
+      { modelId: "openai/speech-out", units: ["second", "token"] },
+    ]);
   });
 });
