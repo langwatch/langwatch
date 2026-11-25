@@ -13,7 +13,7 @@ import {
 import { tenantScope, tenantSet } from "@langwatch/clickhouse-client";
 import { customMetadataKeyCondition } from "@langwatch/trace-contract";
 
-import { findUnapplicableFilterValue } from "../../rules/analytics-filter-values.rules.ts";
+import { findUnapplicableFilter } from "../../rules/analytics-filter-values.rules.ts";
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../rules/trace-signal.rules.ts";
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import {
@@ -237,6 +237,9 @@ function buildSlimFilterClauses(filters: TimeseriesQueryInput["filters"]): {
   params: Record<string, unknown>;
 } {
   if (!filters) return { clauses: [], params: {} };
+  // A value no case below can apply would be dropped and widen the answer.
+  const unapplicable = findUnapplicableFilter(filters);
+  if (unapplicable) throw analyticsFilterRefusal(unapplicable);
 
   const clauses: string[] = [];
   const params: Record<string, unknown> = {};
@@ -318,11 +321,9 @@ function appendSlimFilterClause({
       break;
     }
     case "traces.error": {
-      // The options endpoint returns "true"/"false"; any other value is refused, never dropped.
+      // The options endpoint returns "true"/"false"; anything else was refused above.
       const vals = collectStringValues(rawValue);
       if (vals.length === 0) break;
-      const unapplicable = findUnapplicableFilterValue({ field, values: vals, depth: 0 });
-      if (unapplicable) throw analyticsFilterRefusal(unapplicable);
       const wantsErrors = vals.includes("true");
       const wantsClean = vals.includes("false");
       if (wantsErrors && !wantsClean) {
