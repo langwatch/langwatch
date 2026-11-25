@@ -59,7 +59,8 @@ export interface ChartFrameLogEntry {
 export interface CreateFrameBridgeOptions {
   readonly iframe: HTMLIFrameElement;
   readonly executeQuery: ChartFrameExecuteQuery;
-  readonly dashboardContext: ChartFrameDashboardContext;
+  /** Read when the frame loads, so a theme switched since the bridge began sends its colours. */
+  readonly readDashboardContext: () => ChartFrameDashboardContext;
   /** Author-declared parameter defaults, delivered once on `lw:init`. */
   readonly params?: ChartFrameParamsSnapshot;
   /**
@@ -170,7 +171,7 @@ export class FrameBridgeSession implements FrameBridge {
     iframe.contentWindow.postMessage(
       {
         type: "lw:init",
-        dashboardContext: this.#options.dashboardContext,
+        dashboardContext: this.#options.readDashboardContext(),
         params: this.#options.params ?? {},
         source: this.#options.source,
       },
