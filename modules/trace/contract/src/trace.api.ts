@@ -40,13 +40,13 @@ import type {
   DeriveClaudeResponseContentInput,
   DeriveClaudeResponseContentResult,
 } from "./features/attribute/trace-canonicalisation.ts";
-import type { ThreadTraceIds } from "./features/content/trace-content-read.service.ts";
 import type {
   BraidActivity,
   BraidAttributeKeys,
   BraidPreview,
   BraidTestTrace,
 } from "./features/braid/trace-braid.schemas.ts";
+import type { ThreadTraceIds } from "./features/content/trace-content-read.service.ts";
 import type {
   TraceEditOverlayDto,
   TraceEditOverlayPatch,
