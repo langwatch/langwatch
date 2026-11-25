@@ -133,6 +133,7 @@ function AwsConnectionPicker({
 /** Region codes as chips, each checked against the adapter's own pattern before it is added. */
 function AwsRegionsInput({ value, onChange, isInvalid, readOnly }: ControlProps) {
   const regions = parseRegions(value);
+  /** The typed value the chip check refused; typing something else clears the complaint. */
   const [refused, setRefused] = useState<string | null>(null);
   const setRegions = (next: readonly string[]) => onChange(serializeRegions(next));
   const stale = regions.filter((region) => !isAwsRegion(region));
@@ -148,9 +149,17 @@ function AwsRegionsInput({ value, onChange, isInvalid, readOnly }: ControlProps)
           setRefused(null);
           setRegions(details.value.map((region) => region.trim()));
         }}
-        onInputValueChange={() => setRefused(null)}
-        onValueInvalid={() => setRefused("Use a region code such as eu-west-1.")}
-        validate={(details) => isAwsRegion(details.inputValue.trim())}
+        onInputValueChange={({ inputValue }) => {
+          // The chips clear a refused value a frame later; only new typing clears the complaint.
+          const typed = inputValue.trim();
+          if (typed && typed !== refused) setRefused(null);
+        }}
+        validate={(details) => {
+          const candidate = details.inputValue.trim();
+          if (isAwsRegion(candidate)) return true;
+          setRefused(candidate);
+          return false;
+        }}
         max={MAX_REGIONS}
         addOnPaste
         delimiter=","
@@ -163,7 +172,11 @@ function AwsRegionsInput({ value, onChange, isInvalid, readOnly }: ControlProps)
           <TagsInput.Input aria-label="Regions" placeholder="Type a region and press Enter" />
         </TagsInput.Control>
       </TagsInput.Root>
-      {refused && <FieldComplaint testId="aws-regions-refused">{refused}</FieldComplaint>}
+      {refused && (
+        <FieldComplaint testId="aws-regions-refused">
+          Use a region code such as eu-west-1.
+        </FieldComplaint>
+      )}
       {stale.length > 0 && (
         <FieldComplaint testId="aws-regions-stale">
           {`${stale.join(", ")} ${stale.length === 1 ? "is not a region code" : "are not region codes"}. Remove ${stale.length === 1 ? "it" : "them"} to save.`}

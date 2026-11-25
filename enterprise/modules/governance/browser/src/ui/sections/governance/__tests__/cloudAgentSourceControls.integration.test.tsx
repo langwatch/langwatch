@@ -103,6 +103,9 @@ describe("the AWS regions control", () => {
     expect(await screen.findByTestId("aws-regions-refused")).toHaveTextContent(
       "Use a region code such as eu-west-1.",
     );
+    // The chips clear the refused text on the next frame; the complaint stays until new typing.
+    await waitFor(() => expect(screen.getByLabelText("Regions")).toHaveValue(""));
+    expect(screen.getByTestId("aws-regions-refused")).toBeVisible();
     expect(field.values).toEqual([]);
   });
 
