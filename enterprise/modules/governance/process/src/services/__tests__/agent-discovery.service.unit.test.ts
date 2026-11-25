@@ -11,10 +11,14 @@ import type {
 import { HttpCopilotBotsChannel } from "../../channels/http/http.copilot-bots.channel.ts";
 import { HttpGenieSpacesChannel } from "../../channels/http/http.genie-spaces.channel.ts";
 import { HttpProviderSignInChannel } from "../../channels/http/http.provider-sign-in.channel.ts";
+import { MemoryArdRegistryChannel } from "../../channels/memory/memory.ard-registry.channel.ts";
+import { MemoryAwsAgentInventoryChannel } from "../../channels/memory/memory.aws-agent-inventory.channel.ts";
+import { MemoryVertexAgentEngineChannel } from "../../channels/memory/memory.vertex-agent-engine.channel.ts";
 import { AgentDiscoveryService } from "../../features/agents/services/agent-discovery.service.ts";
 import { SourceCredentialAccessService } from "../../features/ingestion-source/services/source-credential-access.service.ts";
 import { MemoryDiscoveredAgentRepository } from "../../repositories/memory/memory.discovered-agent.repository.ts";
 import { MemoryDiscoveredPeopleStore } from "../../repositories/memory/memory.discovered-people.store.ts";
+import { MemoryGovernanceAwsConnectionRepository } from "../../repositories/memory/memory.governance-aws-connection.repository.ts";
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
 
 const ORG = "org_agent_sync";
@@ -103,6 +107,10 @@ async function buildWorld({
     signIn: HttpProviderSignInChannel.create({ http }),
     genieSpaces: HttpGenieSpacesChannel.create({ http }),
     copilotBots: HttpCopilotBotsChannel.create({ http }),
+    awsAgentInventory: MemoryAwsAgentInventoryChannel.create(),
+    vertexAgentEngine: MemoryVertexAgentEngineChannel.create(),
+    ardRegistry: MemoryArdRegistryChannel.create(),
+    awsConnections: MemoryGovernanceAwsConnectionRepository.create(),
     ...(registry ? { registry } : {}),
     logger,
   });

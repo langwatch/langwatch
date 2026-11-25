@@ -70,9 +70,10 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
     return result.count > 0;
   }
 
+  /** An archived row is gone, as for rename: a second archive matches nothing. */
   async archive(input: { id: string; organizationId: string }): Promise<boolean> {
     const result = await this.prisma.department.updateMany({
-      where: input,
+      where: { ...input, archivedAt: null },
       data: { archivedAt: toDate(nowInstant()) },
     });
     return result.count > 0;

@@ -24,6 +24,8 @@ function stamped({
   note,
   simulatorModel = "openai/gpt-5",
   judgeModel = "openai/gpt-5-mini",
+  traceQuietPeriodMs,
+  traceWaitTimeoutMs,
 }: {
   ref?: string;
   key?: string;
@@ -33,6 +35,8 @@ function stamped({
   note?: string;
   simulatorModel?: string;
   judgeModel?: string;
+  traceQuietPeriodMs?: number;
+  traceWaitTimeoutMs?: number;
 }): string {
   return JSON.stringify({
     ...(note && { note }),
@@ -43,6 +47,8 @@ function stamped({
       targetType: type,
       simulatorModel,
       judgeModel,
+      ...(traceQuietPeriodMs !== undefined && { traceQuietPeriodMs }),
+      ...(traceWaitTimeoutMs !== undefined && { traceWaitTimeoutMs }),
       ...(targetParameters && { targetParameters }),
     },
   });
@@ -94,6 +100,8 @@ describe("MemoryRunConfigurationsRepository", () => {
           RepeatCount: "2",
           SimulatorModel: "openai/gpt-5",
           JudgeModel: "openai/gpt-5-mini",
+          TraceQuietPeriodMs: "",
+          TraceWaitTimeoutMs: "",
           Parameters: '{"tone":"warm"}',
           FirstTargetParameters: "",
           UsesNote: "1",
@@ -133,6 +141,30 @@ describe("MemoryRunConfigurationsRepository", () => {
       expect(rows[0]?.UsesNote).toBe("0");
       const [newest] = await configurations.findConfigurations({ filter: filter(), limit: 1 });
       expect(newest?.LastRunAtMs).toBe("3000");
+    });
+
+    it("answers the judge trace wait as its raw number and keeps a run without it apart", async () => {
+      const configurations = await given([
+        runState({
+          ScenarioRunId: "r-1",
+          BatchRunId: "b-1",
+          StartedAt: 2_000,
+          Metadata: stamped({ traceQuietPeriodMs: 20_000, traceWaitTimeoutMs: 90_000 }),
+        }),
+        runState({
+          ScenarioRunId: "r-2",
+          BatchRunId: "b-2",
+          StartedAt: 1_000,
+          Metadata: stamped({}),
+        }),
+      ]);
+
+      const rows = await configurations.findConfigurations({ filter: filter() });
+
+      expect(rows.map((row) => [row.TraceQuietPeriodMs, row.TraceWaitTimeoutMs])).toEqual([
+        ["20000", "90000"],
+        ["", ""],
+      ]);
     });
 
     it("reads the parameters off the plain target when a variant ran beside it, else off the first run", async () => {

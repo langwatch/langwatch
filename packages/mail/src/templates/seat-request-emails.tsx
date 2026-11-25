@@ -169,7 +169,16 @@ export const sendSeatRequestEmail = async ({
   ...props
 }: SeatRequestProps & { mailer: MailSender; idempotencyKey?: string }) => {
   const { subject, html } = await renderMailTemplate(seatRequestTemplate, props);
-  await sendEmail({ mailer, content: { to: props.recipientEmail, subject, html, idempotencyKey } });
+  await sendEmail({
+    mailer,
+    content: {
+      to: props.recipientEmail,
+      subject,
+      html,
+      idempotencyKey,
+      template: seatRequestTemplate.id,
+    },
+  });
 };
 
 /* ── The identity provider refused somebody. ─────────────────────────────── */
@@ -236,5 +245,14 @@ export const sendIdpRefusedSignInEmail = async ({
   ...props
 }: IdpRefusedSignInProps & { mailer: MailSender; idempotencyKey?: string }) => {
   const { subject, html } = await renderMailTemplate(idpRefusedSignInTemplate, props);
-  await sendEmail({ mailer, content: { to: props.recipientEmail, subject, html, idempotencyKey } });
+  await sendEmail({
+    mailer,
+    content: {
+      to: props.recipientEmail,
+      subject,
+      html,
+      idempotencyKey,
+      template: idpRefusedSignInTemplate.id,
+    },
+  });
 };

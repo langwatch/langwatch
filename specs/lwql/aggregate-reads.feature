@@ -66,6 +66,53 @@ Feature: LangWatchQL on an aggregate project reads its members inside their gran
     When ana runs a statement that reads the same view twice
     Then both references are narrowed to the members' windows
 
+  # tasks#1212: a fanned-out PostgreSQL view keeps one copy of a team- or organization-level
+  # row, the lowest in-scope project's. That copy's window alone must not decide the row.
+  @unit @integration
+  Scenario: A member window on the kept copy does not hide a row a sibling's window admits
+    Given two sibling projects of one organization and an organization-level row
+    And the project whose copy the view keeps is shared only from after the row was created
+    And its sibling is shared for its whole history
+    When ana runs a statement reading that row's view over both
+    Then the row is read once
+
+  @unit
+  Scenario: A member window for a project the caller cannot read is dropped
+    Given ana reads projects A and B
+    And the member windows also name a project C outside them
+    When the statement is scoped
+    Then C's window is dropped before any predicate is built from it
+
+  @unit
+  Scenario: A read where every project has its own whole-history window is left as written
+    Given ana reads projects A and B
+    And the member windows name each of them once, shared for its whole history
+    When the statement is scoped
+    Then the statement is left as written, since the row policy bounds it exactly
+
+  @unit
+  Scenario: A project with no member window reads nothing once windows are given
+    Given ana reads projects A and B
+    And the member windows name only project A, shared for its whole history
+    When the statement is scoped
+    Then each view it reads keeps rows of project A only
+
+  @unit
+  Scenario: A read whose every member window is dropped reads nothing
+    Given ana reads projects A and B
+    And the member windows name only a project C outside them
+    When the statement is scoped
+    Then every view it reads admits no row
+
+  # Below that filter: proves the engine table's row policy alone also keeps C's copy out.
+  @integration
+  Scenario: A member window cannot admit a row through a project the caller cannot read
+    Given an organization with an organization-level row and three projects
+    And the caller's key set holds only two of them, each shared only from after the row was created
+    And the window predicate names the third project as shared for its whole history
+    When ana's session reads that row's view through the predicate
+    Then the row is not read
+
   @unit
   Scenario: A view with no time column reads only members shared for their whole history
     Given project B is shared from a point in time

@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { AuthzMemoryStore } from "../../repositories/memory/authz-memory.store.ts";
 import { MemoryAuthzGrantProjectionRepository } from "../../repositories/memory/memory.authz-grant-projection.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { MemoryAuthzReadRepository } from "../../repositories/memory/memory.authz-read.repository.ts";
 import { MemoryAuthzRepositories } from "../../repositories/memory/memory.authz.repositories.ts";
 import { AuthzModule, type AuthzSetup } from "../authz.app.ts";
@@ -27,6 +28,15 @@ function composeOver(
   memory: AuthzMemoryStore,
   read: MemoryAuthzReadRepository = MemoryAuthzReadRepository.create({ memory }),
 ) {
+  const organizationPolicies = MemoryAuthzOrganizationPolicyRepository.create();
+  // Both organisations have Braids turned on; the setting itself: authz-braids-enabled.
+  for (const organizationId of [ORG, "org_other"]) {
+    void organizationPolicies.setBraidsEnabled({
+      organizationId,
+      braidsEnabled: true,
+      updatedByUserId: "seed",
+    });
+  }
   return AuthzModule.create({
     dependencies: {},
     config: {
@@ -41,6 +51,7 @@ function composeOver(
     repositories: {
       ...MemoryAuthzRepositories.create(),
       read,
+      organizationPolicies,
     },
   });
 }

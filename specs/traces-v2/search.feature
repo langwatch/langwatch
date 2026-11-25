@@ -215,6 +215,30 @@ Rule: Query syntax
     When the user searches for "NOT @status:error"
     Then traces with status "error" are excluded from results
 
+  @unit
+  Scenario: NOT over a bracketed group negates the whole group
+    Given traces that are errors on "gpt-4o-mini", errors on another model, and not errors on "gpt-4o-mini"
+    When the user searches for "NOT (@status:error AND @model:gpt-4o-mini)"
+    Then only the errors on "gpt-4o-mini" are excluded
+    And "NOT (@status:error OR @model:gpt-4o-mini)" excludes every error and every "gpt-4o-mini" trace
+    And a NOT inside the group cancels only on its own term while the AND still becomes an OR, so "NOT (NOT @status:error AND @model:gpt-4o-mini)" keeps every error and every trace not on "gpt-4o-mini"
+    And the trace list and an automation's match on a single trace give the same answer
+
+  @unit
+  Scenario: NOT over an evaluator group keeps the evaluator's own results together
+    Given a trace where evaluator "x" scored 0.3 and evaluator "y" scored 0.9
+    When the user searches for "NOT (@evaluator:x AND @evaluatorScore:>0.5)"
+    Then the trace is shown, because x did not score above 0.5
+    And the compiled query passes the tenant guard instead of erroring
+    And the evaluator stays tied to its results only when they are written in one AND chain; a written-out form such as "NOT (NOT @evaluator:x OR NOT @evaluatorScore:>0.5)" reads them separately
+
+  @integration
+  Scenario: The table lists exactly the complement of a group under NOT
+    Given stored traces that are errors on a model, errors on another model, and not errors on that model
+    When the trace list reads "NOT (@status:error AND @model:<model>)" and "NOT (@status:error OR @model:<model>)"
+    Then each lists the traces its group leaves out, no more and no fewer
+    And the table total and the sidebar's counts agree with that list
+
   Scenario: CSV shorthand for OR within a field
     When the user searches for "@status:error,warning"
     Then traces with status "error" or "warning" are shown
@@ -639,6 +663,32 @@ Rule: Categorical facet selection logic
   Scenario: Combined within and across facet selections
     When the user checks "Error" and "Warning" under Status and "gpt-4o" under Model
     Then the query is "(@status:error OR @status:warning) AND @model:gpt-4o"
+
+  @unit
+  Scenario: A value a group in the search bar makes optional is marked as in group
+    When the user searches for "NOT (@status:error AND @model:gpt-5-mini)" or "@status:error OR @model:gpt-5-mini"
+    Then the "Error" row under Status and the "gpt-5-mini" row under Model are neither included nor excluded
+    And each says "in group", titled "Part of a group in the search bar" and then what a click does
+    And clicking such a row does what it did before
+
+  @unit
+  Scenario: Values every result must match keep their include or exclude mark
+    When the user searches for "@status:error AND @model:gpt-5-mini", "NOT (@status:error OR @model:gpt-5-mini)" or "@status:error OR @status:warning"
+    Then each named row shows include or exclude as before, with no "in group" label
+
+  @unit
+  Scenario: The exclude button on a row in a group says what a click does
+    When the user searches for "NOT (@status:error AND @model:gpt-5-mini)" and hovers the "Error" row
+    Then its exclude button reads "Remove Error from the group" and is not pressed, because a click removes "Error" from that group, which can widen or narrow what it hides
+    And the same holds for "NOT (@evaluator:abc AND @evaluatorVerdict:fail)" and the "gpt-5-mini" row of "@status:error AND NOT (@status:error AND @model:gpt-5-mini)"
+    And on a row in a group the query names plainly, as in "@status:error OR @model:gpt-5-mini", the button reads "Exclude <value>", because a click excludes it from every result
+
+  @unit
+  Scenario: Attribute, metadata and event rows a group makes optional also say in group
+    When a group in the search bar makes an attribute, metadata or event value optional, as "NOT (@status:error AND @attribute.metadata.customer:acme)" does for the "acme" row under Metadata
+    Then its row in the sidebar says "in group" and is neither included nor excluded
+    And its title and accessible name say what a click does: "remove from the group" for a negated term, "exclude" for a plain one
+    And clicking it does what it did before
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1624,6 +1674,36 @@ Rule: Enter routes a sentence
     Then the query is `service:api AND "cannot connect to database"`
     And no model is called
 
+  # A question is never a literal string to look for: nobody types "Was the
+  # customer frustrated?" hoping a trace contains those words.
+  @unit
+  Scenario: A question the classifier or the model calls a phrase is judged instead
+    Given Instant Evals are available for the project
+    And the classifier, or the model without one, answers "free_text" for "Was the customer frustrated?"
+    When the router runs
+    Then the result is an Instant Eval on that question, rewritten by the FAST model like any judgement
+    And a sentence that is not a question, such as "cannot connect to database", is still searched as one phrase
+
+  @unit
+  Scenario: A question no model could route is judged as typed
+    Given Instant Evals are available for the project
+    And no classifier answered and the FAST model fails or is not configured
+    When the user submits "Was the customer frustrated?"
+    Then the result is an Instant Eval whose question is "Was the customer frustrated?"
+    And it says the model failed, as a judgement without a model does
+
+  @unit
+  Scenario: A question stays a phrase search while Instant Evals are unavailable
+    Given Instant Evals are not available for the project
+    And the classifier answers "free_text" for "Was the customer frustrated?"
+    When the router runs
+    Then the sentence is searched as one quoted phrase
+
+  @unit
+  Scenario: A sentence reads as a question when it asks one
+    Then "Was the customer frustrated?" and "did the agent call the refund tool" read as questions
+    And "cannot connect to database", "how", "is" and "?" do not
+
   @unit
   Scenario: A question for the assistant goes to Langy with the view attached
     Given the classifier answers "langy" for "why did errors spike this morning"
@@ -1789,6 +1869,9 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     When the user opens the Langy ask surface
     Then it says the active search goes with the question
 
+  # Regression: the trace host's ask once handed the question to nothing, so the
+  # surface dissolved and no panel opened.
+  @integration @regression
   Scenario: Enter hands the question and the search to the panel
     Given the Langy ask surface is open with "why are these failing?" typed
     And the search bar contains the applied query "status:error"
@@ -2730,10 +2813,17 @@ Rule: Enter routes a sentence
       And a query that named only that facet becomes empty
 
     @unit
-    Scenario: A facet term under a NOT is removed with the rest
-      Given a query negating a group that names the facet
+    Scenario: A facet term under a NOT over an OR group is removed with the rest
+      Given a query negating an OR group that names the facet, which reads as an AND
       When the query is rewritten for that facet's count
       Then the negated group no longer carries the facet's term
+
+    @unit @integration
+    Scenario: A facet whose term an OR joins to other terms counts under the whole query
+      Given a query joining the facet's term to another field's by an OR, or by an AND under a NOT
+      When the facet's counts are computed
+      Then the facet is counted under the whole query, as the table is
+      And a facet joined to the rest by AND still drops its own terms
 
   Rule: The Explorer leaves Langy's own turns out unless the query names an origin
 

@@ -243,6 +243,23 @@ describe.skipIf(!databaseUrl)("DepartmentService", () => {
     });
   });
 
+  describe("given a department that is already archived", () => {
+    /** @scenario "Archiving a department that is already archived is refused" */
+    it("refuses the second archive as not found and keeps the first archive time", async () => {
+      const legacy = await service().create({ organizationId: ORG_ID, name: `Gone-${ns}` });
+      await service().archive({ id: legacy.id, organizationId: ORG_ID });
+      const archivedAt = async () =>
+        (await prisma.department.findUniqueOrThrow({ where: { id: legacy.id } })).archivedAt;
+      const firstArchivedAt = await archivedAt();
+
+      await expect(
+        service().archive({ id: legacy.id, organizationId: ORG_ID }),
+      ).rejects.toMatchObject({ code: "department_not_found" });
+      expect(firstArchivedAt).not.toBeNull();
+      expect(await archivedAt()).toEqual(firstArchivedAt);
+    });
+  });
+
   describe("given an assignment target that does not exist in the org", () => {
     it("throws instead of silently reporting success for a missing user/team/project", async () => {
       const dept = await service().create({

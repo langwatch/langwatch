@@ -52,6 +52,10 @@ export function memoryObjectStorage(): ObjectStorage {
       slot(at);
       return Promise.resolve({ kind: "through-process" });
     },
+    uploadRoute(projectId) {
+      slot({ projectId, key: "" });
+      return Promise.resolve("through-process");
+    },
     signDownload(at, facts) {
       slot(at);
       const url = new URL(`memory://object-storage/${encodeURIComponent(at.projectId)}/${at.key}`);

@@ -174,6 +174,24 @@ describe("persistBlockToRc", () => {
     expect(content).toMatch(/# <<< langwatch end <<</);
   });
 
+  /** @scenario "The shell rc carrying a tool's ingest key is made owner-only" */
+  it.skipIf(process.platform === "win32")(
+    "narrows an rc file everyone could read to its owner",
+    () => {
+      const target = rcPath("zsh");
+      fs.writeFileSync(target, 'alias g="git"\n', { mode: 0o644 });
+      fs.chmodSync(target, 0o644);
+
+      persistBlockToRc(
+        "zsh",
+        'gemini() { OTEL_EXPORTER_OTLP_HEADERS="Bearer ik-lw-x" command gemini; }',
+      );
+
+      expect(fs.statSync(target).mode & 0o777).toBe(0o600);
+      expect(fs.readFileSync(target, "utf8")).toMatch(/^alias g="git"\n/);
+    },
+  );
+
   it("appends without disturbing existing rc content", () => {
     const target = rcPath("zsh");
     fs.writeFileSync(target, 'alias g="git"\nplugins=(z)');

@@ -43,6 +43,8 @@ export type ExtractorContext = {
 export type LogExtractorContext = {
   bag: CanonicalLogRecordStore;
   out: CanonicalAttributes;
+  /** The record's resource, read-only, for declarations such as `langwatch.session.id`. */
+  resourceAttributes?: CanonicalAttributes;
   recordRule: (ruleId: string) => void;
   setAttr: (key: string, value: unknown) => void;
   setAttrIfAbsent: (key: string, value: unknown) => void;

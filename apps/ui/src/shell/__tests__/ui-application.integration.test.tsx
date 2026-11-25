@@ -14,7 +14,7 @@ import type { RouteObject } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { uiRouteTable } from "../ui-route-table";
+import { uiMountedRouteTable } from "../ui-route-table";
 
 const publicAppConfig: UiPublicTelemetry = {
   mode: "test",
@@ -57,7 +57,7 @@ class StubSession extends UiSession {
 /** The host's registry: one loader per page key the route table names; layouts pass through. */
 function hostLoaders(page: ComponentType): UiPageLoaderRegistry {
   const registry: Record<string, () => Promise<{ default: ComponentType }>> = {};
-  for (const key of uiRoutePageKeys(uiRouteTable)) {
+  for (const key of uiRoutePageKeys(uiMountedRouteTable)) {
     const component = key.startsWith("layouts/") ? Outlet : page;
     registry[key] = async () => ({ default: component });
   }
@@ -74,7 +74,7 @@ function applicationOf({
   return createUiApplication({
     providers,
     pages: {
-      table: uiRouteTable,
+      table: uiMountedRouteTable,
       shellLayouts: {
         auth: async () => ({ default: () => <Outlet /> }),
         chrome: async () => ({ default: () => <Outlet /> }),
