@@ -55,15 +55,6 @@ function renderDialog(
   return host;
 }
 
-/** A clipboard write the test resolves by hand, so it can land after the dialog has closed. */
-function pendingCopy(): { promise: Promise<boolean>; resolve: (ok: boolean) => void } {
-  let resolve!: (ok: boolean) => void;
-  const promise = new Promise<boolean>((done) => {
-    resolve = done;
-  });
-  return { promise, resolve };
-}
-
 function useInCodeSection(): HTMLElement {
   return screen.getByRole("region", { name: "Use in Code" });
 }
@@ -470,34 +461,41 @@ describe("given a token has just been minted", () => {
         "the .env box",
         async () => within(await boxLabelled(".env")).getByRole("button", { name: /copy/i }),
       ],
+      ["the config block", async () => screen.findByRole("button", { name: /copy config/i })],
     ])("schedules no reset and logs nothing when %s resolves after unmount", async (_, button) => {
       const host = renderDialog();
-      const pending = pendingCopy();
-      const clipboard = vi.spyOn(host, "copyToClipboard").mockReturnValue(pending.promise);
+      const settle = host.deferNextCopy();
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
       const timerSpy = vi.spyOn(globalThis, "setTimeout");
-      fireEvent.click(await button());
-      expect(clipboard).toHaveBeenCalledTimes(1);
+      try {
+        fireEvent.click(await button());
+        expect(host.copies).toHaveLength(1);
 
-      cleanup();
-      timerSpy.mockClear();
-      await act(async () => {
-        pending.resolve(true);
-        await pending.promise;
-        await vi.advanceTimersByTimeAsync(2000);
-      });
+        cleanup();
+        timerSpy.mockClear();
+        await act(async () => {
+          settle(true);
+          await vi.advanceTimersByTimeAsync(2000);
+        });
 
-      expect(timerSpy).not.toHaveBeenCalledWith(expect.any(Function), 2000);
-      expect(errorSpy).not.toHaveBeenCalled();
-      errorSpy.mockRestore();
-      timerSpy.mockRestore();
+        expect(timerSpy).not.toHaveBeenCalledWith(expect.any(Function), 2000);
+        expect(errorSpy).not.toHaveBeenCalled();
+      } finally {
+        errorSpy.mockRestore();
+        timerSpy.mockRestore();
+      }
     });
 
     /** @scenario Copying twice restarts the reset window */
-    it("keeps the tick past the first window when copied again, then clears it after the second", async () => {
+    it.each([
+      [
+        "the .env box",
+        async () => within(await boxLabelled(".env")).getByRole("button", { name: /copy/i }),
+      ],
+      ["the config block", async () => screen.findByRole("button", { name: /copy config/i })],
+    ])("restarts the reset window for %s when copied again", async (_, button) => {
       renderDialog();
-      const box = await boxLabelled(".env");
-      const copyButton = within(box).getByRole("button", { name: /copy/i });
+      const copyButton = await button();
       const isChecked = () => copyButton.querySelector("svg.lucide-check") !== null;
 
       fireEvent.click(copyButton);
