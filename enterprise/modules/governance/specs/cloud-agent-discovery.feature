@@ -196,6 +196,14 @@ Feature: Cloud agent discovery with shadow and dormant agents
     When the registry reconciles
     Then the entry is dormant and a "governance.agent.versioned" event records it
 
+  @unit @integration
+  Scenario: An entry stored before dormancy existed turns dormant without a new version
+    Given a registry entry stored by a release that did not store the dormant flag
+    And the agent has had no traffic for the dormancy window
+    When the registry reconciles
+    Then the entry is dormant at the same version
+    And the registry appends no event
+
   @unit
   Scenario: A listed agent younger than the dormancy window is not dormant
     Given a listed Bedrock agent created 3 days ago with no traffic
@@ -276,6 +284,63 @@ Feature: Cloud agent discovery with shadow and dormant agents
     Given the registry holds a governed, a shadow and a dormant entry
     When GET /api/governance/registry/agents is asked with posture "dormant"
     Then only the dormant entry is returned
+
+  # Source form
+
+  @integration
+  Scenario: The AWS source form refuses a region code before it adds it
+    When an admin types "not-a-region" in the regions of an AWS source
+    Then the form says to use a region code such as eu-west-1 and adds nothing
+    When the admin types "eu-north-1" and picks the suggested "us-east-1"
+    Then both are added to the regions
+
+  @integration
+  Scenario: An AWS source holding a value that is not a region code says to remove it
+    Given an AWS source whose regions hold "mars-1"
+    When an admin opens its form
+    Then the form says "mars-1" is not a region code and must be removed to save
+
+  @integration
+  Scenario: The Google Cloud source form adds and removes project rows
+    When an admin adds a second project row with no location
+    Then that row asks for a project id and a location
+    When the admin removes the second row
+    Then only the first project and location remain
+
+  @integration
+  Scenario: The AWS connection picker lists the organisation's connections
+    Given the organisation holds a key pair connection and a role connection
+    When an admin opens the AWS connection picker
+    Then each connection is offered by name with its role or the key it ends with
+
+  @integration
+  Scenario: The AWS connection picker says when the connections did not load and reads them again
+    Given the AWS connections read fails
+    When the admin asks to try again
+    Then the connections are read again and the picker is offered
+
+  @integration
+  Scenario: The AWS connection picker adds a connection without leaving the form and picks it
+    When an admin adds an AWS connection from the picker
+    Then the new connection is created and picked for the source
+    And cancelling the new connection leaves the source's connection unchanged
+
+  @integration
+  Scenario: The dormancy window control says when the window did not load and reads it again
+    Given the registry settings read fails
+    When the admin asks to retry
+    Then the saved dormancy window is shown
+
+  @integration
+  Scenario: The dormancy window control opens with the saved window and saves a new one
+    Given the organisation saved a dormancy window of 30 days
+    When an admin opens the dormancy window control and saves 14 days
+    Then the control shows 14 days and the agents are read again
+
+  @integration
+  Scenario: The dormancy window control refuses a window outside 1 to 365 days
+    When an admin types 400 days in the dormancy window control
+    Then the control asks for a whole number from 1 to 365 and sends nothing
 
   # Test connection
 

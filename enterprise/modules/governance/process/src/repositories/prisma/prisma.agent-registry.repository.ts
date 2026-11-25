@@ -131,6 +131,11 @@ function eventPageOf({
   };
 }
 
+/** Whether the row was written by a release that stores the dormant flag. */
+function isStoredWithDormancy(value: Prisma.JsonValue): boolean {
+  return value !== null && typeof value === "object" && !Array.isArray(value) && "dormant" in value;
+}
+
 function entryOf(value: Prisma.JsonValue): AgentRegistryEntry {
   return storedRegistryEntryOf(value);
 }
@@ -240,7 +245,13 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
           where: { organizationId },
           select: { id: true, sourceKey: true, fingerprint: true, entry: true },
         });
-        const changes = plan(rows.map((row) => ({ ...row, entry: entryOf(row.entry) })));
+        const changes = plan(
+          rows.map((row) => ({
+            ...row,
+            entry: entryOf(row.entry),
+            dormancyBaselined: isStoredWithDormancy(row.entry),
+          })),
+        );
         const baselined = await transaction.agentRegistryBaseline.findUnique({
           where: { organizationId },
           select: { organizationId: true },

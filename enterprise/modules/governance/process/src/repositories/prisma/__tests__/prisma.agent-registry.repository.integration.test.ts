@@ -375,6 +375,50 @@ describe.skipIf(!connection)("PrismaAgentRegistryRepository", () => {
     });
   });
 
+  describe("given an entry a release before the dormant flag stored", () => {
+    /** @scenario "An entry stored before dormancy existed turns dormant without a new version" */
+    it("stores its first dormancy at the same version and appends no event", async () => {
+      const organizationId = newOrganization();
+      await reconcile({ organizationId, drafts: [draft("idle")], at: "2026-11-10T00:00:00Z" });
+      const row = await prisma().agentRegistryEntry.findFirstOrThrow({
+        where: { organizationId, sourceKey: "langwatch:idle" },
+        select: { id: true, entry: true },
+      });
+      const {
+        dormant: _dormant,
+        posture: _posture,
+        platform: _platform,
+        labels: _labels,
+        owner_label: _ownerLabel,
+        ...stored
+      } = row.entry as Record<string, unknown>;
+      await prisma().agentRegistryEntry.updateMany({
+        where: { organizationId, id: row.id },
+        data: { entry: JSON.parse(JSON.stringify(stored)) },
+      });
+      const eventsBefore = await prisma().agentRegistryEvent.count({ where: { organizationId } });
+
+      const appended = await reconcile({
+        organizationId,
+        drafts: [{ ...draft("idle"), dormant: true }],
+        at: "2026-12-20T00:00:00Z",
+      });
+
+      expect(appended).toEqual([]);
+      const entry = await repository().getEntry({ organizationId, id: row.id });
+      expect([entry.version, entry.dormant, entry.posture]).toEqual([1, true, "dormant"]);
+      await expect(prisma().agentRegistryEvent.count({ where: { organizationId } })).resolves.toBe(
+        eventsBefore,
+      );
+      const next = await reconcile({
+        organizationId,
+        drafts: [{ ...draft("idle"), dormant: true }],
+        at: "2026-12-21T00:00:00Z",
+      });
+      expect(next).toEqual([]);
+    });
+  });
+
   describe("given an event another release wrote with a type this release does not know", () => {
     /** @scenario An event another release wrote with a type this release does not know is left out of the feed and versions */
     it("leaves it out of the feed, the versions and the undelivered events, and pages past it", async () => {

@@ -20,6 +20,8 @@ export type StoredRegistryEntry = {
   sourceKey: string;
   fingerprint: string;
   entry: AgentRegistryEntry;
+  /** False for a row stored before the dormant flag existed; absent reads as stored with it. */
+  dormancyBaselined?: boolean;
 };
 
 /** A row to write: the entry as it now stands. */
@@ -275,6 +277,8 @@ function planObserved(
   const candidate = { ...observed, last_seen_at: lastSeenAt };
   const fingerprint = registryFingerprint(candidate);
   const row = { id: held.id, sourceKey: held.sourceKey, fingerprint, isNew: false };
+  const baseline = dormancyBaselineOf({ held, candidate, row });
+  if (baseline) return baseline;
 
   if (fingerprint === held.fingerprint && previous.status === "active") {
     if (candidate.last_seen_at === previous.last_seen_at) return { writes: [], events: [] };
@@ -296,6 +300,33 @@ function planObserved(
     events.push(event({ ...facts, type: "governance.agent.tool_deprecated", tool }, context));
   }
   return { writes: [{ ...row, entry: candidate }], events };
+}
+
+/**
+ * A row stored before the dormant flag existed takes its first dormant flag as a baseline, not a
+ * change: written with the flag and its fingerprint, same version, no event, so a deploy versions
+ * and announces no agent for a dormancy it never saw happen.
+ */
+function dormancyBaselineOf({
+  held,
+  candidate,
+  row,
+}: {
+  held: StoredRegistryEntry;
+  candidate: AgentRegistryEntry;
+  row: Omit<RegistryEntryWrite, "entry">;
+}): RegistryChangeSet | null {
+  const previous = held.entry;
+  if (held.dormancyBaselined !== false || previous.status !== "active") return null;
+  if (!candidate.dormant || previous.dormant) return null;
+  if (registryFingerprint({ ...candidate, dormant: false }) !== held.fingerprint) return null;
+  const entry: AgentRegistryEntry = {
+    ...previous,
+    dormant: true,
+    posture: registryPostureOf({ shadow: previous.shadow, dormant: true }),
+    last_seen_at: candidate.last_seen_at,
+  };
+  return { writes: [{ ...row, fingerprint: registryFingerprint(entry), entry }], events: [] };
 }
 
 /** Whether another reconcile committed to these rows after `readAt`. */
