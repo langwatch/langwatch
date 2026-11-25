@@ -2331,22 +2331,31 @@ export class TraceModule implements TraceApi, CollectorApp {
     // One rule for both reads (#8549): the drawer's content protections and the
     // plan's visibility window decide, and a span the viewer may not fully read
     // is refused rather than opened as an editable prompt.
+    // Narrow the proof to the link's member first, as the span detail read does, so a
+    // restriction on a member the span does not belong to cannot hide it.
+    const narrowed =
+      input.trace === undefined ? undefined : await this.authorizationForTrace(input.trace);
     const protections = await this.resolveViewerProtections({
       projectId: input.projectId,
       userId: input.viewerUserId,
-      ...(input.trace === undefined ? {} : { authorization: input.trace.authorization }),
+      ...(narrowed === undefined ? {} : { authorization: narrowed }),
     });
     if (promptStudioContentHidden(protections)) {
       throw new SpanContentWithheldError(input.spanId, "content_hidden");
     }
     const span =
-      input.trace === undefined
+      input.trace === undefined || narrowed === undefined
         ? await this.findPromptStudioSpan({
             projectId: input.projectId,
             spanId: input.spanId,
             protections,
           })
-        : await this.#tracePromptStudioSpan({ ...input, trace: input.trace, protections });
+        : await this.#tracePromptStudioSpan({
+            spanId: input.spanId,
+            trace: input.trace,
+            authorization: narrowed,
+            protections,
+          });
     if (!span) throw new SpanNotFoundError(input.spanId);
     const withheld = promptStudioSpanWithholding({ span, protections });
     if (withheld) throw new SpanContentWithheldError(input.spanId, withheld);
@@ -2356,11 +2365,13 @@ export class TraceModule implements TraceApi, CollectorApp {
   /** The prompt studio span read through a link naming its trace, attributes protected. */
   async #tracePromptStudioSpan(input: {
     spanId: string;
-    trace: { authorization: Authorization; traceId: string; tenantId?: string; occurredAtMs?: number };
+    trace: { traceId: string; occurredAtMs?: number };
+    /** The proof already narrowed to the link's member. */
+    authorization: Authorization;
     protections: Protections;
   }): Promise<PromptStudioSpanResult | null> {
     const spans = await this.#spanReads.read("findStoredSpansByTraceId", {
-      authorization: await this.authorizationForTrace(input.trace),
+      authorization: input.authorization,
       traceId: input.trace.traceId,
       ...occurredAtHint(input.trace.occurredAtMs),
     });

@@ -7,6 +7,7 @@
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
+import type { Authorization } from "@langwatch/authorization";
 import type { Protections } from "@langwatch/trace-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
@@ -56,13 +57,19 @@ const llmSpan: StoredTraceSpan = {
   statusMessage: null,
 };
 
+const MEMBER_PROJECT = "member-project";
 async function callerWith(protections: Protections) {
   const reads: string[] = [];
+  const proofsResolvedAgainst: Authorization[] = [];
   const summaries = MemoryTraceSummaryRepository.create();
   await summaries.upsert({ ...createInitState(), traceId: TRACE_ID }, PROJECT);
+  const summary = TraceSummaryService.create({ repository: summaries });
+  // The proof narrowed to the member holding the trace, distinct from the viewer's own proof.
+  const memberProof = ownProof({ projectId: MEMBER_PROJECT });
+  summary.getTraceAuthorization = async () => memberProof;
   const app = createTraceAppHarness({
     traces: {
-      summary: TraceSummaryService.create({ repository: summaries }),
+      summary,
       spans: createApiFixture<TraceAppDependencies["traces"]["spans"]>({
         findStoredSpansByTraceId: async () => {
           reads.push("trace-named");
@@ -83,7 +90,10 @@ async function callerWith(protections: Protections) {
       }),
     },
     protections: createApiFixture<NonNullable<TraceAppDependencies["protections"]>>({
-      resolve: async () => protections,
+      resolve: async ({ authorization }) => {
+        if (authorization) proofsResolvedAgainst.push(authorization);
+        return protections;
+      },
     }),
   });
 
@@ -102,7 +112,7 @@ async function callerWith(protections: Protections) {
   const caller = createTrpcRuntime<TestContext>({ root: trpc, procedure: trpc.procedure, members })
     .mount(spansTrpcTransport, () => app)
     .createCaller({ actor: { id: "ana" } });
-  return { caller, reads };
+  return { caller, reads, proofsResolvedAgainst, memberProof };
 }
 
 const LINKS = {
@@ -197,6 +207,16 @@ describe("Feature: the playground reads a span through the viewer's protections"
         expect(JSON.stringify(span)).not.toContain("Alice");
         expect(span.llmConfig.model).toBe("gpt-test");
       });
+    });
+  });
+});
+describe("Feature: the playground resolves protections for the member holding the trace", () => {
+  describe("given a link naming the trace", () => {
+    /** @scenario "A restriction on another member of the proof does not hide the span" */
+    it("resolves the protections against the proof narrowed to that member", async () => {
+      const { caller, proofsResolvedAgainst, memberProof } = await callerWith(FULL);
+      await caller.getForPromptStudio(LINKS["a link naming the trace"]);
+      expect(proofsResolvedAgainst).toEqual([memberProof]);
     });
   });
 });
