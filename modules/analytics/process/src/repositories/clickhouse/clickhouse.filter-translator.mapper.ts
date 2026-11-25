@@ -183,7 +183,7 @@ export function translateFilter({
   const unapplicable = findUnapplicableFilterValue({
     field,
     values,
-    depth: subkey ? 2 : key ? 1 : 0,
+    depth: [key, subkey].filter(Boolean).length,
   });
   if (unapplicable) throw analyticsFilterRefusal(unapplicable);
 

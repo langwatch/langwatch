@@ -125,7 +125,7 @@ export class AggregateUnattendedReadError extends HandledError {
 }
 
 /** A boolean filter value the query cannot apply, as the refusal reports it. */
-export const analyticsFilterValueRefusalSchema = z.object({
+const analyticsFilterValueRefusalSchema = z.object({
   filterField: z.string(),
   filterName: z.string(),
   received: z.string(),
@@ -134,7 +134,7 @@ export const analyticsFilterValueRefusalSchema = z.object({
 export type AnalyticsFilterValueRefusal = z.infer<typeof analyticsFilterValueRefusalSchema>;
 
 /** A keyed filter sent without its key, as the refusal reports it. */
-export const analyticsFilterKeyRefusalSchema = z.object({
+const analyticsFilterKeyRefusalSchema = z.object({
   filterField: z.string(),
   example: z.string(),
 });
