@@ -9,6 +9,10 @@ const unset = {
   microsoftGraphApiBase: undefined,
   databricksWorkspaceBase: undefined,
   dataverseEnvironmentBase: undefined,
+  bedrockAgentEndpoint: undefined,
+  bedrockAgentCoreControlEndpoint: undefined,
+  googleOauthTokenBase: undefined,
+  vertexAiApiBase: undefined,
 };
 
 describe("vendorBasesOf()", () => {

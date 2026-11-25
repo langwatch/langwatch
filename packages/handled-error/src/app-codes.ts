@@ -490,6 +490,7 @@ export const APP_ERROR_CODES = [
   "langy_api_key_no_langy_access",
   "langy_api_key_unowned",
   "langy_api_request_invalid",
+  "langy_attachment_refused",
   "langy_codex_plan_limit",
   "langy_codex_session_expired",
   "langy_confirmation_required",
