@@ -307,6 +307,142 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "nurturing:replay-user-erasure-marks",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Marks every person erased in user's log, before the keys copy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-identity-erasure-marks",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Marks every person erased in identity's log, before the keys copy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-virtual-keys",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's key copy from gateway's key lifecycle log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-evaluation-days",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's evaluation days from evaluation's log since 2026-10-19.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-organization-plans",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's plan copy from billing's subscription log; sends nothing.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-project-placements",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's project placement copy from project's created facts at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-organizations-created",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's organization creation copy from organization's log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-organization-admins",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills each organization's admin and seeded flag from project's created facts at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-organization-members",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's member copy from organization's member facts at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-auth-members",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's member copy from auth's single sign-on joins at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-personal-owners-from-organization",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's personal-project owners from organization's personal-workspace log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-personal-owners-from-project",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's personal-project owners from the owners project listed at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-traced-projects-from-trace",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's traced projects from trace's project_traced log at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-traced-projects-from-project",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's traced projects from the first messages project listed at deploy.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-last-traces",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills each organization's latest trace time from trace's facts since the day before the release.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-trace-day-spans",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's trace days from trace's span log, one counting window back.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-trace-day-failures",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's failed-trace days from trace's trace_failed log, one counting window back.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "ops:copy-automation-migration-state",
     "kind": "data",
     "mode": "blocking",
@@ -364,6 +500,14 @@
     "mode": "background",
     "owner": "organization",
     "description": "Records every organization's seat holders as they stand, to open its seat peak.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "organization:list-member-facts",
+    "kind": "data",
+    "mode": "background",
+    "owner": "organization",
+    "description": "Lists every organization's active members, neither disabled nor deactivated, with when each joined.",
     "needsOldWritersGone": true
   },
   {
@@ -515,6 +659,14 @@
     "mode": "background",
     "owner": "trace",
     "description": "Refolds the last 62 days of traces so each carries its evaluation rows for the stock widgets.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:replay-trace-analytics-managed-prompt-version",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Refolds the last 122 days of trace analytics rows so they carry the managed prompt version each trace last used.",
     "needsOldWritersGone": true
   },
   {

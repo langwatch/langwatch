@@ -13,6 +13,9 @@
       "path": "./apps/backend"
     },
     {
+      "path": "./apps/docs"
+    },
+    {
       "path": "./apps/haven-web"
     },
     {

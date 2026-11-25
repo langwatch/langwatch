@@ -59,7 +59,8 @@ export interface ChartFrameLogEntry {
 export interface CreateFrameBridgeOptions {
   readonly iframe: HTMLIFrameElement;
   readonly executeQuery: ChartFrameExecuteQuery;
-  readonly dashboardContext: ChartFrameDashboardContext;
+  /** Read when the frame loads, so a theme switched since the bridge began sends its colours. */
+  readonly readDashboardContext: () => ChartFrameDashboardContext;
   /** Author-declared parameter defaults, delivered once on `lw:init`. */
   readonly params?: ChartFrameParamsSnapshot;
   /**
@@ -135,7 +136,9 @@ export class FrameBridgeSession implements FrameBridge {
     this.#disposed = true;
     if (this.#watchdog !== null) clearInterval(this.#watchdog);
     this.#options.iframe.removeEventListener("load", this.#onFrameLoad);
-    document.removeEventListener("visibilitychange", this.#onVisibilityChange);
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", this.#onVisibilityChange);
+    }
     for (const abort of this.#activeAborts.values()) abort.abort();
     this.#activeAborts.clear();
     this.#port?.close();
@@ -168,7 +171,7 @@ export class FrameBridgeSession implements FrameBridge {
     iframe.contentWindow.postMessage(
       {
         type: "lw:init",
-        dashboardContext: this.#options.dashboardContext,
+        dashboardContext: this.#options.readDashboardContext(),
         params: this.#options.params ?? {},
         source: this.#options.source,
       },
@@ -185,6 +188,11 @@ export class FrameBridgeSession implements FrameBridge {
 
   /** Suspended while hidden: background throttling hits both sides, so silence proves nothing. */
   #checkHeartbeat(): void {
+    // No document means the page is gone; stop the watchdog instead of reading it.
+    if (typeof document === "undefined") {
+      this.dispose();
+      return;
+    }
     if (document.visibilityState === "hidden") return;
     if (
       nowInstant().epochMilliseconds - this.#lastHeartbeatAt <=

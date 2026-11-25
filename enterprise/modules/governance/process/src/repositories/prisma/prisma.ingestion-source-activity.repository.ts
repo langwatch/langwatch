@@ -39,7 +39,9 @@ const ORIGIN_KIND_VALUE = GOVERNANCE_ORIGIN_KIND_VALUE;
  * A row a source wrote itself rather than a trace mirror: pullers write under a synthetic `pull:`
  * trace id, and a Security Lake source writes with no trace id (a pushed event has none either).
  */
-const PULLED_ROW = `(startsWith(TraceId, 'pull:') OR (TraceId = '' AND SourceType = '${SECURITY_LAKE_SOURCE_TYPE}'))`;
+const PULLED_ROW = `(startsWith(TraceId, 'pull:') OR (TraceId = '' AND SourceType = {securityLakeSourceType:String}))`;
+/** The parameter `PULLED_ROW` binds; every query that embeds it passes this too. */
+const PULLED_ROW_PARAMS = { securityLakeSourceType: SECURITY_LAKE_SOURCE_TYPE };
 
 const ZERO_PULLED_USAGE = {
   cost_usd: "0",
@@ -319,6 +321,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         GROUP BY sourceId
       `,
       query_params: {
+        ...PULLED_ROW_PARAMS,
         tenantId: args.tenantId,
         since: args.since,
         sourceIds: args.sourceIds,
@@ -374,6 +377,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         LIMIT {limit:UInt32}
       `,
       query_params: {
+        ...PULLED_ROW_PARAMS,
         tenantId: input.tenantId,
         sourceId: input.sourceId,
         beforeMs: input.beforeMs,
@@ -477,6 +481,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
           )
       `,
       query_params: {
+        ...PULLED_ROW_PARAMS,
         tenantId: args.tenantId,
         since24h: args.since24h,
         since7d: args.since7d,

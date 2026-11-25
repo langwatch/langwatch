@@ -89,6 +89,7 @@ export const RETENTION_CLASS_BY_AGGREGATE_TYPE: Record<string, EventLogRetention
   gateway_connect_managed_key: "indefinite",
   github_installation: "indefinite",
   global: "indefinite",
+  governance_ingestion_source: "indefinite",
   governance_subject: "indefinite",
   guided_onboarding: "indefinite",
   instant_eval_judge_spend: "indefinite",

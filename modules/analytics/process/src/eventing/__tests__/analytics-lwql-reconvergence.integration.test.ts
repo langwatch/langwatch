@@ -15,6 +15,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { LangWatchQLCollectionBindingService } from "../../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
+import { LangWatchQLPostgresGapsService } from "../../features/provisioning/services/langwatch-ql-postgres-gaps.service.ts";
 import { LWQL_POSTGRES_READER_ROLE } from "../../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
 import {
   type LwqlAppOwnedDrift,
@@ -27,7 +28,10 @@ import {
   startLangWatchQLPostgres,
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
-import type { LwqlProvisioningDatabase } from "../../repositories/langwatch-ql-postgres.repository.ts";
+import type {
+  LwqlProvisioningDatabase,
+  LwqlScopedViewState,
+} from "../../repositories/langwatch-ql-postgres.repository.ts";
 import { MemoryLwqlUnconfirmedSinceRepository } from "../../repositories/memory/memory.langwatch-ql-unconfirmed-since.repository.ts";
 import { PrismaLangWatchQLPostgresRepository } from "../../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
@@ -47,6 +51,7 @@ class AllowTestQueries extends PrismaQueryGuard {
 }
 
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
+const postgresGaps = LangWatchQLPostgresGapsService.create();
 
 const collectionBinding = LangWatchQLCollectionBindingService.create();
 const ENGINE_TABLES = LangWatchQLCatalogShapesService.create()
@@ -54,6 +59,13 @@ const ENGINE_TABLES = LangWatchQLCatalogShapesService.create()
   .map((view) => view.sourceTable);
 const READER_PASSWORD = "reader-reconvergence-secret";
 const converged: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], isKeyMapMissing: false };
+/** This suite's PostgreSQL has no scoped-reader group. */
+const NO_GROUP: LwqlScopedViewState = {
+  groupExists: false,
+  scopedSchema: "absent",
+  groupOnShared: [],
+  copies: [],
+};
 
 function repositoryOver(client: ClickHouseClient) {
   return ClickHouseLangWatchQLProvisioningRepository.create({
@@ -195,15 +207,15 @@ describe("given a rendered install whose config store has not mounted the named 
         role: postgres.readerRole,
         views,
       });
-      expect(selfProvisioning.findPostgresGaps({ found: granted })).toEqual([]);
+      expect(postgresGaps.findGaps({ found: granted, scoped: NO_GROUP })).toEqual([]);
 
       const absent = await repository.findApprovedViews({
         schema: "public",
         role: "lwql_role_that_does_not_exist",
         views,
       });
-      expect(selfProvisioning.findPostgresGaps({ found: absent })).toEqual(
-        views.map((view) => ({ view, absent: false })),
+      expect(postgresGaps.findGaps({ found: absent, scoped: NO_GROUP })).toEqual(
+        views.map((view) => ({ kind: "shared", view, absent: false })),
       );
     });
   });
@@ -223,8 +235,8 @@ describe("given a rendered install whose config store has not mounted the named 
       const before = await findLwqlAppOwnedDrift({ database: database(), plan: plan() });
       expect(before.clickHouse).toEqual(expect.arrayContaining(ENGINE_TABLES));
       expect(before.postgres).toEqual([
-        { view: dropped, absent: true },
-        { view: revoked, absent: false },
+        { kind: "shared", view: dropped, absent: true },
+        { kind: "shared", view: revoked, absent: false },
       ]);
 
       for (let checks = 0; checks < 2; checks++) {

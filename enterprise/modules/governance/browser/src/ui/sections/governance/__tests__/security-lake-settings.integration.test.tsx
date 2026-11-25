@@ -293,6 +293,45 @@ describe("SecurityLakeHealthPanel", () => {
   });
 });
 
+describe("given a source whose last read wrote no events", () => {
+  const healthAfter = ({ lastReadAt }: { lastReadAt: number | null }) => ({
+    sourceId: "src_1",
+    status: "active" as const,
+    lastError: null,
+    health: {
+      lastReadAt,
+      lagMs: null,
+      runs: lastReadAt === null ? 0 : 1,
+      messages: 0,
+      objects: 0,
+      rows: 0,
+      written: 0,
+      dropped: 0,
+      invalid: 0,
+      retried: 0,
+      poisonCount: 0,
+      poison: [],
+    },
+  });
+
+  /** @scenario "The health card says a read wrote no new events rather than showing no lag" */
+  it("says there were no new events instead of a lag of None", () => {
+    render(
+      <SecurityLakeHealthPanel health={healthAfter({ lastReadAt: Date.UTC(2026, 10, 17) })} />,
+    );
+
+    expect(screen.getByText("No new events")).toBeInTheDocument();
+    expect(screen.queryByText("None")).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The health card says a read wrote no new events rather than showing no lag" */
+  it("says the source was not read yet before its first read", () => {
+    render(<SecurityLakeHealthPanel health={healthAfter({ lastReadAt: null })} />);
+
+    expect(screen.getAllByText("Not read yet")).toHaveLength(2);
+  });
+});
+
 describe("SecurityLakeCallersList", () => {
   /** @scenario The settings list each caller without traces with its models and Regions */
   it("lists each principal with its models and Regions", () => {

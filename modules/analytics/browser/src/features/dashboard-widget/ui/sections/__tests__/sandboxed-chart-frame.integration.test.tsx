@@ -52,6 +52,12 @@ const ui = (
   </DesignSystemProvider>
 );
 
+/** The context the bridge the frame built last sends when its frame loads. */
+function lastBridgeContext(): unknown {
+  const [options] = bridgeMock.mock.lastCall as [{ readDashboardContext: () => unknown }];
+  return options.readDashboardContext();
+}
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -66,14 +72,10 @@ describe("given a sandboxed chart frame", () => {
       const iframe = container.querySelector("iframe");
       expect(iframe?.hasAttribute("src")).toBe(false);
       expect(iframe?.hasAttribute("srcdoc")).toBe(false);
-      expect(bridgeMock).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          source: "A",
-          dashboardContext: expect.objectContaining({
-            colors: expect.objectContaining({ "bg.card": "#123456", "chart.1": "#123456" }),
-          }),
-        }),
-      );
+      expect(bridgeMock).toHaveBeenLastCalledWith(expect.objectContaining({ source: "A" }));
+      expect(lastBridgeContext()).toMatchObject({
+        colors: expect.objectContaining({ "bg.card": "#123456", "chart.1": "#123456" }),
+      });
     });
   });
 
@@ -100,9 +102,7 @@ describe("given a sandboxed chart frame", () => {
       const second = container.querySelector("iframe");
 
       expect(second).not.toBe(first);
-      expect(bridgeMock).toHaveBeenLastCalledWith(
-        expect.objectContaining({ dashboardContext: expect.objectContaining({ theme: "dark" }) }),
-      );
+      expect(lastBridgeContext()).toMatchObject({ theme: "dark" });
     });
   });
 

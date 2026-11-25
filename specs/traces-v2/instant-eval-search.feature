@@ -357,6 +357,21 @@ Feature: Instant Evals inside the Trace Explorer
       Then the list and the facets are read one last time
       And only after they answer do the bar leave, the chip read partial and the counts read the list's total
 
+    # The end of a run reaches the page as a read hint, and the hint can land before the run's
+    # own row says it ended. The run has no later event to hint again, so the page asks.
+    @integration
+    Scenario: A run waiting on its end is read again until it says it ended
+      Given a run that has judged every row, or one the reader asked to stop, that still reads as judging
+      When no hint brings a read that says it ended
+      Then the run is read again 1, 2 and 4 seconds later, then every 8 seconds, for at most two minutes
+      And as soon as a read says it ended, the bar settles as it does after any other end
+
+    @unit
+    Scenario: Only a run waiting on its end is read on a timer
+      Given a run still judging with rows left and no stop asked
+      Then it is never read on a timer, only when a hint arrives
+      And a run that ended, or one waited on for two minutes, is not read on a timer either
+
     @unit
     Scenario: A run that ended long before the page opened is settled at once
       Given a run that finished more than fifteen seconds ago
