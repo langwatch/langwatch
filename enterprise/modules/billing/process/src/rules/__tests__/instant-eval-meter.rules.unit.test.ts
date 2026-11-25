@@ -121,4 +121,19 @@ describe("usageBilledSinceInMonth", () => {
       ).toEqual({ outcome: "since", startMs: utcMs("2026-02-10") });
     });
   });
+
+  describe("given a subscription that ended at the first instant of February", () => {
+    /** @scenario "Free use before an upgrade mid-month is not reported" */
+    it("does not count it, since a period's end is exclusive, and starts on the 10th", () => {
+      expect(
+        usageBilledSinceInMonth({
+          billingMonth: FEBRUARY,
+          periods: [
+            { startMs: utcMs("2026-02-10"), endMs: null },
+            { startMs: utcMs("2025-06-01"), endMs: utcMs("2026-02-01") },
+          ],
+        }),
+      ).toEqual({ outcome: "since", startMs: utcMs("2026-02-10") });
+    });
+  });
 });

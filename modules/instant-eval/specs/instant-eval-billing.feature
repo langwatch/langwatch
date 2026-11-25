@@ -267,6 +267,13 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       And spend since the last report is sent as a positive delta
       # The window only ever starts earlier within a month, so the floor never swallows new spend.
 
+    @integration
+    Scenario: The billing lookup reads every growth-seat period a month can overlap, newest first
+      Given an organization with a live subscription, an ended one with both dates, a cancelled one with no start and a pending one with no end
+      When its billing lookup is read from Postgres
+      Then the periods are the live one and the ended one, newest start first
+      And a live subscription with no recorded start comes before every dated one
+
     @unit
     Scenario: A subscription that cannot be read holds the Instant Eval usage and retries
       Given an organization whose subscription cannot be read from Stripe

@@ -229,11 +229,13 @@ function totalWithinContractCeiling({
  */
 function notBelowReportedInNarrowedWindow({
   measured,
+  organizationId,
   billingMonth,
   usageBilledSinceMs,
   lastReportedTotal,
 }: {
   measured: BillableEventsTotalResult;
+  organizationId: string;
   billingMonth: string;
   usageBilledSinceMs: number | null;
   lastReportedTotal: number;
@@ -242,8 +244,20 @@ function notBelowReportedInNarrowedWindow({
   const narrowed =
     instantEvalWindowMs({ billingMonth, usageBilledSinceMs }).fromMs >
     billingMonthWindowMs(billingMonth).fromMs;
+  if (!narrowed || measured.total >= lastReportedTotal) return measured;
 
-  return narrowed ? { ...measured, total: Math.max(measured.total, lastReportedTotal) } : measured;
+  logger.info(
+    {
+      organizationId,
+      billingMonth,
+      meter: INSTANT_EVAL_USD_EVENT_NAME,
+      measured: measured.total,
+      reported: lastReportedTotal,
+    },
+    "the subscription window read less than was reported; keeping the reported total",
+  );
+
+  return { ...measured, total: lastReportedTotal };
 }
 
 /**
@@ -304,6 +318,7 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
               billingMonth,
               usageBilledSinceMs,
             }),
+            organizationId,
             billingMonth,
             usageBilledSinceMs,
             lastReportedTotal,

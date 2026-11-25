@@ -1023,6 +1023,16 @@ describe("ReportUsageForMonthCommand", () => {
       expect(events).toEqual([]);
       expect(checkpoint).toMatchObject({ lastReportedTotal: 15_000, pendingReportedTotal: null });
       expect(mockSelfDispatch).not.toHaveBeenCalled();
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        {
+          organizationId: "org-1",
+          billingMonth: "2026-02",
+          meter: "langwatch_instant_eval_usd",
+          measured: 5_000,
+          reported: 15_000,
+        },
+        "the subscription window read less than was reported; keeping the reported total",
+      );
     });
 
     /** @scenario "A month already reported is not lowered by the subscription window" */

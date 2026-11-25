@@ -62,7 +62,7 @@ export function usageBilledSinceInMonth({
   const month = billingMonthWindowMs(billingMonth);
   const overlapping = periods.filter(
     ({ startMs, endMs }) =>
-      (endMs === null || endMs >= month.fromMs) && (startMs === null || startMs < month.toMs),
+      (endMs === null || endMs > month.fromMs) && (startMs === null || startMs < month.toMs),
   );
   if (overlapping.some(({ startMs }) => startMs === null)) return { outcome: "whole_month" };
   const startedLater = periods.filter(({ startMs }) => startMs !== null && startMs >= month.toMs);
