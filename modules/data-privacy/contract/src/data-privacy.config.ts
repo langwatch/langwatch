@@ -23,6 +23,14 @@ export const dataPrivacyConfig = Config.define((c) => ({
    * HTTP address, for a cluster or self-hosted service. Unset names no model.
    */
   piiRedactionModelEndpoint: c.env("PII_REDACTION_MODEL_ENDPOINT", z.string().optional()),
+  /**
+   * The split model's Lambda function ARN: where pieces of a long batch go (ADR-207). Unset, or
+   * not a Lambda function ARN, splits nothing and long batches go to Presidio.
+   */
+  piiRedactionModelSplitEndpoint: c.env(
+    "PII_REDACTION_MODEL_SPLIT_ENDPOINT",
+    z.string().optional(),
+  ),
   /** The shared deployment leaf: a self-hosted install runs the model and is never priced. */
   isSaas,
 }));

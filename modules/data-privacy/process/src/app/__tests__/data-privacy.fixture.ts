@@ -103,6 +103,7 @@ export async function createDataPrivacyTestApp({
     isSaas: true,
     langevalsEndpoint: undefined,
     piiRedactionModelEndpoint: undefined,
+    piiRedactionModelSplitEndpoint: undefined,
     ...settings,
   };
   return DataPrivacyModule.create({

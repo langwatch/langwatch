@@ -108,6 +108,7 @@ describe("given the PII redaction model wired into the module", () => {
               lambda,
               functionArn: ALIAS_ARN,
             }),
+            piiRedactionModelSplit: MemoryPresidioChannel.create(),
             dlp: MemoryGoogleDlpChannel.create(),
           }),
         });
@@ -176,6 +177,7 @@ describe("given the PII redaction model wired into the module", () => {
         channels: async () => ({
           presidio,
           piiRedactionModel: refusingModel,
+          piiRedactionModelSplit: MemoryPresidioChannel.create(),
           dlp: MemoryGoogleDlpChannel.create(),
         }),
       });

@@ -101,6 +101,7 @@ async function cloudCustomer({ free, level }: { free: boolean; level: "STRICT" |
     channels: async () => ({
       presidio: presidio.channel,
       piiRedactionModel: model.channel,
+      piiRedactionModelSplit: MemoryPresidioChannel.create(),
       dlp: MemoryGoogleDlpChannel.create(),
     }),
   });

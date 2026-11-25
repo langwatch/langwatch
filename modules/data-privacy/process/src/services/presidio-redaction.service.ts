@@ -1,13 +1,11 @@
 import { LangevalsPiiDetectionError } from "@langwatch/evaluation-contract";
-import { normalizePresidioMarkers } from "@langwatch/redaction";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
 import type { PresidioChannel } from "../channels/presidio.channel.ts";
 import {
+  clearingOfAnswer,
   PII_ANALYSIS_TEXT_BUDGET,
   presidioEntitiesFor,
-  redactSparingNamesAndPlaces,
-  type PiiClearing,
 } from "../rules/pii-analysis.rules.ts";
 import type {
   PiiAnalysisMethod,
@@ -94,7 +92,7 @@ export class PresidioRedactionService {
       if (result.status === "error") throw new Error(result.details);
       if (result.status !== "processed") return null;
       findings += findingsIn(result.raw_response);
-      const clearing = clearingOf({
+      const clearing = clearingOfAnswer({
         input: entry.input,
         rawResponse: result.raw_response,
         spareNamesAndPlaces: input.spareNamesAndPlaces?.[i] ?? false,
@@ -104,14 +102,51 @@ export class PresidioRedactionService {
     return { cleared, findings };
   }
 
+  /**
+   * The service's raw answer per text, for pieces of a split span (ADR-207): its findings and its
+   * own masked text. Aborted by `signal` or at the time cap; any refusal throws.
+   */
+  async answers(input: {
+    texts: readonly string[];
+    piiRedactionLevel: PIIRedactionLevel;
+    entities?: readonly string[] | undefined;
+    projectId?: string | undefined;
+    signal: AbortSignal;
+  }): Promise<{ findings: unknown; anonymized: unknown }[]> {
+    this.deps.metrics.analysisCalled(this.deps.method);
+    const startedAt = performance.now();
+    const outcome = await this.#detect(input);
+    this.deps.metrics.analysisObserved(performance.now() - startedAt, this.deps.method);
+    if (outcome.kind === "not_configured") throw new Error("the split model is not configured");
+    return input.texts.map((_text, i) => {
+      const result = outcome.results[i];
+      if (!result) throw new Error(`the split model returned no result for text ${i}`);
+      this.deps.metrics.analysisFinished(result.status, this.deps.method);
+      if (result.status === "error") throw new Error(result.details);
+      const response =
+        result.status === "processed" && typeof result.raw_response === "object"
+          ? (result.raw_response ?? {})
+          : {};
+      return {
+        findings: "results" in response ? response.results : [],
+        anonymized: "anonymized" in response ? response.anonymized : null,
+      };
+    });
+  }
+
   async #detect(input: {
     texts: readonly string[];
     piiRedactionLevel: PIIRedactionLevel;
     entities?: readonly string[] | undefined;
     projectId?: string | undefined;
+    signal?: AbortSignal | undefined;
   }) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.deps.timeoutMs);
+    const outer = input.signal;
+    const abort = () => controller.abort();
+    if (outer?.aborted) controller.abort();
+    outer?.addEventListener("abort", abort, { once: true });
     const startedAt = performance.now();
     try {
       return await this.deps.presidio.detect({
@@ -128,35 +163,9 @@ export class PresidioRedactionService {
       throw error;
     } finally {
       clearTimeout(timeout);
+      outer?.removeEventListener("abort", abort);
     }
   }
-}
-
-/**
- * How one analysed input was cleared. A flagged input whose findings cannot be placed keeps
- * Presidio's own full redaction rather than going unredacted.
- */
-function clearingOf({
-  input,
-  rawResponse,
-  spareNamesAndPlaces,
-}: {
-  input: string;
-  rawResponse: unknown;
-  spareNamesAndPlaces: boolean;
-}): PiiClearing {
-  const response = typeof rawResponse === "object" && rawResponse !== null ? rawResponse : {};
-  if (spareNamesAndPlaces) {
-    const spared = redactSparingNamesAndPlaces({
-      text: input,
-      findings: "results" in response ? response.results : undefined,
-    });
-    if (spared.kind !== "unplaceable") return spared;
-  }
-  const anonymized = "anonymized" in response ? response.anonymized : undefined;
-  return typeof anonymized === "string" && anonymized
-    ? { kind: "redacted", text: normalizePresidioMarkers(anonymized) }
-    : { kind: "unchanged" };
 }
 
 /** How many findings one answer lists; their values are never read here. */

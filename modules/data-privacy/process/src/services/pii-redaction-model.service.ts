@@ -1,16 +1,29 @@
 import type { PiiLevel } from "@langwatch/data-privacy-contract";
 import { type EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { ConcurrencyLimiter } from "@langwatch/limiter";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
 import {
   batchCharactersOf,
-  isBatchTooLongForModel,
   PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS,
   PII_REDACTION_MODEL_FLAG,
 } from "../rules/pii-redaction-model.rules.ts";
+import {
+  clearSplitSpan,
+  fitsSpanBudget,
+  isPlaceablePiece,
+  PII_REDACTION_MODEL_ABORTED_SLOT_HOLD_MS,
+  PII_REDACTION_MODEL_SPAN_BUDGET_MS,
+  PII_REDACTION_MODEL_SPLIT_SLOTS,
+  type PieceAnswer,
+  planSpan,
+  type SplitCall,
+  type SplitPiece,
+  splitFindingsCount,
+} from "../rules/pii-redaction-split.rules.ts";
 import type { DataPrivacyProjectScopeService } from "./data-privacy-project-scope.service.ts";
 import type {
   PiiAnalysisMetricsOtelService,
@@ -40,6 +53,8 @@ export type PiiRedactionModelUsage = Readonly<{
   findings: number;
   outcome: "ok" | PiiRedactionModelFallbackReason;
   durationMs: number;
+  /** A split span only (ADR-207): how many calls the split model was sent. */
+  calls?: number;
   /** On an error only: the failure's class name. */
   errorName?: string;
 }>;
@@ -65,6 +80,14 @@ type ModelBreaker = Readonly<{ kind: "closed" }> | Readonly<{ kind: "open"; unti
 /** How one batch was let through the breaker: as usual, or as the one try after a cool-down. */
 type BreakerAdmission = "call" | "probe";
 
+/** The single-call model and the split model trip apart, so long spans never stop short ones. */
+type BreakerKind = "single" | "split";
+
+/** How a split span's calls ended: every answer, or the first failure that ends the span. */
+type SplitOutcome =
+  | Readonly<{ kind: "answered"; answers: PieceAnswer[]; callDurationsMs: number[] }>
+  | Readonly<{ kind: "failed"; reason: "timeout" | "throttled" | "error"; error?: unknown }>;
+
 /** One strict-analysis batch, as the redaction pass hands it to Presidio. */
 type ModelClearInput = {
   texts: readonly string[];
@@ -86,6 +109,10 @@ type ModelClearInput = {
 export class PiiRedactionModelService {
   static create(input: {
     model: PresidioRedactionService;
+    /** The split model, for pieces of a long batch (ADR-207); absent splits nothing. */
+    split?: PresidioRedactionService | undefined;
+    /** The process's split call slots; one per process, two by default (ADR-207 decision 9). */
+    splitSlots?: ConcurrencyLimiter | undefined;
     featureFlags: FeatureFlagApi;
     scopes: DataPrivacyProjectScopeService;
     /** Self-hosted, the model comes with the Enterprise license; Cloud prices it. */
@@ -112,8 +139,14 @@ export class PiiRedactionModelService {
    * when it is slow it is slow for all of them, and a per-organization breaker would pay the
    * time cap once per organization instead of once per process.
    */
-  #breaker: ModelBreaker = { kind: "closed" };
+  readonly #breakers: Record<BreakerKind, ModelBreaker> = {
+    single: { kind: "closed" },
+    split: { kind: "closed" },
+  };
   private readonly model: PresidioRedactionService;
+  private readonly split: PresidioRedactionService | undefined;
+  /** Per process: the split calls in flight, the same two slots for every span (decision 9). */
+  private readonly splitSlots: ConcurrencyLimiter;
   private readonly featureFlags: FeatureFlagApi;
   private readonly scopes: DataPrivacyProjectScopeService;
   private readonly selfHosted: boolean;
@@ -125,6 +158,8 @@ export class PiiRedactionModelService {
 
   private constructor(input: {
     model: PresidioRedactionService;
+    split?: PresidioRedactionService | undefined;
+    splitSlots?: ConcurrencyLimiter | undefined;
     featureFlags: FeatureFlagApi;
     scopes: DataPrivacyProjectScopeService;
     selfHosted: boolean;
@@ -135,6 +170,10 @@ export class PiiRedactionModelService {
     now: () => number;
   }) {
     this.model = input.model;
+    this.split = input.split;
+    this.splitSlots =
+      input.splitSlots ??
+      new ConcurrencyLimiter({ maxConcurrent: PII_REDACTION_MODEL_SPLIT_SLOTS, maxQueued: 0 });
     this.featureFlags = input.featureFlags;
     this.scopes = input.scopes;
     this.selfHosted = input.selfHosted;
@@ -180,13 +219,17 @@ export class PiiRedactionModelService {
       return null;
     }
     const { organizationId } = routing;
-    if (isBatchTooLongForModel(input.texts)) {
+    const plan = planSpan({ texts: input.texts, splitting: await this.#isSplitting() });
+    if (plan.kind === "too_long") {
       this.metrics.modelFellBack("too_long");
       this.log.info({ ...call, findings: 0, outcome: "too_long", durationMs: 0 }, USAGE_MESSAGE);
       return null;
     }
+    if (plan.kind === "split") {
+      return this.#clearSplit({ input, organizationId, projectId, call, calls: plan.calls });
+    }
 
-    const admission = this.#admit();
+    const admission = this.#admit("single");
     if (!admission) {
       this.metrics.modelFellBack("breaker_open");
       this.log.info(
@@ -200,19 +243,19 @@ export class PiiRedactionModelService {
     try {
       const { cleared, findings } = await this.model.clearCounting(input);
       const durationMs = elapsedSince(startedAt);
-      this.#settle({ admission, unavailable: false });
+      this.#settle({ kind: "single", admission, unavailable: false });
       this.log.info({ ...call, findings, outcome: "ok", durationMs }, USAGE_MESSAGE);
       await this.spend.record({
         organizationId,
         projectId,
         texts: input.texts,
         recordKey: input.recordKey,
-        durationMs,
+        callDurationsMs: [durationMs],
       });
       return cleared;
     } catch (error) {
       const outcome = failureOutcomeOf(error);
-      this.#settle({ admission, unavailable: outcome !== "error" });
+      this.#settle({ kind: "single", admission, unavailable: outcome !== "error" });
       this.metrics.modelFellBack(outcome);
       this.log.warn(
         {
@@ -228,12 +271,154 @@ export class PiiRedactionModelService {
     }
   }
 
+  /** Whether a split model is set: asked of its channel once, like the model's. */
+  async #isSplitting(): Promise<boolean> {
+    if (!this.split) return false;
+    try {
+      return await this.split.isConfigured();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * A long batch through the split model (ADR-207): the free slots taken at once, never waited
+   * for; one 50 s budget for every call; the first failure sends the whole span to Presidio.
+   */
+  async #clearSplit({
+    input,
+    organizationId,
+    projectId,
+    call,
+    calls,
+  }: {
+    input: ModelClearInput;
+    organizationId: string;
+    projectId: string;
+    call: Omit<PiiRedactionModelUsage, "findings" | "outcome" | "durationMs">;
+    calls: readonly SplitCall[];
+  }): Promise<(string | null)[] | null> {
+    const fallBack = (
+      outcome: Exclude<PiiRedactionModelUsage["outcome"], "ok">,
+      durationMs = 0,
+    ) => {
+      this.metrics.modelFellBack(outcome);
+      this.log.info(
+        { ...call, findings: 0, outcome, durationMs, calls: calls.length },
+        USAGE_MESSAGE,
+      );
+      return null;
+    };
+    const placeable = calls
+      .flatMap((c) => c.pieces)
+      .filter((piece) => !piece.whole)
+      .every((p) => isPlaceablePiece(pieceTextOf({ texts: input.texts, piece: p })));
+    if (!placeable) return fallBack("unplaceable");
+    const slots = Math.min(
+      PII_REDACTION_MODEL_SPLIT_SLOTS - this.splitSlots.stats().inFlight,
+      calls.length,
+    );
+    if (slots < 1 || !fitsSpanBudget({ calls, slots })) return fallBack("busy");
+    const admission = this.#admit("split");
+    if (!admission) return fallBack("breaker_open");
+
+    const startedAt = this.now();
+    const outcome = await this.#runSplitCalls({ input, calls, slots });
+    const durationMs = this.now() - startedAt;
+    if (outcome.kind === "failed") {
+      this.#settle({ kind: "split", admission, unavailable: outcome.reason !== "error" });
+      this.metrics.modelFellBack(outcome.reason);
+      this.log.warn(
+        {
+          ...call,
+          findings: 0,
+          outcome: outcome.reason,
+          durationMs,
+          calls: calls.length,
+          ...(outcome.error === undefined ? {} : { errorName: failureName(outcome.error) }),
+        },
+        USAGE_MESSAGE,
+      );
+      return null;
+    }
+    this.#settle({ kind: "split", admission, unavailable: false });
+    const cleared = clearSplitSpan({
+      texts: input.texts,
+      answers: outcome.answers,
+      spareNamesAndPlaces: input.spareNamesAndPlaces,
+    });
+    if (cleared === "unplaceable") return fallBack("unplaceable", durationMs);
+    const findings = splitFindingsCount({ texts: input.texts, answers: outcome.answers });
+    this.log.info(
+      { ...call, findings, outcome: "ok", durationMs, calls: calls.length },
+      USAGE_MESSAGE,
+    );
+    await this.spend.record({
+      organizationId,
+      projectId,
+      texts: input.texts,
+      recordKey: input.recordKey,
+      callDurationsMs: outcome.callDurationsMs,
+    });
+    return cleared;
+  }
+
+  /**
+   * The span's calls over `slots` slots it takes now, each slot running calls one after another.
+   * Resolves at the first failure or the budget's end; calls still running finish on their own.
+   */
+  #runSplitCalls({
+    input,
+    calls,
+    slots,
+  }: {
+    input: ModelClearInput;
+    calls: readonly SplitCall[];
+    slots: number;
+  }): Promise<SplitOutcome> {
+    const split = this.split;
+    if (!split) return Promise.resolve({ kind: "failed", reason: "error" });
+    const abort = new AbortController();
+    return new Promise<SplitOutcome>((resolve) => {
+      const run: SplitRun = {
+        calls,
+        next: 0,
+        answers: [],
+        callDurationsMs: [],
+        ended: false,
+        now: this.now,
+        answer: (splitCall) =>
+          split.answers({
+            texts: splitCall.pieces.map((piece) => pieceTextOf({ texts: input.texts, piece })),
+            piiRedactionLevel: input.piiRedactionLevel,
+            entities: input.entities,
+            projectId: input.projectId,
+            signal: abort.signal,
+          }),
+        end: (outcome) => {
+          if (run.ended) return;
+          run.ended = true;
+          clearTimeout(budget);
+          if (outcome.kind === "failed" && outcome.reason === "timeout") abort.abort();
+          resolve(outcome);
+        },
+      };
+      const budget = setTimeout(
+        () => run.end({ kind: "failed", reason: "timeout" }),
+        PII_REDACTION_MODEL_SPAN_BUDGET_MS,
+      );
+      for (let slot = 0; slot < slots; slot++) {
+        void this.splitSlots.run({ task: () => runSplitSlot(run) }).catch(() => void 0);
+      }
+    });
+  }
+
   /** Whether a batch may call the model now, and how; null while the breaker is open. */
-  #admit(): BreakerAdmission | null {
-    const breaker = this.#breaker;
+  #admit(kind: BreakerKind): BreakerAdmission | null {
+    const breaker = this.#breakers[kind];
     if (breaker.kind === "closed") return "call";
     if (this.now() < breaker.until) return null;
-    this.#openBreaker();
+    this.#openBreaker(kind);
     return "probe";
   }
 
@@ -242,13 +427,24 @@ export class PiiRedactionModelService {
    * a batch that set off before the breaker opened and answers late says nothing about now. Any
    * other answer to the probe, even a refusal, shows the model is reachable in time.
    */
-  #settle({ admission, unavailable }: { admission: BreakerAdmission; unavailable: boolean }): void {
-    if (unavailable) this.#openBreaker();
-    else if (admission === "probe") this.#breaker = { kind: "closed" };
+  #settle({
+    kind,
+    admission,
+    unavailable,
+  }: {
+    kind: BreakerKind;
+    admission: BreakerAdmission;
+    unavailable: boolean;
+  }): void {
+    if (unavailable) this.#openBreaker(kind);
+    else if (admission === "probe") this.#breakers[kind] = { kind: "closed" };
   }
 
-  #openBreaker(): void {
-    this.#breaker = { kind: "open", until: this.now() + PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS };
+  #openBreaker(kind: BreakerKind): void {
+    this.#breakers[kind] = {
+      kind: "open",
+      until: this.now() + PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS,
+    };
   }
 
   /**
@@ -302,6 +498,61 @@ export class PiiRedactionModelService {
       const { organizationId } = await this.scopes.getScopeFacts({ projectId });
       return organizationId;
     });
+  }
+}
+
+/** One split span's calls as its slots share them. */
+type SplitRun = {
+  readonly calls: readonly SplitCall[];
+  next: number;
+  readonly answers: PieceAnswer[];
+  readonly callDurationsMs: number[];
+  ended: boolean;
+  readonly now: () => number;
+  readonly answer: (call: SplitCall) => Promise<{ findings: unknown; anonymized: unknown }[]>;
+  readonly end: (outcome: SplitOutcome) => void;
+};
+
+function pieceTextOf({ texts, piece }: { texts: readonly string[]; piece: SplitPiece }): string {
+  return (texts[piece.text] ?? "").slice(piece.start, piece.end);
+}
+
+/** One slot: the span's next call until none is left, the span ended or a call failed. */
+async function runSplitSlot(run: SplitRun): Promise<void> {
+  while (!run.ended && run.next < run.calls.length) {
+    const splitCall = run.calls[run.next++];
+    if (!splitCall || !(await runSplitCall({ run, splitCall }))) return;
+  }
+}
+
+/**
+ * One call; false when it failed. A call our abort rejected keeps its slot until the model's
+ * own deadline has passed, so the slots never count as free what the model may still run.
+ */
+async function runSplitCall({
+  run,
+  splitCall,
+}: {
+  run: SplitRun;
+  splitCall: SplitCall;
+}): Promise<boolean> {
+  const startedAt = run.now();
+  try {
+    const answered = await run.answer(splitCall);
+    run.callDurationsMs.push(run.now() - startedAt);
+    splitCall.pieces.forEach((piece, i) =>
+      run.answers.push({ piece, ...(answered[i] ?? { findings: [], anonymized: null }) }),
+    );
+    if (run.callDurationsMs.length === run.calls.length) {
+      run.end({ kind: "answered", answers: run.answers, callDurationsMs: run.callDurationsMs });
+    }
+    return true;
+  } catch (error) {
+    const reason = failureOutcomeOf(error);
+    run.end({ kind: "failed", reason, error });
+    const holdMs = startedAt + PII_REDACTION_MODEL_ABORTED_SLOT_HOLD_MS - run.now();
+    if (reason === "timeout" && holdMs > 0) await new Promise((wake) => setTimeout(wake, holdMs));
+    return false;
   }
 }
 

@@ -224,6 +224,13 @@ export class DataPrivacyModule implements DataPrivacyApi {
           timeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
           method: "pii_redaction_model",
         }),
+        // Pieces of a long batch go to a model function of their own (ADR-207).
+        split: PresidioRedactionService.create({
+          presidio: channels.piiRedactionModelSplit,
+          metrics,
+          timeoutMs: PII_REDACTION_MODEL_TIMEOUT_MS,
+          method: "pii_redaction_model",
+        }),
         featureFlags: dependencies.featureFlags,
         scopes: projectScopes,
         selfHosted: !config.isSaas,

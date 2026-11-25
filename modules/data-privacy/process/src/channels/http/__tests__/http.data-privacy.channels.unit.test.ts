@@ -17,6 +17,7 @@ function channelsFor(settings: Partial<DataPrivacyServerConfig>) {
       isSaas: true,
       langevalsEndpoint: "http://langevals:5562",
       piiRedactionModelEndpoint: undefined,
+      piiRedactionModelSplitEndpoint: undefined,
       ...settings,
     },
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
@@ -65,5 +66,27 @@ describe("HttpDataPrivacyChannels", () => {
         results: [],
       });
     });
+  });
+});
+
+describe("HttpDataPrivacyChannels, the split model (ADR-207)", () => {
+  /** @scenario "A split model named by anything but a Lambda function ARN splits nothing" */
+  it("composes a split channel that answers not configured for an address or a bad ARN", async () => {
+    for (const setting of [undefined, "http://pii-redaction-model:8080", "arn:aws:s3:::bucket"]) {
+      const { piiRedactionModelSplit } = await channelsFor({
+        piiRedactionModelSplitEndpoint: setting,
+      });
+
+      await expect(piiRedactionModelSplit.detect(probe)).resolves.toEqual({
+        kind: "not_configured",
+      });
+    }
+  });
+
+  /** @scenario "A split model named by anything but a Lambda function ARN splits nothing" */
+  it("composes the Lambda channel for a Lambda function ARN", async () => {
+    const { piiRedactionModelSplit } = await channelsFor({ piiRedactionModelSplitEndpoint: ARN });
+
+    expect(piiRedactionModelSplit).toBeInstanceOf(AwsPiiRedactionModelChannel);
   });
 });

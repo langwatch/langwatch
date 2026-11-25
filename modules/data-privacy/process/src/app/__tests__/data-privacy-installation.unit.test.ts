@@ -30,6 +30,7 @@ function process(role: "api" | "worker", googleCredentials?: string) {
         isSaas: true,
         langevalsEndpoint: undefined,
         piiRedactionModelEndpoint: undefined,
+        piiRedactionModelSplitEndpoint: undefined,
       },
     })
     .provide({

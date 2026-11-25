@@ -14,6 +14,9 @@ export class MemoryDataPrivacyChannels {
       piiRedactionModel: MemoryPresidioChannel.create({
         endpoint: config.piiRedactionModelEndpoint,
       }),
+      piiRedactionModelSplit: MemoryPresidioChannel.create({
+        endpoint: config.piiRedactionModelSplitEndpoint,
+      }),
       dlp: MemoryGoogleDlpChannel.create(),
     };
   }

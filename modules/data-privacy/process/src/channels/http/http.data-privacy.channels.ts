@@ -4,6 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ScopedSecrets } from "@langwatch/secrets";
 
 import { piiRedactionModelTargetOf } from "../../rules/pii-redaction-model.rules.ts";
+import { splitModelTargetOf } from "../../rules/pii-redaction-split.rules.ts";
 import { AwsPiiRedactionModelChannel } from "../aws.pii-redaction-model.channel.ts";
 import type { DataPrivacyChannels } from "../data-privacy.channels.ts";
 import { googleApplicationCredentials } from "../google-dlp.channel.ts";
@@ -30,9 +31,30 @@ export class HttpDataPrivacyChannels {
     return {
       presidio: HttpPresidioChannel.create({ endpoint: config.langevalsEndpoint }),
       piiRedactionModel: piiRedactionModelChannel({ config }),
+      piiRedactionModelSplit: piiRedactionSplitModelChannel({ config }),
       dlp,
     };
   }
+}
+
+/** The split model's channel; anything but a Lambda function ARN splits nothing (ADR-207). */
+function piiRedactionSplitModelChannel({
+  config,
+}: {
+  config: Pick<DataPrivacyServerConfig, "piiRedactionModelSplitEndpoint">;
+}): PresidioChannel {
+  const target = splitModelTargetOf(config.piiRedactionModelSplitEndpoint);
+  if (target.kind === "lambda") {
+    const lambda = new LambdaClient({ region: target.region, maxAttempts: 1 });
+    return AwsPiiRedactionModelChannel.create({ lambda, functionArn: target.functionArn });
+  }
+  if (target.kind === "invalid") {
+    logger.error(
+      { reason: target.reason },
+      "PII redaction split model setting is unusable; long spans use Presidio",
+    );
+  }
+  return HttpPresidioChannel.create({ endpoint: void 0 });
 }
 
 /** An unusable setting is logged and leaves the model unconfigured: batches stay on Presidio. */
