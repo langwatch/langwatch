@@ -84,12 +84,15 @@ export class TraceViewerProtectionService {
     }>,
   ): Promise<Protections> {
     const personId = input.principal?.type === "user" ? input.principal.id : void 0;
+    const proof = input.authorization;
+    const ownProof =
+      personId && proof?.principal.type === "user" && proof.principal.id === personId;
     const [protections, canSeeCosts] = await Promise.all([
       this.resolve({
         projectId: input.projectId,
         userId: personId,
         publiclyShared: false,
-        ...(personId && input.authorization ? { authorization: input.authorization } : {}),
+        ...(ownProof ? { authorization: proof } : {}),
       }),
       this.keyPermitted(input),
     ]);

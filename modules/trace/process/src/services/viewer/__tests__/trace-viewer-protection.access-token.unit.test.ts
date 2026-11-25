@@ -190,5 +190,17 @@ describe("TraceViewerProtectionService.resolveForApiKey", () => {
         projectIds: [project.id, SHARED_PROJECT],
       });
     });
+
+    it("ignores a proof minted for someone else, reading only its own project's policy", async () => {
+      const { service, getResolvedForProjects } = protectionsWith({ held: ADMIN });
+
+      await service.resolveForApiKey({
+        projectId: project.id,
+        principal: { type: "user", id: "admin-1" },
+        authorization: proofSharing({ userId: "someone-else" }),
+      });
+
+      expect(getResolvedForProjects).toHaveBeenCalledWith({ projectIds: [project.id] });
+    });
   });
 });
