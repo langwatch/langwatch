@@ -65,7 +65,7 @@ export class InstantEvalJudgeRouteRunService {
   private readonly flags: string[] = [];
   private inputTokens = 0;
   private costNanoUsd = 0;
-  /** What the gate's sends waited on the limiter, ahead of the legs that answered. */
+  /** The longest limiter wait of the gate's side-by-side sends, ahead of the legs that answered. */
   private gateWaitMs = 0;
 
   private constructor(input: {
@@ -201,7 +201,9 @@ export class InstantEvalJudgeRouteRunService {
     if (legs.length === 0 && failed?.outcome === "failed") return this.nothingAnswered(failed);
     // The escalation's answers: the hard branch's own, and the easy ones a failed primary left it.
     const escalated = answersIn(hardLegs.own) + answersIn(easyLegs.other);
-    return this.result({ questions, legs, escalated });
+    // The branches waited side by side, so the longer one; a branch's own two asks are in a row.
+    const waitMs = Math.max(waitOf(easyLegs), waitOf(hardLegs));
+    return this.result({ questions, legs, escalated, waitMs });
   }
 
   /**
@@ -235,8 +237,10 @@ export class InstantEvalJudgeRouteRunService {
       const question = questions[at]!;
       const verdict =
         leg.outcome === "answered" ? leg.answers.get(question.id)?.verdict : undefined;
-      if (leg.outcome === "answered") this.gateWaitMs += leg.limiterWaitMs;
-      else this.gateFailed({ backend: gate.backend, leg });
+      // The sends waited side by side; a send that failed reports no wait, as any failed leg.
+      if (leg.outcome === "answered") {
+        this.gateWaitMs = Math.max(this.gateWaitMs, leg.limiterWaitMs);
+      } else this.gateFailed({ backend: gate.backend, leg });
       const { branch, hasScore } = instantEvalJudgeGateBranchOf({
         verdict,
         easyBelow: gate.easyBelow,
@@ -595,21 +599,27 @@ export class InstantEvalJudgeRouteRunService {
     return { ...instantEvalSkipped(leg.reason), ...this.spent(), routing: this.routing({}) };
   }
 
-  /** The verdicts the legs supplied; a pair's legs waited side by side, so the longer wait. */
+  /**
+   * The verdicts the legs supplied; a pair's legs waited side by side, so the longer wait. A gated
+   * plan gives its branches' wait itself.
+   */
   private result({
     questions,
     legs,
     escalated = 0,
     pick,
+    waitMs,
   }: {
     questions: readonly InstantEvalQuestion[];
     legs: readonly InstantEvalJudgeAnsweredLeg[];
     escalated?: number;
     pick?: (questionId: string) => InstantEvalJudgeAnsweredLeg | undefined;
+    waitMs?: number;
   }): InstantEvalJudgement {
     const { verdicts, answeredBy } = instantEvalRoutedVerdictsOf({ questions, legs, pick });
     const waits = legs.map((leg) => leg.limiterWaitMs);
-    const legsWaitMs = pick ? Math.max(0, ...waits) : waits.reduce((sum, ms) => sum + ms, 0);
+    const legsWaitMs =
+      waitMs ?? (pick ? Math.max(0, ...waits) : waits.reduce((sum, ms) => sum + ms, 0));
     return {
       verdicts,
       isTextTruncated: legs.some((leg) => leg.isTextTruncated),
@@ -643,4 +653,12 @@ export class InstantEvalJudgeRouteRunService {
 /** How many questions a leg answered; none for a leg that was not asked or failed. */
 function answersIn(leg: Leg | undefined): number {
   return leg?.outcome === "answered" ? leg.answers.size : 0;
+}
+
+/** What one gated branch waited on the limiter: its own ask, then the other backend's. */
+function waitOf({ own, other }: { own?: Leg; other?: Leg }): number {
+  return [own, other].reduce(
+    (sum, leg) => sum + (leg?.outcome === "answered" ? leg.limiterWaitMs : 0),
+    0,
+  );
 }

@@ -269,6 +269,29 @@ describe("InstantEvalJudgeRouterService, given a gated plan", () => {
       });
       expect(judgement.costNanoUsd).toBe(2 * GATE_COST + DECISIONS_COST + LLM_COST);
     });
+
+    /** @scenario "A gate rates each question of a call on its own" */
+    it("reports the longest of the side-by-side waits, never their sum", async () => {
+      const { classify } = harness({
+        gate: (request) => {
+          const isFirst = request.text.includes("Task: is the user upset");
+          return { ...rated(isFirst ? 0.2 : 3.4)(request), limiterWaitMs: isFirst ? 30 : 50 };
+        },
+        // The easy branch's ask waits 7; the hard branch's escalation is down and its fallback onto
+        // the primary waits 11.
+        decisions: (questions) => ({
+          ...decided(0.9, questions[0]!.id),
+          limiterWaitMs: questions[0]!.id === "q" ? 7 : 11,
+        }),
+        llm: () => llmDown,
+      });
+      const judgement = await classify([Q, Q2]);
+      expect(judgement.routing?.flags).toEqual(
+        expect.arrayContaining(["gate:easy", "gate:hard", "gate_hard_failed"]),
+      );
+      // Two gate sends side by side (30 and 50), then the two branches side by side (7 and 11).
+      expect(judgement.limiterWaitMs).toBe(50 + 11);
+    });
   });
 
   describe("when the gate cannot rate the case", () => {
