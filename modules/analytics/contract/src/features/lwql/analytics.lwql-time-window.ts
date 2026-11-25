@@ -61,12 +61,44 @@ export const LWQL_LIST_PARAMETERS = [LWQL_SOURCES_PARAMETER, LWQL_PROJECTS_PARAM
 
 export type LangWatchQLListParameter = (typeof LWQL_LIST_PARAMETERS)[number];
 
-/** Reserved surface parameters: window bounds, granularity, sources and projects. */
+/**
+ * The viewer's IANA time zone (`String`), set by the surface from `timeZone`, so a statement can
+ * bucket and label by the reader's clock. "UTC" when the surface sends none.
+ */
+export const LWQL_TIME_ZONE_PARAMETER = "dashboard_context_timezone";
+
+/** The zone a run is bound to when the surface names none. */
+export const LWQL_DEFAULT_TIME_ZONE = "UTC";
+
+/** The characters an IANA zone name is made of; quotes, spaces and braces never pass. */
+const IANA_TIME_ZONE_NAME = /^[A-Za-z][A-Za-z0-9_+-]*(?:\/[A-Za-z0-9_+-]+){0,3}$/;
+
+/** Whether a value is an IANA zone name this runtime knows, such as "America/Los_Angeles". */
+export function isLangWatchQLTimeZone(value: string): boolean {
+  if (value.length > 64 || !IANA_TIME_ZONE_NAME.test(value)) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Exactly `String`: the zone binds as written. */
+const LWQL_TIME_ZONE_PARAMETER_TYPE = /^String$/;
+
+/** Whether a declared ClickHouse type can carry the time zone. */
+export function isLangWatchQLTimeZoneParameterType(type: string): boolean {
+  return LWQL_TIME_ZONE_PARAMETER_TYPE.test(type.trim());
+}
+
+/** Reserved surface parameters: window bounds, granularity, sources, projects and time zone. */
 export const LWQL_SURFACE_PARAMETERS = [
   LWQL_PERIOD_START_PARAMETER,
   LWQL_PERIOD_END_PARAMETER,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
   ...LWQL_LIST_PARAMETERS,
+  LWQL_TIME_ZONE_PARAMETER,
 ] as const;
 
 /** Whether a parameter name is one of the two that carry a list. */
@@ -112,7 +144,8 @@ export type LangWatchQLGranularityStep = (typeof LWQL_GRANULARITY_STEPS)[number]
 
 /**
  * Every step any door accepts: the sub-day ones plus one day and one week, the
- * Dashboards grain choices (dashboards-v1.feature, AC13). Buckets are UTC.
+ * Dashboards grain choices (dashboards-v1.feature, AC13). Buckets are UTC unless
+ * the statement reads the time zone.
  */
 export const LWQL_ACCEPTED_GRANULARITY_STEPS = [
   ...LWQL_GRANULARITY_STEPS,
@@ -125,6 +158,29 @@ export const LWQL_ACCEPTED_GRANULARITY_STEPS = [
  * accepted step below a week divides it, so only week buckets move.
  */
 export const LWQL_BUCKET_ALIGNMENT_SECONDS = 345_600;
+
+/**
+ * The start of the bucket `column` falls in, as a UTC `DateTime`. With a `timeZone` placeholder
+ * it buckets by that zone's wall clock, so a day starts at the reader's midnight across DST;
+ * without one, by UTC as before. `granularity` is the step in seconds, as SQL.
+ */
+export function lwqlBucketStartSql({
+  column,
+  granularity,
+  timeZone,
+}: {
+  column: string;
+  granularity: string;
+  timeZone?: string;
+}): string {
+  const shift = LWQL_BUCKET_ALIGNMENT_SECONDS;
+  const floor = (time: string) =>
+    `addSeconds(toStartOfInterval(subtractSeconds(${time}, ${shift}), INTERVAL ${granularity} SECOND), ${shift})`;
+  if (timeZone === undefined) return floor(column);
+  const wall = `toDateTime(toString(toDateTime(${column}), ${timeZone}), 'UTC')`;
+
+  return `toTimeZone(toDateTime(toString(${floor(wall)}), ${timeZone}), 'UTC')`;
+}
 
 /** One of the accepted steps: the only values any door accepts. */
 export type LangWatchQLAcceptedGranularityStep = (typeof LWQL_ACCEPTED_GRANULARITY_STEPS)[number];

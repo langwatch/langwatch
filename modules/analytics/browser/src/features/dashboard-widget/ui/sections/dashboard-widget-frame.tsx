@@ -19,6 +19,7 @@ import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, Text } from "@langwatch/design-system/primitives";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { browserTimeZone } from "../../../../behavior/browser-time-zone.ts";
 import { useAnalyticsPeriod } from "../../../../behavior/use-analytics-period.ts";
 import { useFrameDiagnostic } from "../../../../behavior/use-frame-diagnostic.ts";
 import { useManagedPromptVersionFloor } from "../../../../behavior/use-managed-prompt-version-floor.ts";
@@ -306,7 +307,7 @@ function WidgetFrameOverWindow({
     () => ({
       timeWindow: hostParams.timeWindow,
       granularitySeconds: hostParams.granularitySeconds,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timezone: browserTimeZone(),
       theme: colorMode === "dark" ? "dark" : "light",
       widgetId: id,
       projectId,

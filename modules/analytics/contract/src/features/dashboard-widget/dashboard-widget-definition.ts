@@ -65,6 +65,12 @@ export const RESERVED_PARAMETERS = [
     type: "UInt32",
     description: "Suggested bucket size in seconds for the selected range.",
   },
+  {
+    name: "dashboard_context_timezone",
+    type: "String",
+    description:
+      "The reader's time zone, such as America/Los_Angeles; UTC when the browser names none.",
+  },
 ] as const;
 
 /**

@@ -4,10 +4,18 @@
  * `CustomGraph.graph` persists as a `DashboardWidgetDefinition`.
  */
 
+import { lwqlBucketStartSql } from "@langwatch/analytics-contract";
 import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
+/** The board's grain on the reader's clock: a day bucket starts at the reader's midnight. */
+const READER_BUCKET = lwqlBucketStartSql({
+  column: "OccurredAt",
+  granularity: "{dashboard_context_granularity_seconds:UInt32}",
+  timeZone: "{dashboard_context_timezone:String}",
+});
+
 /** Bucketed trace counts — the canonical follows-everything statement. */
-const BUCKETED_TRACES_SQL = `SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket,
+const BUCKETED_TRACES_SQL = `SELECT ${READER_BUCKET} AS bucket,
   count() AS events
 FROM traces
 WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
@@ -40,7 +48,7 @@ export default function Widget() {
       : data.length + " rows";
 
   const rows = (data || []).map(function (row) {
-    return { bucket: String(row.bucket).slice(5, 16), events: Number(row.events) };
+    return { bucket: LW.formatTime(row.bucket), events: Number(row.events) };
   });
 
   return (

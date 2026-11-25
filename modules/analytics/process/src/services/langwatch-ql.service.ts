@@ -8,6 +8,8 @@ import {
   LangWatchQLParameterMissingError,
   LangWatchQLUnavailableError,
   langWatchQLPassSchema,
+  LWQL_DEFAULT_TIME_ZONE,
+  LWQL_TIME_ZONE_PARAMETER,
   type LangWatchQLEvalGate,
   type LangWatchQLExecuteInput,
   type LangWatchQLMemberScope,
@@ -174,6 +176,7 @@ export class LangWatchQLService {
     parameters,
     timeWindow,
     lists,
+    timeZone,
     isInstantEvalsEnabled,
   }: {
     /** Logged with a refusal. The database, not this, decides the tenant. */
@@ -188,6 +191,8 @@ export class LangWatchQLService {
      * that declares them is checked against the default sources and no project (nothing runs).
      */
     readonly lists?: Readonly<{ sources: readonly TraceSource[]; projects: readonly string[] }>;
+    /** The reader's IANA zone, for a statement that declares the time zone; UTC when absent. */
+    readonly timeZone?: string | undefined;
     /**
      * Whether this caller may call an eval function. The surface answers it —
      * the flag for this project, in this caller's scope. Absent means no.
@@ -215,6 +220,7 @@ export class LangWatchQLService {
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
       lists: lists ?? { sources: resolveRunSources(undefined), projects: [] },
+      timeZone,
     });
 
     const missing = langWatchQLMissingParameters({ declared: validation.parameters, window });
@@ -408,6 +414,7 @@ export class LangWatchQLService {
     granularitySeconds,
     onBudgetOverflow,
     sources,
+    timeZone,
     memberWindows: requestedWindows,
     isInstantEvalsEnabled,
     signal,
@@ -427,6 +434,7 @@ export class LangWatchQLService {
       ...(parameters ? { parameters } : {}),
       ...(timeWindow ? { timeWindow } : {}),
       lists: { sources: boundSources, projects: projectIds },
+      timeZone,
       isInstantEvalsEnabled: isInstantEvalsEnabled === true,
     });
     const granularity = timeWindows.resolveRunGranularityOrRefuseUnfilled({
@@ -470,6 +478,7 @@ export class LangWatchQLService {
       ...(memberWindows ? { memberWindows } : {}),
       timeWindow: followedWindow,
       granularitySeconds: granularity.followsGranularity ? granularity.granularitySeconds : void 0,
+      timeZone: getBucketTimeZone(validation),
     });
 
     const limited = this.withRunNotes({
@@ -483,6 +492,12 @@ export class LangWatchQLService {
     if (completeness.kind !== "reported") return limited;
     return { ...limited, completeness: completeness.completeness };
   }
+}
+
+/** The zone the statement's buckets follow: the one it was bound to, else UTC. */
+function getBucketTimeZone(validation: ValidatedLangWatchQL): string {
+  const bound = validation.boundParameters?.[LWQL_TIME_ZONE_PARAMETER];
+  return typeof bound === "string" ? bound : LWQL_DEFAULT_TIME_ZONE;
 }
 
 /**

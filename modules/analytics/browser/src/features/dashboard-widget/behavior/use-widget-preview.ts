@@ -7,6 +7,7 @@ import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboa
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { browserTimeZone } from "../../../behavior/browser-time-zone.ts";
 import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
 import { declaredParamDefaults } from "../../../model/dashboard-widget/params-snapshot.ts";
 import { editorLimitError } from "../../../model/dashboard-widget/widget-limit-failure.ts";
@@ -99,7 +100,7 @@ export function useWidgetPreview({
     () => ({
       timeWindow: hostParams.timeWindow,
       granularitySeconds: hostParams.granularitySeconds,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timezone: browserTimeZone(),
       theme: colorMode === "dark" ? "dark" : "light",
       projectId,
       ...(widgetId !== undefined ? { widgetId } : {}),
