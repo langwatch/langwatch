@@ -56,8 +56,8 @@ export class TraceQueryTranslationService {
           searchContent,
           ...(isHiddenAttribute ? { isHiddenAttribute } : {}),
         }),
-      translateScope: (scope, scopeCtx) =>
-        translateEvaluationScope({ scope, ctx: scopeCtx, fields: this.#fields }),
+      translateScope: (scope, scopeCtx, negated) =>
+        translateEvaluationScope({ scope, ctx: scopeCtx, fields: this.#fields, negated }),
     });
 
     return sql === null ? null : { sql, params: ctx.params };

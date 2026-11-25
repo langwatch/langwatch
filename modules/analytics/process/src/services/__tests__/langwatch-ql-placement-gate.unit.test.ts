@@ -15,6 +15,7 @@ import type { LangWatchQLTarget } from "../../repositories/clickhouse/clickhouse
 import { RoutedLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-routed-executor.repository.ts";
 import {
   LWQL_ACCESS_MODEL_ANSWER_TTL_MS,
+  type LangWatchQLAccessModelAnswer,
   type LangWatchQLAccessModelAnswerRepository,
 } from "../../repositories/langwatch-ql-access-model-answer.repository.ts";
 import type { LangWatchQLPlacementRepository } from "../../repositories/langwatch-ql-placement.repository.ts";
@@ -52,7 +53,9 @@ function codeOf(run: Promise<unknown>): Promise<string> {
  * The real service over a real routed executor, behind the real gate: `ROUTED` routes to its own
  * ClickHouse, every other project to the shared one. Records each route ask and executor built.
  */
-function routedServiceOver() {
+function routedServiceOver({
+  privateAnswer = "provisioned",
+}: { privateAnswer?: LangWatchQLAccessModelAnswer } = {}) {
   const routeAsks: (readonly string[])[] = [];
   const built: { target: LangWatchQLTarget; executor: RecordingLangWatchQLExecutor }[] = [];
   const router = RoutedLangWatchQLExecutorRepository.create({
@@ -87,6 +90,7 @@ function routedServiceOver() {
       placement: MemoryLangWatchQLPlacementRepository.create({ routedTenants: [ROUTED.id] }),
       target: { configured: true, origin: MEMORY_SHARED_ORIGIN },
       accessModel: { configured: true, probeOwner: () => Promise.resolve("sql_store") },
+      privateAccessModel: { probe: () => Promise.resolve(privateAnswer) },
       answers: MemoryLangWatchQLAccessModelAnswerRepository.create(),
     }),
   });
@@ -113,6 +117,7 @@ function routedServiceOver() {
 function serviceOver({
   owner = () => Promise.resolve("sql_store"),
   configured = true,
+  privateAnswer = () => Promise.resolve("provisioned"),
   origin = MEMORY_SHARED_ORIGIN,
   answers = MemoryLangWatchQLAccessModelAnswerRepository.create(),
   placement = MemoryLangWatchQLPlacementRepository.create({
@@ -122,12 +127,14 @@ function serviceOver({
 }: {
   owner?: () => Promise<LwqlAccessModelOwner>;
   configured?: boolean;
+  privateAnswer?: () => Promise<LangWatchQLAccessModelAnswer>;
   origin?: string;
   answers?: LangWatchQLAccessModelAnswerRepository;
   placement?: Pick<LangWatchQLPlacementRepository, "placementOf">;
 } = {}) {
   const executor = new RecordingLangWatchQLExecutor();
   let probes = 0;
+  let privateProbes = 0;
   const service = createLangWatchQLService({
     executor,
     database: "analytics",
@@ -141,6 +148,12 @@ function serviceOver({
           return owner();
         },
       },
+      privateAccessModel: {
+        probe: () => {
+          privateProbes += 1;
+          return privateAnswer();
+        },
+      },
       answers,
     }),
   });
@@ -152,7 +165,7 @@ function serviceOver({
         sql: "SELECT 1",
       }),
     );
-  return { executor, run, probes: () => probes };
+  return { executor, run, probes: () => probes, privateProbes: () => privateProbes };
 }
 
 describe("LangWatchQLPlacementGateService", () => {
@@ -166,20 +179,67 @@ describe("LangWatchQLPlacementGateService", () => {
     });
   });
 
-  describe("given an organisation routed to its own ClickHouse", () => {
-    /** @scenario "An organisation routed to its own ClickHouse is refused before any SQL runs" */
+  describe("given an organisation routed to its own ClickHouse whose server is provisioned", () => {
+    /** @scenario "A routed organisation whose server is provisioned is answered on its own server" */
+    it("lets the query through, asking the private probe and never the shared one", async () => {
+      const { executor, run, probes, privateProbes } = serviceOver();
+
+      expect(await run(ROUTED)).toBe("answered");
+      expect(executor.calls.length).toBeGreaterThan(0);
+      expect(privateProbes()).toBe(1);
+      expect(probes()).toBe(0);
+    });
+
+    /** @scenario "A routed organisation whose server is provisioned is answered on its own server" */
+    it("holds the private answer apart from the shared server's, though the origin is the same", async () => {
+      const { executor, run, privateProbes } = serviceOver({
+        privateAnswer: () => Promise.resolve("not_provisioned"),
+        placement: {
+          placementOf: ({ tenantId }) =>
+            Promise.resolve({
+              recordedPrivate: tenantId === ROUTED.id,
+              routedPrivately: tenantId === ROUTED.id,
+              origin: MEMORY_SHARED_ORIGIN,
+            }),
+        },
+      });
+
+      expect(await run(SHARED)).toBe("answered");
+      const sharedCalls = executor.calls.length;
+      expect(await run(ROUTED)).toBe("lwql_not_provisioned");
+      expect(privateProbes()).toBe(1);
+      expect(executor.calls).toHaveLength(sharedCalls);
+    });
+  });
+
+  describe("given an organisation routed to its own ClickHouse whose server is not provisioned", () => {
+    /** @scenario "An organisation routed to a private ClickHouse that is not provisioned is refused before any SQL runs" */
     it("refuses lwql_not_provisioned and never calls the executor", async () => {
-      const { executor, run } = serviceOver();
+      const { executor, run } = serviceOver({
+        privateAnswer: () => Promise.resolve("not_provisioned"),
+      });
 
       expect(await run(ROUTED)).toBe("lwql_not_provisioned");
+      expect(executor.calls).toEqual([]);
+    });
+
+    /** @scenario "A private server that cannot be probed refuses rather than falling back" */
+    it("refuses lwql_unavailable when the private server cannot be probed", async () => {
+      const { executor, run } = serviceOver({
+        privateAnswer: () => Promise.reject(new Error("connect ECONNREFUSED")),
+      });
+
+      expect(await run(ROUTED)).toBe("lwql_unavailable");
       expect(executor.calls).toEqual([]);
     });
   });
 
   describe("given a routed organisation behind a routed executor", () => {
     /** @scenario "A routed organisation is refused before its routed executor is built" */
-    it("refuses lwql_not_provisioned at every entry, never asks its route and builds no executor for its ClickHouse", async () => {
-      const { everyEntry, routeAsks, built } = routedServiceOver();
+    it("refuses lwql_not_provisioned at every entry and builds no executor for its ClickHouse", async () => {
+      const { everyEntry, routeAsks, built } = routedServiceOver({
+        privateAnswer: "not_provisioned",
+      });
 
       expect(await everyEntry(ROUTED)).toEqual({
         query: "lwql_not_provisioned",
@@ -191,8 +251,23 @@ describe("LangWatchQLPlacementGateService", () => {
       expect(built.flatMap(({ executor }) => executor.calls)).toEqual([]);
     });
 
+    /** @scenario "A routed organisation whose server is provisioned is answered on its own server" */
+    it("runs a provisioned organisation on an executor built for its own ClickHouse", async () => {
+      const { everyEntry, routeAsks, built } = routedServiceOver();
+
+      expect(await everyEntry(ROUTED)).toEqual({
+        query: "answered",
+        pass: "answered",
+        validation: "answered",
+      });
+      expect(routeAsks).toEqual([[ROUTED.id], [ROUTED.id], [ROUTED.id]]);
+      expect(built.map(({ target }) => target)).toEqual(["shared", "private"]);
+      expect(built[0]?.executor.calls).toEqual([]);
+      expect(built[1]?.executor.calls.length).toBeGreaterThan(0);
+    });
+
     /** @scenario "A routed organisation is refused before its routed executor is built" */
-    it("asks the route for an admitted organisation, so the silence above is the gate's", async () => {
+    it("asks the route for an admitted shared organisation, so the silence above is the gate's", async () => {
       const { everyEntry, routeAsks, built } = routedServiceOver();
 
       expect(await everyEntry(SHARED)).toEqual({
@@ -202,24 +277,6 @@ describe("LangWatchQLPlacementGateService", () => {
       });
       expect(routeAsks).toEqual([[SHARED.id], [SHARED.id], [SHARED.id]]);
       expect(built.map(({ target }) => target)).toEqual(["shared"]);
-    });
-  });
-
-  describe("given a routed organisation whose server shares the LangWatchQL target's origin", () => {
-    it("still refuses lwql_not_provisioned until the organisation is opted in", async () => {
-      const { executor, run } = serviceOver({
-        placement: {
-          placementOf: () =>
-            Promise.resolve({
-              recordedPrivate: true,
-              routedPrivately: true,
-              origin: MEMORY_SHARED_ORIGIN,
-            }),
-        },
-      });
-
-      expect(await run(ROUTED)).toBe("lwql_not_provisioned");
-      expect(executor.calls).toEqual([]);
     });
   });
 

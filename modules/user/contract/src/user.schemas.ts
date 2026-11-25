@@ -169,3 +169,16 @@ export interface UserCodeAccessPreferenceSchema extends Named<
 export const userCodeAccessPreferenceSchema: UserCodeAccessPreferenceSchema =
   userCodeAccessPreferenceSchemaDefinition;
 export type UserCodeAccessPreference = z.infer<typeof userCodeAccessPreferenceSchema>;
+
+/** Who remembers the choice, and the choice: `{ id }` alone refuses the choice it carries. */
+const setUserCodeAccessPreferenceInputSchemaDefinition = userCodeAccessPreferenceSchemaDefinition
+  .safeExtend({ id: z.string().min(1) })
+  .strict();
+export interface SetUserCodeAccessPreferenceInputSchema extends Named<
+  typeof setUserCodeAccessPreferenceInputSchemaDefinition
+> {}
+export const setUserCodeAccessPreferenceInputSchema: SetUserCodeAccessPreferenceInputSchema =
+  setUserCodeAccessPreferenceInputSchemaDefinition;
+export type SetUserCodeAccessPreferenceInput = z.infer<
+  typeof setUserCodeAccessPreferenceInputSchema
+>;

@@ -30,8 +30,10 @@ import type {
   LangWatchQLRoute,
   LangWatchQLRouter,
 } from "../repositories/langwatch-ql-executor.repository.ts";
-import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
-import { assertNoUnsupportedTableModifiers } from "../rules/langwatch-ql-query-scope.rules.ts";
+import {
+  assertNoUnsupportedTableModifiers,
+  readableMemberWindows,
+} from "../rules/langwatch-ql-query-scope.rules.ts";
 import { assertNoReservedNameAssigned } from "../rules/langwatch-ql-reserved-names.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { runNotes } from "../rules/langwatch-ql-run-notes.rules.ts";
@@ -48,6 +50,7 @@ import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.
 import { LangWatchQLCompletenessService } from "./langwatch-ql-completeness.service.ts";
 import { LangWatchQLExecutionService } from "./langwatch-ql-execution.service.ts";
 import { LangWatchQLExtractionService } from "./langwatch-ql-extraction.service.ts";
+import { LangWatchQLPassRunService } from "./langwatch-ql-pass-run.service.ts";
 import type { LangWatchQLPlacementGateService } from "./langwatch-ql-placement-gate.service.ts";
 import { LangWatchQLPolicyValidationService } from "./langwatch-ql-policy-validation.service.ts";
 import type { LangWatchQLRunTelemetryService } from "./langwatch-ql-run-telemetry.service.ts";
@@ -58,6 +61,7 @@ const lwqlCapability = LangWatchQLCapabilityService.create();
 const timeWindows = LangWatchQLTimeWindowService.create();
 const lwqlSchema = LangWatchQLSchemaService.create();
 const lwqlCompleteness = LangWatchQLCompletenessService.create();
+const lwqlPassRun = LangWatchQLPassRunService.create();
 
 const logger = createLogger("langwatch:analytics:lwql");
 
@@ -365,24 +369,16 @@ export class LangWatchQLService {
       tenantIds: [project.id],
       kind: "pass",
     });
-
-    const composed = langWatchQLPassSql({ sql, pass: wrapper });
-    const executionParameters = { ...validation.boundParameters, ...composed.parameters };
-    const execution = await executor.execute({
-      sql: composed.sql,
-      ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
+    return lwqlPassRun.runAs({
+      executor,
+      sql,
+      pass: wrapper,
+      database,
+      views: this.views,
+      bound: validation.boundParameters,
       tenantCapability: lwqlCapability.tenantCapability({ secret: project.lwqlKey }),
       projectIds: [project.id],
     });
-
-    return {
-      columns: execution.columns,
-      rows: execution.rows,
-      statistics: execution.statistics,
-      diagnostics: [],
-      followsTimeWindow: false,
-      followsGranularity: false,
-    };
   }
 
   /** The same, over every project in the set — an API key's readable projects. */
@@ -395,7 +391,7 @@ export class LangWatchQLService {
     granularitySeconds,
     onBudgetOverflow,
     sources,
-    memberWindows,
+    memberWindows: requestedWindows,
     isInstantEvalsEnabled,
     signal,
     telemetry,
@@ -403,6 +399,9 @@ export class LangWatchQLService {
     LangWatchQLEvalGate &
     LangWatchQLMemberScope): Promise<LangWatchQLQueryResult> {
     const projectIds = projects.map((project) => project.id);
+    // Both the run and its completeness read take their windows from here, never the request's.
+    const memberWindows =
+      requestedWindows && readableMemberWindows({ projects, memberWindows: requestedWindows });
     const boundSources = resolveRunSources(sources);
     const { executor: routed, database } = await this.admittedRoute({ tenantIds: projectIds });
     const validation = this.validate({

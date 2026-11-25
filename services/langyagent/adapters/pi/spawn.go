@@ -99,7 +99,6 @@ type workerModelConfig struct {
 	API        string         `json:"api"`
 	BaseURLEnv string         `json:"baseUrlEnv"`
 	APIKeyEnv  string         `json:"apiKeyEnv"`
-	Reasoning  bool           `json:"reasoning,omitempty"`
 	Compat     map[string]any `json:"compat,omitempty"`
 }
 
@@ -129,6 +128,9 @@ type workerConfig struct {
 //     compat.supportsDeveloperRole=false: the gateway's non-OpenAI providers
 //     reject the `developer` role pi would otherwise use for reasoning models.
 //
+// A lane never declares whether the model reasons: a provider prefix cannot
+// tell gpt-4.1 from gpt-5. The worker reads that from pi's own catalog.
+//
 // The model id rides verbatim (provider prefix included): the gateway's own
 // prefix routing is the single source of provider fan-out, and the LLM relay
 // forwards the body untouched (its codex model rewrite sets the same full id).
@@ -141,7 +143,6 @@ func modelLane(model string) workerModelConfig {
 	switch {
 	case strings.HasPrefix(model, "anthropic/"):
 		lane.API = "anthropic-messages"
-		lane.Reasoning = true
 		// Long cache retention (with PI_CACHE_RETENTION=long in the worker
 		// env) makes pi stamp its cache_control breakpoints with ttl "1h"
 		// instead of the 5-minute default. A langy conversation's rhythm is
@@ -153,7 +154,6 @@ func modelLane(model string) workerModelConfig {
 		lane.Compat = map[string]any{"supportsLongCacheRetention": true}
 	case strings.HasPrefix(model, "openai_codex/"):
 		lane.API = "openai-responses"
-		lane.Reasoning = true
 		// NO supportsLongCacheRetention here: the ChatGPT codex backend
 		// answers 400 "Unsupported parameter: prompt_cache_retention" on the
 		// field the flag makes pi send (the API-key Responses endpoint
@@ -165,7 +165,6 @@ func modelLane(model string) workerModelConfig {
 		lane.Compat = map[string]any{"supportsStore": false}
 	case strings.HasPrefix(model, "openai/"):
 		lane.API = "openai-responses"
-		lane.Reasoning = true
 		lane.Compat = map[string]any{"supportsLongCacheRetention": true}
 	default:
 		lane.API = "openai-completions"

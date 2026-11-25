@@ -4,7 +4,7 @@
  * (dashboards-v2 AC204), and one that reads only origin-less views cannot follow sources (AC202f).
  */
 
-import { LWQL_SOURCES_PARAMETER } from "@langwatch/analytics-contract";
+import { LWQL_SOURCES_PARAMETER, lwqlExecutedText } from "@langwatch/analytics-contract";
 
 export const SOURCES_PLACEHOLDER = `{${LWQL_SOURCES_PARAMETER}:Array(String)}`;
 
@@ -14,30 +14,36 @@ export const PRESENCE_QUERY = "present";
 /** Views with the normalised `Source` column. */
 export const SOURCE_VIEWS = ["trace_metrics", "evaluation_metrics"] as const;
 
+/**
+ * Views that keep both the evaluation's `Source` and its trace's `TraceSource`: the read they
+ * replace kept both `evaluation_metrics` and the joined `trace_metrics` to the sources.
+ */
+export const SOURCE_AND_TRACE_SOURCE_VIEWS = [
+  "trace_evaluation_metrics",
+  "trace_evaluation_checks",
+] as const;
+
 /** Views keyed by the trace that carries the origin, reached through `trace_metrics`. */
-export const TRACE_VIEWS = ["traces", "spans", "evaluations", "annotations"] as const;
+export const TRACE_VIEWS = [
+  "traces",
+  "spans",
+  "span_metrics",
+  "evaluations",
+  "annotations",
+] as const;
 
 /** Views that keep an origin, or reach one through their trace. */
-export const VIEWS_WITH_ORIGIN: readonly string[] = [...SOURCE_VIEWS, ...TRACE_VIEWS];
+export const VIEWS_WITH_ORIGIN: readonly string[] = [
+  ...SOURCE_VIEWS,
+  ...SOURCE_AND_TRACE_SOURCE_VIEWS,
+  ...TRACE_VIEWS,
+];
 
-/** The SQL without its comments, and with its string literals emptied. */
-function codeOf(sql: string): string {
-  return sql
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/--[^\n]*/g, " ")
-    .replace(/'(?:[^'\\]|\\.|'')*'/g, "''");
-}
-
-/** Whether the SQL reads the placeholder in an expression: not in a comment or a literal. */
-export function readsSourcesParameter(sql: string): boolean {
-  return codeOf(sql).includes(SOURCES_PLACEHOLDER);
-}
-
-/** The distinct views a query names after FROM or JOIN, in the order first named. */
+/** The distinct views a query names after FROM or JOIN, with or without their database. */
 export function namedViews(sql: string): string[] {
-  const named = [...codeOf(sql).matchAll(/\b(?:FROM|JOIN)\s+(?:analytics\.)?([a-z_]+)/gi)].map(
-    (match) => match[1] ?? "",
-  );
+  const named = [
+    ...lwqlExecutedText(sql).matchAll(/\b(?:FROM|JOIN)\s+(?:[a-z_]+\.)?([a-z_]+)/gi),
+  ].map((match) => match[1] ?? "");
 
   return [...new Set(named)];
 }

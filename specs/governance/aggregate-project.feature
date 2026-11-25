@@ -38,6 +38,8 @@ Feature: An aggregate project reads its member projects
     When a project-reader grant carries a condition with a non-empty where clause
     Then the grant is refused
     # The slot is kept for the OTTL compiler. Nothing is compiled in v1.
+    # ADR-201 (Braids) compiles a where on a span condition only; a trace
+    # condition, which every aggregate grant carries, keeps refusing one.
 
   @unit
   Scenario: A project-reader grant never escalates
@@ -143,6 +145,40 @@ Feature: An aggregate project reads its member projects
     And a repository that filters on it fails the lint gate
     # Naming the column as a projected value or a dedup tuple member is
     # fine; only a predicate picks tenants, and only the client writes one.
+
+  @unit
+  Scenario: A tenant marker is only ever a top-level AND conjunct of its WHERE
+    Given a statement whose tenant marker sits under OR, XOR or NOT, inside a bracket holding an OR, or outside the WHERE of its select
+    When the store client expands it
+    Then the client refuses it and the refusal says to write the marker AND-ed into that WHERE
+    And no query runs
+    And a marker AND-ed into the WHERE of its own select or subquery renders as before
+    # Checked on the caller's text before expansion, so the fence's own OR
+    # between own projects and braid clauses is never seen.
+
+  @unit
+  Scenario: Every select that reads a table carries a tenant marker of its own
+    Given a statement with a UNION arm, a scalar subquery or a nested select reading a table with no tenant marker in its own WHERE
+    And a statement with a JOIN or comma to a table, a table function, or an IN over a table by name
+    When the store client expands it
+    Then the client refuses it as an unfenced select and no query runs
+    And a select reading a fenced subquery or the statement's own CTE, or joining a fenced subquery, renders as before
+    # {{idBound}} bounds time only, so it never counts as a select's tenant marker.
+
+  @unit
+  Scenario: No alias takes a name the fence reads
+    Given a statement naming an alias TenantId, SpanAttributes, a time column or another name the fence reads
+    And the alias is written with or without AS, quoted, in any case, in a WITH or an ARRAY JOIN
+    When the store client expands it
+    Then the client refuses it and no query runs
+
+  @integration
+  Scenario: A column always wins over an alias of its name
+    Given two tenants' spans and a statement whose alias shadows a column the fence reads
+    When the statement runs with ClickHouse's default settings
+    Then the other tenant's span passes the fence
+    And with the settings the reader pins on every statement only the fenced span passes
+    And neither the statement nor its caller can change those settings
 
   @integration
   Scenario: A plain project reads the same rows as before
@@ -529,6 +565,15 @@ Feature: An aggregate project reads its member projects
     # half it is. The proof is narrowed to one of its own tenants; a tenant
     # outside the proof is refused rather than read.
 
+  # Shares do not chain (ADR-201): the aggregate's proof carries its own
+  # grants only, never the braids its members receive.
+  @integration @unimplemented
+  Scenario: A member trace shows none of the spans braided into that member
+    Given a member project that receives a braid from another project
+    And a member trace holding spans braided into it
+    When ana opens that trace from the aggregate
+    Then only the member's own spans are shown
+
   @integration
   Scenario: Two members with the same trace id each list their own events
     Given an aggregate project whose two members each hold a trace with the same id
@@ -680,6 +725,8 @@ Feature: An aggregate project reads its member projects
     # Twenty call sites in the trace router today pass the project id by
     # hand. After this block none do, and the gate keeps it so. A route left
     # behind the baseline is listed by name with its owner and reason.
+    # ADR-201 extends the gate below the route: modules/trace/specs/braided-spans.feature,
+    # "A trace content read cannot swap the route's proof for an own-only one".
 
   @integration
   Scenario: Neither an aggregate nor the governance project is ever the project the app lands on

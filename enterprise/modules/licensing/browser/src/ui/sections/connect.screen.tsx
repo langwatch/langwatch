@@ -28,7 +28,7 @@ export default function ConnectScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Connect</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start">
         <Text color="fg.muted">
           Which LangWatch-hosted services this install may call, what they send and what they cost.
         </Text>

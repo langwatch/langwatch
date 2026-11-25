@@ -11,9 +11,11 @@ import {
   type AuthorizationCondition,
   type AuthorizationGrant,
   type AuthorizationPurpose,
+  BRAID_CONDITION_EVERY_SPAN,
   type GrantCondition,
   sealAuthorization,
   ProjectNotFoundError,
+  SPAN_BRAID_PERMISSION,
 } from "@langwatch/authorization";
 import {
   type AuthzPrincipalRef,
@@ -29,6 +31,9 @@ import type { AuthzService } from "./authz.service.ts";
 /** A proof never outlives this, whatever the grants say: the ceiling on
  *  how stale a route's view of access may be. */
 export const AUTHORIZATION_MAX_AGE_MS = 5 * 60 * 1000;
+
+/** ADR-201 §8: a proof carrying a braid lives at most this, so a removal shows within it. */
+export const BRAID_REVOCATION_BOUND_MS = 30_000;
 
 /** How long a project's organisation is remembered for internal mints: it
  *  bounds how stale a remembered scope may be, for a project that has since
@@ -62,6 +67,9 @@ type SharedReadsEntry = {
   rows: SharedReadRow[];
   storedAt: number;
 };
+
+/** The reader's shared reads and when they were read from the ledger, cached or not. */
+type SharedReadsSnapshot = { rows: SharedReadRow[]; readAt: number };
 
 /** The door: evaluates a route's permission and mints the sealed proof its
  *  reads carry, with one shared grant per project shared with the caller's. */
@@ -182,15 +190,15 @@ export class AuthorizationService {
       role: PROJECT_READER_ROLE_KEY,
       permission,
     });
-    const rows = sharedPermitted
+    const snapshot = sharedPermitted
       ? await this.liveSharedReads({
           organizationId: scopeRef.organizationId,
           readerProjectId: scope.projectId,
           now,
         })
-      : [];
+      : { rows: [], readAt: now };
     const { shared, expiresAt } = sharedGrantsFrom({
-      rows,
+      ...snapshot,
       readerProjectId: scope.projectId,
       permission,
       now,
@@ -209,7 +217,7 @@ export class AuthorizationService {
   /**
    * The reader's live shared reads, cached per organisation epoch (ADR-177, Consequences). The
    * epoch is read before the rows, so a write landing between the two bumps it past the entry.
-   * Expiry and the reader naming itself are still applied per mint, against the rows.
+   * `readAt` is when the rows were read, which bounds a braid's proof (ADR-201 §8), never the mint.
    */
   private async liveSharedReads({
     organizationId,
@@ -219,15 +227,16 @@ export class AuthorizationService {
     organizationId: string;
     readerProjectId: string;
     now: number;
-  }): Promise<SharedReadRow[]> {
+  }): Promise<SharedReadsSnapshot> {
     const { epochReader, cacheEnabled, sharedReads } = this.deps;
     const epoch =
       epochReader && cacheEnabled?.() === true ? await epochReader({ organizationId }) : null;
     if (epoch === null) {
-      return sharedReads.findLiveSharedReads({
+      const rows = await sharedReads.findLiveSharedReads({
         organizationId,
         readerProjectId,
       });
+      return { rows, readAt: now };
     }
     const key = `${organizationId}:${readerProjectId}`;
     const cached = this.sharedReadsCache.get(key);
@@ -236,7 +245,7 @@ export class AuthorizationService {
       cached.epoch === epoch &&
       now - cached.storedAt < SHARED_READS_CACHE_MAX_AGE_MS
     ) {
-      return cached.rows;
+      return { rows: cached.rows, readAt: cached.storedAt };
     }
     const rows = await sharedReads.findLiveSharedReads({
       organizationId,
@@ -248,63 +257,107 @@ export class AuthorizationService {
       if (oldest !== undefined) this.sharedReadsCache.delete(oldest);
     }
     this.sharedReadsCache.set(key, { epoch, rows, storedAt: now });
-    return rows;
+    return { rows, readAt: now };
   }
 }
 
 /**
- * One shared grant per applicable row, and the earliest expiry among them
- * under the ceiling. A row that cannot be applied - a where clause, an
- * expired grant, the reader naming itself - is left out.
+ * One shared grant per applicable row, and the earliest expiry among them under the ceiling. A
+ * row that cannot apply - a where clause, an expired grant, the reader naming itself, a replaced
+ * braid (ADR-201 §2), a braid read longer ago than the bound (§8) - is left out.
  */
 function sharedGrantsFrom({
   rows,
+  readAt,
   readerProjectId,
   permission,
   now,
 }: {
   rows: SharedReadRow[];
+  readAt: number;
   readerProjectId: string;
   permission: AuthzPermission;
   now: number;
 }): { shared: AuthorizationGrant[]; expiresAt: number } {
   const shared: AuthorizationGrant[] = [];
   let expiresAt = now + AUTHORIZATION_MAX_AGE_MS;
+  const replaced = new Set(rows.map((row) => row.replacesGrantId));
   for (const row of rows) {
-    const condition = proofCondition(row.condition);
-    const expiry = row.expiresAt?.epochMilliseconds;
-    const applicable =
-      row.memberProjectId !== readerProjectId &&
-      condition !== "not_applicable" &&
-      (expiry === undefined || expiry > now);
-    if (!applicable) continue;
+    const applied = appliedRow({ row, replaced, readerProjectId, readAt, now });
+    if (applied === "not_applicable") continue;
+    // A braid carries its own permission alone, which only the span read accepts (ADR-201 §3).
     shared.push({
       projectId: row.memberProjectId,
-      permissions: [permission],
+      permissions: applied.isBraid ? [SPAN_BRAID_PERMISSION] : [permission],
       via: [row.grantId],
       kind: "shared",
-      condition,
+      condition: applied.condition,
     });
-    if (expiry !== undefined) expiresAt = Math.min(expiresAt, expiry);
+    expiresAt = Math.min(expiresAt, applied.until);
   }
   return { shared, expiresAt };
 }
 
+/** A row's proof condition and the latest a proof may carry it, when it applies at all. */
+function appliedRow({
+  row,
+  replaced,
+  readerProjectId,
+  readAt,
+  now,
+}: {
+  row: SharedReadRow;
+  replaced: ReadonlySet<SharedReadRow["replacesGrantId"]>;
+  readerProjectId: string;
+  readAt: number;
+  now: number;
+}): { condition: AuthorizationCondition; isBraid: boolean; until: number } | "not_applicable" {
+  const condition =
+    row.condition === "unreadable" ? "not_applicable" : proofCondition(row.condition);
+  const expiry = row.expiresAt?.epochMilliseconds ?? Number.POSITIVE_INFINITY;
+  if (condition === "not_applicable" || expiry <= now) return "not_applicable";
+  if (replaced.has(row.grantId) || row.memberProjectId === readerProjectId) return "not_applicable";
+  // Bounded from the ledger read, so a cached snapshot never stretches a removal past it (§8).
+  const isBraid = condition.type === "span";
+  const until = isBraid ? Math.min(expiry, readAt + BRAID_REVOCATION_BOUND_MS) : expiry;
+  return isBraid && until <= now ? "not_applicable" : { condition, isBraid, until };
+}
+
 /**
- * The ledger's ISO window as the proof's epoch milliseconds. A non-empty `where` has no compiler
- * in v1, and a window with no start would open the widest window there is, so either keeps the
- * row out of the proof rather than in it unfiltered.
+ * The ledger's ISO window as the proof's epoch milliseconds. A window with no start (the widest
+ * there is), or a condition with no compiled form it needs, keeps the row out of the proof rather
+ * than in it unfiltered.
  */
 function proofCondition(condition: GrantCondition): AuthorizationCondition | "not_applicable" {
-  // ADR-185 §1, §9: a braid is honoured only from the release that ships its fence.
-  if (condition.type === "span" || condition.compiledWhere !== undefined) return "not_applicable";
-  if (condition.where !== undefined && condition.where !== "") return "not_applicable";
+  const compiled = compiledFormOf(condition);
+  if (compiled === "not_applicable") return "not_applicable";
   if (condition.from === undefined) return "not_applicable";
   const from = epochMillisecondsOf(condition.from);
   const until = condition.until === undefined ? null : epochMillisecondsOf(condition.until);
   if (from === "not_applicable" || until === "not_applicable") return "not_applicable";
 
-  return { type: condition.type, from, until };
+  return { type: condition.type, ...compiled, from, until };
+}
+
+/**
+ * Only a span braid carries a compiled form, and it always does (ADR-201 §3): its stored one
+ * under a `where`, the explicit "every span" form under none, rows stored before that form
+ * existed included. A `where` without its compiled form, or one on another type, is refused.
+ */
+function compiledFormOf(
+  condition: GrantCondition,
+): Pick<AuthorizationCondition, "where" | "compiledWhere"> | "not_applicable" {
+  const where = condition.where ?? "";
+  const { compiledWhere } = condition;
+  if (condition.type !== "span") {
+    return where === "" && compiledWhere === undefined ? {} : "not_applicable";
+  }
+  if (where === "") {
+    return compiledWhere === undefined
+      ? { compiledWhere: BRAID_CONDITION_EVERY_SPAN }
+      : "not_applicable";
+  }
+  return compiledWhere === undefined ? "not_applicable" : { where, compiledWhere };
 }
 
 function epochMillisecondsOf(iso: string): number | "not_applicable" {

@@ -15,14 +15,18 @@ class UpdateTestSuiteResponse404:
     """
     Attributes:
         error (str):
+        code (str):
         message (str | Unset):
     """
 
     error: str
+    code: str
     message: str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         error = self.error
+
+        code = self.code
 
         message = self.message
 
@@ -31,6 +35,7 @@ class UpdateTestSuiteResponse404:
         field_dict.update(
             {
                 "error": error,
+                "code": code,
             }
         )
         if message is not UNSET:
@@ -43,10 +48,13 @@ class UpdateTestSuiteResponse404:
         d = dict(src_dict)
         error = d.pop("error")
 
+        code = d.pop("code")
+
         message = d.pop("message", UNSET)
 
         update_test_suite_response_404 = cls(
             error=error,
+            code=code,
             message=message,
         )
 

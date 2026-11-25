@@ -17,7 +17,7 @@ export const ingestionKeyTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("install")
-  .mintsCredential("organization:view")
+  .mintsCredential()
   .withPermission("organization:view")
   .handle(({ app, input, actor }) =>
     app.ingestionKeyInstall({
@@ -31,7 +31,7 @@ export const ingestionKeyTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("rotate")
-  .mintsCredential("organization:view")
+  .mintsCredential()
   .withPermission("organization:view")
   .handle(({ app, input, actor }) =>
     app.ingestionKeyRotate({

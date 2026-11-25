@@ -254,7 +254,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When a view whose source sorts by a column its write path moves is inspected
     Then it declares that one row is one record rather than one sort key
     And a view that declares a grain narrower than its engine's key declares a strategy that can deliver it
-    And the views whose sort keys hold still keep the shipped default
+    And the views whose sort keys hold still keep the shipped default, read their latest version in order without FINAL, read rows written once as written, or settle retraction pairs without FINAL
 
   @integration
   Scenario: A pre-aggregated view returns one merged row per bucket
@@ -304,6 +304,12 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the restricted identity selects that record through the LangWatchQL view
     Then one row is returned
     And it carries the newer version's values
+
+  @integration
+  Scenario: A plain span_metrics read counts a residual duplicate span
+    Given span_analytics holds two copies of one span, a residual duplicate ADR-034 accepts
+    When the restricted identity selects that span through the span_metrics view
+    Then both copies are returned, because a plain read does not deduplicate
 
   @integration
   Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
@@ -563,9 +569,22 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   @unit
   Scenario: A parameter value that does not fit its declared type is refused with the parameter named
     Given a query declaring {start:DateTime64(3)}
-    When the request binds start to a value the server cannot read as that type, such as an ISO string ending in Z
+    When the request binds start to a value the server cannot read as that type, such as "last tuesday"
     Then the query is refused with error code lwql_parameter_invalid at HTTP 400, a customer fault
     And the refusal names the parameter and nothing else from the server's message
+
+  @unit
+  Scenario: An ISO instant bound to a date-time parameter is sent as the same moment the server can read
+    Given a query declaring {start:DateTime64(3, 'UTC')} and {day:DateTime}
+    When the request binds start to "2026-11-01T00:00:00Z" and day to "2026-11-01T02:00:00+02:00"
+    Then the server receives each as Unix seconds for that moment, start with its fraction and day whole
+    And a value that is not an ISO instant with an offset is sent exactly as the caller bound it
+
+  @unit
+  Scenario: Placeholder text inside a string literal or comment does not change a bound value
+    Given a query declaring {s:String} that also holds the text {s:DateTime} in a string literal and in a comment
+    When the request binds s to "2026-11-01T00:00:00Z"
+    Then the server receives s exactly as the caller bound it
 
   @unit
   Scenario: A missing column passed to a function is named in the refusal
@@ -744,15 +763,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the query is rejected rather than executed with weaker guarantees
 
   # ---------------------------------------------------------------------------
-  # Organizations with a private ClickHouse (issue #9248). This path is
-  # unreachable today: the placement gate (specs/lwql/isolation.feature) refuses
-  # every routed organization with lwql_not_provisioned before any route is
-  # asked, until ADR-200's per-organization Ops opt-in exists. The scenarios
-  # below describe the query layer behind that opt-in. Which identity and login
-  # a private ClickHouse is queried as stays ADR-200's later decision; until
-  # then the query layer uses only the login the route URL carries, never the
-  # shared LangWatchQL one. Provisioning LangWatchQL objects on a private
-  # ClickHouse lands in a later PR.
+  # Organizations with a private ClickHouse (issue #9248). The placement gate
+  # (specs/lwql/isolation.feature) admits a routed organization only where its
+  # own server is provisioned, probed as the route's reader login. The query
+  # layer behind it uses only the login the route URL carries, never the
+  # shared LangWatchQL one. Infra provisions LangWatchQL objects on the server.
   # ---------------------------------------------------------------------------
 
   @unit
@@ -1230,7 +1245,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # counts a view as drift only when it lacks a column this worker's catalog
   # declares, never for an extra one, so a newer deploy that added a column looks
   # healthy to an older worker, which leaves the newer view alone. Its grants are
-  # additive and never revoke, so a view only the newer catalog has keeps its
+  # additive and never revoke the shared reader, so a view only the newer catalog has keeps its
   # SELECT. A newer deploy that only removed a column is put back to the older
   # view by an older worker, and the newer worker accepts the extra column: the
   # view settles on the union of the columns both catalogs need, so it stops
@@ -1249,8 +1264,130 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given a newer deploy has converged views and approved views that added columns this worker's catalog does not declare
     When this worker's reconvergence check runs
     Then it finds no drift and runs no DDL
-    And repairing a missing or ungranted approved view grants SELECT on that view alone and never revokes
-    And a deploy's converge still revokes and grants the reader role's whole set
+    And repairing a missing or ungranted approved view grants SELECT on that view alone and never revokes the shared reader
+    And the scoped-reader group's SELECT is revoked on every shared view and on any scoped copy that fails the scoped-view check
+    And a deploy's converge still revokes and grants the shared reader's whole set
+    And a deploy's converge or a repair warns, naming any scoped copy the scoped-reader group still cannot select
+
+  @integration
+  Scenario: A scoped view a deploy converge restores regains the scoped-reader group's SELECT
+    Given the scoped-reader group has SELECT on a row-scoped copy in lwql_scoped
+    And that copy is replaced by an unscoped look-alike and the group loses its SELECT
+    When a deploy's converge runs and restores the row-scoped copy
+    Then the scoped-reader group has SELECT on it again, with no manual step
+
+  # Scoped readers read copies of the approved views in schema lwql_scoped, under
+  # the same names. Each copy reads the base tables directly and carries a
+  # per-reader row scope: a login sees only the projects of the organizations
+  # whose lwql_org_<md5(organizationId)> role it is a member of, and no login is
+  # exempt. The shared lwql_* views keep main's definition; the shared reader
+  # reads those and keeps every row.
+  @integration
+  Scenario: Each Postgres reader login sees only its own organizations' projects
+    Given two logins in the scoped-reader group, each holding one organization's role
+    And the shared reader login
+    When the shared reader reads every shared view and each organization login every scoped copy
+    Then the shared reader sees exactly the TenantIds the base tables hold for each view
+    And each organization login sees only its organization's projects
+    And its rows equal the shared reader's rows filtered to that organization
+
+  @integration
+  Scenario: A Postgres reader's row scope follows a project moved to another organization
+    Given a project belongs to org_a and an org_b login reads every scoped copy
+    When the project moves to a team of org_b
+    Then the org_a login no longer sees the moved project
+    And the org_b login keeps every row it saw before and sees the moved project's rows through a project-path view
+
+  @integration
+  Scenario: A Postgres reader login with no organization role sees no rows
+    Given a login in the scoped-reader group that holds no organization role
+    When it reads every scoped copy
+    Then every copy returns no rows
+
+  # A copy without the barrier lets a caller's leaky function see rows the
+  # scope predicate would remove; the barrier must not cost the tenant filter
+  # its pushdown onto the scan of the relation carrying the project id.
+  @integration
+  Scenario: Every scoped copy is a security barrier and keeps the tenant filter pushed down
+    Given the scoped copies are provisioned
+    Then every one is created with security_barrier=true
+    And on the deepest join paths an organization login's TenantId filter is applied on the tenant relation's scan
+    And no subquery scan above the barrier carries that filter
+
+  # The scoped-reader group's grant reads the live copy's stored definition
+  # (pg_get_viewdef): it must be a security barrier and carry the org-role
+  # lookup, the pg_auth_members join and the rolname = current_user tie.
+  @integration
+  Scenario: The scoped-reader group is granted only a live view that is provably row-scoped
+    Given a live copy in lwql_scoped that is unscoped, or carries the org-role lookup without the membership join or the current-user tie
+    And the scoped-reader group holds a stale SELECT on it
+    When the app grants the scoped copies
+    Then the group's SELECT on that copy is revoked
+    And the group keeps SELECT on every row-scoped copy
+
+  @integration
+  Scenario: Provisioning without the scoped-reader group is unchanged
+    Given a deployment where the scoped-reader group does not exist
+    When the app provisions the approved views
+    Then provisioning succeeds without creating the group
+    And no lwql_scoped schema exists, and the shared views keep main's definition
+    And the shared reader still reads every view
+
+  @integration
+  Scenario: The scoped-reader state read reports nothing and raises nothing without the group
+    Given live copies, and a group name that may or may not exist
+    When the converge reads the scoped-reader group's reach
+    Then a group that does not exist yields no copy, no shared grant and no error
+    And a copy passes only when it is a security barrier carrying the row scope tied to the current user
+    And a copy is granted only when the group holds USAGE on lwql_scoped and SELECT on the copy
+    And the scoped schema is this installation's only when its comment names this app schema
+
+  # Scoped readers read copies in schema lwql_scoped that read base tables
+  # directly; no older version writes that schema, so its converge (a rollback's
+  # included) cannot unscope them. Shared lwql_* views keep main's definition.
+  @integration
+  Scenario: An older version's converge cannot weaken a scoped copy
+    Given the scoped-reader group has SELECT on every scoped copy
+    When an older version's converge rewrites the shared views, its drop-and-create fallback included
+    Then every scoped copy's stored definition and options are unchanged
+    And the group can select no relation outside the scoped copies that pass the scoped-view check
+    And each organization login sees only its organizations' rows through every scoped copy
+
+  @integration
+  Scenario: Without CREATE on the database, the scoped part fails closed
+    Given the scoped-reader group exists, lwql_scoped is absent and the app role lacks CREATE on the database
+    When a deploy's converge runs
+    Then the shared views and the shared reader's grants converge as without the group
+    And a warning says the scoped schema is absent
+    And the group can select no relation
+
+  # lwql_scoped is one per database, the app schema one per installation: the
+  # schema's comment names the app schema that created it, so two installations
+  # sharing a database never write each other's copies.
+  @integration
+  Scenario: A scoped schema marked as another installation's is left alone
+    Given the scoped-reader group exists and lwql_scoped exists with a comment naming another app schema
+    When a deploy's converge runs
+    Then no copy is written into it and the group is granted nothing in it
+    And the group can select no relation
+    And a warning says lwql_scoped is not marked as this installation's
+
+  @unit
+  Scenario: The reconvergence check guards every scoped copy
+    Given the scoped-reader group exists
+    And it holds SELECT on a shared view, one copy is absent, one is replaced by an unscoped look-alike, and one lacks its grant
+    When the reconvergence check runs
+    Then it revokes the group on the shared view and the look-alike before any DDL
+    And it rebuilds only the absent and unscoped copies, and no shared view
+    And it grants the group each copy only once it passes the scoped-view check
+
+  @integration
+  Scenario: Scoped copies exist only where the scoped-reader group does
+    Given no scoped-reader group
+    When a deploy's converge runs
+    Then no lwql_scoped schema exists and the check reports no scoped gap
+    When the group is created and the next reconvergence check runs
+    Then every scoped copy exists and the group has USAGE on lwql_scoped only
 
   # A deploy converges views after the engine tables and stops at the first
   # failing statement, so a deploy whose PostgreSQL bridge fails never replaces
@@ -1550,6 +1687,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #  views are usable at scale)
 #   → Scenario: A LangWatchQL view returns only the calling tenant's rows
 #   → Scenario: A LangWatchQL view returns one row per logical record, the latest version
+#   → Scenario: A plain span_metrics read counts a residual duplicate span
 #   → Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
 #   → Scenario: Reading the physical fact table directly is policed the same way
 #   → Scenario: Row policies leave the application's own reads untouched

@@ -37,6 +37,7 @@ class TestScenarioExecutionService extends ScenarioExecutionService {
   readonly recordCutAtLimit = vi.fn(() => Promise.resolve());
 
   readonly recordHooks = vi.fn(() => Promise.resolve());
+  readonly recordRedTeamReport = vi.fn(() => Promise.resolve());
 
   submit(_input: ScenarioExecutionJob): Promise<void> {
     throw new Error("submit unexpectedly called in backfill tests");

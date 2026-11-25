@@ -81,6 +81,8 @@ export interface ReplayEventSource {
     maxCutoff: CutoffInfo;
     cursor?: CutoffInfo;
     batchSize: number;
+    /** Ends the page before its payloads pass this many bytes; its first event is always read. */
+    maxPayloadBytes?: number;
     occurredAtBounds?: OccurredAtBounds;
   }): Promise<ReplayEvent[]>;
   optimizeTables?(tenantId: string, tables: readonly string[]): Promise<void>;

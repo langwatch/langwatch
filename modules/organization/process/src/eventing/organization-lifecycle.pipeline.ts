@@ -49,7 +49,10 @@ import {
   RecordMemberDisabledCommand,
   RecordMemberEnabledCommand,
   RecordMemberRemovedCommand,
+  RecordMemberListedCommand,
   RecordMemberDepartmentChangedCommand,
+  RecordMemberRoleChangedCommand,
+  RecordMemberAdmittedCommand,
   RecordPersonalWorkspaceProvisionedCommand,
   RecordPersonalTeamCreatedCommand,
   RecordPersonalWorkspaceArchivedCommand,
@@ -58,6 +61,7 @@ import {
   RecordPresenceSettingChangedCommand,
   RecordSignedUpCommand,
   RecordTraceSharingDisabledCommand,
+  RecordDocsPlaygroundSessionsDisabledCommand,
 } from "./organization-lifecycle.commands.ts";
 import {
   integrationMethodChosenEventSchema,
@@ -68,10 +72,14 @@ import {
   organizationMemberDisabledEventSchema,
   organizationMemberEnabledEventSchema,
   organizationMemberRemovedEventSchema,
+  organizationMemberListedEventSchema,
   organizationMemberDepartmentChangedEventSchema,
+  organizationMemberRoleChangedEventSchema,
+  organizationMemberAdmittedEventSchema,
   organizationPresenceSettingChangedEventSchema,
   organizationSignedUpEventSchema,
   organizationTraceSharingDisabledEventSchema,
+  organizationDocsPlaygroundSessionsDisabledEventSchema,
   personalWorkspaceProvisionedEventSchema,
   personalTeamCreatedEventSchema,
   personalWorkspaceArchivedEventSchema,
@@ -131,11 +139,15 @@ function lifecycleCommands() {
       personalWorkspaceFeaturesChangedEventSchema,
       organizationPresenceSettingChangedEventSchema,
       organizationTraceSharingDisabledEventSchema,
+      organizationDocsPlaygroundSessionsDisabledEventSchema,
       organizationMemberDisabledEventSchema,
       organizationMemberEnabledEventSchema,
       organizationMemberRemovedEventSchema,
       organizationMemberDepartmentChangedEventSchema,
+      organizationMemberRoleChangedEventSchema,
+      organizationMemberAdmittedEventSchema,
       organizationCreatedEventSchema,
+      organizationMemberListedEventSchema,
     ])
     .withCommand("recordSignedUp", RecordSignedUpCommand)
     .withCommand("recordMembersInvited", RecordMembersInvitedCommand)
@@ -151,11 +163,18 @@ function lifecycleCommands() {
     )
     .withCommand("recordPresenceSettingChanged", RecordPresenceSettingChangedCommand)
     .withCommand("recordTraceSharingDisabled", RecordTraceSharingDisabledCommand)
+    .withCommand(
+      "recordDocsPlaygroundSessionsDisabled",
+      RecordDocsPlaygroundSessionsDisabledCommand,
+    )
     .withCommand("recordMemberDisabled", RecordMemberDisabledCommand)
     .withCommand("recordMemberEnabled", RecordMemberEnabledCommand)
     .withCommand("recordMemberRemoved", RecordMemberRemovedCommand)
     .withCommand("recordMemberDepartmentChanged", RecordMemberDepartmentChangedCommand)
-    .withCommand("recordCreated", RecordCreatedCommand);
+    .withCommand("recordMemberRoleChanged", RecordMemberRoleChangedCommand)
+    .withCommand("recordMemberAdmitted", RecordMemberAdmittedCommand)
+    .withCommand("recordCreated", RecordCreatedCommand)
+    .withCommand("recordMemberListed", RecordMemberListedCommand);
 }
 
 export type OrganizationLifecycleDefinition = ReturnType<
@@ -291,5 +310,8 @@ export const organizationLifecycleEventing = defineEventingModule({
   pipeline: ORGANIZATION_LIFECYCLE_PIPELINE_NAME,
   build: ({ app }: EventingSetup<OrganizationRepositories, OrganizationModule>) =>
     app.lifecyclePipeline(),
-  connect: ({ app, commands }) => app.connectLifecycle(commands),
+  connect: ({ app, commands }) => {
+    app.connectLifecycle(commands);
+    app.connectMemberListing(commands);
+  },
 });

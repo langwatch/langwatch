@@ -73,6 +73,19 @@ describe("given a governed file", () => {
     });
   });
 
+  describe("when the file is a docs island's browser code", () => {
+    /** @scenario "A docs island may load a heavy part late" */
+    it("reports nothing there and still reports the rest of the docs app", () => {
+      const code = 'const form = await import("./body-form.ts");';
+
+      expect(report(code, "apps/docs/src/features/api-reference/browser/playground.tsx")).toEqual(
+        [],
+      );
+      expect(report(code, "apps/docs/src/features/api-reference/model/codegen.ts")).toHaveLength(1);
+      expect(report(code, "apps/docs/src/browser/entry.ts")).toHaveLength(1);
+    });
+  });
+
   describe("when the file is the dev runtime entry", () => {
     /** @scenario The dev runtime's entries are exempt */
     it("reports nothing there and still reports its siblings", () => {

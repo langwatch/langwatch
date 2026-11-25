@@ -1,6 +1,10 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+/** The longest name and description an ingestion source takes. */
+export const INGESTION_SOURCE_NAME_MAX = 128;
+export const INGESTION_SOURCE_DESCRIPTION_MAX = 2_000;
+
 export const GOVERNANCE_INGESTION_SOURCE_TYPES = [
   "otel_generic",
   "claude_code",
@@ -15,6 +19,7 @@ export const GOVERNANCE_INGESTION_SOURCE_TYPES = [
   "databricks_genie",
   "s3_custom",
   "http_custom",
+  "security_lake",
 ] as const;
 export const governanceIngestionSourceTypeSchema = z.enum(GOVERNANCE_INGESTION_SOURCE_TYPES);
 export type GovernanceIngestionSourceType = z.infer<typeof governanceIngestionSourceTypeSchema>;
@@ -80,7 +85,7 @@ const createGovernanceIngestionSourceCommandSchemaDefinition = z
     parserConfig: z.record(z.string(), z.unknown()).optional(),
     pullConfig: z.record(z.string(), z.unknown()).nullable().optional(),
     pullSchedule: z.string().nullable().optional(),
-    actorUserId: z.string().min(1),
+    actorUserId: z.string().min(1).nullable(),
   })
   .strict();
 export interface CreateGovernanceIngestionSourceCommandSchema extends Named<

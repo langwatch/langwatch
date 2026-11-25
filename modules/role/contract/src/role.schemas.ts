@@ -3,7 +3,7 @@
  * Permissions parse against the authorization registry's own vocabulary, so a
  * role the decision engine could not read is refused here.
  */
-import { authzPermissionSchema } from "@langwatch/authorization";
+import { grantablePermissionSchema } from "@langwatch/authorization";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
@@ -37,7 +37,7 @@ const roleApiCreateInputSchemaDefinition = z.object({
   organizationId: z.string(),
   name: z.string().min(1).max(50),
   description: z.string().optional(),
-  permissions: z.array(authzPermissionSchema),
+  permissions: z.array(grantablePermissionSchema),
 });
 export interface RoleApiCreateInputSchema extends Named<
   typeof roleApiCreateInputSchemaDefinition
@@ -50,7 +50,7 @@ const roleApiUpdateInputSchemaDefinition = z.object({
   roleId: z.string(),
   name: z.string().min(1).max(50).optional(),
   description: z.string().optional(),
-  permissions: z.array(authzPermissionSchema).optional(),
+  permissions: z.array(grantablePermissionSchema).optional(),
 });
 export interface RoleApiUpdateInputSchema extends Named<
   typeof roleApiUpdateInputSchemaDefinition

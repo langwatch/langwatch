@@ -178,6 +178,12 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     When its input tokens are estimated
     Then the count uses the ratio the classifier publishes rather than a prose rule
 
+  @unit
+  Scenario: A request is priced with the envelope the judge bills on every call
+    Given a judged text of known length and one question
+    When its input tokens are estimated
+    Then the count is the text plus the questions plus the classifier's request overhead
+
   # ---------------------------------------------------------------------------
   # Reading a run
   # ---------------------------------------------------------------------------
@@ -217,6 +223,19 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     Given a run with two questions
     When the results are read for one question and matches only
     Then every judgement belongs to that question and passed
+
+  @integration
+  Scenario: Results narrowed to non-matches keep the skipped and failed judgements
+    Given a run with passed, not passed, skipped and failed judgements on a yes or no and a score question
+    When the results are read with matches excluded
+    Then the yes or no judgements that did not pass are returned with every skipped and failed judgement
+    And matches and non-matches together are every judgement, each once
+
+  @integration
+  Scenario: Non-matches narrowed to skipped or failed return those judgements
+    Given a run with passed, not passed, skipped and failed judgements on a yes or no and a score question
+    When the results are read with matches excluded and the status skipped, then failed
+    Then each read returns every judgement with that status
 
   @integration
   Scenario: A sample re-reads the text that was judged without judging it again
@@ -284,6 +303,16 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     When the executor loads the run
     Then it fails with instant_eval_not_enabled
     And it does not report the run as missing
+
+  # The restricted identity finds a project's tenant only through the LangWatchQL key map.
+  # A project with no row there reads zero rows and no error, so the gap is closed up front.
+  @unit
+  Scenario: A project with no key-map row is given one before it runs, or is refused
+    Given a project whose LangWatchQL key map holds no row for it
+    When a run or an estimate is requested
+    Then the row is written before anything is read
+    And when the row cannot be written, the request is refused with instant_eval_not_enabled
+    And the run is never created to finish with zero rows
 
   @unit
   Scenario: A query identity ClickHouse refuses to log in answers as not enabled

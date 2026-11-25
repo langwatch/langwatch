@@ -261,6 +261,8 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // asserts it, so scenarios under specs/ci/ can only bind from this root.
   // Without it those feature files report "all bound" while binding nothing.
   "tools/ciguard",
+  // The review job's wait for the other checks (specs/ci/pr-review-bot.feature).
+  "tools/waitforchecks",
   "tools/deployimpact",
   "tools/operatornotes",
   "tools/cachesweep",
@@ -279,12 +281,17 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The docs deploy's redirect store and its job (specs/ci/docs-deploy.feature).
   "tools/docsdeploy",
   "tools/chartheap",
+  "tools/charts3region",
+  // The PII model image a release copies (specs/ci/pii-redaction-model-release.feature).
+  "tools/newestimage",
   // How the package-suites weights are measured from main's job logs
   // (specs/ci/package-suites-weights.feature).
   "tools/suiteweights",
   // The gateway-matrix seed: which providers it seeds from which credentials,
   // and that Bedrock stays keyless (specs/ci/gateway-matrix-seed.feature).
   "tools/matrixseed",
+  // Its command writes the bootstrapped step output the later steps gate on.
+  "cmd/matrixseed",
   // The CLI half of the same tool: the verdict-to-exit-code step is the part
   // CI gates on, so the "check fails" / "check passes" scenarios bind here.
   "cmd/linkcheck",
@@ -510,7 +517,6 @@ const LEGACY_INERT: string[] = [
   "specs/features/trigger-cli.feature",
   "specs/features/workflow-cli.feature",
   "specs/home/onboarding-progress-ui.feature",
-  "specs/home/voice-agents-home-banner.feature",
   // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
   // specs ship ahead of the code, and the PR that builds each surface binds its
   // file as it lands. Remove each entry with its first binding.
@@ -529,7 +535,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-empty-state-suggestions.feature",
   "specs/langy/langy-panel-fold-motion.feature",
   "specs/langy/langy-selfhost-install.feature",
-  "specs/langy/langy-session-key-lifecycle.feature",
   "specs/langy/langy-shutdown-handoff.feature",
   "specs/langy/langy-workbench-sidebar.feature",
   "specs/langy/langy-worker-isolation.feature",
@@ -547,7 +552,6 @@ const LEGACY_INERT: string[] = [
   "specs/model-config/anthropic-empty-content.feature",
   "specs/model-config/litellm-reasoning-params.feature",
   "specs/model-config/model-parameter-display.feature",
-  "specs/model-config/model-selector-ux.feature",
   "specs/model-config/unified-reasoning-ui.feature",
   "specs/model-providers/custom-model-max-tokens.feature",
   "specs/model-providers/default-provider.feature",
@@ -700,6 +704,10 @@ const LEGACY_PARTIAL: string[] = [
   // the "Cost formatting" rule is enforced. The pills, duration, token and
   // span tab rules are described here and stay untagged.
   "specs/traces-v2/metrics.feature",
+  // Reason: left LEGACY_INERT when the blank-key refusal and the worker age
+  // cap were bound to Go tests. The older mint and revoke scenarios describe
+  // control-plane behaviour and stay untagged.
+  "specs/langy/langy-session-key-lifecycle.feature",
   // Reason: left LEGACY_INERT when the CLI gained the traces.count alias
   // and the unknown-metric refusal, which its three new scenarios enforce.
   // The six older scenarios describe the query presets and stay untagged.

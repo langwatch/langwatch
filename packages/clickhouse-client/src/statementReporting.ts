@@ -4,11 +4,15 @@
  * so a catch-site throw from a counter or log sink never masks the real error.
  */
 
+import { createWarnThrottle, type WarnThrottle } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+
 import { QUERY_CAUSE_FIELD, quietly, RETRY_CAUSE_FIELD } from "./resilience.ts";
 import type { RetryAttemptNotice } from "./retry.ts";
 import {
   extractQueryPreview,
   extractRawQuery,
+  queryShapeOf,
   safeQueryMeta,
   type VendorQueryType,
 } from "./statementShape.ts";
@@ -82,7 +86,12 @@ const NOOP_METRICS: StatementMetrics = {
   incrementCount: () => undefined,
 };
 
+/** How long a cold-scan warning for one query shape stays quiet after it is logged. */
+const COLD_SCAN_WARN_INTERVAL_MS = 60 * 60 * 1000;
+
 export interface StatementReporterOptions {
+  /** Epoch milliseconds; injectable so a test steps the cold-scan quiet window. */
+  now?: (() => number) | undefined;
   cluster?: string | undefined;
   metrics?: StatementMetrics | undefined;
   noticeLogger?: StatementLogSink | undefined;
@@ -99,8 +108,12 @@ export class StatementReporter {
   /** Raw on purpose: a failure here is worth a line on the notice sink. */
   private readonly outcomeLogger: StatementLogSink;
   private readonly detectColdScan: (rawQuery: string) => string | null;
+  private readonly now: () => number;
+  /** One cold-scan warning per query shape per interval; per reporter, so tests stay apart. */
+  private readonly coldScanThrottle: WarnThrottle = createWarnThrottle(COLD_SCAN_WARN_INTERVAL_MS);
 
   constructor({
+    now = () => nowInstant().epochMilliseconds,
     cluster = "shared",
     metrics = NOOP_METRICS,
     noticeLogger = NOOP_SINK,
@@ -112,6 +125,17 @@ export class StatementReporter {
     this.noticeLogger = guardedLogSink(noticeLogger);
     this.outcomeLogger = outcomeLogger;
     this.detectColdScan = detectColdScan;
+    this.now = now;
+  }
+
+  /** Null while the shape is quiet; otherwise how many warnings it held back since the last. */
+  private claimColdScanWarning(rawQuery: string): { suppressedSincePrevious: number } | null {
+    const suppressed = this.coldScanThrottle.claim({
+      key: queryShapeOf(rawQuery),
+      now: this.now(),
+    });
+
+    return suppressed === undefined ? null : { suppressedSincePrevious: suppressed };
   }
 
   /** Count one finished statement. */
@@ -202,12 +226,12 @@ export class StatementReporter {
       // including any cold tier on object storage - a burst of GET requests
       // per call. Worth warning even when fast, because the cost is request
       // count, not latency.
+      const rawQuery = extractRawQuery(params);
       const coldScanTable =
-        operation === "query" && !declaresFullScan(params)
-          ? this.detectColdScan(extractRawQuery(params))
-          : null;
+        operation === "query" && !declaresFullScan(params) ? this.detectColdScan(rawQuery) : null;
+      const coldScanClaim = coldScanTable === null ? null : this.claimColdScanWarning(rawQuery);
 
-      if (coldScanTable !== null) {
+      if (coldScanTable !== null && coldScanClaim !== null) {
         this.outcomeLogger.warn(
           {
             source: "clickhouse",
@@ -219,6 +243,7 @@ export class StatementReporter {
             query: extractQueryPreview(params),
             coldScan: true,
             coldScanTable,
+            suppressedSincePrevious: coldScanClaim.suppressedSincePrevious,
           },
           `ClickHouse cold-scan ${operation}: cold scan of ${coldScanTable} (no time filter, walks S3 partitions)`,
         );

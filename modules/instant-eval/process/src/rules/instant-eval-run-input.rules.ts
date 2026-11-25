@@ -13,7 +13,7 @@ import {
   type InstantEvalShorthandInput,
 } from "@langwatch/instant-eval-contract";
 import type { Instant } from "@langwatch/time";
-import type { LangWatchQLTraceFilter } from "@langwatch/trace-contract";
+import type { LangWatchQLTraceFilter, SpanAnalyticsFloor } from "@langwatch/trace-contract";
 
 import {
   type CompiledInstantEvalFilter,
@@ -75,6 +75,7 @@ export function instantEvalStatementFor({
   now,
   filter,
   selection,
+  spanAnalyticsFloor,
 }: {
   readonly input: InstantEvalRunInput;
   readonly now: Instant;
@@ -82,6 +83,8 @@ export function instantEvalStatementFor({
   readonly filter?: CompiledInstantEvalFilter | null;
   /** Trace ids to bind in place of a filter the dialect cannot compile. */
   readonly selection?: readonly string[];
+  /** Where span_analytics is complete from; none keeps the attribute map read. */
+  readonly spanAnalyticsFloor?: SpanAnalyticsFloor | null;
 }): InstantEvalStatement {
   const source = statementSourceOf(input);
   if (source.kind === "sql") {
@@ -98,6 +101,7 @@ export function instantEvalStatementFor({
     now,
     ...(filter ? { filter } : {}),
     ...(selection ? { selection } : {}),
+    spanAnalyticsFloor: spanAnalyticsFloor ?? null,
   });
 }
 

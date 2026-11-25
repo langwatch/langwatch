@@ -428,7 +428,11 @@ export async function startLangWatchQLClickHouse({
   // A reused container carries the previous run's objects. Dropping the
   // database first makes every run start from the same state, so a test that
   // creates a fixture object cannot leak into the next run's audits.
-  await applyAsAdmin([`DROP DATABASE IF EXISTS ${names.database}`]);
+  // The facts database is dropped too, or its inserts pile up across reused runs.
+  await applyAsAdmin([
+    `DROP DATABASE IF EXISTS ${names.database}`,
+    ...(facts === "migrated" ? [`DROP DATABASE IF EXISTS ${names.database}_facts`] : []),
+  ]);
   await applyAsAdmin([`CREATE DATABASE ${names.database}`]);
 
   const factDatabase = facts === "migrated" ? `${names.database}_facts` : names.database;
@@ -1174,6 +1178,9 @@ export async function seedEveryCatalogSource({
             row[column.name] = tenant.tenantId;
           } else if (column.name === "_retention_days") {
             row[column.name] = 0;
+          } else if (column.name === view.dedup.signColumn) {
+            // A settled view keeps a key only while its signs sum above zero.
+            row[column.name] = 1;
           } else if (column.type.startsWith("DateTime")) {
             row[column.name] = now;
           } else if (sortKey.has(column.name) && SEEDABLE_KEY_TYPE.test(column.type)) {

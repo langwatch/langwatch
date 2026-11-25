@@ -1,3 +1,4 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingParticipation, FoldReadAuthorizer } from "@langwatch/eventing";
@@ -14,9 +15,11 @@ import type { TraceBlobStoreService } from "../features/media/services/trace-blo
 import { TraceMediaReferenceService } from "../features/media/services/trace-media-reference.service.ts";
 import { leanForProjection } from "../features/projection/rules/trace-projection-lean.rules.ts";
 import { OtlpSpanCostEnrichmentService } from "../features/span/services/span-cost-enrichment.service.ts";
+import { SpanSignatureVerificationService } from "../features/span/services/span-signature-verification.service.ts";
 import { OtlpSpanTokenEstimationService } from "../features/span/services/span-token-estimation.service.ts";
 import { TraceSpanNormalizationAdapterService } from "../features/span/services/trace-span-normalization-adapter.service.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import type { TraceEvaluationOutcomeService } from "../services/trace-evaluation-outcome.service.ts";
 import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import {
   createDeferredOriginHandler,
@@ -32,9 +35,11 @@ import type {
   TraceSpanTokenEstimation,
 } from "./record-span.commands.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
+import { SpanAnalyticsStore } from "./span-analytics.store.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
 import { SpanStorageStore } from "./span-storage.store.ts";
 import { TraceAnalyticsStore } from "./trace-derived.store.ts";
+import { TraceEvaluationAnalyticsStore } from "./trace-evaluation-analytics.store.ts";
 import {
   createTraceFailedHandler,
   type TraceFailedSubscriberDeps,
@@ -52,6 +57,8 @@ import {
 } from "./tracked-event-sync.subscriber.ts";
 
 interface TraceProcessingPeers {
+  /** Checks a span's braid signature at admission (ADR-201 §4). */
+  apiKeys: Pick<ApiKeyApi, "verifyBraidSignature">;
   dataPrivacy: Pick<DataPrivacyApi, "redactSpan" | "dropSpanContent">;
   dataRetention: Pick<
     DataRetentionApi,
@@ -61,7 +68,7 @@ interface TraceProcessingPeers {
   modelProviders: Pick<ModelProviderApi, "listCosts">;
   projects: Pick<
     ProjectApi,
-    "findById" | "updateMetadata" | "resolveOrgAdmin" | "findOrganizationId"
+    "findById" | "findIdentity" | "updateMetadata" | "resolveOrgAdmin" | "findOrganizationId"
   >;
 }
 
@@ -75,6 +82,8 @@ export interface TraceProcessingPipelineInput {
     | "summaryProjection"
     | "analyticsProjection"
     | "analyticsRollup"
+    | "evaluationAnalytics"
+    | "spanAnalytics"
     | "summaryFoldCache"
     | "analyticsFoldCache"
   >;
@@ -97,6 +106,8 @@ export interface TraceProcessingPipelineInput {
   milestones: ProjectMetadataSubscriberDeps["milestones"] & TraceFailedSubscriberDeps["milestones"];
   /** Mints the own-only proof the summary and analytics fold stores read back through. */
   authorizeFoldRead: FoldReadAuthorizer;
+  /** Records evaluation's COMPLETED and REPORTED as outcomes on their traces (ADR-003). */
+  evaluationOutcomes?: Pick<TraceEvaluationOutcomeService, "recordCompleted" | "recordReported">;
   /** Test-only: overrides `WRITE_COMPACT_ORIGIN_JOBS`; production never passes it. */
   writeCompactOriginJobs?: boolean;
 }
@@ -137,12 +148,21 @@ export class TraceProcessingRuntimeAdapter {
       derivedStore: repositories.analyticsFoldCache.cached(
         TraceAnalyticsStore.create({
           storage: repositories.analyticsProjection,
+          evaluationAnalytics: TraceEvaluationAnalyticsStore.create({
+            storage: repositories.evaluationAnalytics,
+            defaultRetentionDays,
+            authorize: authorizeFoldRead,
+          }),
           defaultRetentionDays,
           authorize: authorizeFoldRead,
         }),
       ),
       rollupStore: TraceAnalyticsRollupStore.create({
         storage: repositories.analyticsRollup,
+        defaultRetentionDays,
+      }),
+      spanAnalyticsStore: SpanAnalyticsStore.create({
+        storage: repositories.spanAnalytics,
         defaultRetentionDays,
       }),
       canonicalisation,
@@ -161,7 +181,14 @@ export class TraceProcessingRuntimeAdapter {
         costEnrichment: this.#costEnrichment(),
         tokenEstimation: this.#tokenEstimation(),
         spool: this.#spool(),
+        signatures: SpanSignatureVerificationService.create({
+          signatures: peers.apiKeys,
+          projects: peers.projects,
+        }),
       }),
+      ...(this.input.evaluationOutcomes
+        ? { evaluationOutcomes: this.input.evaluationOutcomes }
+        : {}),
     })
       .build()
       .withRetention({

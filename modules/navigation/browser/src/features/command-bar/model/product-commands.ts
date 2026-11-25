@@ -8,7 +8,7 @@ import {
   personalTracesNavItem,
   personalUsageNavItem,
 } from "../../../model/personal-nav-items.ts";
-import { type ProductId, productById } from "../../../model/products.ts";
+import { type ProductId, productById, productHomeHref } from "../../../model/products.ts";
 import { projectNavItems } from "../../../model/project-nav-items.ts";
 import type { SectionNavItemData } from "../../../model/section-nav-items.ts";
 import type { Command } from "./command-bar-types.ts";
@@ -44,13 +44,16 @@ function pageCommand({
 export function switchProductCommands({
   reachableProducts,
   projectSlug,
+  hasOrganizationLibrary = false,
 }: {
   reachableProducts: readonly ProductId[];
   projectSlug: string | null;
+  /** Dashboards then opens on the organization's library, as the rail does. */
+  hasOrganizationLibrary?: boolean;
 }): Command[] {
   return reachableProducts.flatMap((productId) => {
     const product = productById(productId);
-    const home = product.homeHref({ projectSlug });
+    const home = productHomeHref({ product, projectSlug, hasOrganizationLibrary });
     if (!home) return [];
     return [
       {

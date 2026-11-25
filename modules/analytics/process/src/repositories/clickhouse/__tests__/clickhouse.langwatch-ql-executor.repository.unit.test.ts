@@ -89,6 +89,109 @@ describe("given a statement that calls no app function", () => {
   });
 });
 
+/** As ClickHouse refuses a FROM naming a parameterised view that does not exist. */
+const unknownTableFunction = (name: string) =>
+  Object.assign(
+    new Error(`Code: 46. DB::Exception: Unknown table function ${name}. (UNKNOWN_FUNCTION)`),
+    { code: "46", type: "UNKNOWN_FUNCTION" },
+  );
+
+const FLOORED_READ =
+  "SELECT count() AS n FROM analytics.trace_metrics__floor(lwql_floor = " +
+  "toTimeZone(toDateTime64((subtractDays(now(), 7)), 3), timezone())) AS trace_metrics " +
+  "WHERE OccurredAt >= subtractDays(now(), 7)";
+
+/** As the floor rewrites a caller who wrote `` `analytics`.trace_metrics ``. */
+const QUOTED_FLOORED_READ = FLOORED_READ.replace("analytics.", "`analytics`.");
+
+describe("given a floored statement on a deployment whose twin is not provisioned yet", () => {
+  describe("when the server reports the twin as an unknown table function", () => {
+    /** @scenario "A twin the server reports as an unknown table function is unavailable" */
+    it("refuses with lwql_unavailable, so the floor sends the statement as written", async () => {
+      queryMock.mockRejectedValueOnce(unknownTableFunction("analytics.trace_metrics__floor"));
+
+      expect((await refusalOf(FLOORED_READ)).code).toBe("lwql_unavailable");
+    });
+  });
+
+  describe("when the statement quotes the twin's database", () => {
+    /** @scenario "A twin the server reports as an unknown table function is unavailable" */
+    it("refuses with lwql_unavailable, so the floor sends it as written", async () => {
+      queryMock.mockRejectedValueOnce(unknownTableFunction("analytics.trace_metrics__floor"));
+
+      expect((await refusalOf(QUOTED_FLOORED_READ)).code).toBe("lwql_unavailable");
+    });
+  });
+});
+
+describe("given a pass's read of a trace-ids twin on a deployment that lacks it", () => {
+  describe("when the server reports the twin as an unknown table function", () => {
+    /** @scenario "A pass reads its view as written while the trace-ids twin is not readable" */
+    it("refuses with lwql_unavailable, so the pass reads the statement as written", async () => {
+      queryMock.mockRejectedValueOnce(unknownTableFunction("analytics.traces__ids"));
+
+      const read =
+        "SELECT TraceId FROM analytics.traces__ids(lwql_trace_ids = " +
+        "{lwql_pass_trace_ids:Array(String)}) AS traces";
+      expect((await refusalOf(read)).code).toBe("lwql_unavailable");
+    });
+  });
+});
+
+/** The driver's error passed through untranslated, as an unmapped code 46 always was. */
+const UNMAPPED_UNKNOWN_FUNCTION = { code: "46", fault: undefined, httpStatus: undefined };
+
+describe("given an unknown function that is not a floored twin", () => {
+  describe("when a statement reading no twin names an unknown table function", () => {
+    /** @scenario "A twin the server reports as an unknown table function is unavailable" */
+    it("passes the driver's error through, as before", async () => {
+      queryMock.mockRejectedValueOnce(unknownTableFunction("nosuchtf"));
+
+      expect(await refusalOf("SELECT 1 FROM nosuchtf(1)")).toEqual(UNMAPPED_UNKNOWN_FUNCTION);
+    });
+  });
+
+  describe("when the named twin is not the one the statement reads", () => {
+    /** @scenario "A twin the server reports as an unknown table function is unavailable" */
+    it("passes the driver's error through, as before", async () => {
+      queryMock.mockRejectedValueOnce(unknownTableFunction("analytics.trace_metrics__floor"));
+      const sql = QUOTED_FLOORED_READ.replace("trace_metrics__floor(", "span_metrics__floor(");
+
+      expect(await refusalOf(sql)).toEqual(UNMAPPED_UNKNOWN_FUNCTION);
+    });
+  });
+
+  describe("when a floored statement calls a native function the server lacks", () => {
+    /** @scenario "A twin the server reports as an unknown table function is unavailable" */
+    it("passes the driver's error through, though the quoted statement names the twin", async () => {
+      const sql = FLOORED_READ.replace("count() AS n", "nosuchfn(1) AS n");
+      queryMock.mockRejectedValueOnce(
+        Object.assign(
+          new Error(
+            `Code: 46. DB::Exception: Function with name \`nosuchfn\` does not exist. In scope ${sql}. (UNKNOWN_FUNCTION)`,
+          ),
+          { code: "46", type: "UNKNOWN_FUNCTION" },
+        ),
+      );
+
+      expect(await refusalOf(sql)).toEqual(UNMAPPED_UNKNOWN_FUNCTION);
+    });
+  });
+
+  describe("when an app function is unknown in a statement that also reads a twin", () => {
+    /** @scenario "A twin the server reports as an unknown table function is unavailable" */
+    it("still refuses with lwql_app_function_unavailable", async () => {
+      queryMock.mockRejectedValueOnce(unknownFunction());
+
+      const refusal = await refusalOf(
+        FLOORED_READ.replace("count() AS n", "conversation(ConversationId) AS transcript"),
+      );
+
+      expect(refusal.code).toBe("lwql_app_function_unavailable");
+    });
+  });
+});
+
 describe("given the LangWatchQL identity is running as many statements as it may", () => {
   describe("when the server refuses one more", () => {
     /** @scenario "A busy query service is a named, retryable refusal" */
@@ -179,7 +282,7 @@ describe("given a bound parameter whose value does not fit its declared type", (
       queryMock.mockRejectedValueOnce(
         Object.assign(
           new Error(
-            "Value 2026-09-10T00:00:00.000Z cannot be parsed as DateTime64(3) for query parameter 'start' because it isn't parsed completely: only 23 of 24 bytes was parsed: 2026-09-10T00:00:00.000.",
+            "Value last tuesday cannot be parsed as DateTime64(3) for query parameter 'start' because it isn't parsed completely: only 0 of 12 bytes was parsed: .",
           ),
           { code: "457", type: "BAD_QUERY_PARAMETER" },
         ),
@@ -206,6 +309,126 @@ describe("given a bound parameter whose value does not fit its declared type", (
         fault: "customer",
         httpStatus: 400,
         meta: { parameter: "start" },
+      });
+    });
+  });
+});
+
+describe("given date-time parameters bound as ISO instants", () => {
+  describe("when the executor sends them", () => {
+    /** @scenario "An ISO instant bound to a date-time parameter is sent as the same moment the server can read" */
+    it("sends Unix seconds for that moment and leaves every other value as bound", async () => {
+      queryMock.mockResolvedValueOnce({ json: async () => ({ data: [], meta: [] }) });
+
+      await executor.execute({
+        sql:
+          "SELECT count() FROM analytics.traces WHERE OccurredAt >= {start:DateTime64(3, 'UTC')}" +
+          " AND toStartOfDay(OccurredAt) = {day:DateTime} AND OccurredAt < {end:Nullable(DateTime64(3))}" +
+          " AND TraceId = {label:String}",
+        parameters: {
+          start: "2026-11-01T00:00:00Z",
+          day: "2026-11-01T02:00:00+02:00",
+          end: "2026-11-02 00:00:00.000",
+          label: "2026-11-01T00:00:00Z",
+        },
+        projectIds: PROJECT_IDS,
+        tenantCapability: TENANT_A_CAPABILITY,
+      });
+
+      expect(queryMock.mock.lastCall?.[0].query_params).toEqual({
+        start: "1793491200.000000000",
+        day: "1793491200",
+        end: "2026-11-02 00:00:00.000",
+        label: "2026-11-01T00:00:00Z",
+      });
+    });
+
+    it("leaves a name declared as both DateTime and DateTime64 as bound", async () => {
+      queryMock.mockResolvedValueOnce({ json: async () => ({ data: [], meta: [] }) });
+
+      await executor.execute({
+        sql: "SELECT {t:DateTime} AS a, {t:DateTime64(9)} AS b FROM analytics.traces",
+        parameters: { t: "2026-11-01T00:00:00.5Z" },
+        projectIds: PROJECT_IDS,
+        tenantCapability: TENANT_A_CAPABILITY,
+      });
+
+      expect(queryMock.mock.lastCall?.[0].query_params).toEqual({ t: "2026-11-01T00:00:00.5Z" });
+    });
+
+    /** @scenario "Placeholder text inside a string literal or comment does not change a bound value" */
+    it("ignores placeholder text inside string literals, quoted identifiers and comments", async () => {
+      queryMock.mockResolvedValueOnce({ json: async () => ({ data: [], meta: [] }) });
+
+      await executor.execute({
+        sql:
+          "SELECT {s:String} AS v, 'it''s {s:DateTime}' AS a, 'x\\' {s:DateTime}' AS b," +
+          " `{s:DateTime}` AS c -- {s:DateTime}\n" +
+          "/* {s:DateTime} /* nested */ {s:DateTime} */ # {s:DateTime}\n" +
+          "FROM analytics.traces",
+        parameters: { s: "2026-11-01T00:00:00Z" },
+        projectIds: PROJECT_IDS,
+        tenantCapability: TENANT_A_CAPABILITY,
+      });
+
+      expect(queryMock.mock.lastCall?.[0].query_params).toEqual({ s: "2026-11-01T00:00:00Z" });
+    });
+
+    it("ignores placeholder text inside heredoc strings and still reads the real one", async () => {
+      queryMock.mockResolvedValueOnce({ json: async () => ({ data: [], meta: [] }) });
+
+      await executor.execute({
+        sql:
+          "SELECT $$'$$, {s:String}, $$'{s:DateTime}$$, $q$it's$q$ AS x$y$z," +
+          " {t:DateTime} FROM analytics.traces",
+        parameters: { s: "2026-11-01T00:00:00Z", t: "2026-11-01T00:00:00Z" },
+        projectIds: PROJECT_IDS,
+        tenantCapability: TENANT_A_CAPABILITY,
+      });
+
+      expect(queryMock.mock.lastCall?.[0].query_params).toEqual({
+        s: "2026-11-01T00:00:00Z",
+        t: "1793491200",
+      });
+    });
+
+    it("leaves a name declared as both String and DateTime as bound", async () => {
+      queryMock.mockResolvedValueOnce({ json: async () => ({ data: [], meta: [] }) });
+
+      await executor.execute({
+        sql: "SELECT {s:String} AS v, {s:DateTime} AS w FROM analytics.traces",
+        parameters: { s: "2026-11-01T00:00:00Z" },
+        projectIds: PROJECT_IDS,
+        tenantCapability: TENANT_A_CAPABILITY,
+      });
+
+      expect(queryMock.mock.lastCall?.[0].query_params).toEqual({ s: "2026-11-01T00:00:00Z" });
+    });
+
+    it("reads date-time types in any case and under LowCardinality", async () => {
+      queryMock.mockResolvedValueOnce({ json: async () => ({ data: [], meta: [] }) });
+
+      await executor.execute({
+        sql:
+          "SELECT {a:datetime}, {b:DATETIME64(3)}, {c:LowCardinality(DateTime)}," +
+          " {d:Nullable( dateTime64(3, 'UTC') )}, {e:DateTime32} FROM analytics.traces",
+        parameters: {
+          e: "2026-11-01T00:00:00Z",
+          a: "2026-11-01T00:00:00Z",
+          b: "2026-11-01T00:00:00Z",
+          c: "2026-11-01T00:00:00Z",
+          d: "2026-11-01T00:00:00.25Z",
+        },
+        projectIds: PROJECT_IDS,
+        tenantCapability: TENANT_A_CAPABILITY,
+      });
+
+      expect(queryMock.mock.lastCall?.[0].query_params).toEqual({
+        a: "1793491200",
+        b: "1793491200.000000000",
+        c: "1793491200",
+        d: "1793491200.250000000",
+        e: "1793491200",
       });
     });
   });

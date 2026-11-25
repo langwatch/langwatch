@@ -9,6 +9,10 @@ import type { BillingChannels } from "../billing.channels.ts";
 import { ConnectedStatementMailChannel } from "../connected-statement-mail.channel.ts";
 import { HubspotFormChannel, type HubspotFormReceipt } from "../hubspot-form.channel.ts";
 import { LicenseEmailChannel } from "../license-email.channel.ts";
+import {
+  PaymentRecoveryEmailChannel,
+  type PaymentRecoveryEmail,
+} from "../payment-recovery-email.channel.ts";
 import { UsageLimitEmailChannel } from "../usage-limit-email.channel.ts";
 import { MemoryConnectedInvoicingChannel } from "./memory.connected-invoicing.channel.ts";
 import { MemoryStripeCustomersChannel } from "./memory.stripe-customers.channel.ts";
@@ -44,6 +48,7 @@ export class MemoryBillingChannels {
       alerts: MemoryBillingAlertChannel.create(),
       hubspotForms: MemoryHubspotFormChannel.create(),
       licenseEmail: MemoryLicenseEmailChannel.create(),
+      paymentRecoveryEmail: MemoryPaymentRecoveryEmailChannel.create(),
       statementMail: MemoryConnectedStatementMailChannel.create(),
       usageLimitEmail: MemoryUsageLimitEmailChannel.create(),
     };
@@ -115,6 +120,25 @@ export class MemoryLicenseEmailChannel extends LicenseEmailChannel {
   }
 
   async send(input: LicenseEmailDelivery): Promise<void> {
+    this.sent.push(input);
+  }
+}
+
+/** Records each recovery email; `refuse` names addresses the provider turns down. */
+export class MemoryPaymentRecoveryEmailChannel extends PaymentRecoveryEmailChannel {
+  readonly sent: { to: string; email: PaymentRecoveryEmail }[] = [];
+  readonly refused = new Set<string>();
+
+  private constructor() {
+    super();
+  }
+
+  static create(): MemoryPaymentRecoveryEmailChannel {
+    return new MemoryPaymentRecoveryEmailChannel();
+  }
+
+  async send(input: { to: string; email: PaymentRecoveryEmail }): Promise<void> {
+    if (this.refused.has(input.to)) throw new Error("The mail provider refused the address");
     this.sent.push(input);
   }
 }

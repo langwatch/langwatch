@@ -47,7 +47,7 @@ The gate reads three things:
 - **Provisioning.** Config decides where it can: with no LangWatchQL server configured, the answer is `lwql_not_provisioned` without I/O. Otherwise the gate probes the server and keeps the answer, yes or no, in the module's Redis for 5 minutes, keyed by the target's origin so a changed target is probed afresh. A Redis failure refuses `lwql_unavailable`.
 - **Refusal codes.** `lwql_not_provisioned` is a 403; `lwql_unavailable` is a 503.
 
-A self-hosted install queries its own ClickHouse only once LangWatchQL is enabled and provisioned there. A routed organisation stays refused `lwql_not_provisioned`. Running LangWatchQL on an organisation's own ClickHouse will be opt-in, per organisation, set from the admin (Ops) side. That opt-in arrives through this gate, which then compares against that organisation's provisioned server. The catalogue, identity and token logins it needs are a later decision.
+A self-hosted install queries its own ClickHouse only once LangWatchQL is enabled and provisioned there. A routed organisation is admitted only where its own server is provisioned, probed as the route's reader login (never an admin): the reader must log in, be granted `traces`, carry the tenant setting, and see no row with the empty capability. That answer is kept apart from the shared server's, under the private origin. A routed organisation with no usable route or a server that fails the probe stays refused.
 
 **The capability never leaves the LangWatchQL server.** Key-map rows are written only through the LangWatchQL admin target, never a tenant's routed client. The executor carries the capability in the request body, never in the URL, as three parts that only together keep it out of every log:
 

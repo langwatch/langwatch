@@ -82,6 +82,38 @@ describe("given a target and some questions", () => {
       expect(sql).toContain("StartTime AS OccurredAt");
       expect(sql.trimEnd().endsWith("ORDER BY TraceId, SpanId")).toBe(true);
     });
+
+    const expandLlmSpans = (floor: { from: string | null; rebuilding: boolean } | null) =>
+      expandInstantEvalShorthand({
+        shorthand: { target: "llm_spans", questions: [ask()] },
+        now: NOW,
+        spanAnalyticsFloor: floor,
+      });
+
+    /** @scenario "The llm_spans target reads the span type from span_metrics inside its floor" */
+    it("keeps model calls through span_metrics when its floor covers the window", () => {
+      const { sql } = expandLlmSpans({ from: "2026-09-01T00:00:00.000Z", rebuilding: false });
+
+      expect(sql).toContain("FROM spans");
+      expect(sql).toContain("FROM span_metrics");
+      expect(sql).toContain("SpanType = 'llm'");
+      expect(sql).toContain("StartTime >= {start_at:DateTime64(3, 'UTC')}");
+      expect(sql).not.toContain("SpanAttributes");
+    });
+
+    /** @scenario "The llm_spans target reads the span type from its map outside the floor" */
+    it("keeps the attribute map read when the floor starts after the window or cannot be trusted", () => {
+      const floors = [
+        null,
+        { from: "2026-09-15T00:00:00.000Z", rebuilding: false },
+        { from: null, rebuilding: true },
+      ];
+      for (const floor of floors) {
+        const { sql } = expandLlmSpans(floor);
+        expect(sql).toContain("SpanAttributes['langwatch.span.type'] = 'llm'");
+        expect(sql).not.toContain("span_metrics");
+      }
+    });
   });
 
   describe("when no window is named", () => {

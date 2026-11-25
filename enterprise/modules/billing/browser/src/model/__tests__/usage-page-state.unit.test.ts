@@ -185,6 +185,22 @@ describe("fullSeats", () => {
   it("shows only the count where the plan does not cap seats", () => {
     expect(fullSeats({ used: 12, plan: { ...FREE, maxMembers: 9_999 } })).toBe("12");
   });
+
+  it("shows only the count where a licence writes no cap as 1M or more", () => {
+    expect(fullSeats({ used: 12, plan: { ...FREE, maxMembers: Number.MAX_SAFE_INTEGER } })).toBe(
+      "12",
+    );
+  });
+
+  it("keeps a finite cap above the catalogue's stand-in as a cap", () => {
+    expect(fullSeats({ used: 12, plan: { ...FREE, maxMembers: 10_000 } })).toBe("12 / 10,000");
+  });
+
+  it("keeps a licence's 9,999 as a cap, not the catalogue's stand-in", () => {
+    expect(
+      fullSeats({ used: 12, plan: { ...FREE, maxMembers: 9_999, planSource: "license" } }),
+    ).toBe("12 / 9,999");
+  });
 });
 
 describe("developerSeats", () => {

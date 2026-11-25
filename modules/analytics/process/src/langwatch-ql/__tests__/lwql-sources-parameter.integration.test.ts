@@ -47,7 +47,8 @@ function storedLookup(view: string): string {
     .replace(/\bSource\b/g, sourceOfOrigin("Origin"));
 }
 
-const BY_TRACE = storedLookup("spans");
+// The stock widgets read span rows through span_metrics, so its lookup is the one they store.
+const BY_TRACE = storedLookup("span_metrics");
 const TRACES_BY_TRACE = storedLookup("traces");
 const EVALUATION_BY_TRACE = storedLookup("evaluations");
 

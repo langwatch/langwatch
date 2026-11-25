@@ -2,6 +2,11 @@ import { scryptSync } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  baseViewName,
+  flooredViewName,
+  flooredViewNames,
+} from "../../../../rules/lwql-dedup-floor.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../../../rules/lwql-view-catalog.rules.ts";
 import type { LangWatchQLNames } from "../../../../services/langwatch-ql-access-model.service.ts";
 import { lwqlAppFunctionNames } from "../../../app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
@@ -47,10 +52,10 @@ function statementsWith({ includeAppFunctions }: { includeAppFunctions?: boolean
 }
 
 describe("given a self-hosted ClickHouse with more than one replica", () => {
-  describe("when it has no user_defined_zookeeper_path", () => {
+  describe("when Keeper holds no shared function store", () => {
     /** @scenario "A multi-replica server without a shared function store is provisioned without the functions" */
     it("is provisioned without the app functions but with the rest of the access model", () => {
-      expect(canProvisionAppFunctions({ maxTotalReplicas: 3, userDefinedZookeeperPath: "" })).toBe(
+      expect(canProvisionAppFunctions({ maxTotalReplicas: 3, keeperStoreFound: false })).toBe(
         false,
       );
 
@@ -60,15 +65,22 @@ describe("given a self-hosted ClickHouse with more than one replica", () => {
       expect(statements.some((s) => s.startsWith("CREATE USER"))).toBe(true);
     });
   });
+
+  describe("when Keeper holds the shared function store", () => {
+    /** @scenario "A multi-replica server whose function store is in Keeper is provisioned with the functions" */
+    it("creates the app functions once, for every replica", () => {
+      expect(canProvisionAppFunctions({ maxTotalReplicas: 3, keeperStoreFound: true })).toBe(true);
+
+      expect(statementsWith({}).some((s) => s.startsWith("CREATE OR REPLACE FUNCTION"))).toBe(true);
+    });
+  });
 });
 
 describe("given a single-node ClickHouse", () => {
   describe("when self-provisioning runs", () => {
     /** @scenario "A single-node server is provisioned with the functions" */
     it("creates the app functions on its local store", () => {
-      expect(canProvisionAppFunctions({ maxTotalReplicas: 0, userDefinedZookeeperPath: "" })).toBe(
-        true,
-      );
+      expect(canProvisionAppFunctions({ maxTotalReplicas: 0, keeperStoreFound: false })).toBe(true);
 
       expect(statementsWith({}).some((s) => s.startsWith("CREATE OR REPLACE FUNCTION"))).toBe(true);
     });
@@ -545,7 +557,10 @@ describe("given the drift a reconvergence check converges", () => {
 
   /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
   it("creates the key map and a function only when each drifted, and a drifted view alone", () => {
-    const view = relations.at(-1);
+    const twins = new Set(flooredViewNames(LWQL_VIEW_CATALOG));
+    const view = LWQL_VIEW_CATALOG.map(({ name }) => name)
+      .filter((name) => !twins.has(flooredViewName(name)))
+      .at(-1);
     const [appFunction] = lwqlAppFunctionNames();
     if (!view || !appFunction) throw new Error("the catalog declares no view or no function");
 
@@ -559,28 +574,16 @@ describe("given the drift a reconvergence check converges", () => {
       expect.stringMatching(new RegExp(`^CREATE OR REPLACE VIEW ${SOURCE_DATABASE}\\.${view}\\n`)),
     ]);
   });
-});
-
-describe("given what the reconvergence check finds in PostgreSQL", () => {
-  const views = selfProvisioning.approvedPostgresViews();
-  const found = views.map((view) => ({ view, granted: true }));
-
-  /** @scenario "The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place" */
-  it("finds no gap when every approved view exists and the reader may select it", () => {
-    expect(selfProvisioning.findPostgresGaps({ found })).toEqual([]);
-  });
 
   /** @scenario "The reconvergence check converges the app-owned LangWatchQL objects it finds missing" */
-  it("names a missing view as absent and an ungranted one as present", () => {
-    const [missing, ungranted] = views;
-    if (!missing || !ungranted) throw new Error("the catalog maps too few datasets");
-    const gapped = found
-      .filter((view) => view.view !== missing)
-      .map((view) => (view.view === ungranted ? { ...view, granted: false } : view));
+  it("re-creates a drifted floored twin together with the view it is cut from", () => {
+    const twin = flooredViewNames(LWQL_VIEW_CATALOG).at(-1);
+    if (!twin) throw new Error("the catalog declares no floored twin");
+    const base = baseViewName(twin);
 
-    expect(selfProvisioning.findPostgresGaps({ found: gapped })).toEqual([
-      { view: missing, absent: true },
-      { view: ungranted, absent: false },
+    expect(statementsFor([twin])).toEqual([
+      expect.stringMatching(new RegExp(`^CREATE OR REPLACE VIEW ${SOURCE_DATABASE}\\.${base}\\n`)),
+      expect.stringMatching(new RegExp(`^CREATE OR REPLACE VIEW ${SOURCE_DATABASE}\\.${twin}\\n`)),
     ]);
   });
 });

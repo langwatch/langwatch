@@ -3,13 +3,19 @@
  * @see specs/langy/langy-cli-tool-envelope.feature
  *      "A failure keeps its structure all the way to the card"
  */
+import type { SerializedReason } from "@langwatch/handled-error";
 import {
   type CliErrorDocumentRead,
+  type LangWatchHandledErrorReason,
   type LangWatchHandledErrorShape,
   isTerminalFailure,
   readCliErrorDocument,
 } from "@langwatch/handled-error/langwatch-handled-error";
-import { explainHandledError } from "@langwatch/handled-error/presentation";
+import {
+  explainHandledError,
+  supplementalTips,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "@langwatch/handled-error/presentation";
 import { parseCliJson } from "@langwatch/langy-contract";
 
 import { LIMIT_TYPE_LABELS } from "../../../../model/limit-type-labels.ts";
@@ -234,6 +240,18 @@ const credentialFault = ({
 };
 
 /**
+ * Whether a failure is Langy's own sandbox credential. Its tool output is the CLI telling
+ * the reader to log in, so the receipt shows Langy's copy in its place.
+ */
+export const isSandboxCredentialFault = ({
+  presentation,
+  toolName,
+}: {
+  presentation: LangyToolErrorPresentation;
+  toolName: string | undefined;
+}): boolean => credentialFault({ code: presentation.code, toolName }) === "sandbox";
+
+/**
  * Whether the reader has to act, so the failure keeps its card. A credential failure
  * keeps it on a local tool and folds in the sandbox; an access-denial code, a terminal
  * github-not-connected, 401 or 403 keep it. A terminal not-found folds.
@@ -360,7 +378,40 @@ function describeFailure({
     };
   }
 
-  return { message: domain.message, remediationApplies: true };
+  return { message: platformSentence(domain), remediationApplies: true };
+}
+
+/** The platform's sentence; the registry's when the wire carried only the code (#5984). */
+function platformSentence(domain: LangWatchHandledErrorShape): string {
+  if (domain.message.trim() !== "" && domain.message !== domain.code) return domain.message;
+  const copy = explainHandledError({
+    code: domain.code,
+    meta: domain.meta,
+    httpStatus: domain.httpStatus,
+    fault: "customer",
+    retryable: domain.retryable,
+    tips: [],
+    docsUrl: undefined,
+    traceId: undefined,
+    reasons: serializedReasons(domain.reasons),
+  });
+  if (!copy.isRegistered) {
+    return domain.code.trim() !== "" ? copy.title : UNKNOWN_ERROR_PRESENTATION.title;
+  }
+  return copy.description !== "" ? copy.description : copy.title;
+}
+
+/** The CLI's reason chain in the registry's shape: `kind` is the reason's code. */
+function serializedReasons(
+  reasons: readonly LangWatchHandledErrorReason[] = [],
+): SerializedReason[] {
+  return reasons.map((reason) => ({
+    code: reason.kind,
+    kind: reason.kind,
+    retryable: reason.retryable,
+    ...(reason.meta ? { meta: reason.meta } : {}),
+    reasons: serializedReasons(reason.reasons),
+  }));
 }
 
 /**
@@ -398,6 +449,42 @@ function githubAppNotInstalled({
     code: GITHUB_NOT_CONNECTED_CODE,
     terminal: true,
     raw,
+  };
+}
+
+/**
+ * The lines the CLI prints in text mode when it has no key (sdks/typescript/src/cli/utils/
+ * apiKey.ts: `missingCredentialsLines` and `checkOrgApiKey`). A whole output line must equal
+ * one, so a tool that only echoes it (a grep hit, a printed log) is not reclassified.
+ */
+export const CLI_MISSING_KEY_LINES = [
+  "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+  "Error: LANGWATCH_API_KEY not found.",
+];
+
+/** Per line, since `raw` (from rawFailureText) has its colour codes stripped already. */
+function printsCliMissingKeyLine(raw: string): boolean {
+  return raw.split("\n").some((line) => CLI_MISSING_KEY_LINES.includes(line.trim()));
+}
+
+/** Text mode carries no code, so the sandbox CLI's own line stands in for `missing_api_key`. */
+function sandboxMissingKeyFromText({
+  toolName,
+  raw,
+}: {
+  toolName: string | undefined;
+  raw: string | undefined;
+}): LangWatchHandledErrorShape | null {
+  if (!raw || !printsCliMissingKeyLine(raw)) return null;
+  if (toolName?.startsWith(LOCAL_TOOL_PREFIX)) return null;
+  return {
+    code: "missing_api_key",
+    kind: "missing_api_key",
+    message: "",
+    httpStatus: 0,
+    meta: {},
+    isHandled: true,
+    retryable: false,
   };
 }
 
@@ -470,6 +557,9 @@ function buildDomainPresentation({
   const logsUrl = safeHttpUrl(domain.logsUrl) ?? safeHttpUrl(trace?.logsUrl);
   const docsUrl = safeHttpUrl(domain.docUrl);
   const { message, detail, limit, remediationApplies } = describeFailure({ domain, toolName });
+  // The CLI's own text for Langy's key tells the reader to log in, so it never reaches them.
+  const keepsRaw = credentialFault({ code: domain.code, toolName }) !== "sandbox";
+  const tips = supplementalTips({ tips: domain.suggestions ?? [], description: message });
 
   return {
     title: `${title} failed`,
@@ -483,13 +573,13 @@ function buildDomainPresentation({
     ...(isTerminalFailure(domain) ? { terminal: true } : {}),
     // The platform's own next steps (ADR-045's remediation channel), shown as written —
     // paraphrasing them here would put the card out of step with the docs they are
-    // pinned to.
-    ...(remediationApplies && domain.suggestions?.length ? { tips: domain.suggestions } : {}),
+    // pinned to. A step pointing at `meta` (for API callers) or repeating the message is left out.
+    ...(remediationApplies && tips.length ? { tips } : {}),
     ...(remediationApplies && docsUrl ? { docsUrl } : {}),
     ...(traceId ? { traceId } : {}),
     ...(traceUrl ? { traceUrl } : {}),
     ...(logsUrl ? { logsUrl } : {}),
-    ...(raw ? { raw } : {}),
+    ...(raw && keepsRaw ? { raw } : {}),
   };
 }
 
@@ -514,7 +604,8 @@ export function presentLangyToolError({
 }): LangyToolErrorPresentation {
   const raw = rawFailureText(errorText);
   const structured = readStructuredError(errorText);
-  const domain = structured.kind === "error" ? structured.error : null;
+  const domain =
+    structured.kind === "error" ? structured.error : sandboxMissingKeyFromText({ toolName, raw });
 
   const notInstalled = githubAppNotInstalled({ toolName, raw });
   if (notInstalled) return notInstalled;

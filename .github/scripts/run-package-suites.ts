@@ -320,9 +320,9 @@ export interface SuiteJob {
 }
 
 /**
- * The lanes that may not overlap across packages. Integration files run
- * serially against one shared datastore; a browser lane installs Chromium
- * through apt, which holds a machine-wide lock. Everything else is `shared`.
+ * The serial lanes. Integration files share one datastore and a browser lane's apt install
+ * holds a machine-wide lock; across lanes they share one `serial` key, because tasks#1178
+ * saw a browser run fail while an integration run overlapped it. Others are `shared`.
  */
 const LANES: Record<string, "integration" | "browser"> = {
   "test:integration": "integration",
@@ -419,9 +419,9 @@ const startReady = ({
 };
 
 /**
- * Runs every job, at most `concurrency` at once, in order where it can. A package
- * runs one script at a time, `integration` and `browser` hold one slot each, and a
- * heavy job runs alone. Every job runs even after one fails.
+ * Runs every job, at most `concurrency` at once, in order where it can. A package runs
+ * one script at a time, integration and browser jobs share one slot, and a heavy job
+ * runs alone. Every job runs even after one fails.
  */
 export const runJobs = async ({
   jobs,
@@ -459,12 +459,16 @@ export const runJobs = async ({
   return statuses;
 };
 
-/** The shard-wide keys a job holds while it runs: its package, its lane, and heavy. */
+/**
+ * The shard-wide keys a job holds while it runs: package, `serial` for lane jobs, heavy.
+ * Integration and browser jobs share one `serial` key, so they never overlap; a browser
+ * run failed to load its test file 3/3 while an integration run overlapped it (tasks#1178).
+ */
 const keysOf = (job: SuiteJob, isHeavy: (pkg: DiscoveredPackage) => boolean): string[] => {
   const lane = laneOf(job.script);
   return [
     `package:${job.pkg.name}`,
-    ...(lane === "shared" ? [] : [lane]),
+    ...(lane === "shared" ? [] : ["serial"]),
     ...(isHeavy(job.pkg) ? ["heavy"] : []),
   ];
 };
@@ -853,9 +857,11 @@ if (isEntrypoint()) {
   const failed = outcomes.filter((o) => o.outcome === "failed");
   if (failed.length > 0) {
     console.error(`::error::${failed.length} package suite(s) failed and are not registered.`);
-    process.exit(1);
+    // Not process.exit: on a pipe it drops whatever of a suite's output is still past 64 KiB.
+    process.exitCode = 1;
+  } else {
+    console.log(
+      `All ${outcomes.filter((o) => o.outcome === "passed").length} package suites passed.`,
+    );
   }
-  console.log(
-    `All ${outcomes.filter((o) => o.outcome === "passed").length} package suites passed.`,
-  );
 }

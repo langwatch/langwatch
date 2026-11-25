@@ -34,6 +34,7 @@ function consumer({ resolveDeferredOrigin }: Pick<Reactions, "resolveDeferredOri
     summaryStore: createApiFixture<Options["summaryStore"]>(),
     derivedStore: createApiFixture<Options["derivedStore"]>(),
     rollupStore: createApiFixture<Options["rollupStore"]>(),
+    spanAnalyticsStore: createApiFixture<Options["spanAnalyticsStore"]>(),
     canonicalisation: TraceCanonicalisationService.create(),
     ioExtraction: createApiFixture<Options["ioExtraction"]>(),
     mediaReferences: createApiFixture<Options["mediaReferences"]>(),

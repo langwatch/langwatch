@@ -1,7 +1,9 @@
 import {
   adminEmails,
+  clickhouseCluster,
   Config,
   environmentOneOrTrueSchema,
+  installMethod,
   grafana,
   isSaas,
   nodeEnvironment,
@@ -30,9 +32,17 @@ export const opsConfig = Config.define((c) => ({
   apiKey: c.env("LANGWATCH_OPS_API_KEY", z.string().optional()),
   /** A third ClickHouse identity; never falls back to the tenant-keyed client. */
   clickhouseOpsUrl: c.env("CLICKHOUSE_OPS_URL", z.string().optional()),
+  /** A file holding the ops user's password, re-read per statement; blank means unset. */
+  clickhouseOpsPasswordFile: c.env(
+    "CLICKHOUSE_OPS_PASSWORD_FILE",
+    z.preprocess(
+      (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+      z.string().optional(),
+    ),
+  ),
   usageStats: {
     disabled: c.env("DISABLE_USAGE_STATS", environmentOneOrTrueSchema),
-    installMethod: c.env("INSTALL_METHOD", z.string().optional()),
+    installMethod,
     /** The Helm chart release, which moves separately from the app. */
     chartVersion: c.env("LANGWATCH_CHART_VERSION", z.string().optional()),
   },
@@ -43,6 +53,12 @@ export const opsConfig = Config.define((c) => ({
     "DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND",
     environmentOneOrTrueSchema,
   ),
+  /**
+   * The ClickHouse cluster; set, backup history is read across all of its replicas. The Helm chart
+   * already sets it for replicated or named external ClickHouse, so those installs read across
+   * replicas from the upgrade on.
+   */
+  clickhouseCluster,
   collectClickHouseBackupMetrics: c.env(
     "CLICKHOUSE_BACKUP_METRICS_ENABLED",
     z

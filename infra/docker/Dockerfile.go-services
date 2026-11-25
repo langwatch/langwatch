@@ -122,6 +122,10 @@ ENV SERVER_ADDR=:8080
 ENV NLPGO_ENGINE_CODE_BLOCK_ALLOW_VISIBLE_PROCESS=true
 ENV AWS_LWA_READINESS_CHECK_PATH=/healthz
 ENV AWS_LWA_INVOKE_MODE=RESPONSE_STREAM
+# The model catalog (services/nlpgo/adapters/modelcatalog): it decides the name
+# each model takes its output token limit as, the same files langevals reads.
+ENV LANGWATCH_MODEL_CATALOG_DIR=/opt/model-catalog
+COPY modules/model-provider/contract/src/catalog/model-catalog.json modules/model-provider/contract/src/catalog/model-catalog.overlay.json /opt/model-catalog/
 EXPOSE 8080
 CMD ["nlpgo"]
 
@@ -136,5 +140,9 @@ CMD ["aigateway"]
 # http://langwatch_nlp:5561 and set SERVER_ADDR themselves.
 FROM service AS nlp
 ENV SERVER_ADDR=:5561
+# The model catalog (services/nlpgo/adapters/modelcatalog): it decides the name
+# each model takes its output token limit as, the same files langevals reads.
+ENV LANGWATCH_MODEL_CATALOG_DIR=/opt/model-catalog
+COPY modules/model-provider/contract/src/catalog/model-catalog.json modules/model-provider/contract/src/catalog/model-catalog.overlay.json /opt/model-catalog/
 EXPOSE 5561
 CMD ["nlpgo"]

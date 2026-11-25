@@ -28,7 +28,8 @@ type Driver = {
 
 const { drivers } = vi.hoisted(() => ({ drivers: [] as Driver[] }));
 
-vi.mock("@clickhouse/client", () => ({
+vi.mock("@clickhouse/client", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   createClient: (config: DriverConfig) => {
     const driver: Driver = {
       config,
@@ -90,9 +91,13 @@ const runOn = ({
   executor: RoutedLangWatchQLExecutorRepository;
   tenantIds: readonly string[];
 }) =>
-  executor
-    .resolveRoute({ tenantIds })
-    .then((route) => route.executor.execute({ sql: "SELECT 1", tenantCapability: "capability" }));
+  executor.resolveRoute({ tenantIds }).then((route) =>
+    route.executor.execute({
+      sql: "SELECT 1",
+      tenantCapability: "ab12",
+      projectIds: tenantIds,
+    }),
+  );
 
 function routeOf({ tenantIds }: { tenantIds: readonly string[] }): Promise<TenantRoute> {
   const routes = new Set(tenantIds.map((tenantId) => ROUTES[tenantId]));
@@ -185,7 +190,9 @@ describe("given a statement over an organization with a private ClickHouse", () 
       password: SHARED.password,
     });
     expect(isolated?.query).toHaveBeenCalledWith(
-      expect.objectContaining({ clickhouse_settings: { custom_lwql_key_hash: "capability" } }),
+      expect.objectContaining({
+        query: expect.stringContaining("SETTINGS custom_lwql_key_hash = 'ab12'"),
+      }),
     );
     expect(shared.query).not.toHaveBeenCalled();
   });

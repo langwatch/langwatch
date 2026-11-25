@@ -4,7 +4,15 @@
  * already reads, plus `traces.SatisfactionScore` and the `topics` view.
  */
 
-import { bucketOf, inPeriod, inPeriodAndPrevious, MIDPOINT, START } from "./lwql-period.ts";
+import {
+  bucketOf,
+  firstTraceMetricsRow,
+  inPeriod,
+  inPeriodAndPrevious,
+  MIDPOINT,
+  START,
+} from "./lwql-period.ts";
+import { costByModelSql } from "./model-cost-queries.ts";
 
 export const TRAFFIC_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket, uniqExact(TraceId) AS traces
 FROM trace_metrics
@@ -31,11 +39,12 @@ FROM traces
 WHERE ${inPeriodAndPrevious("OccurredAt")}
   AND SatisfactionScore IS NOT NULL`;
 
-export const TOKEN_TREND_SQL = `SELECT ${bucketOf("BucketStart")} AS bucket,
-  sum(PromptTokensSum) AS prompt_tokens,
-  sum(CompletionTokensSum) AS completion_tokens
-FROM trace_metrics_by_minute
-WHERE ${inPeriod("BucketStart")}
+export const TOKEN_TREND_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket,
+  sum(PromptTokens) AS prompt_tokens,
+  sum(CompletionTokens) AS completion_tokens
+FROM trace_metrics
+WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}
 GROUP BY bucket
 ORDER BY bucket`;
 
@@ -86,16 +95,16 @@ export const TOP_MODELS_SQL = `SELECT arrayJoin(Models) AS model, uniqExact(Trac
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
 GROUP BY model
-ORDER BY traces DESC
+ORDER BY traces DESC, model
 LIMIT 10`;
 
-export const MODEL_COSTS_SQL = `SELECT Model AS model, sum(CostSum) AS cost
-FROM model_usage_by_minute
-WHERE ${inPeriod("BucketStart")}
-  AND Model != ''
-GROUP BY model
-ORDER BY cost DESC
-LIMIT 50`;
+/** The requests that call at least one model: the whole a model's share is taken of. */
+export const MODEL_REQUEST_COUNT_SQL = `SELECT uniqExact(TraceId) AS traces
+FROM trace_metrics
+WHERE ${inPeriod("OccurredAt")}
+  AND notEmpty(Models)`;
+
+export const MODEL_COSTS_SQL = costByModelSql({ limit: 10, among: TOP_MODELS_SQL });
 
 /** All trace spend, read from `TotalCost` so the report names the models with no price. */
 export const MODEL_SPEND_TOTAL_SQL = `SELECT sum(TotalCost) AS cost
@@ -115,7 +124,7 @@ export const SLOWEST_OPERATIONS_SQL = `SELECT SpanName AS operation,
   sum(DurationMs) AS total_ms,
   quantileExact(0.95)(DurationMs) AS p95_ms,
   count() AS spans
-FROM spans
+FROM span_metrics
 WHERE ${inPeriod("StartTime")}
 GROUP BY operation
 ORDER BY total_ms DESC

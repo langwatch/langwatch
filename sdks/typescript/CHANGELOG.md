@@ -1,5 +1,52 @@
 # Changelog
 
+## [2.3.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v2.2.0...typescript-sdk@v2.3.0) (2026-11-23)
+
+
+### Features
+
+* **braids:** show one project's matching spans in another project's traces ([#8946](https://github.com/langwatch/langwatch/issues/8946)) ([707db81](https://github.com/langwatch/langwatch/commit/707db81837e4d3a8205177469ffa231c19aceaa7))
+* **dataset:** create a dataset with its rows in one call and upsert rows by a key column ([#9502](https://github.com/langwatch/langwatch/issues/9502)) ([0c843e2](https://github.com/langwatch/langwatch/commit/0c843e262e0768eb393611a3d4ba52d499925dd6))
+* **experiments:** show the agent version a label resolved to and the concurrency each run used ([#9449](https://github.com/langwatch/langwatch/issues/9449)) ([cbabd19](https://github.com/langwatch/langwatch/commit/cbabd1909c3a20e3cd8ad25c8817294d3d990f9f))
+* **langy:** measured changes, CI as the lab, traces always found, and a judge that reads long traces ([#9536](https://github.com/langwatch/langwatch/issues/9536)) ([a697ebd](https://github.com/langwatch/langwatch/commit/a697ebdf2403dc0aad86e3240fa7e00620d2395d))
+* **navigation:** offer new organization in the organization menu ([#9569](https://github.com/langwatch/langwatch/issues/9569)) ([f15d4cf](https://github.com/langwatch/langwatch/commit/f15d4cf29b1397cc291b9669b298a8dbd6e013b0))
+* **navigation:** rename Me to Coding agents, with /me redirects ([#9698](https://github.com/langwatch/langwatch/issues/9698)) ([871c08d](https://github.com/langwatch/langwatch/commit/871c08d13825099e4f7fad4b0af8d69d650a8035))
+* **organization:** seat requests over the limit, IdP refusal screens and a Billing role ([#9391](https://github.com/langwatch/langwatch/issues/9391)) ([0805d4e](https://github.com/langwatch/langwatch/commit/0805d4ee7d7ca66f10740a417176c7261c9c3e38))
+* **scenario:** red team scenario kind, suite templates and the OWASP LLM Top 10 2025 pack (phase 1) ([#9640](https://github.com/langwatch/langwatch/issues/9640)) ([52abff0](https://github.com/langwatch/langwatch/commit/52abff019b506f987e3acd481a8585fff7909c4e))
+* settings and docs polish, typed API playground, scoped docs playground sessions ([#9568](https://github.com/langwatch/langwatch/issues/9568)) ([a9f6428](https://github.com/langwatch/langwatch/commit/a9f6428693244ac519c67dd6b8ab86272e794b30))
+
+
+### Bug Fixes
+
+* **agents,experiment:** agent edits refresh without reload, plus experiment workbench fixes ([#9290](https://github.com/langwatch/langwatch/issues/9290)) ([c4e344c](https://github.com/langwatch/langwatch/commit/c4e344ce7ffb073ee7e0933322340d60288e2025))
+* **billing:** let every organization member start a paid subscription ([#9370](https://github.com/langwatch/langwatch/issues/9370)) ([56f6a10](https://github.com/langwatch/langwatch/commit/56f6a106451981e4d36dbbe831a33d37af034c1a))
+* bound includeSpans trace search pages, and a round of error hygiene ([#8979](https://github.com/langwatch/langwatch/issues/8979)) ([ce120ab](https://github.com/langwatch/langwatch/commit/ce120ab2cedf7aa1db42655422145ffad1b303c3))
+* **cli:** device login codes live 15 minutes and a rerun waits on the same code ([#9786](https://github.com/langwatch/langwatch/issues/9786)) ([4dfb94d](https://github.com/langwatch/langwatch/commit/4dfb94d0e291edeab511fc35b1794233dce682fa))
+* **cli:** ingestion-templates commands ([#9589](https://github.com/langwatch/langwatch/issues/9589)) ([350dc47](https://github.com/langwatch/langwatch/commit/350dc475fc0f9d579bbee6e658f014dac5b2b1ad))
+* **cli:** never ask for a credential the CLI cannot keep, and keep keys private ([#9593](https://github.com/langwatch/langwatch/issues/9593)) ([6d7da38](https://github.com/langwatch/langwatch/commit/6d7da38b8fd8dc101cb62ad735361b6c1dde9623))
+* **cli:** say what a non-array value is when --jq iterates or indexes it ([#9410](https://github.com/langwatch/langwatch/issues/9410)) ([67ac2d9](https://github.com/langwatch/langwatch/commit/67ac2d9069a8190f2e30c37069ad94aa5a0899c0))
+* **coding-agent:** Grok follow-ups apart from user denials, plus review clean-ups ([#9328](https://github.com/langwatch/langwatch/issues/9328)) ([8c9c33e](https://github.com/langwatch/langwatch/commit/8c9c33e928c0a5e1885985bea05f93ad7b8aa0e3))
+* **coding-agents:** pi and Grok sessions carry their prompt, model, columns and banner ([#9350](https://github.com/langwatch/langwatch/issues/9350)) ([c548e5a](https://github.com/langwatch/langwatch/commit/c548e5ae992b71c7b75f1b46961651765e317d97))
+* **dashboards:** widgets and graphs created without a size land readable; /api/graphs takes the grid's bounds ([#9737](https://github.com/langwatch/langwatch/issues/9737)) ([88d08a7](https://github.com/langwatch/langwatch/commit/88d08a739420c0d1c47f279d1087746f7fb3dddb))
+* **evaluator:** create custom code and workflow evaluators through the public API ([#9504](https://github.com/langwatch/langwatch/issues/9504)) ([2e36264](https://github.com/langwatch/langwatch/commit/2e36264f098b5cfdaf15f732c85ccf00b444233a))
+* **gateway:** a virtual key config update keeps the sections it leaves out ([#9779](https://github.com/langwatch/langwatch/issues/9779)) ([5ece2f7](https://github.com/langwatch/langwatch/commit/5ece2f746b19056f36ed4572bd9a86d887751bdb))
+* **langy:** clearer empty trace searches, retryable causeless agent errors and literal local_grep fallback ([#9780](https://github.com/langwatch/langwatch/issues/9780)) ([69386bb](https://github.com/langwatch/langwatch/commit/69386bbe934d19a134f5c9c64a3978e2e78c8110))
+* **langy:** tell a terminal signed in as someone else that the request is not theirs ([#9424](https://github.com/langwatch/langwatch/issues/9424)) ([9df8637](https://github.com/langwatch/langwatch/commit/9df8637d95e774115cbe5badd725285daef7e45f))
+* **mcp:** platform_update_prompt keeps the prompt's parameters ([#9776](https://github.com/langwatch/langwatch/issues/9776)) ([99e82c5](https://github.com/langwatch/langwatch/commit/99e82c56dbbb20829141150b94cdd4361977512c))
+* **sdk:** unit tests never write the developer's real Claude settings ([#9555](https://github.com/langwatch/langwatch/issues/9555)) ([0e10e58](https://github.com/langwatch/langwatch/commit/0e10e58b436156ee78b6e80392793f0352c113d1))
+* **sdk:** unit tests run in a temp HOME with no agent config dirs set, so they never write the developer's real settings ([0e10e58](https://github.com/langwatch/langwatch/commit/0e10e58b436156ee78b6e80392793f0352c113d1))
+* **security:** raise JS floors for high alerts (undici, toml, effect, msal-node and more) ([#9784](https://github.com/langwatch/langwatch/issues/9784)) ([914b46c](https://github.com/langwatch/langwatch/commit/914b46c21fd712caa32d0aaba24e5b11595ed59c))
+
+
+### Documentation
+
+* **coding-agents:** add pi and Grok CLI setup pages ([#9305](https://github.com/langwatch/langwatch/issues/9305)) ([b0ae643](https://github.com/langwatch/langwatch/commit/b0ae643cc744ef7a955da6242e4b56c55e3d5f01))
+
+
+### Code Refactoring
+
+* **coding-agents:** one trace window merge and one shellQuote ([#9583](https://github.com/langwatch/langwatch/issues/9583)) ([a679c57](https://github.com/langwatch/langwatch/commit/a679c575ffc249f367f2d51cb3b7e62296a0d3d5))
+
 ## [2.2.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v2.1.0...typescript-sdk@v2.2.0) (2026-11-03)
 
 
