@@ -8,11 +8,11 @@ import { describe, expect, it } from "vitest";
 import { onboardingRest } from "../onboarding.rest.ts";
 
 describe("given Langy reports a path as done with the conversation's key", () => {
-  describe("when the guided state and completion routes declare their guards", () => {
+  describe("when the guided state, completion and start routes declare their guards", () => {
     /** @scenario the REST routes are guarded by a permission Langy's own key can hold */
     it("declares only permissions the platform delegates to a Langy session key", () => {
       const routes = onboardingRest.router().routes;
-      expect(routes).toHaveLength(2);
+      expect(routes).toHaveLength(3);
       for (const route of routes) {
         expect(route.permission).toBeDefined();
         const permission = String(route.permission);

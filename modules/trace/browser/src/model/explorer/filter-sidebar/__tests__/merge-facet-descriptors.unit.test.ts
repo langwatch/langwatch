@@ -62,3 +62,31 @@ describe("given a counted payload", () => {
     expect(merged.countState).toBe("stale");
   });
 });
+
+describe("given a query that matches nothing yet", () => {
+  /** @scenario "A pending chip under NOT is not judged yet" */
+  it("reads as a counted read matching no trace: discovered descriptors, nothing counted, settled", () => {
+    const range: FacetDescriptor = {
+      key: "duration",
+      kind: "range",
+      label: "Duration",
+      group: "trace",
+      min: 1,
+      max: 9,
+      discrete: { values: [{ value: 1, count: 4 }], distinctCount: 1 },
+    };
+    const merged = mergeFacetDescriptors({
+      discovered: [categorical("status", 9), range, keyList],
+      filtered: [],
+      filteredIsPlaceholder: false,
+      filteredMatchesNothing: true,
+    });
+
+    expect(merged.countState).toBe("settled");
+    expect(merged.descriptors).toEqual([
+      { ...categorical("status", 9), topValues: [], totalDistinct: 0 },
+      { key: "duration", kind: "range", label: "Duration", group: "trace", min: 0, max: 0 },
+      keyList,
+    ]);
+  });
+});

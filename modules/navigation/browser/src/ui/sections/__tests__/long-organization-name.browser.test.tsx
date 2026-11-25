@@ -64,6 +64,7 @@ function renderBar({ organizations }: { organizations: (typeof LONG_ORG)[] }) {
           activeProductId: null,
           isSettingsRoute: true,
           seatRefusal: null,
+          openBoard: null,
           showDevelopmentIndicator: false,
           isCompactSidebar: false,
           isMobile: false,

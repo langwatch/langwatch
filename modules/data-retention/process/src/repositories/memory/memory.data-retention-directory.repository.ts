@@ -1,3 +1,5 @@
+import type { Instant } from "@langwatch/time";
+
 import type {
   DataRetentionDirectoryReader,
   RetentionOrganizationDirectory,
@@ -8,6 +10,7 @@ type MemoryDirectoryRows = Readonly<{
   lineage?: RetentionProjectLineage;
   directory?: RetentionOrganizationDirectory;
   scopeProjects?: readonly { id: string; teamId: string }[];
+  organizationCreatedAt?: Instant;
 }>;
 
 /** The directory's memory twin: one organization's lineage, seeded by whoever creates it. */
@@ -29,5 +32,9 @@ export class MemoryDataRetentionDirectoryRepository implements DataRetentionDire
 
   async findScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
     return this.rows.scopeProjects ?? [];
+  }
+
+  async findOrganizationCreatedAt(): Promise<readonly Instant[]> {
+    return this.rows.organizationCreatedAt ? [this.rows.organizationCreatedAt] : [];
   }
 }

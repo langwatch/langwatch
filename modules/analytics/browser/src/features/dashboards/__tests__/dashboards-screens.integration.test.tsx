@@ -5,9 +5,9 @@
  */
 
 import { type UiProcedureCall, UiProcedureRefusal } from "@langwatch/browser/testing-transport";
-import { screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost, type StubAnalyticsHostOptions } from "../../../testing.tsx";
 import DashboardBoardScreen from "../ui/sections/dashboard-board.screen.tsx";
@@ -65,6 +65,29 @@ function hostOpening({
   });
 }
 
+/** Opens one board on the board screen, with the given boards listed and no widgets. */
+function openBoardAmong({
+  dashboardId,
+  boards,
+}: {
+  dashboardId: string;
+  boards: ReturnType<typeof listed>[];
+}) {
+  renderDashboards({
+    element: <DashboardBoardScreen />,
+    host: hostOpening({ dashboardId, flags: FLAG_ON }),
+    answer: (call) => {
+      if (call.path === "boards.getAll") return Promise.resolve(boards);
+      if (call.path === "boards.listStarred") return Promise.resolve([]);
+      if (call.path === "dashboardWidgets.list") return Promise.resolve([]);
+      return NO_PROCEDURES(call);
+    },
+  });
+}
+
+// Unmounting disposes each chart frame, whose heartbeat timer would otherwise outlive jsdom.
+afterEach(cleanup);
+
 describe("the Dashboards screens", () => {
   describe("given the release_dashboards flag is off for the project", () => {
     describe("when a member opens /[project]/dashboards", () => {
@@ -76,6 +99,16 @@ describe("the Dashboards screens", () => {
         expect(screen.getByRole("heading", NOT_FOUND)).toBeInTheDocument();
         expect(host.navigations).toEqual([]);
       });
+    });
+
+    /** @scenario "AC3j The Dashboards pages show no old-Analytics banner when they do not open" */
+    it("shows no old-Analytics banner", () => {
+      renderDashboards({
+        element: <DashboardBoardScreen />,
+        host: hostOpening({ dashboardId: "board-1", flags: FLAG_OFF }),
+      });
+
+      expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
     });
   });
 
@@ -122,6 +155,7 @@ describe("the Dashboards screens", () => {
         });
 
         expect(await screen.findByRole("heading", NOT_FOUND)).toBeInTheDocument();
+        expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
         expect(refused.container.innerHTML).toBe(flagOffPage);
       });
     });
@@ -191,23 +225,50 @@ describe("the Dashboards screens", () => {
       });
     });
 
-    describe("when the member opens a board", () => {
-      /** @scenario "AC3i The Dashboards pages do not point back to the old Analytics" */
-      it("does not ask if they look for the old Analytics", async () => {
-        renderDashboards({
-          element: <DashboardBoardScreen />,
-          host: hostOpening({ dashboardId: "board-1", flags: FLAG_ON }),
-          answer: (call) => {
-            if (call.path === "boards.getAll") return Promise.resolve([listed({ id: "board-1" })]);
-            if (call.path === "boards.listStarred") return Promise.resolve([]);
-            if (call.path === "dashboardWidgets.list") return Promise.resolve([]);
-            return NO_PROCEDURES(call);
-          },
+    describe("when the member lands on their My dashboard", () => {
+      /** @scenario "AC3i The page the Analytics entry lands on points back to the old Analytics" */
+      it("asks if they look for the old Analytics and links to it", async () => {
+        openBoardAmong({
+          dashboardId: "mine",
+          boards: [listed({ id: "mine", name: "My dashboard" })],
         });
 
-        expect(await screen.findByRole("heading", { name: "board-1" })).toBeInTheDocument();
-        expect(screen.queryByText(/Looking for the old Analytics/)).toBeNull();
-        expect(screen.queryByRole("link", { name: "Open Analytics" })).toBeNull();
+        expect(await screen.findByTestId("old-analytics-banner")).toHaveTextContent(
+          "Looking for the old Analytics? It is still here.",
+        );
+        expect(screen.getByRole("link", { name: "Open Analytics" })).toHaveAttribute(
+          "href",
+          "/test-project/analytics",
+        );
+      });
+    });
+
+    describe("when the member opens any other board", () => {
+      /** @scenario "AC3t No other Dashboards page shows the old-Analytics banner" */
+      it("shows no old-Analytics banner on a named board", async () => {
+        openBoardAmong({
+          dashboardId: "board-1",
+          boards: [
+            listed({ id: "mine", name: "My dashboard" }),
+            listed({ id: "board-1", name: "Legal ops quality" }),
+          ],
+        });
+
+        expect(
+          await screen.findByRole("heading", { name: "Legal ops quality" }),
+        ).toBeInTheDocument();
+        expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
+      });
+
+      /** @scenario "AC3t No other Dashboards page shows the old-Analytics banner" */
+      it("shows no old-Analytics banner on someone else's My dashboard", async () => {
+        openBoardAmong({
+          dashboardId: "theirs",
+          boards: [listed({ id: "theirs", name: "My dashboard", createdById: "user-2" })],
+        });
+
+        expect(await screen.findByRole("heading", { name: "My dashboard" })).toBeInTheDocument();
+        expect(screen.queryByTestId("old-analytics-banner")).toBeNull();
       });
     });
   });

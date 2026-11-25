@@ -10,6 +10,7 @@ import { MemoryAuthzAdmissionRepository } from "./memory.authz-admission.reposit
 import { MemoryAuthzAuditTrailRepository } from "./memory.authz-audit-trail.repository.ts";
 import { MemoryAuthzBillingGrantRepository } from "./memory.authz-billing-grant.repository.ts";
 import { MemoryAuthzBraidLockRepository } from "./memory.authz-braid-lock.repository.ts";
+import { MemoryAuthzBraidWriteRepository } from "./memory.authz-braid-write.repository.ts";
 import { MemoryAuthzGrantProjectionRepository } from "./memory.authz-grant-projection.repository.ts";
 import { MemoryAuthzLedgerReadRepository } from "./memory.authz-ledger-read.repository.ts";
 import { MemoryAuthzLineageEpochRepository } from "./memory.authz-lineage-epoch.repository.ts";
@@ -48,6 +49,7 @@ export class MemoryAuthzRepositories {
       migration: MemoryAuthzMigrationRepository.create({ memory }),
       ledgerReads: MemoryAuthzLedgerReadRepository.create({ memory }),
       braidLocks: MemoryAuthzBraidLockRepository.create(),
+      braidWrites: MemoryAuthzBraidWriteRepository.create(),
       organizationPolicies: MemoryAuthzOrganizationPolicyRepository.create(),
     };
   }

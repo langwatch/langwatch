@@ -26,7 +26,32 @@ watching. Those runs reach Grafana and the logs only, never PostHog.
 | `lwql_rows_read{caller}`                   | Grafana | same                                                                                               | which callers read the most data             |
 | "LangWatchQL executed" / "failed" log line | logs    | same; carries `caller`, `outcome`, `queryHash`, board, widget and template ids, and the error code | find the run behind a slow or failing number |
 
-The Grafana board is `docs/langwatchql-queries-dashboard.json`.
+The Grafana board is `docs/langwatchql-queries-dashboard.json`. Its "Failed
+widget queries" tables list failed widget runs by project, newest first.
+
+A "failed" line logs at `warn` when the customer's query is at fault (a memory
+or scan limit, a refused statement), at `error` for ours (timeout, database
+down, unhandled), at `info` when aborted. It carries `projectId` to group by,
+which is the first entry of `projectIds`: the run's own project, or for an
+aggregate board or an organisation-wide key the first project of the resolved
+scope. A run that resolves no project at all, such as an organisation-wide key
+over all projects, carries neither field, so it has no project to group by. Any
+other refused run still carries the project it came from, plus any it named.
+`projectIds` is a list of the project ids the run covered. Logs Insights shows
+each as `projectIds.0`, `projectIds.1`, and so on (the dashboard panel shows the
+first three; open the log line for the full list).
+
+A chart, a board header action or a widget's sandboxed frame that crashes while
+drawing goes to PostHog as an exception (`surface`, board and widget ids), not
+as a product event; so does a chart whose Vega embed or run fails
+(`lwql_chart_embed`), and so does a frame whose React, Recharts or Babel did not
+load from the CDN (`dashboard_widget_frame_load`, usually the reader's network or
+a CDN outage rather than the widget). Each carries the active `trace_id` and
+`span_id` when there is one. A frame's compile error or missing export, and a chart's
+blocked resource load, are not reported. Tokens, emails and long encoded runs
+are masked in the message and stack before they leave the browser. A widget frame
+crash reports only its first line, cut to at most 200 characters at a word
+boundary, and repeats of the same first line in one mount report once.
 
 ### What people do (PostHog)
 
@@ -52,8 +77,8 @@ change. Each event also carries `projectId`.
 | `insights.filed/seen/archived/kept.insight`          | sent by nurturing from insight's own events, on the person who acted             | are insights read and acted on                 |
 | `automations.opened.alert_link`                      | a signed-in member opens a link marked `lw_from=alert` (`landedOn`)              | do alerts bring people back to the app         |
 
-No attribute we set carries a raw board or widget id, SQL, a title or question
-text. `dashboardKey` is 16 hex of SHA-256 of the board id.
+No product event attribute we set carries a raw board or widget id, SQL, a
+title or question text; a crash exception names its board and widget by id. `dashboardKey` is 16 hex of SHA-256 of the board id.
 
 ## How a run gets its caller
 

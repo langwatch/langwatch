@@ -2,6 +2,7 @@ import { toaster } from "@langwatch/design-system/toaster";
 import type { ExplorerSearchClassification } from "@langwatch/instant-eval-contract";
 import {
   combineQueries,
+  hasInstantEvalChipUnderOr,
   isRouteKind,
   type ModelTrouble,
   queryWithoutInstantEvalChip,
@@ -17,7 +18,16 @@ import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { type SearchNotice } from "../../../../behavior/query.slice.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import {
+  unmarkNewlyTyped,
+  useInstantEvalRunStore,
+} from "../../../../features/instant-eval/behavior/instant-eval-run.store.ts";
 import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";
+import {
+  isSurelyInstantEvalChip,
+  typedQuestionKey,
+  UNJUDGEABLE_NOT_COPY,
+} from "../../../../model/surely-instant-eval-chip.ts";
 import { explainAnyError } from "../../errors/index.ts";
 
 interface UseSubmitSearchOptions {
@@ -148,10 +158,17 @@ function useApplyRoute({
   );
 }
 
+/** What a submit's eval chips ask for, before the submit path is chosen. */
+interface TypedEvalRun {
+  run: InstantEvalRoutePayload | "unjudgeable" | null;
+  /** The questions the submit records as Instant Evals, on a path that judges or refuses them. */
+  typedQuestions: string[];
+}
+
 /**
- * The run a typed eval chip asks for, or null when every chip already has one.
- * The question is judged as written, with no model between Enter and the
- * estimate, and the fallback is the query as typed so a refusal leaves it be.
+ * The run a typed eval chip asks for, or null when every chip has one; the question is judged as
+ * written. An Instant Eval chip a `NOT` reaches from above an `OR` or a group is unjudgeable; a
+ * bare one never run, submitted here, or judged by this submit is left out, as an evaluator name.
  */
 function typedEvalRunOf({
   queryText,
@@ -159,10 +176,16 @@ function typedEvalRunOf({
 }: {
   queryText: string;
   projectId: string;
-}): InstantEvalRoutePayload | null {
+}): TypedEvalRun {
   // Read from the store at submit time, not from the debounced copy: the chip
   // just typed is matched against the window and lens the search will run in.
-  const { activeLensId, timeRange, evalRuns } = useFilterStore.getState();
+  const {
+    activeLensId,
+    timeRange,
+    evalRuns,
+    projectId: shownProjectId,
+  } = useFilterStore.getState();
+  const runsByKey = evalRuns ?? {};
   const { chips } = resolveInstantEvalChips({
     queryText,
     lensId: activeLensId,
@@ -171,23 +194,70 @@ function typedEvalRunOf({
       to: timeRange.to,
       ...(timeRange.presetId ? { presetId: timeRange.presetId } : {}),
     },
-    runsByKey: evalRuns ?? {},
+    runsByKey,
   });
-  const pending = chips.find((chip) => chip.runId === null);
-  if (!pending) return null;
+  const judgeable = chips.filter((chip) => !chip.isUnjudgeable);
+  const typed = judgeable.map((chip) => chip.question);
+  // This submit's own judgeable chips count as marked: a run they start would mark them anyway.
+  const marked = { ...useInstantEvalRunStore.getState().typedQuestions };
+  for (const question of typed) {
+    marked[typedQuestionKey({ projectId: shownProjectId ?? "", question })] = true;
+  }
+  const isUnjudgeable = chips.some(
+    (chip) =>
+      chip.isUnjudgeable &&
+      isSurelyInstantEvalChip({
+        chip,
+        projectId: shownProjectId ?? "",
+        typedQuestions: marked,
+        runsByKey,
+      }),
+  );
+  if (isUnjudgeable) return { run: "unjudgeable", typedQuestions: [] };
+  const pending = judgeable.find((chip) => chip.runId === null);
+  if (!pending) return { run: null, typedQuestions: typed };
+  const chip = { queryText, field: pending.field, question: pending.question };
   return {
-    projectId,
-    sentence: pending.question,
-    question: { instructions: pending.question },
-    target: pending.target,
-    otherQuery: queryWithoutInstantEvalChip({
-      queryText,
-      field: pending.field,
-      question: pending.question,
-    }),
-    fallbackQuery: queryText,
-    timeRange: { from: timeRange.from, to: timeRange.to },
+    run: {
+      projectId,
+      sentence: pending.question,
+      question: { instructions: pending.question },
+      target: pending.target,
+      otherQuery: queryWithoutInstantEvalChip({
+        queryText,
+        field: pending.field,
+        question: pending.question,
+      }),
+      fallbackQuery: queryText,
+      ...(hasInstantEvalChipUnderOr(chip) ? {} : { typedQuery: queryText }),
+      timeRange: { from: timeRange.from, to: timeRange.to },
+    },
+    typedQuestions: typed,
   };
+}
+
+/**
+ * Records a submit's chips as Instant Evals, so their rows read as not judged while no run answers
+ * them, rather than as an evaluator name. Keyed by the project the explorer shows, as the table
+ * reads it. The run carries the questions that had no mark before this submit.
+ */
+function markTypedQuestions<Run extends InstantEvalRoutePayload | null>({
+  questions,
+  run,
+}: {
+  questions: readonly string[];
+  run: Run;
+}): Run {
+  const projectId = useFilterStore.getState().projectId ?? "";
+  const { markTyped, typedQuestions } = useInstantEvalRunStore.getState();
+  const newlyTyped = [
+    ...new Set(
+      questions.filter((question) => !typedQuestions[typedQuestionKey({ projectId, question })]),
+    ),
+  ];
+  for (const question of questions) markTyped({ projectId, question });
+  if (run === null || newlyTyped.length === 0) return run;
+  return { ...run, newlyTypedQuestions: newlyTyped };
 }
 
 /**
@@ -304,6 +374,7 @@ function useRouteSubmit({
 
 /** Where a submit goes, once the typed-eval run and the sentence are known. */
 type SubmitPath =
+  | { kind: "unjudgeable" }
   | { kind: "refuse"; run: InstantEvalRoutePayload }
   | { kind: "filter"; run: InstantEvalRoutePayload | null }
   | { kind: "requote" }
@@ -311,8 +382,8 @@ type SubmitPath =
 
 /**
  * The routing decision for a non-empty submit, in the order a reader checks by hand: a typed chip
- * the deployment cannot run is refused first; a text with no bare words is a filter; a bare-word
- * text with no project is requoted; anything left routes.
+ * no run can answer is refused first, then one the deployment cannot run; a text with no bare
+ * words is a filter; a bare-word text with no project is requoted; anything left routes.
  */
 function submitPathOf({
   trimmed,
@@ -322,9 +393,10 @@ function submitPathOf({
 }: {
   trimmed: string;
   projectId: string | null;
-  run: InstantEvalRoutePayload | null;
+  run: InstantEvalRoutePayload | "unjudgeable" | null;
   isInstantEvalAvailable: boolean;
 }): SubmitPath {
+  if (run === "unjudgeable") return { kind: "unjudgeable" };
   if (run && !isInstantEvalAvailable) return { kind: "refuse", run };
   const { sentence } = splitBareWords(trimmed);
   if (!sentence) return { kind: "filter", run };
@@ -387,21 +459,30 @@ export function useSubmitSearch({
       }
       // The sample preview has no project to search or judge in.
       const projectId = isSamplePreview ? null : (project?.id ?? null);
-      const run = projectId ? typedEvalRunOf({ queryText: trimmed, projectId }) : null;
+      const typed = projectId ? typedEvalRunOf({ queryText: trimmed, projectId }) : null;
       const path = submitPathOf({
         trimmed,
         projectId,
-        run,
+        run: typed?.run ?? null,
         isInstantEvalAvailable,
       });
       switch (path.kind) {
+        case "unjudgeable":
+          // Nothing is searched or started: any rebuild would change what was typed.
+          toaster.create({ ...UNJUDGEABLE_NOT_COPY, type: "warning" });
+          return;
         case "refuse":
           // Nothing is searched: the typed chip stays in the bar under the
           // popover that says why the run did not start.
-          onInstantEval(path.run);
+          onInstantEval(
+            markTypedQuestions({ questions: typed?.typedQuestions ?? [], run: path.run }),
+          );
           return;
         case "filter":
-          applyFilter({ queryText: trimmed, run: path.run });
+          applyFilter({
+            queryText: trimmed,
+            run: markTypedQuestions({ questions: typed?.typedQuestions ?? [], run: path.run }),
+          });
           return;
         case "requote":
           applyQueryText(requoteBareTerms(trimmed));
@@ -427,6 +508,11 @@ export function useSubmitSearch({
     (payload: InstantEvalRoutePayload) => {
       const seq = ++submitSeqRef.current;
       onSupersede();
+      // The words were no Instant Eval: the marks this submit made go, ones made earlier stay.
+      unmarkNewlyTyped({
+        projectId: useFilterStore.getState().projectId ?? "",
+        questions: payload.newlyTypedQuestions,
+      });
       const text = combineQueries({ base: payload.otherQuery, addition: payload.sentence });
       if (!splitBareWords(text).sentence || isSamplePreview) {
         applyQueryText(requoteBareTerms(text));

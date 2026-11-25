@@ -238,6 +238,15 @@ const runListEntrySchema = z.object({
     .nullable()
     .optional()
     .describe("Cells the run executed at once. Null for a run that recorded none."),
+  repeat: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe(
+      "How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.",
+    ),
   summary: runAggregateSummarySchema,
 });
 
@@ -296,7 +305,13 @@ const executionSummarySchemaDefinition = z.object({
         name: z.string(),
         passed: z.number(),
         failed: z.number(),
-        passRate: z.number(),
+        errored: z
+          .number()
+          .optional()
+          .describe("Cells where the evaluator crashed and gave no verdict"),
+        passRate: z
+          .number()
+          .describe("Percentage of verdicts that passed; 0 when passed and failed are both 0"),
         avgScore: z.number().optional(),
       }),
     )
@@ -424,6 +439,15 @@ const runResultsResponseSchemaDefinition = z.object({
     .nullable()
     .optional()
     .describe("Cells the run executed at once. Null for a run that recorded none."),
+  repeat: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe(
+      "How many times the run repeated every dataset row. Run row `r * repeat + k` is repetition `k` of dataset row `r`. Null for a run that ran each row once.",
+    ),
   targets: z
     .array(runTargetSchema)
     .nullable()

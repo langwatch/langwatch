@@ -104,6 +104,8 @@ const experimentRunSchemaDefinition = z
     total: z.number().nullable().optional(),
     /** Cells the run kept in flight at once; null for a run that recorded none. */
     concurrency: z.number().int().positive().nullable().optional(),
+    /** How many times the run repeated every dataset row; null for a run that ran each once. */
+    repeat: z.number().int().positive().nullable().optional(),
     targets: z.array(experimentRunTargetSchema).nullable().optional(),
     summary: experimentRunSummarySchema,
   })
@@ -334,6 +336,8 @@ const experimentRunWithItemsSchemaDefinition = z
     total: z.number().nullable().optional(),
     /** Cells the run kept in flight at once; null for a run that recorded none. */
     concurrency: z.number().int().positive().nullable().optional(),
+    /** How many times the run repeated every dataset row; null for a run that ran each once. */
+    repeat: z.number().int().positive().nullable().optional(),
     targets: z.array(experimentRunTargetSchema).nullable().optional(),
     dataset: z.array(experimentRunDatasetEntrySchema),
     evaluations: z.array(experimentRunEvaluationSchema),

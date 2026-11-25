@@ -272,14 +272,29 @@ function PendingAnswers({
       onFailure(describeError({ error, fallbackTitle: "Could not send your answer" }));
     },
   });
+  // The switch reads the cached folder read, so the choice is written there on the click and
+  // rolled back on a refusal. Without it the switch held its old value until a later refetch.
+  const utils = api.useUtils();
+  const workspaceKey = { projectId, conversationId };
   const setPolicy = api.langy.setLocalPolicy.useMutation({
-    onError: (error) =>
+    onMutate: async ({ skipPermissions: next }) => {
+      await utils.langy.getLocalWorkspace.cancel(workspaceKey);
+      const previous = utils.langy.getLocalWorkspace.getData(workspaceKey);
+      utils.langy.getLocalWorkspace.setData(workspaceKey, (old) =>
+        old ? { ...old, skipPermissions: next } : old,
+      );
+      return { previous };
+    },
+    onError: (error, _input, context) => {
+      if (context?.previous) utils.langy.getLocalWorkspace.setData(workspaceKey, context.previous);
       onFailure(
         describeError({
           error,
           fallbackTitle: "Could not change the permission checks",
         }),
-      ),
+      );
+    },
+    onSettled: () => void utils.langy.getLocalWorkspace.invalidate(workspaceKey),
   });
 
   // The decision travels with the settle: the durable record needs a moment to

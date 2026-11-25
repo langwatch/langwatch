@@ -26,6 +26,13 @@ Feature: Eventing's own surfaces over its tables
       And it touches only rows of that category's aggregate types that may expire
       And it carries the category's marker
 
+    @unit
+    Scenario: A category's raise only lengthens its rows
+      Given a classification naming each aggregate type's retention class
+      When a category's retention is raised for a tenant
+      Then the rewrite touches only that category's finite rows kept for less than the new retention
+      And a row kept forever is never touched
+
     # Only customer telemetry expires (Alex, 2026-10-09): an unlisted aggregate type is kept forever.
     @unit
     Scenario: An aggregate type mapped to no category is never rewritten
