@@ -69,6 +69,14 @@ const API_KEY_CREDENTIAL: RestCredentialPrincipal = {
 
 const LEGACY_PROJECT_KEY_CREDENTIAL: RestCredentialPrincipal = { kind: "legacyProjectKey" };
 
+const ACCESS_TOKEN_CREDENTIAL: RestCredentialPrincipal = {
+  kind: "cliAccessToken",
+  userId: "user-1",
+  organizationId: "org-1",
+  projectId: "project-1",
+  teamId: "team-1",
+};
+
 function dataPrivacyResolving(
   resolve: () => Promise<dataPrivacyContractModule.ResolvedDataPrivacy>,
 ): { dataPrivacy: DataPrivacyApi; getResolvedForProject: ReturnType<typeof vi.fn> } {
@@ -440,6 +448,23 @@ describe("resolveApiKeyProtections", () => {
       });
 
       expect(resolved.canSeeCapturedInput).toBe(false);
+    });
+  });
+
+  describe("given an admin's project-bound access token and content restricted to admins", () => {
+    /** @scenario "A project-bound access token reads captured content as its person" */
+    it("shows the content, as the workbench shows it to that admin", async () => {
+      const { authz } = authzAnswering(true);
+      const { dataPrivacy } = dataPrivacyResolving(async () => inputRestrictedTo("group-a"));
+
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveApiKeyProtections({
+        projectId: "project-1",
+        credential: ACCESS_TOKEN_CREDENTIAL,
+      });
+
+      expect(resolved.canSeeCapturedOutput).toBe(true);
+      expect(resolved.canSeeCapturedInput).toBe(false);
+      expect(resolved.canSeeCosts).toBe(true);
     });
   });
 });

@@ -2242,6 +2242,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     const protections = await this.resolveApiKeyProtections({
       projectId: input.projectId,
       principal: input.principal,
+      authorization: input.authorization,
     });
     const facetKey = this.#dependencies.traces.list.resolveFacetKey({ field, protections });
     const result = await this.readFacetValues({
@@ -2516,6 +2517,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   resolveApiKeyProtections(input: {
     projectId: string;
     principal: PrincipalRef | null;
+    authorization?: Authorization;
   }): Promise<Protections> {
     if (!this.#dependencies.protections)
       throw new Error("Trace protections service is unavailable");
