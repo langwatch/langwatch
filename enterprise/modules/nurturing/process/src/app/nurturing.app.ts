@@ -25,6 +25,7 @@ import { NurturingCopiedProjectsService } from "../services/nurturing-copied-pro
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
 import { NurturingGatewayFactsService } from "../services/nurturing-gateway-facts.service.ts";
 import { NurturingGovernanceFactsService } from "../services/nurturing-governance-facts.service.ts";
+import { NurturingGuidedOnboardingBackfillService } from "../services/nurturing-guided-onboarding-backfill.service.ts";
 import { NurturingMemberFactsService } from "../services/nurturing-member-facts.service.ts";
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingOrganizationCreatedService } from "../services/nurturing-organization-created.service.ts";
@@ -98,6 +99,14 @@ export class NurturingModule implements NurturingApi {
       memberFacts,
       members: repositories.members,
       erasedUsers: repositories.erasedUsers,
+      guidedBackfill:
+        customerIo &&
+        NurturingGuidedOnboardingBackfillService.create({
+          claims: repositories.claims,
+          customerIo,
+          members: repositories.members,
+          organizations: dependencies.organizations,
+        }),
     });
     const gatewayFacts = NurturingGatewayFactsService.create({
       keys: repositories.virtualKeys,

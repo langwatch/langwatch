@@ -51,7 +51,7 @@ Feature: PostHog guided onboarding events
     Then exactly one "onboarding_variant_assigned" event is tracked for that user with variant "guided" and the organization id
     And it carries a uuid derived from the organization and the assignment time as its timestamp, so PostHog keeps one even after the delivery claim expires
     And the person property onboarding_variant is set to "guided"
-    And Customer.io receives nothing
+    And Customer.io is told the variant once, on the person and the organization, with no path
 
   @unit
   Scenario: the variant assignment is the exposure of the experiment

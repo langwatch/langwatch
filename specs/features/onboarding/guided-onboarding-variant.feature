@@ -213,6 +213,17 @@ Feature: Guided onboarding variant
     When the user records paths
     Then the guided onboarding event hook receives a "paths_selected" event for that organization and user
 
+  # Langy's governance opener asks how the person wants to start. "call" is the
+  # choice they made: nothing books the call, so nothing records one as booked.
+  @unit
+  Scenario: recording Langy's start stores the choice and announces it
+    Given an organization in the guided variant that picked governance
+    When the start call is recorded
+    Then the guided state carries the start call
+    And a "start_chosen" event is announced with the start call
+    When the start coding is recorded after it
+    Then the guided state carries the start coding
+
   # ============================================================================
   # The CLI reaches the same state through the project's credential
   # ============================================================================
@@ -228,6 +239,12 @@ Feature: Guided onboarding variant
     Given a project whose organization has the current path llmops
     When the llmops path is completed with that project's credential
     Then the organization's done paths list llmops
+
+  @unit
+  Scenario: the REST route records Langy's start for the project's organization
+    When the start call is recorded with that project's credential
+    Then the start is recorded on the project's organization
+    And a start other than coding or call is refused before the application is called
 
   @unit
   Scenario: the REST routes are guarded by a permission Langy's own key can hold
@@ -259,6 +276,18 @@ Feature: Guided onboarding variant
     Given Langy runs "langwatch onboarding complete-path" inside the panel, where the output is a card
     When the command prints
     Then the card carries that one line and none of the state the platform answered
+
+  @unit
+  Scenario: the CLI records Langy's start by name
+    When "langwatch onboarding start call" runs
+    Then it asks the platform to record the start call
+    And it prints one line saying the person chose a call, never that a call is booked
+
+  @unit
+  Scenario: the CLI refuses a start other than coding or call before any request
+    When "langwatch onboarding start meeting" runs
+    Then it fails naming coding and call
+    And the platform is never asked
 
   @unit
   Scenario: the onboarding card carries what the person reads and nothing else

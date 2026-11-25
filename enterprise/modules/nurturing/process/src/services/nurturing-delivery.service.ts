@@ -29,6 +29,7 @@ import {
   fireGuidedOnboardingPaths,
   fireGuidedOnboardingProgress,
   fireGuidedTurnFailedPostHog,
+  fireOnboardingVariantAssigned,
   postHogUuidFor,
 } from "../rules/nurturing-guided-onboarding-service.rules.ts";
 import {
@@ -59,6 +60,7 @@ import { fireSignup } from "../rules/nurturing-signup-identification-service.rul
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
 import { NurturingClaimedCallsDeliveryService } from "./nurturing-claimed-calls-delivery.service.ts";
 import { NurturingErasedPeopleService } from "./nurturing-erased-people.service.ts";
+import type { NurturingGuidedOnboardingBackfillService } from "./nurturing-guided-onboarding-backfill.service.ts";
 import { NurturingJoinedOrganizationService } from "./nurturing-joined-organization.service.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import { NurturingOwnCodingDeliveryService } from "./nurturing-own-coding-delivery.service.ts";
@@ -107,6 +109,8 @@ export class NurturingDeliveryService {
       members: Pick<NurturingOrganizationMemberRepository, "findMembershipsOfUsers">;
       /** Nurturing's erasure marks: no signal reaches an erased person. */
       erasedUsers: Pick<NurturingErasedUserRepository, "findErased">;
+      /** A login's guided traits, sent once; absent where the deployment named no Customer.io key. */
+      guidedBackfill?: NurturingGuidedOnboardingBackfillService;
     }>,
     private readonly parts: Readonly<{
       postHogDelivery: NurturingPostHogDeliveryService | undefined;
@@ -167,6 +171,7 @@ export class NurturingDeliveryService {
     this.toPostHogSafely(signal);
     await this.identifyCodingAgentMembers(signal);
     await this.parts.ownCodingDelivery?.deliver(signal);
+    await this.deps.guidedBackfill?.deliver(signal);
     if (memberBatch) this.identifyInBatches(memberBatch);
   }
 
@@ -391,6 +396,8 @@ export class NurturingDeliveryService {
         return this.sendCustomerIoCalls(fireGuidedOnboardingPaths(signal));
       case "guided_onboarding_progress":
         return this.sendCustomerIoCalls(fireGuidedOnboardingProgress(signal));
+      case "onboarding_variant_assigned":
+        return this.sendCustomerIoCalls(fireOnboardingVariantAssigned(signal));
       case "subscription_changed":
         // A failed change gives its claim back and fails the delivery, so the job's retry sends it.
         return this.parts.planSync.planChanged(signal).catch((error: unknown) =>

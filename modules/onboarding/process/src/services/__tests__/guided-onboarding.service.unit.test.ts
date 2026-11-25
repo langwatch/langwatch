@@ -329,6 +329,35 @@ describe("GuidedOnboardingService over a real organization read/write", () => {
     });
   });
 
+  /** @scenario "recording Langy's start stores the choice and announces it" */
+  it("stores the start, announces start_chosen, and keeps the latest of two picks", async () => {
+    const { api, records } = createOrganizations({
+      org_1: { state: { paths: ["governance"], donePaths: [] }, variant: "guided" },
+    });
+    const announced = collectAnnouncements();
+    const service = GuidedOnboardingService.create({
+      organizations: api,
+      announce: announced.announce,
+    });
+    const actor = { organizationId: "org_1", userId: "user_1" };
+
+    const state = await service.recordLangyStart(actor, { start: "call" });
+
+    expect(state.langyStart).toBe("call");
+    expect(records.get("org_1")?.variant).toBe("guided");
+    expect(announced.events).toEqual([
+      expect.objectContaining({
+        event: "start_chosen",
+        payload: { start: "call" },
+        state: expect.objectContaining({ paths: ["governance"], langyStart: "call" }),
+      }),
+    ]);
+
+    await service.recordLangyStart(actor, { start: "coding" });
+
+    expect(records.get("org_1")?.state.langyStart).toBe("coding");
+  });
+
   /** @scenario "attaching a conversation tracks nothing" */
   it("announces nothing for a conversation attached", async () => {
     const { api } = createOrganizations({

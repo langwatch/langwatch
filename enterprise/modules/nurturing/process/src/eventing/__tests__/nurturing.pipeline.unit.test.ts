@@ -549,7 +549,7 @@ function variantAssignedFact(variant: OnboardingVariantAssignedEventData["varian
 describe("nurturing's onboardingVariantAssigned peer subscriber", () => {
   describe("when onboarding records the guided variant, delivered twice", () => {
     /** @scenario "the variant assignment reaches PostHog once with the person property" */
-    it("tracks exactly one onboarding_variant_assigned and tells Customer.io nothing", async () => {
+    it("tracks exactly one onboarding_variant_assigned and tells Customer.io the variant once", async () => {
       const { posthog, customerIoFetch, deliverFact } = nurturingOverMemoryPostHog();
       const fact = variantAssignedFact("guided");
 
@@ -571,7 +571,12 @@ describe("nurturing's onboardingVariantAssigned peer subscriber", () => {
           },
         },
       ]);
-      expect(customerIoFetch).not.toHaveBeenCalled();
+      const bodies = customerIoFetch.mock.calls.map(([, init]) => String(init?.body));
+      expect(bodies).toHaveLength(2);
+      for (const body of bodies) {
+        expect(body).toContain('"onboarding_variant":"guided"');
+        expect(body).not.toContain("onboarding_primary_path");
+      }
     });
   });
 

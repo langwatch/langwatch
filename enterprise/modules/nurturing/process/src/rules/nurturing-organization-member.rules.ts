@@ -23,7 +23,7 @@ export function isCurrentMembership(membership: NurturingMembership): boolean {
 }
 
 /** Each person's current membership with the latest join, ties by organization id. */
-function latestCurrentMemberships(
+export function latestCurrentMemberships(
   memberships: readonly NurturingMembership[],
 ): NurturingMembership[] {
   const latest = new Map<string, NurturingMembership>();

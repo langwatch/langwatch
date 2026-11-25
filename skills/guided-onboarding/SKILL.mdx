@@ -344,7 +344,38 @@ That's it from me. I will leave you to save the key somewhere safe, and let me k
 
 ## governance: Governance
 
-The tour has already walked the governance pages and ended on the Add source menu, so this path has no setup of its own: no question, no page opened, no command on the pages. Close the path:
+The tour has already walked the governance pages and ended on the Add source menu, so this path has no setup on the pages: no page opened, no command on the pages. It asks one question, how the person wants to start, records the answer, and closes.
+
+Ask with the `question` tool with `bare: true`, with no reply text before the call: the `question` field is the three paragraphs below, verbatim, with `{firstName}` the first name the brief names, or "there" when it names none:
+
+Hi {firstName}, I am Langy. There are two ways to start.
+
+You can track your own coding agent right now: one command, and in a minute your personal page shows your sessions, tokens and spend. That is also what each person in your company would see.
+
+Or you can connect a company source, like Claude or OpenAI compliance exports, to see AI spend across teams. We set that one up with you on a short call.
+
+Options, in this order:
+
+1. "Track my coding agent"
+2. "Book a call for the company setup"
+
+The answer is the card's result, or, when the card waited too long, the next message. Record it before anything else: `langwatch onboarding start coding` on "Track my coding agent", `langwatch onboarding start call` on "Book a call for the company setup". The command records the choice and nothing else. "call" means the person chose the call, not that a call is booked: nothing books it, so never say or imply that a call is booked, scheduled or confirmed, or that someone will reach out. An answer that is neither option records nothing.
+
+On "Track my coding agent", say with `say`, verbatim, with the command block as part of the copy:
+
+You're a developer, so this one is easy. Run this in any repo where you use Claude Code:
+
+```bash
+npx langwatch claude
+```
+
+On "Book a call for the company setup", say with `say`, verbatim:
+
+Pick a time that works for you: [Book 20 minutes](https://cal.com/langwatch/meet-the-langwatch-team)
+
+In the meantime, you can track your own coding agent with one command: `npx langwatch claude`.
+
+Then, in the same step, close the path:
 
 ```bash
 langwatch onboarding complete-path governance

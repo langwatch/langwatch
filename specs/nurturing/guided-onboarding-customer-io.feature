@@ -81,6 +81,77 @@ Feature: Customer.io guided onboarding traits and campaign triggers
     Then no Customer.io call is made
 
   # ============================================================================
+  # Langy's governance start
+  # ============================================================================
+
+  @unit
+  Scenario: Langy's start choice reaches nurturing as a guided progress signal
+    Given guided onboarding records a "start_chosen" event with the start call
+    Then nurturing raises a guided onboarding progress signal carrying the start call
+
+  @unit
+  Scenario: choosing the coding start identifies the start and tracks the choice
+    Given a guided onboarding event "start_chosen" for the start coding
+    Then the user is identified with langy_start "coding"
+    And a "langy_start_chosen" event is tracked with start "coding"
+
+  @unit
+  Scenario: choosing the call start records the choice, never a booking
+    Given a guided onboarding event "start_chosen" for the start call
+    Then the user is identified with langy_start "call"
+    And a "langy_start_chosen" event is tracked with start "call"
+    And no trait or event says a call was booked
+
+  @unit
+  Scenario: a start that is neither coding nor call sends nothing
+    Given a guided onboarding event "start_chosen" for the start "meeting"
+    Then no Customer.io call is made
+
+  @unit
+  Scenario: the backfill carries the start the state holds
+    Given a guided onboarding state that lists governance with the start call
+    Then the person traits it reads as carry langy_start "call"
+
+  # ============================================================================
+  # The variant, and the first-login backfill
+  # ============================================================================
+
+  @unit
+  Scenario: the assigned experiment variant reaches the creator and the organization
+    Given an organization assigned the "guided" onboarding variant
+    Then its creator is identified with onboarding_variant "guided"
+    And the organization group carries onboarding_variant "guided"
+    And neither carries onboarding_primary_path, since no path is picked yet
+
+  @unit
+  Scenario: a login backfills the picked paths of the person's latest organization, once
+    Given a member whose latest organization picked gateway then llmops in the guided variant
+    When their session starts twice
+    Then they are identified once with onboarding_primary_path "gateway" and onboarding_paths "gateway,llmops"
+    And the organization group carries onboarding_primary_path "gateway" once
+
+  @unit
+  Scenario: a login before any pick sends no backfill and keeps it for a later login
+    Given a member whose latest organization picked no path yet
+    When their session starts
+    Then no Customer.io call is made
+    When the organization picks governance and their session starts again
+    Then they are identified with onboarding_primary_path "governance"
+
+  @unit
+  Scenario: a backfill whose send fails is sent on the next login
+    Given a member whose latest organization picked gateway in the guided variant
+    And Customer.io refuses the first backfill
+    When their session starts twice
+    Then the second session sends the backfill
+
+  @unit
+  Scenario: an organization with picks but no variant sends no backfill
+    Given a member whose latest organization picked gateway but carries no variant
+    When their session starts
+    Then no Customer.io call is made
+
+  # ============================================================================
   # Attribution, absence of a key, failures, backfill
   # ============================================================================
 
