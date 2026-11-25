@@ -76,7 +76,6 @@ export function syntheticGatedScenarioRouteTable(): InstantEvalJudgeRouteTable {
       "llm-a": {
         kind: "openai_responses",
         model: "llm-model-a",
-        timeoutMs: 5000,
         reasoningEffort: "medium",
       },
       "llm-c": { kind: "gemini_generate_content", model: "llm-model-c", timeoutMs: 5000 },
