@@ -1,6 +1,6 @@
 ---
 name: haven-logs
-description: "Read a haven stack's own logs, errors, traces, metrics and profiles: `haven logs`, `errors`, `obs traces`, `obs query`, `obs metrics`, `obs profiles` and the `status` stores and jobs sections, with `--agent` for plain output. Use when someone says 'haven logs', 'read the api log', 'tail the log', 'haven logs -f', 'haven traces', 'haven metrics', 'haven query', 'haven stores', 'haven jobs', 'what failed in the stack', 'haven errors', 'haven obs traces', 'slow traces of the stack', 'logs for a trace', 'traceql', 'logql', 'promql', 'haven obs query', 'haven obs metrics', 'what is burning CPU', 'is the database at its limit', or 'what did the up run'. These are the stack's own OTel data, not product traces."
+description: "Read a haven stack's own logs, errors, traces, metrics and profiles: `haven logs`, `errors`, `obs traces`, `obs query`, `obs metrics`, `obs profiles`, `obs cpu`/`obs heap`/`obs compare` (profile a Node lane, then diff after a change) and the `status` stores and jobs sections, with `--agent` for plain output. Use when someone says 'profile the api', 'cpu profile', 'heap snapshot', 'why is the api slow', 'what is allocating', 'memory leak in the worker', 'did my perf fix help', 'haven obs cpu', 'haven obs compare', 'haven logs', 'read the api log', 'tail the log', 'haven logs -f', 'haven traces', 'haven metrics', 'haven query', 'haven stores', 'haven jobs', 'what failed in the stack', 'haven errors', 'haven obs traces', 'slow traces of the stack', 'logs for a trace', 'traceql', 'logql', 'promql', 'haven obs query', 'haven obs metrics', 'what is burning CPU', 'is the database at its limit', or 'what did the up run'. These are the stack's own OTel data, not product traces."
 user-invocable: true
 argument-hint: "[logs <service> --since 10m --level warn --agent | errors | obs traces | obs query traceql '<q>']"
 ---
@@ -28,6 +28,8 @@ Every read is filtered to this worktree and prints a Grafana deep link (`grafana
 | Filter traces                         | `haven obs traces --service api --name checkout --since 1h`             |
 | Request rate, latency, queues, memory | `haven obs metrics --json`                                              |
 | Functions burning CPU and heap        | `haven obs profiles --json`                                             |
+| Profile one Node lane now             | `haven obs cpu api --agent` (see below)                                 |
+| What a change did to CPU              | `haven obs compare api --agent`                                         |
 | Each database server vs its limit     | `haven status --json stores`                                            |
 | The one-shot lanes of the last up     | `haven status --json jobs` (install, codegen, migrations, seed, images) |
 | Another worktree's stack              | add `--stack <slug>` to any of these                                    |
@@ -46,6 +48,32 @@ lane stamped). `haven obs traces` also takes `--since` (default 10m).
   empty, so fall back to `--since` around the trace's start time.
 - `haven logs ui` shows each UI rebuild's `built in <ms>` and `ui bundle swapped in`.
 - Never poll a slow boot in a loop. Read `haven status` once, later.
+
+## Profiling a Node lane: profile, change, compare
+
+`obs profiles` is Pyroscope's always-on view. To measure one lane now, or to prove a fix, profile
+the process directly (no observability tier needed):
+
+```bash
+haven obs cpu api --agent                          # 30s CPU profile of the api lane (it hosts the workers)
+haven obs cpu api --load telemetry:50 --agent      # ...while telemetrysim sends 50 llm-trace batches/s
+# change the code, let the lane reload, then the same command again
+haven obs compare api --agent                      # the lane's last two profiles: what moved, biggest first
+haven obs heap api --agent                         # sampled MB allocated by function and package (--live: still alive)
+haven obs heap api --snapshot --agent              # retained by constructor, biggest holders, two-byte strings, duplicate packages
+```
+
+- Read the header first: `busy %` (everything but idle) and `gc %`. Then self time by package
+  says which dependency or workspace directory owns the time; by function gives file:line.
+- The `.cpuprofile` path is printed on its own line (opens in Chrome DevTools). `compare <before> <after>`
+  takes two paths; `compare api` takes the last two saved for that lane.
+- Same `--duration` and `--load` on both runs, or the comparison measures the load, not the code.
+  Shares are % of each profile's window, so different lengths still compare; `change pt` is points.
+- `--snapshot` pauses the process while V8 writes it (seconds for a big heap) and the file is as large as
+  the heap: use it on your own stack.
+- Exit 65 means the stack or lane is down (`haven up --agent -d`); 64 an unknown lane or bad flag.
+  "port 9229 is held" means the lane predates free inspector ports and another profile holds 9229:
+  retry after it, or `haven restart api`.
 
 ## Raw queries
 

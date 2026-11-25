@@ -1,6 +1,6 @@
 # ADR-064: haven CLI redesign: agents first, one name per command
 
-**Date:** 2026-07-23 (amended 2026-10-10)
+**Date:** 2026-07-23 (amended 2026-10-10, 2026-10-23)
 
 **Status:** Accepted. The amendment of 2026-10-10 supersedes the 2026-07-23
 decision wherever they conflict; its first section lists each superseded point.
@@ -683,6 +683,42 @@ the next write. `--watch` with `--hmr` exits 64.
 | `haven up -w` / `--watch` on built UI | `haven up --watch` (now also rebuilds the UI) |
 
 Every retired spelling exits 64 with `now: haven up [--watch|--hmr]`.
+
+## Amendment 2026-10-23: obs cpu, heap and compare
+
+`obs` gains three tools that profile a running stack's Node lane over the
+Chrome DevTools protocol, so an agent can see where a lane spends its CPU and
+memory without opening DevTools:
+
+```text
+obs cpu [lane] [--duration 30s] [--load telemetry:<rate>] [--out <file>] [--limit <n>]
+obs heap [lane] [--duration 30s] [--live | --snapshot] [--load telemetry:<rate>] [--out <file>] [--limit <n>]
+obs compare [lane | <before> <after>] [--limit <n>]
+```
+
+- `lane` is `api` by default (the app lane on a monolith), or `ui` or
+  `workers`; the process is the one listening on the lane's port, and the
+  output says when it also serves other lanes (the api hosts the workers in
+  dev). An unknown lane exits 64 naming the lanes the stack has; a stopped
+  stack or lane exits 65 naming `haven up --agent -d`.
+- The flags keep the one-meaning rule: `--duration` is how long, as on
+  `sim telemetry load`; `--limit` caps rows, as on `obs query`; `--out` is
+  where to write, as on `browser`. `--load telemetry:<rate>` starts an
+  llm-trace telemetrysim load for the window. `--for` is not used: it is
+  `wait`'s state.
+- The profile is saved under the stack's gitignored
+  `.claude/tmp/haven-profiles/<stack>/<lane>-<time>.<ext>` and its path
+  printed on a line of its own; `compare <lane>` diffs the last two there.
+- Output is plain text for agents and terminals alike (aligned, no colour,
+  every number with its unit), `--json` the same data in the `{"v":1}`
+  envelope.
+- The inspector: one the process already has open is used and left open;
+  otherwise haven sends SIGUSR1 and closes the inspector after. Lanes start
+  with `--inspect-port=0` in `NODE_OPTIONS` (unless the shell already names an
+  inspector port) so SIGUSR1 binds a free port rather than 9229, which a
+  second stack would find taken.
+
+Spec: `specs/setup/haven-obs-node-profiling.feature`.
 
 ## Rationale / Trade-offs
 

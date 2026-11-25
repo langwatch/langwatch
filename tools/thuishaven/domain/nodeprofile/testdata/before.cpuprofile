@@ -1,0 +1,18 @@
+{
+  "nodes": [
+    {"id": 1, "callFrame": {"functionName": "(root)", "url": "", "lineNumber": -1, "columnNumber": -1}, "children": [2, 3, 4, 5]},
+    {"id": 2, "callFrame": {"functionName": "(idle)", "url": "", "lineNumber": -1, "columnNumber": -1}},
+    {"id": 3, "callFrame": {"functionName": "(program)", "url": "", "lineNumber": -1, "columnNumber": -1}},
+    {"id": 4, "callFrame": {"functionName": "(garbage collector)", "url": "", "lineNumber": -1, "columnNumber": -1}},
+    {"id": 5, "callFrame": {"functionName": "main", "url": "file:///repo/apps/api/src/main.ts", "lineNumber": 9, "columnNumber": 0}, "children": [6, 7, 9]},
+    {"id": 6, "callFrame": {"functionName": "parse", "url": "file:///repo/node_modules/.pnpm/zod@3.23.8/node_modules/zod/lib/types.js", "lineNumber": 99, "columnNumber": 4}, "children": [8]},
+    {"id": 7, "callFrame": {"functionName": "handle", "url": "file:///repo/modules/traces/process/src/services/ingest.service.ts%3Flw=12", "lineNumber": 41, "columnNumber": 2}},
+    {"id": 8, "callFrame": {"functionName": "JSON.parse", "url": "", "lineNumber": -1, "columnNumber": -1}},
+    {"id": 9, "callFrame": {"functionName": "walk", "url": "file:///repo/apps/api/src/walk.ts", "lineNumber": 0, "columnNumber": 0}, "children": [10]},
+    {"id": 10, "callFrame": {"functionName": "walk", "url": "file:///repo/apps/api/src/walk.ts", "lineNumber": 0, "columnNumber": 0}}
+  ],
+  "startTime": 0,
+  "endTime": 16000,
+  "samples": [2, 2, 2, 2, 3, 4, 5, 6, 6, 7, 7, 7, 8, 10, 10],
+  "timeDeltas": [1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000]
+}

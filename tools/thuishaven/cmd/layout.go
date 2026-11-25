@@ -16,8 +16,9 @@ func buildTable() []commandSpec {
 	for _, spec := range append(slices.Clone(baseTable), tabSpecs()...) {
 		flat[spec.name] = spec
 	}
-	for _, spec := range []commandSpec{querySpec(), seedSpec(), apiSpec(), gatewaySpec(), telemetrySpec(), authSpec(), browserSpec(), mfaSpec()} {
-		flat[spec.name] = spec
+	built := []commandSpec{querySpec(), obsCPUSpec(), obsHeapSpec(), obsCompareSpec(), seedSpec(), apiSpec(), gatewaySpec(), telemetrySpec(), authSpec(), browserSpec(), mfaSpec()}
+	for i := range built {
+		flat[built[i].name] = built[i]
 	}
 	take := func(name string) commandSpec {
 		spec, ok := flat[name]
@@ -59,7 +60,7 @@ func buildTable() []commandSpec {
 		browserCommand(take("browser"), take("auth"), take("mfa")),
 		take("pr"), take("switch"), take("focus"), waitSpec(), defaultsSpec(),
 		{name: "sim", args: "[<name> <verb>]", summary: "every simulator: bare lists them; sim <name> <verb> drives one", run: runSims, flags: simFlags(), subs: sims},
-		{name: "obs", summary: "this stack's own telemetry: traces, metrics, profiles, raw queries", subs: []commandSpec{take("traces"), take("metrics"), take("profiles"), take("query")}},
+		{name: "obs", summary: "this stack's own telemetry: traces, metrics, profiles, raw queries; cpu, heap and compare profile a Node lane", subs: []commandSpec{take("traces"), take("metrics"), take("profiles"), take("query"), take("cpu"), take("heap"), take("compare")}},
 		{name: "orb", summary: "what the haven orb on the app page saw and was sent", subs: []commandSpec{take("feedback"), pageVerb("console"), pageVerb("network")}},
 		dbCommand(take("db"), take("seed")),
 		apiCommand(take("api"), take("gateway")),

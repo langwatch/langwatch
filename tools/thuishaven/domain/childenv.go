@@ -32,19 +32,29 @@ import (
 // pull request away.
 const NodeQuietFlags = "--disable-warning=ExperimentalWarning"
 
+// NodeInspectPortFlag makes SIGUSR1 open a lane's inspector on a free port
+// instead of the fixed 9229, so `haven obs cpu` can profile two stacks at once
+// (the second would find 9229 taken and get no inspector). It opens nothing by
+// itself; `haven obs` finds the port the process listens on.
+const NodeInspectPortFlag = "--inspect-port=0"
+
 // NodeOptionsEnv returns the NODE_OPTIONS assignment for a child, preserving
 // whatever the developer's own shell already put there — a debugger port, a
 // heap limit — rather than replacing it. inherited is the value from the
-// environment haven itself was started with ("" when unset).
+// environment haven itself was started with ("" when unset). A debugger port
+// the shell already chose is kept and the free-port flag left out.
 func NodeOptionsEnv(inherited string) string {
-	existing := strings.TrimSpace(inherited)
-	if existing == "" {
-		return "NODE_OPTIONS=" + NodeQuietFlags
+	var flags []string
+	if existing := strings.TrimSpace(inherited); existing != "" {
+		flags = append(flags, existing)
 	}
-	if strings.Contains(existing, NodeQuietFlags) {
-		return "NODE_OPTIONS=" + existing
+	if !strings.Contains(inherited, NodeQuietFlags) {
+		flags = append(flags, NodeQuietFlags)
 	}
-	return "NODE_OPTIONS=" + existing + " " + NodeQuietFlags
+	if !strings.Contains(inherited, "--inspect-port") && !strings.Contains(inherited, "--debug-port") {
+		flags = append(flags, NodeInspectPortFlag)
+	}
+	return "NODE_OPTIONS=" + strings.Join(flags, " ")
 }
 
 // NodeOptionsEnvFromProcess is NodeOptionsEnv against the environment haven

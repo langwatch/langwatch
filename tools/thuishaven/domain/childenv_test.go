@@ -10,8 +10,25 @@ import (
 //
 /** @scenario "A Node lane does not announce the flag it always runs with" */
 func TestNodeOptionsEnv_AddsTheWarningSwitch(t *testing.T) {
-	if got := NodeOptionsEnv(""); got != "NODE_OPTIONS="+NodeQuietFlags {
-		t.Errorf("NodeOptionsEnv(\"\") = %q, want the quiet flags alone", got)
+	if got := NodeOptionsEnv(""); got != "NODE_OPTIONS="+NodeQuietFlags+" "+NodeInspectPortFlag {
+		t.Errorf("NodeOptionsEnv(\"\") = %q, want the quiet flags and the free inspector port alone", got)
+	}
+}
+
+// TestNodeOptionsEnv_InspectorOnAFreePort pins that SIGUSR1 opens a lane's
+// inspector on a free port, unless the shell already chose one.
+//
+/** @scenario "The inspector is opened for the profile and closed after" */
+func TestNodeOptionsEnv_InspectorOnAFreePort(t *testing.T) {
+	if got := NodeOptionsEnv("--max-old-space-size=8192"); !strings.Contains(got, NodeInspectPortFlag) {
+		t.Errorf("NodeOptionsEnv did not add the free inspector port: %q", got)
+	}
+	got := NodeOptionsEnv("--inspect-port=9300")
+	if strings.Contains(got, NodeInspectPortFlag) || !strings.Contains(got, "--inspect-port=9300") {
+		t.Errorf("NodeOptionsEnv overrode the shell's own inspector port: %q", got)
+	}
+	if again := NodeOptionsEnv(strings.TrimPrefix(NodeOptionsEnv(""), "NODE_OPTIONS=")); strings.Count(again, NodeInspectPortFlag) != 1 {
+		t.Errorf("NodeOptionsEnv repeated the inspector flag: %q", again)
 	}
 }
 

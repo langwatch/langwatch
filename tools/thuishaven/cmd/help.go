@@ -46,6 +46,8 @@ EXAMPLES
     haven sim                    # every simulator: running here, console, verbs, skill
     haven sim mail list --json   # what mailsim caught
     haven obs traces --json      # this stack's recent root spans
+    haven obs cpu api            # profile the api lane for 30s: where its CPU goes
+    haven obs compare api        # after a change: what moved since the last profile
     haven db seed demo           # reseed in place, dropping nothing
     haven pr 4913 --throwaway    # a PR in a sandbox that quitting destroys
     haven down --destroy --yes   # stop the stack and drop its databases
