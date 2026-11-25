@@ -18240,7 +18240,6 @@
       "pricing": {
         "inputCostPerToken": 0.0000025,
         "outputCostPerToken": 0.00001,
-        "inputCostPerSecond": 0.0001,
         "audioCostPerToken": 0.0000025
       },
       "contextLength": 0,
@@ -18249,7 +18248,7 @@
       "defaultParameters": null,
       "modality": "audio->text",
       "mode": "audio",
-      "description": "Speech-to-text, priced per second of audio. Synced from litellm's price registry.",
+      "description": "Speech-to-text, priced per token. Synced from litellm's price registry.",
       "supportsImageInput": false,
       "supportsAudioInput": true,
       "supportsImageOutput": false,
