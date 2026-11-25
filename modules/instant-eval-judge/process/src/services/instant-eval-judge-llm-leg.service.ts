@@ -26,7 +26,7 @@ import { findInstantEvalLlmVerdicts } from "../rules/instant-eval-judge-sureness
 
 type InstantEvalJudgeLlmCall = Pick<
   InstantEvalLlmJudgeRequest,
-  "wire" | "model" | "timeoutMs" | "reasoningEffort"
+  "wire" | "model" | "timeoutMs" | "reasoningEffort" | "maxOutputTokens"
 >;
 
 /** The answers read, and the last reason a question went unanswered. */

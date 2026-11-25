@@ -361,6 +361,7 @@ export class InstantEvalJudgeRouteRunService {
         questions,
         timeoutMs: config.timeoutMs,
         reasoningEffort: config.reasoningEffort,
+        maxOutputTokens: config.maxOutputTokens,
         paid,
       });
     }
@@ -388,6 +389,7 @@ export class InstantEvalJudgeRouteRunService {
     questions,
     timeoutMs,
     reasoningEffort,
+    maxOutputTokens,
     paid,
   }: {
     backend: string;
@@ -396,6 +398,7 @@ export class InstantEvalJudgeRouteRunService {
     questions: readonly InstantEvalQuestion[];
     timeoutMs: number;
     reasoningEffort: InstantEvalJudgeReasoningEffort | undefined;
+    maxOutputTokens: number | undefined;
     paid: (spend: { backend: string; inputTokens: number; outputTokens: number }) => void;
   }): Promise<Leg> {
     // The table refuses an LLM backend with no model at boot; this keeps the type honest.
@@ -411,7 +414,13 @@ export class InstantEvalJudgeRouteRunService {
       logger: this.logger,
       paid: (spend) => paid({ backend, ...spend }),
     });
-    const call = { wire, model, timeoutMs, ...(reasoningEffort ? { reasoningEffort } : {}) };
+    const call = {
+      wire,
+      model,
+      timeoutMs,
+      ...(reasoningEffort ? { reasoningEffort } : {}),
+      ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
+    };
     const { answers, reason } = await leg.ask({ call, questions });
     if (answers.size === 0) return { outcome: "failed", reason };
     if (answers.size < questions.length) this.flags.push(`${backend}_partial:${reason}`);

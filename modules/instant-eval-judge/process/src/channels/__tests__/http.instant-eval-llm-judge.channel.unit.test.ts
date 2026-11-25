@@ -285,6 +285,24 @@ describe("HttpInstantEvalLlmJudgeChannel, given a backend's reasoning effort", (
     expect((JSON.parse(sent) as Record<string, unknown>).max_output_tokens).toBe(cap);
   });
 
+  /** @scenario "A backend that reasons waits long enough to write its output cap" */
+  it("sends a backend's own output cap on either wire, reasoning or not", async () => {
+    let openAi = "";
+    answering((body) => (openAi = body));
+    const anthropic: { body?: Record<string, unknown> } = {};
+    anthropicAnswering({ result: true }, anthropic);
+
+    await llm().judge({
+      ...request("openai_responses"),
+      reasoningEffort: "high",
+      maxOutputTokens: 1_100,
+    });
+    await llm().judge({ ...request("anthropic_messages"), maxOutputTokens: 500 });
+
+    expect((JSON.parse(openAi) as Record<string, unknown>).max_output_tokens).toBe(1_100);
+    expect(anthropic.body?.max_tokens).toBe(500);
+  });
+
   /** @scenario "A reasoning effort is sent only when the backend sets one" */
   it("skips an answer stopped at the output cap before its call, billing and naming it", async () => {
     const warned: unknown[][] = [];

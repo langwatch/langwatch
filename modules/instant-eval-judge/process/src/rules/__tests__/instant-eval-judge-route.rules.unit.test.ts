@@ -338,6 +338,12 @@ describe("a send's worst case", () => {
       jv: { kind: "jev" },
       llm: { kind: "openai_responses", model: "llm-model" },
       llmHigh: { kind: "openai_responses", model: "llm-model", reasoningEffort: "high" },
+      llmCapped: {
+        kind: "openai_responses",
+        model: "llm-model",
+        reasoningEffort: "high",
+        maxOutputTokens: 1_100,
+      },
       ant: { kind: "anthropic_messages", model: "llm-model" },
     },
   });
@@ -349,6 +355,7 @@ describe("a send's worst case", () => {
       jv: { usdPerMillionInputTokens: 0.05, usdPerMillionOutputTokens: 0 },
       llm: llmPrice,
       llmHigh: llmPrice,
+      llmCapped: llmPrice,
       ant: llmPrice,
     },
   };
@@ -415,6 +422,12 @@ describe("a send's worst case", () => {
     const both = worst({ backend: "llm", questions: [ONE, TWO] });
     expect(both).toBeGreaterThan(2 * plain);
     expect(both).toBeLessThan(2 * plain + 100 * 1_000);
+  });
+
+  /** @scenario "A send's worst case bounds what it can bill" */
+  it("adds a backend's own output cap where the table sets one", () => {
+    // 1,100 against 8,000 output tokens at 5 per million.
+    expect(worst({ backend: "llm" }) - worst({ backend: "llmCapped" })).toBe(6_900 * 5 * 1_000);
   });
 
   /** @scenario "A send's worst case bounds what it can bill" */

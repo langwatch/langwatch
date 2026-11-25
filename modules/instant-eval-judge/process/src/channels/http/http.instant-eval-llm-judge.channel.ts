@@ -62,7 +62,16 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
   }
 
   async judge(
-    { wire, model, job, question, text, timeoutMs, reasoningEffort }: InstantEvalLlmJudgeRequest,
+    {
+      wire,
+      model,
+      job,
+      question,
+      text,
+      timeoutMs,
+      reasoningEffort,
+      maxOutputTokens,
+    }: InstantEvalLlmJudgeRequest,
     signal?: AbortSignal,
   ): Promise<InstantEvalLlmJudgeAnswer> {
     const apiKey = this.keys[wire];
@@ -78,6 +87,7 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
         model,
         prompt,
         ...(reasoningEffort ? { reasoningEffort } : {}),
+        ...(maxOutputTokens === undefined ? {} : { maxOutputTokens }),
       }),
     );
     let response: Awaited<ReturnType<typeof undiciFetch>>;

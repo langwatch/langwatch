@@ -412,6 +412,69 @@ describe("given an OpenAI Responses backend that sets a reasoning effort", () =>
       expect(parsed.backends["llm-b"]?.timeoutMs).toBe(expected);
     },
   );
+
+  const capped = (backend: Record<string, unknown>) =>
+    instantEvalJudgeRouteTableSchema.safeParse(
+      gatedTable({
+        backends: {
+          "llm-b": { kind: "openai_responses", model: "m", reasoningEffort: "high", ...backend },
+        },
+      }),
+    );
+
+  /** @scenario "A backend that reasons waits long enough to write its output cap" */
+  it.each([
+    [1_100, undefined, 10_000],
+    [2_200, undefined, 20_000],
+    [1_100, 10_000, 10_000],
+    [1_000, undefined, 9_091],
+  ] as const)(
+    "takes its own cap of %i tokens with timeout %s as %i ms",
+    (maxOutputTokens, timeoutMs, expected) => {
+      const parsed = capped({ maxOutputTokens, ...(timeoutMs ? { timeoutMs } : {}) });
+      expect(parsed.success).toBe(true);
+      expect(parsed.data?.backends["llm-b"]?.timeoutMs).toBe(expected);
+      expect(parsed.data?.backends["llm-b"]?.maxOutputTokens).toBe(maxOutputTokens);
+    },
+  );
+
+  /** @scenario "A backend that reasons waits long enough to write its output cap" */
+  it("refuses a timeout too short to write its own cap at 110 tokens a second, naming both", () => {
+    const parsed = capped({ maxOutputTokens: 1_100, timeoutMs: 9_999 });
+    expect(parsed.success).toBe(false);
+    expect(JSON.stringify(parsed.error?.issues)).toContain(
+      "backend llm-b: reasoningEffort high and maxOutputTokens 1100 needs a timeoutMs of at least 10000",
+    );
+  });
+
+  /** @scenario "A backend that reasons waits long enough to write its output cap" */
+  it("still refuses a timeout under 300,000 ms where the backend sets no cap of its own", () => {
+    expect(capped({ timeoutMs: 10_000 }).success).toBe(false);
+  });
+});
+
+describe("given a backend that sets its own output cap", () => {
+  /** @scenario "A backend that reasons waits long enough to write its output cap" */
+  it.each([
+    ["jev", { kind: "jev", maxOutputTokens: 100 }],
+    ["decisions", { kind: "decisions", model: "decision-model-a", maxOutputTokens: 100 }],
+  ] as const)("refuses it on a %s backend", (kind, extra) => {
+    const parsed = instantEvalJudgeRouteTableSchema.safeParse(gatedTable({ backends: { extra } }));
+    expect(parsed.success).toBe(false);
+    expect(JSON.stringify(parsed.error?.issues)).toContain(
+      `backend extra: a ${kind} backend takes no maxOutputTokens`,
+    );
+  });
+
+  /** @scenario "A backend that reasons waits long enough to write its output cap" */
+  it("keeps the 30,000 ms default on a backend that does not reason", () => {
+    const parsed = instantEvalJudgeRouteTableSchema.parse(
+      gatedTable({
+        backends: { "llm-b": { kind: "anthropic_messages", model: "m", maxOutputTokens: 500 } },
+      }),
+    );
+    expect(parsed.backends["llm-b"]).toMatchObject({ timeoutMs: 30_000, maxOutputTokens: 500 });
+  });
 });
 
 describe("given a gated entry", () => {

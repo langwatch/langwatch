@@ -122,6 +122,7 @@ export function instantEvalJudgeSendWorstCaseNanoUsd({
     const outputTokens = instantEvalLlmJudgeMaxOutputTokensOf({
       wire: config.kind,
       reasoningEffort: config.reasoningEffort,
+      maxOutputTokens: config.maxOutputTokens,
     });
     const fitted = prepareInstantEvalText({
       text,

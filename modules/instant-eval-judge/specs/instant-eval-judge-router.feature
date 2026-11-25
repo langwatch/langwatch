@@ -293,6 +293,9 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then its timeout defaults to 300,000 ms where the entry names none
     And an entry that names a shorter timeout is refused, naming the backend and the floor
     And a backend with no effort, or effort none, keeps the 30,000 ms default
+    And an LLM backend may set its own output cap, sent on every call and refused on any other kind
+    And a reasoning backend with its own cap needs only the time to write it at 110 tokens a second, its default timeout
+    And an answer cut at that cap is no answer, its tokens billed, so the backend's fallback answers
 
   @unit
   Scenario: The LLM legs send one forced score or category tool call and read it back
@@ -392,7 +395,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Then it prices every UTF-8 byte of what is sent as a token, plus a fixed slack per send
     And it counts the text as the backend's channel fits it: an LLM's content budget, or the budget the questions leave a decision model
     And it takes the dearer of the base and long-context rates
-    And an LLM adds its output cap at its output rate, the reasoning cap where an effort is set
+    And an LLM adds its output cap at its output rate: its own cap where the table sets one, else the reasoning cap where an effort is set
     And an LLM or Decisions backend is counted once per question, Jev once for all
     And a backend with no price can never be held
 

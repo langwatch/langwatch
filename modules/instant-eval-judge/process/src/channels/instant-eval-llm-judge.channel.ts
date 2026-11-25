@@ -33,6 +33,8 @@ export interface InstantEvalLlmJudgeRequest {
   readonly timeoutMs: number;
   /** From the route table's backend; absent, the request names no effort. */
   readonly reasoningEffort?: InstantEvalJudgeReasoningEffort;
+  /** From the route table's backend; absent, the leg's default output cap. */
+  readonly maxOutputTokens?: number;
 }
 
 /**
