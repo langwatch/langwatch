@@ -4,6 +4,8 @@
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
+import type { DashboardHomeProduct } from "@langwatch/dashboard-contract";
+
 import {
   CATALOGUE_TEMPLATES,
   type CatalogueTemplate,
@@ -11,7 +13,7 @@ import {
   stackWidgets,
 } from "../catalogue/index.ts";
 import type { BoardTemplateWidget } from "../templates/index.ts";
-import { TEMPLATE_LIBRARY, type LibraryTemplate } from "./template-library.ts";
+import { type LibraryTemplate, templateCardById } from "./template-library.ts";
 
 /**
  * The one From LangWatch list, in order; every surface follows it (the sidebar group and
@@ -41,7 +43,7 @@ function curatedWidgets(template: CatalogueTemplate): BoardTemplateWidget[] {
 
 function curatedBoard(templateId: string): CuratedBoard[] {
   const template = CATALOGUE_TEMPLATES.find(({ id }) => id === templateId);
-  const card = TEMPLATE_LIBRARY.find(({ board }) => board.id === templateId);
+  const card = templateCardById(templateId);
   if (!template || !card) return [];
   return [
     {
@@ -58,7 +60,31 @@ function curatedBoard(templateId: string): CuratedBoard[] {
 /** The From LangWatch boards, in their one order. */
 export const CURATED_BOARDS: readonly CuratedBoard[] = CURATED_TEMPLATE_IDS.flatMap(curatedBoard);
 
+/** A product's pinned board: its template, and the address it opens at. */
+export interface ProductDefaultBoard {
+  readonly templateId: string;
+  /** `project` opens under the project in view; `organization` opens under no project. */
+  readonly at: "project" | "organization";
+}
+
+/**
+ * The From LangWatch board each product pins first in its Dashboards section; Governance pins
+ * none. Org-scope boards open at the organization address, which needs no project in view.
+ */
+export const PRODUCT_DEFAULT_BOARD_IDS: Readonly<
+  Partial<Record<DashboardHomeProduct, ProductDefaultBoard>>
+> = {
+  "llm-ops": { templateId: "cockpit", at: "project" },
+  gateway: { templateId: "gateway-costs", at: "organization" },
+  me: { templateId: "coding-costs", at: "organization" },
+};
+
+/** The pinned boards, kept out of the From LangWatch group the sidebar lists. */
+const PINNED_BOARDS: readonly CuratedBoard[] = Object.values(PRODUCT_DEFAULT_BOARD_IDS).flatMap(
+  (pinned) => (pinned === undefined ? [] : curatedBoard(pinned.templateId)),
+);
+
 /** One From LangWatch board by its template id; undefined for any other id. */
 export function curatedBoardById(templateId: string): CuratedBoard | undefined {
-  return CURATED_BOARDS.find((board) => board.templateId === templateId);
+  return [...CURATED_BOARDS, ...PINNED_BOARDS].find((board) => board.templateId === templateId);
 }

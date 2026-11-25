@@ -434,3 +434,26 @@ Feature: Product sidebars
   Scenario: The remembered product is the sidebar drawn
     Given I opened a dashboard from LLM Ops
     Then the device remembers "llm-ops" for the organization, not "dashboards"
+
+  # Each product's Dashboards section pins one From LangWatch board on top. LLM Ops pins Agent
+  # health (opens under the project); Gateway pins Gateway costs and Coding agents pins Coding
+  # agent costs (both open at the organization address); Governance pins none.
+  @integration
+  Scenario: Each product pins its own From LangWatch board first
+    Given I can reach Dashboards in every product
+    When I am in LLM Ops
+    Then the Dashboards section lists "Agent health" above my own boards
+    And it opens the From LangWatch board "Agent health" at its curated address
+    When I am in Gateway
+    Then the Dashboards section lists "Gateway costs" above my own boards
+    When I am in Coding agents
+    Then the Dashboards section lists "Coding agent costs" above my own boards
+    When I am in Governance
+    Then that product's Dashboards section pins no From LangWatch board
+
+  @integration
+  Scenario: The Add dashboard row stays under a product's boards
+    Given I can create a board in LLM Ops
+    When I open the LLM Ops Dashboards section
+    Then the last row is a dotted "Add dashboard" row
+    And choosing it opens the same create dialog as the "+" button

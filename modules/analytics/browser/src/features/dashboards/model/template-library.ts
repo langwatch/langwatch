@@ -183,6 +183,16 @@ const isHidden = ({ scope, focusKind }: CatalogueTemplate): boolean =>
 
 const CATALOGUE_BY_ID = new Map(CATALOGUE_TEMPLATES.map((template) => [template.id, template]));
 
+/**
+ * One template's card by id, org boards included: the finder hides them, but a product's pinned
+ * board still needs its card. Undefined for an id with no board.
+ */
+export function templateCardById(templateId: string): LibraryTemplate | undefined {
+  const board = BOARD_TEMPLATES.find(({ id }) => id === templateId);
+  const template = CATALOGUE_BY_ID.get(templateId);
+  return board && template ? libraryTemplate({ board, template }) : undefined;
+}
+
 /** Every template the finder knows, built or not, each base followed by its focus templates. */
 export const TEMPLATE_LIBRARY: readonly LibraryTemplate[] = BOARD_TEMPLATES.flatMap((board) => {
   const template = CATALOGUE_BY_ID.get(board.id);

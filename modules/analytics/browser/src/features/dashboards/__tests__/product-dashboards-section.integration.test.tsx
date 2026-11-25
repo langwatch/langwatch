@@ -77,7 +77,7 @@ const linkNames = (list: HTMLElement) =>
 describe("a product's Dashboards section", () => {
   describe("given more of the product's boards than the section shows", () => {
     /** @scenario "Each product's sidebar lists its own boards" */
-    it("lists 8 by name, then Show N more and Show less, and none from other products", async () => {
+    it("lists the pinned board, then 8 boards with Show N more, and none from other products", async () => {
       const gateway = Array.from({ length: 10 }, (_, index) => board({ id: `Board ${index}` }));
       const { user } = render({
         element: <ProductDashboardsSection product="gateway" />,
@@ -85,11 +85,13 @@ describe("a product's Dashboards section", () => {
       });
 
       const list = await screen.findByRole("list", { name: "Dashboards" });
-      expect(linkNames(list)).toHaveLength(8);
+      // The pinned board is not one of the 8 the cap counts.
+      expect(linkNames(list)[0]).toBe("Gateway costs");
+      expect(linkNames(list).slice(1)).toHaveLength(8);
       expect(within(list).queryByRole("link", { name: "Elsewhere" })).toBeNull();
 
       await user.click(screen.getByRole("button", { name: "Show 2 more" }));
-      expect(linkNames(list)).toHaveLength(10);
+      expect(linkNames(list).slice(1)).toHaveLength(10);
       expect(screen.getByRole("button", { name: "Show less" })).toBeInTheDocument();
     });
   });
@@ -113,7 +115,12 @@ describe("a product's Dashboards section", () => {
       });
 
       const list = await screen.findByRole("list", { name: "Dashboards" });
-      expect(linkNames(list)).toEqual(["Only me board", "Organization board", "Project board"]);
+      expect(linkNames(list)).toEqual([
+        "Agent health",
+        "Only me board",
+        "Organization board",
+        "Project board",
+      ]);
       expect(screen.queryByRole("list", { name: "Starred" })).toBeNull();
     });
   });
@@ -174,14 +181,79 @@ describe("a product's Dashboards section", () => {
   });
 
   describe("given LLM Ops with no saved board", () => {
-    /** @scenario "From LangWatch boards are not listed for now" */
-    it("says No dashboards yet and lists no From LangWatch group", async () => {
+    /** @scenario "Each product pins its own From LangWatch board first" */
+    it("pins Agent health to the top, links it to its curated address, and lists no From LangWatch group", async () => {
       render({ element: <ProductDashboardsSection product="llm-ops" />, listed: [] });
 
       const section = await screen.findByRole("region", { name: "Dashboards" });
-      expect(within(section).getByText("No dashboards yet")).toBeInTheDocument();
+      expect(within(section).queryByText("No dashboards yet")).toBeNull();
+      expect(within(section).getByRole("link", { name: "Agent health" })).toHaveAttribute(
+        "href",
+        "/test-project/dashboards/curated/cockpit",
+      );
       expect(within(section).queryByText("From LangWatch")).toBeNull();
       expect(screen.queryByRole("list", { name: "From LangWatch" })).toBeNull();
+    });
+  });
+
+  describe.each([
+    { product: "gateway", name: "Gateway costs", href: "/dashboards/curated/gateway-costs" },
+    { product: "me", name: "Coding agent costs", href: "/dashboards/curated/coding-costs" },
+  ] as const)("given $product with no saved board", ({ product, name, href }) => {
+    /** @scenario "Each product pins its own From LangWatch board first" */
+    it("pins its board, linked at the organization address", async () => {
+      render({ element: <ProductDashboardsSection product={product} />, listed: [] });
+
+      const section = await screen.findByRole("region", { name: "Dashboards" });
+      expect(within(section).getByRole("link", { name })).toHaveAttribute("href", href);
+      expect(within(section).queryByText("No dashboards yet")).toBeNull();
+    });
+  });
+
+  describe("given Governance with no saved board", () => {
+    /** @scenario "Each product pins its own From LangWatch board first" */
+    it("pins no board and says No dashboards yet", async () => {
+      render({ element: <ProductDashboardsSection product="governance" />, listed: [] });
+
+      const section = await screen.findByRole("region", { name: "Dashboards" });
+      expect(within(section).getByText("No dashboards yet")).toBeInTheDocument();
+      expect(within(section).queryByRole("link", { name: "Agent health" })).toBeNull();
+      expect(within(section).queryByRole("link", { name: "Gateway costs" })).toBeNull();
+    });
+  });
+
+  describe("given LLM Ops with a board of its own and a store project", () => {
+    /** @scenario "The Add dashboard row stays under a product's boards" */
+    it("lists the pinned board, then its boards, then the dotted Add dashboard row", async () => {
+      render({
+        element: <ProductDashboardsSection product="llm-ops" />,
+        listed: [
+          board({
+            id: "Project board",
+            homeProduct: "llm-ops",
+            scope: "PROJECT",
+            project: IN_VIEW,
+          }),
+        ],
+      });
+
+      const list = await screen.findByRole("list", { name: "Dashboards" });
+      const items = within(list).getAllByRole("listitem");
+      expect(items[0]).toHaveTextContent("Agent health");
+      expect(items[1]).toHaveTextContent("Project board");
+      expect(items.at(-1)).toHaveTextContent("Add dashboard");
+      expect(within(list).getByRole("button", { name: "Add dashboard" })).toBeVisible();
+    });
+
+    /** @scenario "The Add dashboard row stays under a product's boards" */
+    it("opens the same New dashboard dialog as the + button", async () => {
+      const { user } = render({
+        element: <ProductDashboardsSection product="llm-ops" />,
+        listed: [],
+      });
+
+      await user.click(await screen.findByRole("button", { name: "Add dashboard" }));
+      expect(await screen.findByRole("dialog", { name: "New dashboard" })).toBeInTheDocument();
     });
   });
 
@@ -207,9 +279,10 @@ describe("a product's Dashboards section", () => {
 
   describe("given no board homed in the product", () => {
     /** @scenario "Each product's sidebar lists its own boards" */
+    // Gateway pins a board now; Governance pins none, so it carries the quiet line.
     it("still draws the heading, New dashboard and the quiet line, and no other product's", async () => {
       render({
-        element: <ProductDashboardsSection product="gateway" />,
+        element: <ProductDashboardsSection product="governance" />,
         listed: [board({ id: "Elsewhere", homeProduct: "llm-ops" })],
         host: new StubAnalyticsHost({ projectPermissions: { [SHOP.id]: ["analytics:update"] } }),
       });
@@ -266,7 +339,8 @@ describe("a product's Dashboards section", () => {
         storeProjects: [],
       });
 
-      await waitFor(() => expect(screen.getAllByText("No dashboards yet")).toHaveLength(4));
+      // Only Governance pins nothing, so it alone draws the quiet line.
+      await waitFor(() => expect(screen.getAllByText("No dashboards yet")).toHaveLength(1));
       // Absence only counts once the store projects are answered.
       await waitFor(() => expect(calls.map((call) => call.path)).toContain("boards.storeProjects"));
       expect(screen.queryByRole("button", { name: "New dashboard" })).toBeNull();

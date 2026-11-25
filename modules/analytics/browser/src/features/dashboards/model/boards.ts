@@ -65,6 +65,11 @@ export function curatedBoardPath({
 
 export { ORGANIZATION_DASHBOARDS_PATH };
 
+/** The address of one From LangWatch board in the organization's area, under no project. */
+export function organizationCuratedBoardPath({ templateId }: { templateId: string }): string {
+  return `${ORGANIZATION_DASHBOARDS_PATH}/${CURATED_SEGMENT}/${encodeURIComponent(templateId)}`;
+}
+
 /** The address of a board in the organization's area, opened by id under no project. */
 export function organizationBoardPath({ dashboardId }: { dashboardId: string }): string {
   return `${ORGANIZATION_DASHBOARDS_PATH}/${encodeURIComponent(dashboardId)}`;

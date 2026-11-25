@@ -6,7 +6,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { LibraryBoard } from "../model/organization-library.ts";
-import { productSidebarBoards, sharingTitle } from "../model/product-dashboards.ts";
+import {
+  productDefaultBoard,
+  productSidebarBoards,
+  sharingTitle,
+} from "../model/product-dashboards.ts";
 
 const SHOP = { id: "proj-shop", slug: "shop", name: "Shop" };
 const OPS = { id: "proj-ops", slug: "ops", name: "Ops" };
@@ -79,5 +83,29 @@ describe("sharingTitle", () => {
     { scope: "ORGANIZATION", title: "Shared with the organization" },
   ] as const)("says who sees a $scope board", ({ scope, title }) => {
     expect(sharingTitle({ scope, project: SHOP })).toBe(title);
+  });
+});
+
+describe("a product's pinned From LangWatch board", () => {
+  /** @scenario "Each product pins its own From LangWatch board first" */
+  it.each([
+    { product: "llm-ops", name: "Agent health", href: "/shop/dashboards/curated/cockpit" },
+    { product: "gateway", name: "Gateway costs", href: "/dashboards/curated/gateway-costs" },
+    { product: "me", name: "Coding agent costs", href: "/dashboards/curated/coding-costs" },
+  ] as const)("pins $name in $product, linked to its address", ({ product, name, href }) => {
+    expect(productDefaultBoard({ product, projectSlug: "shop" })).toEqual({
+      templateId: href.split("/").pop(),
+      name,
+      href,
+    });
+  });
+
+  /** @scenario "Each product pins its own From LangWatch board first" */
+  it("pins nothing in Governance, and no project board without a project in view", () => {
+    expect(productDefaultBoard({ product: "governance", projectSlug: "shop" })).toBeUndefined();
+    expect(productDefaultBoard({ product: "llm-ops", projectSlug: undefined })).toBeUndefined();
+    expect(productDefaultBoard({ product: "gateway", projectSlug: undefined })?.href).toBe(
+      "/dashboards/curated/gateway-costs",
+    );
   });
 });
