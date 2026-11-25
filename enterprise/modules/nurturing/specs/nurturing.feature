@@ -68,6 +68,22 @@ Feature: Nurturing sends the signals its owners record
     When a signal is delivered
     Then nothing is claimed and nothing is sent
 
+  # Customer.io runs on multiple identifiers: a profile born with only an id fails every email
+  # automation ("undefined variable: customer.email"). The address is read fresh, never stored.
+  @unit
+  Scenario: Every Customer.io identify carries the person's email, or is not sent
+    Given nurturing sends Customer.io identifies for one person or a batch of members
+    When the user module holds a person's email
+    Then that person's identify carries it, the batch's addresses read in one query
+    And a person with no email, or one the user module does not know, gets no identify
+
+  @unit
+  Scenario: A Customer.io track goes behind an identify that carries the person's email
+    Given a Customer.io track creates the person's profile when none exists
+    When nurturing tracks an event for a person
+    Then the same request first identifies them with their email
+    And a person with no email is tracked nothing
+
   @unit
   Scenario: A Customer.io outage is logged and the delivery completes
     Given Customer.io answers every call with a server error

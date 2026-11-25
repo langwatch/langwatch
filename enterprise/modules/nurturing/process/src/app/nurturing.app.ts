@@ -80,7 +80,7 @@ export class NurturingModule implements NurturingApi {
     resources,
   }: NurturingSetup): Promise<NurturingModule> {
     const customerIo = channels.customerIo
-      ? NurturingService.create({ channel: channels.customerIo })
+      ? NurturingService.create({ channel: channels.customerIo, users: dependencies.users })
       : void 0;
     const { posthog } = channels;
     if (posthog) resources.own("Nurturing PostHog client", () => posthog.close());

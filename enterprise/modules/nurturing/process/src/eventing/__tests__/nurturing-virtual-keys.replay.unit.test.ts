@@ -36,7 +36,6 @@ import {
   USER_AGGREGATE_TYPE,
   USER_ERASED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
-  type UserApi,
 } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -46,6 +45,7 @@ import { MemoryNurturingVirtualKeyRepository } from "../../repositories/memory/m
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingVirtualKeyRepository } from "../../repositories/nurturing-gateway-key.repository.ts";
 import { virtualKeyFactOf } from "../../rules/nurturing-virtual-key.rules.ts";
+import { peopleWithEmails } from "../../services/__tests__/nurturing-person-email.test-helpers.ts";
 import {
   buildNurturingProjectUsagePipeline,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
@@ -639,7 +639,7 @@ async function liveWorker({ events }: { events: ReplayEvent[] }) {
   const repositories = MemoryNurturingRepositories.create();
   const app = await NurturingModule.create({
     dependencies: {
-      users: createApiFixture<UserApi>({}, "UserApi"),
+      users: peopleWithEmails(),
       organizations: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
     },
     config: {
@@ -756,7 +756,14 @@ describe("given a worker composing nurturing with a recording Customer.io channe
       expect(worker.customerIo.requests).toMatchObject([
         {
           method: "batch",
-          input: [{ type: "track", userId: ADMIN_USER_ID, event: "virtual_key_created" }],
+          input: [
+            {
+              type: "identify",
+              userId: ADMIN_USER_ID,
+              traits: { email: `${ADMIN_USER_ID}@example.com` },
+            },
+            { type: "track", userId: ADMIN_USER_ID, event: "virtual_key_created" },
+          ],
         },
       ]);
     });
