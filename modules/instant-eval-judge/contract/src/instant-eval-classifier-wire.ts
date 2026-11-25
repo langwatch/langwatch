@@ -238,11 +238,14 @@ function findNamedLevelIndex({
 }): number[] {
   const loose = (text: string) => text.trim().toLowerCase();
   const heard = loose(said);
-  const at = names.findIndex((name) => {
+  const exact = names.findIndex((name) => loose(name) === heard);
+  if (exact >= 0) return [exact];
+  // A label stands for a level only when it names one: "risk" fits "risk: low" and "risk: high".
+  const byLabel = names.flatMap((name, at) => {
     const label = loose(name.split(":", 1)[0] ?? name);
-    return heard === loose(name) || heard === label || heard.startsWith(`${label}:`);
+    return heard === label || heard.startsWith(`${label}:`) ? [at] : [];
   });
-  return at < 0 ? [] : [at];
+  return byLabel.length === 1 ? byLabel : [];
 }
 
 function findOfferedLevel({

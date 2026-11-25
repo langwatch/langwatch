@@ -38,6 +38,28 @@ export type InstantEvalJudgeBackendKind = (typeof INSTANT_EVAL_JUDGE_BACKEND_KIN
 const INSTANT_EVAL_JUDGE_REASONING_EFFORTS = ["none", "minimal", "low", "medium", "high"] as const;
 export type InstantEvalJudgeReasoningEffort = (typeof INSTANT_EVAL_JUDGE_REASONING_EFFORTS)[number];
 
+/**
+ * A reasoning model counts its reasoning against the output cap, so an effort other than `none`
+ * gets the room OpenAI advises reserving for reasoning (25,000) plus the answer's.
+ */
+export const INSTANT_EVAL_JUDGE_REASONING_MAX_OUTPUT_TOKENS = 32_000;
+
+/**
+ * The shortest timeout a backend asked for an effort other than `none` may have, and its default:
+ * the time a model takes to write the whole cap (about 110 tokens a second). A call cut off sooner
+ * reads no usage, so what the provider charged for it is never billed (ADR-190 decision 12).
+ */
+export const INSTANT_EVAL_JUDGE_REASONING_TIMEOUT_FLOOR_MS = 300_000;
+
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+/** Whether an effort asks the model to reason, so the reasoning cap and timeout floor apply. */
+export function isInstantEvalJudgeReasoning(
+  effort: InstantEvalJudgeReasoningEffort | undefined,
+): boolean {
+  return effort !== undefined && effort !== "none";
+}
+
 /** The kinds that take a reasoning effort on the wire. */
 const KINDS_TAKING_A_REASONING_EFFORT: readonly InstantEvalJudgeBackendKind[] = [
   "openai_responses",
@@ -135,12 +157,21 @@ const backendSchema = z
     /** The provider's model id; a Decisions or LLM backend must name one, there is no default. */
     model: z.string().min(1).optional(),
     enabled: z.boolean().default(true),
-    timeoutMs: z.number().int().positive().default(30_000),
+    /** Unset, 30 s, or the reasoning floor when the backend sets an effort other than `none`. */
+    timeoutMs: z.number().int().positive().optional(),
     /** Tried in order when this backend cannot answer. */
     fallbacks: z.array(z.string().min(1)).readonly().default([]),
     /** Sent with every call of an OpenAI Responses backend; unset, the request names none. */
     reasoningEffort: z.enum(INSTANT_EVAL_JUDGE_REASONING_EFFORTS).optional(),
   })
+  .transform(({ timeoutMs, ...backend }) => ({
+    ...backend,
+    timeoutMs:
+      timeoutMs ??
+      (isInstantEvalJudgeReasoning(backend.reasoningEffort)
+        ? INSTANT_EVAL_JUDGE_REASONING_TIMEOUT_FLOOR_MS
+        : DEFAULT_TIMEOUT_MS),
+  }))
   .readonly();
 type InstantEvalJudgeBackend = z.infer<typeof backendSchema>;
 
@@ -330,6 +361,14 @@ function backendIssues({
     !KINDS_TAKING_A_REASONING_EFFORT.includes(backend.kind)
   ) {
     issues.push(`backend ${name}: a ${backend.kind} backend takes no reasoningEffort`);
+  }
+  if (
+    isInstantEvalJudgeReasoning(backend.reasoningEffort) &&
+    backend.timeoutMs < INSTANT_EVAL_JUDGE_REASONING_TIMEOUT_FLOOR_MS
+  ) {
+    issues.push(
+      `backend ${name}: reasoningEffort ${backend.reasoningEffort} needs a timeoutMs of at least ${INSTANT_EVAL_JUDGE_REASONING_TIMEOUT_FLOOR_MS}`,
+    );
   }
   for (const fallback of backend.fallbacks) {
     if (!table.backends[fallback]) issues.push(`backend ${name}: unknown fallback ${fallback}`);

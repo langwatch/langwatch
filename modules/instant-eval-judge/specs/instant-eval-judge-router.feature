@@ -286,6 +286,14 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And a backend that sets none sends the request it sent before, with no effort named
     And the table refuses an effort on any other backend kind, or one the provider does not name
 
+  @unit @regression
+  Scenario: A backend that reasons waits long enough to write its output cap
+    Given an OpenAI Responses backend whose table entry sets a reasoning effort other than none
+    When the table is read
+    Then its timeout defaults to 300,000 ms where the entry names none
+    And an entry that names a shorter timeout is refused, naming the backend and the floor
+    And a backend with no effort, or effort none, keeps the 30,000 ms default
+
   @unit
   Scenario: The LLM legs send one forced score or category tool call and read it back
     Given a score or category question on an Anthropic Messages or OpenAI Responses leg
