@@ -129,6 +129,8 @@ export const opsSessionSchema = z.object({
   projects: z.array(opsProjectSchema),
   defaultProjectId: z.string().optional(),
   scopes: z.array(z.string()),
+  /** The ops functions the ops token may call. */
+  functions: z.array(z.string()).optional(),
   expiresAt: z.string(),
   createdAt: z.string(),
 });
@@ -241,6 +243,12 @@ export const takePendingRequest = ({
   requestId: string;
   now?: number;
 }): PendingRequest | undefined => loadPending({ now })[requestId];
+
+/** Every request made on this machine whose approval window is still open. */
+export const listPendingRequests = ({ now = Date.now() }: { now?: number } = {}): Record<
+  string,
+  PendingRequest
+> => loadPending({ now });
 
 export const forgetPendingRequest = ({
   requestId,

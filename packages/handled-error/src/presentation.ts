@@ -2991,6 +2991,35 @@ const presentations = {
     describe: () =>
       "Run results and stored files hold what the organization's users wrote, and this access was approved without content.",
   },
+  staff_function_unknown: {
+    title: "No such ops function",
+    describe: () =>
+      "The function name is not in the registry. List the functions to see every name.",
+  },
+  staff_function_not_approved: {
+    title: "This function was not approved",
+    describe: () =>
+      "A staff session calls only the functions its approval named. Ask for a new approval that names it.",
+  },
+  staff_function_scope_mismatch: {
+    title: "This function needs another scope",
+    describe: () =>
+      "Lookup and platform functions need ops:read; organization functions need an organization scope.",
+  },
+  staff_function_bad_input: {
+    title: "The function input is not valid",
+    describe: () =>
+      "The input does not match the function's schema, or its time range is longer than 31 days.",
+  },
+  staff_function_bad_cursor: {
+    title: "The page cursor is not valid",
+    describe: () => "Pass the nextCursor of the previous page of this same function, unchanged.",
+  },
+  staff_function_not_found: {
+    title: "Not found in this organization",
+    describe: () =>
+      "The project or record the function asked for is not in the approved organization.",
+  },
   staff_write_not_allowed: {
     title: "Staff access cannot make this change",
     describe: () =>

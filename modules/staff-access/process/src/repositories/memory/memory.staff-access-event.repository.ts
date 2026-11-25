@@ -22,6 +22,7 @@ export class MemoryStaffAccessEventRepository implements StaffAccessEventReposit
     status: number;
     errorCode: string | null;
     durationMs: number;
+    rowCount?: number;
   }): Promise<void> {
     const row = this.#rows.get(input.id);
     if (!row) return;
@@ -30,6 +31,7 @@ export class MemoryStaffAccessEventRepository implements StaffAccessEventReposit
       status: input.status,
       errorCode: input.errorCode,
       durationMs: input.durationMs,
+      ...(input.rowCount === undefined ? {} : { rowCount: input.rowCount }),
     });
   }
 

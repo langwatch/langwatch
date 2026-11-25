@@ -107,7 +107,11 @@ const optionsSchema = z.object({ challenge: z.string(), rpId: z.string() });
 const enrolledSchema = z.object({ requesterKey: z.string() });
 const overviewSchema = z.object({ hasPasskey: z.boolean() });
 const createdSchema = z.object({ requestId: z.string() });
-const redeemedSchema = z.object({ apiKey: z.string(), organizationId: z.string() });
+const redeemedSchema = z.object({
+  opsToken: z.string(),
+  organizationId: z.string(),
+  functions: z.array(z.string()),
+});
 const answerSchema = z.looseObject({ code: z.string().optional() });
 
 describe.skipIf(!liveStoresConfigured)("given the staff access approval on the live api", () => {
@@ -325,6 +329,7 @@ describe.skipIf(!liveStoresConfigured)("given the staff access approval on the l
           codeChallenge: CODE_CHALLENGE,
           codeChallengeMethod: "S256",
           machine: "operator-macbook",
+          functions: ["org.snapshot"],
         },
       });
       expect(asked.status, asked.text).toBe(200);
@@ -381,9 +386,11 @@ describe.skipIf(!liveStoresConfigured)("given the staff access approval on the l
         body: { codeVerifier: VERIFIER },
       });
       expect(redeemed.status, redeemed.text).toBe(200);
-      const { apiKey, organizationId } = redeemedSchema.parse(redeemed.json);
-      expect(apiKey.length).toBeGreaterThan(0);
-      expect(organizationId).toBe(acme.id);
+      const answer = redeemedSchema.parse(redeemed.json);
+      expect(answer.opsToken).toMatch(/^lwsa_/);
+      expect(redeemed.json).not.toHaveProperty("apiKey");
+      expect(answer.organizationId).toBe(acme.id);
+      expect(answer.functions).toEqual(["org.snapshot"]);
     }, 90_000);
   });
 

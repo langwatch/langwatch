@@ -21,6 +21,7 @@ class CreateStaffAccessRequestBody:
         code_challenge_method (Literal['S256']):
         machine (str):
         organization (str | Unset):
+        functions (list[str] | Unset):
     """
 
     scopes: list[CreateStaffAccessRequestBodyScopesItem]
@@ -29,6 +30,7 @@ class CreateStaffAccessRequestBody:
     code_challenge_method: Literal["S256"]
     machine: str
     organization: str | Unset = UNSET
+    functions: list[str] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         scopes = []
@@ -46,6 +48,10 @@ class CreateStaffAccessRequestBody:
 
         organization = self.organization
 
+        functions: list[str] | Unset = UNSET
+        if not isinstance(self.functions, Unset):
+            functions = self.functions
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -59,6 +65,8 @@ class CreateStaffAccessRequestBody:
         )
         if organization is not UNSET:
             field_dict["organization"] = organization
+        if functions is not UNSET:
+            field_dict["functions"] = functions
 
         return field_dict
 
@@ -84,6 +92,8 @@ class CreateStaffAccessRequestBody:
 
         organization = d.pop("organization", UNSET)
 
+        functions = cast(list[str], d.pop("functions", UNSET))
+
         create_staff_access_request_body = cls(
             scopes=scopes,
             reason=reason,
@@ -91,6 +101,7 @@ class CreateStaffAccessRequestBody:
             code_challenge_method=code_challenge_method,
             machine=machine,
             organization=organization,
+            functions=functions,
         )
 
         return create_staff_access_request_body

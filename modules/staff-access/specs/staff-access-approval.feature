@@ -42,11 +42,12 @@ Feature: Ops agent access approval
     Then the request is refused with a validation error and nothing is stored
 
   @integration
-  Scenario: An agent asks for access and gets an approval URL that lasts ten minutes
+  Scenario: An agent asks for access and gets an approval URL that lasts two hours
     Given Olivia enrolled "laptop agent"
     When the agent asks for "org:content" on "ACME" with a reason and a PKCE challenge
     Then it receives a request id and an approval URL under "/ops/agents/approve/"
-    And the request expires in ten minutes
+    And the request expires in two hours
+    And Olivia is emailed that a request is waiting for her, with its approval URL
 
   @integration
   Scenario: A sixth request in one hour is refused
@@ -231,7 +232,7 @@ Feature: Ops agent access approval
   @integration
   Scenario: An approval that was never redeemed is audited when it lapses
     Given Olivia approved a request on "ACME" that the agent never redeemed
-    When its ten minutes pass and the sweep runs
+    When its two hours pass and the sweep runs
     Then ACME's audit log holds a "staffAccess.expired" row for it
 
   @integration
@@ -263,3 +264,16 @@ Feature: Ops agent access approval
     Given a signed-in person with no platform-operator grant
     When they call the agents page procedures
     Then each is refused and nothing changes
+
+  @integration
+  Scenario: The requester withdraws a request it no longer needs
+    Given a pending request from Olivia's agent on ACME
+    When the agent withdraws it with its requester key
+    Then the request reads "revoked" and can no longer be approved or redeemed
+    And another requester's withdraw is refused as not found
+
+  @integration
+  Scenario: A request that was decided cannot be withdrawn
+    Given a request Olivia approved
+    When the agent withdraws it
+    Then it is refused with "request_not_pending"

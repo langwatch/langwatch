@@ -14,26 +14,38 @@ const text = (value: unknown): string => {
   return sanitizeTerminalText(JSON.stringify(value));
 };
 
-/** The listing whether the route answers an array or `{ organizations: [...] }`. */
-const organizationsOf = (body: unknown): Row[] => {
-  if (Array.isArray(body)) return body as Row[];
-  const listed = (body as { organizations?: unknown } | null)?.organizations;
-  return Array.isArray(listed) ? (listed as Row[]) : [];
-};
+interface OrganizationPage {
+  items: Row[];
+  total: number;
+  truncated: boolean;
+  nextCursor: string | null;
+}
 
-/** `langwatch ops orgs [--query <q>]`: organizations across the platform (ops:read). */
-export const opsOrgsCommand = async ({ query }: { query?: string }): Promise<CommandResult> => {
+/** `langwatch ops orgs [--query <q>]`: a page of organizations across the platform (ops:read). */
+export const opsOrgsCommand = async ({
+  query,
+  limit,
+  cursor,
+}: {
+  query?: string;
+  limit?: string;
+  cursor?: string;
+}): Promise<CommandResult> => {
   const { opsToken, endpoint } = requireOpsToken();
-  const search = query?.trim() ? `?query=${encodeURIComponent(query.trim())}` : "";
-  const body = await staffAccessFetch<unknown>({
+  const params = new URLSearchParams();
+  if (query?.trim()) params.set("query", query.trim());
+  if (limit) params.set("limit", limit);
+  if (cursor) params.set("cursor", cursor);
+  const search = params.size > 0 ? `?${params.toString()}` : "";
+  const page = await staffAccessFetch<OrganizationPage>({
     method: "GET",
     path: `/api/staff-access/ops/organizations${search}`,
     bearer: opsToken,
     endpoint,
   });
-  const organizations = organizationsOf(body);
+  const organizations = page.items ?? [];
   return {
-    data: { organizations },
+    data: page,
     table: () => {
       formatTable({
         data: organizations.map((org) => ({
@@ -45,6 +57,11 @@ export const opsOrgsCommand = async ({ query }: { query?: string }): Promise<Com
         colorMap: { Name: chalk.cyan },
         emptyMessage: "No organizations match.",
       });
+      console.log(
+        chalk.gray(
+          `Showing ${organizations.length} of ${page.total}${page.truncated ? `. More: --cursor ${page.nextCursor}` : "."}`,
+        ),
+      );
     },
   };
 };

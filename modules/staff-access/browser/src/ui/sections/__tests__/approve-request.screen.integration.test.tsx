@@ -50,7 +50,7 @@ describe("given a pending request", () => {
       expect(screen.getByText("org_acme")).toBeInTheDocument();
       expect(screen.getByText("Organization metadata")).toBeInTheDocument();
       expect(screen.getByText("Ops read")).toBeInTheDocument();
-      expect(screen.getByText(/No trace or dataset content/)).toBeInTheDocument();
+      expect(screen.getByText(/No trace, prompt or dataset content/)).toBeInTheDocument();
       expect(screen.getByText("olivia-mbp")).toBeInTheDocument();
       expect(screen.getByText("203.0.113.7")).toBeInTheDocument();
       expect(screen.getByTestId("staff-access-approval-countdown")).toHaveTextContent(
@@ -63,6 +63,17 @@ describe("given a pending request", () => {
       );
       expect(reason.querySelector("b")).toBeNull();
       expect(reason.querySelector("img")).toBeNull();
+    });
+  });
+
+  describe("when it names ops functions", () => {
+    /** @scenario "The approval page shows the functions it approves" */
+    it("lists each function with its title", () => {
+      renderPage();
+
+      const functions = screen.getByTestId("staff-access-functions");
+      expect(functions).toHaveTextContent("org.snapshot");
+      expect(functions).toHaveTextContent("Plan, member and project counts, creation and flags");
     });
   });
 

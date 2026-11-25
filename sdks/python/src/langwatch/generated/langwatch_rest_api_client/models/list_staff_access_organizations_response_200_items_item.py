@@ -5,11 +5,11 @@ from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 
-T = TypeVar("T", bound="ListStaffAccessOrganizationsResponse200OrganizationsItem")
+T = TypeVar("T", bound="ListStaffAccessOrganizationsResponse200ItemsItem")
 
 
 @_attrs_define
-class ListStaffAccessOrganizationsResponse200OrganizationsItem:
+class ListStaffAccessOrganizationsResponse200ItemsItem:
     """
     Attributes:
         id (str):
@@ -49,10 +49,10 @@ class ListStaffAccessOrganizationsResponse200OrganizationsItem:
 
         name = d.pop("name")
 
-        list_staff_access_organizations_response_200_organizations_item = cls(
+        list_staff_access_organizations_response_200_items_item = cls(
             id=id,
             slug=slug,
             name=name,
         )
 
-        return list_staff_access_organizations_response_200_organizations_item
+        return list_staff_access_organizations_response_200_items_item

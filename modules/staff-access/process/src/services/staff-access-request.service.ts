@@ -15,7 +15,11 @@ import type {
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
+  isStaffAccessFunctionName,
+  STAFF_ACCESS_FUNCTION_NAMES,
   STAFF_ACCESS_PRINCIPAL,
+  StaffFunctionScopeMismatchError,
+  StaffFunctionUnknownError,
   StaffAccessAlreadyRedeemedError,
   StaffAccessInvalidCodeVerifierError,
   StaffAccessNotFoundError,
@@ -37,6 +41,7 @@ import type {
   StaffAccessRequestRepository,
   StaffAccessRequestRow,
 } from "../repositories/staff-access.repository.ts";
+import { functionFitsScopes } from "../rules/staff-access-function.rules.ts";
 import {
   approvalChallengeOf,
   assertPending,
@@ -102,6 +107,8 @@ export class StaffAccessRequestService {
    * @throws {StaffAccessRateLimitedError} past five requests in an hour
    * @throws {StaffAccessNotConfiguredError} when the deployment has no public base URL
    * @throws {StaffAccessIpMismatchError} when the request carries no client address to pin
+   * @throws {StaffFunctionUnknownError} for a function name the registry does not hold
+   * @throws {StaffFunctionScopeMismatchError} for a function the scopes cannot reach
    */
   async createRequest({
     requesterId,
@@ -125,6 +132,7 @@ export class StaffAccessRequestService {
     if (recent >= STAFF_ACCESS_REQUESTS_PER_HOUR) {
       throw new StaffAccessRateLimitedError({ retryAfterMs: STAFF_ACCESS_RATE_WINDOW_MS });
     }
+    const functions = functionsFor({ names: body.functions ?? [], scopes: body.scopes });
     const organization = reachesOrganization(body.scopes)
       ? await this.resolveOrganization({ organization: body.organization ?? "" })
       : null;
@@ -134,6 +142,7 @@ export class StaffAccessRequestService {
       requesterId,
       ownerUserId,
       scopes: [...body.scopes],
+      functions,
       organizationId: organization?.id ?? null,
       organizationName: organization?.name ?? null,
       reason: body.reason,
@@ -160,11 +169,42 @@ export class StaffAccessRequestService {
       createdAt: at,
     };
     await this.deps.requests.create(row);
-    return {
-      requestId: row.id,
-      approvalUrl: `${publicBaseUrl.replace(/\/+$/, "")}/ops/agents/approve/${row.id}`,
-      expiresAt: isoText(row.expiresAt),
-    };
+    const approvalUrl = `${publicBaseUrl.replace(/\/+$/, "")}/ops/agents/approve/${row.id}`;
+    await this.deps.notices.tellOwner({
+      ownerUserId,
+      subject: "Your agent is waiting for your approval",
+      lines: [
+        { label: "Approve at", value: approvalUrl },
+        { label: "Organization", value: organization?.name ?? "None (ops read only)" },
+        { label: "Scopes", value: row.scopes.join(", ") },
+        ...(functions.length > 0 ? [{ label: "Functions", value: functions.join(", ") }] : []),
+        { label: "Reason", value: row.reason },
+        { label: "Machine", value: row.machine },
+        { label: "Waits until", value: isoText(row.expiresAt) },
+      ],
+      idempotencyKey: `staff-access-requested:${row.id}`,
+    });
+    return { requestId: row.id, approvalUrl, expiresAt: isoText(row.expiresAt) };
+  }
+
+  /**
+   * The requester takes back a request nobody decided yet; its card and link stop working.
+   * @throws {StaffAccessRequestNotPendingError} once it was decided, withdrawn or lapsed
+   */
+  async withdrawRequest({
+    requesterId,
+    requestId,
+  }: {
+    requesterId: string;
+    requestId: string;
+  }): Promise<{ withdrawn: true }> {
+    const row = await this.requestOfRequester({ requesterId, requestId });
+    const at = this.deps.now();
+    assertPending({ row, at });
+    if (!(await this.deps.requests.withdraw({ id: row.id, requesterId, at }))) {
+      await this.throwUndecidable({ id: row.id });
+    }
+    return { withdrawn: true };
   }
 
   async getRequestStatus({
@@ -252,6 +292,9 @@ export class StaffAccessRequestService {
       lines: [
         { label: "Organization", value: row.organizationName ?? "None (ops read only)" },
         { label: "Scopes", value: row.scopes.join(", ") },
+        ...(row.functions.length > 0
+          ? [{ label: "Functions", value: row.functions.join(", ") }]
+          : []),
         { label: "Reason", value: row.reason },
         { label: "Machine", value: row.machine },
         { label: "Runs that spend allowed", value: spendApproved ? "Yes" : "No" },
@@ -416,6 +459,7 @@ export class StaffAccessRequestService {
     const challenge = approvalChallengeOf({
       requestId: row.id,
       scopes: row.scopes,
+      functions: row.functions,
       organizationId: row.organizationId,
       organizationName: row.organizationName,
       reason: row.reason,
@@ -488,4 +532,25 @@ export class StaffAccessRequestService {
       spendOffered: scopes.includes("org:support"),
     };
   }
+}
+
+/**
+ * The functions a request names, sorted, each in the registry and within reach of its scopes.
+ * @throws {StaffFunctionUnknownError} for a name the registry does not hold
+ * @throws {StaffFunctionScopeMismatchError} for one the scopes cannot reach
+ */
+function functionsFor({
+  names,
+  scopes,
+}: {
+  names: readonly string[];
+  scopes: readonly StaffAccessScope[];
+}): string[] {
+  for (const name of names) {
+    if (!isStaffAccessFunctionName(name)) {
+      throw new StaffFunctionUnknownError({ names: STAFF_ACCESS_FUNCTION_NAMES, httpStatus: 422 });
+    }
+    if (!functionFitsScopes({ name, scopes })) throw new StaffFunctionScopeMismatchError({ name });
+  }
+  return names.toSorted();
 }

@@ -13,8 +13,9 @@ import type {
 } from "../repositories/staff-access.repository.ts";
 import {
   isoText,
+  mintsOpsToken,
+  mintsOrganizationKey,
   mintToken,
-  reachesOrganization,
   staffKeyKindOf,
 } from "../rules/staff-access.rules.ts";
 
@@ -26,7 +27,10 @@ type RedemptionDeps = Readonly<{
   projects: Pick<ProjectApi, "listByOrganization">;
 }>;
 
-/** What a redeemed request hands its agent (ADR-202): the staff key and the ops token. */
+/**
+ * What a redeemed request hands its agent (ADR-202): an organization key for content and
+ * support, and an ops token for `ops:read` and the approved functions.
+ */
 export class StaffAccessRedemptionService {
   private constructor(private readonly deps: RedemptionDeps) {}
 
@@ -43,7 +47,7 @@ export class StaffAccessRedemptionService {
   }): Promise<StaffAccessRedeemed> {
     const scopes = row.scopes as StaffAccessScope[];
     const organizationKey =
-      reachesOrganization(scopes) && row.organizationId
+      mintsOrganizationKey(scopes) && row.organizationId
         ? await this.deps.apiKeys.mintStaffAccessKey({
             organizationId: row.organizationId,
             permissions: staffAccessPermissions({ scopes }),
@@ -51,7 +55,9 @@ export class StaffAccessRedemptionService {
             kind: staffKeyKindOf(scopes),
           })
         : null;
-    const opsToken = scopes.includes("ops:read") ? mintToken(STAFF_ACCESS_OPS_TOKEN_PREFIX) : null;
+    const opsToken = mintsOpsToken({ scopes, functions: row.functions })
+      ? mintToken(STAFF_ACCESS_OPS_TOKEN_PREFIX)
+      : null;
     await this.deps.requests.attachCredentials({
       id: row.id,
       apiKeyId: organizationKey?.apiKeyId ?? null,
@@ -74,6 +80,7 @@ export class StaffAccessRedemptionService {
       ...(row.organizationId ? { organizationId: row.organizationId } : {}),
       projects,
       scopes,
+      functions: [...row.functions],
       expiresAt: isoText(accessExpiresAt),
     };
   }

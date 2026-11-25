@@ -31,7 +31,8 @@ We will give an operator's coding agent access only through the public REST API 
 - Organization reach is an ownerless, system-managed, restricted API key: "LangWatch Staff Read"
   (`staff-reader`) or "LangWatch Support" (`staff-support`). The bags exclude credentials,
   members, SSO, roles, keys, billing and every delete or manage permission. Prompt text
-  (`prompts:view`) is in the content bag. The support bag holds no prompt or trigger write. No
+  (`prompts:view`) is in the content bag. The support bag writes prompts and triggers too
+  (amendment 2026-11-25). No
   impersonation and no fake user.
 - Cross-organization reads are an allowlist on a separate `staff_access` door answering the new
   platform-tier permission `opsRead:view`, never `ops:view`.
@@ -108,3 +109,62 @@ cannot reach any customer route.
 
 - Specs: `modules/staff-access/specs/`
 - ADR-161 (impersonation scope), ADR-185 (docs session keys)
+
+## Amendment 2026-11-25: ops functions, longer asks, withdraw
+
+**Status:** Accepted
+
+### Context
+
+An `org:metadata` key reached every public read route the staff-reader bag allows. Nothing listed
+which reads are useful or safe for an investigation, and the questions operators ask most ("are
+traces arriving", "why does this evaluator fail", "is the org over its limit", "does this person
+have an account") have no public route at all. Operators in meetings missed ten-minute asks, and
+an agent that asked twice left two cards with no way to close one.
+
+### Decision
+
+- **Ops functions.** `STAFF_ACCESS_FUNCTIONS` in the staff-access contract is the registry of
+  named investigation reads. Each has a title, a scope (`lookup`, `platform` or `org`), a strict
+  Zod input and output, and the investigation it answers. Outputs carry ids, counts, states, codes
+  and times only. A unit test walks every output schema and fails on a field name that reads as
+  content or a secret.
+- A request names the functions it wants (at most 12). The passkey signs the sorted list as part
+  of `approvalChallengeOf`, and the approval page shows it. `lookup` and `platform` functions need
+  `ops:read`; `org` functions need an organization scope and run against the approved
+  organization only. No function input names an organization.
+- **`org:metadata` is reached only through functions.** A session approved for `org:metadata`
+  without `org:content` or `org:support` gets no organization key. It gets the ops token, and the
+  ops token calls only the functions its approval signed, through
+  `POST /api/staff-access/functions/:name` on the `staff_access` door. An unknown name is refused
+  with `staff_function_unknown`, an unsigned one with `staff_function_not_approved`.
+- **Support mode is the act-as-customer path.** `org:content` and `org:support` keep the
+  organization key and reach the public REST API and the whole `langwatch` CLI in that one
+  organization, under the gate rules above (spend tick, content routes, confirmations), prompt
+  and trigger writes included. The function registry never narrows them.
+- Every function list answer is a page: `{ items, total, truncated, nextCursor }`. The cursor is
+  opaque keyset text over the sort key, never an offset. The `ops:read` organization listing
+  takes the same shape.
+- A function with a time range accepts at most 31 days, ending after it starts.
+- Each call writes its trail row before it runs, with the function name and its input, and
+  records the row count when it finishes.
+- `GET /api/staff-access/functions` lists the registry to a requester key or an ops token, so the
+  server, not the CLI build, decides what exists (`langwatch ops functions`).
+- The `ops:read` usage answer names API keys by id and kind, never by their names.
+- **Asks.** A request waits 2 hours for a decision. Its requester can withdraw it while it is
+  undecided. The owner is emailed when a request arrives, through the same notice path as the
+  other staff access emails. `langwatch ops access request` answers at once with the request id;
+  `--wait` polls, and `langwatch ops access redeem <id>` resumes later.
+
+### Consequences
+
+- A new investigation read is a new function: a spec scenario, an ids-and-counts operation on the
+  owning module's `*Api`, a registry entry, and a deploy. The staff-access module never reads
+  another module's tables.
+- The content guard on outputs is name-based. Review still has to catch content under an
+  innocent field name; the registry and the owner's operation are the real guard.
+- Support mode writes everything the organization's own members could create or edit in its
+  bag, prompts and triggers included: a prompt write can reach production and a trigger can send
+  data out, so both rest on the operator's approval and the spend tick like every other write
+  outside datasets. The only routes a staff key never reaches are those declared
+  `.withConfirmation`, which remove or switch off a record. Every write stays audited as before.

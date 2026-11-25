@@ -14,7 +14,7 @@ import {
 } from "@langwatch/staff-access-contract";
 import { type Instant, Temporal } from "@langwatch/time";
 
-export const STAFF_ACCESS_REQUEST_TTL_MS = 10 * 60 * 1000;
+export const STAFF_ACCESS_REQUEST_TTL_MS = 2 * 60 * 60 * 1000;
 export const STAFF_ACCESS_SESSION_TTL_MS = 60 * 60 * 1000;
 export const STAFF_ACCESS_REQUESTER_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 export const STAFF_ACCESS_CHALLENGE_TTL_MS = 5 * 60 * 1000;
@@ -32,9 +32,28 @@ export const STAFF_ACCESS_USAGE_CLASSIFICATION =
   "still call. membersSignedIn counts members holding a live browser session, which is UI use. " +
   "An organization with API figures and no signed-in members uses LangWatch through the API only.";
 
-/** Whether the scopes reach into one organization, which mints an organization key. */
+/** Whether the scopes reach into one organization. */
 export function reachesOrganization(scopes: readonly StaffAccessScope[]): boolean {
   return scopes.some((scope) => scope !== "ops:read");
+}
+
+/**
+ * Whether the session gets an organization key: content and support drive the public API as
+ * the customer would. `org:metadata` alone reaches the organization only through functions.
+ */
+export function mintsOrganizationKey(scopes: readonly StaffAccessScope[]): boolean {
+  return scopes.includes("org:content") || scopes.includes("org:support");
+}
+
+/** Whether the session gets an ops token: for the `ops:read` routes or any approved function. */
+export function mintsOpsToken({
+  scopes,
+  functions,
+}: {
+  scopes: readonly StaffAccessScope[];
+  functions: readonly string[];
+}): boolean {
+  return scopes.includes("ops:read") || functions.length > 0;
 }
 
 /** Support writes as "LangWatch Support"; anything else reads as "LangWatch Staff Read". */
@@ -66,6 +85,7 @@ export function organizationNameMatches({
 export type StaffAccessApprovalFields = Readonly<{
   requestId: string;
   scopes: readonly string[];
+  functions: readonly string[];
   organizationId: string | null;
   organizationName: string | null;
   reason: string;
@@ -76,11 +96,12 @@ export type StaffAccessApprovalFields = Readonly<{
   expiresAt: string;
 }>;
 
-/** base64url(SHA-256(canonical JSON)): keys sorted, scopes sorted, nothing else. */
+/** base64url(SHA-256(canonical JSON)): keys sorted, scopes and functions sorted, nothing else. */
 export function approvalChallengeOf(fields: StaffAccessApprovalFields): string {
   const canonical = {
     codeChallenge: fields.codeChallenge,
     expiresAt: fields.expiresAt,
+    functions: fields.functions.toSorted(),
     machine: fields.machine,
     organizationId: fields.organizationId,
     organizationName: fields.organizationName,
@@ -191,7 +212,7 @@ type DecisionRow = Readonly<{
   redeemedAt: Instant | null;
 }>;
 
-/** @throws when the request is no longer pending or its ten minutes passed */
+/** @throws when the request is no longer pending or its two hours passed */
 export function assertPending({ row, at }: { row: DecisionRow; at: Instant }): void {
   if (row.status !== "pending") throw new StaffAccessRequestNotPendingError();
   if (hasPassed({ moment: row.expiresAt, at })) throw new StaffAccessRequestExpiredError();

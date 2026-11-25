@@ -12,6 +12,8 @@ import {
   PasskeyAssertionRefusedError,
 } from "@langwatch/auth-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { NotificationService, SendEmailCommand } from "@langwatch/notification-contract";
@@ -103,6 +105,18 @@ export function staffAccessWorld({
   const ops = createApiFixture<OpsApi>({
     offersCloudOps: () => state.cloudOps,
     listPlatformOperators: async () => operators(),
+    countQueueGroupsForTenants: async ({ tenantIds }) => [
+      {
+        queueName: "events",
+        pendingGroups: tenantIds.length,
+        blockedGroups: 0,
+        activeGroups: 1,
+        parkedGroups: 0,
+        dlqGroups: 1,
+        pendingJobs: 2,
+        oldestPendingAt: Date.parse("2026-11-02T09:00:00Z"),
+      },
+    ],
     listQueues: async () => [
       {
         name: "events",
@@ -139,6 +153,21 @@ export function staffAccessWorld({
       return { credentialId: "credential1" };
     },
     countUsageForMembers: async ({ memberUserIds }) => ({ signedInUsers: memberUserIds.length }),
+    findSignInFacts: async ({ email }) =>
+      email === "olivia@acme.test"
+        ? [
+            {
+              userId: "user_acme_olivia",
+              createdAt: Date.parse("2026-01-01T00:00:00Z"),
+              lastSignInAt: Date.parse("2026-11-01T07:00:00Z"),
+              methods: ["password", "google"],
+              passkeys: 1,
+              twoStepEnabled: false,
+              locked: false,
+              deactivated: false,
+            },
+          ]
+        : [],
   });
 
   const summaries = [ACME, GLOBEX].map((organization) => ({
@@ -150,6 +179,14 @@ export function staffAccessWorld({
       summaries.find((summary) => summary.id === id) ?? null,
     listProvisioningSummaries: async () => summaries,
     getAllMembers: async () => [{ id: "member_1" }, { id: "member_2" }] as never,
+    getOpsSnapshot: async ({ organizationId }) => ({
+      organizationId,
+      createdAt: Date.parse("2025-01-01T00:00:00Z"),
+      membersCount: 2,
+      pendingInvitesCount: 1,
+      teamsCount: 1,
+      projectIds: [`${organizationId}_project`],
+    }),
   });
 
   const projects = createApiFixture<ProjectApi>({
@@ -173,6 +210,18 @@ export function staffAccessWorld({
       if (state.keyRevokeRefused.has(apiKeyId)) throw new Error("api key store unavailable");
       state.revokedKeys.push(apiKeyId);
     },
+    findKeyFactsForOrganization: async () => [
+      {
+        id: "key_customer",
+        kind: "service",
+        projectId: `${ACME.id}_project`,
+        createdAt: Date.parse("2026-01-01T00:00:00Z"),
+        lastUsedAt: Date.parse("2026-11-01T09:00:00Z"),
+        expiresAt: null,
+        revokedAt: null,
+        permissions: ["traces:create"],
+      },
+    ],
     listAll: async (): Promise<ApiKey[]> => [
       {
         id: "key_customer",
@@ -224,7 +273,10 @@ export function staffAccessWorld({
     config: { publicBaseUrl },
     dependencies: {
       ops,
-      featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => state.flag }),
+      featureFlags: createApiFixture<FeatureFlagApi>({
+        isEnabled: async () => state.flag,
+        findEnabledFlagsForOrganization: async () => ["release_trace_media_extraction"],
+      }),
       auth,
       users: createApiFixture<UserApi>({
         findById: async ({ id }) => {
@@ -252,6 +304,47 @@ export function staffAccessWorld({
       }),
       traces: createApiFixture<TraceApi>({
         countUsage: async () => ({ traces: 42, spans: 300 }),
+        countIngestionByProject: async ({ projectIds }) =>
+          projectIds.map((projectId) => ({
+            projectId,
+            traces: 42,
+            lastTraceAt: Date.parse("2026-11-02T09:30:00Z"),
+            planLimitRefusals: 3,
+          })),
+        findTracePresence: async ({ projectId, traceId }) =>
+          traceId === "trace_stored"
+            ? [
+                {
+                  projectId,
+                  traceId,
+                  firstSeenAt: Date.parse("2026-11-02T09:00:00Z"),
+                  lastSeenAt: Date.parse("2026-11-02T09:00:05Z"),
+                  spanCount: 7,
+                },
+              ]
+            : [],
+      }),
+      entitlements: createApiFixture<EntitlementApi>({
+        getUsageLimits: async () => ({
+          plan: "growth",
+          limits: [
+            { name: "traces_per_month", cap: 200_000, used: 199_000 },
+            { name: "members", cap: null, used: null },
+          ],
+        }),
+      }),
+      evaluations: createApiFixture<EvaluationApi>({
+        countEvaluatorOutcomes: async ({ projectIds }) =>
+          projectIds.map((projectId) => ({
+            projectId,
+            evaluatorId: "monitor_1",
+            evaluatorType: "langevals/llm_boolean",
+            runs: 10,
+            errors: 4,
+            skipped: 1,
+            errorsByCode: [{ code: "provider_rate_limited", count: 4 }],
+            lastErrorAt: Date.parse("2026-11-02T08:00:00Z"),
+          })),
       }),
     },
     now: () => state.at,
@@ -307,13 +400,21 @@ export function requestBody({
   scopes,
   organization = ACME.slug,
   reason = "fix ACME's broken evaluator",
+  functions,
 }: {
   scopes: ("ops:read" | "org:metadata" | "org:content" | "org:support")[];
   organization?: string;
   reason?: string;
+  functions?: string[];
 }) {
   const reachesOrganization = scopes.some((scope) => scope !== "ops:read");
+  const metadataOnly =
+    scopes.includes("org:metadata") &&
+    !scopes.includes("org:content") &&
+    !scopes.includes("org:support");
+  const named = functions ?? (metadataOnly ? ["org.snapshot"] : []);
   return {
+    ...(named.length > 0 ? { functions: named } : {}),
     scopes,
     ...(reachesOrganization ? { organization } : {}),
     reason,

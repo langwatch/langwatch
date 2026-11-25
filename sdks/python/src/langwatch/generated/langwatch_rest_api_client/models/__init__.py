@@ -37,6 +37,8 @@ from .call_connected_agent_response_200_instance import CallConnectedAgentRespon
 from .call_connected_agent_response_200_output_type_1 import CallConnectedAgentResponse200OutputType1
 from .call_connected_agent_response_200_output_type_2_item import CallConnectedAgentResponse200OutputType2Item
 from .call_connected_agent_response_200_state_type_0 import CallConnectedAgentResponse200StateType0
+from .call_staff_access_function_body import CallStaffAccessFunctionBody
+from .call_staff_access_function_response_200 import CallStaffAccessFunctionResponse200
 from .cancel_instant_eval_run_response_200 import CancelInstantEvalRunResponse200
 from .cancel_instant_eval_run_response_200_matched_by_question import CancelInstantEvalRunResponse200MatchedByQuestion
 from .cancel_instant_eval_run_response_200_parameters import CancelInstantEvalRunResponse200Parameters
@@ -4373,10 +4375,14 @@ from .list_run_plans_response_200_item_targets_item_scenario_mappings_additional
 from .list_run_plans_response_200_item_targets_item_type import ListRunPlansResponse200ItemTargetsItemType
 from .list_scim_tokens_response_200 import ListScimTokensResponse200
 from .list_scim_tokens_response_200_tokens_item import ListScimTokensResponse200TokensItem
-from .list_staff_access_organizations_response_200 import ListStaffAccessOrganizationsResponse200
-from .list_staff_access_organizations_response_200_organizations_item import (
-    ListStaffAccessOrganizationsResponse200OrganizationsItem,
+from .list_staff_access_functions_response_200 import ListStaffAccessFunctionsResponse200
+from .list_staff_access_functions_response_200_items_item import ListStaffAccessFunctionsResponse200ItemsItem
+from .list_staff_access_functions_response_200_items_item_input_schema import (
+    ListStaffAccessFunctionsResponse200ItemsItemInputSchema,
 )
+from .list_staff_access_functions_response_200_items_item_scope import ListStaffAccessFunctionsResponse200ItemsItemScope
+from .list_staff_access_organizations_response_200 import ListStaffAccessOrganizationsResponse200
+from .list_staff_access_organizations_response_200_items_item import ListStaffAccessOrganizationsResponse200ItemsItem
 from .list_suite_templates_response_200_item import ListSuiteTemplatesResponse200Item
 from .list_suite_templates_response_200_item_kind import ListSuiteTemplatesResponse200ItemKind
 from .list_suite_templates_response_200_item_scenarios_item import ListSuiteTemplatesResponse200ItemScenariosItem
@@ -11221,6 +11227,7 @@ from .update_test_suite_response_200_fields_item import UpdateTestSuiteResponse2
 from .update_test_suite_response_200_fields_item_type import UpdateTestSuiteResponse200FieldsItemType
 from .update_test_suite_response_404 import UpdateTestSuiteResponse404
 from .validate_project_auth_token_response_200 import ValidateProjectAuthTokenResponse200
+from .withdraw_staff_access_request_response_200 import WithdrawStaffAccessRequestResponse200
 
 __all__ = (
     "AgUiToolCall",
@@ -11260,6 +11267,8 @@ __all__ = (
     "CallConnectedAgentResponse200OutputType1",
     "CallConnectedAgentResponse200OutputType2Item",
     "CallConnectedAgentResponse200StateType0",
+    "CallStaffAccessFunctionBody",
+    "CallStaffAccessFunctionResponse200",
     "CancelInstantEvalRunResponse200",
     "CancelInstantEvalRunResponse200MatchedByQuestion",
     "CancelInstantEvalRunResponse200Parameters",
@@ -13658,8 +13667,12 @@ __all__ = (
     "ListRunPlansResponse200ItemTargetsItemType",
     "ListScimTokensResponse200",
     "ListScimTokensResponse200TokensItem",
+    "ListStaffAccessFunctionsResponse200",
+    "ListStaffAccessFunctionsResponse200ItemsItem",
+    "ListStaffAccessFunctionsResponse200ItemsItemInputSchema",
+    "ListStaffAccessFunctionsResponse200ItemsItemScope",
     "ListStaffAccessOrganizationsResponse200",
-    "ListStaffAccessOrganizationsResponse200OrganizationsItem",
+    "ListStaffAccessOrganizationsResponse200ItemsItem",
     "ListSuiteTemplatesResponse200Item",
     "ListSuiteTemplatesResponse200ItemKind",
     "ListSuiteTemplatesResponse200ItemScenariosItem",
@@ -17112,4 +17125,5 @@ __all__ = (
     "UpdateTestSuiteResponse200FieldsItemType",
     "UpdateTestSuiteResponse404",
     "ValidateProjectAuthTokenResponse200",
+    "WithdrawStaffAccessRequestResponse200",
 )

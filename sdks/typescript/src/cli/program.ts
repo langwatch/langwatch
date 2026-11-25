@@ -6349,29 +6349,39 @@ function registerOpsCommands(program: Command): void {
         collectScope,
         [],
       )
+      .option(
+        "--function <name>",
+        "An ops function the session may call (see `ops functions`); repeat for more. org:metadata needs at least one",
+        collectScope,
+        [],
+      )
       .option("--org <idOrSlug>", "The organization an org:* scope applies to")
       .option("--reason <text>", "Why the access is needed; shown to the approver and the customer")
       .option(
         "--project <idOrSlug>",
         "Default project for commands run with --ops-session while the session lives",
       )
-      .option("--no-wait", "Print the approval URL and exit; finish with `ops access redeem <id>`"),
+      .option(
+        "--wait",
+        "Poll until the request is decided and redeem it, instead of answering at once",
+      ),
     run(async () => {
       const { opsAccessRequestCommand } = await import("./commands/ops/access.js");
       return (options: {
         scope?: string[];
+        function?: string[];
         org?: string;
         reason?: string;
         project?: string;
         wait?: boolean;
-      }) => opsAccessRequestCommand(options);
+      }) => opsAccessRequestCommand({ ...options, fn: options.function ?? [] });
     }),
   );
 
   emitsResult(
     accessCmd
       .command("redeem <requestId>")
-      .description("Finish a request made with --no-wait once it is approved")
+      .description("Finish a request once it is approved")
       .option(
         "--project <idOrSlug>",
         "Default project for commands run with --ops-session while the session lives",
@@ -6384,10 +6394,24 @@ function registerOpsCommands(program: Command): void {
   );
 
   emitsResult(
-    accessCmd.command("status").description("Show the local ops session and its expiry"),
+    accessCmd
+      .command("status [requestId]")
+      .description(
+        "Show one request's state on the server, or the local ops session and the requests still waiting",
+      ),
     run(async () => {
       const { opsAccessStatusCommand } = await import("./commands/ops/access.js");
-      return () => opsAccessStatusCommand();
+      return (requestId?: string) => opsAccessStatusCommand({ requestId });
+    }),
+  );
+
+  emitsResult(
+    accessCmd
+      .command("withdraw <requestId>")
+      .description("Take back a request nobody approved yet"),
+    run(async () => {
+      const { opsAccessWithdrawCommand } = await import("./commands/ops/access.js");
+      return (requestId: string) => opsAccessWithdrawCommand({ requestId });
     }),
   );
 
@@ -6406,10 +6430,39 @@ function registerOpsCommands(program: Command): void {
       .command("orgs")
       .description("List organizations across the platform (needs the ops:read scope)")
       .option("--query <text>", "Filter by name, slug or id")
+      .option("--limit <n>", "Page size, up to 200 (default 50)")
+      .option("--cursor <cursor>", "The nextCursor of the previous page")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     run(async () => {
       const { opsOrgsCommand } = await import("./commands/ops/read.js");
-      return (options: { query?: string }) => opsOrgsCommand({ query: options.query });
+      return (options: { query?: string; limit?: string; cursor?: string }) =>
+        opsOrgsCommand(options);
+    }),
+  );
+
+  emitsResult(
+    opsCmd
+      .command("functions")
+      .description("List the ops functions the server offers, with what each answers")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    run(async () => {
+      const { opsFunctionsCommand } = await import("./commands/ops/functions.js");
+      return () => opsFunctionsCommand();
+    }),
+  );
+
+  emitsResult(
+    opsCmd
+      .command("call <name>")
+      .description("Run one ops function the session's approval named")
+      .option("--input <json>", "The function's input as a JSON object")
+      .option("--limit <n>", "Page size for a list answer")
+      .option("--cursor <cursor>", "The nextCursor of the previous page")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    run(async () => {
+      const { opsCallCommand } = await import("./commands/ops/functions.js");
+      return (name: string, options: { input?: string; limit?: string; cursor?: string }) =>
+        opsCallCommand({ name, ...options });
     }),
   );
 

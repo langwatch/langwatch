@@ -163,6 +163,22 @@ export class MemoryStaffAccessRequestRepository implements StaffAccessRequestRep
     });
   }
 
+  async withdraw({
+    id,
+    requesterId,
+    at,
+  }: {
+    id: string;
+    requesterId: string;
+    at: Instant;
+  }): Promise<boolean> {
+    const row = this.#rows.get(id);
+    if (!row || row.requesterId !== requesterId || row.status !== "pending") return false;
+    if (row.revokedAt !== null || !isAfter(row.expiresAt, at)) return false;
+    this.#rows.set(id, { ...row, status: "revoked", revokedAt: at, revokeCause: "withdrawn" });
+    return true;
+  }
+
   async revoke({
     id,
     at,

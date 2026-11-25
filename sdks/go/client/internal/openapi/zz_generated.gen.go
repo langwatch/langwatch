@@ -36132,6 +36132,27 @@ func (e GetApiSlackConnections200JSONResponseBodyScopeType) Valid() bool {
 	}
 }
 
+// Defines values for ListStaffAccessFunctions200JSONResponseBodyItemsScope.
+const (
+	Lookup   ListStaffAccessFunctions200JSONResponseBodyItemsScope = "lookup"
+	Org      ListStaffAccessFunctions200JSONResponseBodyItemsScope = "org"
+	Platform ListStaffAccessFunctions200JSONResponseBodyItemsScope = "platform"
+)
+
+// Valid indicates whether the value is a known member of the ListStaffAccessFunctions200JSONResponseBodyItemsScope enum.
+func (e ListStaffAccessFunctions200JSONResponseBodyItemsScope) Valid() bool {
+	switch e {
+	case Lookup:
+		return true
+	case Org:
+		return true
+	case Platform:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateStaffAccessRequestJSONBodyCodeChallengeMethod.
 const (
 	S256 CreateStaffAccessRequestJSONBodyCodeChallengeMethod = "S256"
@@ -36234,6 +36255,21 @@ func (e RedeemStaffAccessRequest200JSONResponseBodyScopes) Valid() bool {
 	case RedeemStaffAccessRequest200JSONResponseBodyScopesOrgMetadata:
 		return true
 	case RedeemStaffAccessRequest200JSONResponseBodyScopesOrgSupport:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WithdrawStaffAccessRequest200JSONResponseBodyWithdrawn.
+const (
+	WithdrawStaffAccessRequest200JSONResponseBodyWithdrawnTrue WithdrawStaffAccessRequest200JSONResponseBodyWithdrawn = true
+)
+
+// Valid indicates whether the value is a known member of the WithdrawStaffAccessRequest200JSONResponseBodyWithdrawn enum.
+func (e WithdrawStaffAccessRequest200JSONResponseBodyWithdrawn) Valid() bool {
+	switch e {
+	case WithdrawStaffAccessRequest200JSONResponseBodyWithdrawnTrue:
 		return true
 	default:
 		return false
@@ -42095,13 +42131,13 @@ func (e PostApiWebhooksV1Endpoints201JSONResponseBodyData1Status) Valid() bool {
 
 // Defines values for DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived.
 const (
-	True DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived = true
+	DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchivedTrue DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived = true
 )
 
 // Valid indicates whether the value is a known member of the DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived enum.
 func (e DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchived) Valid() bool {
 	switch e {
-	case True:
+	case DeleteApiWebhooksV1EndpointsById200JSONResponseBodyDataArchivedTrue:
 		return true
 	default:
 		return false
@@ -60508,15 +60544,26 @@ type GetApiSlackConnections200JSONResponseBodyKind string
 // GetApiSlackConnections200JSONResponseBodyScopeType defines parameters for GetApiSlackConnections.
 type GetApiSlackConnections200JSONResponseBodyScopeType string
 
+// ListStaffAccessFunctions200JSONResponseBodyItemsScope defines parameters for ListStaffAccessFunctions.
+type ListStaffAccessFunctions200JSONResponseBodyItemsScope string
+
+// CallStaffAccessFunctionJSONBody defines parameters for CallStaffAccessFunction.
+type CallStaffAccessFunctionJSONBody struct {
+	Input interface{} `json:"input,omitempty"`
+}
+
 // ListStaffAccessOrganizationsParams defines parameters for ListStaffAccessOrganizations.
 type ListStaffAccessOrganizationsParams struct {
-	Query *string `form:"query,omitempty" json:"query,omitempty"`
+	Query  *string `form:"query,omitempty" json:"query,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // CreateStaffAccessRequestJSONBody defines parameters for CreateStaffAccessRequest.
 type CreateStaffAccessRequestJSONBody struct {
 	CodeChallenge       string                                              `json:"codeChallenge"`
 	CodeChallengeMethod CreateStaffAccessRequestJSONBodyCodeChallengeMethod `json:"codeChallengeMethod"`
+	Functions           *[]string                                           `json:"functions,omitempty"`
 	Machine             string                                              `json:"machine"`
 	Organization        *string                                             `json:"organization,omitempty"`
 	Reason              string                                              `json:"reason"`
@@ -60542,6 +60589,9 @@ type RedeemStaffAccessRequestJSONBody struct {
 
 // RedeemStaffAccessRequest200JSONResponseBodyScopes defines parameters for RedeemStaffAccessRequest.
 type RedeemStaffAccessRequest200JSONResponseBodyScopes string
+
+// WithdrawStaffAccessRequest200JSONResponseBodyWithdrawn defines parameters for WithdrawStaffAccessRequest.
+type WithdrawStaffAccessRequest200JSONResponseBodyWithdrawn bool
 
 // CreateStoredObjectUploadJSONBody defines parameters for CreateStoredObjectUpload.
 type CreateStoredObjectUploadJSONBody struct {
@@ -65544,6 +65594,9 @@ type DeleteApiSecretsByIdJSONRequestBody DeleteApiSecretsByIdJSONBody
 
 // PutApiSecretsByIdJSONRequestBody defines body for PutApiSecretsById for application/json ContentType.
 type PutApiSecretsByIdJSONRequestBody PutApiSecretsByIdJSONBody
+
+// CallStaffAccessFunctionJSONRequestBody defines body for CallStaffAccessFunction for application/json ContentType.
+type CallStaffAccessFunctionJSONRequestBody CallStaffAccessFunctionJSONBody
 
 // CreateStaffAccessRequestJSONRequestBody defines body for CreateStaffAccessRequest for application/json ContentType.
 type CreateStaffAccessRequestJSONRequestBody CreateStaffAccessRequestJSONBody
@@ -139269,6 +139322,14 @@ type ClientInterface interface {
 	// GetApiSlackConnections request
 	GetApiSlackConnections(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListStaffAccessFunctions request
+	ListStaffAccessFunctions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CallStaffAccessFunctionWithBody request with any body
+	CallStaffAccessFunctionWithBody(ctx context.Context, functionName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CallStaffAccessFunction(ctx context.Context, functionName string, body CallStaffAccessFunctionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListStaffAccessOrganizations request
 	ListStaffAccessOrganizations(ctx context.Context, params *ListStaffAccessOrganizationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -139293,6 +139354,9 @@ type ClientInterface interface {
 	RedeemStaffAccessRequestWithBody(ctx context.Context, requestId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	RedeemStaffAccessRequest(ctx context.Context, requestId string, body RedeemStaffAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// WithdrawStaffAccessRequest request
+	WithdrawStaffAccessRequest(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateStoredObjectUploadWithBody request with any body
 	CreateStoredObjectUploadWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -145966,6 +146030,42 @@ func (c *Client) GetApiSlackConnections(ctx context.Context, reqEditors ...Reque
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListStaffAccessFunctions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListStaffAccessFunctionsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CallStaffAccessFunctionWithBody(ctx context.Context, functionName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCallStaffAccessFunctionRequestWithBody(c.Server, functionName, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CallStaffAccessFunction(ctx context.Context, functionName string, body CallStaffAccessFunctionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCallStaffAccessFunctionRequest(c.Server, functionName, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListStaffAccessOrganizations(ctx context.Context, params *ListStaffAccessOrganizationsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListStaffAccessOrganizationsRequest(c.Server, params)
 	if err != nil {
@@ -146064,6 +146164,18 @@ func (c *Client) RedeemStaffAccessRequestWithBody(ctx context.Context, requestId
 
 func (c *Client) RedeemStaffAccessRequest(ctx context.Context, requestId string, body RedeemStaffAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRedeemStaffAccessRequestRequest(c.Server, requestId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) WithdrawStaffAccessRequest(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewWithdrawStaffAccessRequestRequest(c.Server, requestId)
 	if err != nil {
 		return nil, err
 	}
@@ -164489,6 +164601,80 @@ func NewGetApiSlackConnectionsRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListStaffAccessFunctionsRequest generates requests for ListStaffAccessFunctions
+func NewListStaffAccessFunctionsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/staff-access/functions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCallStaffAccessFunctionRequest calls the generic CallStaffAccessFunction builder with application/json body
+func NewCallStaffAccessFunctionRequest(server string, functionName string, body CallStaffAccessFunctionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCallStaffAccessFunctionRequestWithBody(server, functionName, "application/json", bodyReader)
+}
+
+// NewCallStaffAccessFunctionRequestWithBody generates requests for CallStaffAccessFunction with any type of body
+func NewCallStaffAccessFunctionRequestWithBody(server string, functionName string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "functionName", functionName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/staff-access/functions/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListStaffAccessOrganizationsRequest generates requests for ListStaffAccessOrganizations
 func NewListStaffAccessOrganizationsRequest(server string, params *ListStaffAccessOrganizationsParams) (*http.Request, error) {
 	var err error
@@ -164520,6 +164706,30 @@ func NewListStaffAccessOrganizationsRequest(server string, params *ListStaffAcce
 		if params.Query != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "query", *params.Query, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -164755,6 +164965,40 @@ func NewRedeemStaffAccessRequestRequestWithBody(server string, requestId string,
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewWithdrawStaffAccessRequestRequest generates requests for WithdrawStaffAccessRequest
+func NewWithdrawStaffAccessRequestRequest(server string, requestId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "requestId", requestId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/staff-access/requests/%s/withdraw", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -169160,6 +169404,14 @@ type ClientWithResponsesInterface interface {
 	// GetApiSlackConnectionsWithResponse request
 	GetApiSlackConnectionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetApiSlackConnectionsResponse, error)
 
+	// ListStaffAccessFunctionsWithResponse request
+	ListStaffAccessFunctionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListStaffAccessFunctionsResponse, error)
+
+	// CallStaffAccessFunctionWithBodyWithResponse request with any body
+	CallStaffAccessFunctionWithBodyWithResponse(ctx context.Context, functionName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CallStaffAccessFunctionResponse, error)
+
+	CallStaffAccessFunctionWithResponse(ctx context.Context, functionName string, body CallStaffAccessFunctionJSONRequestBody, reqEditors ...RequestEditorFn) (*CallStaffAccessFunctionResponse, error)
+
 	// ListStaffAccessOrganizationsWithResponse request
 	ListStaffAccessOrganizationsWithResponse(ctx context.Context, params *ListStaffAccessOrganizationsParams, reqEditors ...RequestEditorFn) (*ListStaffAccessOrganizationsResponse, error)
 
@@ -169184,6 +169436,9 @@ type ClientWithResponsesInterface interface {
 	RedeemStaffAccessRequestWithBodyWithResponse(ctx context.Context, requestId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RedeemStaffAccessRequestResponse, error)
 
 	RedeemStaffAccessRequestWithResponse(ctx context.Context, requestId string, body RedeemStaffAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*RedeemStaffAccessRequestResponse, error)
+
+	// WithdrawStaffAccessRequestWithResponse request
+	WithdrawStaffAccessRequestWithResponse(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*WithdrawStaffAccessRequestResponse, error)
 
 	// CreateStoredObjectUploadWithBodyWithResponse request with any body
 	CreateStoredObjectUploadWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateStoredObjectUploadResponse, error)
@@ -197444,15 +197699,94 @@ func (r GetApiSlackConnectionsResponse) ContentType() string {
 	return ""
 }
 
+type ListStaffAccessFunctionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Items []struct {
+			Answers     string                                                `json:"answers"`
+			InputSchema map[string]interface{}                                `json:"inputSchema"`
+			Name        string                                                `json:"name"`
+			Personal    bool                                                  `json:"personal"`
+			Scope       ListStaffAccessFunctions200JSONResponseBodyItemsScope `json:"scope"`
+			Title       string                                                `json:"title"`
+		} `json:"items"`
+		NextCursor *string `json:"nextCursor"`
+		Total      int     `json:"total"`
+		Truncated  bool    `json:"truncated"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r ListStaffAccessFunctionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListStaffAccessFunctionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListStaffAccessFunctionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CallStaffAccessFunctionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Name   string      `json:"name"`
+		Output interface{} `json:"output"`
+		Rows   int         `json:"rows"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r CallStaffAccessFunctionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CallStaffAccessFunctionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CallStaffAccessFunctionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListStaffAccessOrganizationsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		Organizations []struct {
+		Items []struct {
 			Id   string `json:"id"`
 			Name string `json:"name"`
 			Slug string `json:"slug"`
-		} `json:"organizations"`
+		} `json:"items"`
+		NextCursor *string `json:"nextCursor"`
+		Total      int     `json:"total"`
+		Truncated  bool    `json:"truncated"`
 	}
 }
 
@@ -197486,8 +197820,8 @@ type GetStaffAccessOrganizationUsageResponse struct {
 	JSON200      *struct {
 		ApiKeys []struct {
 			Id         string  `json:"id"`
+			Kind       string  `json:"kind"`
 			LastUsedAt *string `json:"lastUsedAt"`
-			Name       string  `json:"name"`
 		} `json:"apiKeys"`
 		At                  string `json:"at"`
 		Classification      string `json:"classification"`
@@ -197680,10 +198014,11 @@ type RedeemStaffAccessRequestResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		ApiKey         *string `json:"apiKey,omitempty"`
-		ExpiresAt      string  `json:"expiresAt"`
-		OpsToken       *string `json:"opsToken,omitempty"`
-		OrganizationId *string `json:"organizationId,omitempty"`
+		ApiKey         *string  `json:"apiKey,omitempty"`
+		ExpiresAt      string   `json:"expiresAt"`
+		Functions      []string `json:"functions"`
+		OpsToken       *string  `json:"opsToken,omitempty"`
+		OrganizationId *string  `json:"organizationId,omitempty"`
 		Projects       []struct {
 			Id   string `json:"id"`
 			Name string `json:"name"`
@@ -197711,6 +198046,38 @@ func (r RedeemStaffAccessRequestResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r RedeemStaffAccessRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type WithdrawStaffAccessRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Withdrawn WithdrawStaffAccessRequest200JSONResponseBodyWithdrawn `json:"withdrawn"`
+	}
+}
+
+// Status returns HTTPResponse.Status
+func (r WithdrawStaffAccessRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r WithdrawStaffAccessRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r WithdrawStaffAccessRequestResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -205514,6 +205881,32 @@ func (c *ClientWithResponses) GetApiSlackConnectionsWithResponse(ctx context.Con
 	return ParseGetApiSlackConnectionsResponse(rsp)
 }
 
+// ListStaffAccessFunctionsWithResponse request returning *ListStaffAccessFunctionsResponse
+func (c *ClientWithResponses) ListStaffAccessFunctionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListStaffAccessFunctionsResponse, error) {
+	rsp, err := c.ListStaffAccessFunctions(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListStaffAccessFunctionsResponse(rsp)
+}
+
+// CallStaffAccessFunctionWithBodyWithResponse request with arbitrary body returning *CallStaffAccessFunctionResponse
+func (c *ClientWithResponses) CallStaffAccessFunctionWithBodyWithResponse(ctx context.Context, functionName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CallStaffAccessFunctionResponse, error) {
+	rsp, err := c.CallStaffAccessFunctionWithBody(ctx, functionName, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCallStaffAccessFunctionResponse(rsp)
+}
+
+func (c *ClientWithResponses) CallStaffAccessFunctionWithResponse(ctx context.Context, functionName string, body CallStaffAccessFunctionJSONRequestBody, reqEditors ...RequestEditorFn) (*CallStaffAccessFunctionResponse, error) {
+	rsp, err := c.CallStaffAccessFunction(ctx, functionName, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCallStaffAccessFunctionResponse(rsp)
+}
+
 // ListStaffAccessOrganizationsWithResponse request returning *ListStaffAccessOrganizationsResponse
 func (c *ClientWithResponses) ListStaffAccessOrganizationsWithResponse(ctx context.Context, params *ListStaffAccessOrganizationsParams, reqEditors ...RequestEditorFn) (*ListStaffAccessOrganizationsResponse, error) {
 	rsp, err := c.ListStaffAccessOrganizations(ctx, params, reqEditors...)
@@ -205591,6 +205984,15 @@ func (c *ClientWithResponses) RedeemStaffAccessRequestWithResponse(ctx context.C
 		return nil, err
 	}
 	return ParseRedeemStaffAccessRequestResponse(rsp)
+}
+
+// WithdrawStaffAccessRequestWithResponse request returning *WithdrawStaffAccessRequestResponse
+func (c *ClientWithResponses) WithdrawStaffAccessRequestWithResponse(ctx context.Context, requestId string, reqEditors ...RequestEditorFn) (*WithdrawStaffAccessRequestResponse, error) {
+	rsp, err := c.WithdrawStaffAccessRequest(ctx, requestId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseWithdrawStaffAccessRequestResponse(rsp)
 }
 
 // CreateStoredObjectUploadWithBodyWithResponse request with arbitrary body returning *CreateStoredObjectUploadResponse
@@ -237342,6 +237744,74 @@ func ParseGetApiSlackConnectionsResponse(rsp *http.Response) (*GetApiSlackConnec
 	return response, nil
 }
 
+// ParseListStaffAccessFunctionsResponse parses an HTTP response from a ListStaffAccessFunctionsWithResponse call
+func ParseListStaffAccessFunctionsResponse(rsp *http.Response) (*ListStaffAccessFunctionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListStaffAccessFunctionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Items []struct {
+				Answers     string                                                `json:"answers"`
+				InputSchema map[string]interface{}                                `json:"inputSchema"`
+				Name        string                                                `json:"name"`
+				Personal    bool                                                  `json:"personal"`
+				Scope       ListStaffAccessFunctions200JSONResponseBodyItemsScope `json:"scope"`
+				Title       string                                                `json:"title"`
+			} `json:"items"`
+			NextCursor *string `json:"nextCursor"`
+			Total      int     `json:"total"`
+			Truncated  bool    `json:"truncated"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCallStaffAccessFunctionResponse parses an HTTP response from a CallStaffAccessFunctionWithResponse call
+func ParseCallStaffAccessFunctionResponse(rsp *http.Response) (*CallStaffAccessFunctionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CallStaffAccessFunctionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Name   string      `json:"name"`
+			Output interface{} `json:"output"`
+			Rows   int         `json:"rows"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListStaffAccessOrganizationsResponse parses an HTTP response from a ListStaffAccessOrganizationsWithResponse call
 func ParseListStaffAccessOrganizationsResponse(rsp *http.Response) (*ListStaffAccessOrganizationsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -237358,11 +237828,14 @@ func ParseListStaffAccessOrganizationsResponse(rsp *http.Response) (*ListStaffAc
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			Organizations []struct {
+			Items []struct {
 				Id   string `json:"id"`
 				Name string `json:"name"`
 				Slug string `json:"slug"`
-			} `json:"organizations"`
+			} `json:"items"`
+			NextCursor *string `json:"nextCursor"`
+			Total      int     `json:"total"`
+			Truncated  bool    `json:"truncated"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -237392,8 +237865,8 @@ func ParseGetStaffAccessOrganizationUsageResponse(rsp *http.Response) (*GetStaff
 		var dest struct {
 			ApiKeys []struct {
 				Id         string  `json:"id"`
+				Kind       string  `json:"kind"`
 				LastUsedAt *string `json:"lastUsedAt"`
-				Name       string  `json:"name"`
 			} `json:"apiKeys"`
 			At                  string `json:"at"`
 			Classification      string `json:"classification"`
@@ -237566,16 +238039,45 @@ func ParseRedeemStaffAccessRequestResponse(rsp *http.Response) (*RedeemStaffAcce
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			ApiKey         *string `json:"apiKey,omitempty"`
-			ExpiresAt      string  `json:"expiresAt"`
-			OpsToken       *string `json:"opsToken,omitempty"`
-			OrganizationId *string `json:"organizationId,omitempty"`
+			ApiKey         *string  `json:"apiKey,omitempty"`
+			ExpiresAt      string   `json:"expiresAt"`
+			Functions      []string `json:"functions"`
+			OpsToken       *string  `json:"opsToken,omitempty"`
+			OrganizationId *string  `json:"organizationId,omitempty"`
 			Projects       []struct {
 				Id   string `json:"id"`
 				Name string `json:"name"`
 				Slug string `json:"slug"`
 			} `json:"projects"`
 			Scopes []RedeemStaffAccessRequest200JSONResponseBodyScopes `json:"scopes"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseWithdrawStaffAccessRequestResponse parses an HTTP response from a WithdrawStaffAccessRequestWithResponse call
+func ParseWithdrawStaffAccessRequestResponse(rsp *http.Response) (*WithdrawStaffAccessRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &WithdrawStaffAccessRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Withdrawn WithdrawStaffAccessRequest200JSONResponseBodyWithdrawn `json:"withdrawn"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

@@ -1,7 +1,7 @@
 /**
  * The agent's wire under `/api/staff-access` (ADR-202), behind the `staff_access` door. A
- * requester key asks, checks, redeems and ends; an ops token reads the `ops:read` allowlist.
- * Spec: modules/staff-access/specs/staff-access-approval.feature
+ * requester key asks, checks, withdraws, redeems and ends; an ops token reads the `ops:read`
+ * allowlist and calls the functions its approval named. Spec: staff-access-approval.feature
  */
 import { anyAuthenticated } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
@@ -9,6 +9,11 @@ import {
   StaffAccessApi,
   staffAccessDoorSessionSchema,
   staffAccessEndedSchema,
+  staffAccessFunctionAnswerSchema,
+  staffAccessFunctionCallBodySchema,
+  staffAccessFunctionListSchema,
+  staffAccessFunctionParamsSchema,
+  staffAccessWithdrawnSchema,
   staffAccessNoBodySchema,
   staffAccessOrganizationListSchema,
   staffAccessOrganizationParamsSchema,
@@ -26,6 +31,10 @@ import {
 const AGENT = anyAuthenticated({
   reason:
     "the bearer is an operator's enrolled agent or one approved session; each operation answers only that agent's own requests",
+});
+const FUNCTION_CALLER = anyAuthenticated({
+  reason:
+    "the bearer is one approved session's ops token; the operation runs only the functions that session's passkey approval named",
 });
 const OPS_READ = { at: "platform", refusal: "hidden" } as const;
 
@@ -71,12 +80,44 @@ export const staffAccessRest = defineRestRouter(StaffAccessApi)
   .withOutput(staffAccessEndedSchema)
   .handle(({ app, session, input }) => app.endSession({ session, requestId: input.requestId }))
 
+  .post("/api/staff-access/requests/:requestId/withdraw", "withdrawStaffAccessRequest")
+  .keepsRecords()
+  .withoutAudit(
+    "the withdraw is recorded on the request row; an undecided request has no customer row",
+  )
+  .withParams(staffAccessRequestParamsSchema)
+  .withInput(staffAccessNoBodySchema)
+  .withAccess(AGENT)
+  .withOutput(staffAccessWithdrawnSchema)
+  .handle(({ app, session, input }) => app.withdrawRequest({ session, requestId: input.requestId }))
+
+  .get("/api/staff-access/functions", "listStaffAccessFunctions")
+  .withAccess(AGENT)
+  .withOutput(staffAccessFunctionListSchema)
+  .handle(({ app, session }) => app.listFunctions({ session }))
+
+  .post("/api/staff-access/functions/:functionName", "callStaffAccessFunction")
+  .keepsRecords()
+  .withoutAudit("read sent as a POST")
+  .withParams(staffAccessFunctionParamsSchema)
+  .withInput(staffAccessFunctionCallBodySchema)
+  .withAccess(FUNCTION_CALLER)
+  .withOutput(staffAccessFunctionAnswerSchema)
+  .handle(({ app, session, input }) =>
+    app.callFunction({ session, name: input.functionName, input: input.input }),
+  )
+
   .get("/api/staff-access/ops/organizations", "listStaffAccessOrganizations")
   .withQuery(staffAccessOrganizationsQuerySchema)
   .withPermission("opsRead:view", OPS_READ)
   .withOutput(staffAccessOrganizationListSchema)
   .handle(({ app, session, input }) =>
-    app.listOrganizations({ session, ...(input.query ? { query: input.query } : {}) }),
+    app.listOrganizations({
+      session,
+      ...(input.query ? { query: input.query } : {}),
+      ...(input.limit === undefined ? {} : { limit: input.limit }),
+      ...(input.cursor ? { cursor: input.cursor } : {}),
+    }),
   )
 
   .get("/api/staff-access/ops/organizations/:organization/usage", "getStaffAccessOrganizationUsage")

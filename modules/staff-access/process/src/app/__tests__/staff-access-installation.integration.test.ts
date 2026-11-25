@@ -6,6 +6,8 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { NotificationService } from "@langwatch/notification-contract";
@@ -54,6 +56,8 @@ async function boot(role: "api" | "worker") {
       testPeer({ token: CodingAgentApi, instance: createApiFixture<CodingAgentApi>() }),
       testPeer({ token: GatewayApi, instance: createApiFixture<GatewayApi>() }),
       testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
+      testPeer({ token: EntitlementApi, instance: createApiFixture<EntitlementApi>() }),
+      testPeer({ token: EvaluationApi, instance: createApiFixture<EvaluationApi>() }),
     ],
     surface: () => ({
       hosts: { rest: recordingHost(rest), trpc: recordingHost(trpc) },

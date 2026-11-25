@@ -39,14 +39,14 @@ Feature: Using ops agent access
     Then it is refused
 
   @integration
-  Scenario: A metadata key cannot read trace content
-    Given a redeemed "org:metadata" key on ACME
+  Scenario: A key without org:content cannot read trace content
+    Given a redeemed "org:support" key on ACME approved without "org:content"
     When the agent searches traces
     Then it is refused
 
   @integration
-  Scenario: A metadata key cannot read run results or stored files
-    Given a redeemed "org:metadata" key on ACME
+  Scenario: A key without org:content cannot read run results or stored files
+    Given a redeemed "org:support" key on ACME approved without "org:content"
     When the agent reads an experiment run's results or a stored file
     Then it is refused 403 with "staff_content_not_approved"
 

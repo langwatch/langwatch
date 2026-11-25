@@ -10,7 +10,7 @@ export type ScopeCopy = { label: string; line: string };
 export const SCOPE_COPY: Readonly<Record<StaffAccessScopeName, ScopeCopy>> = {
   "org:metadata": {
     label: "Organization metadata",
-    line: "How the organization is set up and used: projects, settings, evaluators, prompts, costs and usage. No trace or dataset content.",
+    line: "Only the named functions below, against this organization: ids, counts, states and times. No trace, prompt or dataset content.",
   },
   "org:content": {
     label: "Organization content",
@@ -18,7 +18,7 @@ export const SCOPE_COPY: Readonly<Record<StaffAccessScopeName, ScopeCopy>> = {
   },
   "org:support": {
     label: "Support changes",
-    line: "Everything in metadata, plus creating and editing evaluators, prompts, datasets, scenarios, dashboards and triggers as LangWatch Support. Never members, keys or billing.",
+    line: "Acts as the customer through the API and CLI: creating and editing evaluators, prompts, datasets, scenarios, dashboards and triggers as LangWatch Support. Never members, keys, billing, or removing anything.",
   },
   "ops:read": {
     label: "Ops read",

@@ -31,10 +31,16 @@ export class PrismaStaffAccessEventRepository
     status: number;
     errorCode: string | null;
     durationMs: number;
+    rowCount?: number;
   }): Promise<void> {
     await this.database.staffAccessEvent.update({
       where: { id: input.id },
-      data: { status: input.status, errorCode: input.errorCode, durationMs: input.durationMs },
+      data: {
+        status: input.status,
+        errorCode: input.errorCode,
+        durationMs: input.durationMs,
+        ...(input.rowCount === undefined ? {} : { rowCount: input.rowCount }),
+      },
     });
   }
 

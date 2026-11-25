@@ -1345,6 +1345,24 @@ const registry = {
   staff_content_not_approved: {
     tips: ["Request access again with the org:content scope"],
   },
+  staff_function_unknown: {
+    tips: ["Run langwatch ops functions to list every function"],
+  },
+  staff_function_not_approved: {
+    tips: ["Request access again naming this function with --function"],
+  },
+  staff_function_scope_mismatch: {
+    tips: ["Ask ops:read for lookup and platform functions, an org scope for org functions"],
+  },
+  staff_function_bad_input: {
+    tips: ["Check the input against the schema langwatch ops functions prints"],
+  },
+  staff_function_bad_cursor: {
+    tips: ["Start again without a cursor"],
+  },
+  staff_function_not_found: {
+    tips: ["Check the id against the organization's projects"],
+  },
   staff_write_not_allowed: {
     tips: ["Ask a member of the organization to make this change"],
   },

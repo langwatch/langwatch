@@ -13,18 +13,18 @@ class GetStaffAccessOrganizationUsageResponse200ApiKeysItem:
     """
     Attributes:
         id (str):
-        name (str):
+        kind (str):
         last_used_at (None | str):
     """
 
     id: str
-    name: str
+    kind: str
     last_used_at: None | str
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
 
-        name = self.name
+        kind = self.kind
 
         last_used_at: None | str
         last_used_at = self.last_used_at
@@ -34,7 +34,7 @@ class GetStaffAccessOrganizationUsageResponse200ApiKeysItem:
         field_dict.update(
             {
                 "id": id,
-                "name": name,
+                "kind": kind,
                 "lastUsedAt": last_used_at,
             }
         )
@@ -46,7 +46,7 @@ class GetStaffAccessOrganizationUsageResponse200ApiKeysItem:
         d = dict(src_dict)
         id = d.pop("id")
 
-        name = d.pop("name")
+        kind = d.pop("kind")
 
         def _parse_last_used_at(data: object) -> None | str:
             if data is None:
@@ -57,7 +57,7 @@ class GetStaffAccessOrganizationUsageResponse200ApiKeysItem:
 
         get_staff_access_organization_usage_response_200_api_keys_item = cls(
             id=id,
-            name=name,
+            kind=kind,
             last_used_at=last_used_at,
         )
 

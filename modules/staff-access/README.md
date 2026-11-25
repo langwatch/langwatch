@@ -11,7 +11,7 @@ Staff access lets a platform operator's coding agent reach production for one ho
 | Classification | core (`modules/catalogue.json`)                                                                                          |
 | Subjects       | staff-access                                                                                                             |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                                                 |
-| Api token      | `StaffAccessApi` = `moduleApi<StaffAccessApi>()("staff-access")`, `contract/src/staff-access.api.ts:109` (18 operations) |
+| Api token      | `StaffAccessApi` = `moduleApi<StaffAccessApi>()("staff-access")`, `contract/src/staff-access.api.ts:120` (21 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                               |
 
 ## What staff-access owns
@@ -35,6 +35,8 @@ Anything else staff-access needs belongs to another module and is reached throug
 | `auditLog`      | `AuditLogApi`         | [audit-log](../audit-log/README.md)       |
 | `auth`          | `AuthApi`             | [auth](../auth/README.md)                 |
 | `codingAgents`  | `CodingAgentApi`      | [coding-agent](../coding-agent/README.md) |
+| `entitlements`  | `EntitlementApi`      | [entitlement](../entitlement/README.md)   |
+| `evaluations`   | `EvaluationApi`       | [evaluation](../evaluation/README.md)     |
 | `featureFlags`  | `FeatureFlagApi`      | [feature-flag](../feature-flag/README.md) |
 | `gateway`       | `GatewayApi`          | [gateway](../gateway/README.md)           |
 | `notifications` | `NotificationService` | [notification](../notification/README.md) |

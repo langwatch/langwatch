@@ -15445,6 +15445,12 @@ importers:
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../../coding-agent/contract
+      '@langwatch/entitlement-contract':
+        specifier: workspace:*
+        version: link:../../entitlement/contract
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../evaluation/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing
@@ -15454,6 +15460,9 @@ importers:
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../gateway/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid

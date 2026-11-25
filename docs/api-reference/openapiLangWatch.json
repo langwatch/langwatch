@@ -129834,6 +129834,15 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
+                  },
+                  "functions": {
+                    "maxItems": 12,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
                   }
                 },
                 "required": [
@@ -129972,6 +129981,12 @@
                         ]
                       }
                     },
+                    "functions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "expiresAt": {
                       "type": "string"
                     }
@@ -129979,6 +129994,7 @@
                   "required": [
                     "projects",
                     "scopes",
+                    "functions",
                     "expiresAt"
                   ],
                   "additionalProperties": false
@@ -130072,6 +130088,209 @@
         ]
       }
     },
+    "/api/v1/staff-access/requests/{requestId}/withdraw": {
+      "post": {
+        "operationId": "withdrawStaffAccessRequest",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "withdrawn": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "withdrawn"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "requestId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ]
+      }
+    },
+    "/api/v1/staff-access/functions": {
+      "get": {
+        "operationId": "listStaffAccessFunctions",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": "string",
+                            "enum": [
+                              "lookup",
+                              "platform",
+                              "org"
+                            ]
+                          },
+                          "answers": {
+                            "type": "string"
+                          },
+                          "personal": {
+                            "type": "boolean"
+                          },
+                          "inputSchema": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "title",
+                          "scope",
+                          "answers",
+                          "personal",
+                          "inputSchema"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total",
+                    "truncated",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        }
+      }
+    },
+    "/api/v1/staff-access/functions/{functionName}": {
+      "post": {
+        "operationId": "callStaffAccessFunction",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "rows": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "output": {}
+                  },
+                  "required": [
+                    "name",
+                    "rows",
+                    "output"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "input": {}
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "internal"
+          ],
+          "permissions": []
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "functionName",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/v1/staff-access/ops/organizations": {
       "get": {
         "operationId": "listStaffAccessOrganizations",
@@ -130083,7 +130302,7 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "organizations": {
+                    "items": {
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -130105,10 +130324,27 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   },
                   "required": [
-                    "organizations"
+                    "items",
+                    "total",
+                    "truncated",
+                    "nextCursor"
                   ],
                   "additionalProperties": false
                 }
@@ -130132,6 +130368,24 @@
             "schema": {
               "type": "string",
               "maxLength": 200
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
             }
           }
         ]
@@ -130229,7 +130483,7 @@
                           "id": {
                             "type": "string"
                           },
-                          "name": {
+                          "kind": {
                             "type": "string"
                           },
                           "lastUsedAt": {
@@ -130241,7 +130495,7 @@
                         },
                         "required": [
                           "id",
-                          "name",
+                          "kind",
                           "lastUsedAt"
                         ],
                         "additionalProperties": false
