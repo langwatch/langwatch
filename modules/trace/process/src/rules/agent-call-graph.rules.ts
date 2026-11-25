@@ -9,7 +9,6 @@ import {
   A2A_V1_METHODS,
   a2aSpanNameMatch,
   NormalizedSpanKind,
-  type A2aSpanMark,
   type AgentCallGraph,
   type AgentCallGraphEdge,
   type AgentCallGraphNode,
@@ -73,6 +72,16 @@ function hasA2aAttribute(params: AgentCallGraphSpan["params"]): boolean {
   if (!params) return false;
   const keys = Object.keys(params);
   return keys.some((key) => key.startsWith("a2a.")) || isRecord(params.a2a);
+}
+
+/** What the A2A classifier reads off a span it recognises as an A2A call. */
+export interface A2aSpanMark {
+  spanId: string;
+  role: "client" | "server" | "unknown";
+  method: string | null;
+  contextId: string | null;
+  taskId: string | null;
+  taskState: string | null;
 }
 
 export type A2aClassification = { isA2a: false } | { isA2a: true; mark: A2aSpanMark };
