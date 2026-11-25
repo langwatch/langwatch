@@ -138,10 +138,12 @@ function OpenCuratedBoard({
     ? store.storeProject !== void 0 && store.mayShare
     : reader.mayCreate;
   // Edits to a From LangWatch board belong to the organization area; off, the page is main's.
-  const organizationArea = useOrganizationLibraryOpen().isOpen;
-  const mayEdit = organizationArea && mayCreate;
+  const library = useOrganizationLibraryOpen();
+  const mayEdit = library.isOpen && mayCreate;
   // A copy is saved and filled, which asks analytics:update in the project in view too.
-  const mayCopy = mayCreate && reader.mayEdit;
+  // Offered on the project address only; the organization address shows no copy path.
+  const mayCopy = !atOrganization && !library.isLoading && mayCreate && reader.mayEdit;
+  const showHint = !atOrganization && !library.isLoading && !mayEdit && !mayCopy;
   const { createWithWidget } = useBoardFromTemplate({
     atOrganization,
     storeProject: store.storeProject,
@@ -171,7 +173,7 @@ function OpenCuratedBoard({
     headerAction = (
       <MakeCopyButton
         isCopying={copy.creatingId === board.templateId}
-        disabled={saved.isLoading}
+        disabled={saved.isLoading || !!saved.loadError}
         onClick={() => void copy.duplicate(board)}
       />
     );
@@ -219,7 +221,7 @@ function OpenCuratedBoard({
       <DashboardRefetchIntervalContext.Provider value={autoRefresh.refetchInterval}>
         <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
           <VStack align="stretch" gap={4}>
-            {!mayEdit && !mayCopy && (
+            {showHint && (
               <Text textStyle="bodySm" color="fg.muted">
                 Members who can create and edit dashboards can make their own copy to edit it.
               </Text>

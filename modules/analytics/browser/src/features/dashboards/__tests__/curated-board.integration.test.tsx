@@ -55,6 +55,7 @@ function curatedServer({
   organizationArea = true,
   storedNames = [],
   boardsGate,
+  flagsGate,
   createFails = false,
   pinnedTemplateId,
 }: {
@@ -62,6 +63,8 @@ function curatedServer({
   storedNames?: readonly string[];
   /** Holds the saved boards' answer until it resolves. */
   boardsGate?: Promise<void>;
+  /** Holds the organization's flags until it resolves. */
+  flagsGate?: Promise<void>;
   createFails?: boolean;
   /** A From LangWatch board the member pinned. */
   pinnedTemplateId?: string;
@@ -80,7 +83,9 @@ function curatedServer({
     }
     switch (call.path) {
       case "featureFlag.isEnabledForEachOrganization":
-        return Promise.resolve({ enabledByOrganizationId: { "org-1": organizationArea } });
+        return (flagsGate ?? Promise.resolve()).then(() => ({
+          enabledByOrganizationId: { "org-1": organizationArea },
+        }));
       case "boards.create":
         if (createFails) return Promise.reject(new Error("boards.create failed"));
         return Promise.resolve({ id: "board-1", ...(call.input as object) });
@@ -106,6 +111,7 @@ function openCurated({
   permissions = MEMBER,
   storedNames = [],
   boardsGate,
+  flagsGate,
   createFails,
   pinnedTemplateId,
   query = {},
@@ -117,6 +123,7 @@ function openCurated({
   permissions?: readonly string[];
   storedNames?: readonly string[];
   boardsGate?: Promise<void>;
+  flagsGate?: Promise<void>;
   createFails?: boolean;
   pinnedTemplateId?: string;
   /** The address's query, as when "Add a widget" is already open. */
@@ -126,6 +133,7 @@ function openCurated({
     organizationArea,
     storedNames,
     boardsGate,
+    flagsGate,
     createFails,
     pinnedTemplateId,
   });
@@ -194,6 +202,21 @@ describe("given a member opens a From LangWatch board", () => {
     });
   });
 
+  it("shows neither Make a copy nor the quiet line while the flags load", async () => {
+    let answer = () => {};
+    const flagsGate = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    openCurated({ templateId: "release", flagsGate });
+
+    await screen.findByRole("heading", { name: "Ready to ship?" });
+    expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
+    expect(screen.queryByText(/can create and edit dashboards can make/)).toBeNull();
+    answer();
+    await screen.findByRole("button", { name: "Add a widget" });
+    expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
+  });
+
   describe("when the member may not create dashboards", () => {
     /** @scenario "From LangWatch: a member who may not create dashboards gets no edit control" */
     it("offers no edit control, and a widget's menu holds only Export CSV", async () => {
@@ -205,7 +228,7 @@ describe("given a member opens a From LangWatch board", () => {
       expect(screen.queryByRole("button", { name: "Use this template" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
       expect(
-        screen.getByText(
+        await screen.findByText(
           "Members who can create and edit dashboards can make their own copy to edit it.",
         ),
       ).toBeInTheDocument();
@@ -254,7 +277,9 @@ describe("given a member opens a From LangWatch board", () => {
 
       expect(await screen.findByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
-      expect(screen.getByText(/can create and edit dashboards can make/)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/can create and edit dashboards can make/),
+      ).toBeInTheDocument();
     });
 
     it("keeps Make a copy disabled until the saved boards have loaded", async () => {
