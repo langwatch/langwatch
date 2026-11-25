@@ -216,7 +216,7 @@ jobs:
             </users>
           </clickhouse>
           XML
-          curl -fsS -u default:ci_password http://localhost:8123/ --data-binary "SYSTEM RELOAD CONFIG"
+          curl -fsS "${CLICKHOUSE_BASE_URL}/" --data-binary "SYSTEM RELOAD CONFIG"
 
       # Head's upgrade, as its pre-roll Job runs it: the schema plus the ledger a
       # gated base api reads before it serves (specs/upgrade/entry-points.feature).
@@ -587,7 +587,7 @@ jobs:
             </users>
           </clickhouse>
           XML
-          curl -fsS -u default:ci_password http://localhost:8123/ --data-binary "SYSTEM RELOAD CONFIG"
+          curl -fsS "${CLICKHOUSE_BASE_URL}/" --data-binary "SYSTEM RELOAD CONFIG"
 
       - name: Migrate with head's tasks
         env:
