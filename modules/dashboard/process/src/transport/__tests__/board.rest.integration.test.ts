@@ -437,7 +437,10 @@ describe("given two Dashboards boards, one holding a widget", () => {
   it("stores application on a new query, a picked set as sent, and keeps it through a rename", async () => {
     const { other, send } = await twoBoards();
     const widgets = `${BOARDS}/${other.id}/widgets`;
-    const query = { name: "turns", sql: "SELECT count() FROM traces" };
+    const query = {
+      name: "turns",
+      sql: "SELECT count() FROM trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)}",
+    };
 
     const created = await send("dashboards", widgets, {
       method: "POST",

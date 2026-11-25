@@ -21,10 +21,12 @@ import {
   LangWatchQLViewStatementsService,
   SHIPPED_LWQL_DEDUP,
 } from "../langwatch-ql-view-statements.service.ts";
+import { LangWatchQLViewTwinStatementsService } from "../langwatch-ql-view-twin-statements.service.ts";
 
 const accessModel = LangWatchQLAccessModelService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();
+const twinStatements = LangWatchQLViewTwinStatementsService.create();
 const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 
 /** The views plus the access model's policies and grants, as a SQL-mode boot runs them. */
@@ -512,7 +514,7 @@ describe("given the views pinned to latest-in-order", () => {
   it("floors trace_metrics' read of trace_analytics on OccurredAt before LIMIT 1 BY", () => {
     const view = pickLwqlViewByName("trace_metrics");
     if (!view) throw new Error("trace_metrics is not in the catalog");
-    const twins = viewStatements.flooredViewStatements({
+    const twins = twinStatements.flooredViewStatements({
       names: NAMES,
       sourceDatabase: SOURCE_DATABASE,
       view,
@@ -537,7 +539,7 @@ describe("given the views pinned to latest-in-order", () => {
       if (!view) throw new Error(`${name} is not in the catalog`);
 
       expect(
-        viewStatements.flooredViewStatements({
+        twinStatements.flooredViewStatements({
           names: NAMES,
           sourceDatabase: SOURCE_DATABASE,
           view,
@@ -592,7 +594,7 @@ describe("given the views over trace_evaluation_analytics", () => {
       dedup: SHIPPED_LWQL_DEDUP,
     });
   const twins = (view: LangWatchQLViewDefinition) =>
-    viewStatements.flooredViewStatements({
+    twinStatements.flooredViewStatements({
       names: NAMES,
       sourceDatabase: SOURCE_DATABASE,
       view,

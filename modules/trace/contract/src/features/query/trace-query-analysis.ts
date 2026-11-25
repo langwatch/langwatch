@@ -184,18 +184,12 @@ function isAnyOfGroup({ node, negated }: { node: LiqeQuery; negated: boolean }):
   return visit(node, negated) && fields.size === 1;
 }
 
-function displayStateOf({
-  negated,
-  grouped,
-}: {
-  negated: boolean;
-  grouped: boolean;
-}): FacetDisplayState {
-  if (grouped) return "grouped";
-  return negated ? "exclude" : "include";
+function signedKey({ key, negated }: { key: string; negated: boolean }): string {
+  return `${negated ? "-" : "+"}${key}`;
 }
 
-function markDisplayStates({
+/** Per signed key (`+field|value`, `-field|value`): whether every occurrence of it is grouped. */
+function markGroupedOccurrences({
   node,
   negated,
   grouped,
@@ -204,18 +198,18 @@ function markDisplayStates({
   node: LiqeQuery;
   negated: boolean;
   grouped: boolean;
-  map: Map<string, FacetDisplayState>;
+  map: Map<string, boolean>;
 }): void {
   switch (node.type) {
     case "Tag": {
-      // A term every result must match keeps its mark even where it also sits in a group.
       for (const key of rowKeysNamedBy(node)) {
-        if (!(grouped && map.has(key))) map.set(key, displayStateOf({ negated, grouped }));
+        const signed = signedKey({ key, negated });
+        map.set(signed, (map.get(signed) ?? true) && grouped);
       }
       return;
     }
     case "UnaryOperator":
-      markDisplayStates({
+      markGroupedOccurrences({
         node: node.operand,
         negated: negated !== isNegation(node.operator),
         grouped,
@@ -223,14 +217,14 @@ function markDisplayStates({
       });
       return;
     case "ParenthesizedExpression":
-      markDisplayStates({ node: node.expression, negated, grouped, map });
+      markGroupedOccurrences({ node: node.expression, negated, grouped, map });
       return;
     case "LogicalExpression": {
       // Under a NOT, AND acts as OR (De Morgan), as in `facetReach`.
       const actsAsOr = (node.operator.operator === "OR") !== negated;
       const inGroup = grouped || (actsAsOr && !isAnyOfGroup({ node, negated }));
-      markDisplayStates({ node: node.left, negated, grouped: inGroup, map });
-      markDisplayStates({ node: node.right, negated, grouped: inGroup, map });
+      markGroupedOccurrences({ node: node.left, negated, grouped: inGroup, map });
+      markGroupedOccurrences({ node: node.right, negated, grouped: inGroup, map });
       return;
     }
     default:
@@ -240,12 +234,13 @@ function markDisplayStates({
 
 /**
  * The signed keys (`+field|value`, `-field|value`) every result of a subtree must match: both
- * sides of an AND, only what both sides of an OR share (NOT swaps them, as in `markDisplayStates`).
+ * sides of an AND, only what both sides of an OR share (NOT swaps them, as in
+ * `markGroupedOccurrences`).
  */
 function requiredSignedKeys({ node, negated }: { node: LiqeQuery; negated: boolean }): Set<string> {
   switch (node.type) {
     case "Tag":
-      return new Set(rowKeysNamedBy(node).map((key) => `${negated ? "-" : "+"}${key}`));
+      return new Set(rowKeysNamedBy(node).map((key) => signedKey({ key, negated })));
     case "UnaryOperator":
       return requiredSignedKeys({
         node: node.operand,
@@ -265,17 +260,37 @@ function requiredSignedKeys({ node, negated }: { node: LiqeQuery; negated: boole
 }
 
 /**
- * What each sidebar row shows, keyed by `${field}|${value}`. A term keeps include or exclude only
- * when every result must match it; one a group makes optional is "grouped" (#9810). Display only:
- * clicks still read `getFacetValueState`.
+ * What each sidebar row shows, keyed by `${field}|${value}`. Its sign is the one a click reads
+ * (`getFacetValueState`: a plain term beats a negated one); it is include or exclude when every
+ * result must match the term with that sign, else grouped (#9810, #9863).
  */
 export function buildFacetDisplayLookup(ast: LiqeQuery): ReadonlyMap<string, FacetDisplayState> {
+  const grouped = new Map<string, boolean>();
+  markGroupedOccurrences({ node: ast, negated: false, grouped: false, map: grouped });
+  const required = requiredSignedKeys({ node: ast, negated: false });
   const map = new Map<string, FacetDisplayState>();
-  markDisplayStates({ node: ast, negated: false, grouped: false, map });
-  for (const signed of requiredSignedKeys({ node: ast, negated: false })) {
-    map.set(signed.slice(1), signed.startsWith("-") ? "exclude" : "include");
+  for (const signed of grouped.keys()) {
+    const key = signed.slice(1);
+    const negated = !grouped.has(signedKey({ key, negated: false }));
+    const asSigned = signedKey({ key, negated });
+    const inGroup = !required.has(asSigned) && grouped.get(asSigned) === true;
+    if (inGroup) map.set(key, negated ? "grouped-exclude" : "grouped-include");
+    else map.set(key, negated ? "exclude" : "include");
   }
   return map;
+}
+
+/** One row's display state from a lookup, neutral when the query does not name it. */
+export function displayStateFor({
+  lookup,
+  field,
+  value,
+}: {
+  lookup: ReadonlyMap<string, FacetDisplayState>;
+  field: string;
+  value: string;
+}): FacetDisplayState {
+  return lookup.get(`${field}|${value}`) ?? "neutral";
 }
 
 /** The explicit `field:[a TO b]` range on one Tag, or none when it is not one. */

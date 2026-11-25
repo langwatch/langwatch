@@ -27,8 +27,14 @@ export interface SearchFieldMeta {
 
 export type FacetState = "neutral" | "include" | "exclude";
 
-/** What a sidebar row shows: a term not every result must match is "grouped" (#9810). */
-export type FacetDisplayState = FacetState | "grouped";
+/** A sidebar row: a term a group makes optional is grouped, signed as in the query (#9810). */
+export type FacetDisplayState = FacetState | "grouped-include" | "grouped-exclude";
+
+export function isGroupedState(
+  state: FacetDisplayState,
+): state is "grouped-include" | "grouped-exclude" {
+  return state === "grouped-include" || state === "grouped-exclude";
+}
 
 export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
   origin: {
