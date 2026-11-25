@@ -1171,6 +1171,7 @@ export interface LwqlPrismaRows {
     readonly extraHeaders: "Json?";
     readonly customModels: "Json?";
     readonly customEmbeddingsModels: "Json?";
+    readonly lastListedModelIds: "Json?";
     readonly deploymentMapping: "Json?";
     readonly rateLimitRpm: "Int?";
     readonly rateLimitTpm: "Int?";

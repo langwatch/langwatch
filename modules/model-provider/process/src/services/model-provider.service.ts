@@ -21,6 +21,7 @@ import {
   type ModelDefaultSnapshot,
   type ModelDefaultSnapshotInput,
   type ModelProvider,
+  type ModelProviderSave,
   type ModelProviderApiKeyValidation,
   type ModelProviderCredentialVerdict,
   type ModelProviderApiKeyValidationInput,
@@ -57,6 +58,7 @@ import { ModelProviderDefaultsWriteService } from "../features/defaults/services
 import { ModelProviderDefaultsService } from "../features/defaults/services/model-provider-defaults.service.ts";
 import { ModelProviderOnboardingDefaultsService } from "../features/defaults/services/model-provider-onboarding-defaults.service.ts";
 import { ModelProviderCostsService } from "../features/model-cost/services/model-provider-costs.service.ts";
+import type { ModelProviderModelImportService } from "../features/served-models/services/model-provider-model-import.service.ts";
 import type { ModelCostRepository } from "../repositories/model-cost.repository.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
@@ -94,6 +96,8 @@ interface ModelProviderServiceOptions {
   ids: ModelProviderIdService;
   /** The own-decision-model flag (ADR-182 decision 4). */
   isOwnDecisionModelAllowed: OwnDecisionModelGate;
+  /** Imports an OpenAI-compatible provider's listed models on save; absent imports nothing. */
+  modelImport?: ModelProviderModelImportService;
 }
 
 /**
@@ -157,6 +161,7 @@ export class ModelProviderService {
       }),
       ids: options.ids,
       scopes,
+      modelImport: options.modelImport,
     });
     this.costs = ModelProviderCostsService.create({
       costs: options.costs,
@@ -286,11 +291,11 @@ export class ModelProviderService {
     return this.execution.prepare(input);
   }
 
-  upsert(input: ModelProviderWriteInput): Promise<ModelProvider> {
+  upsert(input: ModelProviderWriteInput): Promise<ModelProviderSave> {
     return this.commands.upsert(input);
   }
 
-  upsertByProviderKey(input: ModelProviderWriteInput): Promise<ModelProvider> {
+  upsertByProviderKey(input: ModelProviderWriteInput): Promise<ModelProviderSave> {
     return this.commands.upsertByProviderKey(input);
   }
 

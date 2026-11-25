@@ -3,6 +3,7 @@ import {
   modelProviders,
   type ModelProviderEditorValue as MaybeStoredModelProvider,
   type CustomModelEntry,
+  type ModelImportOutcome,
 } from "@langwatch/model-provider-contract";
 import { useCallback, useState } from "react";
 import { type ZodError, z } from "zod";
@@ -120,6 +121,40 @@ function optionalScopes(scopes: ProviderScope[] | undefined): ProviderScope[] | 
 }
 
 /** Empty is how the operator clears a name, and the server reads absence for that. */
+/** Tells the user what the save imported; nothing when the provider has no listing or no new model. */
+function modelImportToast({
+  modelImport,
+  providerName,
+}: {
+  modelImport: ModelImportOutcome | undefined;
+  providerName: string;
+}): ModelProviderToast | null {
+  if (!modelImport) return null;
+  if (modelImport.status === "failed") {
+    return {
+      title: "Could not list models from this provider",
+      description: "The provider was saved. Add its models by hand.",
+      type: "warning",
+      duration: 6000,
+    };
+  }
+  if (modelImport.status === "skipped") {
+    return {
+      title: "Models were not imported this time",
+      description:
+        "The provider was saved. Too many provider checks ran in the last minute. Save again in a minute to import its models.",
+      type: "info",
+      duration: 6000,
+    };
+  }
+  if (modelImport.added === 0) return null;
+  return {
+    title: `Imported ${modelImport.added} ${modelImport.added === 1 ? "model" : "models"} from ${providerName}`,
+    type: "success",
+    duration: 4000,
+  };
+}
+
 function nameToSend(name: string | undefined): string | undefined {
   const trimmed = (name ?? "").trim();
 
@@ -515,7 +550,7 @@ export function useProviderFormSubmit({
         return;
       }
 
-      await updateMutation.mutateAsync({
+      const saved = await updateMutation.mutateAsync({
         id: provider.id,
         projectId,
         organizationId,
@@ -562,6 +597,14 @@ export function useProviderFormSubmit({
         type: "success",
         duration: 3000,
       });
+      const importToast = modelImportToast({
+        modelImport: saved?.modelImport,
+        providerName:
+          nameToSend(name) ??
+          modelProviders[provider.provider as keyof typeof modelProviders]?.name ??
+          provider.provider,
+      });
+      if (importToast) toaster.create(importToast);
       onSuccess?.();
     } catch (err) {
       onError?.(err);
