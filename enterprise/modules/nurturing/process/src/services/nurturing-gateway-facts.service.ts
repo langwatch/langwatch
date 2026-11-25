@@ -2,6 +2,7 @@
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import type {
   RecordBudgetCrossingCommandData,
+  RecordUnbudgetedSpendCommandData,
   RecordVkFirstRequestCommandData,
   RecordVkLifecycleCommandData,
 } from "@langwatch/gateway-contract";
@@ -14,10 +15,11 @@ import {
   keyBudgetPeriodEndOf,
   keyBudgetThresholdSignal,
   keyFirstRequestSignal,
-  pickKeyRecipient,
+  spendWithoutBudgetSignal,
   virtualKeyCreatedSignal,
 } from "../rules/nurturing-gateway-facts.rules.ts";
 import { isLiveKey, isPersonKey } from "../rules/nurturing-virtual-key.rules.ts";
+import { NurturingFactRecipientService } from "./nurturing-fact-recipient.service.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 
 type GatewayFactsDependencies = Readonly<{
@@ -50,8 +52,8 @@ export const KEY_FIRST_REQUEST_COPY_ATTEMPTS = 13;
 
 /**
  * Turns gateway's key facts into one person's signal, reading only nurturing's own copies: a
- * created person's key, its first request and its budget's crossings. Machine-owned keys, unknown
- * keys and keys nobody can be found for send nothing.
+ * created person's key, its first request and its budget's crossings, and an organization's
+ * unbudgeted spend. Machine-owned keys, unknown keys and keys nobody can be found for send nothing.
  * Spec: enterprise/modules/nurturing/specs/gateway-facts.feature
  */
 export class NurturingGatewayFactsService {
@@ -59,7 +61,11 @@ export class NurturingGatewayFactsService {
     return new NurturingGatewayFactsService(dependencies);
   }
 
-  private constructor(private readonly dependencies: GatewayFactsDependencies) {}
+  private readonly recipients: NurturingFactRecipientService;
+
+  private constructor(private readonly dependencies: GatewayFactsDependencies) {
+    this.recipients = NurturingFactRecipientService.create(dependencies);
+  }
 
   /** Only a created USER key is told; a rotate, disable, enable or revoke only folds the copy. */
   async virtualKeyCreated({
@@ -154,35 +160,38 @@ export class NurturingGatewayFactsService {
   }
 
   /**
-   * The key's holder, its creator or the organization's admin, whoever is a current member and
-   * not erased. An erased person is dropped before the choice, so is never warned of as passed
-   * over: a raw fact still names them, and a join racing their erasure can leave a member row
-   * until its re-check.
+   * An organization's week of spend on keys no budget applies to, told to its admin while they are
+   * a current member and not erased; the keys' holders are not told, the budget being the admin's.
    */
+  async unbudgetedSpendRecorded({
+    data,
+    deliver,
+  }: Readonly<{ data: RecordUnbudgetedSpendCommandData; deliver: Deliver }>): Promise<void> {
+    const userId = await this.recipientOf({
+      organizationId: data.organization_id,
+      virtualKeyId: null,
+      holders: [],
+    });
+    if (!userId) {
+      return this.noRecipient({ virtualKeyId: null, fact: "gateway_spend_without_budget" });
+    }
+    await deliver(spendWithoutBudgetSignal({ data, userId }));
+  }
+
+  /** The key's holder, its creator or the organization's admin, whoever is a current member. */
   private async recipientOf({
     organizationId,
     virtualKeyId,
-    holders: named,
+    holders,
   }: Readonly<{
     organizationId: string;
-    virtualKeyId: string;
+    /** Null for an organization's fact, which names no one key. */
+    virtualKeyId: string | null;
     holders: readonly (string | null)[];
   }>): Promise<string | null> {
-    const isSomeone = (userId: string | null): userId is string => userId !== null;
-    const admin = await this.dependencies.admins.adminOf({ organizationId });
-    const erased = new Set(
-      await this.dependencies.erasedUsers.findErased({ userIds: named.filter(isSomeone) }),
-    );
-    const holders = named.map((userId) =>
-      isSomeone(userId) && erased.has(userId) ? null : userId,
-    );
-    const userIds = [...holders, admin.kind === "admin" ? admin.userId : null].filter(isSomeone);
-    const memberships = await this.dependencies.members.findMembershipsOfUsers({ userIds });
-    const { recipient, passedOverWithoutRow } = pickKeyRecipient({
+    const { recipient, passedOverWithoutRow } = await this.recipients.recipientOf({
       organizationId,
-      holders,
-      memberships,
-      admin,
+      named: holders,
     });
     if (passedOverWithoutRow.length > 0) {
       this.dependencies.logger.warn(
@@ -196,7 +205,7 @@ export class NurturingGatewayFactsService {
   private noRecipient({
     virtualKeyId,
     fact,
-  }: Readonly<{ virtualKeyId: string; fact: string }>): void {
+  }: Readonly<{ virtualKeyId: string | null; fact: string }>): void {
     this.dependencies.logger.debug(
       { virtualKeyId, fact, reason: "no_recipient" },
       "a gateway key fact finds no current member to tell, the admin included; nothing is sent",

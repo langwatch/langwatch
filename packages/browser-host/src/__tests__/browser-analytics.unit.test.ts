@@ -4,8 +4,9 @@
  * react-contextual-analytics sent before it was evicted.
  * @vitest-environment jsdom
  */
+import { trace } from "@opentelemetry/api";
 import type { PostHog } from "posthog-js";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBrowserUiAnalytics } from "../telemetry/browser-analytics.ts";
 
@@ -222,5 +223,93 @@ describe("who the events are about", () => {
       isDevelopment: true,
     });
     expect(() => consoleOnly.identify({ id: "user_1", email: null })).not.toThrow();
+  });
+});
+
+describe("a crash a screen caught", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("given a SaaS deployment with PostHog registered", () => {
+    it("goes to PostHog as an exception with its properties, not as an event", () => {
+      const capture = vi.fn();
+      const captureException = vi.fn();
+      const error = new Error("render crash");
+
+      createBrowserUiAnalytics({
+        isSaaS: true,
+        posthogClient: fakePostHog({ capture, captureException } as Partial<PostHog>),
+        isGtagReady: false,
+        isDevelopment: false,
+      }).captureException({ error, properties: { surface: "lwql_chart", widgetId: "w-1" } });
+
+      expect(captureException.mock.calls[0]?.[0]).toMatchObject({ message: "render crash" });
+      expect(captureException.mock.calls[0]?.[1]).toEqual({
+        surface: "lwql_chart",
+        widgetId: "w-1",
+      });
+      expect(capture).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("names the trace and span active where the crash was caught, over any property", () => {
+      const captureException = vi.fn();
+      const traceId = "0af7651916cd43dd8448eb211c80319c";
+      const spanId = "b7ad6b7169203331";
+      vi.spyOn(trace, "getActiveSpan").mockReturnValue(
+        trace.wrapSpanContext({ traceId, spanId, traceFlags: 1 }),
+      );
+
+      createBrowserUiAnalytics({
+        isSaaS: true,
+        posthogClient: fakePostHog({ captureException } as Partial<PostHog>),
+        isGtagReady: false,
+        isDevelopment: false,
+      }).captureException({
+        error: "render crash",
+        properties: { surface: "lwql_chart", trace_id: "spoofed" },
+      });
+
+      expect(captureException.mock.calls[0]?.[1]).toEqual({
+        surface: "lwql_chart",
+        trace_id: traceId,
+        span_id: spanId,
+      });
+    });
+
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("masks a token the crash's message quotes before it reaches PostHog", () => {
+      const captureException = vi.fn();
+      const error = new Error("fetch failed with Bearer sk-lw-abcdef0123456789abcdef");
+      error.stack = `Error: ${error.message}\n    at Widget (https://app.example.com/chunk.js:1:2)`;
+
+      createBrowserUiAnalytics({
+        isSaaS: true,
+        posthogClient: fakePostHog({ captureException } as Partial<PostHog>),
+        isGtagReady: false,
+        isDevelopment: false,
+      }).captureException({ error });
+
+      const sent = captureException.mock.calls[0]?.[0] as Error;
+      expect(sent.message).toBe("fetch failed with Bearer [SECRET]");
+      expect(sent.stack).not.toContain("abcdef0123456789");
+      expect(sent.stack).toContain("https://app.example.com/chunk.js:1:2");
+    });
+  });
+
+  describe("given a self-hosted deployment", () => {
+    it("reaches no destination and does not throw", () => {
+      const captureException = vi.fn();
+
+      createBrowserUiAnalytics({
+        isSaaS: false,
+        posthogClient: fakePostHog({ captureException } as Partial<PostHog>),
+        isGtagReady: false,
+        isDevelopment: false,
+      }).captureException({ error: new Error("render crash") });
+
+      expect(captureException).not.toHaveBeenCalled();
+    });
   });
 });

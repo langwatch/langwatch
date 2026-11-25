@@ -15,7 +15,7 @@ import type {
   GovernanceOcsfEventSink,
 } from "../../../../repositories/governance.repositories.ts";
 import { MemoryOcsfEventsRepository } from "../../../../repositories/memory/memory.ocsf-events.repository.ts";
-import type { SecurityLakeDecodeLimits } from "../security-lake-parquet.service.ts";
+import type { SecurityLakeDecodeLimits } from "../../rules/security-lake-parquet.rules.ts";
 import {
   SecurityLakeReaderService,
   type SecurityLakeRunBudget,
@@ -294,6 +294,19 @@ describe("SecurityLakeReaderService", () => {
       expect(result.poison[0]).toMatchObject({ key: MGMT_KEY });
       expect(result.poison[0]!.reason.length).toBeGreaterThan(0);
       expect(queue.pending()).toEqual([]);
+    });
+
+    /** @scenario A corrupt object's poison reason says it is not a readable Parquet file */
+    it("records the reason as an unreadable Parquet file rather than an AWS failure", async () => {
+      const { queue, objects, read } = setup({ config: { maxReceives: 1 } });
+      objects.seedBytes({ bucket: BUCKET, key: MGMT_KEY, bytes: new TextEncoder().encode("nope") });
+      queue.send({ body: notification(MGMT_KEY) });
+
+      const result = await read();
+
+      expect(result.poison).toHaveLength(1);
+      expect(result.poison[0]!.reason).toMatch(/^The object is not a readable Parquet file/);
+      expect(result.poison[0]!.reason).not.toMatch(/AWS/);
     });
   });
 

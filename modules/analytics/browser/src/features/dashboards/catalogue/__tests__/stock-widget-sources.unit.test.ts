@@ -112,3 +112,25 @@ describe("given the stock widgets of the catalogue", () => {
     expect(module).not.toHaveProperty("CATALOGUE_QUERY_SOURCES");
   });
 });
+
+/** The views that keep no origin, so a widget reading them would count every source. */
+const ORIGIN_LESS_ROLLUPS = ["model_usage_by_minute", "trace_metrics_by_minute"];
+
+describe("given a stock widget that keeps to its sources", () => {
+  /** @scenario "A widget that keeps to its sources reads no view without an origin" */
+  it("reads no per-minute rollup in any of its queries", () => {
+    const keeping = widgets.filter(({ definition }) =>
+      definition.queries.some(({ sql }) => readsSourcesParameter(sql)),
+    );
+
+    expect(keeping.length).toBeGreaterThan(0);
+    for (const { key, definition } of keeping) {
+      for (const { name, sql } of definition.queries.filter((q) => q.name !== PRESENCE_QUERY)) {
+        expect(
+          namedViews(sql).filter((view) => ORIGIN_LESS_ROLLUPS.includes(view)),
+          `${key}/${name}`,
+        ).toEqual([]);
+      }
+    }
+  });
+});

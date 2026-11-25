@@ -3555,6 +3555,15 @@
           "documentation": "Department assignment for spend attribution (the people lens).\nSingle-valued, org-scoped, accounting-only (never gates access).\nPlain column ref (relationMode=\"prisma\"); the service validates the\nid belongs to this org. See departments.feature."
         },
         {
+          "name": "billingOnly",
+          "columnName": "billingOnly",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "A Billing-only member (ADR-205): role EXTERNAL, the Billing grant, no team and\nno seat. Any role change clears it. See billing-only-invite.feature."
+        },
+        {
           "name": "disabledAt",
           "columnName": "disabledAt",
           "type": "DateTime",
@@ -8098,6 +8107,15 @@
           "isList": false,
           "isOptional": true,
           "documentation": ""
+        },
+        {
+          "name": "billingOnly",
+          "columnName": "billingOnly",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Invites the person who pays with the Billing grant and no seat (ADR-205)."
         },
         {
           "name": "createdAt",
@@ -21619,7 +21637,7 @@
     {
       "name": "NurturingUncopiedProject",
       "tableName": "NurturingUncopiedProject",
-      "documentation": "A project nurturing saw traces of with no placement copy, and when it first did: every worker\nretries its trace batches only within one window from then, across restarts. Deleted when the\ncopy lands.",
+      "documentation": "retired: unread since v3.28.0. The trace-day folds count a trace with no placement copy, so no\nretry clock reads or writes this table; an operator step may drop it once old writers are gone.",
       "primaryKey": [
         "projectId"
       ],
@@ -22095,7 +22113,7 @@
     {
       "name": "NurturingProjectUsageView",
       "tableName": "NurturingProjectUsageView",
-      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per\norganization for the per-email traits. Traces are counted in NurturingProjectTraceDay.",
+      "documentation": "Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario\nand simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per\norganization for the per-email traits. Traces are counted in NurturingProjectTraceDayCount.",
       "primaryKey": [
         "projectId",
         "owner"
@@ -22160,7 +22178,7 @@
     {
       "name": "NurturingProjectTraceDay",
       "tableName": "NurturingProjectTraceDay",
-      "documentation": "Nurturing's own trace counts from trace's span_received and trace_failed (ARCHITECTURE §9), a\nroot span being one trace, one row per project and UTC day of append time, incremented in place\nby each batch. A redelivered batch can count a trace twice; accepted (issue 9378). Kept 30 days.",
+      "documentation": "retired: unread since v3.28.0. Replaced by NurturingProjectTraceDayCount, which the trace-day\npeer folds write and a replay rebuilds; an operator step may drop it once old writers are gone.",
       "primaryKey": [
         "projectId",
         "day"
@@ -22219,6 +22237,99 @@
           "isList": false,
           "isOptional": true,
           "documentation": "Append time of the newest trace_failed."
+        }
+      ]
+    },
+    {
+      "name": "NurturingProjectTraceDayCount",
+      "tableName": "NurturingProjectTraceDayCount",
+      "documentation": "Nurturing's own trace counts (ARCHITECTURE §9), one row per project, UTC day of append time and\nsource: `spans` from trace's span_received peer fold (a customer root span is one trace),\n`failures` from trace_failed's. Each fold owns its rows, so the two never overwrite each other;\nreaders sum a day's sources. Rebuilt by a projection replay. Kept 30 days.",
+      "primaryKey": [
+        "projectId",
+        "day",
+        "source"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "day",
+          "columnName": "day",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "UTC `YYYY-MM-DD` of the facts' append time."
+        },
+        {
+          "name": "source",
+          "columnName": "source",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The peer fold that wrote the row: `spans` or `failures`."
+        },
+        {
+          "name": "traceCount",
+          "columnName": "traceCount",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "errorCount",
+          "columnName": "errorCount",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastTraceAt",
+          "columnName": "lastTraceAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Append time of the newest root span."
+        },
+        {
+          "name": "lastFailedTraceAt",
+          "columnName": "lastFailedTraceAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Append time of the newest trace_failed."
+        },
+        {
+          "name": "appliedEventIds",
+          "columnName": "appliedEventIds",
+          "type": "String",
+          "kind": "scalar",
+          "isList": true,
+          "isOptional": false,
+          "documentation": "The event ids of the last delivery folded in, so a redelivery folds once."
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "A row of another version reads as undecodable and is left out of the read."
         }
       ]
     },

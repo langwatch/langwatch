@@ -187,6 +187,8 @@ const organizationApiCreateInvitesInputSchemaDefinition = z.object({
         )
         .optional(),
       role: organizationApiMemberRoleSchema,
+      /** The person who pays: the Billing grant, no team and no seat (ADR-205). */
+      billingOnly: z.boolean().optional(),
     }),
   ),
 });

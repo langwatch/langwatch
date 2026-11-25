@@ -8,9 +8,11 @@ import {
 } from "@langwatch/eventing";
 import {
   GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+  GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
   type GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
   type RecordBudgetCrossingCommandData,
+  type RecordUnbudgetedSpendCommandData,
   type RecordVkFirstRequestCommandData,
   type RecordVkLifecycleCommandData,
 } from "@langwatch/gateway-contract";
@@ -43,6 +45,7 @@ import {
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingGatewayFactsService } from "../../services/nurturing-gateway-facts.service.ts";
+import { NurturingGovernanceFactsService } from "../../services/nurturing-governance-facts.service.ts";
 import { NurturingMemberFactsService } from "../../services/nurturing-member-facts.service.ts";
 import { NurturingUserErasureService } from "../../services/nurturing-user-erasure.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
@@ -115,10 +118,30 @@ export function firstRequestFact(
   };
 }
 
+/** Gateway's fact that org-1's person keys spent without a budget in ISO week 2026-W48. */
+export function unbudgetedSpendFact(
+  overrides: Partial<RecordUnbudgetedSpendCommandData> = {},
+): RecordUnbudgetedSpendCommandData {
+  return {
+    tenantId: "project-1",
+    organization_id: ORGANIZATION_ID,
+    iso_week: "2026-W48",
+    keys: [
+      { virtual_key_id: "vk_1", name: "Support bot key", spent_usd: "42.5" },
+      { virtual_key_id: "vk_2", name: "CI key", spent_usd: "7" },
+    ],
+    key_count: 2,
+    total_spent_usd: "49.5",
+    occurred_at: 6_000,
+    ...overrides,
+  };
+}
+
 type GatewayFact =
   | { type: typeof GATEWAY_VK_LIFECYCLE_EVENT_TYPE; data: RecordVkLifecycleCommandData }
   | { type: typeof GATEWAY_BUDGET_CROSSING_EVENT_TYPE; data: RecordBudgetCrossingCommandData }
-  | { type: typeof GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE; data: RecordVkFirstRequestCommandData };
+  | { type: typeof GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE; data: RecordVkFirstRequestCommandData }
+  | { type: typeof GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE; data: RecordUnbudgetedSpendCommandData };
 
 /** The fact's subject and what happened to it: one event id per distinct fact. */
 function subjectOf(fact: GatewayFact): string {
@@ -127,6 +150,9 @@ function subjectOf(fact: GatewayFact): string {
   }
   if (fact.type === GATEWAY_BUDGET_CROSSING_EVENT_TYPE) {
     return `budget:${fact.data.budget_id}:${fact.data.kind}`;
+  }
+  if (fact.type === GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE) {
+    return `org:${fact.data.organization_id}:${fact.data.iso_week}`;
   }
   return `vk:${fact.data.virtual_key_id}:first_request`;
 }
@@ -164,9 +190,9 @@ function registeredCopyLanes({
   const pipeline = buildNurturingProjectUsagePipeline({
     store: others.projectUsage,
     evaluationDays: others.evaluationDays,
+    traceDays: others.traceDays,
     copies: {
       placements: others.placements,
-      copyLanded: async () => undefined,
       organizationsCreated: others.organizationsCreated,
       admins: others.milestones,
       members,
@@ -305,15 +331,16 @@ function recordingCustomerIo() {
 }
 
 /**
- * Nurturing as the app composes it for gateway's facts, over its own memory copies and a
- * recording Customer.io: the key copy's and member copy's subscribers, then every nurturing peer
- * lane on the type.
+ * Nurturing as the app composes it for gateway's and governance's facts, over its own memory
+ * copies and a recording Customer.io: the key copy's and member copy's subscribers, then every
+ * nurturing peer lane on the type.
  * `user-admin` is the organization's copied admin and a current member; `claims` may be
- * Redis-backed.
+ * Redis-backed, and `organizationId` (org-1 by default) unique to a run that shares them.
  */
 export async function gatewayFactsOver({
   claims = MemoryNurturingClaimRepository.create(),
-}: Readonly<{ claims?: NurturingClaimRepository }> = {}) {
+  organizationId = ORGANIZATION_ID,
+}: Readonly<{ claims?: NurturingClaimRepository; organizationId?: string }> = {}) {
   const customerIo = recordingCustomerIo();
   // One mark set for every copy and send, as the app composes them.
   const erasedUsers = MemoryNurturingErasedUserRepository.create();
@@ -321,13 +348,13 @@ export async function gatewayFactsOver({
   const members = MemoryNurturingOrganizationMemberRepository.create({ erasedUsers });
   const milestones = MemoryNurturingMilestonesRepository.create({ erasedUsers });
   await milestones.recordOrganization({
-    organizationId: ORGANIZATION_ID,
+    organizationId,
     adminUserId: ADMIN_USER_ID,
     seeded: false,
   });
   // The admin hears a key only as a current member, so the copy holds their membership.
   await members.recordMembershipChange({
-    organizationId: ORGANIZATION_ID,
+    organizationId,
     userId: ADMIN_USER_ID,
     change: "joined",
     at: 1,
@@ -355,6 +382,12 @@ export async function gatewayFactsOver({
     admins: memberFacts,
     logger,
   });
+  const governanceFacts = NurturingGovernanceFactsService.create({
+    erasedUsers,
+    members,
+    admins: memberFacts,
+    logger,
+  });
   const userErasure = NurturingUserErasureService.create({
     personalProjects: MemoryNurturingPersonalProjectRepository.create(),
     organizations: milestones,
@@ -372,6 +405,9 @@ export async function gatewayFactsOver({
     virtualKeyCreated: (input) => gatewayFacts.virtualKeyCreated(input),
     keyBudgetCrossed: (input) => gatewayFacts.keyBudgetCrossed(input),
     keyFirstRequested: (input) => gatewayFacts.keyFirstRequested(input),
+    unbudgetedSpendRecorded: (input) => gatewayFacts.unbudgetedSpendRecorded(input),
+    governanceSourceConnected: (input) => governanceFacts.sourceConnected(input),
+    governanceSourceLive: (input) => governanceFacts.sourceWentLive(input),
   });
   const toSubscribers = liveSubscribersOf(pipeline);
   // The key and member copies as the usage pipeline registers them: parse, then store.
@@ -388,7 +424,7 @@ export async function gatewayFactsOver({
   /** A current member of the organization since `at`, as an owner's join fact records one. */
   async function joined(userId: string, at = 1): Promise<void> {
     await members.recordMembershipChange({
-      organizationId: ORGANIZATION_ID,
+      organizationId,
       userId,
       change: "joined",
       at,
@@ -397,7 +433,7 @@ export async function gatewayFactsOver({
   /** A member disabled at `at`: the copy keeps the row, so the person is no current member. */
   async function disabled(userId: string, at = 2): Promise<void> {
     await members.recordMembershipChange({
-      organizationId: ORGANIZATION_ID,
+      organizationId,
       userId,
       change: "left",
       at,

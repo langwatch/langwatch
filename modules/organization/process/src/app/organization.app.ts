@@ -1118,6 +1118,15 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
         admission,
       })
       .catch((error: unknown) => this.#infrastructure.signals.reportError(error));
+    // A held seat is recorded when it is given (admitWaitingMember); a repeat call adds nothing.
+    if (admission.outcome === "created" && !admission.pending) {
+      this.#infrastructure.lifecycle.memberAdmitted({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        role: admission.seat,
+        via: "create_membership",
+      });
+    }
     return admission;
   }
 

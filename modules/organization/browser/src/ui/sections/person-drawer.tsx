@@ -101,7 +101,7 @@ function PersonDetail({
         image={person.user.image}
         badges={
           <>
-            {person.role === "EXTERNAL" ? (
+            {person.role === "EXTERNAL" && !person.billingOnly ? (
               <Badge colorPalette="gray" size="sm">
                 Lite Member
               </Badge>
@@ -175,6 +175,7 @@ function PersonDetail({
           organizationId={organizationId}
           userId={person.userId}
           memberRole={person.role}
+          memberBillingOnly={person.billingOnly === true}
           canManage={canManage}
           isCurrentUser={isSelf}
         />

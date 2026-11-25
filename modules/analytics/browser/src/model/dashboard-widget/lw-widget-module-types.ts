@@ -105,7 +105,7 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     stacked?: boolean;
     projectionFrom?: string | number;
     colors?: readonly string[];
-    height?: number;
+    height?: number | string;
     /** How the hover prints a value. */
     format?: MetricFormat;
     /**
@@ -120,14 +120,14 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     series: readonly string[];
     projectionFrom?: string | number;
     colors?: readonly string[];
-    height?: number;
+    height?: number | string;
   }
   export interface GroupedBarsProps {
     data: readonly Row[];
     x: string;
     series: readonly string[];
     colors?: readonly string[];
-    height?: number;
+    height?: number | string;
   }
   export interface ProjectionBarsProps {
     data: readonly Row[];
@@ -136,7 +136,7 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     projectionFrom: string | number;
     budget?: number;
     colors?: readonly string[];
-    height?: number;
+    height?: number | string;
   }
   export interface DonutProps {
     data: readonly Row[];
@@ -144,7 +144,7 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     valueKey: string;
     centerLabel?: string;
     colors?: readonly string[];
-    height?: number;
+    height?: number | string;
   }
   export interface LeaderboardProps {
     data: readonly Row[];
@@ -152,7 +152,7 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     valueKey: string;
     max?: number;
     format?: MetricFormat;
-    height?: number;
+    height?: number | string;
     navigateTo?: { target: string; params: (row: Row) => object };
     /** \`completeness.unpriced\`: each model gets a "no price" row with a dash, never $0. */
     unpriced?: { models: readonly string[] };
@@ -167,7 +167,7 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     colorScale?: [string, string];
     /** "count": a cell with no row is 0. "measure" (default): it is a gap, drawn empty. */
     kind?: SeriesKind;
-    height?: number;
+    height?: number | string;
   }
   /** A count may be a real 0; a measure (rate, average, percentile) with no data is a gap. */
   export type SeriesKind = "count" | "measure";
@@ -185,7 +185,7 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     y?: string | readonly string[];
     series?: string;
     colors?: readonly string[];
-    height?: number;
+    height?: number | string;
     /** \`completeness.unpriced\`: a leaderboard lists each model with "no price". */
     unpriced?: { models: readonly string[] };
   }

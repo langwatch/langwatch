@@ -5,6 +5,7 @@ import {
 } from "@langwatch/onboarding-contract";
 import {
   type OrganizationJoinSetting,
+  BillingOnlyNoTeamAccessError,
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
   PersonalProjectNotFoundError,
@@ -580,6 +581,13 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     };
     resources: PersonalWorkspaceResourceIds;
   }): Promise<EnsuredPersonalTeam> {
+    const billingOnly = this.memory.organizationUsers.some(
+      (member) =>
+        member.userId === input.workspace.userId &&
+        member.organizationId === input.workspace.organizationId &&
+        member.billingOnly === true,
+    );
+    if (billingOnly) throw new BillingOnlyNoTeamAccessError();
     const existing = this.findPersonalTeam(input.workspace);
     if (existing) return existing;
 

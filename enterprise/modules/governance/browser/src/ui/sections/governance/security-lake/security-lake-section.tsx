@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { EnterpriseLock } from "@langwatch/browser-host/enterprise-lock";
 import { Button, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
 import { SettingsCard } from "@langwatch/design-system/settings-card";
 import {
@@ -14,6 +15,8 @@ import {
   useGovernanceToaster,
   useShowErrorToast,
 } from "../../../../behavior/governance-feedback.ts";
+import { useGovernancePlan } from "../../../../behavior/governance-session.ts";
+import { useGovernanceHost } from "../../../../model/governance-host.ts";
 import {
   blankSecurityLakeForm,
   securityLakeCreateInput,
@@ -46,6 +49,11 @@ export function SecurityLakeSection({
   onChanged: () => unknown;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
+  const host = useGovernanceHost();
+  const plan = useGovernancePlan();
+  // The Security Lake procedures need Enterprise, so add and edit wait for the plan to allow them.
+  const mayEdit = canManage && plan.isEnterprise && editing === null;
+  const lockedByPlan = !plan.isLoading && !plan.isEnterprise;
   const lakes = (sources ?? []).filter((source) => source.sourceType === SECURITY_LAKE_SOURCE_TYPE);
   const toaster = useGovernanceToaster();
   const showErrorToast = useShowErrorToast();
@@ -82,7 +90,7 @@ export function SecurityLakeSection({
         title="AWS Security Lake"
         hint="Reads AI activity from the CloudTrail events your Security Lake collects."
         actions={
-          canManage && editing === null ? (
+          mayEdit ? (
             <Button size="sm" variant="outline" onClick={() => edit("new")}>
               <Plus size={14} /> Add Security Lake source
             </Button>
@@ -90,6 +98,16 @@ export function SecurityLakeSection({
         }
       >
         <VStack align="stretch" gap={6} padding={4}>
+          {lockedByPlan && (
+            <EnterpriseLock
+              feature="AWS Security Lake"
+              description="Read AI activity from the CloudTrail events your Security Lake collects."
+              canManage={host.hasPermission("organization:manage")}
+              canSeePlans={host.hasPermission("organization:view")}
+              inset
+              data-testid="security-lake-enterprise-lock"
+            />
+          )}
           {editing === "new" && (
             <SecurityLakeSourceForm
               initialValues={blankSecurityLakeForm()}
@@ -123,7 +141,7 @@ export function SecurityLakeSection({
                 key={lake.id}
                 organizationId={organizationId}
                 lake={lake}
-                onEdit={canManage && editing === null ? () => edit(lake.id) : undefined}
+                onEdit={mayEdit ? () => edit(lake.id) : undefined}
               />
             ),
           )}

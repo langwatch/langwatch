@@ -20,6 +20,12 @@ import {
   SUBSCRIPTION_STARTED_EVENT_TYPE,
   subscriptionStartedEventDataSchema,
 } from "@langwatch/enterprise-billing-contract";
+import {
+  INGESTION_SOURCE_CREATED_EVENT_TYPE,
+  INGESTION_SOURCE_WENT_LIVE_EVENT_TYPE,
+  type IngestionSourceFactData,
+  ingestionSourceFactDataSchema,
+} from "@langwatch/enterprise-governance-contract/ingestion-source-lifecycle";
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import {
   USAGE_REPORT_RECEIVED_EVENT_TYPE,
@@ -51,10 +57,13 @@ import {
 } from "@langwatch/experiment-contract";
 import {
   GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+  GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
   GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
   type RecordBudgetCrossingCommandData,
   recordBudgetCrossingCommandDataSchema,
+  type RecordUnbudgetedSpendCommandData,
+  recordUnbudgetedSpendCommandDataSchema,
   type RecordVkFirstRequestCommandData,
   recordVkFirstRequestCommandDataSchema,
   type RecordVkLifecycleCommandData,
@@ -86,6 +95,10 @@ import {
   inviteAcceptedEventDataSchema,
   MEMBERS_INVITED_EVENT_TYPE,
   membersInvitedEventDataSchema,
+  ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+  organizationMemberAdmittedEventDataSchema,
+  ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
+  organizationMemberRoleChangedEventDataSchema,
   ORGANIZATION_SIGNED_UP_EVENT_TYPE,
   organizationSignedUpEventDataSchema,
 } from "@langwatch/organization-contract";
@@ -137,6 +150,8 @@ import {
   guidedOnboardingSignal,
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
+  memberAdmittedSignal,
+  memberRoleChangedSignal,
   membersInvitedSignal,
   onboardingVariantAssignedSignal,
   projectActiveDaySignal,
@@ -279,6 +294,21 @@ export function buildNurturingPipeline(deps: {
     data: RecordVkFirstRequestCommandData;
     deliver: (signal: NurturingSignal) => Promise<void>;
     deliveryAttempt?: number;
+  }) => Promise<void>;
+  /** An organization's weekly unbudgeted spend: its admin's signal. */
+  unbudgetedSpendRecorded: (input: {
+    data: RecordUnbudgetedSpendCommandData;
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** A governance source was created: its creator's signal, else its organization admin's. */
+  governanceSourceConnected: (input: {
+    data: IngestionSourceFactData;
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** A governance source took its first data: its creator's signal, else the admin's. */
+  governanceSourceLive: (input: {
+    data: IngestionSourceFactData;
+    deliver: (signal: NurturingSignal) => Promise<void>;
   }) => Promise<void>;
 }): NurturingPipeline {
   const deliverSignal = (signal: NurturingSignal) =>
@@ -448,6 +478,22 @@ export function buildNurturingPipeline(deps: {
           return deliverSignal(signal);
         },
       })
+      .withPeerSubscriber("memberRoleChanged", {
+        eventType: ORGANIZATION_MEMBER_ROLE_CHANGED_EVENT_TYPE,
+        data: organizationMemberRoleChangedEventDataSchema,
+        handle: (data, { aggregateId }) => {
+          const signal = memberRoleChangedSignal({ data, aggregateId });
+          return deliverSignal(signal);
+        },
+      })
+      .withPeerSubscriber("memberAdmitted", {
+        eventType: ORGANIZATION_MEMBER_ADMITTED_EVENT_TYPE,
+        data: organizationMemberAdmittedEventDataSchema,
+        handle: (data, { aggregateId }) => {
+          const signal = memberAdmittedSignal({ data, aggregateId });
+          return deliverSignal(signal);
+        },
+      })
       .withPeerSubscriber("integrationMethodChosen", {
         eventType: INTEGRATION_METHOD_CHOSEN_EVENT_TYPE,
         data: integrationMethodChosenEventDataSchema,
@@ -573,6 +619,21 @@ export function buildNurturingPipeline(deps: {
         data: recordVkFirstRequestCommandDataSchema,
         handle: (data, { deliveryAttempt }) =>
           deps.keyFirstRequested({ data, deliveryAttempt, deliver: deliverSignal }),
+      })
+      .withPeerSubscriber("gatewaySpendWithoutBudget", {
+        eventType: GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
+        data: recordUnbudgetedSpendCommandDataSchema,
+        handle: (data) => deps.unbudgetedSpendRecorded({ data, deliver: deliverSignal }),
+      })
+      .withPeerSubscriber("governanceSourceConnected", {
+        eventType: INGESTION_SOURCE_CREATED_EVENT_TYPE,
+        data: ingestionSourceFactDataSchema,
+        handle: (data) => deps.governanceSourceConnected({ data, deliver: deliverSignal }),
+      })
+      .withPeerSubscriber("governanceSourceLive", {
+        eventType: INGESTION_SOURCE_WENT_LIVE_EVENT_TYPE,
+        data: ingestionSourceFactDataSchema,
+        handle: (data) => deps.governanceSourceLive({ data, deliver: deliverSignal }),
       })
       .withPeerSubscriber("langyFirstMessageSeen", {
         eventType: LANGY_FIRST_MESSAGE_SEEN_EVENT_TYPE,

@@ -131,6 +131,8 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     projectId: id,
     /** The latest of the evaluations this signal counts; its type, score and verdict follow. */
     evaluationId: id,
+    /** The organization counted against; optional because a signal recorded before it was named is re-parsed. */
+    organizationId: id.optional(),
     evaluatorType: z.string().nullish(),
     score: z.number().nullish(),
     passed: z.boolean().nullish(),
@@ -185,6 +187,25 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     organizationName: z.string(),
     /** The OrganizationUserRole joined with; absent on events stored before it was recorded. */
     role: z.string().optional(),
+  }),
+  z.object({
+    /** An admin moved a member to another seat: the person's seat is told, never a join. */
+    kind: z.literal("member_role_changed"),
+    ...signalSource,
+    userId: id,
+    organizationId: id,
+    /** The OrganizationUserRole now held; a plain string so an unknown role still parses. */
+    role: z.string(),
+    previousRole: z.string().optional(),
+  }),
+  z.object({
+    /** A person admitted by a path with no joined fact of its own: their seat and Company link. */
+    kind: z.literal("member_admitted"),
+    ...signalSource,
+    userId: id,
+    organizationId: id,
+    /** The OrganizationUserRole admitted with; a plain string so an unknown role still parses. */
+    role: z.string(),
   }),
   z.object({
     kind: z.literal("sso_auto_added"),
@@ -450,6 +471,10 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     scopeType: id,
     /** ISO-8601 UTC; null for a window that never rolls; absent when gateway named no end. */
     periodEnd: z.string().nullish(),
+    /** The model the key spent most on this period; absent when gateway named none. */
+    topModel: z.string().nullish(),
+    /** That model's share of the key's spend as a whole percent, 0 to 100; absent with it. */
+    topModelShare: z.number().nullish(),
   }),
   z.object({
     /** A person's key served its first request. `sourceEventId` is the key and `first_request`. */
@@ -459,6 +484,42 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     userId: id,
     organizationId: id,
     virtualKeyId: id,
+  }),
+  z.object({
+    /**
+     * An organization's person keys spent without a budget this week. `sourceEventId` is
+     * `<organization>:unbudgeted:<ISO week>`, once per organization per week.
+     */
+    kind: z.literal("gateway_spend_without_budget"),
+    ...signalSource,
+    /** The organization's admin. */
+    userId: id,
+    organizationId: id,
+    /** The keys that spent most, most first, at most five. */
+    keys: z.array(z.object({ name: z.string(), spendUsd: z.number() })),
+    /** Every key that spent without a budget, named or not. */
+    keyCount: z.number().int().positive(),
+    totalSpendUsd: z.number(),
+  }),
+  z.object({
+    /** An organization connected a governance source. `sourceEventId` is `<source>:connected`. */
+    kind: z.literal("governance_source_connected"),
+    ...signalSource,
+    /** The source's creator while a current member, else the organization's admin. */
+    userId: id,
+    organizationId: id,
+    sourceId: id,
+    sourceType: id,
+  }),
+  z.object({
+    /** A governance source took its first data. `sourceEventId` is `<source>:live`, once. */
+    kind: z.literal("governance_source_live"),
+    ...signalSource,
+    /** The source's creator while a current member, else the organization's admin. */
+    userId: id,
+    organizationId: id,
+    sourceId: id,
+    sourceType: id,
   }),
 ]);
 export interface NurturingSignalSchema extends Named<typeof nurturingSignalSchemaDefinition> {}

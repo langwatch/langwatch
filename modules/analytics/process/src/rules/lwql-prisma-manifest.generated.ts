@@ -327,6 +327,7 @@ export interface LwqlPrismaRows {
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
     readonly departmentId: "String?";
+    readonly billingOnly: "Boolean";
     readonly disabledAt: "DateTime?";
     readonly pendingSsoGrantId: "String?";
     readonly membershipStamp: "String";
@@ -735,6 +736,7 @@ export interface LwqlPrismaRows {
     readonly subscriptionId: "String?";
     readonly acceptedByUserId: "String?";
     readonly acceptedViaIdentifierId: "String?";
+    readonly billingOnly: "Boolean";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
@@ -2114,6 +2116,17 @@ export interface LwqlPrismaRows {
     readonly errorCount: "Int";
     readonly lastTraceAt: "DateTime?";
     readonly lastFailedTraceAt: "DateTime?";
+  };
+  readonly NurturingProjectTraceDayCount: {
+    readonly projectId: "String";
+    readonly day: "String";
+    readonly source: "String";
+    readonly traceCount: "Int";
+    readonly errorCount: "Int";
+    readonly lastTraceAt: "DateTime?";
+    readonly lastFailedTraceAt: "DateTime?";
+    readonly appliedEventIds: "String[]";
+    readonly projectionVersion: "String";
   };
   readonly NurturingProjectEvaluationDay: {
     readonly projectId: "String";

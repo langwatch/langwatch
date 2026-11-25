@@ -51,6 +51,7 @@ function worker() {
     buildNurturingProjectUsagePipeline({
       store: repositories.projectUsage,
       evaluationDays: repositories.evaluationDays,
+      traceDays: repositories.traceDays,
       copies: copiesOver(repositories),
       plans: { store: repositories.plans, deliver: async () => undefined },
       sync: undefined,

@@ -987,6 +987,7 @@ describe("NurturingDeliveryService", () => {
         userId: "admin-1",
         projectId: "project-1",
         evaluationId: "eval-3",
+        organizationId: "org-1",
         score: 1,
         passed: true,
         evaluationsCounted: 3,
@@ -1007,6 +1008,10 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(cio.sent).toEqual([
+        {
+          path: "/v1/group",
+          body: expect.objectContaining({ userId: "admin-1", groupId: "org-1" }),
+        },
         {
           path: "/v1/identify",
           body: expect.objectContaining({
@@ -1031,6 +1036,107 @@ describe("NurturingDeliveryService", () => {
       ]);
     });
 
+    /** @scenario "A counted evaluation tells the organization's Company it has evaluation results and its count" */
+    it("tells the organization's Company it has evaluation results and its count", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-3",
+        signal: counted("project-1:eval-3"),
+      });
+      await settle();
+
+      const groups = cio.sent.filter((call) => call.path === "/v1/group");
+      expect(groups).toEqual([
+        {
+          path: "/v1/group",
+          body: expect.objectContaining({
+            userId: "admin-1",
+            groupId: "org-1",
+            traits: { has_evaluation_results: true, evaluation_count: 7 },
+          }),
+        },
+      ]);
+    });
+
+    /** @scenario "The organization's first counted evaluations set first_evaluation_at on its Company" */
+    it("sets first_evaluation_at on the Company for the organization's first evaluations", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-2",
+        signal: counted("project-1:eval-2", {
+          evaluationId: "eval-2",
+          evaluationsCounted: 2,
+          organizationEvaluationCount: 2,
+          first: true,
+        }),
+      });
+      await settle();
+
+      expect(cio.sent.filter((call) => call.path === "/v1/group")).toEqual([
+        {
+          path: "/v1/group",
+          body: expect.objectContaining({
+            groupId: "org-1",
+            traits: {
+              has_evaluation_results: true,
+              evaluation_count: 2,
+              first_evaluation_at: expect.any(Number),
+            },
+          }),
+        },
+      ]);
+    });
+
+    /** @scenario "A debounced evaluation batch still updates the organization's Company" */
+    it("updates the Company for a batch whose person-level update is debounced", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-3",
+        signal: counted("project-1:eval-3"),
+      });
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-4",
+        signal: counted("project-1:eval-4", {
+          evaluationId: "eval-4",
+          organizationEvaluationCount: 9,
+        }),
+      });
+      await settle();
+
+      expect(cio.sent.filter((call) => call.path === "/v1/group")).toEqual([
+        {
+          path: "/v1/group",
+          body: expect.objectContaining({
+            traits: expect.objectContaining({ evaluation_count: 7 }),
+          }),
+        },
+        {
+          path: "/v1/group",
+          body: expect.objectContaining({
+            traits: expect.objectContaining({ evaluation_count: 9 }),
+          }),
+        },
+      ]);
+      expect(cio.sent.filter((call) => call.path === "/v1/identify")).toHaveLength(1);
+      expect(cio.sent.filter((call) => call.path === "/v1/track")).toHaveLength(1);
+    });
+
+    /** @scenario "An evaluation signal recorded before it named its organization updates no Company" */
+    it("updates no Company for a signal recorded before it named its organization", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-3",
+        signal: counted("project-1:eval-3", { organizationId: undefined }),
+      });
+      await settle();
+
+      expect(cio.sent.filter((call) => call.path === "/v1/group")).toEqual([]);
+    });
+
     /** @scenario "The batch that counts an organization's first evaluations sends its milestone once" */
     it("sends first_evaluation_created with the count the batch reached", async () => {
       const { cio, delivery } = deliveryOverBothSinks();
@@ -1046,7 +1152,8 @@ describe("NurturingDeliveryService", () => {
       });
       await settle();
 
-      expect(cio.sent.slice(0, 2)).toEqual([
+      expect(cio.sent.filter((call) => call.path === "/v1/group")).toHaveLength(1);
+      expect(cio.sent.filter((call) => call.path !== "/v1/group").slice(0, 2)).toEqual([
         {
           path: "/v1/identify",
           body: expect.objectContaining({

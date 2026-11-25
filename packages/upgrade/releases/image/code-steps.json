@@ -427,6 +427,22 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "nurturing:replay-trace-day-spans",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's trace days from trace's span log, one counting window back.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "nurturing:replay-trace-day-failures",
+    "kind": "data",
+    "mode": "background",
+    "owner": "nurturing",
+    "description": "Fills nurturing's failed-trace days from trace's trace_failed log, one counting window back.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "ops:copy-automation-migration-state",
     "kind": "data",
     "mode": "blocking",
@@ -643,6 +659,14 @@
     "mode": "background",
     "owner": "trace",
     "description": "Refolds the last 62 days of traces so each carries its evaluation rows for the stock widgets.",
+    "needsOldWritersGone": true
+  },
+  {
+    "id": "trace:replay-trace-analytics-managed-prompt-version",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Refolds the last 122 days of trace analytics rows so they carry the managed prompt version each trace last used.",
     "needsOldWritersGone": true
   },
   {

@@ -3,7 +3,7 @@ Feature: Instant Evals decision model column in Default models
   I want to pick the decision model Instant Evals run on, per organization, team or project
   So that Instant Evals run on LangWatch's hosted model by default, or on our own provider key
 
-  # ADR-182. LangWatch Evals Preview is the hosted, metered default. An own decision model
+  # ADR-182. LangWatch Instant (preview) is the hosted, metered default. An own decision model
   # runs on the organization's key, unmetered and uncapped, behind the
   # release_instant_evals_own_decision_model flag, on by default. A broken own key never falls back.
 
@@ -20,10 +20,10 @@ Feature: Instant Evals decision model column in Default models
   # --- Resolving the column ---
 
   @unit
-  Scenario: An unset column runs on LangWatch Evals Preview
+  Scenario: An unset column runs on LangWatch Instant (preview)
     Given the Instant Evals column is not set at any scope
     When the project's decision model is resolved
-    Then it resolves to LangWatch Evals Preview
+    Then it resolves to LangWatch Instant (preview)
 
   @unit
   Scenario: An own decision model with a key resolves with its endpoint and key
@@ -149,11 +149,11 @@ Feature: Instant Evals decision model column in Default models
     Then it resolves as unavailable because it is not enabled
 
   @unit
-  Scenario: A caller picking LangWatch Evals Preview runs on the hosted model
+  Scenario: A caller picking LangWatch Instant (preview) runs on the hosted model
     Given the flag is on for the organization
     And the Instant Evals column is "Cloudflare Clef"
-    When the decision model is resolved for a caller picking "LangWatch Evals Preview"
-    Then it resolves to LangWatch Evals Preview
+    When the decision model is resolved for a caller picking "LangWatch Instant (preview)"
+    Then it resolves to LangWatch Instant (preview)
     And no provider row is read
 
   @unit
@@ -170,15 +170,15 @@ Feature: Instant Evals decision model column in Default models
     And the Instant Evals column is not set at any scope
     And the project has an enabled OpenAI row with a key
     When one caller resolves with a pick and another resolves with none
-    Then the second answers LangWatch Evals Preview, not the first caller's pick
+    Then the second answers LangWatch Instant (preview), not the first caller's pick
 
   # --- Offering the models ---
 
   @unit
-  Scenario: With the flag off only LangWatch Evals Preview is offered
+  Scenario: With the flag off only LangWatch Instant (preview) is offered
     Given the flag is off for the organization
     When the project's pickable decision models are listed
-    Then only "LangWatch Evals Preview" is offered
+    Then only "LangWatch Instant (preview)" is offered
 
   @unit
   Scenario: With the flag on the models that would run are offered
@@ -186,7 +186,7 @@ Feature: Instant Evals decision model column in Default models
     And the project has an enabled OpenAI row with a key
     And the project has no Inception row
     When the project's pickable decision models are listed
-    Then "LangWatch Evals Preview" is offered first
+    Then "LangWatch Instant (preview)" is offered first
     And "OpenAI Decisions API" is offered
     And "Inception Mercury Decide" is not offered
 
@@ -211,7 +211,7 @@ Feature: Instant Evals decision model column in Default models
     Given the flag is on for the organization
     And only project "A" has an enabled OpenAI row with a key
     When the pickable decision models are listed for a config on the organization
-    Then only "LangWatch Evals Preview" is offered
+    Then only "LangWatch Instant (preview)" is offered
 
   @unit
   Scenario: A config on several scopes is offered only what every scope runs
@@ -375,40 +375,40 @@ Feature: Instant Evals decision model column in Default models
   # --- Settings UI ---
 
   @integration
-  Scenario: The Default models table shows an Instant Evals column defaulting to LangWatch Evals Preview
+  Scenario: The Default models table shows an Instant Evals column defaulting to LangWatch Instant (preview)
     When I open Settings > Model Providers > Default models
     Then I see an "Instant Evals" column
-    And it reads "Evals Preview" with the LangWatch mark where nothing is set
+    And it reads "LangWatch Instant (preview)" with the LangWatch mark where nothing is set
 
   @integration
-  Scenario: Without Evals Preview, the Instant Evals column reads Not set
+  Scenario: Without LangWatch Instant (preview), the Instant Evals column reads Not set
     Given LangWatch's hosted model is neither released for my organization nor one switch away
     When I open Settings > Model Providers > Default models
-    Then the Instant Evals column reads "Not set" where nothing is set, or where Evals Preview is pinned
-    And it never reads "Evals Preview"
+    Then the Instant Evals column reads "Not set" where nothing is set, or where LangWatch Instant (preview) is pinned
+    And it never reads "LangWatch Instant (preview)"
     And a picked own decision model still reads its own name
 
   @integration
-  Scenario: Without Evals Preview, the drawer offers only the project's own decision models
+  Scenario: Without LangWatch Instant (preview), the drawer offers only the project's own decision models
     Given LangWatch's hosted model is neither released for my organization nor one switch away
     And own decision models are on and my project has an OpenAI key
     When I edit the Instant Evals column
-    Then "Evals Preview" is not listed
+    Then "LangWatch Instant (preview)" is not listed
     And I can pick OpenAI's "Decisions API"
     And the column reads "Not set" while nothing is picked
 
   @integration
-  Scenario: Without Evals Preview, a config that pinned it reads Not set in the drawer
+  Scenario: Without LangWatch Instant (preview), a config that pinned it reads Not set in the drawer
     Given LangWatch's hosted model is neither released for my organization nor one switch away
-    And a config row pinned "Evals Preview" for the Instant Evals column before that
+    And a config row pinned "LangWatch Instant (preview)" for the Instant Evals column before that
     When I edit that config row
     Then the Instant Evals column reads "Not set", as the table does
-    And it never reads "Evals Preview"
+    And it never reads "LangWatch Instant (preview)"
 
   @unit
-  Scenario: Evals Preview is offered where it is released or one switch away
+  Scenario: LangWatch Instant (preview) is offered where it is released or one switch away
     Given what the server answers about Instant Evals for my project
-    Then Evals Preview is offered when LangWatch's hosted model is released
+    Then LangWatch Instant (preview) is offered when LangWatch's hosted model is released
     And when my organization, or its admin, can switch Instant Evals on
     And not when the answer is a word with us or a self-hosted reason
     And while the answer is still loading it stays offered, so a released organization never sees it flicker
@@ -419,13 +419,13 @@ Feature: Instant Evals decision model column in Default models
     Then its full name opens with the provider, such as "Inception Mercury Decide"
     And OpenAI's and Azure OpenAI's Decisions models read "Decisions API" beside their provider icon
     And their full names, "OpenAI Decisions" and "Azure OpenAI Decisions", name the provider and the API, not the model
-    And LangWatch's hosted model reads "Evals Preview", described as "Optimized for evals"
+    And LangWatch's hosted model reads "LangWatch Instant (preview)", described as "Optimized for search and quick classification"
 
   @integration
   Scenario: The drawer offers only decision models for the Instant Evals column
     Given the flag is off for my organization
     When I edit the Instant Evals column
-    Then I can pick only "Evals Preview"
+    Then I can pick only "LangWatch Instant (preview)"
     And no other decision model is listed, not even with a hint to add a key
 
   @integration
@@ -433,32 +433,33 @@ Feature: Instant Evals decision model column in Default models
     Given the flag is on for my organization
     And my project has an OpenAI key and no Inception key
     When I edit the Instant Evals column
-    Then I can pick "Evals Preview" and OpenAI's "Decisions API"
+    Then I can pick "LangWatch Instant (preview)" and OpenAI's "Decisions API"
     And "Inception Mercury Decide" is listed but cannot be picked, so every pick I can make runs
 
   @integration
   Scenario: The decision model picker is one flat list with LangWatch's models first
     Given the flag is on for my organization
     When I edit the Instant Evals column
-    Then "Evals Preview" is the first row, checked while the column is unset
-    And with the judge router flag on, "Scenario Judge Preview" and "Search Preview" follow it, listed but not pickable yet
+    Then "LangWatch Instant (preview)" is the first row, checked while the column is unset
+    And with the judge router flag on, "LangWatch Judge (preview)" follows it, listed but not pickable yet
+    And "LangWatch Evals (preview)" is never listed in the column, which no judge router answers for
     And no row is a provider heading or a separate "Default" row
     And every row shows its provider icon, its title and a one-line description
 
   @integration
-  Scenario: Picking Evals Preview stores it, so a wider scope cannot take the column over
+  Scenario: Picking LangWatch Instant (preview) stores it, so a wider scope cannot take the column over
     Given the Instant Evals column is not set at any scope
-    When I pick "Evals Preview" for the Instant Evals column and save
-    Then the config stores "Evals Preview" for the Instant Evals column
+    When I pick "LangWatch Instant (preview)" for the Instant Evals column and save
+    Then the config stores "LangWatch Instant (preview)" for the Instant Evals column
     And a config whose only value is that pin can be saved
     And once it is stored, the inherit entry is listed so the pin can be cleared
 
   @integration
-  Scenario: The Instant Evals feature picker lists Evals Preview once, with no Default row
+  Scenario: The Instant Evals feature picker lists LangWatch Instant (preview) once, with no Default row
     Given neither the Instant Evals column nor its feature is set at any scope
     When I open the Instant Evals feature picker
-    Then "Evals Preview" is listed once and checked
-    And no "Default" row that reads "Evals Preview" is listed beside it
+    Then "LangWatch Instant (preview)" is listed once and checked
+    And no "Default" row that reads "LangWatch Instant (preview)" is listed beside it
 
   @integration
   Scenario: A model two providers offer is told apart by its provider
@@ -476,21 +477,145 @@ Feature: Instant Evals decision model column in Default models
     And it cannot be picked
 
   @unit
-  Scenario: With the router flag on LangWatch Evals Preview says it routes
+  Scenario: LangWatch Instant (preview) reads the same whether or not the judge router flag is on
     Given the judge router flag is on for my organization
     When the Instant Evals choices are built
-    Then "Evals Preview" reads "Optimized for evals, routed"
-    And with the router flag off it reads "Optimized for evals"
+    Then "LangWatch Instant (preview)" reads "Optimized for search and quick classification"
+    And it reads the same with the router flag off
+
+  @integration
+  Scenario: An LLM judge is offered one LangWatch model, named by the judge router flag
+    Given LangWatch's hosted model is released for my project
+    When I open an LLM judge's model picker with the judge router flag on
+    Then only "LangWatch Evals (preview)" is listed of LangWatch's models, described as "Optimized for evals"
+    And with the router flag off only "LangWatch Instant (preview)" is listed
+    And either one saves the judge as "langwatch/instant-evals", the id the previous release reads
+
+  @integration
+  Scenario: An evaluator Instant Evals does not answer is offered no decision model
+    Given LangWatch's hosted model is released for my project
+    And my project has an own decision model
+    When I open the model picker of an Off Topic evaluator
+    Then no LangWatch model and no decision model is listed
+
+  @unit
+  Scenario: The Instant Evals column refuses LangWatch Evals (preview)
+    When a Default models config sets the Instant Evals column or its feature to "langwatch/evals-preview"
+    Then it is refused, since no judge router answers for the column
+    And "langwatch/instant-preview", "langwatch/instant-evals" and own decision models are allowed
 
   @integration
   Scenario: The drawer asks about the picked scopes, not the page's project
     Given I am on project "C"
     When I edit a config row scoped to the organization
     Then the Instant Evals choices are asked for the organization scope
-    And with no scope picked only "LangWatch Evals Preview" is offered
+    And with no scope picked only "LangWatch Instant (preview)" is offered
 
   @integration
   Scenario: Each decision model provider draws its own brand mark
     When the icon for a decision model provider is drawn
     Then the LangWatch hosted model draws the LangWatch logo
     And Inception, Perplexity, Cloudflare, TypeSafe, OpenRouter and Fireworks each draw a mark of their own, not the generic one
+
+  # --- Model ids ---
+  # LangWatch's models share a -preview suffix: langwatch/instant-preview (the decision model
+  # alone), langwatch/evals-preview (the judge router) and langwatch/judge-preview. Expand then
+  # contract (ADR-182, 2026-11-23): every id is read, and writes keep langwatch/instant-evals, the
+  # one id the previous release reads, so a rollback never strands a judge or a config.
+
+  @unit
+  Scenario: Picking LangWatch Instant (preview) by its id finds the hosted model
+    When the decision model "langwatch/instant-preview" is looked up
+    Then it is LangWatch's hosted "LangWatch Instant (preview)"
+    And it is not an own decision model
+
+  @unit
+  Scenario: Picking LangWatch Evals (preview) by its id finds the hosted judge router
+    When the decision model "langwatch/evals-preview" is looked up
+    Then it is LangWatch's hosted "LangWatch Evals (preview)", described as "Optimized for evals"
+    And it is not an own decision model
+
+  @unit
+  Scenario: The earlier LangWatch model id still resolves to the renamed model
+    Given a value stored as "langwatch/instant-evals"
+    When the id is read
+    Then it reads as "langwatch/instant-preview"
+    And it still runs on LangWatch's hosted model, never an own key
+    And the coming-soon ids "langwatch/search-preview" and "langwatch/scenario-judge-preview", never stored, are not decision models
+
+  @unit
+  Scenario: Saving a config stores LangWatch's model under the id the previous release reads
+    Given a Default models config that sends "langwatch/instant-preview" or "langwatch/instant-evals" for the Instant Evals column
+    When it is saved, as a whole config or as one default
+    Then the config stores "langwatch/instant-evals"
+    And an own decision model is stored as it was sent
+
+  @integration
+  Scenario: Default models names the written id LangWatch Instant (preview)
+    Given a config row that stores "langwatch/instant-evals" for the Instant Evals column or its "instant_eval.judge" feature
+    When I open Settings > Model Providers > Default models, or edit that config row
+    Then the table cell and the drawer's role and feature pickers read "LangWatch Instant (preview)", checked in the picker
+    And no surface shows the raw "instant-evals"
+
+  @integration
+  Scenario: Editing a judge's parameters keeps its stored model id
+    Given an LLM judge whose model is stored as "langwatch/instant-evals", "langwatch/evals-preview" or "langwatch/instant-preview"
+    When I change a parameter such as the temperature, with the judge router flag on or off, and save
+    Then the judge's model is still stored as it was
+
+  @unit
+  Scenario: The column picker lists only the new LangWatch model ids
+    When the Instant Evals picker lists LangWatch's decision models
+    Then every id it lists is "langwatch/instant-preview" or "langwatch/judge-preview"
+    And no earlier id is listed
+
+  @integration
+  Scenario: A judge stored with the earlier id shows as LangWatch Instant (preview) where routing is off
+    Given an evaluator whose model is stored as "langwatch/instant-evals"
+    And the judge router flag is off for my organization
+    When its model picker is shown
+    Then it reads "LangWatch Instant (preview)", not an unknown model
+    And the stored id is left as it is
+
+  @integration
+  Scenario: A judge saved on the old id shows LangWatch Evals (preview) where routing is on
+    Given an evaluator whose model is stored as "langwatch/instant-evals"
+    And the judge router flag is on for my organization, so the judge is routed
+    When its model picker is shown
+    Then it reads "LangWatch Evals (preview)", the model that runs
+    And the stored id is left as it is
+
+  @integration
+  Scenario: A judge on the LangWatch Evals (preview) id shows as LangWatch Instant (preview) where routing is off
+    Given an evaluator whose model is stored as "langwatch/evals-preview"
+    And the judge router flag is off for my organization, so the judge is not routed
+    When its model picker is shown
+    Then it reads "LangWatch Instant (preview)", never "Update needed"
+
+  @integration
+  Scenario: A judge on the LangWatch Instant (preview) id keeps its name where routing is on
+    Given an evaluator whose model is stored as "langwatch/instant-preview"
+    And the judge router flag is on for my organization
+    When its model picker is shown
+    Then it reads "LangWatch Instant (preview)", since that judge is never routed
+
+  @integration
+  Scenario: The judge picker waits for the judge router flag before naming a model
+    Given an evaluator whose model is stored as "langwatch/evals-preview"
+    When its model picker is shown while the judge router flag is still loading
+    Then a placeholder is shown, never "Update needed"
+
+  # --- Planned: contract, once no release older than this one runs ---
+
+  @unimplemented
+  Scenario: Writes switch to the -preview ids
+    Given no release older than the one that reads the -preview ids is running
+    When Default models or an LLM judge saves a LangWatch model
+    Then it stores "langwatch/instant-preview" or "langwatch/evals-preview"
+
+  @unimplemented
+  Scenario: An LLM judge may pick LangWatch Instant (preview) beside LangWatch Evals (preview) where routing is on
+    Given writes store the -preview ids
+    When I open an LLM judge's model picker with the judge router flag on
+    Then "LangWatch Instant (preview)" and "LangWatch Evals (preview)" are both listed
+    And a judge on LangWatch Instant (preview) is never routed

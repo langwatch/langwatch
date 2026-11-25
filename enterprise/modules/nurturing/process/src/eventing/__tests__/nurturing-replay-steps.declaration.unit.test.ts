@@ -43,6 +43,11 @@ import {
   PLANS_STEP,
   USER_MARKS_STEP,
 } from "./nurturing-replay-steps.test-helpers.ts";
+import {
+  TRACE_DAY_FAILURES_STEP,
+  TRACE_DAY_SPANS_STEP,
+  traceDayReplayStepsOver,
+} from "./nurturing-trace-days.test-helpers.ts";
 
 const CODE_STEPS_JSON = fileURLToPath(
   new URL("../../../../../../../packages/upgrade/releases/image/code-steps.json", import.meta.url),
@@ -92,6 +97,7 @@ describe("given the nurturing module installed on a worker", () => {
       ...nurturingReplayStepsOver(pinned.replayer),
       ...organizationCopiesReplayStepsOver(pinned.replayer),
       ...projectCopiesReplayStepsOver(pinned.replayer),
+      ...traceDayReplayStepsOver(pinned.replayer),
     ];
 
     expect(steps.map(({ id }) => id)).toEqual([
@@ -110,6 +116,8 @@ describe("given the nurturing module installed on a worker", () => {
       TRACED_PROJECTS_OF_TRACE_STEP,
       TRACED_PROJECTS_OF_PROJECT_STEP,
       LAST_TRACES_STEP,
+      TRACE_DAY_SPANS_STEP,
+      TRACE_DAY_FAILURES_STEP,
     ]);
     for (const [index, step] of steps.entries()) {
       expect(step).toMatchObject({
@@ -136,6 +144,8 @@ describe("given the nurturing module installed on a worker", () => {
       [USER_MARKS_STEP, IDENTITY_MARKS_STEP, PROJECT_LISTING_STEP],
       undefined,
       [PROJECT_LISTING_STEP],
+      undefined,
+      undefined,
       undefined,
     ]);
     // The image ships code-steps.json, not this declaration: a stale list breaks here too.

@@ -44,6 +44,8 @@ class GetApiV1QuerySchemaResponse200ViewsItemColumnsItemGatesItemType1(str, Enum
     EXPERIMENTSUPDATE = "experiments:update"
     EXPERIMENTSVIEW = "experiments:view"
     FEATUREFLAGSMANAGEEXPERIMENTS = "featureFlags:manageExperiments"
+    GATEWAYA2ATARGETSMANAGE = "gatewayA2aTargets:manage"
+    GATEWAYA2ATARGETSVIEW = "gatewayA2aTargets:view"
     GATEWAYBUDGETSCREATE = "gatewayBudgets:create"
     GATEWAYBUDGETSDELETE = "gatewayBudgets:delete"
     GATEWAYBUDGETSMANAGE = "gatewayBudgets:manage"

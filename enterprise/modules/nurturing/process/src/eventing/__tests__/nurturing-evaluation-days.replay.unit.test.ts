@@ -67,7 +67,6 @@ function evaluated(projectId: string, at: number): ReplayEvent {
 /** The usage sync's hooks, each counting its calls: a replay must make none. */
 function countingSync() {
   return {
-    countTraces: vi.fn(async () => undefined),
     usageChanged: vi.fn(async () => undefined),
     tracesChanged: vi.fn(async () => undefined),
     organizationCreated: vi.fn(async () => undefined),
@@ -82,9 +81,9 @@ function deploy({ events, syncs = true }: { events: ReplayEvent[]; syncs?: boole
   const pipeline = buildNurturingProjectUsagePipeline({
     store: repositories.projectUsage,
     evaluationDays: repositories.evaluationDays,
+    traceDays: repositories.traceDays,
     copies: {
       placements: repositories.placements,
-      copyLanded: async () => undefined,
       organizationsCreated: repositories.organizationsCreated,
       admins: repositories.milestones,
       members: repositories.members,

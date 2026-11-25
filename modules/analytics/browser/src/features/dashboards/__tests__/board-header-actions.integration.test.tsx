@@ -1,14 +1,18 @@
 /**
  * @vitest-environment jsdom
  * The board header's extension point: what a peer lends is drawn on a stored board and on a
- * From LangWatch board, and told which board it sits on.
+ * From LangWatch board, and told which board it sits on; one that crashes is reported.
  * @see modules/insight/specs/insight-daily-run.feature
  */
 
 import { type BoardHeaderActionProps, BoardHeaderActionToken } from "@langwatch/analytics-client";
+import type { UiAnalytics } from "@langwatch/browser-host/analytics";
 import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
 import { type UiLend, uiDeclarations } from "@langwatch/browser-host/declarations";
-import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
+import {
+  createUiHostServicesFromHost,
+  RecordingUiAnalytics,
+} from "@langwatch/browser-host/testing";
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import { cleanup, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
@@ -63,14 +67,25 @@ const LENT: UiLend = {
   load: () => Promise.resolve({ default: LentProbe }),
 };
 
+/** A lent action with a bug: it throws while drawing. */
+function CrashingAction(): never {
+  throw new Error("The lent action broke");
+}
+const CRASHING: UiLend = {
+  token: BoardHeaderActionToken,
+  load: () => Promise.resolve({ default: CrashingAction }),
+};
+
 function openScreen({
   element,
   params,
   lends,
+  analytics,
 }: {
   element: ReactElement;
   params: Record<string, string>;
   lends: readonly UiLend[];
+  analytics?: UiAnalytics;
 }) {
   const host = new StubAnalyticsHost({
     flags: { release_dashboards: true },
@@ -83,6 +98,7 @@ function openScreen({
       navigate: () => void 0,
     }),
     declarations: uiDeclarations([{ name: "insight", installation: { capabilities: {}, lends } }]),
+    ...(analytics ? { analytics } : {}),
   };
   renderDashboards({
     element: (
@@ -146,6 +162,32 @@ describe("given no module lends an action to the board header", () => {
 
       expect(await screen.findByRole("heading", { name: "Release check" })).toBeInTheDocument();
       expect(screen.queryByLabelText("Lent action")).toBeNull();
+    });
+  });
+});
+
+describe("given a module lends an action to the board header that crashes while drawing", () => {
+  describe("when a member opens a stored board", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports the crash once as an exception naming the lender and the board", async () => {
+      const silenced = vi.spyOn(console, "error").mockImplementation(() => void 0);
+      const analytics = new RecordingUiAnalytics();
+      openScreen({
+        element: <DashboardBoardScreen />,
+        params: { dashboardId: "board-1" },
+        lends: [CRASHING],
+        analytics,
+      });
+
+      expect(await screen.findByText("This action failed to load")).toBeInTheDocument();
+      expect(analytics.exceptions).toHaveLength(1);
+      expect(analytics.exceptions[0]?.error).toEqual(new Error("The lent action broke"));
+      expect(analytics.exceptions[0]?.properties).toEqual({
+        surface: "board_header_action",
+        owner: "insight",
+        dashboardId: "board-1",
+      });
+      silenced.mockRestore();
     });
   });
 });

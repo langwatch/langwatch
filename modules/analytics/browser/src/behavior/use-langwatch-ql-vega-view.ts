@@ -12,9 +12,12 @@ import {
   type LangWatchQLVegaColorMode,
   type LangWatchQLVegaConfig,
   type LangWatchQLDataset,
+  type LangWatchQLChartCrashContext,
   type VegaValidationError,
 } from "@langwatch/analytics-contract/visualization";
-import { type RefObject, useEffect, useRef, useState } from "react";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { toError } from "@langwatch/browser-host/errors";
+import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import embed, { type EmbedOptions, type Result } from "vega-embed";
 
 export type LangWatchQLVegaViewStatus = "idle" | "embedding" | "ready" | "failed";
@@ -43,6 +46,8 @@ export interface UseLangWatchQLVegaViewInput {
    * it fails. A view already mounted is finalized when this goes false.
    */
   readonly enabled: boolean;
+  /** The board and widget a failure to draw is reported with. */
+  readonly crashContext?: LangWatchQLChartCrashContext;
 }
 
 export interface UseLangWatchQLVegaViewResult {
@@ -89,6 +94,7 @@ export function useLangWatchQLVegaView({
   pinnedConfig,
   colorMode,
   enabled,
+  crashContext,
 }: UseLangWatchQLVegaViewInput): UseLangWatchQLVegaViewResult {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const resultRef = useRef<Result | null>(null);
@@ -103,6 +109,7 @@ export function useLangWatchQLVegaView({
   datasetsRef.current = datasets;
 
   const [state, setState] = useState<LangWatchQLVegaViewState>(IDLE);
+  const fail = useReportedFailure({ setState, crashContext });
 
   useEffect(() => {
     const container = containerRef.current;
@@ -118,9 +125,10 @@ export function useLangWatchQLVegaView({
       pinnedConfig,
       colorMode,
       setState,
+      fail,
       refs: { resultRef, buildRef, loadedDatasetsRef, datasetsRef },
     });
-  }, [spec, themeConfig, pinnedConfig, colorMode, enabled]);
+  }, [spec, themeConfig, pinnedConfig, colorMode, enabled, fail]);
 
   useEffect(() => {
     const result = resultRef.current;
@@ -129,29 +137,66 @@ export function useLangWatchQLVegaView({
     if (loadedDatasetsRef.current === datasets) return;
     loadedDatasetsRef.current = datasets;
 
-    pushDatasetsIntoView({ result, build, datasets, resultRef, setState });
-  }, [datasets, state.status]);
+    pushDatasetsIntoView({ result, build, datasets, resultRef, fail });
+  }, [datasets, state.status, fail]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (state.status !== "ready" || container === null) return;
     if (typeof ResizeObserver === "undefined") return;
 
-    return observeContainerResize({ container, resultRef, setState });
-  }, [state.status]);
+    return observeContainerResize({ container, resultRef, fail });
+  }, [state.status, fail]);
 
   return { containerRef, state };
+}
+
+/**
+ * Ends the view in `failed` and reports the failure as an exception, once per distinct failure
+ * while the chart is mounted. A blocked loader is the spec's own refusal, so it is not reported.
+ */
+function useReportedFailure({
+  setState,
+  crashContext,
+}: {
+  setState: (state: LangWatchQLVegaViewState) => void;
+  crashContext: LangWatchQLChartCrashContext | undefined;
+}): (error: unknown) => void {
+  const analytics = useUiAnalytics();
+  // Refs keep the failure handler stable, so a new context never re-embeds the view.
+  const reporting = useRef({ analytics, crashContext });
+  const reported = useRef(new Set<string>());
+
+  useEffect(() => {
+    reporting.current = { analytics, crashContext };
+  });
+
+  return useCallback(
+    (error: unknown) => {
+      const failure = lwqlRenderFailure(error);
+      setState({ status: "failed", failure });
+      // The contract words every non-Error alike, so the thrown message is the identity.
+      const err = toError(error);
+      if (failure.rule === "loader.blocked" || reported.current.has(err.message)) return;
+      reported.current.add(err.message);
+      reporting.current.analytics.captureException({
+        error: err,
+        properties: { surface: "lwql_chart_embed", ...reporting.current.crashContext },
+      });
+    },
+    [setState],
+  );
 }
 
 /** A resized container re-runs the view; a failure there ends it like any other. */
 function observeContainerResize({
   container,
   resultRef,
-  setState,
+  fail,
 }: {
   container: HTMLDivElement;
   resultRef: RefObject<Result | null>;
-  setState: (state: LangWatchQLVegaViewState) => void;
+  fail: (error: unknown) => void;
 }): () => void {
   const observer = new ResizeObserver(() => {
     const result = resultRef.current;
@@ -161,7 +206,7 @@ function observeContainerResize({
       .resize()
       .runAsync()
       .catch((error: unknown) => {
-        finalizeInto({ result, resultRef, setState, error });
+        finalizeInto({ result, resultRef, fail, error });
       });
   });
   observer.observe(container);
@@ -189,6 +234,7 @@ function embedLangWatchQLVegaView({
   pinnedConfig,
   colorMode,
   setState,
+  fail,
   refs,
 }: {
   container: HTMLDivElement;
@@ -197,6 +243,7 @@ function embedLangWatchQLVegaView({
   pinnedConfig: LangWatchQLVegaConfig;
   colorMode: LangWatchQLVegaColorMode;
   setState: (state: LangWatchQLVegaViewState) => void;
+  fail: (error: unknown) => void;
   refs: LangWatchQLVegaViewRefs;
 }): () => void {
   const { resultRef, buildRef, loadedDatasetsRef, datasetsRef } = refs;
@@ -214,7 +261,7 @@ function embedLangWatchQLVegaView({
       pinnedConfig,
     });
   } catch (error) {
-    setState({ status: "failed", failure: lwqlRenderFailure(error) });
+    fail(error);
     return () => {
       abandoned = true;
     };
@@ -235,7 +282,7 @@ function embedLangWatchQLVegaView({
     .catch((error: unknown) => {
       if (abandoned) return;
       resultRef.current = null;
-      setState({ status: "failed", failure: lwqlRenderFailure(error) });
+      fail(error);
     });
 
   return () => {
@@ -256,23 +303,23 @@ function pushDatasetsIntoView({
   build,
   datasets,
   resultRef,
-  setState,
+  fail,
 }: {
   result: Result;
   build: LangWatchQLVegaSpecBuild;
   datasets: LangWatchQLVegaDatasets;
   resultRef: RefObject<Result | null>;
-  setState: (state: LangWatchQLVegaViewState) => void;
+  fail: (error: unknown) => void;
 }): void {
   try {
     for (const name of build.datasetNames) {
       result.view.data(name, [...(datasets[name] ?? [])]);
     }
     void result.view.runAsync().catch((error: unknown) => {
-      finalizeInto({ result, resultRef, setState, error });
+      finalizeInto({ result, resultRef, fail, error });
     });
   } catch (error: unknown) {
-    finalizeInto({ result, resultRef, setState, error });
+    finalizeInto({ result, resultRef, fail, error });
   }
 }
 
@@ -283,15 +330,15 @@ function pushDatasetsIntoView({
 function finalizeInto({
   result,
   resultRef,
-  setState,
+  fail,
   error,
 }: {
   result: Result;
   resultRef: RefObject<Result | null>;
-  setState: (state: LangWatchQLVegaViewState) => void;
+  fail: (error: unknown) => void;
   error: unknown;
 }): void {
   result.finalize();
   if (resultRef.current === result) resultRef.current = null;
-  setState({ status: "failed", failure: lwqlRenderFailure(error) });
+  fail(error);
 }

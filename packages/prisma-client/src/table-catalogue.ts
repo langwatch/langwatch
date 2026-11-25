@@ -157,6 +157,7 @@ export const prismaTableCatalogue = {
   "NurturingOrganization": "NurturingOrganization",
   "NurturingProjectUsageView": "NurturingProjectUsageView",
   "NurturingProjectTraceDay": "NurturingProjectTraceDay",
+  "NurturingProjectTraceDayCount": "NurturingProjectTraceDayCount",
   "NurturingProjectEvaluationDay": "NurturingProjectEvaluationDay",
   "NurturingPersonalProject": "NurturingPersonalProject",
   "NurturingTracedProject": "NurturingTracedProject",
@@ -609,6 +610,7 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt",
     "departmentId",
+    "billingOnly",
     "disabledAt",
     "pendingSsoGrantId",
     "membershipStamp",
@@ -1091,6 +1093,7 @@ export const prismaModelFieldCatalogue = {
     "subscriptionId",
     "acceptedByUserId",
     "acceptedViaIdentifierId",
+    "billingOnly",
     "createdAt",
     "updatedAt"
   ],
@@ -2621,6 +2624,17 @@ export const prismaModelFieldCatalogue = {
     "lastTraceAt",
     "lastFailedTraceAt"
   ],
+  "NurturingProjectTraceDayCount": [
+    "projectId",
+    "day",
+    "source",
+    "traceCount",
+    "errorCount",
+    "lastTraceAt",
+    "lastFailedTraceAt",
+    "appliedEventIds",
+    "projectionVersion"
+  ],
   "NurturingProjectEvaluationDay": [
     "projectId",
     "day"
@@ -4059,6 +4073,7 @@ export const prismaRelationCatalogue = {
   "NurturingOrganization": {},
   "NurturingProjectUsageView": {},
   "NurturingProjectTraceDay": {},
+  "NurturingProjectTraceDayCount": {},
   "NurturingProjectEvaluationDay": {},
   "NurturingPersonalProject": {},
   "NurturingTracedProject": {},

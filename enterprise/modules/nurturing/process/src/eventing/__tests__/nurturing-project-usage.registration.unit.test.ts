@@ -18,10 +18,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { NurturingModule } from "../../app/nurturing.app.ts";
-import { MemoryNurturingUncopiedProjectRepository } from "../../repositories/memory/memory.nurturing-uncopied-project.repository.ts";
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
-import { UNCOPIED_PROJECT_RETRY_WINDOW_MS } from "../../rules/nurturing-project-usage.rules.ts";
-import { NurturingUncopiedProjectsService } from "../../services/nurturing-uncopied-projects.service.ts";
 import {
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
   nurturingProjectPlacementsMap,
@@ -49,6 +46,8 @@ const COPY_LANES = [
   "tracedProjectsOfProject",
   "lastTraces",
   "evaluationDays",
+  "traceDaySpans",
+  "traceDayFailures",
   "organizationPlans",
 ];
 
@@ -58,8 +57,6 @@ const SYNC_LANES = [
   "evaluatorUsage",
   "scenarioUsage",
   "simulationUsage",
-  "traceDayCount",
-  "failedTraceDayCount",
   "firstTraceUsageSync",
   "traceUsageSync",
   "organizationCreatedSync",
@@ -103,10 +100,11 @@ const organizationCreatedFact = (occurredAt: number) =>
 
 describe("the usage pipeline's registration", () => {
   /** @scenario "Without a Customer.io channel nothing is counted, but the copies are kept" */
-  it("registers only the copies without a Customer.io channel", () => {
+  it("registers only the copies and the replayable day lanes without a Customer.io channel", () => {
     const lanes = usageLanesWith(false);
 
-    expect(lanes).not.toContain(lane("traceDayCount"));
+    expect(lanes).toContain(lane("traceDaySpans"));
+    expect(lanes).toContain(lane("traceDayFailures"));
     expect(lanes.toSorted()).toEqual(COPY_LANES.map(lane).toSorted());
   });
 
@@ -187,32 +185,6 @@ describe("the placement copies", () => {
     const { map } = nurturingProjectPlacementsMap(copies);
 
     expect(map.eventTypes).toEqual([PROJECT_CREATED_EVENT_TYPE]);
-  });
-
-  /** @scenario "A project with no copy after the retries is dropped, and its later batches at once" */
-  it("forgets a project as uncopied once its copy is written, deleting its first-seen row", async () => {
-    let now = 1_000;
-    const uncopiedProjects = MemoryNurturingUncopiedProjectRepository.create();
-    const uncopied = NurturingUncopiedProjectsService.create({
-      uncopiedProjects,
-      clock: { nowMs: () => now },
-    });
-    await uncopied.outcomeOf({ projectId: "project-1" });
-    now += UNCOPIED_PROJECT_RETRY_WINDOW_MS;
-    await uncopied.outcomeOf({ projectId: "project-1" });
-    const repositories = MemoryNurturingRepositories.create();
-    const deliver = liveMapsOver({
-      ...copiesOver(repositories),
-      copyLanded: (input) => uncopied.copyLanded(input),
-    });
-
-    await deliver(projectCreatedFact(now));
-
-    expect(uncopiedProjects.storedProjectIds()).toEqual([]);
-    expect(uncopied.isDropped({ projectId: "project-1" })).toBe(false);
-    await expect(repositories.placements.getPlacement({ projectId: "project-1" })).resolves.toEqual(
-      { outcome: "known", organizationId: "org-1" },
-    );
   });
 
   /** @scenario "A project nurturing never saw created sends nothing" */

@@ -16,13 +16,12 @@ import { PrismaNurturingProjectPlacementRepository } from "./prisma.nurturing-pr
 import { PrismaNurturingProjectUsageRepository } from "./prisma.nurturing-project-usage.repository.ts";
 import { PrismaNurturingTraceDayRepository } from "./prisma.nurturing-trace-day.repository.ts";
 import { PrismaNurturingTracedProjectRepository } from "./prisma.nurturing-traced-project.repository.ts";
-import { PrismaNurturingUncopiedProjectRepository } from "./prisma.nurturing-uncopied-project.repository.ts";
 
 /**
  * Nurturing's own tables: its organizations, usage view, trace and evaluation days, erasure marks,
  * and its copies of project placements, organization creations, members, plans, gateway keys,
- * personal owners and traced projects, and the projects it saw with no placement copy. The copies
- * that read the marks each read them over the same client, so they share them as the table does.
+ * personal owners and traced projects. The copies that read the marks each read them over the same
+ * client, so they share them as the table does.
  */
 const ownedRepositories = prismaRepositories({
   milestones: PrismaNurturingMilestonesRepository,
@@ -37,7 +36,6 @@ const ownedRepositories = prismaRepositories({
   virtualKeys: PrismaNurturingVirtualKeyRepository,
   personalProjects: PrismaNurturingPersonalProjectRepository,
   tracedProjects: PrismaNurturingTracedProjectRepository,
-  uncopiedProjects: PrismaNurturingUncopiedProjectRepository,
 });
 
 /** Nurturing's own tables, and the owners' project rows read through shares without a claim (R40). */

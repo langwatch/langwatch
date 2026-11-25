@@ -44,6 +44,7 @@ import { MemoryNurturingPersonalProjectRepository } from "../../repositories/mem
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import { MemoryNurturingProjectPlacementRepository } from "../../repositories/memory/memory.nurturing-project-placement.repository.ts";
 import { MemoryNurturingProjectUsageRepository } from "../../repositories/memory/memory.nurturing-project-usage.repository.ts";
+import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
 import { MemoryNurturingTracedProjectRepository } from "../../repositories/memory/memory.nurturing-traced-project.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { unplacedMemberFacts } from "../../services/__tests__/nurturing-member-facts.test-helpers.ts";
@@ -106,14 +107,17 @@ function nurturingOverCopies() {
     virtualKeyCreated: async () => undefined,
     keyBudgetCrossed: async () => undefined,
     keyFirstRequested: async () => undefined,
+    unbudgetedSpendRecorded: async () => undefined,
+    governanceSourceConnected: async () => undefined,
+    governanceSourceLive: async () => undefined,
   });
   // The copies of project facts are maps on the usage host, writing the same rows the subscribers did.
   const usagePipeline = buildNurturingProjectUsagePipeline({
     store: MemoryNurturingProjectUsageRepository.create(),
     evaluationDays: MemoryNurturingEvaluationDayRepository.create(),
+    traceDays: MemoryNurturingTraceDayRepository.create(),
     copies: {
       placements: MemoryNurturingProjectPlacementRepository.create(),
-      copyLanded: async () => undefined,
       organizationsCreated: MemoryNurturingOrganizationCreatedRepository.create(),
       admins: organizations,
       members,

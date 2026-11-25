@@ -3657,6 +3657,9 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/organization-client':
+        specifier: workspace:*
+        version: link:../../../../modules/organization/client
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../../packages/plans
@@ -3703,6 +3706,9 @@ importers:
       react-dom:
         specifier: ^19.2.7
         version: 19.2.8(react@19.2.8)
+      react-router:
+        specifier: 'catalog:'
+        version: 8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=3d59b42edf9ca773087e214683a851a88d7f0a6bcdda81663de148b9878822c2)
@@ -4017,6 +4023,9 @@ importers:
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../billing/contract
+      '@langwatch/enterprise-governance-contract':
+        specifier: workspace:*
+        version: link:../../governance/contract
       '@langwatch/enterprise-nurturing-contract':
         specifier: workspace:*
         version: link:../contract
@@ -4038,9 +4047,6 @@ importers:
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../../../modules/gateway/contract
-      '@langwatch/group-queue':
-        specifier: workspace:*
-        version: link:../../../../packages/group-queue
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../../../modules/identity/contract
@@ -17428,12 +17434,18 @@ importers:
       '@langwatch/react-rum':
         specifier: workspace:*
         version: link:../react-rum
+      '@langwatch/redaction':
+        specifier: workspace:*
+        version: link:../redaction
       '@langwatch/time':
         specifier: workspace:*
         version: link:../time
       '@microsoft/fetch-event-source':
         specifier: ^2.0.1
         version: 2.0.1
+      '@opentelemetry/api':
+        specifier: 'catalog:'
+        version: 1.9.1
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.4(react@19.2.8)
@@ -17474,9 +17486,6 @@ importers:
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
-      '@opentelemetry/api':
-        specifier: 'catalog:'
-        version: 1.9.1
       '@opentelemetry/sdk-trace-base':
         specifier: 'catalog:'
         version: 2.10.0(@opentelemetry/api@1.9.1)

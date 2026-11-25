@@ -27,6 +27,7 @@
 /agent-testing/test-suites
 /agent-testing/voice-agents
 /ai-gateway
+/ai-gateway/a2a-proxy
 /ai-gateway/api
 /ai-gateway/api/audio
 /ai-gateway/api/chat-completions

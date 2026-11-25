@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+  GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
   GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
 } from "@langwatch/gateway-contract";
@@ -21,6 +22,7 @@ import {
   gatewayEvent,
   gatewayFactsOver,
   lifecycleFact,
+  unbudgetedSpendFact,
 } from "./nurturing-gateway-facts.test-helpers.ts";
 
 const redisUrl = process.env.LANGWATCH_TEST_REDIS_URL;
@@ -100,6 +102,27 @@ describe.skipIf(!redisUrl)("gateway's key facts over Redis claims", () => {
 
       expect(facts.sent.slice(beforeFirstRequest)).toEqual([
         { type: "identify", userId: "user-holder", traits: { has_app_request: true } },
+      ]);
+    });
+  });
+
+  describe("when an organization's unbudgeted-spend fact is delivered twice", () => {
+    /** @scenario "Unbudgeted spend delivered twice tracks once over Redis claims" */
+    it("tracks gateway_spend_without_budget to the admin once", async () => {
+      const organizationId = `org-test-${run}`;
+      const facts = await gatewayFactsOver({
+        claims: RedisNurturingClaimRepository.create({ redis }),
+        organizationId,
+      });
+      const unbudgeted = gatewayEvent({
+        type: GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
+        data: unbudgetedSpendFact({ organization_id: organizationId }),
+      });
+
+      for (let delivery = 0; delivery < 2; delivery++) await facts.deliverFact(unbudgeted);
+
+      expect(facts.sent.map((call) => (call.type === "track" ? call.event : call.type))).toEqual([
+        "gateway_spend_without_budget",
       ]);
     });
   });

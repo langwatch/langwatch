@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { CioBatchCall, NurturingSignalOf } from "@langwatch/enterprise-nurturing-contract";
+import type {
+  CioBatchCall,
+  NurturingSignal,
+  NurturingSignalOf,
+} from "@langwatch/enterprise-nurturing-contract";
 
 import { unixSecondsOf } from "./nurturing-customer-io-timestamp.rules.ts";
 
@@ -99,4 +103,24 @@ export function fireEvaluationCompleted(
     },
   });
   return calls;
+}
+
+/**
+ * The Company's evaluation facts, sent before the debounce: the person-level update is
+ * debounced per tenant, but a skipped batch must still keep the organization's count current.
+ */
+export function fireEvaluationCompany(signal: NurturingSignal): CioBatchCall[] {
+  if (signal.kind !== "evaluation_completed" || !signal.organizationId) return [];
+  return [
+    {
+      type: "group",
+      userId: signal.userId,
+      groupId: signal.organizationId,
+      traits: {
+        has_evaluation_results: true,
+        evaluation_count: signal.organizationEvaluationCount,
+        ...(signal.first ? { first_evaluation_at: unixSecondsOf(signal.occurredAt) } : {}),
+      },
+    },
+  ];
 }

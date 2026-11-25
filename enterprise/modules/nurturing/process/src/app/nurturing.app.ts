@@ -20,17 +20,15 @@ import { UserApi } from "@langwatch/user-contract";
 import type { NurturingChannels } from "../channels/nurturing.channels.ts";
 import { buildNurturingPipeline, type NurturingPipeline } from "../eventing/nurturing.pipeline.ts";
 import type { NurturingRepositories } from "../repositories/nurturing.repositories.ts";
-import type { NurturingCountedTrace } from "../rules/nurturing-trace-day.rules.ts";
 import { NurturingCodingMilestonesService } from "../services/nurturing-coding-milestones.service.ts";
 import { NurturingCopiedProjectsService } from "../services/nurturing-copied-projects.service.ts";
 import { NurturingDeliveryService } from "../services/nurturing-delivery.service.ts";
 import { NurturingGatewayFactsService } from "../services/nurturing-gateway-facts.service.ts";
+import { NurturingGovernanceFactsService } from "../services/nurturing-governance-facts.service.ts";
 import { NurturingMemberFactsService } from "../services/nurturing-member-facts.service.ts";
 import { NurturingMilestonesService } from "../services/nurturing-milestones.service.ts";
 import { NurturingOrganizationCreatedService } from "../services/nurturing-organization-created.service.ts";
 import { NurturingOrganizationUsageService } from "../services/nurturing-organization-usage.service.ts";
-import { NurturingTraceCountingService } from "../services/nurturing-trace-counting.service.ts";
-import { NurturingUncopiedProjectsService } from "../services/nurturing-uncopied-projects.service.ts";
 import { NurturingUserErasureService } from "../services/nurturing-user-erasure.service.ts";
 import { NurturingService } from "../services/nurturing.service.ts";
 
@@ -55,8 +53,6 @@ export class NurturingModule implements NurturingApi {
   readonly #delivery: NurturingDeliveryService;
   readonly #organizationUsage: NurturingOrganizationUsageService | undefined;
   readonly #organizationCreated: NurturingOrganizationCreatedService | undefined;
-  readonly #uncopiedProjects: NurturingUncopiedProjectsService;
-  readonly #traceCounting: NurturingTraceCountingService;
   #commands: EventingCommands<NurturingPipeline> | undefined;
 
   private constructor({
@@ -64,22 +60,16 @@ export class NurturingModule implements NurturingApi {
     delivery,
     organizationUsage,
     organizationCreated,
-    uncopiedProjects,
-    traceCounting,
   }: Readonly<{
     pipeline: NurturingPipeline;
     delivery: NurturingDeliveryService;
     organizationUsage: NurturingOrganizationUsageService | undefined;
     organizationCreated: NurturingOrganizationCreatedService | undefined;
-    uncopiedProjects: NurturingUncopiedProjectsService;
-    traceCounting: NurturingTraceCountingService;
   }>) {
     this.#pipeline = pipeline;
     this.#delivery = delivery;
     this.#organizationUsage = organizationUsage;
     this.#organizationCreated = organizationCreated;
-    this.#uncopiedProjects = uncopiedProjects;
-    this.#traceCounting = traceCounting;
   }
 
   static async create({
@@ -116,6 +106,12 @@ export class NurturingModule implements NurturingApi {
       admins: memberFacts,
       logger: createLogger("langwatch:nurturing:gateway-facts"),
     });
+    const governanceFacts = NurturingGovernanceFactsService.create({
+      erasedUsers: repositories.erasedUsers,
+      members: repositories.members,
+      admins: memberFacts,
+      logger: createLogger("langwatch:nurturing:governance-facts"),
+    });
     const milestones = NurturingMilestonesService.create({
       milestones: repositories.milestones,
       projects: repositories.projects,
@@ -148,6 +144,7 @@ export class NurturingModule implements NurturingApi {
           milestones: repositories.milestones,
           members: repositories.members,
           erasedUsers: repositories.erasedUsers,
+          claims: repositories.claims,
           sendBatch: (calls) => customerIo.batchOrThrow(calls),
           clock: { nowMs: () => nowInstant().epochMilliseconds },
           logger,
@@ -170,15 +167,6 @@ export class NurturingModule implements NurturingApi {
       members: repositories.members,
       virtualKeys: repositories.virtualKeys,
     });
-    const uncopiedProjects = NurturingUncopiedProjectsService.create({
-      uncopiedProjects: repositories.uncopiedProjects,
-      clock: { nowMs: () => nowInstant().epochMilliseconds },
-    });
-    const traceCounting = NurturingTraceCountingService.create({
-      traceDays: repositories.traceDays,
-      copiedProjects,
-      uncopiedProjects,
-    });
     return new NurturingModule({
       pipeline: buildNurturingPipeline({
         deliver: (input) => delivery.deliver(input),
@@ -191,12 +179,13 @@ export class NurturingModule implements NurturingApi {
         virtualKeyCreated: (input) => gatewayFacts.virtualKeyCreated(input),
         keyBudgetCrossed: (input) => gatewayFacts.keyBudgetCrossed(input),
         keyFirstRequested: (input) => gatewayFacts.keyFirstRequested(input),
+        unbudgetedSpendRecorded: (input) => gatewayFacts.unbudgetedSpendRecorded(input),
+        governanceSourceConnected: (input) => governanceFacts.sourceConnected(input),
+        governanceSourceLive: (input) => governanceFacts.sourceWentLive(input),
       }),
       delivery,
       organizationUsage,
       organizationCreated,
-      uncopiedProjects,
-      traceCounting,
     });
   }
 
@@ -235,14 +224,9 @@ export class NurturingModule implements NurturingApi {
     await this.#delivery.deliver(input);
   }
 
-  /** Counts the traces whose organization is inside its window; rejects while a copy is awaited. */
-  countTraces(input: Readonly<{ traces: readonly NurturingCountedTrace[] }>): Promise<void> {
-    return this.#traceCounting.countTraces(input);
-  }
-
-  /** A project's placement copy was written: it is no longer uncopied. */
-  async uncopiedProjectCopied(input: Readonly<{ projectId: string }>): Promise<void> {
-    await this.#uncopiedProjects.copyLanded(input);
+  /** Drops every project's trace days before `beforeDay`: no read reaches them. */
+  async pruneTraceDaysBefore(input: Readonly<{ beforeDay: string }>): Promise<void> {
+    await this.#organizationUsage?.pruneTraceDaysBefore(input);
   }
 
   /** The trace windows that ended in (`after`, `upTo`]: their trace traits go once as null. */

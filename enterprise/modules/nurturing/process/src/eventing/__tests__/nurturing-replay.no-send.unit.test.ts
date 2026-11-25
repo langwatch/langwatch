@@ -27,6 +27,7 @@ import {
   sealPipelineDefinition,
 } from "@langwatch/eventing";
 import {
+  GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
   GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
 } from "@langwatch/gateway-contract";
@@ -66,8 +67,13 @@ import type { MemoryNurturingPersonalProjectRepository } from "../../repositorie
 import type { MemoryNurturingTracedProjectRepository } from "../../repositories/memory/memory.nurturing-traced-project.repository.ts";
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { utcDayOf } from "../../rules/nurturing-time.rules.ts";
+import { traceCountsOf } from "../../rules/nurturing-trace-day.rules.ts";
 import { buildNurturingProjectUsagePipeline } from "../nurturing-project-usage.pipeline.ts";
-import { firstRequestFact, lifecycleFact } from "./nurturing-gateway-facts.test-helpers.ts";
+import {
+  firstRequestFact,
+  lifecycleFact,
+  unbudgetedSpendFact,
+} from "./nurturing-gateway-facts.test-helpers.ts";
 import {
   ADMINS_STEP,
   AUTH_MEMBERS_STEP,
@@ -94,10 +100,18 @@ import {
   USER_MARKS_STEP,
 } from "./nurturing-replay-steps.test-helpers.ts";
 import { NurturingSeededLog } from "./nurturing-seeded-log.test-helpers.ts";
+import {
+  spanReceived,
+  TRACE_DAY_FAILURES_STEP,
+  TRACE_DAY_SPANS_STEP,
+  traceDayReplayStepsOver,
+  traceFailed,
+} from "./nurturing-trace-days.test-helpers.ts";
 import { RecordingCustomerIoChannel } from "./recording-customer-io-channel.test-helpers.ts";
 
 /** After both replay windows open: evaluation days since 2026-10-19, last traces since 2026-11-18. */
 const AT = Date.UTC(2026, 10, 19, 12);
+const DAY_MS = 24 * 60 * 60 * 1000;
 const ORGANIZATION_ID = "org-1";
 
 let sequence = 0;
@@ -152,13 +166,15 @@ const projectFact = (type: string, projectId: string, data: Record<string, unkno
   });
 
 /**
- * One owner fact for each of the fifteen lanes the deploy replays: the two erasure marks, the key,
- * the evaluation day, the plan, and the organization, project and trace copies. Gateway's
- * first-request fact sits in the log too: only a live subscriber reads it, so no step sends it.
+ * One owner fact for each of the seventeen lanes the deploy replays: the two erasure marks, the
+ * key, the evaluation day, the plan, the organization, project and trace copies, and the two
+ * trace-day folds. Gateway's first-request and unbudgeted-spend facts sit in the log too: only a
+ * live subscriber reads them, so no step sends them.
  */
 function ownerLogs(): ReplayEvent[] {
   const gateway = lifecycleFact({ occurred_at: AT });
   const firstRequest = firstRequestFact({ occurred_at: AT });
+  const unbudgeted = unbudgetedSpendFact({ occurred_at: AT });
   return [
     // User marks, identity marks.
     logged({
@@ -197,6 +213,14 @@ function ownerLogs(): ReplayEvent[] {
       tenantId: firstRequest.tenantId,
       version: "2026-07-31",
       data: firstRequest,
+    }),
+    logged({
+      type: GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
+      aggregateType: "governance_subject",
+      aggregateId: `org:${unbudgeted.organization_id}`,
+      tenantId: unbudgeted.tenantId,
+      version: "2026-07-31",
+      data: unbudgeted,
     }),
     // Evaluation days.
     logged({
@@ -264,6 +288,9 @@ function ownerLogs(): ReplayEvent[] {
       tenantId: "project-lt",
       data: { projectId: "project-lt", userId: "admin-1", organizationId: "org-trace" },
     }),
+    // A root span and a failed trace, each counted on its own trace-day row.
+    spanReceived({ id: "span-td", projectId: "project-td", createdAt: AT }),
+    traceFailed({ id: "failed-td", projectId: "project-td", createdAt: AT }),
   ];
 }
 
@@ -295,9 +322,9 @@ async function deploy(events: ReplayEvent[]) {
   const pipeline = buildNurturingProjectUsagePipeline({
     store: repositories.projectUsage,
     evaluationDays: repositories.evaluationDays,
+    traceDays: repositories.traceDays,
     copies: {
       placements: repositories.placements,
-      copyLanded: (input) => app.uncopiedProjectCopied(input),
       organizationsCreated: repositories.organizationsCreated,
       admins: repositories.milestones,
       members: repositories.members,
@@ -308,7 +335,6 @@ async function deploy(events: ReplayEvent[]) {
     },
     plans: { store: repositories.plans, deliver: (input) => app.deliverPlan(input) },
     sync: {
-      countTraces: (input) => app.countTraces(input),
       usageChanged: (input) => app.organizationUsageChanged(input),
       tracesChanged: (input) => app.organizationTracesChanged(input),
       organizationCreated: (data) => app.organizationCreated(data),
@@ -331,6 +357,7 @@ async function deploy(events: ReplayEvent[]) {
     ...nurturingReplayStepsOver(replayer),
     ...organizationCopiesReplayStepsOver(replayer),
     ...projectCopiesReplayStepsOver(replayer),
+    ...traceDayReplayStepsOver(replayer, { now: AT + DAY_MS }),
   ];
   /** Runs the named steps for real, in the declared order the caller lists them. */
   const run = async (ids: readonly string[]) => {
@@ -374,6 +401,8 @@ const ALL_STEPS = [
   TRACED_PROJECTS_OF_TRACE_STEP,
   TRACED_PROJECTS_OF_PROJECT_STEP,
   LAST_TRACES_STEP,
+  TRACE_DAY_SPANS_STEP,
+  TRACE_DAY_FAILURES_STEP,
 ] as const;
 
 const NOTHING_RECORDED = {
@@ -490,6 +519,19 @@ describe("given every replay step run over seeded owner logs on a worker with re
       await expect(
         rows().milestones.findLastTraceAt({ organizationId: "org-trace" }),
       ).resolves.toBe(AT);
+    });
+
+    it("holds the trace day's spans row and failures row trace's logs counted", async () => {
+      const days = await rows().traceDays.findForProjects({
+        projectIds: ["project-td"],
+        afterDay: "",
+      });
+
+      expect(traceCountsOf({ days, windowStartDay: "" })).toMatchObject({
+        traceCount: 1,
+        errorCount: 1,
+        activeDays: [utcDayOf(AT)],
+      });
     });
   });
 });

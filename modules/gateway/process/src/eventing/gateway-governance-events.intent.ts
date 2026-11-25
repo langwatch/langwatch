@@ -2,10 +2,14 @@ import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventSchema, EventUtils } from "@langwatch/eventing";
 import {
   GATEWAY_BUDGET_CROSSING_EVENT_TYPE,
+  GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
   GATEWAY_VK_FIRST_REQUEST_EVENT_TYPE,
   GATEWAY_VK_LIFECYCLE_EVENT_TYPE,
   type RecordBudgetCrossingCommandData,
   recordBudgetCrossingCommandDataSchema,
+  type RecordUnbudgetedSpendCommandData,
+  recordUnbudgetedSpendCommandDataSchema,
+  unbudgetedSpendKeyOf,
   type RecordVkFirstRequestCommandData,
   recordVkFirstRequestCommandDataSchema,
   type RecordVkLifecycleCommandData,
@@ -23,6 +27,7 @@ const GATEWAY_GOVERNANCE_EVENTS_VERSION = "2026-07-31" as const;
 const RECORD_VK_LIFECYCLE_COMMAND_TYPE = "lw.governance.record_vk_lifecycle" as const;
 const RECORD_BUDGET_CROSSING_COMMAND_TYPE = "lw.governance.record_budget_crossing" as const;
 const RECORD_VK_FIRST_REQUEST_COMMAND_TYPE = "lw.governance.record_vk_first_request" as const;
+const RECORD_UNBUDGETED_SPEND_COMMAND_TYPE = "lw.governance.record_unbudgeted_spend" as const;
 
 const eventEnvelope = z.object({
   ...EventSchema.shape,
@@ -50,10 +55,18 @@ export const gatewayVkFirstRequestEventSchema = z.object({
 });
 type GatewayVkFirstRequestEvent = z.infer<typeof gatewayVkFirstRequestEventSchema>;
 
+export const gatewayUnbudgetedSpendEventSchema = z.object({
+  ...eventEnvelope.shape,
+  type: z.literal(GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE),
+  data: recordUnbudgetedSpendCommandDataSchema,
+});
+type GatewayUnbudgetedSpendEvent = z.infer<typeof gatewayUnbudgetedSpendEventSchema>;
+
 export type GatewayGovernanceProcessingEvent =
   | GatewayVkLifecycleEvent
   | GatewayBudgetCrossingEvent
-  | GatewayVkFirstRequestEvent;
+  | GatewayVkFirstRequestEvent
+  | GatewayUnbudgetedSpendEvent;
 
 /** Keyed on (subject, action, instant), so an admin's double-click records once. */
 export class RecordVkLifecycleCommand implements CommandHandler<
@@ -159,6 +172,45 @@ export class RecordVkFirstRequestCommand implements CommandHandler<
         metadata: {},
         occurredAt: data.occurred_at,
         idempotencyKey: `${command.tenantId}:vk_first_request:${data.virtual_key_id}`,
+      }),
+    ];
+  }
+}
+
+/**
+ * Keyed on (organization, ISO week), with no instant. Every sweep of the week that finds the
+ * organization still unbudgeted appends a fact under that one key: the log collapses repeats
+ * only later, so nurturing's claim and the Customer.io message id stop a second send.
+ */
+export class RecordUnbudgetedSpendCommand implements CommandHandler<
+  Command<RecordUnbudgetedSpendCommandData>,
+  GatewayUnbudgetedSpendEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_UNBUDGETED_SPEND_COMMAND_TYPE,
+    recordUnbudgetedSpendCommandDataSchema,
+    "Record an organization's weekly spend on keys no budget applies to",
+  );
+
+  static getAggregateId(payload: RecordUnbudgetedSpendCommandData): string {
+    return `org:${payload.organization_id}`;
+  }
+
+  async handle(
+    command: Command<RecordUnbudgetedSpendCommandData>,
+  ): Promise<GatewayUnbudgetedSpendEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<GatewayUnbudgetedSpendEvent>({
+        aggregateType: GATEWAY_GOVERNANCE_EVENTS_AGGREGATE_TYPE,
+        aggregateId: `org:${data.organization_id}`,
+        tenantId: createTenantId(command.tenantId),
+        type: GATEWAY_UNBUDGETED_SPEND_EVENT_TYPE,
+        version: GATEWAY_GOVERNANCE_EVENTS_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurred_at,
+        idempotencyKey: unbudgetedSpendKeyOf(data),
       }),
     ];
   }

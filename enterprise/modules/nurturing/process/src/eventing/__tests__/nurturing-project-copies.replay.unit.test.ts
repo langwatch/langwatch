@@ -241,9 +241,9 @@ function deploy({
   const pipeline = buildNurturingProjectUsagePipeline({
     store: repositories.projectUsage,
     evaluationDays: repositories.evaluationDays,
+    traceDays: repositories.traceDays,
     copies: {
       placements: repositories.placements,
-      copyLanded: async () => undefined,
       organizationsCreated: repositories.organizationsCreated,
       admins: repositories.milestones,
       members: repositories.members,

@@ -266,6 +266,16 @@
       "seed": "unplanned",
       "note": "needs evaluation lifecycle_completed facts since 2026-10-19 in the event log; no seed records one yet"
     },
+    "nurturing:replay-trace-day-spans": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "projection replay from the owner's event log; no seed door written yet"
+    },
+    "nurturing:replay-trace-day-failures": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "projection replay from the owner's event log; no seed door written yet"
+    },
     "nurturing:replay-organization-plans": {
       "status": "pending",
       "seed": "unplanned",
@@ -362,6 +372,11 @@
       "seed": "heavy:otlp",
       "note": "the seeded spans' events refold trace_analytics rows with the fold's metadata columns",
       "cells": ["C1", "C3"]
+    },
+    "trace:replay-trace-analytics-managed-prompt-version": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs traces with managed prompt versions written by the old release; no seed carries them yet"
     },
     "trace:replay-span-analytics": {
       "status": "seeded",

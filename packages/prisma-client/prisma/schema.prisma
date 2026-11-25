@@ -1091,6 +1091,10 @@ model OrganizationUser {
   /// id belongs to this org. See departments.feature.
   departmentId String?
 
+  /// A Billing-only member (ADR-205): role EXTERNAL, the Billing grant, no team and
+  /// no seat. Any role change clears it. See billing-only-invite.feature.
+  billingOnly Boolean @default(false)
+
   /// Set when an admin disables this membership to stay within the licensed
   /// seat count. The person loses access to this organization only, keeps
   /// their role, department and everything they did, and frees their seat.
@@ -2256,6 +2260,8 @@ model OrganizationInvite {
   // matched (null for pre-identifier users, who match on User.email).
   acceptedByUserId        String?
   acceptedViaIdentifierId String?
+  /// Invites the person who pays with the Billing grant and no seat (ADR-205).
+  billingOnly             Boolean              @default(false)
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @default(now()) @updatedAt
 
@@ -5300,9 +5306,8 @@ model NurturingProject {
   @@index([organizationId])
 }
 
-/// A project nurturing saw traces of with no placement copy, and when it first did: every worker
-/// retries its trace batches only within one window from then, across restarts. Deleted when the
-/// copy lands.
+/// retired: unread since v3.28.0. The trace-day folds count a trace with no placement copy, so no
+/// retry clock reads or writes this table; an operator step may drop it once old writers are gone.
 model NurturingUncopiedProject {
   projectId   String   @id
   firstSeenAt DateTime @default(now())
@@ -5401,7 +5406,7 @@ model NurturingOrganization {
 
 /// Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario
 /// and simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per
-/// organization for the per-email traits. Traces are counted in NurturingProjectTraceDay.
+/// organization for the per-email traits. Traces are counted in NurturingProjectTraceDayCount.
 model NurturingProjectUsageView {
   projectId         String
   /// The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation).
@@ -5420,9 +5425,8 @@ model NurturingProjectUsageView {
   @@id([projectId, owner])
 }
 
-/// Nurturing's own trace counts from trace's span_received and trace_failed (ARCHITECTURE §9), a
-/// root span being one trace, one row per project and UTC day of append time, incremented in place
-/// by each batch. A redelivered batch can count a trace twice; accepted (issue 9378). Kept 30 days.
+/// retired: unread since v3.28.0. Replaced by NurturingProjectTraceDayCount, which the trace-day
+/// peer folds write and a replay rebuilds; an operator step may drop it once old writers are gone.
 model NurturingProjectTraceDay {
   projectId         String
   /// UTC `YYYY-MM-DD` of the root spans' append time.
@@ -5436,6 +5440,31 @@ model NurturingProjectTraceDay {
   lastFailedTraceAt DateTime?
 
   @@id([projectId, day])
+}
+
+/// Nurturing's own trace counts (ARCHITECTURE §9), one row per project, UTC day of append time and
+/// source: `spans` from trace's span_received peer fold (a customer root span is one trace),
+/// `failures` from trace_failed's. Each fold owns its rows, so the two never overwrite each other;
+/// readers sum a day's sources. Rebuilt by a projection replay. Kept 30 days.
+model NurturingProjectTraceDayCount {
+  projectId         String
+  /// UTC `YYYY-MM-DD` of the facts' append time.
+  day               String
+  /// The peer fold that wrote the row: `spans` or `failures`.
+  source            String
+  traceCount        Int       @default(0)
+  errorCount        Int       @default(0)
+  /// Append time of the newest root span.
+  lastTraceAt       DateTime?
+  /// Append time of the newest trace_failed.
+  lastFailedTraceAt DateTime?
+  /// The event ids of the last delivery folded in, so a redelivery folds once.
+  appliedEventIds   String[]  @default([])
+  /// A row of another version reads as undecodable and is left out of the read.
+  projectionVersion String
+
+  @@id([projectId, day, source])
+  @@index([day])
 }
 
 /// Each project and UTC day with a completed evaluation, from evaluation's lifecycle_completed,

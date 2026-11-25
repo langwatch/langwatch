@@ -26,22 +26,35 @@ import {
   definePipeline,
   type Event,
   EventSourcing,
+  type ReplayEvent,
 } from "@langwatch/eventing";
 import { EventStoreMemory, testEventSchema } from "@langwatch/eventing/testing";
+import { SPAN_RECEIVED_EVENT_TYPE, TRACE_FAILED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { MemoryNurturingEvaluationDayRepository } from "../../repositories/memory/memory.nurturing-evaluation-day.repository.ts";
 import { MemoryNurturingOrganizationPlanRepository } from "../../repositories/memory/memory.nurturing-organization-plan.repository.ts";
+import { MemoryNurturingTraceDayRepository } from "../../repositories/memory/memory.nurturing-trace-day.repository.ts";
 import { MemoryNurturingRepositories } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import {
   buildNurturingProjectUsagePipeline,
   NURTURING_EVALUATION_ACTIVE_DAY_LANE_ALIAS,
   NURTURING_PROJECT_USAGE_PIPELINE_NAME,
   NURTURING_SUBSCRIPTION_CHANGED_LANE_ALIAS,
+  NURTURING_TRACE_DAY_LANE_ALIASES,
   nurturingEvaluationDaysMap,
   nurturingOrganizationPlanFold,
   nurturingPlanSyncSubscriber,
+  nurturingTraceDayFailuresFold,
+  nurturingTraceDaySpansFold,
 } from "../nurturing-project-usage.pipeline.ts";
+import {
+  spanReceived,
+  TRACE_MILESTONES_OWNER,
+  TRACE_PROCESSING_OWNER,
+  traceFailed,
+} from "./nurturing-trace-days.test-helpers.ts";
 
 const NOON = Date.UTC(2026, 10, 20, 12);
 
@@ -118,6 +131,38 @@ function worker() {
   return { eventStore, eventSourcing };
 }
 
+/** A worker of this release with trace's two pipelines as stand-ins and both trace-day folds. */
+function traceDayWorker() {
+  const traceDays = MemoryNurturingTraceDayRepository.create();
+  const eventStore = EventStoreMemory.createForTesting();
+  const eventSourcing = new EventSourcing({ eventStore });
+  for (const [{ name, aggregateType }, type] of [
+    [TRACE_PROCESSING_OWNER, SPAN_RECEIVED_EVENT_TYPE],
+    [TRACE_MILESTONES_OWNER, TRACE_FAILED_EVENT_TYPE],
+  ] as const) {
+    eventSourcing.register(
+      definePipeline({ name, aggregate: defineAggregate({ type: aggregateType }) })
+        .withEvents([testEventSchema(type, z.unknown())])
+        .build(),
+    );
+  }
+  eventSourcing.register(
+    usageHost()
+      .withPeerFoldProjection(nurturingTraceDaySpansFold(traceDays.forSource("spans")))
+      .withPeerFoldProjection(nurturingTraceDayFailuresFold(traceDays.forSource("failures")))
+      .withLaneAliases(NURTURING_TRACE_DAY_LANE_ALIASES)
+      .build(),
+  );
+  eventSourcing.startConsumers();
+  return { traceDays, eventStore, eventSourcing };
+}
+
+/** A logged trace fact as its owner appended it. */
+const appended = ({ timestamp: _timestamp, ...fact }: ReplayEvent): Event => ({
+  ...fact,
+  tenantId: createTenantId(fact.tenantId),
+});
+
 /** A job the previous release queued under `key`, `<pipeline>:<jobType>:<name>`, for `event`. */
 async function queuedByPreviousRelease({
   eventSourcing,
@@ -150,9 +195,9 @@ describe("the usage host's lane aliases", () => {
     const pipeline = buildNurturingProjectUsagePipeline({
       store: repositories.projectUsage,
       evaluationDays: repositories.evaluationDays,
+      traceDays: repositories.traceDays,
       copies: {
         placements: repositories.placements,
-        copyLanded: async () => undefined,
         organizationsCreated: repositories.organizationsCreated,
         admins: repositories.milestones,
         members: repositories.members,
@@ -167,6 +212,9 @@ describe("the usage host's lane aliases", () => {
 
     expect(pipeline.laneAliases).toContainEqual(NURTURING_EVALUATION_ACTIVE_DAY_LANE_ALIAS);
     expect(pipeline.laneAliases).toContainEqual(NURTURING_SUBSCRIPTION_CHANGED_LANE_ALIAS);
+    for (const alias of NURTURING_TRACE_DAY_LANE_ALIASES) {
+      expect(pipeline.laneAliases).toContainEqual(alias);
+    }
     expect(pipeline.laneAliases?.some((alias) => "tombstone" in alias)).toBe(false);
   });
 
@@ -249,6 +297,50 @@ describe("the usage host's lane aliases", () => {
         from: "global:subscriber:nurturing.subscriptionChanged",
         to: { jobType: "projection", lane: "organizationPlans" },
       });
+    });
+  });
+
+  describe("given a job the previous release queued under the traceDayCount subscriber's lane", () => {
+    /** @scenario "A job queued under a retired copy lane reaches its successor" */
+    it("counts its trace through the spans fold", async () => {
+      const { traceDays, eventStore, eventSourcing } = traceDayWorker();
+      const fact = appended(spanReceived({ id: "span-1", createdAt: NOON }));
+      await eventStore.seed({ events: [fact] });
+
+      await queuedByPreviousRelease({
+        eventSourcing,
+        key: NURTURING_TRACE_DAY_LANE_ALIASES[0]!.from,
+        event: fact,
+      });
+
+      await vi.waitFor(async () =>
+        expect(
+          await traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" }),
+        ).toEqual([expect.objectContaining({ day: "2026-11-20", traceCount: 1, errorCount: 0 })]),
+      );
+      await eventSourcing.close();
+    });
+  });
+
+  describe("given a job the previous release queued under the failedTraceDayCount subscriber's lane", () => {
+    /** @scenario "A job queued under a retired copy lane reaches its successor" */
+    it("counts its failure through the failures fold", async () => {
+      const { traceDays, eventStore, eventSourcing } = traceDayWorker();
+      const fact = appended(traceFailed({ id: "trace-1", createdAt: NOON }));
+      await eventStore.seed({ events: [fact] });
+
+      await queuedByPreviousRelease({
+        eventSourcing,
+        key: NURTURING_TRACE_DAY_LANE_ALIASES[1]!.from,
+        event: fact,
+      });
+
+      await vi.waitFor(async () =>
+        expect(
+          await traceDays.findForProjects({ projectIds: ["project-1"], afterDay: "" }),
+        ).toEqual([expect.objectContaining({ day: "2026-11-20", traceCount: 0, errorCount: 1 })]),
+      );
+      await eventSourcing.close();
     });
   });
 });

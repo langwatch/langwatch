@@ -17,7 +17,6 @@ import { MemoryNurturingProjectPlacementRepository } from "./memory.nurturing-pr
 import { MemoryNurturingProjectUsageRepository } from "./memory.nurturing-project-usage.repository.ts";
 import { MemoryNurturingTraceDayRepository } from "./memory.nurturing-trace-day.repository.ts";
 import { MemoryNurturingTracedProjectRepository } from "./memory.nurturing-traced-project.repository.ts";
-import { MemoryNurturingUncopiedProjectRepository } from "./memory.nurturing-uncopied-project.repository.ts";
 
 /** One claim per key, lapsing when its window does, as the Redis key expires. */
 export class MemoryNurturingClaimRepository implements NurturingClaimRepository {
@@ -60,7 +59,6 @@ export class MemoryNurturingRepositories {
       evaluationDays: MemoryNurturingEvaluationDayRepository.create(),
       personalProjects: MemoryNurturingPersonalProjectRepository.create({ erasedUsers }),
       tracedProjects: MemoryNurturingTracedProjectRepository.create(),
-      uncopiedProjects: MemoryNurturingUncopiedProjectRepository.create(),
       claims: MemoryNurturingClaimRepository.create(),
     };
   }

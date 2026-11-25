@@ -15,6 +15,7 @@ import type { NurturingClaimRepository } from "../repositories/nurturing-claim.r
 import type { NurturingErasedUserRepository } from "../repositories/nurturing-erased-user.repository.ts";
 import type { NurturingOrganizationMemberRepository } from "../repositories/nurturing-organization-member.repository.ts";
 import { fire as fireActivity } from "../rules/nurturing-activity-tracking-service.rules.ts";
+import { isClaimedSignal } from "../rules/nurturing-claimed-calls.rules.ts";
 import { fireCodingOrApp, isCodingOrAppSignal } from "../rules/nurturing-coding-delivery.rules.ts";
 import { selfHostedTraits, unixSecondsOf } from "../rules/nurturing-customer-io-timestamp.rules.ts";
 import { pickCustomerIoDebounce } from "../rules/nurturing-delivery-debounce.rules.ts";
@@ -38,9 +39,12 @@ import {
 } from "../rules/nurturing-member-facts.rules.ts";
 import {
   fireInviteAccepted,
+  fireMemberAdmitted,
+  fireMemberRoleChanged,
   fireSsoAutoAdded,
 } from "../rules/nurturing-membership-join-service.rules.ts";
 import {
+  fireEvaluationCompany,
   fireEvaluationCompleted,
   fireFirstTraceIntegrated,
   fireSimulationRunFinished,
@@ -53,8 +57,8 @@ import {
 import { firePromptCreated } from "../rules/nurturing-prompt-creation-service.rules.ts";
 import { fireSignup } from "../rules/nurturing-signup-identification-service.rules.ts";
 import { NurturingClaimReleaseService } from "./nurturing-claim-release.service.ts";
+import { NurturingClaimedCallsDeliveryService } from "./nurturing-claimed-calls-delivery.service.ts";
 import { NurturingErasedPeopleService } from "./nurturing-erased-people.service.ts";
-import { NurturingGatewayKeyDeliveryService } from "./nurturing-gateway-key-delivery.service.ts";
 import { NurturingJoinedOrganizationService } from "./nurturing-joined-organization.service.ts";
 import type { NurturingMemberFactsService } from "./nurturing-member-facts.service.ts";
 import { NurturingOwnCodingDeliveryService } from "./nurturing-own-coding-delivery.service.ts";
@@ -108,7 +112,7 @@ export class NurturingDeliveryService {
       postHogDelivery: NurturingPostHogDeliveryService | undefined;
       ownCodingDelivery: NurturingOwnCodingDeliveryService | undefined;
       joinedOrganization: NurturingJoinedOrganizationService | undefined;
-      gatewayKeys: NurturingGatewayKeyDeliveryService | undefined;
+      claimedCalls: NurturingClaimedCallsDeliveryService | undefined;
       planSync: NurturingPlanSyncService;
       erasedPeople: NurturingErasedPeopleService;
     }>,
@@ -122,9 +126,9 @@ export class NurturingDeliveryService {
         customerIo && NurturingOwnCodingDeliveryService.create({ claims, customerIo }),
       joinedOrganization:
         customerIo && NurturingJoinedOrganizationService.create({ claims, customerIo }),
-      gatewayKeys:
+      claimedCalls:
         customerIo &&
-        NurturingGatewayKeyDeliveryService.create({
+        NurturingClaimedCallsDeliveryService.create({
           claims,
           customerIo,
           windowSeconds: DELIVERED_WINDOW_SECONDS,
@@ -156,6 +160,7 @@ export class NurturingDeliveryService {
     await this.parts.joinedOrganization?.deliver(signal);
     const deliveredClaim = `nurturing:${key}`;
     if (!(await this.deps.claims.claim(deliveredClaim, DELIVERED_WINDOW_SECONDS))) return;
+    this.sendCustomerIoCalls(fireEvaluationCompany(signal));
     if (await this.withinCustomerIoDebounce(signal)) return this.toPostHogSafely(signal);
     const memberBatch = await this.memberBatchOf({ signal, deliveredClaim });
     await this.toCustomerIo(signal, deliveredClaim);
@@ -334,6 +339,10 @@ export class NurturingDeliveryService {
   private async toCustomerIo(signal: NurturingSignal, deliveredClaim: string): Promise<void> {
     if (!this.deps.customerIo) return;
     if (isCodingOrAppSignal(signal)) return this.sendCustomerIoCalls(fireCodingOrApp(signal));
+    // Each call is claimed on its own; a refused one fails the delivery, so its job retries.
+    if (isClaimedSignal(signal)) {
+      return this.parts.claimedCalls?.deliver({ signal, deliveredClaim });
+    }
     switch (signal.kind) {
       case "scenario_created":
         return this.sendCustomerIoCalls(fireScenarioCreated(signal));
@@ -360,6 +369,10 @@ export class NurturingDeliveryService {
           ...signal,
           callsFor: (traces) => fireInviteAccepted({ signal, traces }),
         });
+      case "member_role_changed":
+        return this.sendCustomerIoCalls(fireMemberRoleChanged(signal));
+      case "member_admitted":
+        return this.sendCustomerIoCalls(fireMemberAdmitted(signal));
       case "sso_auto_added":
         return this.sendWithTraces({
           ...signal,
@@ -388,11 +401,6 @@ export class NurturingDeliveryService {
         );
       case "self_hosted_crm":
         return this.selfHostedCrm(signal);
-      case "virtual_key_created":
-      case "key_budget_threshold":
-      case "key_first_request":
-        // Each call is claimed on its own; a refused one fails the delivery, so its job retries.
-        return this.parts.gatewayKeys?.deliver({ signal, deliveredClaim });
       default:
         return;
     }
