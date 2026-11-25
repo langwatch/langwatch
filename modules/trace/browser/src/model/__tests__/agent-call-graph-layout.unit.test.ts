@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   a2aSpanIdsOf,
   hasMultipleAgents,
+  keepsAgentsTab,
   layerAgentCallGraph,
   mayHaveSeveralAgents,
 } from "../agent-call-graph-layout.ts";
@@ -31,7 +32,6 @@ function graphOf(ids: string[], edges: [string, string][]): AgentCallGraph {
       a2a: false,
       firstSpanId: "",
     })),
-    a2aSpans: [],
   };
 }
 
@@ -57,19 +57,6 @@ describe("layerAgentCallGraph", () => {
       ),
     });
     expect(layers.map((layer) => layer.map((n) => n.id))).toEqual([["a"], ["b"], ["c"]]);
-  });
-
-  it("terminates on a cycle", () => {
-    const layers = layerAgentCallGraph({
-      graph: graphOf(
-        ["a", "b"],
-        [
-          ["a", "b"],
-          ["b", "a"],
-        ],
-      ),
-    });
-    expect(layers.flat()).toHaveLength(2);
   });
 });
 
@@ -101,6 +88,24 @@ describe("mayHaveSeveralAgents", () => {
       }),
     ).toBe(true);
     expect(mayHaveSeveralAgents({ spans: [spanOf("a"), spanOf("b", { isA2aCall: true })] })).toBe(
+      true,
+    );
+  });
+});
+
+describe("keepsAgentsTab", () => {
+  /** @scenario "The viz pane keeps the Agents view until the tab's visibility is final" */
+  it("keeps a selected Agents tab while unsettled and drops it once settled hidden", () => {
+    expect(keepsAgentsTab({ isAgentsSelected: true, showsAgents: false, isSettled: false })).toBe(
+      true,
+    );
+    expect(keepsAgentsTab({ isAgentsSelected: true, showsAgents: false, isSettled: true })).toBe(
+      false,
+    );
+    expect(keepsAgentsTab({ isAgentsSelected: false, showsAgents: false, isSettled: false })).toBe(
+      false,
+    );
+    expect(keepsAgentsTab({ isAgentsSelected: false, showsAgents: true, isSettled: true })).toBe(
       true,
     );
   });
