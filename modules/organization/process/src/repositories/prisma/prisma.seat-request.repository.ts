@@ -17,7 +17,7 @@ type PrismaSeatRequestDatabase = Pick<PrismaClient, "seatRequest" | "$transactio
 
 type StoredSeatRequest = Prisma.SeatRequestGetPayload<Record<string, never>>;
 
-/** Reopening, resolving and the sales claim read then write, so each runs SERIALIZABLE. */
+/** Reopening and the sales claim read then write, so each runs SERIALIZABLE. */
 export class PrismaSeatRequestRepository
   extends PrismaRepository.transactionalFor("SeatRequest")
   implements SeatRequestRepository
@@ -125,23 +125,16 @@ export class PrismaSeatRequestRepository
   }
 
   async resolve(input: Parameters<SeatRequestRepository["resolve"]>[0]): Promise<boolean> {
-    return this.serializableTransaction(async (transaction) => {
-      const open = await transaction.seatRequest.findFirst({
-        where: { id: input.id, organizationId: input.organizationId, status: "OPEN" },
-        select: { id: true },
-      });
-      if (!open) return false;
-      await transaction.seatRequest.update({
-        where: { id: input.id },
-        data: {
-          status: input.status,
-          resolvedAt: new Date(input.at),
-          resolvedByUserId: input.resolvedByUserId,
-          seatPendingSince: input.status === "APPROVED" ? new Date(input.at) : null,
-        },
-      });
-      return true;
+    const { count } = await this.prisma.seatRequest.updateMany({
+      where: { id: input.id, organizationId: input.organizationId, status: "OPEN" },
+      data: {
+        status: input.status,
+        resolvedAt: new Date(input.at),
+        resolvedByUserId: input.resolvedByUserId,
+        seatPendingSince: input.status === "APPROVED" ? new Date(input.at) : null,
+      },
     });
+    return count > 0;
   }
 
   async release(input: Parameters<SeatRequestRepository["release"]>[0]): Promise<void> {
