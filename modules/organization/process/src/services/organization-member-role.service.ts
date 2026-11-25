@@ -5,7 +5,7 @@
 import { GrantScopeTier, type AuthzGrantCaller } from "@langwatch/authz-contract";
 import {
   TeamRoleUpdateRejectedError,
-  OrganizationUserRole,
+  type OrganizationUserRole,
   type TeamUserRole,
   CannotDisableSelfError,
   PersonalWorkspaceNotManagedHereError,
@@ -21,16 +21,13 @@ import {
   customRoleIdsOf,
   customRolePermissionsOf,
 } from "../rules/custom-role-permissions.rules.ts";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
+import { intendedRoleChangeGrants, intendedTeamGrant } from "../rules/role-change-grants.rules.ts";
 import {
   EffectiveTeamRoleUpdatesService,
   type EffectiveTeamRoleUpdate,
 } from "./compute-effective-team-role-updates.service.ts";
-import type {
-  OrganizationGrantCeilingService,
-  OrganizationIntendedGrant,
-} from "./organization-grant-ceiling.service.ts";
+import type { OrganizationGrantCeilingService } from "./organization-grant-ceiling.service.ts";
 import type { OrganizationMemberSeatService } from "./organization-member-seat.service.ts";
 import type {
   OrganizationSeatLicense,
@@ -54,6 +51,21 @@ export interface OrganizationSeatRevocationNotice {
     userId: string;
     enabledByUserId: string | null;
   }): Promise<void>;
+  /** Fire-and-forget: the role is already committed, so a failed record must not fail it. */
+  memberRoleChanged(input: {
+    organizationId: string;
+    userId: string;
+    role: string;
+    previousRole: string;
+    changedByUserId: string | null;
+  }): void;
+  /** Fire-and-forget: the membership is already committed, so a failed record must not fail it. */
+  memberAdmitted(input: {
+    organizationId: string;
+    userId: string;
+    role: string;
+    via: string;
+  }): void;
 }
 
 /**
@@ -273,7 +285,7 @@ export class OrganizationMemberRoleService {
       grants: intendedRoleChangeGrants({ organizationId, role, effectiveTeamRoleUpdates }),
     });
 
-    return this.dependencies.seats.withSeat({
+    const result = await this.dependencies.seats.withSeat({
       organizationId,
       work: (lease) =>
         this.writeRoleChange({
@@ -284,6 +296,16 @@ export class OrganizationMemberRoleService {
           lease,
         }),
     });
+    if (role !== currentMember.role) {
+      this.dependencies.seatNotices.memberRoleChanged({
+        organizationId,
+        userId,
+        role,
+        previousRole: currentMember.role,
+        changedByUserId: currentUserId,
+      });
+    }
+    return result;
   }
 
   /** The role change's seat and its write, under the seat lease the caller holds. */
@@ -441,59 +463,4 @@ export class OrganizationMemberRoleService {
       });
     }
   }
-
-  /**
-   * Returns paginated, enriched audit log entries for an organization.
-   */
-}
-
-/** The grants a member-role change writes: the organization role (none if EXTERNAL), then teams. */
-function intendedRoleChangeGrants({
-  organizationId,
-  role,
-  effectiveTeamRoleUpdates,
-}: {
-  organizationId: string;
-  role: OrganizationUserRole;
-  effectiveTeamRoleUpdates: EffectiveTeamRoleUpdate[];
-}): OrganizationIntendedGrant[] {
-  return [
-    ...(role === OrganizationUserRole.EXTERNAL
-      ? []
-      : [
-          {
-            role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
-            scopeType: GrantScopeTier.ORGANIZATION,
-            scopeId: organizationId,
-          },
-        ]),
-    ...effectiveTeamRoleUpdates.map((update) =>
-      intendedTeamGrant({
-        teamId: update.teamId,
-        role: update.role,
-        customRoleId: update.customRoleId,
-      }),
-    ),
-  ];
-}
-
-/** The team grant a requested role resolves to: a built-in role, or `custom:<id>` with its id. */
-function intendedTeamGrant({
-  teamId,
-  role,
-  customRoleId,
-}: {
-  teamId: string;
-  role: string;
-  customRoleId?: string;
-}): OrganizationIntendedGrant {
-  if (role === "ADMIN" || role === "MEMBER" || role === "VIEWER") {
-    return { role, scopeType: GrantScopeTier.TEAM, scopeId: teamId };
-  }
-  return {
-    role: "CUSTOM",
-    customRoleId: customRoleId ?? null,
-    scopeType: GrantScopeTier.TEAM,
-    scopeId: teamId,
-  };
 }

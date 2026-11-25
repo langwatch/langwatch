@@ -151,9 +151,14 @@ export const prismaTableCatalogue = {
   "NurturingUncopiedProject": "NurturingUncopiedProject",
   "NurturingOrganizationMember": "NurturingOrganizationMember",
   "NurturingOrganizationCreated": "NurturingOrganizationCreated",
+  "NurturingOrganizationPlan": "NurturingOrganizationPlan",
+  "NurturingVirtualKey": "NurturingVirtualKey",
+  "NurturingErasedUser": "NurturingErasedUser",
   "NurturingOrganization": "NurturingOrganization",
   "NurturingProjectUsageView": "NurturingProjectUsageView",
   "NurturingProjectTraceDay": "NurturingProjectTraceDay",
+  "NurturingProjectTraceDayCount": "NurturingProjectTraceDayCount",
+  "NurturingProjectEvaluationDay": "NurturingProjectEvaluationDay",
   "NurturingPersonalProject": "NurturingPersonalProject",
   "NurturingTracedProject": "NurturingTracedProject",
   "BillingMeterCheckpoint": "BillingMeterCheckpoint",
@@ -2559,6 +2564,33 @@ export const prismaModelFieldCatalogue = {
     "organizationId",
     "createdAt"
   ],
+  "NurturingOrganizationPlan": [
+    "organizationId",
+    "plan",
+    "occurredAt",
+    "fromCatchUp",
+    "appliedEventIds",
+    "winnerEventId"
+  ],
+  "NurturingVirtualKey": [
+    "virtualKeyId",
+    "organizationId",
+    "name",
+    "occurredAt",
+    "keyCreatedAt",
+    "creatorUserId",
+    "principalUserId",
+    "principalUserIdAt",
+    "purpose",
+    "purposeAt",
+    "disabledAt",
+    "enabledAt",
+    "revokedAt"
+  ],
+  "NurturingErasedUser": [
+    "userIdHash",
+    "erasedAt"
+  ],
   "NurturingOrganization": [
     "organizationId",
     "adminUserId",
@@ -2573,6 +2605,7 @@ export const prismaModelFieldCatalogue = {
     "codingRepositoryKeys",
     "codingFirstDays",
     "lastTraceAt",
+    "adminAt",
     "updatedAt"
   ],
   "NurturingProjectUsageView": [
@@ -2590,6 +2623,21 @@ export const prismaModelFieldCatalogue = {
     "errorCount",
     "lastTraceAt",
     "lastFailedTraceAt"
+  ],
+  "NurturingProjectTraceDayCount": [
+    "projectId",
+    "day",
+    "source",
+    "traceCount",
+    "errorCount",
+    "lastTraceAt",
+    "lastFailedTraceAt",
+    "appliedEventIds",
+    "projectionVersion"
+  ],
+  "NurturingProjectEvaluationDay": [
+    "projectId",
+    "day"
   ],
   "NurturingPersonalProject": [
     "projectId",
@@ -4019,9 +4067,14 @@ export const prismaRelationCatalogue = {
   "NurturingUncopiedProject": {},
   "NurturingOrganizationMember": {},
   "NurturingOrganizationCreated": {},
+  "NurturingOrganizationPlan": {},
+  "NurturingVirtualKey": {},
+  "NurturingErasedUser": {},
   "NurturingOrganization": {},
   "NurturingProjectUsageView": {},
   "NurturingProjectTraceDay": {},
+  "NurturingProjectTraceDayCount": {},
+  "NurturingProjectEvaluationDay": {},
   "NurturingPersonalProject": {},
   "NurturingTracedProject": {},
   "BillingMeterCheckpoint": {},

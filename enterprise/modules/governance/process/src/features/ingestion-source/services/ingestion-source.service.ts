@@ -26,6 +26,7 @@ import type {
 import type { GovernanceDiagnosticsSink } from "../../../services/governance-policy.service.ts";
 import type { PullDestinationService } from "../../ingestion-pull/services/pull-destination.service.ts";
 import { plainUpdateFields } from "../rules/ingestion-source-update.rules.ts";
+import type { IngestionSourceFactsService } from "./ingestion-source-facts.service.ts";
 import { IngestionSourceParserConfigService } from "./ingestion-source-parser-config.service.ts";
 import type { IngestionSecretService } from "./ingestion-source-secret.service.ts";
 import { IngestionSourceValidationService } from "./ingestion-source-validation.service.ts";
@@ -44,6 +45,7 @@ type IngestionSourceProjects = Pick<
   ProjectApi,
   "ensureInternal" | "listActiveByScopes" | "findWithTeam"
 >;
+type IngestionSourceFacts = Pick<IngestionSourceFactsService, "created" | "wentLive">;
 
 export class IngestionSourceService {
   private readonly repository: IngestionSourceRepository;
@@ -58,6 +60,7 @@ export class IngestionSourceService {
   private readonly validation: IngestionSourceValidationService;
   private readonly parserConfigs: IngestionSourceParserConfigService;
   private readonly ottl: Pick<GovernanceOttlGateway, "validate">;
+  private readonly facts: IngestionSourceFacts;
 
   private constructor({
     repository,
@@ -72,6 +75,7 @@ export class IngestionSourceService {
     validation,
     parserConfigs,
     ottl,
+    facts,
   }: {
     repository: IngestionSourceRepository;
     projects: IngestionSourceProjects;
@@ -85,6 +89,7 @@ export class IngestionSourceService {
     validation: IngestionSourceValidationService;
     parserConfigs: IngestionSourceParserConfigService;
     ottl: Pick<GovernanceOttlGateway, "validate">;
+    facts: IngestionSourceFacts;
   }) {
     this.repository = repository;
     this.projects = projects;
@@ -98,6 +103,7 @@ export class IngestionSourceService {
     this.validation = validation;
     this.parserConfigs = parserConfigs;
     this.ottl = ottl;
+    this.facts = facts;
   }
 
   static create(options: {
@@ -110,6 +116,7 @@ export class IngestionSourceService {
     providerAccounts: ProviderAccountChannel;
     diagnostics: GovernanceDiagnosticsSink;
     ottl: Pick<GovernanceOttlGateway, "validate">;
+    facts: IngestionSourceFacts;
     now?: () => number;
     /** A keyless S3 polling source reads as the deployment's own AWS identity (self-hosted). */
     deploymentAwsIdentity?: boolean;
@@ -125,6 +132,7 @@ export class IngestionSourceService {
       diagnostics: options.diagnostics,
       now: options.now ?? Date.now,
       ottl: options.ottl,
+      facts: options.facts,
       validation: IngestionSourceValidationService.create({
         projects: options.projects,
         deploymentAwsIdentity: options.deploymentAwsIdentity ?? false,
@@ -160,9 +168,7 @@ export class IngestionSourceService {
   async findByIngestSecret(rawSecret: string): Promise<GovernanceIngestionSource | null> {
     const candidateHash = this.secrets.hash(rawSecret);
     const direct = await this.repository.findByCurrentSecretHash(candidateHash);
-    if (direct) {
-      return direct;
-    }
+    if (direct) return direct;
 
     const candidates = await this.repository.findByPriorSecretHash(candidateHash);
     const now = this.now();
@@ -277,6 +283,7 @@ export class IngestionSourceService {
       createdById: input.actorUserId,
       providerAccountId: providerAccountId ?? null,
     });
+    this.facts.created(source);
     if (source.pullSchedule) {
       await this.syncBestEffort(source);
     }
@@ -430,12 +437,11 @@ export class IngestionSourceService {
     return source;
   }
 
-  /** A disabled source is never stamped back to active; the repository write says so. */
-  async recordEventReceived(id: string): Promise<void> {
-    await this.repository.recordEventReceived(
-      id,
-      Temporal.Instant.fromEpochMilliseconds(this.now()),
-    );
+  /** A disabled source is never stamped back to active; only its first data makes it live. */
+  async recordEventReceived(source: GovernanceIngestionSource): Promise<void> {
+    const at = Temporal.Instant.fromEpochMilliseconds(this.now());
+    const { wentLive } = await this.repository.recordEventReceived(source, at);
+    if (wentLive) this.facts.wentLive(source, at);
   }
 
   async getById({
@@ -446,9 +452,7 @@ export class IngestionSourceService {
     organizationId: string;
   }): Promise<GovernanceIngestionSource> {
     const source = await this.findById({ id, organizationId });
-    if (!source) {
-      throw new IngestionSourceNotFoundError(id);
-    }
+    if (!source) throw new IngestionSourceNotFoundError(id);
 
     return source;
   }
@@ -465,9 +469,7 @@ export class IngestionSourceService {
     const wanted = [
       ...new Set(sources.map((s) => s.traceProjectId).filter((id): id is string => !!id)),
     ];
-    if (wanted.length === 0) {
-      return new Set();
-    }
+    if (wanted.length === 0) return new Set();
 
     const { data } = await this.projects.listActiveByScopes({
       organizationId,

@@ -5306,9 +5306,8 @@ model NurturingProject {
   @@index([organizationId])
 }
 
-/// A project nurturing saw traces of with no placement copy, and when it first did: every worker
-/// retries its trace batches only within one window from then, across restarts. Deleted when the
-/// copy lands.
+/// retired: unread since v3.28.0. The trace-day folds count a trace with no placement copy, so no
+/// retry clock reads or writes this table; an operator step may drop it once old writers are gone.
 model NurturingUncopiedProject {
   projectId   String   @id
   firstSeenAt DateTime @default(now())
@@ -5338,6 +5337,49 @@ model NurturingOrganizationCreated {
   @@index([createdAt])
 }
 
+/// Each organization's plan, folded from billing's subscription_changed facts: nurturing's own
+/// copy. The newest fact wins, and a real fact wins a tie over a catch-up; Customer.io hears a
+/// fact only when it changes this row.
+model NurturingOrganizationPlan {
+  organizationId  String   @id
+  plan            String?
+  occurredAt      DateTime
+  fromCatchUp     Boolean
+  /// The event ids folded in, so a redelivery folds once.
+  appliedEventIds String[] @default([])
+  /// The fact that last changed the row; only it may tell Customer.io.
+  winnerEventId   String?
+}
+
+/// Each gateway virtual key, folded from gateway's vk_lifecycle facts: nurturing's own copy. The
+/// creator comes from the created fact alone; the holder and purpose are each the latest non-null
+/// value by the fact's time (stamped beside them); the state times keep their latest.
+model NurturingVirtualKey {
+  virtualKeyId      String    @id
+  organizationId    String
+  name              String
+  occurredAt        DateTime
+  keyCreatedAt      DateTime?
+  creatorUserId     String?
+  principalUserId   String?
+  principalUserIdAt DateTime?
+  purpose           String?
+  purposeAt         DateTime?
+  disabledAt        DateTime?
+  enabledAt         DateTime?
+  revokedAt         DateTime?
+
+  @@index([creatorUserId])
+  @@index([principalUserId])
+}
+
+/// Each account nurturing erased, as a SHA-256 of its id and never the id: a gateway key fact
+/// naming it, however late it lands, stores no creator or holder. Platform-wide, like the erasure.
+model NurturingErasedUser {
+  userIdHash String   @id
+  erasedAt   DateTime @default(now())
+}
+
 /// Nurturing's read model per organization: its admin and its milestone counts.
 /// `seeded` marks an organization learned from the project backfill: its first_* already happened.
 model NurturingOrganization {
@@ -5358,16 +5400,18 @@ model NurturingOrganization {
   // UTC day offsets 0 to 2 from the organization's creation that held a coding session.
   codingFirstDays      Int[]     @default([])
   lastTraceAt          DateTime? // moves forward only; told to a person joining later
+  adminAt              DateTime? // stamp of the fact that named adminUserId; the latest wins
   updatedAt            DateTime  @updatedAt
 }
 
 /// Nurturing's own per-project usage: a peer fold over the owners' prompt, evaluator, scenario
 /// and simulation-run events (ARCHITECTURE §9), one peer fold per owner pipeline, summed per
-/// organization for the per-email traits. Traces are counted in NurturingProjectTraceDay.
+/// organization for the per-email traits. Traces are counted in NurturingProjectTraceDayCount.
 model NurturingProjectUsageView {
   projectId         String
-  /// The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation),
-  /// or `evaluation`: the project's evaluation days, written by a subscriber, at most once a day.
+  /// The owner pipeline whose peer fold wrote the row (prompt, evaluator, scenario, simulation).
+  /// Evaluation days are not kept here: the evaluation-days map and its replay write them to
+  /// NurturingProjectEvaluationDay.
   owner             String
   /// The project's usage as the fold folded it (NurturingProjectUsageState).
   folded            Json
@@ -5381,9 +5425,8 @@ model NurturingProjectUsageView {
   @@id([projectId, owner])
 }
 
-/// Nurturing's own trace counts from trace's span_received and trace_failed (ARCHITECTURE §9), a
-/// root span being one trace, one row per project and UTC day of append time, incremented in place
-/// by each batch. A redelivered batch can count a trace twice; accepted (issue 9378). Kept 30 days.
+/// retired: unread since v3.28.0. Replaced by NurturingProjectTraceDayCount, which the trace-day
+/// peer folds write and a replay rebuilds; an operator step may drop it once old writers are gone.
 model NurturingProjectTraceDay {
   projectId         String
   /// UTC `YYYY-MM-DD` of the root spans' append time.
@@ -5395,6 +5438,41 @@ model NurturingProjectTraceDay {
   lastTraceAt       DateTime?
   /// Append time of the newest trace_failed.
   lastFailedTraceAt DateTime?
+
+  @@id([projectId, day])
+}
+
+/// Nurturing's own trace counts (ARCHITECTURE §9), one row per project, UTC day of append time and
+/// source: `spans` from trace's span_received peer fold (a customer root span is one trace),
+/// `failures` from trace_failed's. Each fold owns its rows, so the two never overwrite each other;
+/// readers sum a day's sources. Rebuilt by a projection replay. Kept 30 days.
+model NurturingProjectTraceDayCount {
+  projectId         String
+  /// UTC `YYYY-MM-DD` of the facts' append time.
+  day               String
+  /// The peer fold that wrote the row: `spans` or `failures`.
+  source            String
+  traceCount        Int       @default(0)
+  errorCount        Int       @default(0)
+  /// Append time of the newest root span.
+  lastTraceAt       DateTime?
+  /// Append time of the newest trace_failed.
+  lastFailedTraceAt DateTime?
+  /// The event ids of the last delivery folded in, so a redelivery folds once.
+  appliedEventIds   String[]  @default([])
+  /// A row of another version reads as undecodable and is left out of the read.
+  projectionVersion String
+
+  @@id([projectId, day, source])
+  @@index([day])
+}
+
+/// Each project and UTC day with a completed evaluation, from evaluation's lifecycle_completed,
+/// written insert-ignore. Replaces the `evaluation` rows of NurturingProjectUsageView.
+model NurturingProjectEvaluationDay {
+  projectId String
+  /// UTC `YYYY-MM-DD`.
+  day       String
 
   @@id([projectId, day])
 }
