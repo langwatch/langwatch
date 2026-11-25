@@ -123,6 +123,11 @@ import {
   langWatchQLRunProjectIds,
 } from "../rules/langwatch-ql-run-telemetry.rules.ts";
 import { dashboardsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
+import {
+  derivedRestrictedUser,
+  type LwqlCredentials,
+  resolveLwqlCredentials,
+} from "../rules/lwql-default-credentials.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
@@ -429,6 +434,34 @@ type AnalyticsSetup = FeatureSetup<
 >;
 
 /**
+ * LangWatchQL's passwords and access model mode: the explicit secrets, or, where none is set,
+ * derived from the key pepper (analytics-lwql-default-credentials.feature).
+ */
+function lwqlCredentials({
+  secrets,
+  settings,
+}: {
+  secrets: ScopedSecrets;
+  settings: AnalyticsServerConfig["langwatchQl"];
+}): Promise<LwqlCredentials> {
+  return secrets.into(AnalyticsModule.secrets.lwqlClickHousePassword, (clickHousePassword) =>
+    secrets.into(AnalyticsModule.secrets.lwqlPostgresReaderPassword, (postgresReaderPassword) =>
+      intoKeyPepper(secrets, (keyPepper) =>
+        resolveLwqlCredentials({
+          clickHousePassword:
+            typeof clickHousePassword === "string" ? clickHousePassword : undefined,
+          postgresReaderPassword:
+            typeof postgresReaderPassword === "string" ? postgresReaderPassword : undefined,
+          accessModelMode: settings.accessModelMode,
+          installMethod: settings.installMethod,
+          keyPepper,
+        }),
+      ),
+    ),
+  );
+}
+
+/**
  * The deployment secret the query-hash key derives from, first set wins: API_KEY_PEPPER,
  * CREDENTIALS_SECRET, NEXTAUTH_SECRET, as api-key peppers keys. None refuses the boot rather
  * than logging a hash anyone can recompute.
@@ -538,7 +571,14 @@ export class AnalyticsModule
           }),
       }),
     });
-    const lwqlConfig = setup.config.langwatchQl;
+    const credentials = await lwqlCredentials({
+      secrets: setup.secrets,
+      settings: setup.config.langwatchQl,
+    });
+    const lwqlConfig = {
+      ...setup.config.langwatchQl,
+      accessModelMode: credentials.accessModelMode,
+    };
     const { admin, postgres, database } = langWatchQl;
     const target = admin.configured
       ? LangWatchQLConnectionService.create().applyTargetOverrides({
@@ -547,34 +587,31 @@ export class AnalyticsModule
           explicitDatabase: lwqlConfig.database,
         })
       : { available: false as const };
-    const connection: LangWatchQLConnection | null = target.available
-      ? await setup.secrets.into(AnalyticsModule.secrets.lwqlClickHousePassword, (password) =>
-          typeof password === "string" && password
-            ? {
-                url: target.url,
-                database: target.database,
-                username: lwqlConfig.username ?? LWQL_CONNECTION_DEFAULTS.restrictedUser,
-                tenantSetting: lwqlConfig.tenantSetting ?? LWQL_CONNECTION_DEFAULTS.tenantSetting,
-                password,
-              }
-            : null,
-        )
-      : null;
+    const connection: LangWatchQLConnection | null =
+      target.available && credentials.clickHousePassword !== undefined
+        ? {
+            url: target.url,
+            database: target.database,
+            username:
+              lwqlConfig.username ??
+              (credentials.isDerived
+                ? derivedRestrictedUser({ database: target.database })
+                : LWQL_CONNECTION_DEFAULTS.restrictedUser),
+            tenantSetting: lwqlConfig.tenantSetting ?? LWQL_CONNECTION_DEFAULTS.tenantSetting,
+            password: credentials.clickHousePassword,
+          }
+        : null;
     const lwqlProvisioning =
       admin.configured && postgres.configured && connection
-        ? await setup.secrets.into(
-            AnalyticsModule.secrets.lwqlPostgresReaderPassword,
-            (readerPassword) =>
-              lwqlProvisioningOperations({
-                admin,
-                postgres,
-                database,
-                connection,
-                readerPassword: typeof readerPassword === "string" ? readerPassword : undefined,
-                settings: lwqlConfig,
-                projectKeys: setup.dependencies.projects,
-              }),
-          )
+        ? lwqlProvisioningOperations({
+            admin,
+            postgres,
+            database,
+            connection,
+            readerPassword: credentials.postgresReaderPassword,
+            settings: lwqlConfig,
+            projectKeys: setup.dependencies.projects,
+          })
         : LWQL_UNAVAILABLE;
     const hydration = LangWatchQLHydrationService.create({
       reads: LangWatchQLHydrationReadService.create({
