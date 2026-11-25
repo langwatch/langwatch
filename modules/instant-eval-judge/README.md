@@ -11,7 +11,7 @@ The Instant Evals judge, a dependency leaf that calls no peer (ADR-174 decision 
 | Classification | core (`modules/catalogue.json`)                                                                                                              |
 | Subjects       | instant-eval-judge                                                                                                                           |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                                          |
-| Api token      | `InstantEvalJudgeApi` = `moduleApi<InstantEvalJudgeApi>()("instant-eval-judge")`, `contract/src/instant-eval-judge.api.ts:67` (7 operations) |
+| Api token      | `InstantEvalJudgeApi` = `moduleApi<InstantEvalJudgeApi>()("instant-eval-judge")`, `contract/src/instant-eval-judge.api.ts:72` (8 operations) |
 | Installed by   | api, worker, tasks (process)                                                                                                                 |
 
 ## What instant-eval-judge owns

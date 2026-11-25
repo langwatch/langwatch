@@ -17,7 +17,10 @@ import {
   instantEvalJudgeQueryHoldPricingOf,
   instantEvalJudgeRouteBootIssues,
 } from "../instant-eval-judge-route-boot.rules.ts";
-import { instantEvalJudgeCallCostOf } from "../instant-eval-judge-route-cost.rules.ts";
+import {
+  instantEvalJudgeCallCostOf,
+  instantEvalJudgeSpendAfterCall,
+} from "../instant-eval-judge-route-cost.rules.ts";
 import { instantEvalJudgeFirstSendLeadsOf } from "../instant-eval-judge-route-merge.rules.ts";
 import { instantEvalJudgeRoutePlanOf } from "../instant-eval-judge-route.rules.ts";
 import {
@@ -320,6 +323,65 @@ describe("a routed call's cost", () => {
     expect(cost({ backend: "other", inputTokens: 1, outputTokens: 0 })).toEqual({
       outcome: "unpriced",
     });
+  });
+});
+
+describe("a judgement's spend after one more call", () => {
+  const pricing = {
+    version: "test",
+    backends: { llm: { usdPerMillionInputTokens: 1, usdPerMillionOutputTokens: 5 } },
+  };
+  const spend = { inputTokens: 1000, costNanoUsd: 7 };
+
+  /** @scenario "A routed judgement is priced from the summed cost of every call" */
+  it("adds a priced call's tokens and cost", () => {
+    expect(
+      instantEvalJudgeSpendAfterCall({
+        spend,
+        backend: "llm",
+        inputTokens: 100,
+        outputTokens: 10,
+        pricing,
+      }),
+    ).toEqual({ spend: { inputTokens: 1100, costNanoUsd: 150_007 }, isUnpriced: false });
+  });
+
+  it("adds an unpriced call's tokens and no cost, and says it had no price", () => {
+    expect(
+      instantEvalJudgeSpendAfterCall({
+        spend,
+        backend: "other",
+        inputTokens: 100,
+        outputTokens: 10,
+        pricing,
+      }),
+    ).toEqual({ spend: { inputTokens: 1100, costNanoUsd: 7 }, isUnpriced: true });
+  });
+
+  it("changes nothing for a call that billed no tokens, priced or not", () => {
+    for (const backend of ["llm", "other"]) {
+      expect(
+        instantEvalJudgeSpendAfterCall({
+          spend,
+          backend,
+          inputTokens: 0,
+          outputTokens: 0,
+          pricing,
+        }),
+      ).toEqual({ spend, isUnpriced: false });
+    }
+  });
+
+  it("counts a call that billed output tokens alone", () => {
+    expect(
+      instantEvalJudgeSpendAfterCall({
+        spend,
+        backend: "llm",
+        inputTokens: 0,
+        outputTokens: 10,
+        pricing,
+      }),
+    ).toEqual({ spend: { inputTokens: 1000, costNanoUsd: 50_007 }, isUnpriced: false });
   });
 });
 

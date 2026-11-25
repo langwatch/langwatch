@@ -116,6 +116,13 @@ Feature: A scenario judgement answered by the judge router
     Then the answer is unavailable and nothing is sent
 
   @unit
+  Scenario: Only a table with a turn decision backend can answer a scenario judge
+    Given the public route table, or a table whose decision backend is switched off with no fallback
+    When the judge is asked whether it can answer a scenario judge
+    Then it says no, so a run on LangWatch Judge (preview) is refused before it starts
+    And a table that names an enabled decision backend says yes
+
+  @unit
   Scenario: A judgement is one priced fact under the judge preview model
     Given a verdict whose decision requests and shared LLM call were paid
     When it is recorded

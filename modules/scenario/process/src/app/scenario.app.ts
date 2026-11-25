@@ -364,6 +364,7 @@ export class ScenarioModule implements ScenarioApi {
     const judgePreviewAvailability = JudgePreviewAvailabilityService.create({
       featureFlags: peers.featureFlags,
       projects: peers.projects,
+      judges: peers.judges,
       isSaas: config.isSaas,
     });
 

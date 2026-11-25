@@ -21,12 +21,13 @@ import {
   judgePreviewChatCompletionOf,
   judgePreviewLeafCallOf,
 } from "../../../rules/judge-preview-chat.rules.ts";
-import type { JudgePreviewAvailabilityService } from "./judge-preview-availability.service.ts";
+import {
+  JUDGE_PREVIEW_NOT_ON_CLOUD,
+  type JudgePreviewAvailabilityService,
+} from "./judge-preview-availability.service.ts";
 
 const PROJECT_NOT_LEARNED =
   "LangWatch Judge (preview) has not learned this project yet, so it judged nothing. Run it again in a minute.";
-const NOT_ON_CLOUD =
-  "LangWatch Judge (preview) runs on LangWatch Cloud only, so it judged nothing on this installation.";
 
 type JudgePreviewChatServiceDeps = Readonly<{
   judges: Pick<InstantEvalJudgeApi, "judgeScenario">;
@@ -68,6 +69,8 @@ function judgedOrThrow(
     throw new JudgePreviewBudgetExhaustedError(answer.message);
   }
   throw new JudgePreviewNotAvailableError(
-    answer.code === "instant_eval_project_unknown" ? PROJECT_NOT_LEARNED : NOT_ON_CLOUD,
+    answer.code === "instant_eval_project_unknown"
+      ? PROJECT_NOT_LEARNED
+      : JUDGE_PREVIEW_NOT_ON_CLOUD,
   );
 }

@@ -55,6 +55,7 @@ async function endpoint({
       },
     },
     judges: {
+      isScenarioJudgeConfigured: async () => true,
       judgeScenario: async (call) => {
         asked.push(call);
         return answer;

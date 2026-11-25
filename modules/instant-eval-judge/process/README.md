@@ -48,6 +48,14 @@ One metered scenario judge call, on LangWatch Cloud only: each criterion is rout
 judgeScenario(input: InstantEvalScenarioJudgeCall): Promise<InstantEvalScenarioJudgeAnswer>;
 ```
 
+#### `isScenarioJudgeConfigured`
+
+Whether this install's route table can answer a scenario judge: it names a turn decision backend an enabled LLM backend can take. A run is refused before it starts where not.
+
+```typescript
+isScenarioJudgeConfigured(): Promise<boolean>;
+```
+
 #### `recordSpend`
 
 Prices and records what an Instant Evals run or judged query spent, under the organization the caller resolved, so no project is looked up (ADR-174 decision 13). Throws when the priced fact cannot be stored, so a run's finish retries onto the same request id.

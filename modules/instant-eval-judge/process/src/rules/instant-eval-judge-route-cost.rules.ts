@@ -42,6 +42,38 @@ export function instantEvalJudgeCallCostOf({
   return { outcome: "priced", costNanoUsd: Math.round(nano) };
 }
 
+/** What a judgement's calls have spent so far: the input tokens and their cost. */
+export type InstantEvalJudgeSpend = Readonly<{ inputTokens: number; costNanoUsd: number }>;
+
+/**
+ * The spend after one more call, and whether that call had no price. A call that billed no
+ * tokens changes nothing; an unpriced one adds its tokens and no cost, for its caller to flag.
+ */
+export function instantEvalJudgeSpendAfterCall({
+  spend,
+  backend,
+  inputTokens,
+  outputTokens,
+  pricing,
+}: {
+  spend: InstantEvalJudgeSpend;
+  backend: string;
+  inputTokens: number;
+  outputTokens: number;
+  pricing: InstantEvalJudgeRoutePricing;
+}): Readonly<{ spend: InstantEvalJudgeSpend; isUnpriced: boolean }> {
+  if (inputTokens <= 0 && outputTokens <= 0) return { spend, isUnpriced: false };
+  const cost = instantEvalJudgeCallCostOf({ backend, inputTokens, outputTokens, pricing });
+  const costNanoUsd = cost.outcome === "priced" ? cost.costNanoUsd : 0;
+  return {
+    spend: {
+      inputTokens: spend.inputTokens + inputTokens,
+      costNanoUsd: spend.costNanoUsd + costNanoUsd,
+    },
+    isUnpriced: cost.outcome === "unpriced",
+  };
+}
+
 /**
  * The hosted classifier's cost for a call the router does not route: its routed price, else the
  * published rate, so every judgement a routed call returns carries a cost.

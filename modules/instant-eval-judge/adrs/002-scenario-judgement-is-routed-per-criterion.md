@@ -29,9 +29,10 @@ on a decision model and sent the unsure ones to an LLM that read the judge's who
 4. **The turn decision is not routed.** No measurement covers it. The judge's own call, with its
    two decision tools, goes to the LLM backend the table names in `scenarioDecision`. A failure
    lets the conversation go on, because the judge's last turn forces the verdict. A table that
-   names no decision backend answers no turn decision. Each turn decision is its own priced spend
-   row under `langwatch-judge-preview`, with a request count of 1, whatever it decided; one that
-   billed no tokens records none.
+   names no decision backend answers no turn decision, so `isScenarioJudgeConfigured` says no
+   and a run on LangWatch Judge (preview) is refused before it starts. Each turn decision is its
+   own priced spend row under `langwatch-judge-preview`, with a request count of 1, whatever it
+   decided; one that billed no tokens records none.
 5. **A verdict is never made up.** A criterion no leg answered is inconclusive. A judgement
    nothing answered is `unavailable`, and its caller reports an error, not a failed run.
 6. **One verdict is one spend row** under the model `langwatch-judge-preview`, priced as ADR-190

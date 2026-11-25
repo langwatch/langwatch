@@ -2,6 +2,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import { DEFAULT_MODEL, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ResourceOwnership } from "@langwatch/process";
@@ -45,6 +46,8 @@ type ScenarioExecutorPeers = Readonly<{
   apiKeys: ApiKeyApi;
   gateway: GatewayApi;
   featureFlags: FeatureFlagApi;
+  /** Whether LangWatch Judge (preview) can answer, asked before a run on it starts. */
+  judges: Pick<InstantEvalJudgeApi, "isScenarioJudgeConfigured">;
 }>;
 
 /** The process facts a child is started with, as the module resolved them. */
@@ -134,6 +137,7 @@ export class ScenarioExecutorService {
       judgePreviewAvailability: JudgePreviewAvailabilityService.create({
         featureFlags: peers.featureFlags,
         projects: peers.projects,
+        judges: peers.judges,
         isSaas: config.isSaas,
       }),
       voiceTargets: ScenarioVoiceTargetService.create({

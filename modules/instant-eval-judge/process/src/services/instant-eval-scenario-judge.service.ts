@@ -23,7 +23,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 
 import type { InstantEvalRateLimiter } from "../channels/instant-eval-classifier.channel.ts";
 import type { InstantEvalLlmJudgeChannel } from "../channels/instant-eval-llm-judge.channel.ts";
-import { instantEvalJudgeCallCostOf } from "../rules/instant-eval-judge-route-cost.rules.ts";
+import { instantEvalJudgeSpendAfterCall } from "../rules/instant-eval-judge-route-cost.rules.ts";
 import {
   instantEvalJudgeLlmCallPermitOf,
   instantEvalJudgeScenarioDecisionBackendsOf,
@@ -190,6 +190,11 @@ export class InstantEvalScenarioJudgeService {
     };
   }
 
+  /** Whether a turn decision can be asked at all; without one every run fails at its first turn. */
+  isConfigured(): boolean {
+    return this.decisionBackends().length > 0;
+  }
+
   /** The decision backend and its enabled fallbacks that can take the judge's own tool call. */
   private decisionBackends(): string[] {
     const { table } = this.deps;
@@ -252,14 +257,16 @@ export class InstantEvalScenarioJudgeService {
     inputTokens: number;
     outputTokens: number;
   }): void {
-    if (inputTokens <= 0 && outputTokens <= 0) return;
     const { pricing } = this.deps;
-    const cost = instantEvalJudgeCallCostOf({ backend, inputTokens, outputTokens, pricing });
-    spend.inputTokens += inputTokens;
-    if (cost.outcome === "priced") {
-      spend.costNanoUsd += cost.costNanoUsd;
-      return;
-    }
+    const after = instantEvalJudgeSpendAfterCall({
+      spend,
+      backend,
+      inputTokens,
+      outputTokens,
+      pricing,
+    });
+    Object.assign(spend, after.spend);
+    if (!after.isUnpriced) return;
     // Boot refuses a table whose decision backend has no price: a bug, not a deploy slip.
     this.logger.error({ backend }, "Instant Evals scenario judge called a backend with no price");
   }

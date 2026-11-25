@@ -144,6 +144,7 @@ Feature: Judge column in Default models
   @unit
   Scenario: Saving LangWatch Judge (preview) under another column is refused
     Given the judge preview flag is on for my organization
-    When a Default models config picks langwatch/judge-preview for Default
+    When a Default models config picks langwatch/judge-preview for Default or Fast
     Then the save is refused, saying it can only be the Judge default
+    And picked for Instant Evals it is refused as not a decision model
 

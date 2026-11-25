@@ -69435,7 +69435,7 @@ The **Judge** column sets the model that judges scenario runs. Unset, it uses th
 
 Where LangWatch Judge (preview) is turned on for your organization on LangWatch Cloud, it is the first choice in this column and in the **Judge** picker of a scenario, a suite and a run. It is LangWatch's own scenario judge (`langwatch/judge-preview`) and needs no provider key. No other column takes it.
 
-LangWatch Judge (preview) is billed with Instant Evals: each turn decision is one spend row, and the final verdict is one more. If it cannot answer, the run ends with an error, never with a made-up verdict.
+LangWatch Judge (preview) is billed with Instant Evals: each turn decision is one spend row, and the final verdict is one more. If it cannot reach a verdict, the run ends with an error, never with a made-up verdict.
 
 <Frame>
 <img src="/images/platform/model-providers-default-models.png" alt="The Default Models section with one config and the Add config button" />

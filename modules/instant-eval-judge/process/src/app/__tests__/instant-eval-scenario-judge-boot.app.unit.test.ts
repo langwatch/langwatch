@@ -58,7 +58,8 @@ async function boot({
   isSaas = true,
   table = TABLE,
 }: {
-  table?: typeof TABLE;
+  /** Null boots on the public route table, as an install that sets none does. */
+  table?: typeof TABLE | null;
   keys?: Record<string, string>;
   pricing?: InstantEvalJudgeRoutePricing;
   isSaas?: boolean;
@@ -69,8 +70,8 @@ async function boot({
     classifierModel: undefined,
     globalTokensPerSecond: 300_000,
     tenantTokensPerSecond: 150_000,
-    judgeRoutes: isSaas ? table : undefined,
-    judgeRoutePricing: isSaas ? pricing : undefined,
+    judgeRoutes: isSaas && table ? table : undefined,
+    judgeRoutePricing: isSaas && table ? pricing : undefined,
     isSaas,
     nodeEnvironment: "production",
   };
@@ -114,6 +115,33 @@ describe("InstantEvalJudgeModule.create with a scenario decision backend", () =>
     await expect(boot({ keys: rest })).rejects.toThrow(
       /backend llm-c: no openai_responses key or channel on this install/,
     );
+  });
+});
+
+describe("InstantEvalJudgeModule.isScenarioJudgeConfigured", () => {
+  /** @scenario "Only a table with a turn decision backend can answer a scenario judge" */
+  it("is false on the public route table, which names no decision backend", async () => {
+    const module = await boot({ table: null });
+
+    expect(await module.isScenarioJudgeConfigured()).toBe(false);
+  });
+
+  /** @scenario "Only a table with a turn decision backend can answer a scenario judge" */
+  it("is false when the decision backend is switched off and lists no fallback", async () => {
+    const off = syntheticScenarioRouteTable({
+      backends: {
+        "llm-a": { kind: "anthropic_messages", model: "llm-model-a" },
+        "llm-c": { kind: "openai_responses", model: "llm-model-c", enabled: false },
+      },
+      scenarioDecision: { backend: "llm-c" },
+    });
+
+    expect(await (await boot({ table: off })).isScenarioJudgeConfigured()).toBe(false);
+  });
+
+  /** @scenario "Only a table with a turn decision backend can answer a scenario judge" */
+  it("is true when the table names an enabled decision backend", async () => {
+    expect(await (await boot({})).isScenarioJudgeConfigured()).toBe(true);
   });
 });
 

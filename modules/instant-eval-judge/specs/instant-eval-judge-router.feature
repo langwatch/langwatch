@@ -173,6 +173,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When the gate picks the escalation and the escalation cannot answer
     Then the primary answers, flagged as a failed hard branch
     And when neither answers the judgement is skipped with the platform's skip reason, the gate still billed
+    And a branch whose backend lists the other as a fallback still asks each backend at most once
 
   @unit
   Scenario: A gate rates each question of a call on its own

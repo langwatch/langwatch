@@ -1,4 +1,5 @@
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type * as observability from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -47,6 +48,7 @@ function harness({
       traces: createApiFixture<TraceApi>(),
       projects: createApiFixture<ProjectApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
+      judges: createApiFixture<InstantEvalJudgeApi>(),
     },
     scenarios: createApiFixture<ScenarioService>(),
     simulations: createApiFixture<SimulationService>(),

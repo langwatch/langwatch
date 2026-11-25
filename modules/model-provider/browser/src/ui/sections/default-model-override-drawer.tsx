@@ -482,7 +482,8 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   );
   const { enabled: isJudgePreviewOffered } = useFeatureFlag(
     FrontendFlags.release_langwatch_judge_preview,
-    { projectId: projectId ?? NOT_TARGETED, organizationId, enabled: !!projectId && open },
+    // Asked of the organization only, as the server's save gate asks it.
+    { projectId: NOT_TARGETED, organizationId, enabled: !!projectId && open },
   );
   const { enabled: isOwnModelEnabled } = useFeatureFlag(
     FrontendFlags.release_instant_evals_own_decision_model,

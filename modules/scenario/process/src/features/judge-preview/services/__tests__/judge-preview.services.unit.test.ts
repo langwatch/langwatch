@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest";
 
 import { verdictRequest } from "../../../../__tests__/support/judge-preview-requests.fixture.ts";
 import { judgePreviewAvailabilityFixture } from "../../../../__tests__/support/judge-preview.fixture.ts";
+import { JUDGE_PREVIEW_NOT_ON_CLOUD } from "../judge-preview-availability.service.ts";
 import { JudgePreviewChatService } from "../judge-preview-chat.service.ts";
 import { JudgePreviewModelParametersService } from "../judge-preview-model-parameters.service.ts";
 
@@ -40,10 +41,12 @@ function chat({
   answer = JUDGED,
   isSaas = true,
   isFlagOn = true,
+  isConfigured = true,
 }: {
   answer?: InstantEvalScenarioJudgeAnswer;
   isSaas?: boolean;
   isFlagOn?: boolean;
+  isConfigured?: boolean;
 } = {}) {
   const asked: InstantEvalScenarioJudgeCall[] = [];
   const flagChecks: unknown[][] = [];
@@ -54,7 +57,7 @@ function chat({
         return answer;
       },
     }),
-    availability: judgePreviewAvailabilityFixture({ isSaas, isFlagOn, flagChecks }),
+    availability: judgePreviewAvailabilityFixture({ isSaas, isFlagOn, isConfigured, flagChecks }),
     ids: { next: () => "id-1" },
     clock: { now: () => Temporal.Instant.fromEpochMilliseconds(1_760_000_000_500) },
   });
@@ -154,6 +157,21 @@ describe("JudgePreviewChatService", () => {
         message: expect.stringContaining("LangWatch Judge (preview) has not learned this project"),
       });
     });
+
+    it("refuses in the same words as before a run when the leaf says it is not on Cloud", async () => {
+      const { complete } = chat({
+        answer: {
+          outcome: "refused",
+          code: "classifier_not_configured",
+          message: "Instant Evals is not configured.",
+        },
+      });
+
+      await expect(complete()).rejects.toMatchObject({
+        httpStatus: 403,
+        message: JUDGE_PREVIEW_NOT_ON_CLOUD,
+      });
+    });
   });
 
   describe("given the judge preview flag is off for the organization", () => {
@@ -162,6 +180,19 @@ describe("JudgePreviewChatService", () => {
       const { complete, asked } = chat({ isFlagOn: false });
 
       await expect(complete()).rejects.toBeInstanceOf(JudgePreviewNotAvailableError);
+      expect(asked).toHaveLength(0);
+    });
+  });
+
+  describe("given a judge route table that names no turn decision backend", () => {
+    /** @scenario "A run on LangWatch Judge (preview) is refused before it starts where it is not set up" */
+    it("throws not available, saying it is not set up, and never asks the judge leaf", async () => {
+      const { complete, asked } = chat({ isConfigured: false });
+
+      await expect(complete()).rejects.toMatchObject({
+        httpStatus: 403,
+        message: expect.stringMatching(/is not set up on this installation.*Pick another/),
+      });
       expect(asked).toHaveLength(0);
     });
   });
@@ -204,10 +235,11 @@ describe("JudgePreviewModelParametersService", () => {
   const prepare = ({
     isSaas = true,
     isFlagOn = true,
+    isConfigured = true,
     langwatchEndpoint = "https://app.langwatch.test/",
   } = {}) =>
     JudgePreviewModelParametersService.create({
-      availability: judgePreviewAvailabilityFixture({ isSaas, isFlagOn }),
+      availability: judgePreviewAvailabilityFixture({ isSaas, isFlagOn, isConfigured }),
       langwatchEndpoint,
     }).prepare({ projectId: PROJECT_ID, runKey: "run-key-1" });
 
@@ -239,6 +271,16 @@ describe("JudgePreviewModelParametersService", () => {
       message: expect.stringMatching(
         /LangWatch Judge \(preview\) is not turned on.*Pick another judge model/,
       ),
+    });
+  });
+
+  /** @scenario "A run on LangWatch Judge (preview) is refused before it starts where it is not set up" */
+  it("refuses a run before it starts where the route table names no turn decision backend", async () => {
+    await expect(prepare({ isConfigured: false })).resolves.toEqual({
+      success: false,
+      reason: "provider_not_enabled",
+      message:
+        "LangWatch Judge (preview) is not set up on this installation yet, so it cannot judge. Pick another judge model on the scenario, the suite or in Default models.",
     });
   });
 

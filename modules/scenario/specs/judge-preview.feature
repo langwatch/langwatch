@@ -135,6 +135,14 @@ Feature: LangWatch Judge (preview) as the scenario judge
     When it is prefetched on a self-hosted install, or with the flag off
     Then the run is refused with a message naming LangWatch Judge (preview) and what to pick instead
 
+  @unit @regression
+  Scenario: A run on LangWatch Judge (preview) is refused before it starts where it is not set up
+    Given LangWatch Cloud with the flag on for the organization
+    And a judge route table that names no turn decision backend
+    When a run on LangWatch Judge (preview) is prefetched, or the endpoint is called
+    Then it is refused with a message saying it is not set up and what to pick instead
+    And the judge leaf is never asked to judge
+
   @unit
   Scenario: LangWatch Judge (preview) cannot play another role
     Given a run whose simulator model is langwatch/judge-preview

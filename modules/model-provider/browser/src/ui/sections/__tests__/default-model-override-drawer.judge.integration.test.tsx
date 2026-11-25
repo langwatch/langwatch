@@ -4,6 +4,7 @@
  * reads the Default model while unset. Binds specs/model-providers/judge-default-model.feature.
  */
 import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   DECISION_MODELS,
   isLatestAlias,
@@ -24,11 +25,12 @@ const mockListDecisionModels = vi.fn();
 
 // The drawer asks the judge router and own decision model flags; off unless a case turns one on.
 const flagsOn = new Set<string>();
+const flagReads: { flag: string; target: unknown }[] = [];
 vi.mock("@langwatch/feature-flag-client", () => ({
-  useFeatureFlag: (flag: { name: string }) => ({
-    enabled: flagsOn.has(flag.name),
-    isLoading: false,
-  }),
+  useFeatureFlag: (flag: { name: string }, target: unknown) => {
+    flagReads.push({ flag: flag.name, target });
+    return { enabled: flagsOn.has(flag.name), isLoading: false };
+  },
 }));
 const JUDGE_ROUTER_FLAG = "release_instant_evals_judge_router";
 const OWN_DECISION_MODEL_FLAG = "release_instant_evals_own_decision_model";
@@ -144,6 +146,7 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
   });
   afterEach(() => {
     flagsOn.clear();
+    flagReads.length = 0;
     cleanup();
   });
 
@@ -213,6 +216,15 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
     renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
 
     expect(optionValues("judge").join("\n")).not.toContain("LangWatch Judge");
+  });
+
+  /** @scenario "The drawer's Judge row offers LangWatch Judge (preview) where its flag is on" */
+  it("asks its flag of the organization, never the project, as the save does", () => {
+    renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+    const reads = flagReads.filter((entry) => entry.flag === JUDGE_PREVIEW_FLAG);
+    expect(reads.length).toBeGreaterThan(0);
+    for (const read of reads) expect(read.target).toMatchObject({ projectId: NOT_TARGETED });
   });
 
   /** @scenario "An unset Judge row inherits the Default model" */

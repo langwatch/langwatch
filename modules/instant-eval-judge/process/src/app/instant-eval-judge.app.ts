@@ -217,6 +217,10 @@ export class InstantEvalJudgeModule implements InstantEvalJudgeApi {
     return this.#scenarioJudge.judge(input);
   }
 
+  async isScenarioJudgeConfigured(): Promise<boolean> {
+    return this.#scenarioJudge.isConfigured();
+  }
+
   recordSpend(input: InstantEvalJudgeSpendRecord): Promise<void> {
     return this.#judge.recordSpend(input);
   }

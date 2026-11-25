@@ -26,7 +26,7 @@ import type {
 } from "../channels/instant-eval-classifier.channel.ts";
 import type { InstantEvalHostedDecisionsChannel } from "../channels/instant-eval-hosted-decisions.channel.ts";
 import type { InstantEvalLlmJudgeChannel } from "../channels/instant-eval-llm-judge.channel.ts";
-import { instantEvalJudgeCallCostOf } from "../rules/instant-eval-judge-route-cost.rules.ts";
+import { instantEvalJudgeSpendAfterCall } from "../rules/instant-eval-judge-route-cost.rules.ts";
 import {
   instantEvalJudgeLegsJoined,
   instantEvalRoutedVerdictsOf,
@@ -420,18 +420,16 @@ export class InstantEvalJudgeRouteRunService {
     inputTokens: number;
     outputTokens: number;
   }): void {
-    if (inputTokens <= 0 && outputTokens <= 0) return;
-    this.inputTokens += inputTokens;
-    const cost = instantEvalJudgeCallCostOf({
+    const after = instantEvalJudgeSpendAfterCall({
+      spend: { inputTokens: this.inputTokens, costNanoUsd: this.costNanoUsd },
       backend,
       inputTokens,
       outputTokens,
       pricing: this.deps.pricing,
     });
-    if (cost.outcome === "priced") {
-      this.costNanoUsd += cost.costNanoUsd;
-      return;
-    }
+    this.inputTokens = after.spend.inputTokens;
+    this.costNanoUsd = after.spend.costNanoUsd;
+    if (!after.isUnpriced) return;
     this.flags.push(`unpriced:${backend}`);
     // Boot refuses a table with an unpriced reachable backend, so this is a bug, not a deploy slip.
     this.logger.error(
