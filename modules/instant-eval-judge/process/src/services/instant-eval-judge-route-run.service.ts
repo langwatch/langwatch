@@ -53,6 +53,14 @@ export type InstantEvalJudgeRouteRunDeps = Readonly<{
   limiter: InstantEvalRateLimiter;
 }>;
 
+/** One send's tokens; `isUsageUnread` when the call went out and no usage came back. */
+type Spend = {
+  backend: string;
+  inputTokens: number;
+  outputTokens: number;
+  isUsageUnread?: boolean;
+};
+
 /** One routed call's legs, the calls they paid for and what the routing reports. */
 export class InstantEvalJudgeRouteRunService {
   private readonly deps: InstantEvalJudgeRouteRunDeps;
@@ -323,7 +331,14 @@ export class InstantEvalJudgeRouteRunService {
       heldNanoUsd,
       signal: this.signal,
       backend,
-      send: (bill) => this.sendOne({ ...input, paid: (spend) => bill(this.paid(spend)) }),
+      send: (bill, unread) =>
+        this.sendOne({
+          ...input,
+          paid: (spend) => {
+            bill(this.paid(spend));
+            if (spend.isUsageUnread) unread();
+          },
+        }),
     });
     if (sent.isHeld) return sent.value;
     this.flags.push(`cost_ceiling:${backend}`);
@@ -349,7 +364,7 @@ export class InstantEvalJudgeRouteRunService {
     backend: string;
     questions: readonly InstantEvalQuestion[];
     text?: string | undefined;
-    paid: (spend: { backend: string; inputTokens: number; outputTokens: number }) => void;
+    paid: (spend: Spend) => void;
   }): Promise<Leg> {
     const config = this.deps.table.backends[backend];
     if (!config) return { outcome: "failed", reason: "classifier_provider_unavailable" };
@@ -399,7 +414,7 @@ export class InstantEvalJudgeRouteRunService {
     timeoutMs: number;
     reasoningEffort: InstantEvalJudgeReasoningEffort | undefined;
     maxOutputTokens: number | undefined;
-    paid: (spend: { backend: string; inputTokens: number; outputTokens: number }) => void;
+    paid: (spend: Spend) => void;
   }): Promise<Leg> {
     // The table refuses an LLM backend with no model at boot; this keeps the type honest.
     if (!model) return { outcome: "failed", reason: "classifier_not_configured" };

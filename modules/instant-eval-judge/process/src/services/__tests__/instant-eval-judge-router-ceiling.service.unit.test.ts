@@ -26,6 +26,7 @@ import {
   ScriptedInstantEvalLlmJudgeChannel,
 } from "../../__tests__/support/instant-eval-judge-router.test-fakes.ts";
 import { MemoryInstantEvalRateLimiter } from "../../__tests__/support/instant-eval-rate-limiter.test-fakes.ts";
+import type { InstantEvalLlmJudgeAnswer } from "../../channels/instant-eval-llm-judge.channel.ts";
 import {
   instantEvalJudgeGateInputOf,
   instantEvalJudgeGateQuestionOf,
@@ -118,10 +119,12 @@ function harness({
   decisionProbability = 0.5,
   table = syntheticRouteTable(),
   text = TEXT,
+  llmAnswer = { outcome: "answered", verdict: true, inputTokens: 2000, outputTokens: 100 },
 }: {
   decisionProbability?: number;
   table?: ReturnType<typeof syntheticRouteTable>;
   text?: string;
+  llmAnswer?: InstantEvalLlmJudgeAnswer;
 } = {}) {
   const hostedDecisions = ScriptedInstantEvalHostedDecisionsChannel.create({
     answer: (request) => ({
@@ -133,7 +136,7 @@ function harness({
     }),
   });
   const llmJudge = ScriptedInstantEvalLlmJudgeChannel.create({
-    answer: () => ({ outcome: "answered", verdict: true, inputTokens: 2000, outputTokens: 100 }),
+    answer: () => llmAnswer,
   });
   let jevCalls = 0;
   const classifier = MemoryInstantEvalClassifierChannel.create({
@@ -423,6 +426,44 @@ describe("InstantEvalJudgeRouterService under a cost ceiling, given a send that 
     expect(logger.error).toHaveBeenCalledWith(
       { backend: "classifier", heldNanoUsd: ceiling.holds[0], costNanoUsd: ceiling.billed },
       "Instant Evals send cost more than its worst case; the query ceiling under-held",
+    );
+  });
+});
+
+describe("InstantEvalJudgeRouterService under a cost ceiling, given an LLM call with no usage back", () => {
+  const timedOut: InstantEvalLlmJudgeAnswer = {
+    outcome: "skipped",
+    reason: "classifier_provider_unavailable",
+    inputTokens: 0,
+    outputTokens: 0,
+    isUsageUnread: true,
+  };
+
+  /** @scenario "An LLM call that went out with no usage back keeps its hold on the ceiling" */
+  it("settles a timed-out escalation at its whole hold, billing the customer nothing for it", async () => {
+    const { classify, worstOf } = harness({ llmAnswer: timedOut });
+    const ceiling = new RecordingCeiling(1_000_000_000);
+
+    const judgement = await classify(ceiling, [Q]);
+
+    expect(ceiling.settled).toEqual([
+      { heldNanoUsd: worstOf("decision-a"), costNanoUsd: DECISION_COST_NANO_USD },
+      { heldNanoUsd: worstOf("llm-b"), costNanoUsd: worstOf("llm-b") },
+    ]);
+    expect(judgement.costNanoUsd).toBe(DECISION_COST_NANO_USD);
+  });
+
+  /** @scenario "An LLM call that went out with no usage back keeps its hold on the ceiling" */
+  it("leaves the next send less room, so a second escalation no longer fits", async () => {
+    const { classify, llmJudge, worstOf } = harness({ llmAnswer: timedOut });
+    const ceiling = new RecordingCeiling(2 * worstOf("decision-a") + worstOf("llm-b"));
+
+    await classify(ceiling, [Q]);
+    const second = await classify(ceiling, [Q]);
+
+    expect(llmJudge.requests).toHaveLength(1);
+    expect(second.routing?.flags).toEqual(
+      expect.arrayContaining(["cost_ceiling:llm-b", "escalation_failed"]),
     );
   });
 });

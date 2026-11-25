@@ -51,8 +51,11 @@ export const INSTANT_EVAL_JUDGE_REASONING_MAX_OUTPUT_TOKENS = 32_000;
  */
 export const INSTANT_EVAL_JUDGE_REASONING_TIMEOUT_FLOOR_MS = 300_000;
 
-/** How fast a reasoning model is taken to write its output, for a backend that sets its own cap. */
-const REASONING_OUTPUT_TOKENS_PER_SECOND = 110;
+/**
+ * How fast a reasoning model is taken to write its output, for a backend that sets its own cap:
+ * the slow tenth of measured calls, end to end with the prompt read (ADR-190 decision 12).
+ */
+const REASONING_OUTPUT_TOKENS_PER_SECOND = 50;
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 

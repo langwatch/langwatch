@@ -158,7 +158,42 @@ describe("HttpInstantEvalLlmJudgeChannel", () => {
 
     const answer = await llm().judge(request("openai_responses"));
 
-    expect(answer).toMatchObject({ outcome: "skipped", reason: "classifier_provider_unavailable" });
+    expect(answer).toMatchObject({
+      outcome: "skipped",
+      reason: "classifier_provider_unavailable",
+      isUsageUnread: true,
+    });
+  });
+
+  /** @scenario "An LLM call that went out with no usage back keeps its hold on the ceiling" */
+  it("marks a call past its timeout as usage unread, with no tokens", async () => {
+    agent
+      .get("https://api.openai.com")
+      .intercept({ path: "/v1/responses", method: "POST" })
+      .reply(200, { usage: { input_tokens: 500, output_tokens: 900 } })
+      .delay(500);
+
+    const answer = await llm().judge({ ...request("openai_responses"), timeoutMs: 20 });
+
+    expect(answer).toEqual({
+      outcome: "skipped",
+      reason: "classifier_provider_unavailable",
+      inputTokens: 0,
+      outputTokens: 0,
+      isUsageUnread: true,
+    });
+  });
+
+  /** @scenario "An LLM call that went out with no usage back keeps its hold on the ceiling" */
+  it("does not mark a refused call, which the provider answered, as usage unread", async () => {
+    agent
+      .get("https://api.openai.com")
+      .intercept({ path: "/v1/responses", method: "POST" })
+      .reply(429, { error: { message: "slow down" } });
+
+    const answer = await llm().judge(request("openai_responses"));
+
+    expect(answer).not.toHaveProperty("isUsageUnread");
   });
 });
 

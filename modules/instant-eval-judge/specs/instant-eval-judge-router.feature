@@ -294,7 +294,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     And an entry that names a shorter timeout is refused, naming the backend and the floor
     And a backend with no effort, or effort none, keeps the 30,000 ms default
     And an LLM backend may set its own output cap, sent on every call and refused on any other kind
-    And a reasoning backend with its own cap needs only the time to write it at 110 tokens a second, its default timeout
+    And a reasoning backend with its own cap needs only the time to write it at 50 tokens a second, its default timeout
     And an answer cut at that cap is no answer, its tokens billed, so the backend's fallback answers
 
   @unit
@@ -372,6 +372,14 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When an unrouted classifier call throws, or the caller's stop makes a routed send throw
     Then the send's hold is let go with nothing billed for it
     And no send waiting on the ceiling behind it waits forever
+
+  @unit @regression
+  Scenario: An LLM call that went out with no usage back keeps its hold on the ceiling
+    Given a routed call that carries a cost ceiling
+    When an LLM call times out or loses its socket after it was sent, so no usage comes back
+    Then the channel marks the skip as usage unread
+    And its send settles on the ceiling at its whole hold, so the room left for the next send shrinks
+    And the customer is billed nothing for that call
 
   @unit
   Scenario: A send whose worst case passes the ceiling is not sent

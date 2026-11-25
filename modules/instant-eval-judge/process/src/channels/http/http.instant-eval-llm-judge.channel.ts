@@ -101,7 +101,10 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
       });
     } catch (error) {
       if (signal?.aborted) throw error;
-      return this.skip({ wire, reason: "classifier_provider_unavailable" });
+      return {
+        ...this.skip({ wire, reason: "classifier_provider_unavailable" }),
+        isUsageUnread: true,
+      };
     }
     if (response.status !== 200) {
       await response.body?.cancel().catch(() => undefined);
@@ -111,6 +114,10 @@ export class HttpInstantEvalLlmJudgeChannel implements InstantEvalLlmJudgeChanne
     const parsed: unknown = await response.json().catch(() => undefined);
     const reading = readInstantEvalLlmJudgeAnswer({ wire, body: parsed, question });
     const { inputTokens, outputTokens } = reading;
+    // A body cut off mid-read (the timeout fires after the headers) carries no usage either.
+    if (parsed === undefined) {
+      return { ...this.skip({ wire, reason: "classifier_failed" }), isUsageUnread: true };
+    }
     if (reading.outcome === "none") {
       this.logger.warn(
         { wire, kind: question.kind, stoppedBy: reading.stoppedBy, reasoningEffort },

@@ -135,7 +135,7 @@ export interface InstantEvalJudgeCostCeiling {
    * false, and nothing is held, when it cannot fit even with nothing held. Rejects on the stop.
    */
   hold(nanoUsd: number, signal?: AbortSignal): Promise<boolean>;
-  /** Swaps a send's hold for what it was billed. */
+  /** Swaps a send's hold for what it cost: what it billed, or its whole hold with no usage read. */
   settle(input: { heldNanoUsd: number; costNanoUsd: number }): void;
 }
 

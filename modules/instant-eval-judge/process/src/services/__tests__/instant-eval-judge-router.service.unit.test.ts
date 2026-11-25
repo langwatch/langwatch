@@ -382,7 +382,7 @@ describe("InstantEvalJudgeRouterService", () => {
         wire: "openai_responses",
         reasoningEffort: "high",
         maxOutputTokens: 1_100,
-        timeoutMs: 10_000,
+        timeoutMs: 22_000,
       });
       expect(llmJudge.requests[1]).not.toHaveProperty("maxOutputTokens");
       expect(judgement.verdicts).toEqual([{ questionId: "q", probability: 0 }]);

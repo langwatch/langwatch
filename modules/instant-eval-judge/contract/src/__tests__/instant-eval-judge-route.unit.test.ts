@@ -424,10 +424,10 @@ describe("given an OpenAI Responses backend that sets a reasoning effort", () =>
 
   /** @scenario "A backend that reasons waits long enough to write its output cap" */
   it.each([
-    [1_100, undefined, 10_000],
-    [2_200, undefined, 20_000],
-    [1_100, 10_000, 10_000],
-    [1_000, undefined, 9_091],
+    [1_100, undefined, 22_000],
+    [2_200, undefined, 44_000],
+    [1_100, 22_000, 22_000],
+    [1_001, undefined, 20_020],
   ] as const)(
     "takes its own cap of %i tokens with timeout %s as %i ms",
     (maxOutputTokens, timeoutMs, expected) => {
@@ -439,11 +439,11 @@ describe("given an OpenAI Responses backend that sets a reasoning effort", () =>
   );
 
   /** @scenario "A backend that reasons waits long enough to write its output cap" */
-  it("refuses a timeout too short to write its own cap at 110 tokens a second, naming both", () => {
-    const parsed = capped({ maxOutputTokens: 1_100, timeoutMs: 9_999 });
+  it("refuses a timeout too short to write its own cap at 50 tokens a second, naming both", () => {
+    const parsed = capped({ maxOutputTokens: 1_100, timeoutMs: 21_999 });
     expect(parsed.success).toBe(false);
     expect(JSON.stringify(parsed.error?.issues)).toContain(
-      "backend llm-b: reasoningEffort high and maxOutputTokens 1100 needs a timeoutMs of at least 10000",
+      "backend llm-b: reasoningEffort high and maxOutputTokens 1100 needs a timeoutMs of at least 22000",
     );
   });
 
