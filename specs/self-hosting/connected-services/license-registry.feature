@@ -310,6 +310,19 @@ Feature: License registry
     Then each license shows its customer, seats, term, status, entitled services and whether an instance is bound
     And a license that has synced shows when it last did and the seats it reported
 
+  @unit
+  Scenario: The licenses list shows one row per reissue chain, the newest
+    Given a license that was extended, with the replacement waiting for the install
+    When an operator opens the licenses screen
+    Then the list shows one row for that customer, the replacement
+    And the status and audience counts count it once
+
+  @integration
+  Scenario: The registry lists and counts a reissue chain once
+    Given a license replaced by an unrevoked license, and another whose replacement was revoked
+    When the registry lists the licenses that are newest in their chain
+    Then the replaced license is left out and the one with the revoked replacement stays
+
   # ============================================================================
   # The license drawer: what the install gets, and when it gets it
   # ============================================================================

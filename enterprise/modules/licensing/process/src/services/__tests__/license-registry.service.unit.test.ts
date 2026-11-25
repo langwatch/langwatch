@@ -756,6 +756,24 @@ describe("the chain a license belongs to", () => {
     expect(alone.licenses.map((license) => license.id)).toEqual([unrelated.license.id]);
   });
 
+  /** @scenario "The licenses list shows one row per reissue chain, the newest" */
+  it("lists and counts an extended license once, as the replacement waiting for the install", async () => {
+    const { registry } = harness();
+    const { license: first } = await registry.issue(issueInput());
+    const before = await registry.list({ page: 0, pageSize: 25 });
+    const { license: replacement } = await registry.reissue({
+      id: first.id,
+      expiresAt: Temporal.Instant.from("2027-02-01T00:00:00.000Z"),
+      operatorId: "operator-1",
+    });
+
+    const after = await registry.list({ page: 0, pageSize: 25 });
+
+    expect(after.licenses.map((license) => license.id)).toEqual([replacement.id]);
+    expect(after.total).toBe(1);
+    expect(after.counts).toEqual(before.counts);
+  });
+
   it("refuses a license that is not in the registry", async () => {
     const { registry } = harness();
 

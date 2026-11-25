@@ -106,9 +106,18 @@ export class MemoryIssuedLicenseRepository implements IssuedLicenseRepository {
     return this.matching(query).length;
   }
 
-  private matching({ search, status, emailSuffixes }: IssuedLicenseQuery): IssuedLicenseRecord[] {
+  private matching({
+    search,
+    status,
+    emailSuffixes,
+    chainHeadsOnly,
+  }: IssuedLicenseQuery): IssuedLicenseRecord[] {
     const term = search?.trim().toLowerCase();
+    const replaced = new Set(
+      this.all().flatMap((row) => (row.replacesId && !row.revokedAt ? [row.replacesId] : [])),
+    );
     return this.all()
+      .filter((row) => !chainHeadsOnly || !replaced.has(row.id))
       .filter((row) => (term ? matches(row, term) : true))
       .filter((row) => !status || activeAtInstant(row, status.at) === status.active)
       .filter(

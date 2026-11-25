@@ -69,6 +69,11 @@ export type IssuedLicenseQuery = {
    * `matching` false, the rest.
    */
   emailSuffixes?: { suffixes: readonly string[]; matching: boolean };
+  /**
+   * Keeps only the newest license of each reissue chain: drops every row an
+   * unrevoked row replaces, so a chain lists and counts once.
+   */
+  chainHeadsOnly?: boolean;
 };
 
 export interface IssuedLicenseRepository {

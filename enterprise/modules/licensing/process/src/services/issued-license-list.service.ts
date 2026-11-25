@@ -43,14 +43,16 @@ export class IssuedLicenseListService {
     const statusPart = status ? byStatus(status === "active") : {};
     const audiencePart = audience ? byAudience(audience === "internal") : {};
     const { repository } = this.options;
+    // A reissue chain lists and counts once, as its newest license.
+    const heads: IssuedLicenseQuery = { search, chainHeadsOnly: true };
     // Each count keeps the other filter, so it says what choosing it would list.
     const [{ rows, total }, active, inactive, customer, internal, all] = await Promise.all([
-      repository.listAll({ page, pageSize, search, ...statusPart, ...audiencePart }),
-      repository.countAll({ search, ...audiencePart, ...byStatus(true) }),
-      repository.countAll({ search, ...audiencePart, ...byStatus(false) }),
-      repository.countAll({ search, ...statusPart, ...byAudience(false) }),
-      repository.countAll({ search, ...statusPart, ...byAudience(true) }),
-      repository.countAll({ search }),
+      repository.listAll({ page, pageSize, ...heads, ...statusPart, ...audiencePart }),
+      repository.countAll({ ...heads, ...audiencePart, ...byStatus(true) }),
+      repository.countAll({ ...heads, ...audiencePart, ...byStatus(false) }),
+      repository.countAll({ ...heads, ...statusPart, ...byAudience(false) }),
+      repository.countAll({ ...heads, ...statusPart, ...byAudience(true) }),
+      repository.countAll(heads),
     ]);
     return { rows, total, counts: { active, inactive, customer, internal, all } };
   }

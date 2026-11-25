@@ -321,4 +321,36 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     expect(external.total).toBe(1);
     expect(await repository.countAll({ search: tag, ...internalOnes(true) })).toBe(1);
   });
+
+  /** @scenario "The registry lists and counts a reissue chain once" */
+  it("leaves out a license an unrevoked one replaces, and keeps one whose replacement was revoked", async () => {
+    const tag = `Chains ${RUN}`;
+    const { license: extended } = await issue(`${tag} extended`);
+    const { license: kept } = await issue(`${tag} kept`);
+    const later = nowInstant().add({ hours: 24 * 400 });
+    const replacement = await registry.reissue({
+      id: extended.id,
+      expiresAt: later,
+      operatorId: "user_operator",
+    });
+    const withdrawn = await registry.reissue({
+      id: kept.id,
+      expiresAt: later,
+      operatorId: "user_operator",
+    });
+    await repository.update(withdrawn.license.id, {
+      revokedAt: nowInstant(),
+      revokedReason: "test",
+    });
+    const query = { page: 0, pageSize: 25, search: tag, chainHeadsOnly: true };
+
+    const heads = await repository.listAll(query);
+
+    expect(heads.rows.map((row) => row.id).toSorted()).toEqual(
+      [replacement.license.id, kept.id, withdrawn.license.id].toSorted(),
+    );
+    expect(heads.total).toBe(3);
+    expect(await repository.countAll({ search: tag, chainHeadsOnly: true })).toBe(3);
+    expect(await repository.countAll({ search: tag })).toBe(4);
+  });
 });

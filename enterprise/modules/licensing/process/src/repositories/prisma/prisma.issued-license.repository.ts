@@ -99,7 +99,7 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
     rows: IssuedLicenseRecord[];
     total: number;
   }> {
-    const where = whereOf(query);
+    const where = whereOf({ ...query, replacedIds: await this.replacedIds(query) });
     const [rows, total] = await Promise.all([
       this.prisma.issuedLicense.findMany({
         where,
@@ -113,7 +113,19 @@ export class PrismaIssuedLicenseRepository implements IssuedLicenseRepository {
   }
 
   async countAll(query: IssuedLicenseQuery): Promise<number> {
-    return this.prisma.issuedLicense.count({ where: whereOf(query) });
+    return this.prisma.issuedLicense.count({
+      where: whereOf({ ...query, replacedIds: await this.replacedIds(query) }),
+    });
+  }
+
+  /** The rows an unrevoked row replaces, read only when the query keeps chain heads. */
+  private async replacedIds(query: IssuedLicenseQuery): Promise<string[]> {
+    if (!query.chainHeadsOnly) return [];
+    const replacements = await this.prisma.issuedLicense.findMany({
+      where: { replacesId: { not: null }, revokedAt: null },
+      select: { replacesId: true },
+    });
+    return replacements.flatMap(({ replacesId }) => (replacesId ? [replacesId] : []));
   }
 
   async update(id: string, data: IssuedLicensePatch): Promise<IssuedLicenseRecord> {
@@ -245,9 +257,11 @@ function whereOf({
   search,
   status,
   emailSuffixes,
-}: IssuedLicenseQuery): Prisma.IssuedLicenseWhereInput {
+  replacedIds,
+}: IssuedLicenseQuery & { replacedIds: string[] }): Prisma.IssuedLicenseWhereInput {
   const term = search?.trim();
   const parts: Prisma.IssuedLicenseWhereInput[] = [];
+  if (replacedIds.length > 0) parts.push({ id: { notIn: replacedIds } });
   if (term) {
     parts.push({
       OR: [
