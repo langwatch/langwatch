@@ -3,7 +3,12 @@
  * boards get and the addresses in the area. Addresses are built and read here only.
  */
 
-import { MY_DASHBOARD_NAME } from "@langwatch/dashboard-contract";
+import { ORGANIZATION_DASHBOARDS_PATH } from "@langwatch/analytics-client";
+import {
+  DEFAULT_DASHBOARD_HOME_PRODUCT,
+  type DashboardHomeProduct,
+  MY_DASHBOARD_NAME,
+} from "@langwatch/dashboard-contract";
 
 export { MY_DASHBOARD_NAME };
 
@@ -56,6 +61,29 @@ export function curatedBoardPath({
   templateId: string;
 }): string {
   return `${dashboardsPath({ projectSlug })}/${CURATED_SEGMENT}/${encodeURIComponent(templateId)}`;
+}
+
+export { ORGANIZATION_DASHBOARDS_PATH };
+
+/** The address of a board in the organization's area, opened by id under no project. */
+export function organizationBoardPath({ dashboardId }: { dashboardId: string }): string {
+  return `${ORGANIZATION_DASHBOARDS_PATH}/${encodeURIComponent(dashboardId)}`;
+}
+
+/**
+ * Where an empty board's "View all templates" leads, or undefined where no template is offered:
+ * templates read LLM Ops data, so only an LLM Ops board offers them (owner, 2026-11-23), at any
+ * address it is open at, and it leads to the templates of the project it runs in.
+ */
+export function templateLinks({
+  projectSlug,
+  homeProduct,
+}: {
+  projectSlug: string;
+  homeProduct: DashboardHomeProduct;
+}): { templatesHref: string } | undefined {
+  if (projectSlug === "" || homeProduct !== DEFAULT_DASHBOARD_HOME_PRODUCT) return void 0;
+  return { templatesHref: dashboardTemplatesPath({ projectSlug }) };
 }
 
 /** What the area has open, read from the address under `/dashboards/`. */

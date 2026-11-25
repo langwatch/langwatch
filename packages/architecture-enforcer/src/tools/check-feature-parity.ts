@@ -369,9 +369,6 @@ const LEGACY_INERT: string[] = [
   "modules/authz/specs/access-reviews.feature",
   "modules/authz/specs/agent-principals.feature",
   "modules/authz/specs/authz-passports.feature",
-  // PR 9698's organization-wide Dashboards area (ADR-002, amended): specs land first, every
-  // scenario @unimplemented. Remove this entry with the file's first binding.
-  "modules/dashboard/specs/dashboards-organization-area.feature",
   // 2026-09-06 core-logic audit: these five ship ahead of the tests that
   // would bind them (packages/architecture-enforcer's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its

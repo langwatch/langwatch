@@ -1,6 +1,6 @@
 /**
- * The From LangWatch boards: catalogue templates rendered live and read-only, never stored,
- * so Dashboards opens on useful boards with no setup. Every widget on them has code.
+ * The From LangWatch boards: catalogue templates rendered live and never stored, so Dashboards
+ * opens on useful boards with no setup. A change makes the member's own copy. All have code.
  * @see modules/dashboard/specs/dashboards-v2.feature
  */
 
@@ -19,10 +19,10 @@ import { TEMPLATE_LIBRARY, type LibraryTemplate } from "./template-library.ts";
  */
 export const CURATED_TEMPLATE_IDS = ["release", "data", "breaks"] as const;
 
-/** What the From LangWatch group is, under its heading's (i); the prototype says the same. */
+/** What the From LangWatch group is, under its heading's (i) (owner, 2026-11-24). */
 export const FROM_LANGWATCH_ABOUT =
-  "Dashboards LangWatch made for you. They are read-only and improve over time. Duplicate one to " +
-  "make a copy you can edit.";
+  "Dashboards LangWatch made for you. They improve over time. Change one and it becomes your " +
+  "own copy.";
 
 /** One From LangWatch board: its template's words and its widgets laid out on the grid. */
 export interface CuratedBoard {

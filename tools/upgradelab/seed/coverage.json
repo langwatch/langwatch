@@ -322,6 +322,11 @@
       "note": "projects made by main onboarding in each heavy organization",
       "cells": ["C1", "C3"]
     },
+    "project:reslug-reserved-dashboards": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs a project whose slug is exactly dashboards, which no release since the slug suffix can mint; nothing to seed"
+    },
     "prompt:seed-tags-for-untagged-organizations": {
       "status": "seeded",
       "seed": "heavy:rest.prompt.create",

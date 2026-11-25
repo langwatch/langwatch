@@ -24,7 +24,7 @@ import {
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { nowInstant } from "@langwatch/time";
-import { useCallback, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import type { ChartFrameExecuteQuery } from "../../../behavior/frame-bridge.ts";
@@ -45,6 +45,12 @@ export function cardLimitMessages(
     .filter(({ code }) => LIMIT_DIAGNOSTIC_CODES.includes(code))
     .map(({ message }) => message);
 }
+
+/**
+ * Whether a widget naming no projects reads every project the member may read, not the bound
+ * one: true on a Gateway or Governance board, which reads the organization (ADR-002, D2).
+ */
+export const WidgetReadsEveryProjectContext = createContext(false);
 
 /** Widgets run against the last 24 hours at an hourly step — no toolbar. */
 const DEFAULT_GRANULARITY: LangWatchQLGranularityStep = 3600;
@@ -123,6 +129,7 @@ export function useDashboardWidgetExecutor(
     overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
   // By value, not by object: a caller that builds the ids afresh each render keeps one run.
   const { dashboardId, widgetId, templateId } = telemetryIdsOf(overrides);
+  const readsEveryProject = useContext(WidgetReadsEveryProjectContext);
   const execute = useMemo(
     () =>
       createLangWatchQLExecute({
@@ -130,8 +137,9 @@ export function useDashboardWidgetExecutor(
           mutate: (input, options) => utils.client.analytics.lwql.query.mutate(input, options),
         },
         projectId,
+        readsEveryProject,
       }),
-    [utils, projectId],
+    [utils, projectId, readsEveryProject],
   );
   const [lastRuns, setLastRuns] = useState<Record<string, QueryLastRun>>({});
 
