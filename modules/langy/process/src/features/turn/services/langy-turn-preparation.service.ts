@@ -1,9 +1,6 @@
 import {
   type LangyAttachmentRef,
-  LANGY_CONVERSATION_STATUS,
   LangyAgentUnavailableError,
-  LangyModelNotAllowedError,
-  LangyTurnInProgressError,
   stripGithubCredentials,
   type LangyCredentials,
   type LangyMessageRow,
@@ -24,6 +21,7 @@ import {
 } from "../../../rules/langy-conversation-title.rules.ts";
 import { mintRunToken } from "../../../rules/langy-frame-auth.rules.ts";
 import { langyDispatchIntentOf } from "../../../rules/langy-worker-runtime.rules.ts";
+import { requireRunnableTurn } from "../rules/langy-turn-admission.rules.ts";
 import { LangyEndedTurnService } from "./langy-ended-turn.service.ts";
 import type { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnOverrideService } from "./langy-turn-override.service.ts";
@@ -104,7 +102,13 @@ export class LangyTurnPreparationService {
     if (disabledSkills.length > 0) {
       args.credentials.disabledSkillIds = disabledSkills;
     }
-    const runToken = this.requireRunnableTurn(args, results);
+    const [currentResult, , runTokenResult, modelsAllowedResult] = results;
+    const runToken = requireRunnableTurn({
+      turn: args,
+      current: currentResult,
+      runToken: runTokenResult,
+      modelsAllowed: modelsAllowedResult,
+    });
     const capReachedNote = await this.checkPrCap(args);
     const lateProbe = () => earlyWorkerProbe ?? this.probeWorker(args, disabledSkills);
     await this.ensureWorkerAccess(args, lateProbe);
@@ -180,60 +184,6 @@ export class LangyTurnPreparationService {
         this.deps.conversations.findByIdVisible({ id: conversation.id, projectId, userId }),
     });
     return [{ status: "fulfilled", value }, ...rest];
-  }
-
-  private requireRunnableTurn(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-    [currentResult, , runTokenResult, modelsAllowedResult]: Awaited<
-      ReturnType<LangyTurnPreparationService["readPreparation"]>
-    >,
-  ): string {
-    if (runTokenResult.status === "rejected" || !runTokenResult.value) {
-      logger.error(
-        {
-          error: runTokenResult.status === "rejected" ? runTokenResult.reason : undefined,
-          projectId: args.projectId,
-          conversationId: args.conversation.id,
-          turnId: args.turnId,
-        },
-        "could not read langy runToken; refusing unsignable turn",
-      );
-
-      throw new LangyAgentUnavailableError("Agent request failed");
-    }
-
-    if (modelsAllowedResult.status === "rejected") {
-      throw modelsAllowedResult.reason;
-    }
-
-    if (modelsAllowedResult.value && !modelsAllowedResult.value.includes(args.turnModel)) {
-      logger.warn(
-        {
-          projectId: args.projectId,
-          turnModel: args.turnModel,
-          allowedCount: modelsAllowedResult.value.length,
-        },
-        "turn model not allowed",
-      );
-
-      throw new LangyModelNotAllowedError(args.turnModel);
-    }
-
-    if (currentResult.status === "rejected") {
-      logger.warn(
-        { error: currentResult.reason, conversationId: args.conversation.id },
-        "busy projection read failed after admission",
-      );
-    }
-
-    if (
-      currentResult.status === "fulfilled" &&
-      currentResult.value?.status === LANGY_CONVERSATION_STATUS.RUNNING
-    ) {
-      throw new LangyTurnInProgressError();
-    }
-
-    return runTokenResult.value;
   }
 
   /** Reads today's opened pull requests; only one that opened counts (the PR count subscriber). */

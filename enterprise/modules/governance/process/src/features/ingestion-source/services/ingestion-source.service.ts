@@ -161,7 +161,6 @@ export class IngestionSourceService {
     organizationId: string;
   }): Promise<GovernanceIngestionSource | null> {
     const row = await this.repository.findById(id);
-
     return row?.organizationId === organizationId ? row : null;
   }
 

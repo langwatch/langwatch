@@ -6577,6 +6577,10 @@ const presentations = {
     title: "Langy wasn't quite ready",
     describe: () => "Send that again. This usually resolves itself.",
   },
+  invalid_images: {
+    title: "Image not accepted",
+    describe: () => "One of the attached images could not be read. Remove it and attach it again.",
+  },
   invalid_conversation_id: {
     title: "Conversation not found",
     describe: () => "This conversation link isn't one we can open. Start a new chat to keep going.",

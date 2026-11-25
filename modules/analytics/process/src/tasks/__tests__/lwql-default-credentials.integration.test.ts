@@ -1,5 +1,5 @@
 /**
- * An install that sets no LangWatchQL password gets both derived from the key pepper, in `sql` mode.
+ * An install with no LangWatchQL password gets both derived from the key pepper, in `sql` mode.
  * @see modules/analytics/specs/analytics-lwql-default-credentials.feature
  * @vitest-environment node
  */
