@@ -51,6 +51,12 @@ Feature: Billing-only invite
     And they still hold Billing
     And the person drawer shows Billing on and locked, and says to remove them or move them to a seat
 
+  Scenario: A Billing-only member whose Billing grant is missing can be repaired
+    Given a Billing-only member whose Billing grant is missing
+    When an admin opens their person drawer
+    Then the Billing switch is off and live, and turning it on gives Billing back
+    And turning their Billing off is not refused, as there is nothing to take
+
   Scenario: A Billing-only member is given no team, project or personal workspace
     Given a Billing-only member
     When their invite is accepted, an admin grants them a team or project, or a system write does

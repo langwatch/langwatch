@@ -242,7 +242,7 @@ describe("AuthzBillingRoleService", () => {
     expect(await service.listMembers({ organizationId: ORG })).toEqual([{ userId: MEMBER }]);
   });
 
-  /** @scenario "Billing cannot be taken from a Billing-only member" */
+  /** @scenario "A Billing-only member whose Billing grant is missing can be repaired" */
   it("lets a revoke through for a Billing-only member whose grant is already gone", async () => {
     addMember({ memory, userId: MEMBER, billingOnly: true });
 

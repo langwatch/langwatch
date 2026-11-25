@@ -156,6 +156,7 @@ describe("given a person opened from the members list", () => {
       );
     });
 
+    /** @scenario "A Billing-only member whose Billing grant is missing can be repaired" */
     it("leaves the switch live for a Billing-only member whose grant is missing, so it can be repaired", async () => {
       state.member = { ...sam, role: "EXTERNAL", billingOnly: true };
       renderDrawer();
