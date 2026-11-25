@@ -3,13 +3,13 @@ import { Text } from "@langwatch/design-system/primitives";
 type GroupedState = "grouped-include" | "grouped-exclude";
 
 /** The title a row a search group makes optional carries (#9810). */
-export const IN_GROUP_TITLE = "Part of a group in the search bar";
+const IN_GROUP_TITLE = "Part of a group in the search bar";
 
 /**
  * What a click on a row in a group does (#9863). It reads the query's sign, a plain term first: a
  * plain one is excluded from every result, a negated one is removed from its group.
  */
-export function inGroupClickAction(state: GroupedState): string {
+function inGroupClickAction(state: GroupedState): string {
   return state === "grouped-exclude" ? "remove from the group" : "exclude";
 }
 
