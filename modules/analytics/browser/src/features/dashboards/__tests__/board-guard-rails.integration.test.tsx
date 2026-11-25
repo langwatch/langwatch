@@ -50,6 +50,8 @@ const BOARD_READS = [
   "boards.listStarred",
   "dashboardWidgets.list",
   "analytics.lwql.readableProjects",
+  // The organisation Dashboards area flag: a read of the flag, not of the board's data.
+  "featureFlag.isEnabledForEachOrganization",
 ];
 const notABoardRead = (path: string) => !BOARD_READS.includes(path);
 
@@ -112,6 +114,8 @@ function boardServer({ widgets }: { widgets: ReturnType<typeof widget>[] }) {
         return Promise.resolve([{ ...BOARD }]);
       case "boards.listStarred":
         return Promise.resolve([]);
+      case "featureFlag.isEnabledForEachOrganization":
+        return Promise.resolve({ enabledByOrganizationId: { "org-1": true } });
       case "dashboardWidgets.list":
         return Promise.resolve(widgets.map((each) => structuredClone(each)));
       case "analytics.lwql.query":

@@ -451,7 +451,7 @@ describe("the other products' sidebars once the organization's Dashboards area i
   } as const;
 
   describe("given the area is off, in Gateway", () => {
-    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    /** @scenario "Gateway and Coding agents show the Dashboards section of the project LLM Ops opens" */
     it("keeps the project's Dashboards section", async () => {
       renderSidebar({
         surface: "gateway",
@@ -468,7 +468,7 @@ describe("the other products' sidebars once the organization's Dashboards area i
   });
 
   describe("given the area is off, in Governance", () => {
-    /** @scenario "Gateway and Coding agents show the Dashboards section, naming its project" */
+    /** @scenario "Gateway and Coding agents show the Dashboards section of the project LLM Ops opens" */
     it("draws no Dashboards section", async () => {
       renderSidebar({
         surface: "governance",
@@ -523,7 +523,13 @@ describe("the other products' sidebars once the organization's Dashboards area i
       "draws no Dashboards section in $surface",
       async ({ surface, pathname, project }) => {
         organizationLibrary.open = true;
-        renderSidebar({ surface, pathname, project, ...shopRemembered });
+        renderSidebar({
+          surface,
+          pathname,
+          project,
+          everyProductFlag: false,
+          ...shopRemembered,
+        });
 
         await expect(
           screen.findByTestId("product-dashboards", {}, { timeout: 300 }),

@@ -23,6 +23,7 @@ import { useDashboardViewed } from "../../behavior/use-dashboard-viewed.ts";
 import { useEmptyWidgets } from "../../behavior/use-empty-widgets.ts";
 import { useLimitFailedWidgets } from "../../behavior/use-limit-failed-widgets.ts";
 import { useModifyCurated } from "../../behavior/use-modify-curated.ts";
+import { useOrganizationLibraryOpen } from "../../behavior/use-organization-library-open.ts";
 import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { useStoreProject } from "../../behavior/use-store-project.ts";
 import { useBoardOnScreen, useLangyAsk } from "../../langy/behavior/use-board-langy.ts";
@@ -107,6 +108,9 @@ function OpenCuratedBoard({
   const mayCreate = atOrganization
     ? store.storeProject !== void 0 && store.mayShare
     : reader.mayCreate;
+  // Edits to a From LangWatch board belong to the organization area; off, the page is main's.
+  const organizationArea = useOrganizationLibraryOpen().isOpen;
+  const mayEdit = organizationArea && mayCreate;
   const { createWithWidget } = useBoardFromTemplate({
     atOrganization,
     storeProject: store.storeProject,
@@ -128,7 +132,7 @@ function OpenCuratedBoard({
           name={board.name}
           description={board.job}
           isFromLangWatch
-          {...(mayCreate
+          {...(mayEdit
             ? {
                 onRename: (name: string) => modify.request({ kind: "rename", name }),
                 onDescribe: (description: string) =>
@@ -141,7 +145,7 @@ function OpenCuratedBoard({
             widgetCount: board.widgets.length,
           }}
           action={
-            mayCreate ? (
+            mayEdit ? (
               <>
                 <AddWidgetButton onClick={addWidget} />
                 <UseTemplateButton
@@ -219,7 +223,7 @@ function OpenCuratedBoard({
               onLimitFailureChange={({ widget, limited }) =>
                 limitFailedWidgets.report({ key: widget.key, limited })
               }
-              {...(mayCreate
+              {...(mayEdit
                 ? {
                     onEdit: ({ key }) => modify.request({ kind: "editWidget", key }),
                     onDelete: ({ key }) => modify.request({ kind: "removeWidget", key }),
@@ -228,7 +232,7 @@ function OpenCuratedBoard({
                   }
                 : {})}
             />
-            {mayCreate && <AddBlockCard onClick={addWidget} />}
+            {mayEdit && <AddBlockCard onClick={addWidget} />}
           </VStack>
         </DashboardRefreshedAtContext.Provider>
       </DashboardRefetchIntervalContext.Provider>

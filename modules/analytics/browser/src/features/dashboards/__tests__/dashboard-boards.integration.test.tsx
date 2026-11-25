@@ -170,6 +170,8 @@ function inMemoryServer({
         if (input.description !== void 0) updated.description = input.description as string | null;
         return Promise.resolve({ ...updated });
       }
+      case "featureFlag.isEnabledForEachOrganization":
+        return Promise.resolve({ enabledByOrganizationId: { "org-1": true } });
       case "boards.listStarred":
         return Promise.resolve(
           state.boards
@@ -1129,7 +1131,7 @@ describe("a member's board", () => {
         const { host } = openBoard({ server, projectPermissions: EDITOR });
 
         const title = await screen.findByRole("heading", { name: "Weekly review" });
-        await user.click(within(title).getByRole("button", { name: "Weekly review" }));
+        await user.click(await within(title).findByRole("button", { name: "Weekly review" }));
         const field = screen.getByRole("textbox", { name: "Dashboard name" });
         expect(field).toHaveValue("Weekly review");
         await user.clear(field);

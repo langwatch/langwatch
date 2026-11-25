@@ -140,6 +140,9 @@ function renderBoard({
     if (call.path === "boards.resolve") {
       return answer instanceof Error ? Promise.reject(answer) : Promise.resolve(answer);
     }
+    if (call.path === "featureFlag.isEnabledForEachOrganization") {
+      return Promise.resolve({ enabledByOrganizationId: { "org-1": true } });
+    }
     if (call.path === "boards.getAll") return Promise.resolve([{ ...LISTED_IN_SHOP, homeProduct }]);
     if (call.path === "boards.listStarred") return Promise.resolve([]);
     if (call.path === "dashboardWidgets.list") return Promise.resolve([]);
@@ -174,7 +177,7 @@ describe("a board opened at /dashboards/<id>", () => {
       });
 
       expect(await screen.findByRole("heading", { name: "Everyone's board" })).toBeInTheDocument();
-      expect(screen.getByLabelText(`Data from ${SHOP.name}`)).toBeVisible();
+      expect(await screen.findByLabelText(`Data from ${SHOP.name}`)).toBeVisible();
       expect(host.replacements).toEqual([]);
       expect(host.navigations).toEqual([]);
     });
@@ -283,7 +286,7 @@ describe("a board opened at /dashboards/<id>", () => {
       const heading = await screen.findByRole("heading", { name: "Everyone's board" });
       expect(heading).toBeInTheDocument();
       expect(listReadProjects(calls)).toEqual([SHOP.id]);
-      expect(screen.getByLabelText(`Data from ${SHOP.name}`)).toBeVisible();
+      expect(await screen.findByLabelText(`Data from ${SHOP.name}`)).toBeVisible();
       expect(host.navigations).toEqual([]);
     });
   });

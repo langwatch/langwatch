@@ -52,11 +52,13 @@ const storedBoard = ({ name, index }: { name: string; index: number }) => ({
 
 /** The curated reads plus the create-and-fill path; every call is kept, so a write would show. */
 function curatedServer({
+  organizationArea = true,
   storedNames = [],
   boardsGate,
   createFails = false,
   pinnedTemplateId,
 }: {
+  organizationArea?: boolean;
   storedNames?: readonly string[];
   /** Holds the saved boards' answer until it resolves. */
   boardsGate?: Promise<void>;
@@ -77,6 +79,8 @@ function curatedServer({
       return Promise.resolve(pinned.map((templateId) => ({ kind: "template", templateId })));
     }
     switch (call.path) {
+      case "featureFlag.isEnabledForEachOrganization":
+        return Promise.resolve({ enabledByOrganizationId: { "org-1": organizationArea } });
       case "boards.create":
         if (createFails) return Promise.reject(new Error("boards.create failed"));
         return Promise.resolve({ id: "board-1", ...(call.input as object) });
@@ -98,6 +102,7 @@ function curatedServer({
 function openCurated({
   templateId,
   flags = LANGY_ON,
+  organizationArea,
   permissions = MEMBER,
   storedNames = [],
   boardsGate,
@@ -107,6 +112,8 @@ function openCurated({
 }: {
   templateId: string;
   flags?: Record<string, boolean>;
+  /** The organization's Dashboards area flag; on unless a scenario turns it off. */
+  organizationArea?: boolean;
   permissions?: readonly string[];
   storedNames?: readonly string[];
   boardsGate?: Promise<void>;
@@ -115,7 +122,13 @@ function openCurated({
   /** The address's query, as when "Add a widget" is already open. */
   query?: Record<string, string>;
 }) {
-  const server = curatedServer({ storedNames, boardsGate, createFails, pinnedTemplateId });
+  const server = curatedServer({
+    organizationArea,
+    storedNames,
+    boardsGate,
+    createFails,
+    pinnedTemplateId,
+  });
   const host = new StubAnalyticsHost({
     flags,
     permissions,
@@ -148,6 +161,8 @@ async function pickWidgetAction({
   user: ReturnType<typeof userEvent.setup>;
   action: string;
 }) {
+  // The organization's flag answers after the first paint; its edit controls come with it.
+  await screen.findByRole("button", { name: "Add a widget" });
   await user.click(screen.getAllByRole("button", { name: /^Actions for / })[0]!);
   await user.click(await screen.findByRole("menuitem", { name: action }));
 }
@@ -160,8 +175,8 @@ describe("given a member opens a From LangWatch board", () => {
       const { server } = openCurated({ templateId: "release" });
 
       expect(await screen.findByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Add a widget" })).toBeInTheDocument();
       expect(screen.getByText("From LangWatch")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Add a widget" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Use this template" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Duplicate to edit" })).toBeNull();
       expect(screen.getByTitle("Edit name")).toBeInTheDocument();
@@ -193,6 +208,21 @@ describe("given a member opens a From LangWatch board", () => {
       await user.click(screen.getAllByRole("button", { name: /^Actions for / })[0]!);
       const items = await screen.findAllByRole("menuitem");
       expect(items.map((item) => item.textContent?.trim())).toEqual(["Export CSV Still loading"]);
+      expect(server.calls.filter(({ path }) => WRITES.test(path))).toEqual([]);
+    });
+  });
+
+  describe("when the organization's Dashboards area is off", () => {
+    /** @scenario "With the flag off, a From LangWatch board is read-only, as on main" */
+    it("offers no edit control, though the member may create dashboards", async () => {
+      const { server } = openCurated({ templateId: "release", organizationArea: false });
+
+      expect(await screen.findByRole("heading", { name: "Ready to ship?" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add a widget" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Use this template" })).toBeNull();
+      expect(screen.queryByTitle("Edit name")).toBeNull();
+      expect(screen.queryByTitle("Edit description")).toBeNull();
+      expect(screen.queryByTitle("Drag to move")).toBeNull();
       expect(server.calls.filter(({ path }) => WRITES.test(path))).toEqual([]);
     });
   });

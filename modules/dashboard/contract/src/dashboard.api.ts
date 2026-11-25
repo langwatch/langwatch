@@ -18,6 +18,7 @@ import type {
   DashboardProject,
   DashboardScope,
   DashboardScopeImpact,
+  DashboardScopeProjects,
   DashboardSourcePresence,
   DashboardStar,
   DashboardSummary,
@@ -213,6 +214,12 @@ export interface DashboardApi {
     dashboardId: string;
     viewer: DashboardViewer;
   }): Promise<DashboardScopeImpact>;
+  /** Dashboards area: the projects an Organization board opens under for this member. */
+  listDashboardScopeProjects(input: {
+    projectId: string;
+    dashboardId: string;
+    viewer: DashboardViewer;
+  }): Promise<DashboardScopeProjects>;
   /** Dashboards area: whether each Flight Deck source ever recorded a row, as this member reads. */
   getSourcePresence(input: {
     projectId: string;
