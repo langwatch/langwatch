@@ -287,6 +287,23 @@ describe("given a score question that names its levels", () => {
   });
 
   /** @scenario "The gate reads a frozen framing of the case" */
+  it("reads a level's label followed by a description other than the one sent", () => {
+    expect(
+      read({
+        type: "score",
+        probabilities: { easy: 0.5, "medium: careful reading": 0.3, "very hard": 0.2 },
+      }),
+    ).toBeCloseTo(0.7, 10);
+    expect(
+      read({
+        type: "score",
+        legend: { a: "easy", b: "medium: other wording", c: "very hard" },
+        probabilities: { a: 0.5, b: 0.3, c: 0.2 },
+      }),
+    ).toBeCloseTo(0.7, 10);
+  });
+
+  /** @scenario "The gate reads a frozen framing of the case" */
   it("takes a bare score as the level index, and drops a key that names no level", () => {
     expect(read({ type: "score", score: 1.4 })).toBe(1.4);
     expect(read({ type: "score", probabilities: { "": 1, harder: 1 } })).toBeUndefined();
