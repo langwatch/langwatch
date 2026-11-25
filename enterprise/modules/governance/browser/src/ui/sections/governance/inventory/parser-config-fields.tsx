@@ -6,7 +6,12 @@ import { Fragment, type ReactNode, useEffect } from "react";
 
 import type { SourceType } from "../../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 import { AdvancedSettingsGroup } from "./advanced-settings-group.tsx";
-import { fieldControl, type FieldDef, type ParserConfigMode } from "./parser-field-controls.ts";
+import {
+  type CustomControlRenderer,
+  fieldControl,
+  type FieldDef,
+  type ParserConfigMode,
+} from "./parser-field-controls.ts";
 import { ParserFieldInput } from "./parser-field-inputs.tsx";
 import {
   parserFieldPresentation,
@@ -21,6 +26,7 @@ function ParserConfigField({
   mode = "create",
   readOnly = false,
   isInvalid = false,
+  renderCustomControl,
 }: {
   field: FieldDef;
   values: Record<string, string>;
@@ -29,6 +35,7 @@ function ParserConfigField({
   readOnly?: boolean;
   /** The save was refused because this required field is empty. */
   isInvalid?: boolean;
+  renderCustomControl?: CustomControlRenderer;
 }) {
   const { isSecret, isMultiline, isRequired, hint, placeholder } = parserFieldPresentation({
     field,
@@ -60,18 +67,28 @@ function ParserConfigField({
           <FieldInfoTooltip description={shownHint} testId={`parser-field-info-${field.key}`} />
         )}
       </HStack>
-      <ParserFieldInput
-        ariaLabel={field.label}
-        control={control}
-        fieldKey={field.key}
-        isInvalid={isInvalid}
-        isMultiline={isMultiline}
-        isSecret={isSecret}
-        placeholder={placeholder}
-        readOnly={readOnly}
-        value={values[field.key] ?? ""}
-        onChange={(next) => onChange({ ...values, [field.key]: next })}
-      />
+      {control.kind === "custom" && renderCustomControl ? (
+        renderCustomControl({
+          field,
+          value: values[field.key] ?? "",
+          onChange: (next) => onChange({ ...values, [field.key]: next }),
+          isInvalid,
+          readOnly,
+        })
+      ) : (
+        <ParserFieldInput
+          ariaLabel={field.label}
+          control={control}
+          fieldKey={field.key}
+          isInvalid={isInvalid}
+          isMultiline={isMultiline}
+          isSecret={isSecret}
+          placeholder={placeholder}
+          readOnly={readOnly}
+          value={values[field.key] ?? ""}
+          onChange={(next) => onChange({ ...values, [field.key]: next })}
+        />
+      )}
       {/* Under the input it belongs to, never in the toast alone. The message
           says what to do rather than restating that something is invalid —
           the red border has already said that much. */}
@@ -118,6 +135,8 @@ type ParserConfigFieldsProps = {
    * silently discard the admin's choice on every collapse.
    */
   advancedExtras?: ReactNode;
+  /** Draws the fields declared `control: "custom"` (a connection picker, region chips). */
+  renderCustomControl?: CustomControlRenderer;
 };
 
 /** The fields outside the Advanced group, each run of one group under its heading. */
@@ -128,6 +147,7 @@ function PrimaryParserFields({
   mode,
   isReadOnly,
   isInvalid,
+  renderCustomControl,
 }: {
   fields: FieldDef[];
   values: Record<string, string>;
@@ -135,6 +155,7 @@ function PrimaryParserFields({
   mode: ParserConfigMode;
   isReadOnly: (key: string) => boolean;
   isInvalid: (key: string) => boolean;
+  renderCustomControl?: CustomControlRenderer;
 }) {
   return fields.map((f, i) => (
     <Fragment key={f.key}>
@@ -150,6 +171,7 @@ function PrimaryParserFields({
         mode={mode}
         readOnly={isReadOnly(f.key)}
         isInvalid={isInvalid(f.key)}
+        renderCustomControl={renderCustomControl}
       />
     </Fragment>
   ));
@@ -163,6 +185,7 @@ export function ParserConfigFields({
   readOnlyKeys,
   invalidKeys,
   advancedExtras,
+  renderCustomControl,
 }: ParserConfigFieldsProps) {
   // A held value can stop being offered without the admin touching its field —
   // switching the Anthropic report to `cost` retires every bucket width. Left
@@ -204,6 +227,7 @@ export function ParserConfigFields({
         mode={mode}
         isReadOnly={isReadOnly}
         isInvalid={isInvalid}
+        renderCustomControl={renderCustomControl}
       />
       {(advancedFields.length > 0 || advancedExtras) && (
         <AdvancedSettingsGroup openWhen={hasInvalidAdvancedField}>
@@ -216,6 +240,7 @@ export function ParserConfigFields({
               mode={mode}
               readOnly={isReadOnly(f.key)}
               isInvalid={isInvalid(f.key)}
+              renderCustomControl={renderCustomControl}
             />
           ))}
           {advancedExtras}

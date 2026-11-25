@@ -3,19 +3,21 @@
 import {
   AGENT_REGISTRY_EVENT_TYPES,
   AgentRegistryEntryNotFoundError,
-  agentRegistryEntrySchema,
   type AgentRegistryEntry,
   type AgentRegistryEvent,
+  type AgentRegistryPosture,
   type AgentRegistryStatus,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { skipTenantCheck } from "@langwatch/prisma-client";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import {
   registryEventOf,
+  storedRegistryEntryOf,
+  storedRegistryEntrySchema,
   type RegistryChangeSet,
   type StoredRegistryEntry,
 } from "../../features/registry/rules/registry-reconcile.rules.ts";
@@ -34,7 +36,7 @@ const REGISTRY_TRANSACTION_MAX_WAIT_MS = 10_000;
 
 const eventPayloadSchema = z.object({
   tool: z.string().nullable(),
-  agent: agentRegistryEntrySchema,
+  agent: storedRegistryEntrySchema,
 });
 
 type EventRow = {
@@ -117,14 +119,19 @@ function eventPageOf({
   };
 }
 
+/** Whether the row was written by a release that stores the dormant flag. */
+function isStoredWithDormancy(value: Prisma.JsonValue): boolean {
+  return value !== null && typeof value === "object" && !Array.isArray(value) && "dormant" in value;
+}
+
 function entryOf(value: Prisma.JsonValue): AgentRegistryEntry {
-  return agentRegistryEntrySchema.parse(value);
+  return storedRegistryEntryOf(value);
 }
 
 /** A list skips an entry this release cannot read (a newer release's source) instead of failing. */
 function readableEntriesOf(rows: { id: string; entry: Prisma.JsonValue }[]): AgentRegistryEntry[] {
   return rows.flatMap((row) => {
-    const parsed = agentRegistryEntrySchema.safeParse(row.entry);
+    const parsed = storedRegistryEntrySchema.safeParse(row.entry);
     if (parsed.success) return [parsed.data];
     logger.warn(
       { entryId: row.id, paths: parsed.error.issues.map((issue) => issue.path.join(".")) },
@@ -135,6 +142,20 @@ function readableEntriesOf(rows: { id: string; entry: Prisma.JsonValue }[]): Age
 }
 
 const eventTypeSchema = z.enum(AGENT_REGISTRY_EVENT_TYPES);
+
+/**
+ * Posture follows from the entry's `shadow` and `dormant`; a row stored before `dormant` existed
+ * has no such key and reads as not dormant.
+ */
+function postureWhere(posture: AgentRegistryPosture): Prisma.AgentRegistryEntryWhereInput[] {
+  const shadow = (value: boolean) => ({ entry: { path: ["shadow"], equals: value } });
+  const dormant = (value: boolean | typeof Prisma.AnyNull) => ({
+    entry: { path: ["dormant"], equals: value },
+  });
+  if (posture === "shadow") return [shadow(true)];
+  if (posture === "dormant") return [shadow(false), dormant(true)];
+  return [shadow(false), { OR: [dormant(false), dormant(Prisma.AnyNull)] }];
+}
 const inputJsonSchema = z.custom<Prisma.InputJsonValue>(
   (value) => value !== null && value !== undefined,
 );
@@ -212,7 +233,13 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
           where: { organizationId },
           select: { id: true, sourceKey: true, fingerprint: true, entry: true },
         });
-        const changes = plan(rows.map((row) => ({ ...row, entry: entryOf(row.entry) })));
+        const changes = plan(
+          rows.map((row) => ({
+            ...row,
+            entry: entryOf(row.entry),
+            dormancyBaselined: isStoredWithDormancy(row.entry),
+          })),
+        );
         const baselined = await transaction.agentRegistryBaseline.findUnique({
           where: { organizationId },
           select: { organizationId: true },
@@ -287,24 +314,49 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`agent-registry:${organizationId
     return readableEntriesOf(rows);
   }
 
+  async findActiveWithSourceKeys({
+    organizationId,
+    limit,
+    afterSourceKey,
+  }: {
+    organizationId: string;
+    limit: number;
+    afterSourceKey?: string;
+  }): Promise<{ sourceKey: string; entry: AgentRegistryEntry }[]> {
+    const rows = await this.prisma.agentRegistryEntry.findMany({
+      where: {
+        organizationId,
+        status: "active",
+        ...(afterSourceKey === undefined ? {} : { sourceKey: { gt: afterSourceKey } }),
+      },
+      select: { sourceKey: true, entry: true },
+      orderBy: { sourceKey: "asc" },
+      take: limit,
+    });
+    return rows.map((row) => ({ sourceKey: row.sourceKey, entry: entryOf(row.entry) }));
+  }
+
   async listEntries({
     organizationId,
     limit,
     after,
     updatedSince,
     status,
+    posture,
   }: {
     organizationId: string;
     limit: number;
     after?: RegistryEntryPosition;
     updatedSince?: Instant;
     status?: AgentRegistryStatus;
+    posture?: AgentRegistryPosture;
   }): Promise<RegistryEntryPage> {
     const afterAt = after ? new Date(after.updatedAt) : undefined;
     const rows = await this.prisma.agentRegistryEntry.findMany({
       where: {
         organizationId,
         ...(status ? { status } : {}),
+        ...(posture ? { AND: postureWhere(posture) } : {}),
         ...(updatedSince ? { updatedAt: { gte: toDate(updatedSince) } } : {}),
         ...(after && afterAt
           ? {
