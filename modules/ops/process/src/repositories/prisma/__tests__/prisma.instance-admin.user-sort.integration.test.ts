@@ -30,7 +30,8 @@ describe.skipIf(!DB_URL)("PrismaInstanceAdminRepository users list order", () =>
   const id = (key: string) => `sort_${key}_${run}`;
   const ids = (keys: string) => [...keys].map(id);
   // a: active, 2 orgs, 3 projects. b: unverified, 1 org, 1 project. c: pending SSO, no org.
-  // d: deactivated though verified, no name, 1 org, 2 projects. Only b has logged in.
+  // d: deactivated though verified, no name, 1 org, 2 projects. e: unverified, a cleared
+  // (empty) name, no org. Only b has logged in.
   const users = [
     { id: id("a"), name: `Ada ${run}`, email: `ada-${run}@example.com`, emailVerified: true },
     { id: id("b"), name: `bob ${run}`, email: `bob-${run}@example.com` },
@@ -42,6 +43,7 @@ describe.skipIf(!DB_URL)("PrismaInstanceAdminRepository users list order", () =>
       emailVerified: true,
       deactivatedAt: new Date("2026-01-01T00:00:00Z"),
     },
+    { id: id("e"), name: "", email: `eve-${run}@example.com` },
   ];
   const userIds = users.map((user) => user.id);
   const orgs = [id("org1"), id("org2")];
@@ -140,14 +142,14 @@ describe.skipIf(!DB_URL)("PrismaInstanceAdminRepository users list order", () =>
   /** @scenario "The users list is ordered across every page before it is paged" */
   it("orders every column in both directions, nulls last, before paging", async () => {
     const expected: Record<AdminUserSortField, { ASC: string; DESC: string }> = {
-      id: { ASC: "abcd", DESC: "dcba" },
-      name: { ASC: "abcd", DESC: "cbad" },
-      email: { ASC: "abcd", DESC: "dcba" },
-      createdAt: { ASC: "abcd", DESC: "dcba" },
-      lastLoginAt: { ASC: "bacd", DESC: "bdca" },
-      organizations: { ASC: "cbda", DESC: "adbc" },
-      projects: { ASC: "cbda", DESC: "adbc" },
-      status: { ASC: "abcd", DESC: "dcba" },
+      id: { ASC: "abcde", DESC: "edcba" },
+      name: { ASC: "abcde", DESC: "cbaed" },
+      email: { ASC: "abcde", DESC: "edcba" },
+      createdAt: { ASC: "abcde", DESC: "edcba" },
+      lastLoginAt: { ASC: "bacde", DESC: "bedca" },
+      organizations: { ASC: "cebda", DESC: "adbec" },
+      projects: { ASC: "cebda", DESC: "adbec" },
+      status: { ASC: "abecd", DESC: "dceba" },
     };
     for (const [field, orders] of Object.entries(expected) as [
       AdminUserSortField,
@@ -159,9 +161,9 @@ describe.skipIf(!DB_URL)("PrismaInstanceAdminRepository users list order", () =>
 
     const first = await list({ field: "projects", order: "DESC", page: 1, perPage: 2 });
     const second = await list({ field: "projects", order: "DESC", page: 2, perPage: 2 });
-    expect(first.total).toBe(4);
-    expect(second.total).toBe(4);
-    expect([...first.ids, ...second.ids]).toEqual(ids("adbc"));
+    expect(first.total).toBe(5);
+    expect(second.total).toBe(5);
+    expect([...first.ids, ...second.ids]).toEqual(ids("adbe"));
 
     // A search on an organization's name narrows to its members and keeps the order.
     const searched = await list({ field: "projects", order: "DESC", query: orgs[0]! });

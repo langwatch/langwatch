@@ -38,8 +38,8 @@ const USER_ADMIN_INCLUDE = {
 /** Each users-list column as the SQL it orders by; Status ranks Active, Unverified, Pending SSO, Deactivated. */
 const USER_ORDER_BY: Record<AdminUserSortField, Prisma.Sql> = {
   id: Prisma.sql`u."id"`,
-  name: Prisma.sql`lower(u."name")`,
-  email: Prisma.sql`lower(u."email")`,
+  name: Prisma.sql`NULLIF(lower(u."name"), '')`,
+  email: Prisma.sql`NULLIF(lower(u."email"), '')`,
   createdAt: Prisma.sql`u."createdAt"`,
   lastLoginAt: Prisma.sql`u."lastLoginAt"`,
   organizations: Prisma.sql`(SELECT count(*) FROM "OrganizationUser" ou WHERE ou."userId" = u."id")`,
