@@ -354,6 +354,24 @@ describe("a board's scope in the browser", () => {
     });
   });
 
+  describe("given a new board nothing has stored yet", () => {
+    /** @scenario "AC162d Renaming, describing or pinning a new board stores it with that edit" */
+    it("stores the board when its scope is picked, then sets that scope on the stored board", async () => {
+      const server = scopeServer({ boards: [WEEKLY] });
+      const { user } = open({ server, dashboardId: "new" });
+
+      await user.click(await screen.findByRole("button", { name: "Scope: Project" }));
+      await user.click(await screen.findByRole("menuitemradio", { name: "Organization" }));
+
+      await waitFor(() =>
+        expect(inputsTo(server, "boards.setScope")).toEqual([
+          { projectId: "proj-1", dashboardId: "board-new-2", scope: "ORGANIZATION" },
+        ]),
+      );
+      expect(inputsTo(server, "boards.create")).toHaveLength(1);
+    });
+  });
+
   describe("when a change of scope takes the board from someone", () => {
     const pick = async (user: ReturnType<typeof userEvent.setup>, from: string, to: string) => {
       await user.click(await screen.findByRole("button", { name: `Scope: ${from}` }));

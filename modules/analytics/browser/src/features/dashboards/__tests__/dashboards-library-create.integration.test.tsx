@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- * Making a dashboard from the organization's Dashboards library: the dialog, the one write that
- * makes it at its scope and product, and who is offered creation at all.
+ * Making a dashboard from the organization's Dashboards library: the dialog, the unsaved board it
+ * opens (stored at its scope and product on the first edit), and who is offered creation at all.
  * @see modules/dashboard/specs/dashboards-organization-area.feature
  */
 
@@ -12,6 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { StubAnalyticsHost } from "../../../testing.tsx";
+import { useDraftFrame } from "../behavior/use-draft-board.ts";
 import { NewDashboardDialog } from "../ui/sections/new-dashboard-dialog.tsx";
 import { ALPHA, IN_VIEW, inputsTo, renderLibrary } from "./dashboards-library.test-helpers.tsx";
 import { renderDashboards } from "./render-dashboards.test-helpers.tsx";
@@ -20,61 +21,46 @@ afterEach(() => {
   toaster.remove();
 });
 
+function DraftProject() {
+  return <output aria-label="Draft project">{useDraftFrame().project?.id}</output>;
+}
+
+/** The store project the unsaved board is held for, read off the draft. */
+async function heldIn() {
+  renderDashboards({ element: <DraftProject />, host: new StubAnalyticsHost() });
+  return (await screen.findByRole("status", { name: "Draft project" })).textContent;
+}
+
 describe("the Dashboards library's creation", () => {
   describe("when the member makes a new dashboard", () => {
     /** @scenario "A board made in the library is made at its scope in one write" */
-    it("stores it in the project in view at the scope Project and opens it", async () => {
-      const { host, calls, user } = renderLibrary();
-
-      await user.click(await screen.findByRole("button", { name: "New dashboard" }));
-      await user.click(await screen.findByRole("button", { name: "Create" }));
-
-      await waitFor(() => expect(host.navigations).toEqual(["/dashboards/board-new"]));
-      expect(inputsTo(calls, "boards.create")).toEqual([
-        { projectId: IN_VIEW.id, name: "Untitled dashboard 1", homeProduct: "llm-ops" },
-      ]);
-      expect(inputsTo(calls, "boards.createAtScope")).toEqual([]);
-      expect(inputsTo(calls, "boards.setScope")).toEqual([]);
-      expect(host.successes.map((notice) => notice.title)).toEqual(["Dashboard created"]);
-    });
-
-    /** @scenario "A board made in the library is made at its scope in one write" */
-    it("makes a board Only me in one call and opens it at the organization's address", async () => {
+    it("opens it unsaved at the organization's address, writing nothing yet", async () => {
       const { host, calls, user } = renderLibrary();
 
       await user.click(await screen.findByRole("button", { name: "New dashboard" }));
       await user.click(await screen.findByRole("radio", { name: /Only me/ }));
       await user.click(screen.getByRole("button", { name: "Create" }));
 
-      await waitFor(() => expect(host.navigations).toEqual(["/dashboards/board-new"]));
-      expect(inputsTo(calls, "boards.createAtScope")).toEqual([
-        {
-          projectId: IN_VIEW.id,
-          name: "Untitled dashboard 1",
-          scope: "PRIVATE",
-          homeProduct: "llm-ops",
-        },
-      ]);
+      await waitFor(() => expect(host.navigations).toEqual(["/dashboards/new"]));
       expect(inputsTo(calls, "boards.create")).toEqual([]);
+      expect(inputsTo(calls, "boards.createAtScope")).toEqual([]);
       expect(inputsTo(calls, "boards.setScope")).toEqual([]);
+      expect(host.successes).toEqual([]);
     });
 
     /** @scenario "Create from the library with a name, product and who can see it" */
-    it("stores it in my last-used project, though another comes first by name", async () => {
-      const { host, calls, user } = renderLibrary({ storeProjects: [ALPHA, IN_VIEW] });
+    it("holds it for my last-used project, though another comes first by name", async () => {
+      const { user } = renderLibrary({ storeProjects: [ALPHA, IN_VIEW] });
 
       await user.click(await screen.findByRole("button", { name: "New dashboard" }));
       await user.click(await screen.findByRole("button", { name: "Create" }));
 
-      await waitFor(() => expect(host.navigations).toEqual(["/dashboards/board-new"]));
-      expect(inputsTo(calls, "boards.create")).toEqual([
-        { projectId: IN_VIEW.id, name: "Untitled dashboard 1", homeProduct: "llm-ops" },
-      ]);
+      expect(await heldIn()).toBe(IN_VIEW.id);
     });
 
     /** @scenario "Create from the library with a name, product and who can see it" */
-    it("stores it in the first by name when my last-used project is not among them", async () => {
-      const { host, calls, user } = renderLibrary({
+    it("holds it for the first by name when my last-used project is not among them", async () => {
+      const { user } = renderLibrary({
         storeProjects: [ALPHA, IN_VIEW],
         project: {
           id: "proj-elsewhere",
@@ -87,10 +73,7 @@ describe("the Dashboards library's creation", () => {
       await user.click(await screen.findByRole("button", { name: "New dashboard" }));
       await user.click(await screen.findByRole("button", { name: "Create" }));
 
-      await waitFor(() => expect(host.navigations).toEqual(["/dashboards/board-new"]));
-      expect(inputsTo(calls, "boards.create")).toEqual([
-        { projectId: ALPHA.id, name: "Untitled dashboard 1", homeProduct: "llm-ops" },
-      ]);
+      expect(await heldIn()).toBe(ALPHA.id);
     });
   });
 
@@ -126,21 +109,14 @@ describe("the Dashboards library's creation", () => {
     });
 
     /** @scenario "Create from the library with a name, product and who can see it" */
-    it("makes it homed in the product picked, at that product's scope", async () => {
+    it("opens the new board unsaved, whichever product is picked", async () => {
       const { host, calls, dialog, user } = await openDialog();
 
       await user.selectOptions(dialog.getByRole("combobox"), "gateway");
       await user.click(dialog.getByRole("button", { name: "Create" }));
 
-      await waitFor(() => expect(host.navigations).toEqual(["/dashboards/board-new"]));
-      expect(inputsTo(calls, "boards.createAtScope")).toEqual([
-        {
-          projectId: IN_VIEW.id,
-          name: "Untitled dashboard 1",
-          scope: "ORGANIZATION",
-          homeProduct: "gateway",
-        },
-      ]);
+      await waitFor(() => expect(host.navigations).toEqual(["/dashboards/new"]));
+      expect(inputsTo(calls, "boards.createAtScope")).toEqual([]);
       expect(inputsTo(calls, "boards.create")).toEqual([]);
     });
 

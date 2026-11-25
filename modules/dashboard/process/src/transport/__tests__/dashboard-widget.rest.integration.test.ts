@@ -25,6 +25,9 @@ import {
 
 const CODE = "export default function Widget() { return null; }";
 const SQL = "SELECT count() AS value FROM analytics.traces";
+const READS_SOURCES_SQL =
+  "SELECT count() AS value FROM analytics.trace_metrics " +
+  "WHERE Source IN {dashboard_context_sources:Array(String)}";
 
 function queryDeclaring(parameter: { name: string; type: string; default?: unknown }) {
   return [{ name: "traces", sql: SQL, parameters: [parameter] }];
@@ -169,9 +172,7 @@ describe("given the dashboard widget REST family", () => {
       expect(created.status).toBe(201);
       expect(updated.status).toBe(422);
       expect(updated.json.code).toBe("validation_error");
-      expect(read.json.definition.queries).toEqual(
-        queries.map((query) => ({ ...query, sources: ["application"] })),
-      );
+      expect(read.json.definition.queries).toEqual(queries);
     });
   });
 
@@ -183,7 +184,7 @@ describe("given the dashboard widget REST family", () => {
       const created = await key.create({
         name: "Traces",
         code: CODE,
-        queries: [{ name: "t", sql: SQL }],
+        queries: [{ name: "t", sql: READS_SOURCES_SQL }],
       });
 
       expect(created.status).toBe(201);
@@ -220,7 +221,7 @@ describe("given the dashboard widget REST family", () => {
       const good = await key.create({
         name: "Traces",
         code: CODE,
-        queries: [{ name: "t", sql: SQL }],
+        queries: [{ name: "t", sql: READS_SOURCES_SQL }],
       });
       const updated = await key.update(good.json.id, { queries: bad });
       const read = await key.read(good.json.id);
@@ -242,7 +243,7 @@ describe("given a key whose role only views analytics", () => {
     const created = await editor.create({
       name: "Traces",
       code: CODE,
-      queries: [{ name: "traces", sql: SQL }],
+      queries: [{ name: "traces", sql: READS_SOURCES_SQL }],
     });
 
     const patched = await viewer.update(created.json.id, {

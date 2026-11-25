@@ -92,6 +92,11 @@ export class FakeAuthzGrantsService implements AuthzGrantsService {
     else this.billingHolders.delete(key);
   }
 
+  /** The Billing grant goes without the Billing switch, the state ADR-205's repair covers. */
+  dropBillingGrant({ organizationId, userId }: { organizationId: string; userId: string }): void {
+    this.billingHolders.delete(`${organizationId}:${userId}`);
+  }
+
   /** Every binding currently held for one user, for assertions. */
   bindingsFor(userId: string): FakeBinding[] {
     return Array.from(this.bindings.values()).filter((binding) => binding.userId === userId);

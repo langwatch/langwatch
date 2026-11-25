@@ -184,12 +184,14 @@ Feature: ClickHouse Query Memory Safety Regression Tests
   # Instant Evals sizing and paging failed at the 1 GB cap on a busy project: the key and sample
   # passes projected the thread id, a lookup into the trace attributes map, for every trace the
   # view read, and the view's read-in-order merge held a block of that map per part before the
-  # hash sample and the LIMIT applied.
+  # hash sample and the LIMIT applied. Picking the row ids first was not enough: no filter reaches
+  # below the view's LIMIT 1 BY, so the keys are read over its trace-ids twin (dedup-trace-ids.feature).
   @integration @regression
   Scenario: An Instant Evals key or sample pass picks its rows before reading the thread id
     Given a project whose traces span many parts and carry wide attribute maps
+    And the traces view and its trace-ids twin, as provisioning emits them
     And an Instant Evals statement projecting the thread id and an eval column
-    When the sample pass and the key pass run over it under a 100 MB memory cap
+    When the sample pass and the key pass run over it as the service runs them, every query under a 100 MB memory cap
     Then both answer under the cap
     And they return the same keys the single read returns without a cap
     And the single read that projects the thread id for every trace exceeds the cap

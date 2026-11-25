@@ -207,7 +207,7 @@ describe.skipIf(!DB_URL)("a Billing-only invite on a full Free plan (Postgres)",
     });
 
     /** @scenario "Using a spent invitation link again writes nothing" */
-    it("leaves Billing off when an admin turned it off and the old link is used again", async () => {
+    it("leaves Billing off when the grant is gone and the old link is used again", async () => {
       const email = `payer-again-${ns}@acme.test`;
       await service.createInvites({
         organizationId,
@@ -221,15 +221,7 @@ describe.skipIf(!DB_URL)("a Billing-only invite on a full Free plan (Postgres)",
       const userId = await person("payer-again");
       const caller = { id: userId, name: "payer", email } as never;
       await door.accept({ inviteCode }, caller);
-      // An admin turns their Billing off after they joined.
-      await grants.setBillingRole({
-        organizationId,
-        userId,
-        holds: false,
-        source: "admin",
-        commandId: `admin-off-${ns}`,
-        caller: { type: "user", id: adminUserId },
-      } as never);
+      grants.dropBillingGrant({ organizationId, userId });
 
       await expect(door.accept({ inviteCode }, caller)).rejects.toMatchObject({
         code: "invite_already_accepted",

@@ -1,7 +1,4 @@
 import type { SystemStyleObject } from "@langwatch/design-system/primitives";
-import type { FacetDisplayState } from "@langwatch/trace-contract";
-
-export type FacetValueState = FacetDisplayState;
 
 /**
  * Per-value aggregates the evaluator facet attaches so its sidebar
