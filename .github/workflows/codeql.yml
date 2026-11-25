@@ -24,6 +24,7 @@ concurrency:
 
 jobs:
   changes:
+    timeout-minutes: 5
     # A draft or release-please PR is skipped unless labelled `ci:full`.
     if: >-
       (github.event_name != 'pull_request' || (github.event.pull_request.draft != true && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent'))
@@ -198,6 +199,7 @@ jobs:
           category: "/language:${{matrix.language}}"
 
   codeql-complete:
+    timeout-minutes: 5
     needs: [changes, analyze]
     # `changes` is skipped on draft PRs; treat that as complete too.
     if: always()

@@ -42,6 +42,7 @@ concurrency:
 
 jobs:
   changes:
+    timeout-minutes: 5
     # Skips the whole run for a pull_request_target label other than `approved-ci`.
     # That event exists only to let `approved-ci` run a fork's PR.
     if: (github.event_name != 'pull_request_target' || github.event.label.name == 'approved-ci')

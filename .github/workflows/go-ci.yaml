@@ -51,6 +51,7 @@ concurrency:
 
 jobs:
   changes:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     outputs:
       go: ${{ steps.filter.outputs.go || steps.force.outputs.go }}

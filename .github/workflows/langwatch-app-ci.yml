@@ -50,6 +50,7 @@ concurrency:
 
 jobs:
   changes:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
@@ -953,6 +954,7 @@ jobs:
 
   # Its own job, so a run that times out (cancelled, no failed step) still posts.
   package-suites-notify:
+    timeout-minutes: 5
     needs: [changes, package-suites]
     if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.package-suites.result == 'failure' || needs.package-suites.result == 'cancelled')
     runs-on: ubuntu-latest
@@ -1568,6 +1570,7 @@ jobs:
           cat apps/api/test-failures.txt
 
   langwatch-app-complete:
+    timeout-minutes: 5
     needs: [
         changes,
         # `affected` decides test-unit's matrix, and test-unit is an allowed
