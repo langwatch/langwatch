@@ -111,6 +111,17 @@ Feature: Organization-wide Dashboards area
     And an Organization board homed in LLM Ops instead shows LLM Ops's project switcher in the top bar, on the project in view
     # Evidence: haven browser screenshots of /dashboards/<id> as both members, and of an LLM Ops board
 
+  @integration
+  Scenario: A board only its project lists switches the app to that project
+    Given a Project board, or an Only me board, owned by project "Support Bot" that I read
+    And "Demo" is the project in view
+    When I open "/dashboards/<id>" from a sidebar section's link
+    Then "Support Bot" becomes the project in view and the project I last used
+    And the Dashboards sidebar lists the board, marked as the current one
+    When the board is shared with the organization, has no owning project I read, or its owner is already in view
+    Then the project in view stays as it is
+    # Evidence: haven browser screenshot of the sidebar after opening such a board from a link
+
   # D2 (owner defaults, 2026-11-23): an LLM Ops board with no project reads the project in view,
   # switched from the LLM Ops top bar; Gateway and Governance boards read organization data.
   @integration @unimplemented
