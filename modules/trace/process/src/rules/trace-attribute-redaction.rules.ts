@@ -83,7 +83,7 @@ export function createAttributeRedactor({
   };
 }
 
-type CategoryProtections = Pick<
+export type CategoryProtections = Pick<
   Protections,
   | "canSeeCapturedInput"
   | "canSeeCapturedOutput"
@@ -93,7 +93,7 @@ type CategoryProtections = Pick<
 >;
 
 /** Whether the viewer may read a category, and the audience label when a rule restricts it. */
-function categoryVisibility(
+export function categoryVisibility(
   protections: CategoryProtections,
 ): Record<ContentCategory, { canSee: boolean; visibleTo: string | null | undefined }> {
   const categories = protections.contentCategories;

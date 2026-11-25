@@ -15,6 +15,7 @@ import {
   type CustomersAndLabelsResult,
   type DistinctFieldNamesResult,
   type PromptStudioSpanResult,
+  type Protections,
 } from "@langwatch/trace-contract";
 
 import type { TraceByIdRead } from "../features/legacy/rules/trace-id-lookup.rules.ts";
@@ -116,7 +117,7 @@ export interface TraceLegacyRead {
   findSpanForPromptStudio(input: {
     projectId: string;
     spanId: string;
-    protections: unknown;
+    protections: Protections;
   }): Promise<PromptStudioSpanResult | null>;
 }
 

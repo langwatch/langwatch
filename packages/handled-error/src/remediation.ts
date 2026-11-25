@@ -146,6 +146,13 @@ const registry = {
     ],
     docsPath: "/platform/data-retention",
   },
+  span_content_withheld: {
+    tips: [
+      "A privacy rule hides part of this span's content (input, output, system instructions or tool calls) from you; ask a project admin for access",
+      "On a plan with a visibility window, spans older than the window can't be opened in the playground; upgrade the plan or open a newer span",
+    ],
+    docsPath: "/platform/data-privacy",
+  },
   scenario_run_has_many_traces: {
     tips: [
       "Open one of the listed traces: `langwatch trace get <traceId>`",
