@@ -12,6 +12,8 @@ import { OrganizationModule } from "../organization.app.ts";
 import { organizationModuleSetup } from "./support/organization-module-setup.ts";
 
 const ORGANIZATION_ID = "org-1";
+/** A second organization, always roomy, whose admissions mark the lifecycle queue as drained. */
+const ELSEWHERE_ID = "org-2";
 
 const roomyPlan: Plan = {
   planSource: "free",
@@ -26,7 +28,12 @@ const roomyPlan: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-/** An organization whose administrator holds a seat, with `member_admitted` facts collected. */
+type Admitted = { organizationId: string };
+
+/**
+ * An organization on `plan` whose administrator holds a seat, beside a roomy one she also
+ * administers, with `member_admitted` facts collected.
+ */
 async function organizationWith(plan: Plan) {
   const permissions = TestAuthzApi.create({
     people: [
@@ -39,11 +46,16 @@ async function organizationWith(plan: Plan) {
     permissions,
     memory,
     entitlement: createApiFixture<EntitlementApi>(
-      { getActivePlan: async () => plan, requestBound: async () => 1_000 },
+      {
+        getActivePlan: async ({ organizationId }) =>
+          organizationId === ORGANIZATION_ID ? plan : roomyPlan,
+        requestBound: async () => 1_000,
+      },
       "EntitlementApi",
     ),
   });
-  await setup.repositories.membership(permissions).createAndAssign({
+  const memberships = setup.repositories.membership(permissions);
+  await memberships.createAndAssign({
     userId: "user-admin",
     orgId: ORGANIZATION_ID,
     orgName: "ACME",
@@ -52,8 +64,17 @@ async function organizationWith(plan: Plan) {
     teamSlug: "engineering",
     pricingModel: "SEAT_EVENT",
   });
+  await memberships.createAndAssign({
+    userId: "user-admin",
+    orgId: ELSEWHERE_ID,
+    orgName: "Elsewhere",
+    orgSlug: "elsewhere",
+    teamId: "team-2",
+    teamSlug: "research",
+    pricingModel: "SEAT_EVENT",
+  });
   const app = await OrganizationModule.create(setup);
-  const admitted: unknown[] = [];
+  const admitted: Admitted[] = [];
   const accepts = { send: async () => undefined };
   app.connectLifecycle({
     recordCreated: accepts,
@@ -74,9 +95,25 @@ async function organizationWith(plan: Plan) {
     recordMemberRemoved: accepts,
     recordMemberDepartmentChanged: accepts,
     recordMemberRoleChanged: accepts,
-    recordMemberAdmitted: { send: async (data: unknown) => void admitted.push(data) },
+    recordMemberAdmitted: { send: async (data: Admitted) => void admitted.push(data) },
   });
   return { app, admitted };
+}
+
+/**
+ * What was recorded for the first organization once every earlier lifecycle send has landed.
+ * Sends leave in call order, so Ben's admission elsewhere arriving means any send made
+ * before it has arrived too: a negative check needs no sleep.
+ */
+async function recordedOnceDrained(
+  app: Awaited<ReturnType<typeof organizationWith>>["app"],
+  admitted: Admitted[],
+) {
+  await app.createMembership({ organizationId: ELSEWHERE_ID, userId: "user-ben" });
+  await vi.waitFor(() =>
+    expect(admitted).toContainEqual(expect.objectContaining({ organizationId: ELSEWHERE_ID })),
+  );
+  return admitted.filter((record) => record.organizationId === ORGANIZATION_ID);
 }
 
 describe("given an organization with an administrator", () => {
@@ -113,9 +150,7 @@ describe("given an organization with an administrator", () => {
       });
 
       expect(repeat.outcome).toBe("already-present");
-      // Lifecycle sends are fire-and-forget; give a wrongly sent one time to land.
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      expect(admitted).toHaveLength(1);
+      expect(await recordedOnceDrained(app, admitted)).toHaveLength(1);
     });
   });
 
@@ -135,8 +170,7 @@ describe("given an organization with an administrator", () => {
       });
 
       expect(admission.pending).toBe(true);
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      expect(admitted).toEqual([]);
+      expect(await recordedOnceDrained(app, admitted)).toEqual([]);
     });
   });
 });

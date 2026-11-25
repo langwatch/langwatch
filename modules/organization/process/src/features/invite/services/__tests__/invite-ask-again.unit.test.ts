@@ -1,5 +1,5 @@
 import { InviteNotFoundError, InviteThrottledError } from "@langwatch/organization-contract";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { OrganizationInviteMail } from "../../../../channels/organization-invite-mail.channel.ts";
 import type { OrganizationInviteRateLimitRepository } from "../../../../repositories/organization-invite-rate-limit.repository.ts";
@@ -91,6 +91,11 @@ describe("given one invitation and the two routes that mail it", () => {
     throttleService = InviteSendThrottleService.create(makeInMemoryRateLimiter());
   });
 
+  // Files share a worker, so a clock left faked stalls the next file's timers.
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("when it is sent its fill within the window", () => {
     /** @scenario Resending is throttled per invitation */
     it("refuses the next one and says how long to wait", async () => {
@@ -179,6 +184,10 @@ describe("given an expired invitation", () => {
       sendInvite: vi.fn(),
       sendInviteReRequest: sendInviteReRequestEmail,
     };
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe("when its holder asks for a fresh one", () => {
