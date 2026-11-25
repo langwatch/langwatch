@@ -67,6 +67,9 @@
       "path": "./enterprise/modules/demo-data/process"
     },
     {
+      "path": "./enterprise/modules/digest/contract"
+    },
+    {
       "path": "./enterprise/modules/digest/process"
     },
     {

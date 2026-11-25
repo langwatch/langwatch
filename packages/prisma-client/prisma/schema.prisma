@@ -8179,3 +8179,83 @@ model SignInProviderMount {
   lastAppliedEventId String
   updatedAt          DateTime @default(now()) @updatedAt
 }
+
+// ── Weekly digest (enterprise/modules/digest) ────────────────────────────────
+// Ids and numbers only: names and addresses stay with the user module and are
+// read when an email is rendered, never stored here.
+
+/// An organization enrolled in the weekly digest. No row: not enrolled, so nothing sends.
+model DigestCohortOrganization {
+  organizationId String   @id
+  enrolledBy     String
+  enrolledAt     DateTime @default(now())
+}
+
+/// A person's opt-out of the digest. No row, or no `unsubscribedAt`: subscribed.
+model DigestSubscription {
+  userId                 String    @id
+  unsubscribedAt         DateTime?
+  /// The send whose unsubscribe link or one-click header the person used.
+  unsubscribedFromSendId String?
+  updatedAt              DateTime  @updatedAt
+}
+
+/// A project's ISO week, folded from its owners' events. The id is the fold's aggregate key.
+model DigestProjectWeek {
+  id                String   @id
+  projectId         String
+  organizationId    String
+  isoWeek           String
+  /// The fold state: counts, sums, a fixed-bucket latency histogram, capped model and evaluator maps.
+  state             Json
+  occurredAt        DateTime
+  lastEventId       String
+  acceptedAt        DateTime
+  projectionVersion String
+  createdAt         DateTime
+  updatedAt         DateTime
+
+  @@index([organizationId, isoWeek])
+  @@index([isoWeek])
+}
+
+/// A person's ISO week of coding-agent activity in one organization, folded from the agents' facts.
+model DigestUserWeek {
+  id                String   @id
+  userId            String
+  organizationId    String
+  isoWeek           String
+  /// Sessions (a capped set of ids) and the agents' metric series, converged last-write-wins.
+  state             Json
+  occurredAt        DateTime
+  lastEventId       String
+  acceptedAt        DateTime
+  projectionVersion String
+  createdAt         DateTime
+  updatedAt         DateTime
+
+  @@index([organizationId, isoWeek])
+  @@index([isoWeek])
+  @@index([userId])
+}
+
+/// One person's digest for one ISO week, accepted by our own mailer. The id is `userId:isoWeek`.
+model DigestSend {
+  id             String   @id
+  userId         String
+  organizationId String
+  isoWeek        String
+  templateId     String
+  sentAt         DateTime
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// The digest's one settings row. `armed` is the weekly send's master switch; it starts off.
+model DigestSettings {
+  id              String   @id @default("singleton")
+  armed           Boolean  @default(false)
+  lastPlannedWeek String?
+  updatedAt       DateTime @updatedAt
+}
