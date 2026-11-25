@@ -15,7 +15,11 @@ type Row = Record<string, unknown>;
 const TYPE_PX = { micro: 11, caption: 12, bodySm: 13, metric: 18 } as const;
 
 interface LWGlobal {
-  dashboardContext?: { colors?: Readonly<Record<string, string>>; timezone?: string };
+  dashboardContext?: {
+    colors?: Readonly<Record<string, string>>;
+    timezone?: string;
+    granularitySeconds?: number;
+  };
   navigate?: (target: string, params?: Record<string, unknown>) => void;
 }
 
@@ -145,10 +149,12 @@ function isTimeLikeColumn(data: Row[], key: string): boolean {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** The shortest local day: the night the clocks go forward. */
+const SHORTEST_DAY_MS = 23 * 60 * 60 * 1000;
 
 /**
  * Axis tick formatter for an XAxis's `dataKey`. Time-like columns render on the
- * reader's clock as "MM-DD" when the series spans more than a day or steps by days, else "HH:mm";
+ * reader's clock as "MM-DD" at a day grain or across more than a day, else "HH:mm";
  * everything else (and unparsable values) falls back to the raw string.
  */
 function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string {
@@ -161,8 +167,10 @@ function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string
     if (times.length > 0) {
       const sorted = [...new Set(times)].toSorted((a, b) => a - b);
       const steps = sorted.slice(1).map((time, index) => time - sorted[index]!);
+      const grain = window.LW?.dashboardContext?.granularitySeconds ?? 0;
+      const stepsByDays = steps.length > 0 && Math.min(...steps) >= SHORTEST_DAY_MS;
       spansMultipleDays =
-        sorted.at(-1)! - sorted[0]! > DAY_MS || (steps.length > 0 && Math.min(...steps) >= DAY_MS);
+        grain * 1000 >= DAY_MS || stepsByDays || sorted.at(-1)! - sorted[0]! > DAY_MS;
     }
   }
   return (value: unknown): string => {

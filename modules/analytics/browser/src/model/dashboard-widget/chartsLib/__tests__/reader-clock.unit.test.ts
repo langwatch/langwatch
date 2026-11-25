@@ -133,4 +133,18 @@ describe("given a reader in America/Los_Angeles", () => {
 
     expect(data.map((row) => tick(row.bucket))).toEqual(["11-25", "11-26"]);
   });
+
+  /** @scenario "TZ12 The charts library labels axes and tooltips on the reader's clock" */
+  it("dates the two local midnights around the spring-forward night, 23 hours apart", () => {
+    globals.window = frameWindow("America/Los_Angeles");
+    const data = [
+      { bucket: "2026-03-08 08:00:00", n: 1 },
+      { bucket: "2026-03-09 07:00:00", n: 2 },
+    ];
+    const tree = elements(AreaTimeseries({ data, x: "bucket", series: "n" }));
+    const axis = tree.find((element) => element.type === "XAxis");
+    const tick = axis?.props?.tickFormatter as (value: unknown) => string;
+
+    expect(data.map((row) => tick(row.bucket))).toEqual(["03-08", "03-09"]);
+  });
 });
