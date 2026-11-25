@@ -4,7 +4,7 @@
  * `among` keeps the models another query lists, so a top list always has its models' costs.
  */
 
-import { inPeriod } from "./lwql-period.ts";
+import { firstTraceMetricsRow, inPeriod } from "./lwql-period.ts";
 
 export const costByModelSql = ({
   limit,
@@ -17,6 +17,7 @@ export const costByModelSql = ({
 FROM (SELECT arrayJoin(Models) AS model, Models, TotalCost
   FROM trace_metrics
   WHERE ${inPeriod("OccurredAt")}
+    AND ${firstTraceMetricsRow()}
     AND notEmpty(Models))
 WHERE model != ''${among ? `\n  AND model IN (SELECT model FROM (${among}))` : ""}
 GROUP BY model

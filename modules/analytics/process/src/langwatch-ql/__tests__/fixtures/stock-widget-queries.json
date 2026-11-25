@@ -17,7 +17,7 @@
  },
  {
   "label": "token-drift/main",
-  "sql": "SELECT addSeconds(toStartOfInterval(subtractSeconds(OccurredAt, 345600), INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND), 345600) AS bucket,\n  sum(PromptTokens) AS prompt_tokens,\n  sum(CompletionTokens) AS completion_tokens\nFROM trace_metrics\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime})\nGROUP BY bucket\nORDER BY bucket"
+  "sql": "SELECT addSeconds(toStartOfInterval(subtractSeconds(OccurredAt, 345600), INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND), 345600) AS bucket,\n  sum(PromptTokens) AS prompt_tokens,\n  sum(CompletionTokens) AS completion_tokens\nFROM trace_metrics\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n  AND (TraceId, OccurredAt) IN (SELECT TraceId, min(OccurredAt)\n    FROM trace_metrics\n    WHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= subtractSeconds({dashboard_context_period_start:DateTime}, dateDiff('second', {dashboard_context_period_start:DateTime}, {dashboard_context_period_end:DateTime})) AND OccurredAt < {dashboard_context_period_end:DateTime})\n    GROUP BY TraceId))\nGROUP BY bucket\nORDER BY bucket"
  },
  {
   "label": "token-drift/present",
@@ -73,7 +73,7 @@
  },
  {
   "label": "top-models/modelCosts",
-  "sql": "SELECT model,\n  sum(TotalCost / length(Models)) AS cost\nFROM (SELECT arrayJoin(Models) AS model, Models, TotalCost\n  FROM trace_metrics\n  WHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n    AND notEmpty(Models)))\nWHERE model != ''\n  AND model IN (SELECT model FROM (SELECT arrayJoin(Models) AS model, uniqExact(TraceId) AS traces\nFROM trace_metrics\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime})\nGROUP BY model\nORDER BY traces DESC, model\nLIMIT 10))\nGROUP BY model\nORDER BY cost DESC\nLIMIT 10"
+  "sql": "SELECT model,\n  sum(TotalCost / length(Models)) AS cost\nFROM (SELECT arrayJoin(Models) AS model, Models, TotalCost\n  FROM trace_metrics\n  WHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n    AND (TraceId, OccurredAt) IN (SELECT TraceId, min(OccurredAt)\n    FROM trace_metrics\n    WHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= subtractSeconds({dashboard_context_period_start:DateTime}, dateDiff('second', {dashboard_context_period_start:DateTime}, {dashboard_context_period_end:DateTime})) AND OccurredAt < {dashboard_context_period_end:DateTime})\n    GROUP BY TraceId)\n    AND notEmpty(Models)))\nWHERE model != ''\n  AND model IN (SELECT model FROM (SELECT arrayJoin(Models) AS model, uniqExact(TraceId) AS traces\nFROM trace_metrics\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime})\nGROUP BY model\nORDER BY traces DESC, model\nLIMIT 10))\nGROUP BY model\nORDER BY cost DESC\nLIMIT 10"
  },
  {
   "label": "top-models/traffic",
@@ -169,7 +169,7 @@
  },
  {
   "label": "fd-cost-efficiency/models",
-  "sql": "SELECT model,\n  sum(TotalCost / length(Models)) AS cost\nFROM (SELECT arrayJoin(Models) AS model, Models, TotalCost\n  FROM trace_metrics\n  WHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n    AND notEmpty(Models)))\nWHERE model != ''\nGROUP BY model\nORDER BY cost DESC\nLIMIT 5"
+  "sql": "SELECT model,\n  sum(TotalCost / length(Models)) AS cost\nFROM (SELECT arrayJoin(Models) AS model, Models, TotalCost\n  FROM trace_metrics\n  WHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n    AND (TraceId, OccurredAt) IN (SELECT TraceId, min(OccurredAt)\n    FROM trace_metrics\n    WHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= subtractSeconds({dashboard_context_period_start:DateTime}, dateDiff('second', {dashboard_context_period_start:DateTime}, {dashboard_context_period_end:DateTime})) AND OccurredAt < {dashboard_context_period_end:DateTime})\n    GROUP BY TraceId)\n    AND notEmpty(Models)))\nWHERE model != ''\nGROUP BY model\nORDER BY cost DESC\nLIMIT 5"
  },
  {
   "label": "fd-cost-efficiency/present",
@@ -353,7 +353,7 @@
  },
  {
   "label": "up-loops/totals",
-  "sql": "SELECT uniqExact(TraceId) AS traces, sum(TotalCost) AS cost\nFROM trace_metrics\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime})"
+  "sql": "SELECT uniqExact(TraceId) AS traces, sum(TotalCost) AS cost\nFROM trace_metrics\nWHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n  AND (TraceId, OccurredAt) IN (SELECT TraceId, min(OccurredAt)\n    FROM trace_metrics\n    WHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= subtractSeconds({dashboard_context_period_start:DateTime}, dateDiff('second', {dashboard_context_period_start:DateTime}, {dashboard_context_period_end:DateTime})) AND OccurredAt < {dashboard_context_period_end:DateTime})\n    GROUP BY TraceId))"
  },
  {
   "label": "up-loops/present",
@@ -537,7 +537,7 @@
  },
  {
   "label": "cost-by-model/models",
-  "sql": "SELECT model,\n  sum(TotalCost / length(Models)) AS cost\nFROM (SELECT arrayJoin(Models) AS model, Models, TotalCost\n  FROM trace_metrics\n  WHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n    AND notEmpty(Models)))\nWHERE model != ''\nGROUP BY model\nORDER BY cost DESC\nLIMIT 5"
+  "sql": "SELECT model,\n  sum(TotalCost / length(Models)) AS cost\nFROM (SELECT arrayJoin(Models) AS model, Models, TotalCost\n  FROM trace_metrics\n  WHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\n    AND (TraceId, OccurredAt) IN (SELECT TraceId, min(OccurredAt)\n    FROM trace_metrics\n    WHERE trace_metrics.Source IN {dashboard_context_sources:Array(String)} AND ( OccurredAt >= subtractSeconds({dashboard_context_period_start:DateTime}, dateDiff('second', {dashboard_context_period_start:DateTime}, {dashboard_context_period_end:DateTime})) AND OccurredAt < {dashboard_context_period_end:DateTime})\n    GROUP BY TraceId)\n    AND notEmpty(Models)))\nWHERE model != ''\nGROUP BY model\nORDER BY cost DESC\nLIMIT 5"
  },
  {
   "label": "cost-by-model/spend",

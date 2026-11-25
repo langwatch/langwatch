@@ -62,6 +62,54 @@ const ON_TRACE_EVALUATIONS = new Set(
   fixture("stock-widget-queries.trace-evaluations-baseline.json").map((q) => q.label),
 );
 
+/** The per-minute rollups, which keep no origin, so main's form over them counted every source. */
+const ROLLUP_VIEWS = ["model_usage_by_minute", "trace_metrics_by_minute"];
+const ROLLUP_READ = new RegExp(
+  `\\b(FROM|JOIN)(\\s+)(?:analytics\\.)?(${ROLLUP_VIEWS.join("|")})\\b(?!\\.)`,
+  "gi",
+);
+const readsRollup = (sql: string) => new RegExp(ROLLUP_READ.source, "i").test(sql);
+/**
+ * Main's queries over the rollups, which now read trace_metrics and keep to the list
+ * (specs/lwql/stock-widgets-keep-to-sources.feature): compared over a rollup of the list's traces.
+ */
+const OFF_ROLLUPS = new Set(
+  fixture("stock-widget-queries.json")
+    .filter(
+      ({ label, sql }) =>
+        !readsRollup(sql) && MAIN.some((q) => q.label === label && readsRollup(q.sql)),
+    )
+    .map(({ label }) => label),
+);
+
+/** The SQL with every read of a per-minute rollup pointed at `database`'s copy. */
+const readingRollup = ({ sql, database }: { sql: string; database: string }): string =>
+  sql.replace(ROLLUP_READ, (_match, keyword: string, space: string, view: string) =>
+    [keyword, space, `${database}.${view}`].join(""),
+  );
+
+/** The queries the keep-to-sources change moved, listed so a new rollup reader is noticed. */
+const MOVED_OFF_ROLLUPS = [
+  "cost-by-model/models",
+  "fd-cost-efficiency/models",
+  "ship-rollout/changes",
+  "ship-rollout/checks",
+  "ship-rollout/traffic",
+  "token-drift/main",
+  "tools-wrong-tool/changes",
+  "top-models/modelCosts",
+  "up-errors/changes",
+  "up-loops/totals",
+];
+/** Those whose rows over every source differ from the list's; the rest find no change anyway. */
+const COUNTED_EVERY_SOURCE = [
+  "cost-by-model/models",
+  "fd-cost-efficiency/models",
+  "token-drift/main",
+  "top-models/modelCosts",
+  "up-loops/totals",
+];
+
 /** The queries that date a closed trace by its first row inside the window (analytics ADR-004). */
 const IN_WINDOW_DATED = [
   "ans-idk/topics",
@@ -192,6 +240,34 @@ const TRACES: TraceSeed[] = [
   },
 ];
 
+/** The source a trace counts under: a missing or empty origin counts as application. */
+const sourceOf = (seed: TraceSeed) => seed.origin || "application";
+
+/** Every trace's tokens, which trace_analytics and the rollup both carry. */
+const PROMPT_TOKENS = 40;
+const COMPLETION_TOKENS = 8;
+
+/** A one-span trace's `trace_analytics_rollup` row, as the fold writes it, on the trace's day. */
+function rollupRow(seed: TraceSeed): Record<string, unknown> {
+  return {
+    TenantId: TENANT,
+    BucketStart: onDay(seed.day),
+    Model: seed.day > 0 ? "gpt-5" : "gpt-4",
+    SpanType: "llm",
+    SpanCount: 1,
+    TraceCount: 1,
+    ErrorCount: 0,
+    CostSum: 0.5,
+    NonBilledCostSum: 0,
+    DurationSum: 1000,
+    PromptTokensSum: PROMPT_TOKENS,
+    CompletionTokensSum: COMPLETION_TOKENS,
+    CacheReadTokensSum: 0,
+    CacheWriteTokensSum: 0,
+    ReasoningTokensSum: 0,
+  };
+}
+
 const dayOf = (trace: string) => TRACES.find((seed) => seed.trace === trace)?.day ?? 0;
 const originOf = (trace: string) => TRACES.find((seed) => seed.trace === trace)?.origin ?? "";
 
@@ -228,6 +304,8 @@ function analyticsRow(seed: TraceSeed, day = seed.day): Record<string, unknown> 
     Models: [seed.day > 0 ? "gpt-5" : "gpt-4"],
     Labels: seed.labels ?? [],
     TotalCost: 0.5,
+    PromptTokens: PROMPT_TOKENS,
+    CompletionTokens: COMPLETION_TOKENS,
     TotalDurationMs: 1000,
     HasError: false,
     Attributes: attributesOf(seed),
@@ -536,6 +614,8 @@ describe("given traces, spans and evaluations of each source that the stock quer
   let postgres: LangWatchQLPostgresHarness;
   let client: ClickHouseClient;
   let finalTwins: string;
+  /** Per list, the database whose rollup views read only that list's traces. */
+  const listRollups = new Map<string, string>();
 
   /** The query's rows in a stable order, or its error, so one failure does not hide the rest. */
   async function run({
@@ -558,16 +638,51 @@ describe("given traces, spans and evaluations of each source that the stock quer
     }
   }
 
+  /** Main's form on the FINAL views, its rollup reads kept to `list`'s traces. */
+  function mainOver({
+    query,
+    list,
+    rollup = listRollups.get(list.join()) ?? "",
+  }: {
+    query: StockQuery;
+    list: readonly string[];
+    rollup?: string;
+  }): string {
+    const sql = readingFinalTwins({ sql: mainForm(query), database: finalTwins });
+    return OFF_ROLLUPS.has(query.label) ? readingRollup({ sql, database: rollup }) : sql;
+  }
+
+  /** A database whose rollup views read a rollup table holding only `list`'s traces. */
+  async function provisionListRollup(list: readonly string[]): Promise<string> {
+    const { names, factDatabase } = harness;
+    const database = `${names.database}_rollup_${list.join("_")}`;
+    await harness.applyAsAdmin([
+      `DROP DATABASE IF EXISTS ${database}`,
+      `CREATE DATABASE ${database}`,
+      `CREATE TABLE ${database}.trace_analytics_rollup AS ${factDatabase}.trace_analytics_rollup`,
+      ...viewProvisioning.setupStatements({
+        names: { ...names, database },
+        sourceDatabase: database,
+        views: LWQL_VIEW_CATALOG.filter((view) => ROLLUP_VIEWS.includes(view.name)),
+        dedup: SHIPPED_LWQL_DEDUP,
+      }),
+      `GRANT SELECT ON ${database}.* TO ${names.restrictedUser}`,
+    ]);
+    await harness.admin.insert({
+      table: `${database}.trace_analytics_rollup`,
+      format: "JSONEachRow",
+      values: TRACES.filter((seed) => list.includes(sourceOf(seed))).map(rollupRow),
+    });
+    return database;
+  }
+
   /** The labels whose rows differ from main's form on the FINAL views; every query must run. */
   async function differing(list: readonly string[]): Promise<string[]> {
     const labels: string[] = [];
     for (const query of MAIN.filter(({ label }) => !ON_TRACE_EVALUATIONS.has(label))) {
       const { label } = query;
       const now = await run({ sql: STOCK.get(label) ?? "", list });
-      const before = await run({
-        sql: readingFinalTwins({ sql: mainForm(query), database: finalTwins }),
-        list,
-      });
+      const before = await run({ sql: mainOver({ query, list }), list });
       expect(now.error, `${label} now`).toBeUndefined();
       expect(before.error, `${label} before`).toBeUndefined();
       if (now.rows !== before.rows) labels.push(label);
@@ -585,6 +700,7 @@ describe("given traces, spans and evaluations of each source that the stock quer
     );
     await harness.applyAccessModel({ views: LWQL_VIEW_CATALOG, sourceDatabase: facts });
     finalTwins = await provisionFinalTwins({ harness });
+    for (const { list } of LISTS) listRollups.set(list.join(), await provisionListRollup(list));
 
     const inserts: [string, Record<string, unknown>[]][] = [
       ["trace_summaries", TRACES.map(summaryRow)],
@@ -726,6 +842,24 @@ describe("given traces, spans and evaluations of each source that the stock quer
     expect(MAIN.map(({ label }) => label).toSorted()).toEqual([...STOCK.keys()].toSorted());
     expect(REWRITTEN).toHaveLength(39);
     expect(await differing(list)).toEqual([]);
+  });
+
+  /** @scenario "The queries moved off the rollups return main's rows over the list's own traces" */
+  it("compares the queries moved off the rollups over a rollup of every source too", async () => {
+    expect([...OFF_ROLLUPS].toSorted()).toEqual(MOVED_OFF_ROLLUPS);
+    const everySource = await provisionListRollup(["application", "langy", "simulation"]);
+    const list = ["application"];
+    const compared = await Promise.all(
+      MAIN.filter(({ label }) => OFF_ROLLUPS.has(label)).map(async (query) => ({
+        label: query.label,
+        now: await run({ sql: STOCK.get(query.label) ?? "", list }),
+        unfiltered: await run({ sql: mainOver({ query, list, rollup: everySource }), list }),
+      })),
+    );
+    const changed = compared.filter(({ now, unfiltered }) => now.rows !== unfiltered.rows);
+
+    // Main counted Langy's and the simulation's traces in these; the list now leaves them out.
+    expect(changed.map(({ label }) => label).toSorted()).toEqual(COUNTED_EVERY_SOURCE);
   });
 
   /** @scenario "The loops queries are compared with main's loops query without its arbitrary cap" */

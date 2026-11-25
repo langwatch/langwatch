@@ -4,7 +4,14 @@
  * already reads, plus `traces.SatisfactionScore` and the `topics` view.
  */
 
-import { bucketOf, inPeriod, inPeriodAndPrevious, MIDPOINT, START } from "./lwql-period.ts";
+import {
+  bucketOf,
+  firstTraceMetricsRow,
+  inPeriod,
+  inPeriodAndPrevious,
+  MIDPOINT,
+  START,
+} from "./lwql-period.ts";
 import { costByModelSql } from "./model-cost-queries.ts";
 
 export const TRAFFIC_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket, uniqExact(TraceId) AS traces
@@ -37,6 +44,7 @@ export const TOKEN_TREND_SQL = `SELECT ${bucketOf("OccurredAt")} AS bucket,
   sum(CompletionTokens) AS completion_tokens
 FROM trace_metrics
 WHERE ${inPeriod("OccurredAt")}
+  AND ${firstTraceMetricsRow()}
 GROUP BY bucket
 ORDER BY bucket`;
 

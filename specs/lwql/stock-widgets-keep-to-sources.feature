@@ -38,3 +38,10 @@ Feature: Stock widgets that count production read only views that keep an origin
     Given eleven models that tie on trace count
     When the top models list and its cost lookup run under the application list
     Then both name the same ten models
+
+  @integration
+  Scenario: The queries moved off the rollups return main's rows over the list's own traces
+    Given main's form of each query that read model_usage_by_minute or trace_metrics_by_minute
+    When main's form reads a rollup holding only the traces of the list, and the new form keeps to the list
+    Then both return the same rows
+    And over a rollup of every source, main's spend, traffic and token rows also counted Langy's and the simulation's traces
