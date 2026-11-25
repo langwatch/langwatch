@@ -315,7 +315,7 @@ export class InstantEvalJudgeRouteRunService {
       text: text ?? this.longestPlanText(),
       questions,
     });
-    if (!costCeiling.hold(heldNanoUsd)) {
+    if (!(await costCeiling.hold(heldNanoUsd, this.signal))) {
       this.flags.push(`cost_ceiling:${backend}`);
       return { outcome: "failed", reason: "query_cost_ceiling" };
     }

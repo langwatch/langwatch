@@ -37,7 +37,7 @@ import {
 const defaultLogger: Logger = createLogger("langwatch:instant-eval-judge:router");
 
 type InstantEvalJudgeRouterServiceDeps = InstantEvalJudgeRouteRunDeps &
-  Readonly<{ logger?: Pick<Logger, "error"> }>;
+  Readonly<{ logger?: Pick<Logger, "error" | "warn"> }>;
 
 /** A routed classification: today's input with the route it carries. */
 type RoutedClassification = Omit<InstantEvalClassification, "route" | "decisionModel"> & {
@@ -45,7 +45,7 @@ type RoutedClassification = Omit<InstantEvalClassification, "route" | "decisionM
 };
 
 export class InstantEvalJudgeRouterService {
-  private readonly logger: Pick<Logger, "error">;
+  private readonly logger: Pick<Logger, "error" | "warn">;
 
   private constructor(private readonly deps: InstantEvalJudgeRouterServiceDeps) {
     this.logger = deps.logger ?? defaultLogger;
@@ -183,8 +183,8 @@ export class InstantEvalJudgeRouterService {
           questions,
         })
       : 0;
-    if (costCeiling && !costCeiling.hold(heldNanoUsd)) {
-      defaultLogger.warn(
+    if (costCeiling && !(await costCeiling.hold(heldNanoUsd, signal))) {
+      this.logger.warn(
         { projectId, job: route.job, heldNanoUsd },
         "Instant Evals unrouted send refused by the query cost ceiling",
       );

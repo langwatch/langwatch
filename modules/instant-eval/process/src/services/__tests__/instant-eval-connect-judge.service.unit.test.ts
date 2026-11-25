@@ -72,7 +72,7 @@ describe("the Connect judge", () => {
     await judge.classify({
       ...REQUEST,
       route: { job: "search" },
-      costCeiling: { hold: () => true, settle: () => undefined },
+      costCeiling: { hold: async () => true, settle: () => undefined },
     });
 
     expect(calls.sent).toEqual([{ organizationId: "org-acme", text: "hello", questions: [] }]);

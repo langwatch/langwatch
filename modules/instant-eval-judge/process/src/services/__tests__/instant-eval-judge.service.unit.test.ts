@@ -935,7 +935,7 @@ describe("given the unmetered classify the Api and the judge call share", () => 
         ...call,
         route: { job: "search", tokens: 100 },
         costCeiling: {
-          hold: (nanoUsd) => {
+          hold: async (nanoUsd) => {
             held.push(nanoUsd);
             return false;
           },

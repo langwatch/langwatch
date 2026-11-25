@@ -11,7 +11,7 @@ import type {
   InstantEvalJudgeRouteRequest,
   InstantEvalQuestion,
 } from "@langwatch/instant-eval-judge-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { MemoryInstantEvalClassifierChannel } from "../../__tests__/support/instant-eval-classifier.test-fakes.ts";
 import {
@@ -67,7 +67,7 @@ class RecordingCeiling implements InstantEvalJudgeCostCeiling {
 
   constructor(private readonly ceilingNanoUsd: number) {}
 
-  hold(nanoUsd: number): boolean {
+  async hold(nanoUsd: number): Promise<boolean> {
     if (!Number.isFinite(nanoUsd) || this.billed + this.held + nanoUsd > this.ceilingNanoUsd) {
       this.refused.push(nanoUsd);
       return false;
@@ -120,6 +120,7 @@ function harness({
       return judged(0.5);
     },
   });
+  const logger = { error: vi.fn(), warn: vi.fn() };
   const router = InstantEvalJudgeRouterService.create({
     table,
     pricing: PRICING,
@@ -127,6 +128,7 @@ function harness({
     hostedDecisions,
     llmJudge,
     limiter: MemoryInstantEvalRateLimiter.create(),
+    logger,
   });
   const classify = (costCeiling: InstantEvalJudgeCostCeiling, questions: InstantEvalQuestion[]) =>
     router.classify({ projectId: "project-1", text, questions, route: SEARCH, costCeiling });
@@ -143,7 +145,7 @@ function harness({
       text: sent,
       questions,
     });
-  return { classify, hostedDecisions, llmJudge, jevCalls: () => jevCalls, worstOf, table };
+  return { classify, hostedDecisions, llmJudge, jevCalls: () => jevCalls, worstOf, table, logger };
 }
 
 describe("InstantEvalJudgeRouterService under a cost ceiling", () => {
@@ -212,8 +214,8 @@ describe("InstantEvalJudgeRouterService under a cost ceiling", () => {
   });
 
   /** @scenario "A kind the table does not route holds the classifier's worst case too" */
-  it("does not call the classifier for an unrouted kind whose worst case does not fit", async () => {
-    const { classify, jevCalls, table } = harness();
+  it("does not call the classifier for an unrouted kind whose worst case does not fit, and logs it", async () => {
+    const { classify, jevCalls, table, logger } = harness();
     const score = rating("s", "how polite");
     const worst = instantEvalJudgeClassifierWorstCaseNanoUsd({
       table,
@@ -228,6 +230,11 @@ describe("InstantEvalJudgeRouterService under a cost ceiling", () => {
     const answered = await classify(room, [score]);
 
     expect(refused.skippedReason).toBe("query_cost_ceiling");
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      { projectId: "project-1", job: "search", heldNanoUsd: worst },
+      "Instant Evals unrouted send refused by the query cost ceiling",
+    );
     expect(jevCalls()).toBe(1);
     expect(answered.skippedReason).toBeUndefined();
     expect(room.holds).toEqual([worst]);
@@ -293,7 +300,7 @@ describe("InstantEvalJudgeRouterService under a cost ceiling, given a gated plan
       hostedDecisions,
       llmJudge,
       limiter: MemoryInstantEvalRateLimiter.create(),
-      logger: { error: () => undefined },
+      logger: { error: () => undefined, warn: () => undefined },
     });
     const classify = (costCeiling: InstantEvalJudgeCostCeiling) =>
       router.classify({

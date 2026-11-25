@@ -35,7 +35,7 @@ const REQUEST = {
 };
 
 /** A routed query's ceiling; these tests only check it is passed on or dropped, never call it. */
-const CEILING: InstantEvalJudgeCostCeiling = { hold: () => true, settle: () => undefined };
+const CEILING: InstantEvalJudgeCostCeiling = { hold: async () => true, settle: () => undefined };
 
 const ROUTED_REQUEST: InstantEvalClassifyRequest = {
   ...REQUEST,

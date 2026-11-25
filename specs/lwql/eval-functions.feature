@@ -372,9 +372,18 @@ Feature: LangWatchQL eval functions — a judged column, computed by the classif
     Given a routed query's cost ceiling
     When sends hold their worst cases
     Then a send is held while what was billed plus what is held stays within the ceiling
-    And a send that would pass it is refused and holds nothing
+    And a send that would pass it even with nothing held is refused at once and holds nothing
     And a settled send frees its hold and counts what it was billed
     And a worst case that is not a finite cost is never held
+
+  @unit
+  Scenario: A send that fits only once sends in flight settle waits for them
+    Given a routed query whose rows are judged in parallel
+    When the worst cases held for sends in flight leave no room for the next send
+    Then that send waits, in the order asked, until enough holds settle and then is held
+    And it is refused only once what was billed leaves it no room with nothing held
+    And a caller's stop ends the wait with the stop, holding nothing
+    And a large query whose real cost stays under the ceiling skips no row as "query_cost_ceiling"
 
   @unit
   Scenario: LangWatch's cloud judge passes a routed query's route and ceiling to the judge

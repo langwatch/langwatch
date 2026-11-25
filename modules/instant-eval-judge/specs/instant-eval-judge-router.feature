@@ -375,6 +375,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     Given a routed call with a cost ceiling that asks a question the table does not route
     When the ceiling has no room for the classifier's worst case
     Then the classifier is not called and the text is skipped as "query_cost_ceiling", never as rate limited
+    And the refusal is logged at warn on the router's logger, since it carries no routing flags
 
   @unit
   Scenario: A send's worst case bounds what it can bill

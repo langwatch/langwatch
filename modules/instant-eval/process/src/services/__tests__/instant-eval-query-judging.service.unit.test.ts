@@ -720,7 +720,8 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
       // Each send holds and bills 0.40 USD: the second does not fit a 0.60 USD ceiling.
       const sendNanoUsd = 400_000_000;
       const judge = new ScriptedJudge(async ({ request }) => {
-        if (!request.costCeiling?.hold(sendNanoUsd)) {
+        const ceiling = request.costCeiling;
+        if (!ceiling || !(await ceiling.hold(sendNanoUsd))) {
           return {
             verdicts: [],
             skippedReason: "query_cost_ceiling",
@@ -728,7 +729,7 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
             isTextTruncated: false,
           };
         }
-        request.costCeiling.settle({ heldNanoUsd: sendNanoUsd, costNanoUsd: sendNanoUsd });
+        ceiling.settle({ heldNanoUsd: sendNanoUsd, costNanoUsd: sendNanoUsd });
         return {
           verdicts: request.questions.map((question) => ({
             questionId: question.id,
@@ -746,6 +747,44 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
       expect(judged.rows).toEqual([{ annoyed: 1 }, { annoyed: null }]);
       expect(judged.skipped).toEqual({ query_cost_ceiling: 1 });
       expect(records[0]).toMatchObject({ costNanoUsd: sendNanoUsd });
+    });
+
+    /** @scenario "A send that fits only once sends in flight settle waits for them" */
+    it("skips no row of many long rows judged at once while their real cost stays under the ceiling", async () => {
+      // A long row on the search route holds about 0.0076 USD and bills about 0.0024 USD: 128 holds
+      // at once pass the 0.60 USD ceiling, while the 200 rows' real cost (0.48 USD) does not.
+      const worstNanoUsd = 7_600_000;
+      const billedNanoUsd = 2_400_000;
+      const judge = new ScriptedJudge(async ({ request }) => {
+        const ceiling = request.costCeiling;
+        if (!ceiling || !(await ceiling.hold(worstNanoUsd))) {
+          return {
+            verdicts: [],
+            skippedReason: "query_cost_ceiling",
+            inputTokens: 0,
+            isTextTruncated: false,
+          };
+        }
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        ceiling.settle({ heldNanoUsd: worstNanoUsd, costNanoUsd: billedNanoUsd });
+        return {
+          verdicts: request.questions.map((question) => ({
+            questionId: question.id,
+            probability: 1,
+          })),
+          inputTokens: TOKENS_PER_TEXT,
+          costNanoUsd: billedNanoUsd,
+          isTextTruncated: false,
+        };
+      });
+      const { service } = harness({ judge, isSearchRouted: true, concurrency: 128 });
+      const rows = Array.from({ length: 200 }, (_, at) => ({ annoyed: `row ${at}` }));
+
+      const judged = await service.judgeQuery({ ...query, rows });
+
+      expect(judge.requests).toHaveLength(200);
+      expect(judged.skipped ?? {}).toEqual({});
+      expect(judged.rows.every((row) => row.annoyed === 1)).toBe(true);
     });
   });
 

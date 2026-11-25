@@ -29,7 +29,7 @@ describe("InstantEvalCloudJudgeService.classify", () => {
   /** @scenario "LangWatch's cloud judge passes a routed query's route and ceiling to the judge" */
   it("sends the route and the cost ceiling with the request", async () => {
     const { judge, sent } = cloudJudge();
-    const costCeiling: InstantEvalJudgeCostCeiling = { hold: () => true, settle: () => {} };
+    const costCeiling: InstantEvalJudgeCostCeiling = { hold: async () => true, settle: () => {} };
 
     await judge.classify({
       projectId: "project-1",

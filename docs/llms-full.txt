@@ -41295,7 +41295,7 @@ For example, the first run on the [overview](/features/instant-evals/overview) j
 
 LangWatch can turn on routed search for your organization; it is off until then. With it on, a judged LangWatchQL query is answered by the LangWatch Judge, which may check a question more than once. Its price is what those checks cost LangWatch, plus 30%, rather than the rate above. Runs keep the rate above.
 
-Each routed query is held at its per-query cost ceiling before it starts, 0.78 USD by default. No check is sent once the ceiling has no room left for it. That text keeps the answer it already has, or is skipped as `query_cost_ceiling`.
+Each routed query is held at 0.78 USD before it starts, the most it can be charged: its 0.60 USD cost ceiling plus 30%, by default. No check is sent once what the query has spent leaves the ceiling no room for it. That text keeps the answer it already has, or is skipped as `query_cost_ceiling`. Without a paid plan, a routed query needs 0.78 USD of the free budget left to start, and is refused with `instant_eval_free_budget_exhausted` otherwise.
 
 ## Reading the cost before you start
 
@@ -70754,7 +70754,7 @@ Each plan includes a base volume of events stored for a default window. For exam
 
 Instant Evals are priced separately from events. A judged query or run is charged per input token sent to the judge, at **$0.0546 per million input tokens**. Output is free. Judging ten thousand conversations of average size costs about a quarter of a dollar.
 
-Routed search is the exception, and LangWatch turns it on per organization. With it on, a judged query is answered by the LangWatch Judge and charged what its judge calls cost LangWatch, plus 30%, up to the per-query cost ceiling, 0.78 USD by default. Runs keep the rate above. See [Limits and cost](/features/instant-evals/limits-and-cost#routed-search).
+Routed search is the exception, and LangWatch turns it on per organization. With it on, a judged query is answered by the LangWatch Judge and charged what its judge calls cost LangWatch, plus 30%, at most 0.78 USD per query by default. Runs keep the rate above. See [Limits and cost](/features/instant-evals/limits-and-cost#routed-search).
 
 Input tokens are the text the judge reads, the questions asked about it and a small fixed part of every request. One request carries every question about one text, so a statement with three eval columns costs about the same as one with a single column.
 

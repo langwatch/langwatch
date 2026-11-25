@@ -130,8 +130,11 @@ export interface InstantEvalClassification {
  * and is not sent when that would pass the ceiling, so the query never spends past it.
  */
 export interface InstantEvalJudgeCostCeiling {
-  /** Holds a send's worst-case cost; false, and nothing is held, when it would pass the ceiling. */
-  hold(nanoUsd: number): boolean;
+  /**
+   * Holds a send's worst-case cost, waiting for sends in flight to settle when it fits only then;
+   * false, and nothing is held, when it cannot fit even with nothing held. Rejects on the stop.
+   */
+  hold(nanoUsd: number, signal?: AbortSignal): Promise<boolean>;
   /** Swaps a send's hold for what it was billed. */
   settle(input: { heldNanoUsd: number; costNanoUsd: number }): void;
 }
