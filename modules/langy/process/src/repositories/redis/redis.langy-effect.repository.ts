@@ -140,6 +140,7 @@ class LangyTurnDispatchEffect {
       credentials: handoff.credentials,
       ...(handoff.modelOverride ? { modelOverride: handoff.modelOverride } : {}),
       ...(handoff.resumeToken ? { resumeToken: handoff.resumeToken } : {}),
+      ...(handoff.imageRefs?.length ? { imageRefs: handoff.imageRefs } : {}),
     });
   }
 

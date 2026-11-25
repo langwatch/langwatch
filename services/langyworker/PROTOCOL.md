@@ -30,7 +30,7 @@ U+2028/U+2029). stdout carries protocol lines ONLY. All logging goes to stderr.
 ## Commands (manager -> wrapper)
 
 ```json
-{"type":"turn","turnId":"t1","prompt":"...","system":"...","resumeToken":"..."}
+{"type":"turn","turnId":"t1","prompt":"...","system":"...","resumeToken":"...","images":[{"name":"pasted-7bd830.png","mediaType":"image/png","data":"<base64>"}]}
 {"type":"abort","turnId":"t1"}
 {"type":"shutdown_imminent","deadlineMs":1755800000000}
 {"type":"ping"}
@@ -40,7 +40,13 @@ U+2028/U+2029). stdout carries protocol lines ONLY. All logging goes to stderr.
   prompt for this and following turns (the system prompt is recomposed as
   persona + AGENTS.md + this turn's `system` before every prompt).
   `resumeToken` (optional) is prepended to the prompt as a clearly labeled
-  context seed. **A `turn` received while another turn is running aborts the
+  context seed. `images` (optional) are the turn's attached images: `mediaType`
+  is one of `image/png`, `image/jpeg`, `image/gif`, `image/webp`, `data` is the
+  raw base64 bytes with no `data:` prefix, `name` is for display only. The
+  manager allows at most 4 images of 5 MiB each, so a turn line can be about
+  27 MiB; the wrapper hands them to pi's `prompt()` as image input on the turn's
+  first prompt only (guided continuations carry none), and drops a malformed
+  entry rather than the turn. Image data is never logged. **A `turn` received while another turn is running aborts the
   running turn first**: the old turn reaches its `turn_done` aborted terminal
   before the new turn's `turn_started` is emitted.
 - `abort`: abort the named turn. If `turnId` does not match the running turn

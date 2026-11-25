@@ -1,4 +1,5 @@
 import {
+  type LangyAttachmentRef,
   LANGY_CONVERSATION_STATUS,
   LangyAgentUnavailableError,
   LangyModelNotAllowedError,
@@ -82,6 +83,11 @@ export class LangyTurnPreparationService {
     turnId: string;
     attempt: LangyTurnAttemptService;
   }): Promise<{ conversationId: string; turnId: string }> {
+    const imageRefs =
+      (await this.deps.attachments?.assertSendable({
+        projectId: args.projectId,
+        parts: args.lastUserMessage?.parts,
+      })) ?? [];
     const mintedRunToken = args.conversation.isNew ? mintRunToken() : null;
     // Started before the probe so the probe can carry it: the disabled skills are
     // part of the worker signature. Never rejects (a flag error reads as gated off).
@@ -103,9 +109,9 @@ export class LangyTurnPreparationService {
     const lateProbe = () => earlyWorkerProbe ?? this.probeWorker(args, disabledSkills);
     await this.ensureWorkerAccess(args, lateProbe);
     const prepared = this.buildPreparedTurn(args, results, capReachedNote);
-    await this.stashPreparedTurn({ args, prepared, runToken });
+    await this.stashPreparedTurn({ args, prepared, runToken, imageRefs });
     await this.acceptPreparedTurn(args, prepared, mintedRunToken);
-    await this.dispatchPreparedTurn(args, prepared, runToken);
+    await this.dispatchPreparedTurn({ args, prepared, runToken, imageRefs });
     this.deps.metrics.count({ outcome: "accepted" });
 
     return { conversationId: args.conversation.id, turnId: args.turnId };
@@ -349,10 +355,12 @@ export class LangyTurnPreparationService {
     args,
     prepared,
     runToken,
+    imageRefs,
   }: {
     args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0];
     prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>;
     runToken: string;
+    imageRefs: readonly LangyAttachmentRef[];
   }) {
     try {
       await Promise.all([
@@ -375,6 +383,7 @@ export class LangyTurnPreparationService {
           runToken,
           permitReserved: false,
           ...(prepared.pendingHandoff ? { resumeToken: prepared.pendingHandoff.token } : {}),
+          ...(imageRefs.length > 0 ? { imageRefs: [...imageRefs] } : {}),
         }),
       ]);
     } catch (error) {
@@ -449,11 +458,17 @@ export class LangyTurnPreparationService {
     }
   }
 
-  private async dispatchPreparedTurn(
-    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0],
-    prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>,
-    runToken: string,
-  ) {
+  private async dispatchPreparedTurn({
+    args,
+    prepared,
+    runToken,
+    imageRefs,
+  }: {
+    args: Parameters<LangyTurnPreparationService["prepareAndDispatch"]>[0];
+    prepared: ReturnType<LangyTurnPreparationService["buildPreparedTurn"]>;
+    runToken: string;
+    imageRefs: readonly LangyAttachmentRef[];
+  }) {
     if (!(await args.attempt.commit())) {
       return;
     }
@@ -475,6 +490,7 @@ export class LangyTurnPreparationService {
         credentials: args.credentials,
         modelOverride: args.turnModel,
         ...(prepared.pendingHandoff ? { resumeToken: prepared.pendingHandoff.token } : {}),
+        ...(imageRefs.length > 0 ? { imageRefs } : {}),
       })
       .then((outcome) => {
         if (outcome !== "accepted") {

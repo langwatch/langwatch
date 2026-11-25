@@ -1,0 +1,237 @@
+{
+  "release": "3.29.0",
+  "previous": "3.28.0",
+  "cutAt": "2026-11-25T21:48:52+01:00",
+  "steps": [
+    {
+      "id": "prisma:20261124120000_billing_only_membership",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: billing only membership"
+    },
+    {
+      "id": "prisma:20261124120001_nurturing_organization_plan",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing organization plan"
+    },
+    {
+      "id": "prisma:20261124120002_nurturing_virtual_key",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing virtual key"
+    },
+    {
+      "id": "prisma:20261124120003_nurturing_erased_user",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing erased user"
+    },
+    {
+      "id": "prisma:20261124120004_nurturing_evaluation_day_and_fold_columns",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing evaluation day and fold columns"
+    },
+    {
+      "id": "prisma:20261124120005_nurturing_project_trace_day_count",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing project trace day count"
+    },
+    {
+      "id": "prisma:20261124130000_dashboards_v2_home_product",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "dashboard",
+      "description": "Postgres schema: dashboards v2 home product"
+    },
+    {
+      "id": "prisma:20261125120000_digest",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "digest",
+      "description": "Postgres schema: digest"
+    },
+    {
+      "id": "prisma:20261125140000_governance_cloud_agent_discovery",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: governance cloud agent discovery"
+    },
+    {
+      "id": "clickhouse:00133",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "trace",
+      "description": "ClickHouse schema: trace analytics managed prompt version"
+    },
+    {
+      "id": "nurturing:replay-user-erasure-marks",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Marks every person erased in user's log, before the keys copy.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-identity-erasure-marks",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Marks every person erased in identity's log, before the keys copy.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-virtual-keys",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills nurturing's key copy from gateway's key lifecycle log at deploy.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-evaluation-days",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills nurturing's evaluation days from evaluation's log since 2026-10-19.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-organization-plans",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills nurturing's plan copy from billing's subscription log; sends nothing.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-project-placements",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills nurturing's project placement copy from project's created facts at deploy.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-organizations-created",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills nurturing's organization creation copy from organization's log at deploy.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-organization-admins",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills each organization's admin and seeded flag from project's created facts at deploy.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-organization-members",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills nurturing's member copy from organization's member facts at deploy.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-auth-members",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills nurturing's member copy from auth's single sign-on joins at deploy.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-personal-owners-from-organization",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills nurturing's personal-project owners from organization's personal-workspace log at deploy.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-personal-owners-from-project",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills nurturing's personal-project owners from the owners project listed at deploy.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-traced-projects-from-trace",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills nurturing's traced projects from trace's project_traced log at deploy.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-traced-projects-from-project",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills nurturing's traced projects from the first messages project listed at deploy.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-last-traces",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills each organization's latest trace time from trace's facts since the day before the release.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-trace-day-spans",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills nurturing's trace days from trace's span log, one counting window back.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "nurturing:replay-trace-day-failures",
+      "kind": "data",
+      "mode": "background",
+      "owner": "nurturing",
+      "description": "Fills nurturing's failed-trace days from trace's trace_failed log, one counting window back.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "organization:list-member-facts",
+      "kind": "data",
+      "mode": "background",
+      "owner": "organization",
+      "description": "Lists every organization's active members, neither disabled nor deactivated, with when each joined.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "project:reslug-reserved-dashboards",
+      "kind": "data",
+      "mode": "background",
+      "owner": "project",
+      "description": "Gives a project whose address is exactly /dashboards the usual name-and-id address instead.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "trace:replay-trace-analytics-managed-prompt-version",
+      "kind": "data",
+      "mode": "background",
+      "owner": "trace",
+      "description": "Refolds the last 122 days of trace analytics rows so they carry the managed prompt version each trace last used.",
+      "needsOldWritersGone": true
+    }
+  ]
+}
