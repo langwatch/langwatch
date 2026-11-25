@@ -61,3 +61,21 @@ func TestValidateTurnImages_RefusesBytesThatAreNotTheDeclaredImage(t *testing.T)
 		t.Fatal("a GIF declared as PNG must be rejected")
 	}
 }
+
+func TestValidateTurnImages_ChecksTheHeaderOfAnImageNearTheSizeCap(t *testing.T) {
+	data := make([]byte, MaxTurnImageBytes-256)
+	for i := range data {
+		data[i] = 'a'
+	}
+	copy(data, imageHeads["image/png"])
+	encoded := base64.StdEncoding.EncodeToString(data)
+	var wrapped strings.Builder
+	for start := 0; start < len(encoded); start += 76 {
+		wrapped.WriteString(encoded[start:min(start+76, len(encoded))])
+		wrapped.WriteString("\n")
+	}
+	images := []TurnImage{{MediaType: "image/png", Data: wrapped.String()}}
+	if msg := ValidateTurnImages(images); msg != "" {
+		t.Fatalf("a PNG just under the size cap was refused: %s", msg)
+	}
+}

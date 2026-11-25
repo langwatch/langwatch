@@ -64,6 +64,8 @@ func validateTurnImageData(i int, img TurnImage) string {
 	if err != nil && !errors.Is(err, io.EOF) {
 		return fmt.Sprintf("images[%d]: data is not valid base64", i)
 	}
+	// Peek's slice is the reader's buffer, which the drain below can refill.
+	head = append([]byte(nil), head...)
 	n, err := io.Copy(io.Discard, io.LimitReader(decoded, MaxTurnImageBytes+1))
 	if err != nil {
 		return fmt.Sprintf("images[%d]: data is not valid base64", i)
