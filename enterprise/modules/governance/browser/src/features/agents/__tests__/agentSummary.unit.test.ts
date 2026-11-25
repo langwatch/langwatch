@@ -25,6 +25,8 @@ function agentRow(
     lastActiveMinutesAgo: null,
     health: null,
     registeredDaysAgo: null,
+    posture: null,
+    platform: null,
     ...overrides,
   };
 }
@@ -110,7 +112,7 @@ describe("summarizeAgentFleet", () => {
       expect(owned.tone).toBe("good");
       // Full source names, in the order the source chip lists them, joined the
       // way a person would say it.
-      expect(unclaimed.label).toBe("unclaimed, from Custom and Databricks");
+      expect(unclaimed.label).toBe("unclaimed, from Custom, Databricks and Traces");
       expect(unclaimed.tone).toBe("attention");
     });
 
