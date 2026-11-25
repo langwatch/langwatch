@@ -1,9 +1,8 @@
 /**
  * A template picked on an empty board fills that board rather than making another: its widgets
  * land in the template's places, an untitled board takes the template's name and a board with no
- * description its job. On a new board this is its first edit, so it stores the board (AC162).
- * Then the template's report is drafted in Langy, unsent (AC140).
- */
+ * description its job. As a new board's first edit it stores the board (AC162); Langy then
+ * drafts the template's report, unsent (AC140). */
 
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { useState } from "react";
