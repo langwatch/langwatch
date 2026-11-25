@@ -1,9 +1,11 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { TriggerSettlementPersistenceService } from "../../features/settlement/services/trigger-settlement-persistence.service.ts";
+import type { AutomationSettlementTraceRepository } from "../../repositories/automation-settlement-read.repository.ts";
 
 const trigger: TriggerSummary = {
   id: "trigger-1",
@@ -57,13 +59,14 @@ function runtime(
     projects: {
       findById: vi.fn().mockResolvedValue({ id: "project-1", name: "Project", slug: "project" }),
     } as never,
-    traces: {
+    // Anything but findSummary throws by name, so a new trace read cannot pass unnoticed.
+    traces: createApiFixture<AutomationSettlementTraceRepository>({
       findSummary: vi
         .fn()
         .mockResolvedValue(
           overrides.occurredAt === undefined ? fold : { ...fold, occurredAt: overrides.occurredAt },
         ),
-    } as never,
+    }),
     confirmation: { confirms: vi.fn().mockResolvedValue(overrides.confirms ?? true) } as never,
     persistActions: { dispatch } as never,
     clock: { now: () => Temporal.Instant.from("2026-01-01T00:00:00Z") } as never,
