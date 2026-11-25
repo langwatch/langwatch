@@ -77841,6 +77841,8 @@ See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for h
 
 Dashboards, the SQL workbench and Instant Evals read through a restricted ClickHouse user and a PostgreSQL reader role. The upgrade creates both. Their passwords are derived from `CREDENTIALS_SECRET` (or `API_KEY_PEPPER` when you set it), so you don't set anything for them. To pick your own, set both `LWQL_CLICKHOUSE_PASSWORD` and `LWQL_POSTGRES_READER_PASSWORD`.
 
+Creating them needs a ClickHouse user that can create users, roles and named collections, `custom_` in the server's `custom_settings_prefixes`, and a PostgreSQL user with `CREATEROLE`. The bundled ClickHouse has all of it. If yours doesn't, as on some managed ClickHouse services, the upgrade logs a warning naming what is missing and carries on, and those three features stay off until you add it. With your own passwords set, a missing grant fails the upgrade instead.
+
 See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
 ## Common Operations
