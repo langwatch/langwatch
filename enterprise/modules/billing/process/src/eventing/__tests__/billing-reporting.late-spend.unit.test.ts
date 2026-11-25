@@ -238,19 +238,24 @@ describe("billing's report of spend confirmed after a month's last trace", () =>
 
       const keys = billing.sent.map(({ data }) => reportDedupId(data));
       expect(new Set(keys)).toEqual(new Set([`${ORG}:2026-10`]));
-      expect(billing.sent.map(({ options }) => options)).toEqual([undefined, undefined]);
-      expect(billing.definition.commands[0]?.definition.options?.delay).toBe(REPORT_DELAY_MS);
+      for (const { data, options } of billing.sent) {
+        expect(options?.delay).toBe(REPORT_DELAY_MS);
+        expect(options?.deduplication?.makeId(data)).toBe(`${ORG}:2026-10`);
+        // A spend arriving while the report waits joins it without pushing it later.
+        expect(options?.deduplication?.extend).toBe(false);
+      }
     });
 
     /** @scenario "A spend report that cannot be dispatched is raised so the event is delivered again" */
     it("raises a refused dispatch", async () => {
+      const refusal = new Error("the queue refused the send");
       const billing = rollUp({
         send: async () => {
-          throw new Error("queue unavailable");
+          throw refusal;
         },
       });
 
-      await expect(billing.receive(spendConfirmed())).rejects.toThrow("queue unavailable");
+      await expect(billing.receive(spendConfirmed())).rejects.toBe(refusal);
     });
   });
 
@@ -274,6 +279,7 @@ describe("billing's report of spend confirmed after a month's last trace", () =>
       expect(billing.sent).toEqual([]);
     });
 
+    /** @scenario "Spend no meter bills is skipped before it is queued" */
     it("skips such events before they are queued", () => {
       const { subscribers } = rollUp();
       const filter = subscribers.find(({ name }) => name === SPEND_LANE)?.options?.enqueue?.filter;
@@ -313,7 +319,7 @@ describe("billing's report of spend confirmed after a month's last trace", () =>
       expect(reportDedupId(followUp.data)).not.toBe(reportDedupId(spendReport()));
       expect(reportDedupId(followUp.data)).not.toBe(reportDedupId(convergence));
       expect(followUp.options?.deduplication?.makeId(followUp.data)).toBe(
-        reportDedupId(followUp.data),
+        `${ORG}:2026-10:spend_follow_up`,
       );
       expect(followUp.options?.deduplication?.ttlMs).toBeGreaterThan(followUp.options?.delay ?? 0);
 
@@ -377,13 +383,14 @@ describe("billing's report of spend confirmed after a month's last trace", () =>
 
     /** @scenario "A spend report whose organization cannot be read is retried without a follow-up" */
     it("raises an unreadable organization and dispatches no follow-up", async () => {
+      const unreadable = new Error("the organization could not be read");
       const billing = rollUp({
         lookup: async () => {
-          throw new Error("database unavailable");
+          throw unreadable;
         },
       });
 
-      await expect(billing.run(spendReport())).rejects.toThrow("database unavailable");
+      await expect(billing.run(spendReport())).rejects.toBe(unreadable);
       expect(billing.sent).toEqual([]);
     });
   });

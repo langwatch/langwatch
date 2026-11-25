@@ -68,6 +68,12 @@ const SPEND_FOLLOW_UP_SEND: QueueSendOptions<ReportUsageForMonthCommandData> = {
   deduplication: { makeId: reportDedupId, ttlMs: SPEND_FOLLOW_UP_DELAY_MS + 10_000 },
 };
 
+/** A spend report's send: a spend arriving while one waits joins it, never pushes it later. */
+const SPEND_REPORT_SEND: QueueSendOptions<ReportUsageForMonthCommandData> = {
+  delay: REPORT_DELAY_MS,
+  deduplication: { makeId: reportDedupId, ttlMs: REPORT_DELAY_MS + 10_000, extend: false },
+};
+
 type ReportSender = (
   data: ReportUsageForMonthCommandData,
   options?: QueueSendOptions<ReportUsageForMonthCommandData>,
@@ -95,9 +101,9 @@ export class BillingReportingPipeline {
     if (!this.send) {
       throw new Error("Billing reporting cannot self-dispatch before its pipeline is registered.");
     }
-    return data.trigger === "spend_follow_up"
-      ? this.send(data, SPEND_FOLLOW_UP_SEND)
-      : this.send(data);
+    if (data.trigger === "spend_follow_up") return this.send(data, SPEND_FOLLOW_UP_SEND);
+    if (data.trigger === "spend_confirmed") return this.send(data, SPEND_REPORT_SEND);
+    return this.send(data);
   }
 
   /** The worker resolves the reporter now, so a keyless SaaS worker refuses at boot, as on main. */

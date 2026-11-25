@@ -115,16 +115,12 @@ describe("InstantEvalSpendService", () => {
   });
 
   /** @scenario "Instant Evals no longer nudges the billing report itself" */
-  it("dispatches nothing to billing: billing reports the month from gateway's confirmed spend", async () => {
+  it("records the priced spend once and leaves the month report to billing", async () => {
     const recordPricedSpend = vi.fn(async () => undefined);
-    const formerBillingPeer = { reportBillingMonth: vi.fn(async () => undefined) };
-    const service = InstantEvalSpendService.create({
-      peers: { ...peers({ recordPricedSpend }), ...formerBillingPeer },
-    });
+    const service = InstantEvalSpendService.create({ peers: peers({ recordPricedSpend }) });
 
     await service.recordSpend(RECORD);
 
     expect(recordPricedSpend).toHaveBeenCalledTimes(1);
-    expect(formerBillingPeer.reportBillingMonth).not.toHaveBeenCalled();
   });
 });

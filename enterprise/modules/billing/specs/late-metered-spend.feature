@@ -54,10 +54,17 @@ Feature: Spend confirmed after a month's last trace still reaches Stripe
       Then no report is dispatched
 
     @unit
+    Scenario: Spend no meter bills is skipped before it is queued
+      Given gateway confirms a chat completion's spend, or a spend with an empty organization
+      When the spend subscriber decides whether to queue it
+      Then it is not queued, while a pii_redaction spend is
+
+    @unit
     Scenario: A burst of spend for one organization and month is one report
       Given gateway confirms several instant_eval spends for one organization in one month
       When billing receives them
       Then every dispatch carries the same dedupe key and the report's usual delay
+      And a spend arriving while the report waits joins it without pushing it later
 
     @unit
     Scenario: A spend report that cannot be dispatched is raised so the event is delivered again
