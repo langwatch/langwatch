@@ -15,6 +15,9 @@ export const GOVERNANCE_SOURCE_TYPES = [
   "claude_compliance",
   "anthropic_admin",
   "databricks_genie",
+  "aws_bedrock_agents",
+  "gcp_vertex_agent_engine",
+  "ard_registry",
   "s3_custom",
   "http_custom",
 ] as const;
