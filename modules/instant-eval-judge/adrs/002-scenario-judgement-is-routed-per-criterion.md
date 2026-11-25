@@ -29,12 +29,15 @@ on a decision model and sent the unsure ones to an LLM that read the judge's who
 4. **The turn decision is not routed.** No measurement covers it. The judge's own call, with its
    two decision tools, goes to the LLM backend the table names in `scenarioDecision`. A failure
    lets the conversation go on, because the judge's last turn forces the verdict. A table that
-   names no decision backend answers no turn decision.
+   names no decision backend answers no turn decision. Each turn decision is its own priced spend
+   row under `langwatch-judge-preview`, with a request count of 1, whatever it decided; one that
+   billed no tokens records none.
 5. **A verdict is never made up.** A criterion no leg answered is inconclusive. A judgement
    nothing answered is `unavailable`, and its caller reports an error, not a failed run.
-6. **One judgement is one spend row** under the model `langwatch-judge-preview`, priced as ADR-190
+6. **One verdict is one spend row** under the model `langwatch-judge-preview`, priced as ADR-190
    decision 3: the summed cost of every call times the one markup. Its request count is the number
-   of criteria. An LLM-as-judge evaluation keeps `langwatch-judge`.
+   of criteria. A scenario run therefore writes one row per turn decision (decision 4) and one for
+   its verdict. An LLM-as-judge evaluation keeps `langwatch-judge`.
 7. **The table decides the backends.** Nothing in the leaf names a provider for this job. Boot
    checks a price and a key for the decision backend as it does for a slot's backends.
 8. **A gated entry works per criterion (2026-11-25).** The gate (ADR-190 decision 11) rates each
@@ -51,9 +54,9 @@ on a decision model and sent the unsure ones to an LLM that read the judge's who
 
 - Sharing the verdict call bills its tokens once per judgement, where the measurement paid it per
   check. What a check reads is the same.
-- The query hold (ADR-190 decision 7) is computed over every slot, the `scenario_judge` ones
-  included. A dear scenario backend raises the judged-query hold until the hold is limited to the
-  jobs a query can reach.
+- The query hold (ADR-190 decision 7) is computed over the search and LLM-judge routes only, so a
+  backend only `scenario_judge` slots or `scenarioDecision` reach never raises it. Such a backend
+  still needs a price (and a key) for the table to boot.
 - An `isInconclusive` verdict carries no probability. Only a scenario criterion produces one.
 - A threshold is compared in floats on the router's scale, `abs(2p - 1)`. `abs(2 * 0.95 - 1)` is
   just under 0.9, so a table that means "an answer of 0.95 stands" names a threshold just under

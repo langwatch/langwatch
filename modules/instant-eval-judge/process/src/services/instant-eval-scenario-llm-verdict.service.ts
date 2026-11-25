@@ -5,7 +5,6 @@
  */
 
 import {
-  estimateJudgedTextTokens,
   INSTANT_EVAL_SCENARIO_VERDICT_TOOL,
   type InstantEvalScenarioJudgeCall,
   type InstantEvalSkipReason,
@@ -17,6 +16,7 @@ import type {
   InstantEvalLlmJudgeChannel,
   InstantEvalLlmToolCallRequest,
 } from "../channels/instant-eval-llm-judge.channel.ts";
+import { instantEvalJudgeLlmCallPermitOf } from "../rules/instant-eval-judge-route.rules.ts";
 import {
   findInstantEvalScenarioVerdictReading,
   type InstantEvalScenarioVerdictReading,
@@ -88,14 +88,7 @@ export class InstantEvalScenarioLlmVerdictService {
     const tools = llmCall.tools.filter((tool) => tool.name === INSTANT_EVAL_SCENARIO_VERDICT_TOOL);
     if (tools.length === 0) return { outcome: "failed", reason: "classifier_failed" };
     try {
-      await limiter.acquire(
-        {
-          tokens:
-            estimateJudgedTextTokens({ text: system }) + estimateJudgedTextTokens({ text: user }),
-          tenantId: `${projectId}:llm`,
-        },
-        signal,
-      );
+      await limiter.acquire(instantEvalJudgeLlmCallPermitOf({ projectId, system, user }), signal);
       const answer = await llmJudge.call(
         { ...call, system, user, tools, forcedTool: INSTANT_EVAL_SCENARIO_VERDICT_TOOL },
         ...(signal ? [signal] : []),

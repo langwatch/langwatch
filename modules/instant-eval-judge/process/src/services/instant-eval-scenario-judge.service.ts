@@ -6,11 +6,9 @@
  */
 
 import {
-  estimateJudgedTextTokens,
   INSTANT_EVAL_SCENARIO_DECISION_TOOLS,
   INSTANT_EVAL_SCENARIO_JUDGE_SPEND_MODEL,
   InstantEvalJudgeStoppedError,
-  instantEvalJudgeEnabledFallbacksOf,
   isInstantEvalJudgeLlmBackend,
   isInstantEvalJudgeLlmKind,
   isInstantEvalSpendBillable,
@@ -26,6 +24,10 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { InstantEvalRateLimiter } from "../channels/instant-eval-classifier.channel.ts";
 import type { InstantEvalLlmJudgeChannel } from "../channels/instant-eval-llm-judge.channel.ts";
 import { instantEvalJudgeCallCostOf } from "../rules/instant-eval-judge-route-cost.rules.ts";
+import {
+  instantEvalJudgeLlmCallPermitOf,
+  instantEvalJudgeScenarioDecisionBackendsOf,
+} from "../rules/instant-eval-judge-route.rules.ts";
 import {
   instantEvalScenarioCriterionResultOf,
   instantEvalScenarioQuestionOf,
@@ -188,12 +190,10 @@ export class InstantEvalScenarioJudgeService {
     };
   }
 
+  /** The decision backend and its enabled fallbacks that can take the judge's own tool call. */
   private decisionBackends(): string[] {
     const { table } = this.deps;
-    const backend = table.scenarioDecision?.backend;
-    if (backend === undefined) return [];
-    const own = table.backends[backend]?.enabled === true ? [backend] : [];
-    return [...own, ...instantEvalJudgeEnabledFallbacksOf({ backend, table })].filter((name) =>
+    return instantEvalJudgeScenarioDecisionBackendsOf(table).filter((name) =>
       isInstantEvalJudgeLlmBackend({ backend: name, table }),
     );
   }
@@ -217,11 +217,7 @@ export class InstantEvalScenarioJudgeService {
     if (!isInstantEvalJudgeLlmKind(config.kind)) return void 0;
     try {
       await this.deps.limiter.acquire(
-        {
-          tokens:
-            estimateJudgedTextTokens({ text: system }) + estimateJudgedTextTokens({ text: user }),
-          tenantId: `${projectId}:llm`,
-        },
+        instantEvalJudgeLlmCallPermitOf({ projectId, system, user }),
         signal,
       );
       const answer = await this.deps.llmJudge.call(

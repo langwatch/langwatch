@@ -32,7 +32,7 @@ reasons, the classifier limits and wire format, the token estimates, the pricing
 Evals request type the ledger rows carry, the $1 free budget, the two judge errors, the config
 slice and the priced event's schema. There is no transport.
 
-`InstantEvalJudgeApi` has three methods:
+`InstantEvalJudgeApi` has these methods:
 
 - `judge` is the metered call. In order, it refuses a project it has not learned
   (`instant_eval_project_unknown`), refuses off LangWatch cloud (`classifier_not_configured`),
@@ -47,6 +47,10 @@ slice and the priced event's schema. There is no transport.
   a search or LLM-judge route can reach (a scenario-only backend is left out), never below the
   classifier rate, at the one markup. It is computed once at boot. It is a best-effort hold, not
   a hard cap on a routed query (ADR-190 decision 7).
+- `judgeScenario` is the metered scenario judge call (ADR-002), behind the same checks as `judge`:
+  a verdict routes each criterion as its own `scenario_judge` question, and a turn decision is the
+  judge's own call on the table's `scenarioDecision` backend. Each verdict and each turn decision
+  is one priced fact under `langwatch-judge-preview`.
 - `classify` is the unmetered call Instant Evals uses for its own runs and queries, which keep their
   own spend rule in wave 1.
 - `isClassifierConfigured` tells Instant Evals whether LangWatch's key is set, so it can choose this

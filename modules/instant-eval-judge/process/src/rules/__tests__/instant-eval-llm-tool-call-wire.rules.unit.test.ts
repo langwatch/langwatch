@@ -5,6 +5,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  instantEvalLlmJudgeBodyOf,
+  instantEvalLlmJudgePromptOf,
+  readInstantEvalLlmJudgeAnswer,
+} from "../instant-eval-llm-judge-wire.rules.ts";
+import {
   instantEvalLlmToolCallBodyOf,
   readInstantEvalLlmToolCall,
 } from "../instant-eval-llm-tool-call-wire.rules.ts";
@@ -172,5 +177,62 @@ describe("readInstantEvalLlmToolCall", () => {
 
     expect(badArguments).toEqual({ outcome: "none", inputTokens: 5, outputTokens: 1 });
     expect(otherShape).toEqual({ outcome: "none", inputTokens: 0, outputTokens: 0 });
+  });
+
+  it("reads a call sent with empty arguments as a call with no arguments, on both readers", () => {
+    const body = {
+      output: [{ type: "function_call", name: "evaluation", arguments: "" }],
+      usage: { input_tokens: 9, output_tokens: 2 },
+    };
+    const toolCall = readInstantEvalLlmToolCall({
+      wire: "openai_responses",
+      tools: ["evaluation"],
+      body,
+    });
+    const judge = readInstantEvalLlmJudgeAnswer({
+      wire: "openai_responses",
+      body,
+      question: { id: "q", kind: "boolean", instructions: "Is it polite?" },
+    });
+
+    expect(toolCall).toEqual({
+      outcome: "called",
+      tool: "evaluation",
+      input: {},
+      inputTokens: 9,
+      outputTokens: 2,
+    });
+    // No `result` in an empty call: the question has no value, and the tokens are still billed.
+    expect(judge).toEqual({ outcome: "none", inputTokens: 9, outputTokens: 2 });
+  });
+});
+
+describe("instantEvalLlmJudgeBodyOf", () => {
+  it("is the tool-call body with the evaluation tool forced, on every wire", () => {
+    const prompt = instantEvalLlmJudgePromptOf({
+      job: "search",
+      question: { id: "q", kind: "boolean", instructions: "Is it polite?" },
+      text: "hello",
+    });
+    for (const wire of [
+      "anthropic_messages",
+      "openai_responses",
+      "gemini_generate_content",
+    ] as const) {
+      const judge = instantEvalLlmJudgeBodyOf({ wire, model: "m", prompt, reasoningEffort: "low" });
+      const toolCall = instantEvalLlmToolCallBodyOf({
+        wire,
+        model: "m",
+        reasoningEffort: "low",
+        prompt: {
+          system: prompt.system,
+          user: prompt.user,
+          tools: [prompt.tool],
+          forcedTool: "evaluation",
+        },
+      });
+
+      expect(judge).toEqual(toolCall);
+    }
   });
 });

@@ -13,8 +13,9 @@ export const LANGWATCH_DECISION_MODEL_ID = "langwatch/instant-preview";
 export const LANGWATCH_EVALS_MODEL_ID = "langwatch/evals-preview";
 
 /**
- * LangWatch's hosted scenario judge. Not a decision model: it is stored and read under this id,
- * and only the Judge column and a scenario's or suite's judge may hold it.
+ * LangWatch's hosted scenario judge. Not a decision model: it sits in LANGWATCH_DECISION_PREVIEWS
+ * only for its label and the column it fills. Only the Judge column and a scenario's or suite's
+ * judge may hold it.
  */
 export const LANGWATCH_JUDGE_MODEL_ID = "langwatch/judge-preview";
 
@@ -94,6 +95,11 @@ export function isLangWatchModelFillingRole(id: string, role: ModelRole): boolea
   );
 }
 
+/** The LangWatch hosted models that fill a Default models column, in catalogue order. */
+export function langWatchModelsFillingRole(role: ModelRole): LangWatchDecisionPreview[] {
+  return LANGWATCH_DECISION_PREVIEWS.filter((preview) => preview.fills.includes(role));
+}
+
 const INSTANT_PREVIEW = {
   label: "LangWatch Instant (preview)",
   description: "Optimized for search and quick classification",
@@ -115,9 +121,9 @@ export type LangWatchDecisionPreview = Readonly<{
 }>;
 
 /**
- * LangWatch's decision models, first in the Instant Evals picker. LangWatch Instant (preview)
- * fills that column, LangWatch Evals (preview) is for LLM judges only, and LangWatch Judge
- * (preview) fills the Judge column. Making one pickable is adding its column here.
+ * LangWatch's own hosted models and the Default models column each fills: Instant (preview) fills
+ * Instant Evals, Evals (preview) is for LLM judges only, Judge (preview) fills Judge. The Instant
+ * Evals and Judge pickers list what fills their column, so a new pick is a column added here.
  */
 export const LANGWATCH_DECISION_PREVIEWS: readonly LangWatchDecisionPreview[] = [
   { id: LANGWATCH_DECISION_MODEL_ID, ...INSTANT_PREVIEW, fills: ["INSTANT_EVALS"] },
@@ -126,7 +132,7 @@ export const LANGWATCH_DECISION_PREVIEWS: readonly LangWatchDecisionPreview[] = 
     id: LANGWATCH_JUDGE_MODEL_ID,
     label: "LangWatch Judge (preview)",
     description: "Optimized for scenario judge",
-    // Pickable in the Judge column where the judge preview flag is on, never self-hosted.
+    // The Judge pickers list it from this, where the judge preview flag is on.
     fills: ["JUDGE"],
   },
 ];

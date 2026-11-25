@@ -5,9 +5,11 @@
  * @see modules/instant-eval-judge/specs/instant-eval-scenario-judge.feature
  */
 
-import type {
-  InstantEvalJudgeReasoningEffort,
-  InstantEvalScenarioJudgeTool,
+import {
+  INSTANT_EVAL_JUDGE_REASONING_MAX_OUTPUT_TOKENS,
+  isInstantEvalJudgeReasoning,
+  type InstantEvalJudgeReasoningEffort,
+  type InstantEvalScenarioJudgeTool,
 } from "@langwatch/instant-eval-judge-contract";
 import { z } from "zod";
 
@@ -27,7 +29,10 @@ export interface InstantEvalLlmToolCallPrompt {
   readonly forcedTool?: string;
 }
 
-/** A reasoning effort goes on OpenAI Responses alone, and only when the backend sets one. */
+/**
+ * A reasoning effort goes on OpenAI Responses alone, only when the backend sets one, with a
+ * reasoning-sized output cap.
+ */
 export function instantEvalLlmToolCallBodyOf({
   wire,
   model,
@@ -69,7 +74,9 @@ export function instantEvalLlmToolCallBodyOf({
       { role: "developer", content: system },
       { role: "user", content: user },
     ],
-    max_output_tokens: MAX_OUTPUT_TOKENS,
+    max_output_tokens: isInstantEvalJudgeReasoning(reasoningEffort)
+      ? INSTANT_EVAL_JUDGE_REASONING_MAX_OUTPUT_TOKENS
+      : MAX_OUTPUT_TOKENS,
     ...(reasoningEffort ? { reasoning: { effort: reasoningEffort } } : {}),
     store: false,
     tools: tools.map((tool) => ({ type: "function", ...tool, strict: false })),
@@ -89,18 +96,26 @@ const anthropicResponseSchema = z.object({
 });
 
 const openAiResponseSchema = z.object({
+  status: z.string().optional(),
+  incomplete_details: z.object({ reason: z.string().optional() }).nullish(),
   output: z.array(
     z.object({ type: z.string(), name: z.string().optional(), arguments: z.string().optional() }),
   ),
   usage: usageSchema,
 });
 
-/** The tool the model called with its arguments, or none, and the tokens billed either way. */
+/**
+ * The tool the model called with its arguments, or none, and the tokens billed either way. An
+ * OpenAI answer the provider marked incomplete names why in `stoppedBy` (e.g. `max_output_tokens`).
+ */
 export type InstantEvalLlmToolCallReading = Readonly<{
   inputTokens: number;
   outputTokens: number;
 }> &
-  (Readonly<{ outcome: "called"; tool: string; input: unknown }> | Readonly<{ outcome: "none" }>);
+  (
+    | Readonly<{ outcome: "called"; tool: string; input: unknown }>
+    | Readonly<{ outcome: "none"; stoppedBy?: string }>
+  );
 
 /** The first call of an offered tool; a call of any other name is no answer. */
 export function readInstantEvalLlmToolCall({
@@ -130,13 +145,19 @@ export function readInstantEvalLlmToolCall({
   }
   const parsed = openAiResponseSchema.safeParse(body);
   if (!parsed.success) return { outcome: "none", inputTokens: 0, outputTokens: 0 };
+  const { status, incomplete_details } = parsed.data;
   const usage = usageOf(parsed.data.usage);
+  const none = {
+    outcome: "none",
+    ...(status === "incomplete" ? { stoppedBy: incomplete_details?.reason ?? "incomplete" } : {}),
+    ...usage,
+  } as const;
   const call = parsed.data.output.find(
     (item) => item.type === "function_call" && item.name !== undefined && tools.includes(item.name),
   );
-  if (!call?.name) return { outcome: "none", ...usage };
+  if (!call?.name) return none;
   const input = argumentsOf(call.arguments);
-  if (input === undefined) return { outcome: "none", ...usage };
+  if (input === undefined) return none;
   return { outcome: "called", tool: call.name, input, ...usage };
 }
 

@@ -20,6 +20,8 @@ import {
   type InstantEvalPricing,
 } from "@langwatch/instant-eval-judge-contract";
 
+import { instantEvalJudgeScenarioDecisionBackendsOf } from "./instant-eval-judge-route.rules.ts";
+
 export function instantEvalJudgeRouteBootIssues({
   table,
   pricing,
@@ -34,7 +36,7 @@ export function instantEvalJudgeRouteBootIssues({
   // The turn decision's backend is called outside every slot, so it is checked beside them.
   for (const name of new Set([
     ...reachableBackendsOf(table),
-    ...scenarioDecisionBackendsOf(table),
+    ...instantEvalJudgeScenarioDecisionBackendsOf(table),
   ])) {
     const backend = table.backends[name];
     if (!backend) continue;
@@ -68,14 +70,6 @@ export function instantEvalJudgeQueryHoldPricingOf({
   );
   const usdPerMillionInputTokens = Math.max(classifierPricing.usdPerMillionInputTokens, ...rates);
   return { ...classifierPricing, usdPerMillionInputTokens };
-}
-
-/** The scenario turn decision's backend when it is switched on, with its enabled fallbacks. */
-function scenarioDecisionBackendsOf(table: InstantEvalJudgeRouteTable): string[] {
-  const backend = table.scenarioDecision?.backend;
-  if (backend === undefined) return [];
-  const own = table.backends[backend]?.enabled === true ? [backend] : [];
-  return [...own, ...instantEvalJudgeEnabledFallbacksOf({ backend, table })];
 }
 
 /** Each enabled backend a usable entry of the jobs (all, unless named) may call, with fallbacks. */

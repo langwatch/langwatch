@@ -24,6 +24,7 @@ import {
   isModelAllowedForFeature,
   LANGWATCH_DECISION_MODEL_ID,
   LANGWATCH_JUDGE_MODEL_ID,
+  judgeColumnModelIds,
   langwatchJudgePickerOption,
   LATEST_ALIAS_PROVIDERS,
   MODEL_ROLES,
@@ -303,8 +304,8 @@ function modelOptionsByRoleFor({
     DEFAULT: llmModels,
     FAST: llmModels,
     LANGY: llmModels,
-    // LangWatch's own scenario judge first, where its flag is on for the organization.
-    JUDGE: isJudgePreviewOffered ? [LANGWATCH_JUDGE_MODEL_ID, ...llmModels] : llmModels,
+    // The LangWatch models the catalogue lets fill Judge first, where the judge preview is on.
+    JUDGE: [...judgeColumnModelIds({ isJudgePreviewOffered }), ...llmModels],
     EMBEDDINGS: modelOptionsForMode({
       enabledEntries,
       hasProviderLoadError,

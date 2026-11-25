@@ -4,10 +4,15 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { judgePickerOptions, langwatchJudgePickerOption } from "../../model-options.ts";
+import {
+  judgeColumnModelIds,
+  judgePickerOptions,
+  langwatchJudgePickerOption,
+} from "../../model-options.ts";
 import { isModelAllowedAsRoleDefault, isModelAllowedForFeature } from "../codex-restrictions.ts";
 import {
   isLangWatchModelFillingRole,
+  LANGWATCH_DECISION_PREVIEWS,
   LANGWATCH_JUDGE_MODEL_ID,
   picksLangWatchJudgeModel,
   writtenModelId,
@@ -68,6 +73,20 @@ describe("judgePickerOptions", () => {
     });
 
     expect(options).toEqual(llmOptions);
+  });
+});
+
+describe("judgeColumnModelIds", () => {
+  it("is every LangWatch model whose catalogue entry fills Judge, and none with the flag off", () => {
+    const filling = LANGWATCH_DECISION_PREVIEWS.filter(({ fills }) => fills.includes("JUDGE"));
+
+    expect(judgeColumnModelIds({ isJudgePreviewOffered: true })).toEqual(
+      filling.map(({ id }) => id),
+    );
+    expect(judgeColumnModelIds({ isJudgePreviewOffered: true })).toEqual([
+      LANGWATCH_JUDGE_MODEL_ID,
+    ]);
+    expect(judgeColumnModelIds({ isJudgePreviewOffered: false })).toEqual([]);
   });
 });
 

@@ -97,8 +97,11 @@ function harness({
   isCloud = true,
   isProjectKnown = true,
   spentNanoUsd = 0n,
+  beforeDecision,
 }: {
   probabilities?: Probabilities;
+  /** Awaited inside each hosted decision request before it answers. */
+  beforeDecision?: () => Promise<void>;
   /** The gate's difficulty score per criterion key; a key left out is a case it did not rate. */
   gateScores?: Readonly<Record<string, number>>;
   toolCall?: (
@@ -118,7 +121,10 @@ function harness({
     }),
   };
   const hostedDecisions = ScriptedInstantEvalHostedDecisionsChannel.create({
-    answer: ({ questions }) => decisionAnswer(probabilities, questions[0]?.id),
+    answer: async ({ questions }) => {
+      await beforeDecision?.();
+      return decisionAnswer(probabilities, questions[0]?.id);
+    },
   });
   const classifierRequests: string[] = [];
   const gateRequests: string[] = [];
@@ -279,6 +285,53 @@ describe("given a scenario verdict call on LangWatch Cloud", () => {
       expect(recorded).toHaveLength(1);
       expect(recorded[0]?.costNanoUsd).toBe(3 * 1_000 * 1_000 + 2_000 * 10_000 + 100 * 100_000);
       expect(recorded[0]?.inputTokens).toBe(3 * DECISION_TOKENS + 2_000);
+    });
+  });
+
+  describe("when nine unsure criteria cross the parallel batch boundary", () => {
+    const keys = Array.from({ length: 9 }, (_, at) => `criterion_${at}`);
+    const probabilities = Object.fromEntries(keys.map((key) => [key, 0.5]));
+    const call = scenarioJudgeCall({
+      criteria: keys.map((key) => ({ key, text: `The agent does thing ${key}` })),
+    });
+
+    /** @scenario "Criteria past the parallel cap share the same send and keep their order" */
+    it("sends the judge's own call once across both batches and keeps the key order", async () => {
+      const { service, llmJudge, recorded } = harness({
+        probabilities,
+        toolCall: () =>
+          finishTest(Object.fromEntries(keys.map((key, at) => [key, String(at % 2 === 0)]))),
+      });
+
+      const answer = await service.judge(call);
+
+      expect(llmJudge.calls).toHaveLength(1);
+      expect(answer).toMatchObject({
+        outcome: "judged",
+        criteria: keys.map((key, at) => ({ key, result: at % 2 === 0 ? "met" : "unmet" })),
+      });
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0]?.requests).toBe(9);
+    });
+
+    it("keeps at most eight decision requests in flight at once", async () => {
+      let inFlight = 0;
+      let most = 0;
+      const { service, hostedDecisions } = harness({
+        probabilities,
+        toolCall: () => finishTest(Object.fromEntries(keys.map((key) => [key, "true"]))),
+        beforeDecision: async () => {
+          inFlight += 1;
+          most = Math.max(most, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          inFlight -= 1;
+        },
+      });
+
+      await service.judge(call);
+
+      expect(hostedDecisions.requests).toHaveLength(9);
+      expect(most).toBe(8);
     });
   });
 
@@ -553,6 +606,60 @@ describe("given a scenario turn decision call", () => {
       expect(afterThrow).toMatchObject({ decision: "continue", priceUsd: 0 });
       expect(afterUnreadable).toMatchObject({ decision: "continue", inputTokens: 500 });
       expect(unreadable.recorded[0]).toMatchObject({ costNanoUsd: 500 * 10_000 });
+    });
+  });
+
+  describe("when the decision backend fails and it lists fallbacks", () => {
+    // llm-off is switched off and decision-a is not an LLM, so only llm-c may take the call.
+    const table = syntheticScenarioRouteTable({
+      backends: {
+        "llm-a": {
+          kind: "openai_responses",
+          model: "llm-model-a",
+          timeoutMs: 5000,
+          fallbacks: ["llm-off", "decision-a", "llm-c"],
+        },
+        "llm-off": {
+          kind: "anthropic_messages",
+          model: "llm-model-off",
+          timeoutMs: 5000,
+          enabled: false,
+        },
+        "llm-c": { kind: "gemini_generate_content", model: "llm-model-c", timeoutMs: 5000 },
+      },
+    });
+
+    /** @scenario "A failed decision backend hands the turn decision to its enabled fallback" */
+    it("asks the enabled LLM fallback next, answers its tool and bills both calls", async () => {
+      const { service, llmJudge, hostedDecisions, recorded } = harness({
+        table,
+        toolCall: (request) =>
+          request.wire === "openai_responses"
+            ? { outcome: "skipped", reason: "classifier_failed", inputTokens: 500, outputTokens: 0 }
+            : {
+                outcome: "answered",
+                tool: "make_verdict",
+                input: {},
+                inputTokens: 400,
+                outputTokens: 10,
+              },
+      });
+
+      const answer = await service.judge(scenarioJudgeCall({ phase: "decision" }));
+
+      expect(answer).toMatchObject({ outcome: "judged", phase: "decision", decision: "verdict" });
+      expect(llmJudge.calls.map(({ wire, model }) => ({ wire, model }))).toEqual([
+        { wire: "openai_responses", model: "llm-model-a" },
+        { wire: "gemini_generate_content", model: "llm-model-c" },
+      ]);
+      expect(hostedDecisions.requests).toHaveLength(0);
+      expect(recorded).toEqual([
+        expect.objectContaining({
+          costNanoUsd: 500 * 10_000 + 400 * 30_000 + 10 * 300_000,
+          inputTokens: 900,
+          requests: 1,
+        }),
+      ]);
     });
   });
 

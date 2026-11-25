@@ -4,13 +4,8 @@
  * @see modules/instant-eval-judge/specs/instant-eval-scenario-judge.feature
  */
 
+import type { InstantEvalScenarioJudgeTool } from "@langwatch/instant-eval-judge-contract";
 import { z } from "zod";
-
-type GeminiTool = Readonly<{
-  name: string;
-  description: string;
-  parameters: Readonly<Record<string, unknown>>;
-}>;
 
 /** JSON-schema keys the API refuses in a function's parameters. */
 const REFUSED_SCHEMA_KEYS: readonly string[] = ["$schema", "additionalProperties", "strict"];
@@ -36,7 +31,7 @@ export function instantEvalGeminiBodyOf({
 }: {
   system: string;
   user: string;
-  tools: readonly GeminiTool[];
+  tools: readonly InstantEvalScenarioJudgeTool[];
   allowed: readonly string[];
   maxOutputTokens: number;
 }): Record<string, unknown> {

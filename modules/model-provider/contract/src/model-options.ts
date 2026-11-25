@@ -4,6 +4,7 @@ import {
   isOwnDecisionModelId,
   LANGWATCH_DECISION_PREVIEWS,
   LANGWATCH_JUDGE_MODEL_ID,
+  langWatchModelsFillingRole,
   type DecisionModelEntry,
 } from "./catalog/decision-models.ts";
 import { findAliasTarget, isLatestAlias } from "./catalog/latest-aliases.ts";
@@ -51,15 +52,13 @@ export type ModelPickerOption = {
  * the line under it come from the catalogue, so every picker names it the same way.
  */
 export function langwatchJudgePickerOption(): ModelPickerOption {
-  const preview = LANGWATCH_DECISION_PREVIEWS.find(({ id }) => id === LANGWATCH_JUDGE_MODEL_ID);
-  return {
-    label: preview?.label ?? LANGWATCH_JUDGE_MODEL_ID,
-    value: LANGWATCH_JUDGE_MODEL_ID,
-    subtitle: preview?.description ?? "",
-  };
+  return langwatchPickerOptionOf(LANGWATCH_JUDGE_MODEL_ID);
 }
 
-/** A judge picker's rows: LangWatch Judge (preview) first where it is offered, then the LLMs. */
+/**
+ * A judge picker's rows: the LangWatch models whose catalogue entry fills the Judge column first,
+ * where the judge preview is offered, then the LLMs. Never one of them twice.
+ */
 export function judgePickerOptions({
   llmOptions,
   isJudgePreviewOffered,
@@ -67,8 +66,25 @@ export function judgePickerOptions({
   llmOptions: readonly ModelPickerOption[];
   isJudgePreviewOffered: boolean;
 }): ModelPickerOption[] {
-  const llms = llmOptions.filter((option) => option.value !== LANGWATCH_JUDGE_MODEL_ID);
-  return isJudgePreviewOffered ? [langwatchJudgePickerOption(), ...llms] : llms;
+  const judges = judgeColumnModelIds({ isJudgePreviewOffered });
+  const hosted = langWatchModelsFillingRole("JUDGE").map(({ id }) => id);
+  const llms = llmOptions.filter((option) => !hosted.includes(option.value));
+  return [...judges.map(langwatchPickerOptionOf), ...llms];
+}
+
+/** The LangWatch models the Judge column lists ahead of the LLMs: those filling it, if offered. */
+export function judgeColumnModelIds({
+  isJudgePreviewOffered,
+}: {
+  isJudgePreviewOffered: boolean;
+}): string[] {
+  if (!isJudgePreviewOffered) return [];
+  return langWatchModelsFillingRole("JUDGE").map(({ id }) => id);
+}
+
+function langwatchPickerOptionOf(id: string): ModelPickerOption {
+  const preview = LANGWATCH_DECISION_PREVIEWS.find((entry) => entry.id === id);
+  return { label: preview?.label ?? id, value: id, subtitle: preview?.description ?? "" };
 }
 
 /**

@@ -43,6 +43,14 @@ Feature: A scenario judgement answered by the judge router
     And the call's tokens are billed once
 
   @unit
+  Scenario: Criteria past the parallel cap share the same send and keep their order
+    Given nine criteria that all get an unsure decision answer
+    When the verdict is judged
+    Then at most eight criteria are routed at once
+    And one LLM call is sent for all nine
+    And the criteria come back in the order they were asked
+
+  @unit
   Scenario: An LLM's inconclusive answer stays inconclusive
     Given an unsure criterion that the judge's verdict call marks inconclusive
     When the verdict is judged
@@ -92,6 +100,14 @@ Feature: A scenario judgement answered by the judge router
     Given the decision backend fails or answers unreadably
     When a decision call is judged
     Then the decision is continue
+
+  @unit
+  Scenario: A failed decision backend hands the turn decision to its enabled fallback
+    Given the decision backend fails and lists a switched-off LLM, a decision model and an LLM as fallbacks
+    When a decision call is judged
+    Then only the enabled LLM fallback is asked next
+    And the decision is the tool it called
+    And both calls are billed
 
   @unit
   Scenario: A table that names no decision backend answers no turn decision
