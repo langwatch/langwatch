@@ -56,6 +56,12 @@ Feature: An Instant Evals pass reads only the traces it holds through a latest-i
     Then the pass reads the same traces' keys, or the same page, from the statement as written and returns its rows
     And a refusal naming another relation, or any other refusal of the twin read, refuses the pass
 
+  @integration
+  Scenario: A trace-ids twin returns only the calling tenant's rows
+    Given two tenants' traces in each twin's source table
+    When the first tenant reads each trace-ids twin for every trace id the table holds
+    Then only the first tenant's rows come back
+
   @unit
   Scenario: A caller cannot read a trace-ids twin directly
     Given a statement that names traces__ids or trace_metrics__ids by name, database-qualified, in a subquery or as a table function
