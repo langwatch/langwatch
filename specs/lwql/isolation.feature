@@ -21,7 +21,7 @@ Feature: LangWatchQL never answers across a tenant or an instance
     Given an organisation whose data is on its own ClickHouse
     And that server holds the access model, as its own reader login finds it
     When it runs a LangWatchQL query, a pass, or a run's validation
-    Then the gate lets it through and the statement runs on that server as the route's login
+    Then the gate lets it through and the statement runs on that server as the organisation's derived reader
     And the shared server's answer is never taken for the private one, even at the same origin
 
   @unit

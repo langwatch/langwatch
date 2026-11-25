@@ -10,9 +10,9 @@ import type { LangWatchQLRouter } from "../repositories/langwatch-ql-executor.re
 const PROBE_SQL = "SELECT 1 AS visible FROM traces LIMIT 1";
 
 /**
- * Asks a private ClickHouse whether its access model is in place, as the route's own reader
- * login and never an admin one (ADR-200). With the empty capability the reader must log in,
- * see `traces` and carry the tenant setting, and the row policy must show it no row.
+ * Asks a private ClickHouse whether its access model is in place, as the organisation's derived
+ * reader and never an admin (ADR-200). With the empty capability the reader must log in, see
+ * `traces` and carry the tenant setting, and the row policy must show it no row.
  */
 export class LangWatchQLPrivateAccessModelProbeService {
   private constructor(private readonly router: LangWatchQLRouter) {}

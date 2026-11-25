@@ -44,7 +44,7 @@ function isSet(value: string | undefined): value is string {
   return value !== undefined && value !== "";
 }
 
-function derive({ keyPepper, label }: { keyPepper: string; label: string }): string {
+export function derive({ keyPepper, label }: { keyPepper: string; label: string }): string {
   return createHmac("sha256", keyPepper).update(label).digest("hex");
 }
 

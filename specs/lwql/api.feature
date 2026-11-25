@@ -765,25 +765,120 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # ---------------------------------------------------------------------------
   # Organizations with a private ClickHouse (issue #9248). The placement gate
   # (specs/lwql/isolation.feature) admits a routed organization only where its
-  # own server is provisioned, probed as the route's reader login. The query
-  # layer behind it uses only the login the route URL carries, never the
-  # shared LangWatchQL one. Infra provisions LangWatchQL objects on the server.
+  # own server is provisioned, probed as that organization's derived reader. The
+  # upgrade creates the reader, its profile, grants and row policies on each
+  # server, signing in as the route URL's admin; queries use only the reader.
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse with the route's own login
-    Given an organization whose projects are routed to its own ClickHouse by a URL carrying that server's own user and password
+  Scenario: A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse as the organization's derived reader
+    Given an organization whose projects are routed to its own ClickHouse by a URL carrying that server's admin user and password
     When a LangWatchQL query reads that organization's projects
     Then it runs on the route's server and database
-    And it connects with the user and password in the route URL, never with the shared LangWatchQL user or password
+    And it connects as the reader derived from the key pepper and the organization id
+    And it never connects with the user or password in the route URL, nor with the shared LangWatchQL user or password
     And a query for an organization without a private ClickHouse still runs on the shared ClickHouse as the LangWatchQL identity
 
   @unit
-  Scenario: A private route that carries no login of its own is refused
-    Given an organization routed to its own ClickHouse by a URL with no user in it
+  Scenario: A private route with no key pepper to derive a reader from is refused
+    Given an organization routed to its own ClickHouse
+    And this deployment has no key pepper
     When a LangWatchQL query reads that organization's projects
     Then the query layer refuses it with error code lwql_unavailable before any client is built for that route
-    And the shared LangWatchQL user and password are never sent to the route's server
+    And neither the route URL's login nor the shared LangWatchQL user and password is sent to the route's server
+
+  @unit
+  Scenario: Two organizations never share a derived reader
+    Given two organizations with private ClickHouses
+    When their readers are derived
+    Then each reader has a different lower-case login name and a different password
+    And the same organization always derives the same reader
+
+  @unit
+  Scenario: Each private ClickHouse is provisioned with its own derived reader
+    Given a deployment with a private ClickHouse route for an organization
+    When the upgrade provisions LangWatchQL
+    Then the LangWatchQL views, the reader's profile, grants and row policies are created on that server, in the route's database
+    And the reader is the organization's derived reader, with the tenant setting the router sends
+    And the PostgreSQL statements run once, not once per private server
+
+  @unit
+  Scenario: Provisioning never creates, replaces or alters the route URL's own user
+    Given a private ClickHouse route whose URL carries an admin user
+    When the upgrade provisions LangWatchQL on it
+    Then no statement creates, replaces, alters or grants for the route URL's user
+    And that user's password is never written into a statement
+
+  @unit
+  Scenario: A private ClickHouse routed twice is provisioned once
+    Given two route variables naming the same ClickHouse URL
+    When the upgrade provisions LangWatchQL
+    Then that server is converged once
+
+  @unit
+  Scenario: A private ClickHouse that cannot be provisioned warns and leaves the rest running
+    Given a private ClickHouse whose admin lacks a grant the setup needs
+    When the upgrade provisions LangWatchQL
+    Then a warning names the organization and the reason, with the route URL and passwords redacted
+    And the shared ClickHouse and every other private ClickHouse are still provisioned
+    And the upgrade does not fail on that target, so its queries stay refused
+
+  @unit
+  Scenario: Private provisioning is skipped without a key pepper
+    Given a deployment with a private ClickHouse route and no key pepper
+    When the upgrade provisions LangWatchQL
+    Then no private server is touched and a warning says why
+    And the organization's queries stay refused
+
+  @unit
+  Scenario: A private ClickHouse binds its views to its own lwql_postgres and never carries the shared Postgres password
+    Given a private ClickHouse whose config mounts a lwql_postgres named collection holding that customer's own PostgreSQL login
+    When the upgrade provisions LangWatchQL on it
+    Then every PostgreSQL-backed engine table binds to that lwql_postgres collection
+    And no statement creates or alters a named collection
+    And no statement contains the shared PostgreSQL reader password
+
+  @unit
+  Scenario: A private ClickHouse without lwql_postgres is left unprovisioned and warns
+    Given a private ClickHouse that holds no lwql_postgres named collection
+    When the upgrade provisions LangWatchQL on it
+    Then no statement runs on that server and a warning says the collection is absent
+    And the organization's queries stay refused
+
+  @unit
+  Scenario: The Postgres scoped schema carries a row-scoped copy of each project's key capability
+    Given the scoped-reader group exists
+    When the upgrade writes the scoped copies
+    Then lwql_scoped holds a security_barrier view of the project ids and the lower-hex sha256 of each lwqlKey
+    And it shows a row only to a login in the owning organization's lwql_org role, like the other copies
+    And the scoped reader group is granted SELECT on it only after the scoped-view check
+
+  @unit
+  Scenario: A private ClickHouse reads its key map from Postgres through lwql_postgres
+    Given a private ClickHouse that mounts lwql_postgres
+    When the upgrade provisions LangWatchQL on it
+    Then its key map is a PostgreSQL-engine table over the scoped project keys, bound to lwql_postgres
+    And no local key-map table is created and every row policy reads that engine table
+    And a view or login that cannot be read gives the policy no rows
+
+  @unit
+  Scenario: No statement sent to a private ClickHouse carries a capability
+    Given the plan for a private ClickHouse
+    When its statements are rendered
+    Then none inserts a row and none carries a key hash or a tenant capability value
+
+  @unit
+  Scenario: The shared ClickHouse keeps its local key-map table
+    Given the plan for the shared ClickHouse
+    When its statements are rendered
+    Then it still creates the local key-map table and the row policies read it
+
+  @unit
+  Scenario: A private ClickHouse with no row policy on traces after provisioning warns
+    Given a private ClickHouse provisioned without error
+    And no row policy on traces applies to the organization's reader
+    When the post-provisioning check reads the server
+    Then a warning says the organization's reader has no row policy on traces
 
   @unit
   Scenario: A LangWatchQL query for an organization whose private route is missing is refused, never answered from the shared ClickHouse

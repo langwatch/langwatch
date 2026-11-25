@@ -11,6 +11,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { privateReaderOf } from "../../../rules/lwql-private-reader.rules.ts";
 import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionResult,
@@ -18,6 +19,9 @@ import {
 } from "../../langwatch-ql-executor.repository.ts";
 import { ClickHouseLangWatchQLExecutorRepository } from "../clickhouse.langwatch-ql-executor.repository.ts";
 import { RoutedLangWatchQLExecutorRepository } from "../clickhouse.langwatch-ql-routed-executor.repository.ts";
+
+const TEST_READER = ({ organizationId }: { organizationId: string }) =>
+  privateReaderOf({ keyPepper: "test-pepper", organizationId });
 
 type DriverConfig = Readonly<Record<string, unknown>>;
 type Driver = {
@@ -56,6 +60,8 @@ const PRIVATE_ROUTE: TenantRoute = {
   organizationId: "org-private",
   url: "https://route-user:route-password@private.invalid:8443/acme_db",
 };
+
+const PRIVATE_URL = PRIVATE_ROUTE.kind === "private" ? PRIVATE_ROUTE.url : "";
 
 const privateRoute = (): TenantRoute => PRIVATE_ROUTE;
 
@@ -118,6 +124,7 @@ function fixture() {
       ClickHouseLangWatchQLExecutorRepository.create(input),
   );
   const executor = RoutedLangWatchQLExecutorRepository.create({
+    privateReader: TEST_READER,
     connection: SHARED,
     route: routeOf,
     createExecutor,
@@ -154,6 +161,7 @@ describe("given a statement over no projects", () => {
   it("runs on the shared executor and never asks for a route", async () => {
     const route = vi.fn(routeOf);
     const executor = RoutedLangWatchQLExecutorRepository.create({
+      privateReader: TEST_READER,
       connection: SHARED,
       route,
       createExecutor: (input) => ClickHouseLangWatchQLExecutorRepository.create(input),
@@ -169,21 +177,24 @@ describe("given a statement over no projects", () => {
 });
 
 describe("given a statement over an organization with a private ClickHouse", () => {
-  /** @scenario "A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse with the route's own login" */
-  it("builds the private client from the route's own login, never the shared LangWatchQL user or password", async () => {
+  /** @scenario "A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse as the organization's derived reader" */
+  it("builds the private client from the derived reader, never the route URL's or the shared login", async () => {
     const { shared, run } = fixture();
 
     await run(["project-private"]);
 
+    const reader = TEST_READER({ organizationId: "org-private" });
     const [isolated] = privateDrivers();
     expect(isolated?.config).toMatchObject({
       url: "https://private.invalid:8443",
-      username: "route-user",
-      password: "route-password",
+      username: reader.username,
+      password: reader.password,
       database: "acme_db",
     });
+    expect(isolated?.config.username).not.toBe("route-user");
+    expect(isolated?.config.password).not.toBe("route-password");
     expect(isolated?.config.username).not.toBe(SHARED.username);
-    expect(isolated?.config.password).not.toBe(SHARED.password);
+    expect(JSON.stringify(isolated?.config)).not.toContain("route-password");
     expect(JSON.stringify(isolated?.config)).not.toContain(SHARED.password);
     expect(shared.config).toMatchObject({
       username: SHARED.username,
@@ -227,6 +238,7 @@ describe("given a statement over an organization with a private ClickHouse", () 
 describe("given more private organizations than the executor keeps open", () => {
   it("closes the least recently used private executor and keeps the rest", async () => {
     const executor = RoutedLangWatchQLExecutorRepository.create({
+      privateReader: TEST_READER,
       connection: SHARED,
       route: routeOf,
       createExecutor: (input) => ClickHouseLangWatchQLExecutorRepository.create(input),
@@ -277,6 +289,7 @@ describe("given a private executor evicted while a statement runs on it", () => 
     });
     const built: GatedExecutor[] = [];
     const executor = RoutedLangWatchQLExecutorRepository.create({
+      privateReader: TEST_READER,
       connection: SHARED,
       route: routeOf,
       createExecutor: () => {
@@ -405,6 +418,7 @@ describe("given the router refuses an organization with private_dataplane_unavai
   it("rethrows that refusal unchanged and runs nothing on the shared ClickHouse", async () => {
     const refusal = new RouteMissingError();
     const executor = RoutedLangWatchQLExecutorRepository.create({
+      privateReader: TEST_READER,
       connection: SHARED,
       route: () => Promise.reject(refusal),
       createExecutor: (input) => ClickHouseLangWatchQLExecutorRepository.create(input),
@@ -426,39 +440,44 @@ describe("given the router refuses an organization with private_dataplane_unavai
   });
 });
 
-describe("given a private route whose URL carries no login of its own", () => {
-  /** @scenario "A private route that carries no login of its own is refused" */
-  it.each([
-    ["no user or password", "https://private.invalid:8443/acme_db"],
-    ["a password but no user", "https://:route-password@private.invalid:8443/acme_db"],
-  ])(
-    "refuses a route without its own credentials, with %s, and builds no private client",
-    async (_, url) => {
-      const built: string[] = [];
-      const executor = RoutedLangWatchQLExecutorRepository.create({
-        connection: SHARED,
-        route: () => Promise.resolve({ kind: "private", organizationId: "org-no-login", url }),
-        createExecutor: (input) => {
-          built.push(input.target);
-          return ClickHouseLangWatchQLExecutorRepository.create(input);
-        },
-      });
-      const [shared] = drivers;
+describe("given a deployment with no key pepper to derive a private reader from", () => {
+  /** @scenario "A private route with no key pepper to derive a reader from is refused" */
+  it("refuses a private route and builds no private client, whatever login the URL carries", async () => {
+    const built: string[] = [];
+    const executor = RoutedLangWatchQLExecutorRepository.create({
+      privateReader: null,
+      connection: SHARED,
+      route: () => Promise.resolve({ kind: "private", organizationId: "org-x", url: PRIVATE_URL }),
+      createExecutor: (input) => {
+        built.push(input.target);
+        return ClickHouseLangWatchQLExecutorRepository.create(input);
+      },
+    });
+    const [shared] = drivers;
 
-      const refusal = (await runOn({ executor, tenantIds: ["project-x"] }).catch(
-        (error: unknown) => error,
-      )) as HandledError;
+    const refusal = (await runOn({ executor, tenantIds: ["project-x"] }).catch(
+      (error: unknown) => error,
+    )) as HandledError;
 
-      expect(refusal).toMatchObject({
-        code: "lwql_unavailable",
-        message: "LangWatchQL is not available for this organization's ClickHouse.",
-      });
-      expect(refusal.reasons.map((r) => r.message)).toEqual(["no route credentials"]);
-      expect(built).toEqual(["shared"]);
-      expect(privateDrivers()).toEqual([]);
-      expect(shared?.query).not.toHaveBeenCalled();
-    },
-  );
+    expect(refusal).toMatchObject({ code: "lwql_unavailable" });
+    expect(refusal.reasons.map((r) => r.message)).toEqual(["no private reader"]);
+    expect(built).toEqual(["shared"]);
+    expect(privateDrivers()).toEqual([]);
+    expect(shared?.query).not.toHaveBeenCalled();
+  });
+});
+
+describe("given two organizations with private ClickHouses", () => {
+  /** @scenario "Two organizations never share a derived reader" */
+  it("derives a different reader for each and the same one for the same organization", () => {
+    const first = TEST_READER({ organizationId: "org-one" });
+    const second = TEST_READER({ organizationId: "org-two" });
+
+    expect(first.username).toMatch(/^langwatch_lwql_[0-9a-f]{12}$/);
+    expect(second.username).not.toBe(first.username);
+    expect(second.password).not.toBe(first.password);
+    expect(TEST_READER({ organizationId: "org-one" })).toEqual(first);
+  });
 });
 
 // A route URL with no usable origin is refused, never dialled as "null".
@@ -469,6 +488,7 @@ describe("given a private route whose URL has no usable origin", () => {
         ClickHouseLangWatchQLExecutorRepository.create(input),
     );
     const executor = RoutedLangWatchQLExecutorRepository.create({
+      privateReader: TEST_READER,
       connection: SHARED,
       route: () =>
         Promise.resolve({
@@ -506,6 +526,7 @@ describe("given a private route whose path is not a plain ClickHouse database na
         ClickHouseLangWatchQLExecutorRepository.create(input),
     );
     const executor = RoutedLangWatchQLExecutorRepository.create({
+      privateReader: TEST_READER,
       connection: SHARED,
       route: () => Promise.resolve(route),
       createExecutor,

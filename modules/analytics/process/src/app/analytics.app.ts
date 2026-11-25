@@ -133,6 +133,7 @@ import {
   type LwqlCredentials,
   resolveLwqlCredentials,
 } from "../rules/lwql-default-credentials.rules.ts";
+import { type LwqlPrivateReaderOf, privateReaderOf } from "../rules/lwql-private-reader.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
@@ -319,7 +320,7 @@ function lwqlAccessModelProbe({
   return { configured: true, probeOwner: () => repository.probeOwner({ names }) };
 }
 
-/** The private servers' provisioning read: the route's own reader login, never an admin. */
+/** The private servers' provisioning read: the organisation's derived reader, never an admin. */
 function lwqlPrivateAccessModelProbe({ router }: { router: LangWatchQLRouter | null }): {
   probe(input: { projectIds: readonly string[] }): Promise<LangWatchQLAccessModelAnswer>;
 } {
@@ -638,11 +639,19 @@ export class AnalyticsModule
     const runTelemetry = LangWatchQLRunTelemetryService.create({
       queryHashKey: await queryHashKey(setup.secrets),
     });
+    const privateReader = await intoKeyPepper(
+      setup.secrets,
+      (keyPepper): LwqlPrivateReaderOf | null =>
+        keyPepper === void 0
+          ? null
+          : ({ organizationId }) => privateReaderOf({ keyPepper, organizationId }),
+    );
     const router = connection
       ? RoutedLangWatchQLExecutorRepository.create({
           connection,
           route: langWatchQl.routeTenantSet,
           createExecutor: (input) => ClickHouseLangWatchQLExecutorRepository.create(input),
+          privateReader,
         })
       : null;
     const langWatchQL = LangWatchQLServiceClass.create({

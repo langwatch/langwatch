@@ -25,7 +25,11 @@ import {
   MemoryLangWatchQLPlacementRepository,
 } from "../../repositories/memory/memory.langwatch-ql-placement.repository.ts";
 import type { LwqlAccessModelOwner } from "../../rules/langwatch-ql-config-store.rules.ts";
+import { privateReaderOf } from "../../rules/lwql-private-reader.rules.ts";
 import { LangWatchQLPlacementGateService } from "../langwatch-ql-placement-gate.service.ts";
+
+const TEST_READER = ({ organizationId }: { organizationId: string }) =>
+  privateReaderOf({ keyPepper: "test-pepper", organizationId });
 
 const SHARED = { id: "project-shared", lwqlKey: "lwql-shared" };
 const ROUTED = { id: "project-routed", lwqlKey: "lwql-routed" };
@@ -59,6 +63,7 @@ function routedServiceOver({
   const routeAsks: (readonly string[])[] = [];
   const built: { target: LangWatchQLTarget; executor: RecordingLangWatchQLExecutor }[] = [];
   const router = RoutedLangWatchQLExecutorRepository.create({
+    privateReader: TEST_READER,
     connection: {
       url: MEMORY_SHARED_ORIGIN,
       username: "langwatch_lwql",

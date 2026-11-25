@@ -309,11 +309,11 @@ export class LangWatchQLPostgresMappingService {
     /** Table in the application's schema it reads, aliased {@link POSTGRES_BASE_ALIAS}. */
     baseRelation: string;
     /**
-     * Exposed name, the column behind it, and the alias it is read on, in
-     * catalog order. `alias` defaults to {@link POSTGRES_BASE_ALIAS}; the tenant
-     * column names the last {@link joins} hop's alias, where the project lives.
+     * Exposed name, the column behind it, and the alias it is read on, in catalog order.
+     * `alias` defaults to {@link POSTGRES_BASE_ALIAS}; the tenant column names the last
+     * {@link joins} hop's alias. An `expression` replaces the `source` read: catalogue text.
      */
-    columns: readonly { exposed: string; source: string; alias?: string }[];
+    columns: readonly { exposed: string; source: string; alias?: string; expression?: string }[];
     /**
      * The join chain from the base relation to the relation carrying the owning
      * project. Empty renders a single-table body.
@@ -353,8 +353,11 @@ export class LangWatchQLPostgresMappingService {
     const projection = columns
       .map(
         (column) =>
-          `  ${sqlText.postgresQuoted(column.alias ?? POSTGRES_BASE_ALIAS)}.` +
-          `${sqlText.postgresQuoted(column.source)} AS ${sqlText.postgresQuoted(column.exposed)}`,
+          `  ${
+            column.expression ??
+            `${sqlText.postgresQuoted(column.alias ?? POSTGRES_BASE_ALIAS)}.` +
+              sqlText.postgresQuoted(column.source)
+          } AS ${sqlText.postgresQuoted(column.exposed)}`,
       )
       .join(",\n");
     let previousAlias = POSTGRES_BASE_ALIAS;

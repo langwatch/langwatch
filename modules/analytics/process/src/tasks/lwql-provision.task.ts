@@ -4,7 +4,10 @@
  * @see specs/lwql/api.feature
  */
 
-import { parseConnectionUrl } from "@langwatch/clickhouse-migrations";
+import {
+  parseConnectionUrl,
+  resolveClickHouseMigrationTaskConfig,
+} from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
@@ -21,6 +24,7 @@ import {
 } from "../features/provisioning/rules/lwql-scoped-view.rules.ts";
 import {
   LangWatchQLCollectionBindingService,
+  LWQL_RENDERED_NAMED_COLLECTION,
   type LwqlAccessModelMode,
   type LwqlCollectionProbe,
 } from "../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
@@ -54,11 +58,13 @@ import {
   statementKind,
 } from "../rules/langwatch-ql-config-store.rules.ts";
 import {
+  findKeyPeppers,
   LWQL_CREDENTIAL_SECRETS,
   withLwqlDefaultCredentials,
 } from "../rules/lwql-default-credentials.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
+import { provisionLwqlPrivateTargets } from "./lwql-private-targets.task.ts";
 
 const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
 const clusterGuard = LangWatchQLSqlModeClusterGuardService.create();
@@ -78,8 +84,12 @@ const logger = createLogger("langwatch:task:lwql-provision");
 type LwqlProjectKeys = Pick<ProjectApi, "listLwqlKeys">;
 
 /** Every project's LangWatchQL key, read from the project module a page at a time. */
-async function allLwqlKeys({ projects }: { projects: LwqlProjectKeys }) {
-  const keys = [];
+async function allLwqlKeys({
+  projects,
+}: {
+  projects: LwqlProjectKeys;
+}): Promise<{ id: string; lwqlKey: string }[]> {
+  const keys: { id: string; lwqlKey: string }[] = [];
   let after: string | undefined;
   do {
     const page = await projects.listLwqlKeys({ after, limit: PROJECT_ID_PAGE_LIMIT });
@@ -541,7 +551,11 @@ function postgresStatements({
           schema,
         }),
       ],
-      scoped: [...lwqlProvisioning.postgresScopedViewStatements({ schema }), ...scopedGrants],
+      scoped: [
+        ...lwqlProvisioning.postgresScopedViewStatements({ schema }),
+        ...lwqlProvisioning.postgresProjectKeysStatements({ schema }),
+        ...scopedGrants,
+      ],
     };
   }
   const shared = postgresGaps.sharedGaps({ gaps });
@@ -566,6 +580,7 @@ function postgresStatements({
         schema,
         views: views(postgresGaps.scopedCopiesToRebuild({ gaps })),
       }),
+      ...lwqlProvisioning.postgresProjectKeysStatements({ schema }),
       ...scopedGrants,
     ],
   };
@@ -891,24 +906,91 @@ async function runLwqlProvisioningTask({
     return;
   }
 
-  await convergeLwqlAccessModel({
-    database,
-    failOnError,
-    plan: {
-      request: selfProvision,
-      names: lwqlProvisioning.names({ connection: selfProvision.connection }),
-      sourceDatabase: () =>
-        parseConnectionUrl({
-          connectionUrl: source.CLICKHOUSE_URL,
-          clusterName: source.CLICKHOUSE_CLUSTER,
-        }).database,
-      schema: lwqlProvisioning.postgresSchemaFromDatabaseUrl(source.DATABASE_URL),
-      ...connectionLimitFields(source.DATABASE_URL),
-      settings: source,
-      openRepository: () =>
-        ClickHouseLangWatchQLProvisioningRepository.open({ url: source.CLICKHOUSE_URL }),
-    },
+  const plan: LwqlConvergencePlan = {
+    request: selfProvision,
+    names: lwqlProvisioning.names({ connection: selfProvision.connection }),
+    sourceDatabase: () =>
+      parseConnectionUrl({
+        connectionUrl: source.CLICKHOUSE_URL,
+        clusterName: source.CLICKHOUSE_CLUSTER,
+      }).database,
+    schema: lwqlProvisioning.postgresSchemaFromDatabaseUrl(source.DATABASE_URL),
+    ...connectionLimitFields(source.DATABASE_URL),
+    settings: source,
+    openRepository: () =>
+      ClickHouseLangWatchQLProvisioningRepository.open({ url: source.CLICKHOUSE_URL }),
+  };
+  await convergeLwqlAccessModel({ database, failOnError, plan });
+  await provisionLwqlPrivateTargets({
+    endpoints: resolveClickHouseMigrationTaskConfig({ ...source }).privateEndpoints,
+    sharedUrl: source.CLICKHOUSE_URL,
+    keyPepper: findKeyPeppers(source)[0],
+    shared: plan,
+    clusterName: source.CLICKHOUSE_CLUSTER,
+    converge: (privatePlan) => convergeLwqlPrivateClickHouse({ database, plan: privatePlan }),
   });
+}
+
+/**
+ * One private server's ClickHouse half, under the shared run's lock; its PostgreSQL half is done.
+ * The server's own `lwql_postgres` carries the per-customer login: no collection or password is
+ * written, and a server without it is left alone, so that organisation stays refused.
+ */
+export async function convergeLwqlPrivateClickHouse({
+  database,
+  plan,
+}: {
+  database: LwqlProvisioningDatabase;
+  plan: LwqlConvergencePlan;
+}): Promise<void> {
+  await withSelfProvisionLock({
+    database,
+    connectionLimit: plan.connectionLimit,
+    fn: () =>
+      withProvisioningRepository({
+        open: plan.openRepository,
+        fn: (repository) => convergeLwqlPrivateRepository({ repository, plan }),
+      }),
+  });
+}
+
+export async function convergeLwqlPrivateRepository({
+  repository,
+  plan,
+}: {
+  repository: LangWatchQLProvisioningRepository;
+  plan: LwqlConvergencePlan;
+}): Promise<void> {
+  const { names, request } = plan;
+  const server = await repository.readCollectionState({
+    database: names.database,
+    candidates: [LWQL_RENDERED_NAMED_COLLECTION],
+  });
+  if (!server.available.includes(LWQL_RENDERED_NAMED_COLLECTION)) {
+    logger.warn(
+      { database: names.database },
+      `a private ClickHouse holds no ${LWQL_RENDERED_NAMED_COLLECTION} named collection: its PostgreSQL-backed views are not created and the organisation stays refused until infra mounts it`,
+    );
+    throw new Error("named collection absent");
+  }
+  const configStoreEntities = await repository.inventoryConfigStore({ names });
+  const includeAppFunctions = await appFunctionsProvisionable(repository);
+  await clusterGuard.assertSafe({
+    query: (sql) => repository.queryRows(sql),
+    source: plan.settings,
+  });
+  const statements = selfProvisioning.clickHouseStatements({
+    names,
+    restrictedPassword: request.connection.password,
+    sourceDatabase: plan.sourceDatabase(),
+    postgres: { endpoint: request.endpoint, readerPassword: "" },
+    // The scoped copies are the only relation the per-customer login reads.
+    schema: LWQL_SCOPED_SCHEMA,
+    includeAppFunctions,
+    externalCollection: LWQL_RENDERED_NAMED_COLLECTION,
+    postgresKeyMap: true,
+  });
+  await repository.runStatements({ configStoreEntities, failureLevel: "error", statements });
 }
 
 /**

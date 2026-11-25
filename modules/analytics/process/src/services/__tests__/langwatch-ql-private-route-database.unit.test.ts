@@ -6,7 +6,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { ADMIT_EVERY_PLACEMENT, TEST_RUN_TELEMETRY } from "../../app/__tests__/analytics.fixture.ts";
+import {
+  ADMIT_EVERY_PLACEMENT,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
 import { RoutedLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-routed-executor.repository.ts";
 import {
   type LangWatchQLConnection,
@@ -14,8 +17,12 @@ import {
   type LangWatchQLExecutionResult,
   LangWatchQLExecutorRepository,
 } from "../../repositories/langwatch-ql-executor.repository.ts";
+import { privateReaderOf } from "../../rules/lwql-private-reader.rules.ts";
 import { LangWatchQLService } from "../langwatch-ql.service.ts";
 import { EVERY_CATALOGUE_PERMISSION } from "./lwql-catalogue-access.fixture.ts";
+
+const TEST_READER = ({ organizationId }: { organizationId: string }) =>
+  privateReaderOf({ keyPepper: "test-pepper", organizationId });
 
 const SHARED: LangWatchQLConnection = {
   url: "http://shared.invalid:8123",
@@ -56,6 +63,7 @@ function privateRun(input: {
 }) {
   const executors: RecordingExecutor[] = [];
   const routed = RoutedLangWatchQLExecutorRepository.create({
+    privateReader: TEST_READER,
     connection: SHARED,
     route: () =>
       Promise.resolve({ kind: "private", organizationId: "org-private", url: PRIVATE_URL }),
@@ -97,7 +105,7 @@ function qualifiersOf(requests: readonly LangWatchQLExecutionRequest[]): string[
 }
 
 describe("given a statement for an organization whose route names its own database", () => {
-  /** @scenario "A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse with the route's own login" */
+  /** @scenario "A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse as the organization's derived reader" */
   it("leaves an unqualified statement unqualified and dials the route database", async () => {
     const { done, privateExecutor, sharedExecutor } = privateRun({
       sql: "SELECT count() AS n FROM trace_metrics LIMIT 1",

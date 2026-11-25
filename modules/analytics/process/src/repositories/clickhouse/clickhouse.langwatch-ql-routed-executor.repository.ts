@@ -1,7 +1,7 @@
 /**
  * Runs each LangWatchQL statement where its projects' rows are: the shared ClickHouse, or an
- * organization's own as its route URL's login; the shared login never leaves the shared server.
- * Unreachable until ADR-200's opt-in, which decides the identity. Spec: specs/lwql/api.feature.
+ * organization's own as that organization's derived reader; neither the shared login nor the
+ * route URL's own ever signs a query. Unreachable until ADR-200's opt-in. Spec: api.feature.
  */
 import { LangWatchQLUnavailableError } from "@langwatch/analytics-contract";
 import {
@@ -11,6 +11,10 @@ import {
 } from "@langwatch/clickhouse-client";
 
 import { RESERVED_DATABASES } from "../../rules/langwatch-ql-policy.rules.ts";
+import type {
+  LwqlPrivateReader,
+  LwqlPrivateReaderOf,
+} from "../../rules/lwql-private-reader.rules.ts";
 import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionRequest,
@@ -50,43 +54,41 @@ function refused(reason: string): LangWatchQLUnavailableError {
 }
 
 /**
- * The route's server, database and login, every one from the route URL; only the tenant setting's
- * name is the shared connection's. A URL that is not http(s), carries no user, or names no
- * database, a reserved one or a non-lower-case-identifier one, is refused without its text.
+ * The route's server and database from its URL, the login from the organization's derived reader;
+ * the URL's own user and password are never read. The tenant setting's name is the shared one.
+ * A bad scheme, no database, a reserved or non-identifier one, or no reader is refused unnamed.
  */
 function privateConnectionOf({
   shared,
   url,
+  reader,
 }: {
   shared: LangWatchQLConnection;
   url: string;
+  reader: LwqlPrivateReader | null;
 }): LangWatchQLConnection {
   let parsed: URL;
   let database: string;
-  let username: string;
-  let password: string;
   try {
     parsed = new URL(url);
     database = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
-    username = decodeURIComponent(parsed.username);
-    password = decodeURIComponent(parsed.password);
   } catch {
     // Never the caught error: a URL parse failure carries the whole URL, password included.
     throw refused("unparsable route URL");
   }
   // Any other scheme parses to the origin "null", which no driver can dial.
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw refused("bad scheme");
-  // Failing closed: a route with no login of its own must not borrow the shared one.
-  if (username === "") throw refused("no route credentials");
   // Failing closed: a route naming no database must not adopt the shared deployment's.
   if (database === "") throw refused("no database");
   // Written unquoted into generated SQL: only a lower-case identifier, never a reserved one.
   if (!PLAIN_DATABASE_NAME.test(database)) throw refused("bad name shape");
   if (RESERVED_DATABASES.includes(database)) throw refused("reserved database");
+  // Failing closed: with no reader to derive, the route's own login must not stand in.
+  if (reader === null) throw refused("no private reader");
   return {
     url: parsed.origin,
-    username,
-    password,
+    username: reader.username,
+    password: reader.password,
     database,
     tenantSetting: shared.tenantSetting,
   };
@@ -132,17 +134,21 @@ export class RoutedLangWatchQLExecutorRepository implements LangWatchQLRouter {
     connection,
     route,
     createExecutor,
+    privateReader = null,
     maxPrivateExecutors = DEFAULT_MAX_PRIVATE_EXECUTORS,
   }: {
     connection: LangWatchQLConnection;
     route: LangWatchQLTenantRouting;
     createExecutor: LangWatchQLExecutorFactory;
+    /** An organization's reader; null with no key pepper, so private runs refuse. */
+    privateReader?: LwqlPrivateReaderOf | null;
     maxPrivateExecutors?: number;
   }): RoutedLangWatchQLExecutorRepository {
     return new RoutedLangWatchQLExecutorRepository({
       connection,
       route,
       createExecutor,
+      privateReader,
       maxPrivateExecutors,
       sharedExecutor: createExecutor({ connection, target: "shared" }),
     });
@@ -151,6 +157,7 @@ export class RoutedLangWatchQLExecutorRepository implements LangWatchQLRouter {
   private readonly connection: LangWatchQLConnection;
   private readonly route: LangWatchQLTenantRouting;
   private readonly createExecutor: LangWatchQLExecutorFactory;
+  private readonly privateReader: LwqlPrivateReaderOf | null;
   private readonly sharedExecutor: LangWatchQLExecutorRepository;
   private readonly maxPrivateExecutors: number;
 
@@ -158,18 +165,21 @@ export class RoutedLangWatchQLExecutorRepository implements LangWatchQLRouter {
     connection,
     route,
     createExecutor,
+    privateReader,
     sharedExecutor,
     maxPrivateExecutors,
   }: {
     connection: LangWatchQLConnection;
     route: LangWatchQLTenantRouting;
     createExecutor: LangWatchQLExecutorFactory;
+    privateReader: LwqlPrivateReaderOf | null;
     sharedExecutor: LangWatchQLExecutorRepository;
     maxPrivateExecutors: number;
   }) {
     this.connection = connection;
     this.route = route;
     this.createExecutor = createExecutor;
+    this.privateReader = privateReader;
     this.sharedExecutor = sharedExecutor;
     if (!Number.isInteger(maxPrivateExecutors) || maxPrivateExecutors < 1) {
       throw new RangeError("maxPrivateExecutors must be a positive integer");
@@ -184,8 +194,12 @@ export class RoutedLangWatchQLExecutorRepository implements LangWatchQLRouter {
     const route = await this.routeOrRefuse(tenantIds);
     if (route.kind === "shared") return { executor: this.sharedExecutor };
 
-    const connection = privateConnectionOf({ shared: this.connection, url: route.url });
     const { organizationId } = route;
+    const connection = privateConnectionOf({
+      shared: this.connection,
+      url: route.url,
+      reader: this.privateReader?.({ organizationId }) ?? null,
+    });
     const executor = new PrivateRouteExecutor({
       run: (request) => this.runPrivate({ organizationId, connection, request }),
     });
