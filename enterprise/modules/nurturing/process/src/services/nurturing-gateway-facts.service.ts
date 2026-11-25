@@ -38,15 +38,18 @@ type GatewayFactsDependencies = Readonly<{
   logger: Readonly<{
     debug(payload: Readonly<Record<string, unknown>>, message: string): void;
     warn(payload: Readonly<Record<string, unknown>>, message: string): void;
+    error(payload: Readonly<Record<string, unknown>>, message: string): void;
   }>;
 }>;
 
 type Deliver = (signal: NurturingSignal) => Promise<void>;
 
 /**
- * Deliveries a key's first request waits for the key's copy: twelve retries, about 27 minutes of
- * the queue's 500ms-doubling backoff capped at 600s, for a copy lagging a backlog or the deploy's
- * replay. Bounded so a key nurturing never copies ends instead of holding its queue group.
+ * Attempts a key's first request gets while it waits for the key's copy: twelve retries, each
+ * waiting a full-jitter backoff from `getBackoffMs` (packages/group-queue). The upper bound is
+ * about 27 minutes (500ms doubling, capped at 600s); the expected wait is roughly half of that.
+ * Covers a copy lagging a backlog or the deploy's replay. Bounded so a key nurturing never copies
+ * ends instead of holding its queue group.
  */
 export const KEY_FIRST_REQUEST_COPY_ATTEMPTS = 13;
 
@@ -143,7 +146,7 @@ export class NurturingGatewayFactsService {
           `Key ${virtualKeyId} has no copy in nurturing yet (attempt ${attempt}); retrying its first request`,
         );
       }
-      this.dependencies.logger.warn(
+      this.dependencies.logger.error(
         { virtualKeyId, reason: "key_not_copied", deliveryAttempt: attempt },
         "a key's first request names a key nurturing holds no copy of after its retries; nothing is sent",
       );

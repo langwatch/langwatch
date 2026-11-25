@@ -168,9 +168,22 @@ describe("a gateway key's first request in nurturing", () => {
     });
   });
 
+  describe("when a first request arrives with no delivery attempt", () => {
+    /** @scenario "A first request with no delivery attempt counts as the first and is retried" */
+    it("fails the delivery as its first attempt, so its job is retried", async () => {
+      const facts = await gatewayFactsOver();
+      await facts.joined("user-holder");
+
+      await expect(
+        facts.deliverFact(firstRequest({ virtual_key_id: "vk_no_attempt" })),
+      ).rejects.toThrow("has no copy in nurturing yet");
+      expect(facts.sent).toEqual([]);
+    });
+  });
+
   describe("when nurturing never copies the key", () => {
     /** @scenario "A first request on a key nurturing never copies ends unsent after its retries" */
-    it("fails each delivery before the last attempt, then ends unsent with a warning", async () => {
+    it("fails each delivery before the last attempt, then ends unsent with an error", async () => {
       const facts = await gatewayFactsOver();
       await facts.joined("user-holder");
       const uncopied = firstRequest({ virtual_key_id: "vk_never_copied" });
@@ -183,7 +196,8 @@ describe("a gateway key's first request in nurturing", () => {
       await facts.deliverFact(uncopied, { deliveryAttempt: KEY_FIRST_REQUEST_COPY_ATTEMPTS });
 
       expect(facts.sent).toEqual([]);
-      expect(facts.logLines.findLine("warn", "holds no copy of after its retries")).toBeDefined();
+      expect(facts.logLines.findLine("error", "holds no copy of after its retries")).toBeDefined();
+      expect(facts.logLines.findLine("warn", "holds no copy of after its retries")).toBeUndefined();
     });
   });
 

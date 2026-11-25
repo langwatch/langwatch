@@ -353,7 +353,13 @@ Feature: Customer.io hears when a person's gateway key is created, first used, a
     Given a key whose lifecycle copy never reached nurturing, such as a lost or failed copy
     When its first-request fact is delivered and retried
     Then each delivery before the last of its bounded attempts fails so its job is retried
-    And the last attempt sends nothing and logs a warning, so the job ends instead of looping
+    And the last attempt sends nothing and logs an error, so the job ends instead of looping
+
+  @unit
+  Scenario: A first request with no delivery attempt counts as the first and is retried
+    Given a current member's USER key whose first request arrives before nurturing copies the key
+    When the first-request fact is delivered with no delivery attempt
+    Then the delivery fails as the first attempt, so its job is retried and sends nothing
 
   @unit
   Scenario: A key's first request delivered twice identifies once
