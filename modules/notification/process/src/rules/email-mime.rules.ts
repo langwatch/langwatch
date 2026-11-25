@@ -65,6 +65,14 @@ export function normalizeHeaders(
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
+/** RFC 8058's one-click pair, as main wrote it: every provider carries the same two headers. */
+export function oneClickUnsubscribeHeaders(url: string): Record<string, string> {
+  return {
+    "List-Unsubscribe": `<${url}>`,
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+  };
+}
+
 /**
  * RFC 2047-encode header values as UTF-8 base64 when needed, with header
  * folding for long inputs. Pure ASCII values that fit are passed through.

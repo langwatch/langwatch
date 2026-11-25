@@ -69,6 +69,10 @@ function drawer({ reader = readerSees, owner = ownerHides } = {}) {
     })),
     readSpanTreeDelta: vi.fn<TraceApi["readSpanTreeDelta"]>(async () => treeNodes),
     readSpanSummaries: vi.fn<TraceApi["readSpanSummaries"]>(async () => []),
+    readLangwatchSignals: vi.fn<TraceApi["readLangwatchSignals"]>(async () => [
+      { spanId: "reader-span", signals: ["genai"] },
+      { spanId: "owner-span", signals: ["rag"], ownerProjectId: OWNER },
+    ]),
     readTraceEvents: vi.fn<TraceApi["readTraceEvents"]>(async () => [
       { spanId: "reader-span", timestamp: 1, name: "step", attributes: { said: "hello" } },
       {
@@ -107,7 +111,10 @@ function drawer({ reader = readerSees, owner = ownerHides } = {}) {
     braids: TraceBraidDetailService.create({
       directory: {
         authz: createApiFixture<AuthzApi>({}, "authz"),
-        projects: createApiFixture<ProjectApi>({}, "projects"),
+        projects: createApiFixture<ProjectApi>(
+          { findSummaryById: async () => ({ name: "Specialists", slug: "specialists" }) },
+          "projects",
+        ),
       },
     }),
     totals: TraceBraidedTotalsService.create({
@@ -229,6 +236,31 @@ describe("the drawer's views of a braided trace", () => {
         code: "trace_withheld_over_plan",
       });
       expect(reads.readSpanSummaries).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the instrumentation badges are read", () => {
+    /** @scenario "The instrumentation badges of a braided trace open the trace as the span tree does" */
+    it("refuses a withheld trace before any signal is read", async () => {
+      const { reads, service, view } = drawer();
+      reads.assertTraceNotWithheld.mockRejectedValueOnce(
+        new TraceWithheldOverPlanError({ traceId: "trace-1", members: 5, maxMembers: 2 }),
+      );
+
+      await expect(service.langwatchSignals(view)).rejects.toMatchObject({
+        code: "trace_withheld_over_plan",
+      });
+      expect(reads.readLangwatchSignals).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The instrumentation badges of a braided trace open the trace as the span tree does" */
+    it("names the owner of each braided span's badges", async () => {
+      const { service, view } = drawer();
+
+      await expect(service.langwatchSignals(view)).resolves.toEqual([
+        { spanId: "reader-span", signals: ["genai"] },
+        { spanId: "owner-span", signals: ["rag"], ownerProjectId: OWNER },
+      ]);
     });
   });
 });

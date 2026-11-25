@@ -10,7 +10,7 @@ type GetAllResponse = {
 
 /**
  * Derives a project slug via organization.getAll, not the app-root
- * redirect — a personal-persona user lands on /me, making a URL-derived
+ * redirect — a personal-persona user lands on /coding-agents, making a URL-derived
  * slug non-deterministic. `E2E_PROJECT_SLUG` pins one for local runs.
  */
 export async function getProjectSlug(page: Page): Promise<string> {

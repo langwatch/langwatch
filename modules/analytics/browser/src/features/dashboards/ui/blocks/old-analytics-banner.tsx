@@ -1,7 +1,7 @@
 /**
- * Points a Dashboards page back to the legacy Analytics pages, which the Analytics menu
- * entry no longer opens (dashboards-v1.feature AC3i). Each screen renders it once it is
- * past the gate and its own refusals, so a refused member never sees it (AC21).
+ * Points the member's My dashboard, where the Analytics entry lands, back to the legacy
+ * Analytics pages (dashboards-v1.feature AC3i); no other board shows it (AC3t). The board
+ * screen renders it past the gate and its refusals, so a refused member never sees it (AC21).
  */
 
 import { Banner, BannerAction } from "@langwatch/design-system/banner";

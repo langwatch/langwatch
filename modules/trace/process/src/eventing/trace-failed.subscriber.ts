@@ -3,6 +3,7 @@
  * (span-status-fold), once per trace, so a peer counting failed traces reads one fact instead of
  * keeping a copy of the rule. Spec: modules/trace/specs/trace-failed-fact.feature
  */
+import { isGovernanceOriginTrace } from "@langwatch/enterprise-governance-contract";
 import type { TriggerContext } from "@langwatch/eventing";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 
@@ -49,11 +50,17 @@ export function isNewlyFailedTrace({
   );
 }
 
-/** Records trace_failed with the trace's origin; a failed send throws, so the job retries. */
+/**
+ * Records trace_failed with the trace's origin; a failed send throws, so the job retries.
+ * A governance-ingested trace records nothing: it lands in the organization's hidden governance
+ * project, not the customer's own, and its origin (`langwatch.origin`) cannot tell a peer so.
+ */
 export function createTraceFailedHandler(
   deps: TraceFailedSubscriberDeps,
 ): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
   return async (event, { tenantId, aggregateId, state }) => {
+    if (isGovernanceOriginTrace(state.attributes)) return;
+
     const origin = state.attributes["langwatch.origin"];
     await deps.milestones.recordTraceFailed({
       tenantId,

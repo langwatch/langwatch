@@ -39,6 +39,7 @@ function spanRow(input: {
   durationMs: number;
   attributes?: Record<string, string>;
   updatedOffsetMs?: number;
+  parentSpanId?: string;
 }) {
   const start = new Date(base + input.startOffsetMs);
   return {
@@ -46,7 +47,7 @@ function spanRow(input: {
     TenantId: input.tenantId,
     TraceId: traceId,
     SpanId: input.spanId,
-    ParentSpanId: null,
+    ParentSpanId: input.parentSpanId ?? null,
     ParentTraceId: null,
     ParentIsRemote: null,
     Sampled: 1,
@@ -97,6 +98,7 @@ beforeAll(async () => {
       spanRow({
         tenantId: owner,
         spanId: "web-1",
+        parentSpanId: "root",
         startOffsetMs: 200,
         durationMs: 300,
         attributes: { ...web, ...usage("0.25", "100", "40") },

@@ -6,6 +6,7 @@ import {
   GOVERNANCE_ORIGIN_KIND_VALUE,
   type IngestionSourceHealthRow,
   type RecentAnomalyRow,
+  SECURITY_LAKE_SOURCE_TYPE,
 } from "@langwatch/enterprise-governance-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
@@ -34,6 +35,13 @@ import type {
 const ATTR_ORIGIN_KIND = GOVERNANCE_ATTR.ORIGIN_KIND;
 const ATTR_INGESTION_SOURCE_ID = GOVERNANCE_ATTR.INGESTION_SOURCE_ID;
 const ORIGIN_KIND_VALUE = GOVERNANCE_ORIGIN_KIND_VALUE;
+/**
+ * A row a source wrote itself rather than a trace mirror: pullers write under a synthetic `pull:`
+ * trace id, and a Security Lake source writes with no trace id (a pushed event has none either).
+ */
+const PULLED_ROW = `(startsWith(TraceId, 'pull:') OR (TraceId = '' AND SourceType = {securityLakeSourceType:String}))`;
+/** The parameter `PULLED_ROW` binds; every query that embeds it passes this too. */
+const PULLED_ROW_PARAMS = { securityLakeSourceType: SECURITY_LAKE_SOURCE_TYPE };
 
 const ZERO_PULLED_USAGE = {
   cost_usd: "0",
@@ -298,14 +306,14 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         SELECT SourceId AS sourceId, toString(count()) AS c
         FROM governance_ocsf_events
         WHERE TenantId = {tenantId:String}
-          AND startsWith(TraceId, 'pull:')
+          AND ${PULLED_ROW}
           AND EventTime >= fromUnixTimestamp64Milli({since:UInt64})
           AND SourceId IN ({sourceIds:Array(String)})
           AND (TenantId, EventId, LastUpdatedAt) IN (
             SELECT TenantId, EventId, max(LastUpdatedAt)
             FROM governance_ocsf_events
             WHERE TenantId = {tenantId:String}
-              AND startsWith(TraceId, 'pull:')
+              AND ${PULLED_ROW}
               AND EventTime >= fromUnixTimestamp64Milli({since:UInt64})
               AND SourceId IN ({sourceIds:Array(String)})
             GROUP BY TenantId, EventId
@@ -313,6 +321,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         GROUP BY sourceId
       `,
       query_params: {
+        ...PULLED_ROW_PARAMS,
         tenantId: args.tenantId,
         since: args.since,
         sourceIds: args.sourceIds,
@@ -323,7 +332,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
   }
 
   /**
-   * Rows a puller wrote to `governance_ocsf_events` under the synthetic `pull:` trace id.
+   * Rows a source wrote to `governance_ocsf_events` itself (see `PULLED_ROW`).
    * The dedup set is the page's keys only (its LIMIT), and carrying each key's
    * EventTime prunes the outer, payload-reading scan to the page's months.
    */
@@ -350,14 +359,14 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
           RawOcsfJson AS rawPayload
         FROM governance_ocsf_events
         WHERE TenantId = {tenantId:String}
-          AND startsWith(TraceId, 'pull:')
+          AND ${PULLED_ROW}
           AND SourceId = {sourceId:String}
           AND EventTime < fromUnixTimestamp64Milli({beforeMs:UInt64})
           AND (TenantId, EventId, LastUpdatedAt, EventTime) IN (
             SELECT TenantId, EventId, max(LastUpdatedAt), argMax(EventTime, LastUpdatedAt) AS LatestTime
             FROM governance_ocsf_events
             WHERE TenantId = {tenantId:String}
-              AND startsWith(TraceId, 'pull:')
+              AND ${PULLED_ROW}
               AND SourceId = {sourceId:String}
               AND EventTime < fromUnixTimestamp64Milli({beforeMs:UInt64})
             GROUP BY TenantId, EventId
@@ -368,6 +377,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         LIMIT {limit:UInt32}
       `,
       query_params: {
+        ...PULLED_ROW_PARAMS,
         tenantId: input.tenantId,
         sourceId: input.sourceId,
         beforeMs: input.beforeMs,
@@ -454,23 +464,24 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
           count() AS c30,
           (SELECT toString(toUnixTimestamp64Milli(max(EventTime)))
            FROM governance_ocsf_events
-           WHERE TenantId = {tenantId:String} AND startsWith(TraceId, 'pull:') AND SourceId = {sourceId:String}) AS lastMs
+           WHERE TenantId = {tenantId:String} AND ${PULLED_ROW} AND SourceId = {sourceId:String}) AS lastMs
         FROM governance_ocsf_events
         WHERE TenantId = {tenantId:String}
-          AND startsWith(TraceId, 'pull:')
+          AND ${PULLED_ROW}
           AND SourceId = {sourceId:String}
           AND EventTime >= fromUnixTimestamp64Milli({since30d:UInt64})
           AND (TenantId, EventId, LastUpdatedAt) IN (
             SELECT TenantId, EventId, max(LastUpdatedAt)
             FROM governance_ocsf_events
             WHERE TenantId = {tenantId:String}
-              AND startsWith(TraceId, 'pull:')
+              AND ${PULLED_ROW}
               AND SourceId = {sourceId:String}
               AND EventTime >= fromUnixTimestamp64Milli({since30d:UInt64})
             GROUP BY TenantId, EventId
           )
       `,
       query_params: {
+        ...PULLED_ROW_PARAMS,
         tenantId: args.tenantId,
         since24h: args.since24h,
         since7d: args.since7d,

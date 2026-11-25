@@ -287,7 +287,9 @@ describe("the ingestion-source receivers", () => {
 
       expect(refused.status).toBe(403);
       expect(response.status).toBe(202);
-      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
+      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(
+        expect.objectContaining({ id: SOURCE_ID }),
+      );
     });
   });
 
@@ -381,7 +383,9 @@ describe("the ingestion-source receivers", () => {
           { key: "langwatch.ingestion_source.id", value: { stringValue: SOURCE_ID } },
         ]),
       );
-      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
+      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(
+        expect.objectContaining({ id: SOURCE_ID }),
+      );
     });
   });
 
@@ -401,7 +405,9 @@ describe("the ingestion-source receivers", () => {
       expect(logCollection).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: "gov_project", organizationId: ORGANIZATION_ID }),
       );
-      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
+      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(
+        expect.objectContaining({ id: SOURCE_ID }),
+      );
     });
   });
 
@@ -474,7 +480,9 @@ describe("the ingestion-source receivers", () => {
       expect(response.status).toBe(202);
       await expect(response.json()).resolves.toMatchObject({ accepted: true, bytes: 15 });
       expect(logCollection).toHaveBeenCalledTimes(1);
-      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
+      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(
+        expect.objectContaining({ id: SOURCE_ID }),
+      );
     });
   });
 

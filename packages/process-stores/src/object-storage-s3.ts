@@ -34,6 +34,7 @@ import {
   secondsUntil,
   StoredObjectNotFoundError,
   type ObjectBackend,
+  uploadRouteOf,
 } from "./object-storage-backend.ts";
 
 const SIGNED_UPLOAD_HEADERS = new Set(["content-type", "content-length"]);
@@ -180,8 +181,12 @@ async function writeObject(options: {
 function idleBounded(body: Readable, key: string, idleMs: number): Readable {
   if (!(body instanceof IncomingMessage)) return body;
   body.setTimeout(idleMs, () => {
-    const stalled = new Error(`S3 sent no bytes of "${key}" for ${idleMs} ms.`);
-    body.destroy(Object.assign(stalled, { name: "TimeoutError" }));
+    const stalled = new Error(
+      `No bytes of "${key}" moved for ${idleMs} ms, so the body was closed to free its connection.`,
+    );
+    body.destroy(
+      Object.assign(stalled, { name: "TimeoutError", code: "storage_body_idle_timeout" }),
+    );
   });
   return body;
 }
@@ -274,6 +279,7 @@ export function s3Backend(options: {
     bucket: options.bucket,
     bodyIdleMs: options.bodyIdleMs ?? S3_IDLE_MS,
   };
+  const uploadRoute = uploadRouteOf(options.uploads);
   return {
     destination: { kind: "s3", bucket: place.bucket },
     write: (at, body, facts) => writeObject({ place, at, body, facts }),
@@ -284,9 +290,10 @@ export function s3Backend(options: {
       await place.client.send(new DeleteObjectCommand({ Bucket: place.bucket, Key: at.key }));
     },
     signUpload: async (at, facts) =>
-      options.uploads === "through-langwatch"
+      uploadRoute === "through-process"
         ? { kind: "through-process" }
         : signObjectUpload({ ...place, clock: options.clock }, at, facts),
+    uploadRoute,
     signDownload: (at, facts) => signObjectDownload({ ...place, clock: options.clock }, at, facts),
     async probe() {
       await place.client.send(new HeadBucketCommand({ Bucket: place.bucket }));

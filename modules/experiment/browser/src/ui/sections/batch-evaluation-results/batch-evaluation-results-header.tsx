@@ -7,6 +7,7 @@ import { BarChart2, Download, ExternalLink } from "react-feather";
 
 import type { ExperimentRow } from "../../../model/experiment-api-map.ts";
 import { RunConcurrencyBadge } from "../../elements/batch-results/run-concurrency-badge.tsx";
+import { RunRepeatBadge } from "../../elements/batch-results/run-repeat-badge.tsx";
 import type { BatchEvaluationData } from "../batch-evaluation-results.types.ts";
 
 type BatchEvaluationResultsHeaderProps = {
@@ -15,6 +16,8 @@ type BatchEvaluationResultsHeaderProps = {
   shownRunId?: string;
   /** Cells the shown run kept in flight; absent for a run that recorded none. */
   shownRunConcurrency?: number | null;
+  /** How many times the shown run repeated every dataset row; absent ran each once. */
+  shownRunRepeat?: number | null;
   data: BatchEvaluationData | null;
   charts: { available: boolean; visible: boolean; onChange: (visible: boolean) => void };
   displayControls: React.ReactNode;
@@ -26,10 +29,12 @@ const ExperimentTitle = ({
   experiment,
   shownRunId,
   shownRunConcurrency,
+  shownRunRepeat,
 }: {
   experiment?: ExperimentRow;
   shownRunId?: string;
   shownRunConcurrency?: number | null;
+  shownRunRepeat?: number | null;
 }) => (
   <HStack gap={1} minWidth={0} overflow="hidden" flexShrink={1}>
     <PageLayout.Heading whiteSpace="nowrap" flexShrink={0}>
@@ -56,6 +61,9 @@ const ExperimentTitle = ({
         focusable
         testId="shown-run-concurrency"
       />
+    ) : null}
+    {experiment && shownRunId && shownRunRepeat && shownRunRepeat > 1 ? (
+      <RunRepeatBadge repeat={shownRunRepeat} testId="shown-run-repeat" />
     ) : null}
   </HStack>
 );
@@ -98,6 +106,7 @@ export const BatchEvaluationResultsHeader = ({
   experiment,
   shownRunId,
   shownRunConcurrency,
+  shownRunRepeat,
   data,
   charts,
   displayControls,
@@ -116,6 +125,7 @@ export const BatchEvaluationResultsHeader = ({
         experiment={experiment}
         shownRunId={shownRunId}
         shownRunConcurrency={shownRunConcurrency}
+        shownRunRepeat={shownRunRepeat}
       />
       <Spacer />
       {charts.available && (

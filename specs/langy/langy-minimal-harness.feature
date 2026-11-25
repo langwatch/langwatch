@@ -21,6 +21,17 @@ Feature: Langy minimal worker
     And the shell, file, skill and todo tools stay available, since Langy
       answers questions whose answers are not in LangWatch's docs
 
+  # A cloud replay passed "$HOME/work/<repo>/file" to read and edit. The file
+  # tools took the text literally, failed with ENOENT, and the model fell back
+  # to sed. A shell spelling of the home folder now means the sandbox home.
+  @unit
+  Scenario: The sandbox file tools read a home folder spelled the way a shell spells it
+    Given a file at "work/agent/main.py" under the worker's home
+    When the model reads, edits or writes it as "$HOME/work/agent/main.py", "${HOME}/work/agent/main.py" or "~/work/agent/main.py"
+    Then the tool works on the file under the worker's home
+    And a "$HOME" that is not at the start of the path is left as written
+    And the tools on the user's machine get the path unchanged
+
   @unit
   Scenario: The worker runs only the skills we ship it
     Given the host account has its own agent skills installed

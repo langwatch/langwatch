@@ -14,6 +14,25 @@ Deploy LangWatch on any Kubernetes cluster using the official Helm chart. The ch
 - A domain name (for Ingress with TLS)
 - **Default resource requirements:** ~5 CPU and ~17 Gi RAM (requests). See [Size Overlays](#size-overlays) for smaller or larger configurations.
 
+<Note>
+The chart's PersistentVolumeClaims use the cluster's default StorageClass. A new EKS cluster (1.33 and later) has none, so the claims stay `Pending` and the pods never start. Install the EBS CSI driver add-on and mark a StorageClass as default, for example:
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+volumeBindingMode: WaitForFirstConsumer
+```
+
+Or name a class in the chart values: `postgresql.primary.persistence.storageClass`, `clickhouse.storage.storageClass`, `redis.master.persistence.storageClass` and `app.storedObjects.localFilesystem.storageClassName`.
+</Note>
+
 ## Quick Start
 
 Deploy LangWatch with all dependencies managed by the chart:
@@ -68,7 +87,7 @@ workers:
     - { name: ADMIN_EMAILS, value: "you@yourcompany.com" }
 ```
 
-Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. Dashboard widgets need both `release_dashboards` and `release_lwql_workbench`. The Query API (`POST /api/v1/query`) works without either.
+Shipped features are on by default on a self-hosted install, including LangWatchQL (`release_lwql_workbench`) and Instant Evals (`release_instant_evals`). Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. The same page switches a feature off. Dashboard widgets need both `release_dashboards` and `release_lwql_workbench`. The Query API (`POST /api/v1/query`) works without either.
 
 ### License
 
@@ -624,6 +643,6 @@ redis:
 For clusters without internet access:
 
 1. Push LangWatch images to your private registry
-2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`, plus the bundled services listed in [Docker Images](/self-hosting/deployment/docker-images#private-registries)
+2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`, `images.pii_redaction_model.repository` (when `piiRedactionModel.enabled`), plus the bundled services listed in [Docker Images](/self-hosting/deployment/docker-images#private-registries)
 3. If your registry requires authentication, attach the pull secret to the ServiceAccount the pods use. The chart has no chart-wide `imagePullSecrets` value; see [Private Registries](/self-hosting/deployment/docker-images#private-registries)
 4. License with a signed license key in `app.license.key`, not an activation code: redeeming a code needs outbound access to `connect.langwatch.ai`

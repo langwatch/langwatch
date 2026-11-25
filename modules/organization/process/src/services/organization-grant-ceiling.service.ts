@@ -1,4 +1,5 @@
 import {
+  BILLING_PERMISSIONS,
   CustomRoleNotAssignableError,
   GrantExceedsCallerPermissionsError,
   permissionsConferred,
@@ -21,6 +22,8 @@ export type OrganizationIntendedGrant = Readonly<{
    * a team not created yet is asked at its organization.
    */
   confersAs?: GrantScopeTier;
+  /** The Billing role (ADR-205): it confers its own bag, whatever `role` says. */
+  billing?: boolean;
 }>;
 
 /**
@@ -60,13 +63,15 @@ export class OrganizationGrantCeilingService {
     if (unknownRoleId) throw new CustomRoleNotAssignableError(unknownRoleId);
 
     for (const grant of grants) {
-      const conferred = [
-        ...permissionsConferred({
-          role: grant.role,
-          scopeType: grant.confersAs ?? grant.scopeType,
-          customPermissions: permissionsByRoleId.get(grant.customRoleId ?? "") ?? [],
-        }),
-      ];
+      const conferred = grant.billing
+        ? [...BILLING_PERMISSIONS]
+        : [
+            ...permissionsConferred({
+              role: grant.role,
+              scopeType: grant.confersAs ?? grant.scopeType,
+              customPermissions: permissionsByRoleId.get(grant.customRoleId ?? "") ?? [],
+            }),
+          ];
       // An anonymous caller answers for nothing: every conferred permission is beyond it.
       const missing =
         caller.type === "anonymous"

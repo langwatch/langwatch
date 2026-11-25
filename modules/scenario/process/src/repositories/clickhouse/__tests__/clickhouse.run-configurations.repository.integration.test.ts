@@ -122,6 +122,8 @@ async function runBatch(params: {
   note?: string;
   simulatorModel?: string | null;
   judgeModel?: string | null;
+  traceQuietPeriodMs?: number;
+  traceWaitTimeoutMs?: number;
   /** When the runs of this batch started, epoch ms. */
   runAt: number;
 }): Promise<void> {
@@ -154,6 +156,12 @@ async function runBatch(params: {
               scenarioVersion: 1,
               ...(params.simulatorModel ? { simulatorModel: params.simulatorModel } : {}),
               ...(params.judgeModel ? { judgeModel: params.judgeModel } : {}),
+              ...(params.traceQuietPeriodMs !== undefined
+                ? { traceQuietPeriodMs: params.traceQuietPeriodMs }
+                : {}),
+              ...(params.traceWaitTimeoutMs !== undefined
+                ? { traceWaitTimeoutMs: params.traceWaitTimeoutMs }
+                : {}),
             },
             ...withNote(params.note),
             ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
@@ -421,6 +429,35 @@ describe.skipIf(databaseUrl === null)("the previous configurations of a scope", 
 
       expect(entries[0]!.configuration.simulatorModel).toBe("openai/gpt-5-mini");
       expect(entries[0]!.configuration.judgeModel).toBe("openai/gpt-5");
+    });
+  });
+
+  describe("given a plan run with judge trace wait settings", () => {
+    /** @scenario "The run history offers back the judge trace wait settings a plan ran with" */
+    it("carries both back, and tells them apart from the same plan run without them", async () => {
+      const suiteId = `suite-${nanoid()}`;
+      const scenarioId = `scenario-${nanoid()}`;
+
+      await runBatch({
+        suiteId,
+        scenarioIds: [scenarioId],
+        traceQuietPeriodMs: 20_000,
+        traceWaitTimeoutMs: 90_000,
+        runAt: NOW - HOUR_MS,
+      });
+      await runBatch({ suiteId, scenarioIds: [scenarioId], runAt: NOW - 2 * HOUR_MS });
+
+      const entries = await readConfigurations([plan({ id: suiteId })]);
+
+      expect(entries).toHaveLength(2);
+      expect(entries[0]!.configuration).toMatchObject({
+        traceQuietPeriodMs: 20_000,
+        traceWaitTimeoutMs: 90_000,
+      });
+      expect(entries[1]!.configuration).toMatchObject({
+        traceQuietPeriodMs: null,
+        traceWaitTimeoutMs: null,
+      });
     });
   });
 

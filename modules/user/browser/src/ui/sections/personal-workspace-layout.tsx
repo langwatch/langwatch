@@ -1,5 +1,5 @@
 /**
- * Frame for /me/* pages (container only; chrome belongs to route tree).
+ * Frame for /coding-agents/* pages (container only; chrome belongs to route tree).
  */
 
 import { Box, Container } from "@langwatch/design-system/primitives";

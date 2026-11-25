@@ -1,5 +1,5 @@
 Feature: AI Tools Portal — model-provider tile → VK bridge
-  As a user clicking a model-provider tile on /me
+  As a user clicking a model-provider tile on /coding-agents
   I want inline VK creation that reuses the existing personalVirtualKeys flow
   So that the catalog entry's suggestedRoutingPolicyId binds the new VK without admin intervention
 

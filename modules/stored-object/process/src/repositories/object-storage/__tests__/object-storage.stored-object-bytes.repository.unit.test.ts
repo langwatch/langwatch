@@ -39,6 +39,7 @@ function recordingStorage() {
       reached.push("signUpload");
       return inner.signUpload(at, facts);
     },
+    uploadRoute: (projectId) => inner.uploadRoute(projectId),
     signDownload: (at, facts) => inner.signDownload(at, facts),
     destination: (projectId) => inner.destination(projectId),
     probe: (projectId) => inner.probe(projectId),

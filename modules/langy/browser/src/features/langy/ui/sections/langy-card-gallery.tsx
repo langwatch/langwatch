@@ -43,7 +43,10 @@ import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx"
 import { LangyCapabilityPendingCard } from "./capabilities/langy-capability-pending-card.tsx";
 import { LangyCapabilityRenderer } from "./capabilities/langy-capability-renderer.tsx";
 import { LangyDerivedCardsTestingGround } from "./derived-cards/langy-derived-cards-testing-ground.tsx";
-import { LangyGitHubConnectCard } from "./github/langy-git-hub-connect-card.tsx";
+import {
+  LangyGitHubConnectCard,
+  LangyGitHubNotSetUpCard,
+} from "./github/langy-git-hub-connect-card.tsx";
 import { LangyError } from "./langy-error.tsx";
 import { LangyFeedback } from "./langy-feedback.tsx";
 import { LangyLocalPermissionCard } from "./langy-local-permission-card.tsx";
@@ -475,6 +478,7 @@ export function LangyCardGallery() {
 
       <Section title="GitHub">
         <LangyGitHubConnectCard organizationId="gallery" />
+        <LangyGitHubNotSetUpCard onShareLocalFolder={() => undefined} />
         <LangyGitHubProgressCard
           live
           events={[

@@ -25,6 +25,12 @@ import {
 } from "./lifecycle/liveness-thread.ts";
 import { NOT_HANDLED_DRAINING, NOT_HANDLED_HEADER } from "./lifecycle/not-handled.ts";
 import {
+  holdRequestBody,
+  listenerRequestTimeoutMs,
+  REQUEST_BODY_TIMEOUT_MS,
+  type LongRequestBody,
+} from "./lifecycle/request-body-deadline.ts";
+import {
   HANDLER_UNWIND_MS,
   HTTP_CLOSE_PHASE_MS,
   HTTP_DRAIN_GRACE_MS,
@@ -61,6 +67,10 @@ export type ServerOptions = Readonly<{
    * door is on for every process regardless of whether it configured one.
    */
   healthPort?: number;
+  /** Routes whose body may outlast the short bound; every other body is held to it (#9666). */
+  longRequestBodies?: readonly LongRequestBody[];
+  /** The short bound, Node's 300s unless a test shortens it. */
+  requestBodyTimeoutMs?: number;
 }>;
 
 /**
@@ -126,6 +136,8 @@ export class Server {
       // An embedded server's process stays up, so a timed-out drain must still release the door.
       terminating: options.ownsProcess !== false,
     });
+    server.longRequestBodies = options.longRequestBodies ?? [];
+    server.requestBodyTimeoutMs = options.requestBodyTimeoutMs ?? REQUEST_BODY_TIMEOUT_MS;
     // Hosted first, so it stops LAST: the health door outlives every drain
     // phase, and a probe during shutdown still sees the process as alive.
     server.health = server.createHealthComponent(options.healthPort);
@@ -152,6 +164,8 @@ export class Server {
   private served: ApplicationHandler | undefined;
   private applicationExpected = false;
   private healthListener: http.Server | undefined;
+  private longRequestBodies: readonly LongRequestBody[] = [];
+  private requestBodyTimeoutMs = REQUEST_BODY_TIMEOUT_MS;
   /** Set by `run`: a process with no HTTP surface answers liveness off its main loop. */
   private livenessOffLoop = false;
   private livenessThread: LivenessThread | undefined;
@@ -260,6 +274,25 @@ export class Server {
     await this.livenessThread?.liftConsole();
   }
 
+  /** Node's own answer to a body that outlived its route's bound: a 408, then the socket closes. */
+  private cutSlowBody({
+    request,
+    response,
+    allowedMs,
+  }: {
+    request: IncomingMessage;
+    response: ServerResponse;
+    allowedMs: number;
+  }): void {
+    const path = (request.url ?? "").split("?")[0];
+    const fields = { path, timeoutMs: allowedMs, door: "main" };
+    if (this.logger.warn)
+      this.logger.warn(fields, "request body took longer than its route allows");
+    else this.logger.info(fields, "request body took longer than its route allows");
+    if (response.headersSent) request.socket.destroy();
+    else answerClientError({ code: "ERR_HTTP_REQUEST_TIMEOUT", socket: request.socket });
+  }
+
   /** Node's own answer to a request it could not parse, with one line saying what it was. */
   private refuseUnparsed(error: ClientError, socket: Duplex): void {
     if (isLoggedClientError(error.code)) {
@@ -293,7 +326,9 @@ export class Server {
           this.refuseUnparsed(error, socket),
         );
         // The liveness thread's public listener takes the same timeouts (#9666).
-        Object.assign(listener, PUBLIC_LISTENER_TIMEOUTS);
+        Object.assign(listener, PUBLIC_LISTENER_TIMEOUTS, {
+          requestTimeout: listenerRequestTimeoutMs(this.longRequestBodies),
+        });
         if (this.livenessOffLoop) {
           this.livenessThread = await this.startOffLoop(listener, port ?? 0);
         }
@@ -338,6 +373,7 @@ export class Server {
         readiness: this.readiness.buffer as SharedArrayBuffer,
         proxyPort: loopback.port,
         logger: this.logger,
+        requestTimeoutMs: listener.requestTimeout,
       });
       this.heartbeat = heartbeat;
       return thread;
@@ -353,6 +389,12 @@ export class Server {
   }
 
   private handleHealthRequest(request: IncomingMessage, response: ServerResponse): void {
+    holdRequestBody({
+      request,
+      longBodies: this.longRequestBodies,
+      timeoutMs: this.requestBodyTimeoutMs,
+      onExpired: (allowedMs) => this.cutSlowBody({ request, response, allowedMs }),
+    });
     if (request.url === LIVENESS_PATH) {
       response.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
       return;
