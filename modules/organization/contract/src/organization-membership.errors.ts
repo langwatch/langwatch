@@ -145,6 +145,20 @@ export class MemberSeatLimitReachedError extends HandledError {
   }
 }
 
+/** A failed payment is unpaid: no new member or seat until the card is updated. */
+export class MemberAdditionsHeldForPaymentError extends HandledError {
+  declare readonly code: "member_additions_held_for_payment";
+
+  constructor() {
+    super(
+      "member_additions_held_for_payment",
+      "A payment failed. Update the card on file to add members.",
+      { httpStatus: 402, fault: "customer" },
+    );
+    this.name = "MemberAdditionsHeldForPaymentError";
+  }
+}
+
 /** Another seat change on the organization held its seat lock for the whole wait. */
 export class SeatChangeBusyError extends HandledError {
   declare readonly code: "seat_change_busy";

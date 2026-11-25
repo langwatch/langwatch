@@ -15,6 +15,7 @@ function collect(options: {
   recordFails?: boolean;
   contributionFails?: boolean;
   truncated?: boolean;
+  outputDeclared?: boolean;
 }) {
   const recorded: CanonicalLogRecord[][] = [];
   const contributed: LogTraceContribution[][] = [];
@@ -32,7 +33,8 @@ function collect(options: {
     }),
     extractLogRecordIO: () => ({
       input: "prompt",
-      output: null,
+      output: options.outputDeclared ? "posted reply" : null,
+      outputDeclared: options.outputDeclared ?? false,
       truncated: options.truncated ?? false,
     }),
     recordLogContributions: async (data) => {
@@ -108,6 +110,17 @@ describe("LogRequestCollectionService", () => {
       expect(contributed[0]?.[0]?.liftedAttributes["langwatch.reserved.log_io_truncated"]).toBe(
         true,
       );
+    });
+
+    /** @scenario A declared output is kept over the agent's later closing text */
+    it("carries a declared output to Trace as declared", async () => {
+      const { result, contributed } = collect({
+        accepted: [preparedLog({})],
+        outputDeclared: true,
+      });
+
+      await result;
+      expect(contributed[0]?.[0]).toMatchObject({ output: "posted reply", outputDeclared: true });
     });
   });
 

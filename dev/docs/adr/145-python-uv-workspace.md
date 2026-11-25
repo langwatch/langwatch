@@ -64,6 +64,19 @@ The shared lock resolves against the intersection of the members'
 released ksuid version ever claimed it, the floor was raised rather than
 carving the member out of the workspace.
 
+The lock may resolve for less than that intersection only through
+`environments` in the root `[tool.uv]`, and only to raise the Python patch
+floor when a security fix needs it: soupsieve 4 (a transitive of nbconvert)
+requires Python 3.11.5, so the lock resolves for `python_full_version >=
+'3.11.5'` instead of forking an unpatched beautifulsoup4 onto 3.11.0-3.11.4.
+The same entry leaves out `sys_platform == 'emscripten'`: once
+`environments` is set, uv needs a wheel for each environment, and faiss-cpu
+(an SDK example dependency) ships none for Pyodide.
+The members' published `requires-python` stays as it is, because a narrower
+lock changes nothing for people installing the packages from PyPI. The root
+and `sdks/python` `.python-version` files ask for the same floor, so uv skips
+an older interpreter on the machine and fetches one the lock supports.
+
 ## Consequences
 
 - One `uv.lock` at the root; member lockfiles are deleted and must not
@@ -72,7 +85,7 @@ carving the member out of the workspace.
   that path-filter on a member also watch `uv.lock`, `pyproject.toml` and
   `.python-version` at the root — a re-lock re-pins every member.
 - A matrix job that installs several interpreters must set `UV_PYTHON`;
-  the root `.python-version` (3.11) would otherwise pin every leg.
+  the root `.python-version` (`>=3.11.5,<3.12`) would otherwise pin every leg.
 - The root `.venv` is shared and synced exactly: syncing one member prunes
   another's dev packages until the next `uv sync`/`uv run` there. Harmless
   locally (uv re-syncs per `uv run`), irrelevant in CI (separate runners).

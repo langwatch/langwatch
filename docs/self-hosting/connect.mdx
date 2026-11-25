@@ -55,7 +55,9 @@ Setting the code in `LANGWATCH_LICENSE_KEY` or `app.license.key` instead redeems
 
 The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a new key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
 
-The paste and the file upload stay on the License page for an air-gapped install, which receives a signed license key from LangWatch and enters it with **Enter license key** or **Upload license file**. Neither needs a connection. The page detects the form, so a value pasted under the other option is still accepted. The install still sends the daily usage report unless you switch it off, see [Air-gapped installs and existing licenses](#air-gapped-installs-and-existing-licenses).
+The paste and the file upload stay on the License page for an air-gapped install, which receives a signed license key from LangWatch and enters it with **Enter license key** or **Upload license file**. Neither needs a connection.
+
+The page detects the form, so a value pasted under the other option is still accepted. The install still sends the daily usage report unless you switch it off, see [Air-gapped installs and existing licenses](#air-gapped-installs-and-existing-licenses).
 
 ## Endpoints and variables
 
@@ -143,7 +145,9 @@ A delivered license that does not verify is not applied. The install keeps the l
 
 ## Instant Evals through Connect
 
-An install whose license names **Instant Evals** judges through LangWatch. The license turns them on, with no release flag to set. A self-hosted install cannot judge with a key of its own, so without Connect its eval functions are published as unavailable. Judging on your own infrastructure is planned for a later release. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+An install whose license names **Instant Evals** judges through LangWatch. The license turns them on, with no release flag to set. Without Connect, a project can still run Instant Evals on its own decision model and key, picked in the Instant Evals column of **Settings, Default models** (see [Run Instant Evals on your own decision model](/features/instant-evals/own-model)). That needs no license and no release flag.
+
+A project with neither publishes its eval functions as unavailable. An organization whose admin switched off judging through LangWatch publishes them as unavailable too, so a query never comes back with judged columns that are all empty. A project on its own decision model is not affected by that switch.
 
 When a sentence typed in trace search can't be judged, the popover under the search bar says why:
 
@@ -152,11 +156,9 @@ When a sentence typed in trace search can't be judged, the popover under the sea
 | Your license doesn't include Instant Evals | Contact us to add them to your license. |
 | Instant Evals are switched off for your organization | An organization admin switches them back on in **Settings, Connect**. |
 | This install isn't connected to LangWatch | Switch Connect on, and allow outbound HTTPS to `connect.langwatch.ai` and `gateway.langwatch.ai`. |
-| Instant Evals are off on this install | The install has judging turned off. Whoever runs it sets `RELEASE_INSTANT_EVALS=1`, with a judge configured. |
+| Instant Evals are off on this install | The install has judging turned off. Whoever runs it configures a judge, or the project picks its own decision model in the Instant Evals column of **Settings, Default models**. |
 
 On an install that judges through LangWatch, the "Instant Evals can't run right now" popover also names both addresses, so check that they are still reachable.
-
-With `RELEASE_INSTANT_EVALS=1` set, the four popovers above never show: a sentence that can't be judged gets "Instant Evals can't run right now" instead, whatever the reason. An install that judges through LangWatch needs no flag, so remove it there to get the popover that says why.
 
 Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
 

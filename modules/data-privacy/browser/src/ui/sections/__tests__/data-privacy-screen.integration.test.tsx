@@ -25,6 +25,7 @@ import {
   DataPrivacyHostProvider,
   type PrivacyFailureNotice,
   type PrivacyHostScope,
+  type PrivacyLicence,
   type PrivacyRouteReading,
   type PrivacySuccessNotice,
 } from "../../../model/data-privacy-host.ts";
@@ -115,6 +116,14 @@ class TestPrivacyHost extends DataPrivacyHostApi {
 
   failed(failure: PrivacyFailureNotice): void {
     this.failures.push(failure);
+  }
+
+  licence(): PrivacyLicence {
+    return "unknown";
+  }
+
+  mayManageLicence(): boolean {
+    return false;
   }
 }
 

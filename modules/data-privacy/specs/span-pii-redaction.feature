@@ -57,6 +57,13 @@ Feature: Redacting personal data out of a span at ingestion
     And a selection the native engine covers entirely makes no external call
 
   @unit
+  Scenario: The analysis request turns off every identifier the call did not ask for
+    Given a custom selection whose only analysis-service identifier is person names
+    When the batch is sent to the analysis service
+    Then the request asks for person names
+    And it turns off credit card numbers, email addresses and every other identifier by name
+
+  @unit
   Scenario: An explicit policy level beats the level the ingestion call asked for
     Given a scope whose resolved policy names a level other than the platform default
     When a process redacts a span whose ingestion call asked for a different level
@@ -259,11 +266,12 @@ Feature: Redacting personal data out of a span at ingestion
     Then the model answers it and Presidio is not called
 
   @unit
-  Scenario: Only a resolved strict policy reaches the PII redaction model
+  Scenario: Only a batch whose effective PII level is strict reaches the PII redaction model
     Given a deployment that names the PII redaction model
     And the project's organization is allowlisted for it
     When a batch whose request level is STRICT is analysed
     Then the model answers it when the project's resolved policy is strict, for spans and log records alike
+    And the model answers it when the resolved policy is essential, which the STRICT request raises to strict
     And Presidio answers it when the resolved policy is custom, even with every analysis-service entity selected
     And Presidio answers it when the project's policy could not be loaded
     And in both of those cases the model is not called and the flag is not read
@@ -275,6 +283,49 @@ Feature: Redacting personal data out of a span at ingestion
     When a strict batch is analysed
     Then Presidio answers it and the model is not called
     And a span redacted through the whole module never invokes the model's Lambda
+
+  # Self-hosted, the model comes with the Enterprise licence and has no usage price. Routing
+  # follows the organization's active plan. Unlike SSO, an expired licence does not keep the
+  # model: entitlement resolves it to the baseline plan, so the batch stays on Presidio.
+
+  @unit
+  Scenario: A self-hosted organization without an Enterprise licence keeps the Presidio path
+    Given a self-hosted deployment that names the PII redaction model, with its flag forced on
+    And the organization's active plan is not Enterprise
+    When a strict batch is analysed
+    Then Presidio answers it and the model is not called
+    And the batch is counted with the reason not_licensed
+    And the organization logs one usage line a minute at most, not one per batch
+    And nothing is priced
+
+  @unit
+  Scenario: A self-hosted organization with an Enterprise licence goes to the PII redaction model
+    Given a self-hosted deployment that names the PII redaction model, with its flag forced on
+    And the organization's active plan is Enterprise
+    When a strict batch is analysed
+    Then the model answers it and Presidio is not called
+
+  @unit
+  Scenario: A self-hosted organization whose Enterprise licence expired keeps the Presidio path
+    Given a self-hosted deployment that names the PII redaction model, with its flag forced on
+    And the organization's Enterprise licence has expired, so its active plan is the baseline plan
+    When a strict batch is analysed
+    Then Presidio answers it and the model is not called
+    And the batch is counted with the reason not_licensed
+
+  @unit
+  Scenario: A self-hosted organization's plan is read once a minute
+    Given a self-hosted deployment that names the PII redaction model, with its flag forced on
+    When several strict batches of one organization are analysed within a minute
+    Then the organization's plan is read once
+    And a plan that cannot be read sends the batch to Presidio with the reason routing_error
+
+  @unit
+  Scenario: LangWatch Cloud routes the model without reading the plan
+    Given a LangWatch Cloud deployment that names the PII redaction model
+    And the organization is allowlisted for it, on a plan other than Enterprise
+    When a strict batch is analysed
+    Then the model answers it and the plan is not read
 
   @unit
   Scenario: A model failure falls back to Presidio, never to unredacted text

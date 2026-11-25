@@ -7,15 +7,18 @@ const SHORT_TRACE_ID_LENGTH = 8;
 /**
  * What the bottom bar's prompt line reads. A trace with no name of its own is named after one
  * of its spans, or after its own id on a logs-only trace. The user typed neither, so the
- * session's first prompt stands in; null when there is none, never the stand-in.
+ * session's own name stands in, then its first prompt; null when there is none of them.
  */
 export function promptLineText({
   sessionName,
+  declaredSessionName = null,
   traceId,
   spans,
   entries,
 }: {
   sessionName: string | null | undefined;
+  /** The session's name off its session row or its `langwatch.session.name` resource. */
+  declaredSessionName?: string | null;
   traceId: string;
   spans: SpanDetail[];
   entries: TranscriptEntry[];
@@ -24,6 +27,9 @@ export function promptLineText({
   const isIdPrefix = name.length >= SHORT_TRACE_ID_LENGTH && traceId.startsWith(name);
   const isStandIn = isIdPrefix || spans.some((span) => span.name === name);
   if (name.length > 0 && !isStandIn) return name;
+
+  const declared = declaredSessionName?.trim() ?? "";
+  if (declared.length > 0) return declared;
 
   for (const entry of entries) {
     if (entry.kind !== "user_prompt" || entry.text === null) continue;
@@ -88,6 +94,8 @@ export function toolPrimaryArg(input: unknown): string | null {
       ([key]) =>
         key === "file_path" ||
         key === "command" ||
+        // A Code Mode script's Bash call names its whole command line here.
+        key === "full_command" ||
         key === "path" ||
         key === "url" ||
         key === "query" ||

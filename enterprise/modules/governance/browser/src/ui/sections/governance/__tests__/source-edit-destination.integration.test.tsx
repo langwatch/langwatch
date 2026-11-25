@@ -23,8 +23,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
-import { SourceEditDrawer } from "../governance-inventory.screen.tsx";
 import type { Source } from "../ingestion-source-forms.ts";
+import { SourceEditDrawer } from "../inventory/source-edit-drawer.tsx";
 
 function sourceRow(overrides: Partial<Source>): Source {
   return {

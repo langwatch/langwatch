@@ -13,41 +13,64 @@ import (
 	"github.com/langwatch/langwatch/tools/ciguard"
 )
 
-// prReviewBotPermissionsBlock is the workflow's `permissions:` block, kept as its own constant so it stays in sync with the tests that strip or replace it.
-const prReviewBotPermissionsBlock = `permissions:
-  contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
-  pull-requests: write
+// prReviewBotPermissionsBlock is the review job's `permissions:` block, kept as its own constant so it stays in sync with the tests that strip or replace it.
+const prReviewBotPermissionsBlock = `    permissions:
+      actions: read
+      checks: read
+      contents: write # so the default token can call resolveReviewThread; read would only lose thread auto-resolution
+      pull-requests: write
 `
 
-// goodPRReviewBotWorkflow mirrors .github/workflows/pr-review-bot.yml as it
-// stands when every invariant holds. Individual tests mutate one clause of
+// prWorkflowPermissionsBlock is pr.yml's own block, which the review job's replaces.
+const prWorkflowPermissionsBlock = `permissions:
+  contents: read
+`
+
+// prReviewBotWaitStep is the review job's wait step.
+const prReviewBotWaitStep = `      - run: go run ./cmd/waitforchecks
+        timeout-minutes: 50
+`
+
+// goodPRReviewBotWorkflow mirrors the review job of .github/workflows/pr.yml as
+// it stands when every invariant holds. Individual tests mutate one clause of
 // it at a time so each failure mode is isolated.
-const goodPRReviewBotWorkflow = `name: PR Review Bot
+const goodPRReviewBotWorkflow = `name: pr
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
 
-` + prReviewBotPermissionsBlock + `
+` + prWorkflowPermissionsBlock + `
 concurrency:
-  group: pr-review-bot-${{ github.event.pull_request.number }}
+  group: pr-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   review:
+    needs: ci-complete
     if: |
+      !cancelled() &&
+      needs.ci-complete.result == 'success' &&
+      github.event_name == 'pull_request' &&
+      contains(fromJSON('["opened","synchronize","reopened","ready_for_review"]'), github.event.action) &&
       github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    steps:
+    timeout-minutes: 100
+` + prReviewBotPermissionsBlock + `    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: langwatch/langwatch-pr-review-bot@7ff0638fa8cb21fb3f94f8a12b893c6d5446e521 # main 2026-09-22
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+` + prReviewBotWaitStep + `      - uses: langwatch/langwatch-pr-review-bot@7ff0638fa8cb21fb3f94f8a12b893c6d5446e521 # main 2026-09-22
         with:
           slack_notify: "false"
+          review_timeout_minutes: 20
           claude_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           langwatch_ingest_key: ${{ secrets.LANGWATCH_INGEST_KEY }}
 `
@@ -107,6 +130,63 @@ func TestPRReviewBotGatesOnDraft(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, problems)
 	assert.Contains(t, strings.Join(problems, "\n"), "draft")
+}
+
+// @scenario "The review starts only after CI passed"
+func TestPRReviewBotGatesOnCIComplete(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "      needs.ci-complete.result == 'success' &&\n", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "ci-complete")
+}
+
+// @scenario "The review still starts when CI skipped checks the change does not reach"
+func TestPRReviewBotStartsWhenCISkippedACall(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "      !cancelled() &&\n", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "skipped call")
+}
+
+// @scenario "The review starts only after CI passed"
+func TestPRReviewBotWaitsForCIComplete(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "    needs: ci-complete\n", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "needs: ci-complete")
+}
+
+func TestPRReviewBotAcceptsCICompleteInANeedsList(t *testing.T) {
+	listed := strings.Replace(goodPRReviewBotWorkflow, "    needs: ci-complete\n", "    needs: [changes, ci-complete]\n", 1)
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, listed))
+
+	require.NoError(t, err)
+	assert.Empty(t, problems)
+}
+
+// @scenario "The merge queue gets no review"
+func TestPRReviewBotStaysOutOfTheMergeQueue(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "      github.event_name == 'pull_request' &&\n", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "pull request")
 }
 
 func TestPRReviewBotReportsAMissingReviewJob(t *testing.T) {
@@ -176,6 +256,115 @@ func TestPRReviewBotTriggersOnReadyForReview(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "pull_request types")
 }
 
+// @scenario "The review waits for every other check on the head commit"
+func TestPRReviewBotWaitsForTheOtherChecks(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, prReviewBotWaitStep, "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), `no step running "go run ./cmd/waitforchecks"`)
+}
+
+// A failed wait fails the job, so the only way the bot runs on a red change is
+// to run before the wait.
+// @scenario "The review does not start when another check failed"
+func TestPRReviewBotRunsTheWaitBeforeTheBot(t *testing.T) {
+	botAt := strings.Index(goodPRReviewBotWorkflow, "      - uses: langwatch")
+	require.GreaterOrEqual(t, botAt, 0)
+	bot := goodPRReviewBotWorkflow[botAt:]
+	moved := strings.Replace(goodPRReviewBotWorkflow, bot, "", 1)
+	moved = strings.Replace(moved, prReviewBotWaitStep, bot+prReviewBotWaitStep, 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, moved)
+	root := writePRReviewBotWorkflow(t, moved)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "runs the bot before the wait")
+}
+
+// A wait that cannot fail, or can be skipped, lets the bot run on a red change.
+// @scenario "The review does not start when another check failed"
+func TestPRReviewBotRejectsAWaitThatCannotFailTheJob(t *testing.T) {
+	const wait = "go run ./cmd/waitforchecks"
+	cases := map[string]struct{ step, want string }{
+		"continue-on-error": {
+			step: "      - continue-on-error: true\n        run: " + wait + "\n",
+			want: "continue-on-error",
+		},
+		"continue-on-error expression": {
+			step: "      - continue-on-error: ${{ always() }}\n        run: " + wait + "\n",
+			want: "continue-on-error",
+		},
+		"own if": {
+			step: "      - if: always()\n        run: " + wait + "\n",
+			want: "`if:` of its own",
+		},
+		"or true": {
+			step: "      - run: " + wait + " || true\n",
+			want: "swallows",
+		},
+		"or colon": {
+			// Quoted: a bare `|| :` is invalid YAML in a plain scalar.
+			step: "      - run: '" + wait + " || :'\n",
+			want: "swallows",
+		},
+		"semicolon true": {
+			step: "      - run: " + wait + "; true\n",
+			want: "swallows",
+		},
+		"or exit 0": {
+			step: "      - run: " + wait + " || exit 0\n",
+			want: "swallows",
+		},
+		"set +e": {
+			step: "      - run: |\n          set +e\n          " + wait + "\n",
+			want: "swallows",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			broken := strings.Replace(goodPRReviewBotWorkflow, prReviewBotWaitStep, tc.step, 1)
+			require.NotEqual(t, goodPRReviewBotWorkflow, broken)
+
+			problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, broken))
+
+			require.NoError(t, err)
+			assert.Contains(t, strings.Join(problems, "\n"), tc.want)
+		})
+	}
+}
+
+// @scenario "The review does not start when another check failed"
+func TestPRReviewBotRequiresTheBotStepAfterTheWait(t *testing.T) {
+	botAt := strings.Index(goodPRReviewBotWorkflow, "      - uses: langwatch")
+	require.GreaterOrEqual(t, botAt, 0)
+	broken := goodPRReviewBotWorkflow[:botAt]
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, broken))
+
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(problems, "\n"), "has no langwatch/langwatch-pr-review-bot@ step after the wait")
+}
+
+// @scenario "Review does not run on other pull request event types"
+func TestPRReviewBotLimitsTheJobToTheFourEventTypes(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow,
+		`      contains(fromJSON('["opened","synchronize","reopened","ready_for_review"]'), github.event.action) &&`+"\n", "", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, broken)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), "event type")
+}
+
 // @scenario "In-progress review is canceled for the same PR"
 func TestPRReviewBotCancelsInProgressRunsForTheSamePR(t *testing.T) {
 	noCancel := strings.Replace(goodPRReviewBotWorkflow, "cancel-in-progress: true", "cancel-in-progress: false", 1)
@@ -190,7 +379,7 @@ func TestPRReviewBotCancelsInProgressRunsForTheSamePR(t *testing.T) {
 
 func TestPRReviewBotRequiresTheGroupToKeyOnThePR(t *testing.T) {
 	ungrouped := strings.Replace(goodPRReviewBotWorkflow,
-		"group: pr-review-bot-${{ github.event.pull_request.number }}", "group: pr-review-bot", 1)
+		"group: pr-${{ github.event.pull_request.number || github.ref }}", "group: pr", 1)
 	root := writePRReviewBotWorkflow(t, ungrouped)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -200,7 +389,7 @@ func TestPRReviewBotRequiresTheGroupToKeyOnThePR(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "does not key on the PR number")
 }
 
-// @scenario "The review workflow grants exactly contents write and pull-requests write"
+// @scenario "The review workflow grants exactly actions read, checks read, contents write and pull-requests write"
 func TestPRReviewBotRequiresContentsWrite(t *testing.T) {
 	withRead := strings.Replace(goodPRReviewBotWorkflow,
 		"  contents: write",
@@ -216,18 +405,30 @@ func TestPRReviewBotRequiresContentsWrite(t *testing.T) {
 
 func TestPRReviewBotReportsAMissingPermissionsBlock(t *testing.T) {
 	broken := strings.Replace(goodPRReviewBotWorkflow, prReviewBotPermissionsBlock, "", 1)
+	broken = strings.Replace(broken, prWorkflowPermissionsBlock, "", 1)
 	root := writePRReviewBotWorkflow(t, broken)
 
 	problems, err := ciguard.PRReviewBot(root)
 
 	require.NoError(t, err)
 	require.NotEmpty(t, problems)
-	assert.Contains(t, strings.Join(problems, "\n"), "declares no top-level permissions block")
+	assert.Contains(t, strings.Join(problems, "\n"), "declares no permissions block")
+}
+
+func TestPRReviewBotRequiresChecksRead(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "      checks: read\n", "", 1)
+	root := writePRReviewBotWorkflow(t, broken)
+
+	problems, err := ciguard.PRReviewBot(root)
+
+	require.NoError(t, err)
+	require.NotEmpty(t, problems)
+	assert.Contains(t, strings.Join(problems, "\n"), `missing "checks"`)
 }
 
 func TestPRReviewBotReportsAMissingRequiredPermissionKey(t *testing.T) {
 	withoutPullRequests := strings.Replace(goodPRReviewBotWorkflow,
-		"  pull-requests: write\n", "", 1)
+		"      pull-requests: write\n", "", 1)
 	root := writePRReviewBotWorkflow(t, withoutPullRequests)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -238,7 +439,7 @@ func TestPRReviewBotReportsAMissingRequiredPermissionKey(t *testing.T) {
 }
 
 func TestPRReviewBotRejectsShorthandPermissions(t *testing.T) {
-	shorthand := strings.Replace(goodPRReviewBotWorkflow, prReviewBotPermissionsBlock, "permissions: write-all\n", 1)
+	shorthand := strings.Replace(goodPRReviewBotWorkflow, prReviewBotPermissionsBlock, "    permissions: write-all\n", 1)
 	root := writePRReviewBotWorkflow(t, shorthand)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -250,8 +451,8 @@ func TestPRReviewBotRejectsShorthandPermissions(t *testing.T) {
 
 func TestPRReviewBotRejectsExtraPermissions(t *testing.T) {
 	withExtra := strings.Replace(goodPRReviewBotWorkflow,
-		"  pull-requests: write",
-		"  pull-requests: write\n  issues: write", 1)
+		"      pull-requests: write",
+		"      pull-requests: write\n      issues: write", 1)
 	root := writePRReviewBotWorkflow(t, withExtra)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -262,11 +463,26 @@ func TestPRReviewBotRejectsExtraPermissions(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "extra")
 }
 
-// @scenario "The review workflow grants exactly contents write and pull-requests write"
+// The extra-key message lists every required key, so it never tells a reader
+// to drop a grant the guard then reports as missing.
+// @scenario "The review workflow grants exactly actions read, checks read, contents write and pull-requests write"
+func TestPRReviewBotExtraPermissionMessageNamesEveryRequiredKey(t *testing.T) {
+	withExtra := strings.Replace(goodPRReviewBotWorkflow,
+		"      pull-requests: write",
+		"      pull-requests: write\n      issues: write", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, withExtra, "the mutation must apply")
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, withExtra))
+
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(problems, "\n"), "only actions, checks, contents, pull-requests are needed")
+}
+
+// @scenario "The review workflow grants exactly actions read, checks read, contents write and pull-requests write"
 func TestPRReviewBotUsesJobLevelPermissionsWhenPresent(t *testing.T) {
-	overridden := strings.Replace(goodPRReviewBotWorkflow,
-		"  review:\n    if:",
-		"  review:\n    permissions:\n      contents: read\n      pull-requests: write\n    if:", 1)
+	overridden := strings.Replace(goodPRReviewBotWorkflow, prWorkflowPermissionsBlock,
+		"permissions:\n  contents: write\n  pull-requests: write\n", 1)
+	overridden = strings.Replace(overridden, "      contents: write", "      contents: read", 1)
 	root := writePRReviewBotWorkflow(t, overridden)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -322,6 +538,7 @@ func TestPRReviewBotAcceptsALocalCompositeAction(t *testing.T) {
 		"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n",
 		"      - uses: ./.github/actions/go-build-cache\n"+
 			"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, withLocalAction, "the mutation must apply")
 	root := writePRReviewBotWorkflow(t, withLocalAction)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -342,22 +559,22 @@ func TestPRReviewBotReportsMissingTriggerTypes(t *testing.T) {
 	assert.Contains(t, strings.Join(problems, "\n"), "declares no pull_request")
 }
 
-func TestPRReviewBotReportsAnExtraTriggerType(t *testing.T) {
-	broken := strings.Replace(goodPRReviewBotWorkflow,
+// pr.yml is shared with the product checks, so an extra type is not the review
+// guard's to forbid.
+func TestPRReviewBotAcceptsAnExtraTriggerType(t *testing.T) {
+	extra := strings.Replace(goodPRReviewBotWorkflow,
 		"types: [opened, synchronize, reopened, ready_for_review]",
 		"types: [opened, synchronize, reopened, ready_for_review, edited]", 1)
-	root := writePRReviewBotWorkflow(t, broken)
 
-	problems, err := ciguard.PRReviewBot(root)
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, extra))
 
 	require.NoError(t, err)
-	require.NotEmpty(t, problems)
-	assert.Contains(t, strings.Join(problems, "\n"), "pull_request types")
+	assert.Empty(t, problems)
 }
 
 func TestPRReviewBotReportsAMissingConcurrencyGroup(t *testing.T) {
 	broken := strings.Replace(goodPRReviewBotWorkflow,
-		"\n  group: pr-review-bot-${{ github.event.pull_request.number }}", "", 1)
+		"\n  group: pr-${{ github.event.pull_request.number || github.ref }}", "", 1)
 	root := writePRReviewBotWorkflow(t, broken)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -389,6 +606,7 @@ func TestPRReviewBotAcceptsAQuotedUsesValue(t *testing.T) {
 	quoted := strings.Replace(goodPRReviewBotWorkflow,
 		"- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1",
 		`- uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1" # v7.0.1`, 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, quoted, "the mutation must apply")
 	root := writePRReviewBotWorkflow(t, quoted)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -405,6 +623,7 @@ func TestPRReviewBotAcceptsARepeatedIdenticalStep(t *testing.T) {
 		"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n",
 		"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n"+
 			"      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, repeated, "the mutation must apply")
 	root := writePRReviewBotWorkflow(t, repeated)
 
 	problems, err := ciguard.PRReviewBot(root)
@@ -444,4 +663,58 @@ func TestPRReviewBotHoldsInTheLiveRepo(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, problems)
+}
+
+// @scenario "A slow CI fails the wait with its own message, not the job timeout"
+func TestPRReviewBotRejectsAWaitStepWithoutTimeout(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "        timeout-minutes: 50\n", "", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, broken, "the mutation must apply")
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, broken))
+
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(problems, "\n"), "wait step has no whole-number timeout-minutes")
+}
+
+// @scenario "A slow CI fails the wait with its own message, not the job timeout"
+func TestPRReviewBotRejectsABotStepWithoutReviewTimeoutMinutes(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "          review_timeout_minutes: 20\n", "", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, broken, "the mutation must apply")
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, broken))
+
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(problems, "\n"), "no whole-number review_timeout_minutes")
+}
+
+// The job must cover the wait step plus both of the bot's claude calls plus 5.
+// @scenario "A slow CI fails the wait with its own message, not the job timeout"
+func TestPRReviewBotRejectsAJobTimeoutBelowTheWaitPlusTwiceTheReviewTimeout(t *testing.T) {
+	for limit, wantProblem := range map[string]bool{"94": true, "95": false, "60": true} {
+		t.Run(limit, func(t *testing.T) {
+			changed := strings.Replace(goodPRReviewBotWorkflow,
+				"    timeout-minutes: 100\n", "    timeout-minutes: "+limit+"\n", 1)
+			require.NotEqual(t, goodPRReviewBotWorkflow, changed, "the mutation must apply")
+
+			problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, changed))
+
+			require.NoError(t, err)
+			if wantProblem {
+				assert.Contains(t, strings.Join(problems, "\n"), "leaves no room for the review: want at least 95")
+			} else {
+				assert.Empty(t, problems)
+			}
+		})
+	}
+}
+
+// @scenario "A slow CI fails the wait with its own message, not the job timeout"
+func TestPRReviewBotRejectsAReviewJobWithoutTimeout(t *testing.T) {
+	broken := strings.Replace(goodPRReviewBotWorkflow, "    timeout-minutes: 100\n", "", 1)
+	require.NotEqual(t, goodPRReviewBotWorkflow, broken, "the mutation must apply")
+
+	problems, err := ciguard.PRReviewBot(writePRReviewBotWorkflow(t, broken))
+
+	require.NoError(t, err)
+	assert.Contains(t, strings.Join(problems, "\n"), "review job has no whole-number timeout-minutes")
 }

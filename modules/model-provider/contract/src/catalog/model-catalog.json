@@ -10951,8 +10951,8 @@
       "reasoningConfig": {
         "supported": true,
         "parameterName": "reasoning_effort",
-        "allowedValues": ["high"],
-        "defaultValue": "high",
+        "allowedValues": ["medium", "high", "xhigh"],
+        "defaultValue": "medium",
         "canDisable": false
       },
       "outputTokensParameter": "max_completion_tokens"

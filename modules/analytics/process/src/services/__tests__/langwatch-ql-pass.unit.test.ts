@@ -20,7 +20,13 @@ import {
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
 } from "../../repositories/langwatch-ql-executor.repository.ts";
-import { langWatchQLPassSql } from "../../rules/langwatch-ql-pass-sql.rules.ts";
+import {
+  langWatchQLPassKeysOfTracesSql,
+  langWatchQLPassRowIdsSql,
+  langWatchQLPassSql,
+  LWQL_HYDRATION_TRACE_IDS_ARGUMENT,
+  LWQL_PASS_TRACE_IDS_ARGUMENT,
+} from "../../rules/langwatch-ql-pass-sql.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLCapabilityService } from "../langwatch-ql-capability.service.ts";
 import { LangWatchQLCatalogShapesService } from "../langwatch-ql-catalog-shapes.service.ts";
@@ -99,19 +105,37 @@ describe("LangWatchQLService.executePass", () => {
         });
       }
 
+      const [probe, count, spanKeys, sample, page] = EVERY_PASS;
+      const isEveryKindListed = !!probe && !!count && !!spanKeys;
+      if (!isEveryKindListed || sample?.kind !== "sample" || page?.kind !== "page") {
+        throw new Error("EVERY_PASS lists the five pass kinds in order");
+      }
+      const cutBy = (traceIds: string) =>
+        STATEMENT.replace(
+          "FROM analytics.traces",
+          `FROM analytics.traces__ids(lwql_trace_ids = ${traceIds}) AS traces`,
+        );
       expect(executor.requests).toEqual(
-        EVERY_PASS.map((pass) => {
-          const composed = langWatchQLPassSql({ sql: STATEMENT, pass });
-
-          return {
-            sql: composed.sql,
-            ...(Object.keys(composed.parameters).length > 0
-              ? { parameters: composed.parameters }
-              : {}),
-            tenantCapability: CAPABILITY,
-            projectIds: [PROJECT.id],
-          };
-        }),
+        [
+          langWatchQLPassSql({ sql: STATEMENT, pass: probe }),
+          langWatchQLPassSql({ sql: STATEMENT, pass: count }),
+          langWatchQLPassSql({ sql: STATEMENT, pass: spanKeys }),
+          // The sample projects the thread id: its row ids, then its keys over the twin.
+          langWatchQLPassRowIdsSql({ sql: STATEMENT, pass: sample }),
+          langWatchQLPassKeysOfTracesSql({
+            sql: cutBy(LWQL_PASS_TRACE_IDS_ARGUMENT),
+            pass: sample,
+            traceIds: [],
+          }),
+          langWatchQLPassSql({ sql: cutBy(LWQL_HYDRATION_TRACE_IDS_ARGUMENT), pass: page }),
+        ].map((composed) => ({
+          sql: composed.sql,
+          ...(Object.keys(composed.parameters).length > 0
+            ? { parameters: composed.parameters }
+            : {}),
+          tenantCapability: CAPABILITY,
+          projectIds: [PROJECT.id],
+        })),
       );
     });
 

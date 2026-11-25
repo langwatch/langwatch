@@ -1,10 +1,12 @@
 import { once } from "node:events";
 import { createServer, type Server, type Socket } from "node:net";
 
+import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { notificationProcessModule } from "../../notification.module.ts";
@@ -52,6 +54,7 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: { SMTP_PASSWORD: "p" } }).withEnv(),
   );
+  // The channel tier binds nurturing for Cloud mail; this process installs no nurturing.
   return createApp({
     role: "worker",
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
@@ -67,6 +70,7 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
         smtp: { host: smtp.host, port: smtp.port, user: "u", secure: "false" },
         publicBaseUrl: "https://app.langwatch.test",
         webPushServiceBase: undefined,
+        isSaas: false,
         outboundProxy: {
           HTTPS_PROXY: undefined,
           https_proxy: undefined,
@@ -76,7 +80,8 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
           no_proxy: undefined,
         },
       },
-    });
+    })
+    .provide({ nurturing: createApiFixture<NurturingApi>({}) });
 }
 
 let relay: Awaited<ReturnType<typeof startRelay>> | undefined;

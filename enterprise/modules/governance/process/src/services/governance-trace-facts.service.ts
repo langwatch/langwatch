@@ -13,7 +13,7 @@ import type {
   GovernanceKpiContribution,
   GovernanceKpiContributionWriter,
   GovernanceOcsfEvent,
-  GovernanceOcsfEventWriter,
+  GovernanceOcsfEventSink,
 } from "../repositories/governance.repositories.ts";
 import { OCSF_ACTIVITY, OCSF_SEVERITY } from "../rules/ocsf-codes.rules.ts";
 import type { GovernanceDiagnosticsSink } from "./governance-policy.service.ts";
@@ -59,14 +59,14 @@ type GovernanceTraceRows =
  */
 export class GovernanceTraceFactsService {
   private readonly kpis: GovernanceKpiContributionWriter;
-  private readonly ocsf: GovernanceOcsfEventWriter;
+  private readonly ocsf: GovernanceOcsfEventSink;
   private readonly traces: Pick<TraceApi, "compileLangWatchQLTraceFilter" | "listTraceSummaries">;
   private readonly projects: Pick<ProjectApi, "findInternalIds">;
   private readonly diagnostics: GovernanceDiagnosticsSink;
 
   private constructor(options: {
     kpis: GovernanceKpiContributionWriter;
-    ocsf: GovernanceOcsfEventWriter;
+    ocsf: GovernanceOcsfEventSink;
     traces: Pick<TraceApi, "compileLangWatchQLTraceFilter" | "listTraceSummaries">;
     projects: Pick<ProjectApi, "findInternalIds">;
     diagnostics: GovernanceDiagnosticsSink;
@@ -80,7 +80,7 @@ export class GovernanceTraceFactsService {
 
   static create(options: {
     kpis: GovernanceKpiContributionWriter;
-    ocsf: GovernanceOcsfEventWriter;
+    ocsf: GovernanceOcsfEventSink;
     traces: Pick<TraceApi, "compileLangWatchQLTraceFilter" | "listTraceSummaries">;
     projects: Pick<ProjectApi, "findInternalIds">;
     diagnostics: GovernanceDiagnosticsSink;
@@ -128,7 +128,7 @@ export class GovernanceTraceFactsService {
     tenantId: string;
     summaries: readonly GovernanceTraceSummary[];
   }): Promise<{ written: number }> {
-    let written = 0;
+    const ocsfRows: GovernanceOcsfEvent[] = [];
     for (const summary of summaries) {
       const rows = governanceTraceRows({ tenantId, summary });
       if (rows.kind === "skipped") {
@@ -141,10 +141,10 @@ export class GovernanceTraceFactsService {
         continue;
       }
       await this.kpis.insertContribution(rows.kpi);
-      await this.ocsf.insertEvent(rows.ocsf);
-      written += 1;
+      ocsfRows.push(rows.ocsf);
     }
-    return { written };
+    await this.ocsf.insertEvents(ocsfRows);
+    return { written: ocsfRows.length };
   }
 }
 
@@ -233,6 +233,13 @@ function ocsfEvent({ tenantId, summary, sourceId, sourceType }: RowInput): Gover
         source_id: sourceId,
         trace_id: summary.traceId,
         anomaly_alert_id: anomalyAlertId || undefined,
+        model: targetName || undefined,
+        provider: attributes["gen_ai.provider.name"] || attributes["gen_ai.system"] || undefined,
+        agent_name: attributes["gen_ai.agent.name"] || undefined,
+        agent_id: attributes["gen_ai.agent.id"] || undefined,
+        tokens_input: summary.totalPromptTokenCount ?? undefined,
+        tokens_output: summary.totalCompletionTokenCount ?? undefined,
+        cost_usd: summary.totalCost ?? undefined,
       },
     },
   });
