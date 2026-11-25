@@ -125,7 +125,11 @@ export function yesNo(id: string, instructions: string): InstantEvalBooleanQuest
  * threshold, names and timeouts are invented. `scenarioPrimary` names what scenario judging asks.
  */
 export function gatedRouteTable(
-  overrides: { backends?: Record<string, unknown>; scenarioPrimary?: string } = {},
+  overrides: {
+    backends?: Record<string, unknown>;
+    scenarioPrimary?: string;
+    inputViews?: unknown;
+  } = {},
 ): InstantEvalJudgeRouteTable {
   const gated = {
     instant: { primary: "llm-b" },
@@ -156,5 +160,6 @@ export function gatedRouteTable(
       llm_judge: slots(gated),
       scenario_judge: slots({ instant: { primary: overrides.scenarioPrimary ?? "llm-b" } }),
     },
+    ...(overrides.inputViews ? { inputViews: overrides.inputViews } : {}),
   });
 }

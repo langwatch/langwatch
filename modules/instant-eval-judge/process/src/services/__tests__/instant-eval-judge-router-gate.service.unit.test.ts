@@ -294,6 +294,44 @@ describe("InstantEvalJudgeRouterService, given a gated plan", () => {
     });
   });
 
+  describe("when the call renders a partial view the primary may judge", () => {
+    const VIEW = "rendered view: wording only";
+    const viewed = (difficulty: number) =>
+      harness({
+        gate: rated(difficulty),
+        table: gatedRouteTable({
+          inputViews: {
+            default: "text",
+            byCategory: {},
+            allowedKinds: { text: ["decisions"], tools: [] },
+          },
+        }),
+      });
+    const route: InstantEvalJudgeRouteRequest = { job: "llm_judge", views: { text: VIEW } };
+
+    /** @scenario "The gate reads a frozen framing of the case" */
+    it("frames the full text for the gate, not the view", async () => {
+      const { classify, gateRequests } = viewed(3);
+      await classify([Q], route);
+      expect(gateRequests).toHaveLength(1);
+      expect(gateRequests[0]?.text).toContain(`<text>\n${TEXT}\n</text>`);
+      expect(gateRequests[0]?.text).not.toContain(VIEW);
+    });
+
+    /** @scenario "A gate sends an easy case to the primary alone and the rest to the escalation alone" */
+    it("asks the primary on the view for an easy case and the escalation on the full text for a hard one", async () => {
+      const easy = viewed(0);
+      await easy.classify([Q], route);
+      expect(easy.hostedDecisions.requests[0]?.text).toBe(VIEW);
+
+      const hard = viewed(3);
+      const judgement = await hard.classify([Q], route);
+      expect(judgement.routing).toMatchObject({ inputView: "text", answeredBy: { "llm-b": 1 } });
+      expect(hard.llmJudge.requests).toHaveLength(1);
+      expect(hard.llmJudge.requests[0]?.text).toBe(TEXT);
+    });
+  });
+
   describe("when the gate cannot rate the case", () => {
     /** @scenario "A gate that gives no score sends the case to the escalation" */
     it("sends a case with no readable score to the escalation, still billing the gate", async () => {
