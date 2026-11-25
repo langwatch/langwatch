@@ -129,6 +129,8 @@ export function moduleVitestTestOptions(
     ...(testTimeout === undefined ? {} : { testTimeout }),
     ...(dir === undefined ? {} : { dir }),
     ...test,
+    // A `test.setupFiles` adds to the guards rather than replacing them.
+    setupFiles: [...resolvedSetupFiles, ...[test?.setupFiles ?? []].flat()],
   };
   // vitest runs a package script from the package directory, its default root.
   const suiteRoot = root ?? process.cwd();

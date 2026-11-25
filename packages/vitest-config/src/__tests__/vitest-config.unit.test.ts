@@ -116,6 +116,31 @@ describe("moduleVitestTestOptions", () => {
       expect(test?.globals).toBe(true);
       expect(test?.fsModuleCache).toBe(true);
     });
+
+    it("adds a test block's setupFiles after the guards instead of replacing them", () => {
+      const listed = moduleVitestTestOptions({
+        kind: "unit",
+        setupFiles: ["./vitest.setup.ts"],
+        test: { setupFiles: ["./src/__tests__/setup.ts"] },
+      });
+      const single = moduleVitestTestOptions({
+        kind: "jsdom",
+        test: { setupFiles: "./src/__tests__/setup.ts" },
+      });
+
+      expect(listed?.setupFiles).toEqual([
+        expect.stringMatching(/logger-setup\.ts$/),
+        expect.stringMatching(/timer-guard\.ts$/),
+        expect.stringMatching(/console-guard\.ts$/),
+        "./vitest.setup.ts",
+        "./src/__tests__/setup.ts",
+      ]);
+      expect(single?.setupFiles).toEqual([
+        expect.stringMatching(/logger-setup\.ts$/),
+        expect.stringMatching(/timer-guard\.ts$/),
+        "./src/__tests__/setup.ts",
+      ]);
+    });
   });
 });
 
