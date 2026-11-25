@@ -21,7 +21,7 @@ export interface ResizeHandleProps {
 }
 
 export function clampWidth({ width, min, max }: { width: number; min: number; max: number }) {
-  return Math.round(Math.min(max, Math.max(min, width)));
+  return Math.min(max, Math.max(min, Math.round(width)));
 }
 
 export function ResizeHandle({
