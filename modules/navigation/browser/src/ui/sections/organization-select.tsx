@@ -43,10 +43,11 @@ export function OrganizationSelect({ activeProductId }: { activeProductId: Produ
 
   const organizationIds = organizations.map((org) => org.id);
   const isMultiOrg = organizationIds.length > 1;
-  const { reachableProductsIn, isLoading: isReachabilityLoading } = useProductFlagsByOrganization({
-    organizationIds,
-    enabled: isMultiOrg,
-  });
+  const {
+    reachableProductsIn,
+    hasOrganizationLibraryIn,
+    isLoading: isReachabilityLoading,
+  } = useProductFlagsByOrganization({ organizationIds, enabled: isMultiOrg });
 
   if (!organization) return null;
 
@@ -86,6 +87,7 @@ export function OrganizationSelect({ activeProductId }: { activeProductId: Produ
         currentProduct: activeProductId,
         reachableProducts: reachableProductsIn(target.id),
         projectSlug: firstProjectSlug(target),
+        hasOrganizationLibrary: hasOrganizationLibraryIn(target.id),
         settingsPathname: keptDetourPathname,
       }),
     );

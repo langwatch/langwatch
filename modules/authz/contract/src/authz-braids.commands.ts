@@ -18,6 +18,14 @@ const braidTermsShape = {
   fromMs: z.number().int().nonnegative(),
   /** When the reader stops seeing the spans; absent never ends. */
   expiresAtMs: z.number().int().positive().optional(),
+  /**
+   * Minted once per submit and resent on every retry of it (ADR-201 §1): a repeat answers the
+   * braid that command saved instead of writing again. Absent, the server mints one.
+   */
+  commandId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{16,64}$/, "A command id is 16 to 64 letters, digits, - or _")
+    .optional(),
 };
 
 const authzCreateBraidInputSchemaDefinition = z
@@ -198,6 +206,8 @@ const authzOrganizationPolicySchemaDefinition = z
     ...organizationShape,
     /** While on, only organisation-wide bindings confer `braids:manage`. */
     braidsOrganizationAdminsOnly: z.boolean(),
+    /** While off, braid management refuses and braided spans pause (Alex, 2026-11-18). */
+    braidsEnabled: z.boolean(),
     updatedByUserId: z.string().nullable(),
     updatedAtMs: z.number().int().nullable(),
   })
@@ -230,6 +240,20 @@ export interface AuthzSetBraidsPolicyInputSchema extends Named<
 export const authzSetBraidsPolicyInputSchema: AuthzSetBraidsPolicyInputSchema =
   authzSetBraidsPolicyInputSchemaDefinition;
 export type AuthzSetBraidsPolicyInput = z.infer<typeof authzSetBraidsPolicyInputSchema>;
+
+const authzSetBraidsEnabledInputSchemaDefinition = z
+  .object({
+    ...organizationShape,
+    braidsEnabled: z.boolean(),
+    actor: ledgerActorSchema,
+  })
+  .strict();
+export interface AuthzSetBraidsEnabledInputSchema extends Named<
+  typeof authzSetBraidsEnabledInputSchemaDefinition
+> {}
+export const authzSetBraidsEnabledInputSchema: AuthzSetBraidsEnabledInputSchema =
+  authzSetBraidsEnabledInputSchemaDefinition;
+export type AuthzSetBraidsEnabledInput = z.infer<typeof authzSetBraidsEnabledInputSchema>;
 
 /** Every live braid in an organisation, for its admins' Braids screen. */
 const authzOrganizationBraidsSchemaDefinition = z.array(authzBraidSchema);

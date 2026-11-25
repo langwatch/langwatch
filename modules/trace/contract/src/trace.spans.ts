@@ -1,6 +1,8 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import type { Span } from "./trace-format.schemas.ts";
+
 /** OTLP span kinds after the ingest boundary has normalized numeric/string values. */
 export enum NormalizedSpanKind {
   UNSPECIFIED = 0,
@@ -89,3 +91,9 @@ export type NormalizedAttributes = z.infer<typeof normalizedAttributesSchema>;
 
 export type NormalizedAttrScalar = z.infer<typeof normalizedAttributeScalarSchema>;
 export type NormalizedAttrValue = z.infer<typeof normalizedAttributesValueSchema>;
+
+/**
+ * A span as the trace view reads it: `ownerProjectId` set only on a braided owner's span,
+ * `kind` from the stored row when the read came from it.
+ */
+export type OwnedSpan = Span & { ownerProjectId?: string; kind?: NormalizedSpanKind };

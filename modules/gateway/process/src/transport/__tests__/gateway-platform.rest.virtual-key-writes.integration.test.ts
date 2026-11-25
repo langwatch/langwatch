@@ -35,6 +35,12 @@ import {
 const ORGANIZATION_ID = "org_1";
 const PROJECT_ID = "project_1";
 const KEY_ID = "vk_demo";
+const STORED_CONFIG = {
+  modelsAllowed: ["gpt-5-mini"],
+  cache: { mode: "force", ttlS: 60 },
+  rateLimits: { rpm: 120, tpm: null, rpd: null },
+  metadata: { label: "support bot", tags: ["support"] },
+};
 
 const secrets = new ScopedSecrets(async (handle, build) =>
   build(handle.id === "LW_VIRTUAL_KEY_PEPPER" ? "test-virtual-key-pepper" : undefined),
@@ -66,6 +72,7 @@ async function mountedKeyWrites() {
     ...memoryVirtualKeySeed({ id: KEY_ID, name: "demo", organizationId: ORGANIZATION_ID }),
     description: "keep me",
     traceProjectId: PROJECT_ID,
+    config: STORED_CONFIG,
   });
   const real = await GatewayModule.create({
     channels: MemoryGatewayChannels.create(),
@@ -178,6 +185,22 @@ describe("the platform family's virtual-key writes", () => {
       });
       expect(budgets).toHaveLength(1);
       expect(budgets[0]).toMatchObject({ window: "WEEK" });
+    });
+
+    /** @scenario Updating one config section keeps every other section of the key's config */
+    it("changes only the config section the update names", async () => {
+      const { call, repositories } = await mountedKeyWrites();
+
+      const answer = await call("PATCH", `/virtual-keys/${KEY_ID}`, {
+        config: { fallback: { maxAttempts: 2 } },
+      });
+
+      expect(answer.status).toBe(200);
+      const stored = await repositories.virtualKeys.findById({
+        id: KEY_ID,
+        organizationId: ORGANIZATION_ID,
+      });
+      expect(stored?.config).toMatchObject({ ...STORED_CONFIG, fallback: { maxAttempts: 2 } });
     });
 
     /** @scenario Rotate returns a fresh secret exactly once */

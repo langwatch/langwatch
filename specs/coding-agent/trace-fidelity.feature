@@ -157,6 +157,24 @@ Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
     When the span input is built from the request body
     Then the span input carries the tool names so MCP and built-in tools are visible
 
+  # Claude Code sends a tool's answer back as a user turn holding only
+  # tool_result blocks. The person typed none of it.
+
+  @unit
+  Scenario: A user turn holding only tool results reads as the tools answering
+    Given a claude code api_request_body whose last user turn holds only tool_result blocks
+    When the span input is built from the request body
+    Then that turn is a tool message that keeps the results' text
+    And a user turn mixing typed text with tool results stays a user message
+    And a truncated request body reads its tool-result turns the same way
+
+  @unit
+  Scenario: A tool-result turn is never shown as the user's prompt
+    Given a model call whose input ends with a tool message holding a script's result
+    And the session sent no user_prompt log record
+    When the transcript is derived from the session's spans and logs
+    Then no prompt line is made from the tool message
+
   @unit
   Scenario: Identical system prompts across a session's calls are shown once
     Given two model calls in one trace whose request bodies carry the same system prompt

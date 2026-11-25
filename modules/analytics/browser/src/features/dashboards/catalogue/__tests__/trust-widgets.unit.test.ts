@@ -20,23 +20,20 @@ describe("given the Can I trust my numbers? widgets", () => {
   it("counts each field as a filter, so its gap is never the frame's setup view", () => {
     const { code, sql } = buildOf("data-health");
     for (const flag of [
-      "max(notEmpty(Models)) AS has_model",
-      "max((TotalCost IS NOT NULL OR empty(Models))) AS has_cost",
-      "max(UserId IS NOT NULL) AS has_user",
-      "max(ConversationId IS NOT NULL) AS has_conversation",
-      "max(notEmpty(Labels)) AS has_labels",
-      "max(MetadataOutcome != '') AS has_outcome",
+      "toUInt8(notEmpty(Models)) AS named",
+      "toUInt8(UserId IS NOT NULL) AS user",
+      "toUInt8(ConversationId IS NOT NULL) AS conversation",
+      "toUInt8(notEmpty(Labels) OR CustomerId IS NOT NULL) AS labels",
+      "toUInt8(MetadataOutcome != '') AS outcome",
     ]) {
       expect(sql.fields).toContain(flag);
     }
-    expect(sql.fields).toContain("field = 'all', total");
-    // The result reads only the field and its count, never a trace column.
+    // The result reads only the field, its counts and an example id, never a trace column.
     expect(sql.fields).toMatch(
-      /^SELECT arrayJoin\(splitByChar\(',', '[a-z,]+'\)\) AS field,\n  multiIf\(/,
+      /^SELECT arrayJoin\(splitByChar\(',', '[a-z_,]+'\)\) AS field,\n  multiIf\(/,
     );
-    expect(code).toContain("Missing on ");
-    expect(code).toContain("Sending it unlocks: ");
-    expect(code).toContain('<AllGood title="Every field arrives"');
+    expect(code).toContain('"Cards that need it:\\n"');
+    expect(code).toContain("<AllGood title={report.headline.title}");
   });
 
   /** @scenario "AC166 Can I trust my numbers?: data health names each missing field and what it unlocks" */
@@ -56,13 +53,13 @@ describe("given the Can I trust my numbers? widgets", () => {
     expect(fields.map(({ key }) => key)).toEqual([
       "model",
       "cost",
-      "user",
       "conversation",
+      "user",
       "labels",
       "outcome",
     ]);
-    expect(unlocks.get("cost")).toContain("What is my agent spending?");
-    expect(unlocks.get("cost")).not.toContain("Is my data complete?");
+    expect(unlocks.get("cost")).toContain("How much is my agent costing me?");
+    expect(unlocks.get("cost")).not.toContain("What is my agent not sending yet?");
   });
 
   /** @scenario "AC167 Can I trust my numbers?: cost accuracy counts traces with a model but no price" */

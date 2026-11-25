@@ -299,7 +299,7 @@ test.describe("guided onboarding", () => {
     // The personal home, with the panel open and Langy asking for the model the
     // provider step would have connected, below the tour card; the coding path
     // is the one being guided, so its space shows no offer.
-    await page.waitForURL(/\/me(\/|\?|$)/, { timeout: 90_000 });
+    await page.waitForURL(/\/coding-agents(\/|\?|$)/, { timeout: 90_000 });
     const panel = page.locator('[data-tour="langy-panel"]');
     await expect(panel).toBeVisible({ timeout: 60_000 });
     await expect(panel.getByTestId("guided-tour-card")).toBeVisible({ timeout: 60_000 });

@@ -1,5 +1,6 @@
 import type {
-  Dashboard,
+  Board,
+  DashboardHomeProduct,
   DashboardScope,
   DashboardStar,
   DashboardSummary,
@@ -7,10 +8,10 @@ import type {
 } from "@langwatch/dashboard-contract";
 
 /** A Dashboards board as DashboardsV2 stores it; `order` is always 0, since stars order them. */
-export type BoardRecord = Dashboard;
+export type BoardRecord = Board;
 
 /** The stored summary: `graphCount` is its widgets; stars and the owner are per reader. */
-export type BoardSummaryRecord = DashboardSummary;
+export type BoardSummaryRecord = DashboardSummary & Pick<Board, "homeProduct">;
 
 /** The editable fields of a stored board; an absent key is left as it is. */
 export type BoardUpdate = Readonly<{
@@ -19,6 +20,7 @@ export type BoardUpdate = Readonly<{
   createdById?: string;
   scope?: DashboardScope;
   organizationId?: string;
+  homeProduct?: DashboardHomeProduct;
 }>;
 
 /**
@@ -47,15 +49,20 @@ export type MemberStars = Readonly<{
 export interface BoardRepository {
   /** The project's boards, oldest first, then the organization's from other projects. */
   findBoards(input: BoardReach): Promise<BoardSummaryRecord[]>;
+  /** Every board these projects own, whatever its scope; the caller decides who sees which. */
+  findBoardsInProjects(input: { projectIds: readonly string[] }): Promise<BoardRecord[]>;
   /** The boards among these ids the read reaches; an id it does not reach is left out. */
   findBoardsByIds(input: BoardReach & { dashboardIds: readonly string[] }): Promise<BoardRecord[]>;
-  /** No description; `createdById` null and scope Project when absent. */
+  /** No description; `createdById` null, scope Project and home LLM Ops when absent. */
   createBoard(input: {
     id: string;
     projectId: string;
     name: string;
     createdById?: string | null;
     scope?: DashboardScope;
+    homeProduct?: DashboardHomeProduct;
+    /** Stamped on an Organization board, as setting that scope stamps it. */
+    organizationId?: string | null;
   }): Promise<BoardRecord>;
   updateBoard(input: {
     projectId: string;

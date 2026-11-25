@@ -94,6 +94,7 @@ export class PrismaSeatEventSubscriptionRepository extends SeatEventSubscription
     organizationId: string;
     plan: GrowthSeatPlanType;
     maxMembers: number;
+    maxRetentionDays?: number;
   }): Promise<{ id: string }> {
     return this.prisma.subscription.create({
       data: { ...input, status: "PENDING" },

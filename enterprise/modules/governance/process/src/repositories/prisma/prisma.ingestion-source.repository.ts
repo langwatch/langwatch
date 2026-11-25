@@ -1,5 +1,6 @@
 import {
   INGESTION_SOURCE_LIVE_STATUSES,
+  ingestionSourceAwaitsFirstEvent,
   type GovernanceIngestionSource,
 } from "@langwatch/enterprise-governance-contract";
 import { skipTenantCheck } from "@langwatch/prisma-client";
@@ -16,6 +17,7 @@ import {
   type CreateIngestionSourceRecord,
   type CursorPinnedUpdate,
   type IngestionSourceClaim,
+  type ReceivingIngestionSource,
   type UnpricedUsageSourceWindow,
   type UnpricedUsageWindow,
   type UpdateIngestionSourceRecord,
@@ -194,12 +196,28 @@ export class PrismaIngestionSourceRepository extends IngestionSourceRepository {
     return this.toSource(row);
   }
 
-  /** The `where` is `ingestionSourceStatusIsOff` as SQL: a row that is off is never written. */
-  async recordEventReceived(id: string, at: Instant): Promise<void> {
+  /**
+   * The first write matches only a source awaiting its first event, so of racing batches exactly
+   * one moves it; a source read as live skips it. The second's `where` is
+   * `ingestionSourceStatusIsOff` as SQL: a row that is off is never written.
+   */
+  async recordEventReceived(
+    { id, status }: ReceivingIngestionSource,
+    at: Instant,
+  ): Promise<{ wentLive: boolean }> {
+    const data = { lastEventAt: toDate(at), status: "active" };
+    if (ingestionSourceAwaitsFirstEvent(status)) {
+      const first = await this.database.ingestionSource.updateMany({
+        where: { id, status: "awaiting_first_event" },
+        data,
+      });
+      if (first.count === 1) return { wentLive: true };
+    }
     await this.database.ingestionSource.updateMany({
       where: { id, status: { in: [...INGESTION_SOURCE_LIVE_STATUSES] } },
-      data: { lastEventAt: toDate(at), status: "active" },
+      data,
     });
+    return { wentLive: false };
   }
 
   async getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow> {

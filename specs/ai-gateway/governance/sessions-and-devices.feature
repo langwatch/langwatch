@@ -2,7 +2,7 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
   As an end user managing my own LangWatch credentials across machines
   I want a single inventory of every active session and device-bound
   credential I have — including web sign-ins, CLI device logins, and
-  ingestion keys minted from /me Trace Ingest — with a clear revoke
+  ingestion keys minted from /coding-agents Trace Ingest — with a clear revoke
   affordance and a label that tells me which laptop / process it belongs to
   And as an org admin enforcing a maximum session lifetime
   I want a per-organization `maxSessionDurationDays` policy that applies
@@ -16,12 +16,12 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
       • web session — short-lived cookie + refresh
       • CLI device session — `langwatch login --device` against ~/.langwatch
       • ingestion key — `ik-lw-<...>` (write-only, ingest-only ApiKey) minted
-        by a CLI session or from /me Trace Ingest
+        by a CLI session or from /coding-agents Trace Ingest
 
   Per ingestion-templates-catalog.feature + ingestion-key-lifecycle.feature:
-    Ingestion keys are TODAY surfaced ONLY at /me Trace Ingest tile-grid
+    Ingestion keys are TODAY surfaced ONLY at /coding-agents Trace Ingest tile-grid
     (per-template). They MUST also appear in the unified devices inventory
-    on /me/configure so users can revoke + admins can apply
+    on /coding-agents/configure so users can revoke + admins can apply
     max-session-duration.
 
   Background:
@@ -36,12 +36,12 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
       | ingestion key    | "cursor template"            | 12 days ago |
 
   # ---------------------------------------------------------------------------
-  # User-facing inventory on the /me/configure devices tab
+  # User-facing inventory on the /coding-agents/configure devices tab
   # ---------------------------------------------------------------------------
 
   @bdd @sessions-and-devices @inventory @user-visibility
   Scenario: User sees ALL credential classes in one list on the devices tab
-    When jane opens the devices tab on "/me/configure"
+    When jane opens the devices tab on "/coding-agents/configure"
     Then she sees a card-grid with exactly 4 cards:
       | label                       | class            | revoke affordance |
       | "MacBook Pro — Chrome"      | web              | "Revoke session"  |
@@ -56,7 +56,7 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
   Scenario: Ingestion keys appear on the devices tab alongside CLI sessions
     Given jane's "MacBook Pro" CLI session minted an ingestion key for claude_code
     And jane has an ingestion key for cursor that no live session minted
-    When jane opens the devices tab on "/me/configure"
+    When jane opens the devices tab on "/coding-agents/configure"
     Then the "MacBook Pro" card carries a row labelled "Ingestion key · claude_code"
     And the cursor key is listed under a card titled "Other keys"
     # The devices inventory is the authoritative single-pane-of-glass
@@ -67,7 +67,7 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
   Scenario: Ingestion key card shows last used
     Given jane's claude_code ingestion key was last used 2 hours ago
     And her cursor ingestion key has never been used
-    When jane opens the devices tab on "/me/configure"
+    When jane opens the devices tab on "/coding-agents/configure"
     Then the claude_code row reads "Last used 2h ago"
     And the cursor row reads "Last used Never"
     And each row also carries the date the key was first issued
@@ -184,7 +184,7 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
   Scenario: User sees only their own credentials on the devices tab (never other users')
     Given jane has a CLI session with an ingestion key under it
     And user "ben@acme.com" has a CLI session with an ingestion key of his own
-    When jane opens the devices tab on /me/configure
+    When jane opens the devices tab on /coding-agents/configure
     Then she sees only her own session, carrying her own login key id
     And ben's session and key are NOT listed
     # The devices tab is per-user; admin oversight is at /governance per the
@@ -210,7 +210,7 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
   @integration @sessions-and-devices @inventory @sign-in-method
   Scenario: Each web session says how it signed in
     Given jane signed in on one device with her password and on another with a passkey
-    When jane opens the devices tab on "/me/configure"
+    When jane opens the devices tab on "/coding-agents/configure"
     Then each web session names the method it signed in with
     And each one says whether a second factor was proven at sign-in
     And nothing on the card shows the wire vocabulary a method reference uses
@@ -218,7 +218,7 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
   @integration @sessions-and-devices @inventory @sign-in-method
   Scenario: A session that recorded nothing reads as an ordinary sign-in
     Given jane holds a web session minted before sessions recorded what they proved
-    When jane opens the devices tab on "/me/configure"
+    When jane opens the devices tab on "/coding-agents/configure"
     Then the session is listed like any other
     And it reads as a normal sign-in rather than as a warning
     And nothing offers to end it on those grounds

@@ -14,7 +14,7 @@ import { lwTag } from "./brand";
 import { GovernanceCliError, issuePersonalVirtualKey } from "./cli-api";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
 import type { GovernanceConfig } from "./config";
-import { saveConfig } from "./config";
+import { assertConfigWritable, saveConfig, warnUnsavedCredential } from "./config";
 import { deviceLabelForThisMachine } from "./device-label";
 import { warnIfGeminiOAuthSelected } from "./gemini-settings-preflight";
 import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
@@ -228,6 +228,8 @@ async function ensurePersonalVk({
   gatewayClears: string[];
 }): Promise<{ vars: Record<string, string>; clears: string[] }> {
   if (cfg.default_personal_vk?.secret) return { vars: gatewayVars, clears: gatewayClears };
+  // A key the config cannot hold would be issued again on every run, and none is revoked.
+  assertConfigWritable();
   const issued = await issuePersonalVirtualKey(cfg, {
     deviceLabel: deviceLabelForThisMachine(),
   });
@@ -239,9 +241,8 @@ async function ensurePersonalVk({
   try {
     saveConfig(cfg);
   } catch (error) {
-    // The in-memory key still serves this run; an unsaved config
-    // means the next gateway run issues again.
-    void error;
+    // The in-memory key still serves this run; the write check passed, so this is rare.
+    warnUnsavedCredential("your personal virtual key", error);
   }
   const refreshed = envForTool(cfg, tool);
   process.stderr.write(`${lwTag()} issued your personal virtual key for the gateway path.\n`);
@@ -464,8 +465,8 @@ function persistIngestionChoice({
     try {
       saveConfig(next);
     } catch (error) {
-      // Best-effort cache - failure to persist doesn't block this run.
-      void error;
+      // Best-effort for the mode; a minted key going unsaved is worth saying.
+      if (minted) warnUnsavedCredential(`the ${sourceType} ingest key`, error);
     }
   }
 }

@@ -102,6 +102,9 @@ type ClickHouseTraceAnalyticsWriteRecord = {
 
   // ── The stock widgets' metadata columns (migrations 00126, 00128) ──────
 } & TraceAnalyticsWrittenMetadataColumns & {
+    // ── The managed prompt version the trace last used (migration 00133) ──
+    LastUsedPromptVersionId: string;
+
     // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
     SpanCount: number;
     AnnotationIds: string[];
@@ -556,6 +559,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       ...traceAnalyticsWrittenMetadataColumns(
         row.metadataColumns ?? traceAnalyticsMetadataColumns(row.attributes),
       ),
+      LastUsedPromptVersionId: row.lastUsedPromptVersionId ?? "",
 
       SpanCount: Math.max(0, Math.round(row.spanCount)),
       AnnotationIds: row.annotationIds,
@@ -640,6 +644,8 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
       metadataColumns: traceAnalyticsMetadataColumns(
         TraceAnalyticsClickHouseRepository.asStringMap(record.Attributes),
       ),
+      // '' on a row an older release wrote, and on a part from before goose 00133.
+      lastUsedPromptVersionId: asString(record.LastUsedPromptVersionId),
 
       // Derived, not read — there is no HasSignal column. Mirrors
       // analytics' has-signal predicate door for door, including the version

@@ -9,6 +9,7 @@ import {
   redactStoredObjectStorageUri,
   ObjectNotFoundError,
   StoredObjectNotFoundError,
+  type StoredObjectFileRow,
 } from "@langwatch/stored-object-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
@@ -32,6 +33,10 @@ type RegistryResolver =
 /** The legacy index's reads the byte surface and the probe perform (ADR-158 §5). */
 export interface StoredObjectFileReader {
   headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectProbe>;
+  /** The index row alone, `null` when the project holds none; no byte stream is opened. */
+  findRowById(
+    input: Readonly<{ projectId: string; id: string }>,
+  ): Promise<StoredObjectFileRow | null>;
   /** Throws `StoredObjectNotFoundError` when the project holds no such row. */
   getById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectFileStreamRead>;
 }
@@ -96,6 +101,10 @@ export class StoredObjectsService {
 
     const facts = { mediaType: row.media_type, purpose: row.purpose };
     return bytesPresent ? { status: "available", ...facts } : { status: "missing", ...facts };
+  }
+
+  findRowById({ projectId, id }: { projectId: string; id: string }): Promise<StoredObject | null> {
+    return this.repository.tryFindById({ projectId, id });
   }
 
   /**

@@ -194,7 +194,7 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 			}
 			started := time.Now()
 			outputs, derr := e.dispatch(nodeCtx, req, node, inputs, ns)
-			ns.DurationMS = time.Since(started).Milliseconds()
+			ns.DurationMS = elapsedMS(started)
 			if derr != nil {
 				ns.Status = "error"
 				ns.Error = derr
@@ -312,9 +312,9 @@ func stateEvent(traceID, nodeID string, ns *NodeState) StreamEvent {
 		// and the wall-clock skew between the running and finished
 		// events is measured in microseconds.
 		//
-		// Emit on every completed node, including sub-millisecond ones
-		// (DurationMS == 0). A fast node like if/else legitimately runs
-		// in under a millisecond; gating on DurationMS > 0 meant a
+		// Emit on every completed node, including sub-millisecond ones.
+		// A fast node like if/else legitimately runs in under a
+		// millisecond; gating on a measured duration meant a
 		// re-run never refreshed the panel, because the Studio reducer
 		// merges new timestamps over old and a missing field left the
 		// stale duration from a prior, slower run on screen.

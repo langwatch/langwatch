@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
 
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import { context as otelContext, propagation, type Span, SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
@@ -556,7 +556,7 @@ export class EventSourcingService<
         tenantId: context.tenantId,
         sourceEventId: null,
         messages: rows.map(({ message }) => message),
-        now: nowInstant().epochMilliseconds,
+        now: nowEpochMs(),
       });
       this.logger.warn(
         { pipelineName: this.pipelineName, aggregateId, lanes },

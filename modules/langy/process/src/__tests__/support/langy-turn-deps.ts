@@ -66,6 +66,9 @@ export function langyTurnDeps(over: LangyTurnDepsOverrides = {}): LangyTurnServi
       "localWork",
     ),
     messages: nullable(over.messages, "messages"),
+    ...(over.endedTurnWait
+      ? { endedTurnWait: over.endedTurnWait as { waitMs: number; pollMs: number } }
+      : {}),
   };
 }
 

@@ -198,6 +198,18 @@ Feature: MCP Prompt Tools
     Then the new version retains the prior version's parameters, inputs, outputs, temperature, and responseFormat
 
   @integration
+  Scenario: Changing inputs, outputs and parameters through platform_update_prompt
+    Given a prompt exists
+    When the agent calls platform_update_prompt with inputs, outputs, parameters, temperature and maxTokens
+    Then the update request carries those fields unchanged
+
+  @integration
+  Scenario: Documenting that platform_update_prompt carries unnamed fields forward
+    When the agent inspects the platform_update_prompt tool's registered input schema and description
+    Then the schema exposes inputs, outputs, parameters, temperature and maxTokens
+    And the description says fields left out are carried over from the current version
+
+  @integration
   Scenario: Tag-to-version mapping stays unchanged when an update omits tags
     Given a prompt with "production" tagged on version N
     When the agent calls platform_update_prompt without tags, creating version N+1
