@@ -26,6 +26,10 @@ class InMemoryLicenseStorage implements LicenseStorage {
   async storeLicense(_organizationId: string, license: StoredLicense): Promise<void> {
     this.stored = license;
   }
+  async replaceLicense({ license }: { license: StoredLicense }): Promise<boolean> {
+    this.stored = license;
+    return true;
+  }
   async removeLicense(): Promise<void> {
     this.stored = null;
   }

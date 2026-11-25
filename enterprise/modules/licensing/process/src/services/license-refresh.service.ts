@@ -26,13 +26,19 @@ interface LicenseSeatCounter {
   getMembersLiteCount(organizationId: string): Promise<number>;
 }
 
-/** Applying a delivered license goes through the same path a pasted key does. */
+/**
+ * A delivered license is validated like a pasted key, and stored only while the
+ * organization still holds `replacing`; `superseded` when a newer one landed first.
+ */
 interface LicenseApplication {
-  validateAndStoreLicense(input: {
+  storeDeliveredLicense(input: {
     organizationId: string;
     licenseKey: string;
+    replacing: string | null;
   }): Promise<
-    { success: true; planInfo: { maxMembers: number } } | { success: false; error: LicenseError }
+    | { success: true; planInfo: { maxMembers: number } }
+    | { success: false; error: LicenseError }
+    | { success: false; superseded: true }
   >;
 }
 
@@ -165,6 +171,7 @@ export class LicenseRefreshService {
 
     const [credential] = await this.deps.install.findCredential(organizationId);
     if (!credential) return { outcome: "unchanged" };
+    const [held = null] = await this.deps.install.findOwnLicenseKey(organizationId);
 
     const answer = await host.syncLicense({
       credential,
@@ -172,11 +179,8 @@ export class LicenseRefreshService {
       seats: await this.countSeats(organizationId),
     });
     if (!answer.license) return { outcome: "unchanged" };
-    // Another sync may have applied a newer license while this answer was out.
-    const [current] = await this.deps.install.findCredential(organizationId);
-    if (current?.token !== credential.token) return { outcome: "unchanged" };
 
-    return this.deliver({ organizationId, license: answer.license });
+    return this.deliver({ organizationId, license: answer.license, replacing: held });
   }
 
   private async countSeats(
@@ -190,21 +194,25 @@ export class LicenseRefreshService {
   }
 
   /**
-   * A reissued license the answer carried, through the same validate-and-store
-   * path a pasted key takes. One more sync with the new token is what tells the
-   * registry the replaced license is out of use.
+   * A reissued license the answer carried, validated like a pasted key. One more
+   * sync with the new token tells the registry the replaced license is out of use.
+   * A newer license another sync stored meanwhile wins: this one stores nothing.
    */
   private async deliver({
     organizationId,
     license,
+    replacing,
   }: {
     organizationId: string;
     license: string;
+    replacing: string | null;
   }): Promise<LicenseSyncOutcome> {
-    const stored = await this.deps.licenses.validateAndStoreLicense({
+    const stored = await this.deps.licenses.storeDeliveredLicense({
       organizationId,
       licenseKey: license,
+      replacing,
     });
+    if ("superseded" in stored) return { outcome: "unchanged" };
     if (!stored.success) return { outcome: "delivered_invalid", error: stored.error };
 
     const [renewed] = await this.deps.install.findCredential(organizationId);

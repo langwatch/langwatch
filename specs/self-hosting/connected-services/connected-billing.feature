@@ -430,6 +430,13 @@ Feature: Billing a connected self-hosted customer
     And it does not offer Renew
 
   @integration
+  Scenario: Retrying billing that stopped part way bills the term the account holds
+    Given onboarding opened the billing account for a term and failed before the annual invoice
+    When an operator starts billing again
+    Then the onboarding is sent for the term the account already holds
+    And the license is not signed again
+
+  @integration
   Scenario: A paid term with an empty end day cannot be submitted
     Given a trial license with Start billing open
     When the operator clears the day the paid term ends

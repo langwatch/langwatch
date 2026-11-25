@@ -107,6 +107,12 @@ export class ConnectInstallService {
     return [{ token, instanceId: await this.deps.identity.getInstanceId() }];
   }
 
+  /** The key the organization holds itself, never the instance-wide fallback; empty when none. */
+  async findOwnLicenseKey(organizationId: string): Promise<string[]> {
+    const organization = await this.deps.organizations.findById(organizationId);
+    return organization?.license ? [organization.license] : [];
+  }
+
   /** Where this organization's gateway reaches hosted models; empty where no credential is held. */
   async findUpstream(organizationId: string): Promise<ConnectUpstream[]> {
     const [credential] = await this.findCredential(organizationId);

@@ -208,7 +208,10 @@ describe("a reissued license over a sync", () => {
       facts: appliedConnectFacts(rows),
       seats: { getMemberCount: async () => 53, getMembersLiteCount: async () => 7 },
       licenses: {
-        validateAndStoreLicense: async ({ licenseKey }) => {
+        storeDeliveredLicense: async ({ licenseKey, replacing }) => {
+          if ((rows.get(ORGANIZATION)?.license ?? null) !== replacing) {
+            return { success: false, superseded: true };
+          }
           const result = cryptography.validateLicense({ licenseKey, publicKey: TEST_PUBLIC_KEY });
           if (!result.valid) return { success: false, error: result.error };
           stored.push(licenseKey);
@@ -274,6 +277,7 @@ describe("an answer that arrives after a newer license was applied", () => {
       ],
     ]);
     const stored: string[] = [];
+    const replaced: (string | null)[] = [];
     const refresher = LicenseRefreshService.create({
       install: ConnectInstallService.create({
         organizations: MemoryConnectOrganizationRepository.create({ rows }),
@@ -296,7 +300,11 @@ describe("an answer that arrives after a newer license was applied", () => {
       facts: appliedConnectFacts(rows),
       seats: { getMemberCount: async () => 8, getMembersLiteCount: async () => 0 },
       licenses: {
-        validateAndStoreLicense: async ({ licenseKey }) => {
+        storeDeliveredLicense: async ({ licenseKey, replacing }) => {
+          replaced.push(replacing);
+          if (rows.get(ORGANIZATION)?.license !== replacing) {
+            return { success: false, superseded: true };
+          }
           stored.push(licenseKey);
           return { success: true, planInfo: { maxMembers: 50 } };
         },
@@ -310,6 +318,7 @@ describe("an answer that arrives after a newer license was applied", () => {
     const outcome = await refresher.refresh(ORGANIZATION);
 
     expect(outcome).toEqual({ outcome: "unchanged" });
+    expect(replaced).toEqual([first]);
     expect(stored).toEqual([]);
     expect(rows.get(ORGANIZATION)?.license).toBe(third);
   });

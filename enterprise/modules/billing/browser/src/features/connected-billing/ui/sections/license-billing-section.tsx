@@ -149,7 +149,12 @@ function usePaidTerm({
   const [heldExpiry, setHeldExpiry] = useState<string | null>(null);
   const seed = () => ({
     ...billingFormFrom({ account: overview.account, license }),
-    ...nextPaidTerm({ account: overview.account, license, today: today() }),
+    ...nextPaidTerm({
+      account: overview.account,
+      license,
+      today: today(),
+      finished: isBilled(overview),
+    }),
     seats: String(license.maxMembers),
   });
   const [form, setForm] = useState<BillingForm>(seed);

@@ -256,6 +256,45 @@ export class LicenseService extends LicensingServiceContract {
     organizationId: string;
     licenseKey: string;
   }): Promise<StoreLicenseResult> {
+    const stored = await this.validateAndWrite({
+      organizationId,
+      licenseKey,
+      write: (license) => this.repository.storeLicense(organizationId, license).then(() => true),
+    });
+    if ("superseded" in stored) throw new Error("an unconditional store cannot be superseded");
+    return stored;
+  }
+
+  /**
+   * A license a sync delivered, stored only while the organization still holds
+   * `replacing`, the key the sync started from: a slower sync never overwrites a
+   * newer license another one applied meanwhile. `superseded` when it lost.
+   */
+  async storeDeliveredLicense({
+    organizationId,
+    licenseKey,
+    replacing,
+  }: {
+    organizationId: string;
+    licenseKey: string;
+    replacing: string | null;
+  }): Promise<StoreLicenseResult | { success: false; superseded: true }> {
+    return this.validateAndWrite({
+      organizationId,
+      licenseKey,
+      write: (license) => this.repository.replaceLicense({ organizationId, license, replacing }),
+    });
+  }
+
+  private async validateAndWrite({
+    organizationId,
+    licenseKey,
+    write,
+  }: {
+    organizationId: string;
+    licenseKey: string;
+    write: (license: StoredLicense) => Promise<boolean>;
+  }): Promise<StoreLicenseResult | { success: false; superseded: true }> {
     const result = this.cryptography.validateLicense({ licenseKey });
     if (!result.valid) {
       return { success: false, error: result.error };
@@ -276,11 +315,12 @@ export class LicenseService extends LicensingServiceContract {
       throw new OrganizationNotFoundError();
     }
 
-    await this.repository.storeLicense(organizationId, {
+    const written = await write({
       licenseKey,
       expiresAt: Temporal.Instant.fromEpochMilliseconds(toEpochMs(result.licenseData.expiresAt)),
       validatedAt: this.configuration.now(),
     });
+    if (!written) return { success: false, superseded: true };
     await this.provisionMissingRetentionPolicies(organizationId);
     // This process sees the license at once; other replicas within the deny TTL.
     this.storedRevision += 1;
@@ -492,6 +532,10 @@ export interface LicenseStorage extends Pick<
   "getOrganizationLicense" | "findOrganizationsWithLicense" | "organizationExists"
 > {
   storeLicense(organizationId: string, license: StoredLicense): Promise<void>;
+  /** Stores only while the organization still holds `replacing`; whether it stored. */
+  replaceLicense(
+    input: Readonly<{ organizationId: string; license: StoredLicense; replacing: string | null }>,
+  ): Promise<boolean>;
   removeLicense(organizationId: string): Promise<void>;
   getMemberCount(organizationId: string): Promise<number>;
   getMembersLiteCount(organizationId: string): Promise<number>;

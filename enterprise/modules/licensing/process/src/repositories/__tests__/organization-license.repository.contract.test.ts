@@ -159,6 +159,29 @@ function contractCases(backend: Backend): void {
     });
   });
 
+  it("replaces a licence only while the row holds the key the caller read", async () => {
+    const repository = await backend.seed({ [id("a")]: { licenseKey: null } });
+    const license = (licenseKey: string) => ({ licenseKey, expiresAt: EXPIRES, validatedAt: null });
+
+    await expect(
+      repository.replaceLicense({
+        organizationId: id("a"),
+        license: license("a"),
+        replacing: null,
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      repository.replaceLicense({ organizationId: id("a"), license: license("c"), replacing: "a" }),
+    ).resolves.toBe(true);
+    await expect(
+      repository.replaceLicense({ organizationId: id("a"), license: license("b"), replacing: "a" }),
+    ).resolves.toBe(false);
+
+    await expect(repository.findLicense({ organizationId: id("a") })).resolves.toEqual([
+      license("c"),
+    ]);
+  });
+
   it("restores the row read before a write, and deletes one that was not there", async () => {
     const repository = await backend.seed({
       [id("a")]: { licenseKey: null },

@@ -3,6 +3,8 @@
  * is a replacement of the chain's newest license, delivered to a bound
  * install over sync; terms and revocation reach every live license of it.
  */
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+
 import { api } from "../../../behavior/ops-api.ts";
 import {
   useOpsToaster,
@@ -13,6 +15,9 @@ import type { LicenseChainState } from "../model/license-chain.ts";
 import { termsPayload, type TermsForm } from "../model/license-terms.ts";
 
 const UNUSED_KEY_REASON = "Replaced by a new key before any install used it";
+
+/** How retiring the unused key ended: `in_use` when an install bound it since the drawer loaded. */
+type Retirement = "retired" | "in_use" | "failed";
 
 /**
  * A key a change signed. `forCustomer` when no install holds the chain and the
@@ -47,6 +52,28 @@ async function eachLicense({
   } catch (error) {
     showError({ error, fallbackTitle: failureTitle });
     return false;
+  }
+}
+
+/** Retires each live license's unused key in turn; how the first failure, if any, ended it. */
+async function retireEach({
+  chain,
+  retire,
+  showError,
+}: {
+  chain: LicenseChainState;
+  retire: (id: string) => Promise<unknown>;
+  showError: ShowError;
+}): Promise<Retirement> {
+  try {
+    for (const license of chain.live) await retire(license.id);
+    return "retired";
+  } catch (error) {
+    showError({
+      error,
+      fallbackTitle: "The new key is signed, but the unused one still works: revoke it",
+    });
+    return readHandledError(error)?.code === "license_in_use" ? "in_use" : "failed";
   }
 }
 
@@ -89,26 +116,25 @@ export function useLicenseChanges() {
     chain: LicenseChainState;
     licenseKey: string;
   }): Promise<SignedKey> {
-    const retired = await retireUnused({ chain });
-    return { licenseKey, forCustomer: chain.unbound && retired };
+    const retirement = await retireUnused({ chain });
+    return { licenseKey, forCustomer: chain.unbound && retirement !== "in_use" };
   }
 
   /**
    * No install holds the replaced key, so it stops now rather than on a sync
-   * that never comes. The registry refuses a license an install bound since
-   * the drawer loaded; false, with that refusal on screen.
+   * that never comes. A failure stays on screen; only `in_use` means an install
+   * holds the chain now, any other one leaves it unbound.
    */
-  async function retireUnused({ chain }: { chain: LicenseChainState }): Promise<boolean> {
-    const retired =
-      !chain.unbound ||
-      (await eachLicense({
-        licenses: chain.live,
-        step: (id) => retire.mutateAsync({ id, reason: UNUSED_KEY_REASON, unusedOnly: true }),
-        showError,
-        failureTitle: "The new key is signed, but the unused one still works: revoke it",
-      }));
+  async function retireUnused({ chain }: { chain: LicenseChainState }): Promise<Retirement> {
+    const retirement: Retirement = chain.unbound
+      ? await retireEach({
+          chain,
+          retire: (id) => retire.mutateAsync({ id, reason: UNUSED_KEY_REASON, unusedOnly: true }),
+          showError,
+        })
+      : "retired";
     await refresh();
-    return retired;
+    return retirement;
   }
 
   async function saveTerms({ chain, form }: { chain: LicenseChainState; form: TermsForm }) {

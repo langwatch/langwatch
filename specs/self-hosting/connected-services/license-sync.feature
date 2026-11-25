@@ -278,6 +278,13 @@ Feature: License sync
     Then the install keeps the newer license and stores nothing
 
   @unit
+  Scenario: Two syncs that race to store a delivered license leave the newer one
+    Given a sync read the license the organization holds before it asked
+    And another sync stored a newer license while the first one waited
+    When the first sync stores the license its answer carried
+    Then the store is a single write that keeps the newer license
+
+  @unit
   Scenario: A sync never carries a license that a delivery retired while it looked
     Given LangWatch extended the license, and extended it again before the install synced
     And a sync on the oldest license is walking the chain

@@ -380,6 +380,25 @@ describe("the license registry", () => {
     expect((await repository.findById(license.id))?.revokedAt).toEqual(NOW);
   });
 
+  /** @scenario "An unused-key revoke whose key retirement failed finishes on retry" */
+  it("retires the key again when the row was revoked but its key was not ended", async () => {
+    const { registry, repository, managedKeys } = harness();
+    const { license } = await registry.issue(issueInput());
+    await repository.update(license.id, { virtualKeyId: "vk-unused" });
+    const retire = managedKeys.retire.bind(managedKeys);
+    managedKeys.retire = async () => {
+      throw new Error("gateway unreachable");
+    };
+    const unused = { id: license.id, operatorId: "op", reason: "unused", unusedOnly: true };
+
+    await expect(registry.revoke(unused)).rejects.toThrow("gateway unreachable");
+    managedKeys.retire = retire;
+    const retried = await registry.revoke(unused);
+
+    expect(retried.status).toBe("revoked");
+    expect(managedKeys.retired).toEqual(["vk-unused"]);
+  });
+
   /** @scenario "Reissuing a license" */
   it("signs a replacement that points at the license it replaces", async () => {
     const { registry, repository } = harness();

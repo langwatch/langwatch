@@ -168,6 +168,40 @@ describe("the Billing section of the license drawer", () => {
       expect(screen.queryByRole("button", { name: "Renew for the next term" })).toBeNull();
       expect(onBillingState).toHaveBeenCalledWith("trial");
     });
+
+    /** @scenario "Retrying billing that stopped part way bills the term the account holds" */
+    it("starts billing again for the account's own term without signing again", async () => {
+      mocks.overview.current = {
+        ...trialOverview,
+        account: {
+          id: "acct-1",
+          organizationId: "org-acme",
+          stripeCustomerId: "cus_test",
+          termStartsAt: "2099-12-14T00:00:00.000Z",
+          termEndsAt: "2100-12-14T00:00:00.000Z",
+          commitUsdCents: 0,
+          seatCurrency: "USD",
+          seatRateCents: 500_00,
+          seats: 25,
+          bankTransferType: null,
+          bankTransferCountry: null,
+          billingEmail: "ops@acme.example",
+          renewalPending: false,
+        },
+      };
+      const signPaidTerm = vi.fn(async () => true);
+      const signed = license({ signPaidTerm, expiresAt: "2100-12-14T12:00:00.000Z" });
+      render(<LicenseBillingSection {...signed} />, { wrapper });
+
+      startBilling();
+
+      await waitFor(() => expect(mocks.onboard).toHaveBeenCalledTimes(1));
+      expect(signPaidTerm).not.toHaveBeenCalled();
+      expect(mocks.onboard.mock.calls[0]?.[0]).toMatchObject({
+        termStartsAt: "2099-12-14T00:00:00.000Z",
+        termEndsAt: "2100-12-14T00:00:00.000Z",
+      });
+    });
   });
 
   describe("given a trial license with Start billing open", () => {

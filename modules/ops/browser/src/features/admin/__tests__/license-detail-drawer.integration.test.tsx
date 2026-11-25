@@ -294,7 +294,11 @@ describe("LicenseDetailDrawer", () => {
     /** @scenario "An extension whose unused key an install bound meanwhile keeps the new key for sync" */
     it("reports the refusal and keeps the new key for the install instead of the customer", async () => {
       state.chain = [license()];
-      state.revoke.mockRejectedValue(new Error("license_in_use"));
+      state.revoke.mockRejectedValue(
+        Object.assign(new Error("license_in_use"), {
+          data: { error: { code: "license_in_use", httpStatus: 409 } },
+        }),
+      );
       const { host } = openDrawer({ id: "il_1" });
 
       extendByTwoWeeks();
@@ -303,6 +307,22 @@ describe("LicenseDetailDrawer", () => {
         await screen.findByRole("button", { name: "Install can't sync? Show the signed key" }),
       ).toBeTruthy();
       expect(screen.queryByTestId("send-key")).toBeNull();
+      expect(host.recording.failures.map((failure) => failure.fallbackTitle)).toContain(
+        "The new key is signed, but the unused one still works: revoke it",
+      );
+    });
+  });
+
+  describe("given retiring the unused key fails for another reason", () => {
+    /** @scenario "Retiring an unused key that failed for another reason keeps the new key for the customer" */
+    it("reports the failure and still offers the new key to send to the customer", async () => {
+      state.chain = [license()];
+      state.revoke.mockRejectedValue(new Error("network down"));
+      const { host } = openDrawer({ id: "il_1" });
+
+      extendByTwoWeeks();
+
+      expect(await screen.findByTestId("send-key")).toBeTruthy();
       expect(host.recording.failures.map((failure) => failure.fallbackTitle)).toContain(
         "The new key is signed, but the unused one still works: revoke it",
       );

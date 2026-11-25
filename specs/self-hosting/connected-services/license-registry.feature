@@ -443,6 +443,20 @@ Feature: License registry
     When an operator revokes that row from the table
     Then both the replacement and the license the install holds are revoked
 
+  @unit
+  Scenario: An unused-key revoke whose key retirement failed finishes on retry
+    Given an unused-key revoke marked the license revoked
+    And ending its managed key failed
+    When the operator retries the revoke
+    Then the managed key is ended and the license reads as revoked
+
+  @integration
+  Scenario: Retiring an unused key that failed for another reason keeps the new key for the customer
+    Given no install holds the license
+    And an operator signs a replacement
+    When retiring the unused key fails for a reason other than an install binding it
+    Then the drawer still offers the new key for the customer to paste
+
   @integration
   Scenario: Revoking reaches a replacement signed after the dialog opened
     Given the revoke dialog is open on a license

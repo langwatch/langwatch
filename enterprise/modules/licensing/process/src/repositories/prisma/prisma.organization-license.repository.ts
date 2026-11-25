@@ -146,6 +146,27 @@ export class PrismaOrganizationLicenseRepository implements OrganizationLicenseR
     });
   }
 
+  async replaceLicense({
+    organizationId,
+    license,
+    replacing,
+  }: Readonly<{
+    organizationId: string;
+    license: StoredLicense;
+    replacing: string | null;
+  }>): Promise<boolean> {
+    const updated = await this.prisma.organizationLicense.updateMany({
+      where: { organizationId, licenseKey: replacing },
+      data: rowOf(license),
+    });
+    if (updated.count > 0) return true;
+    const created = await this.prisma.organizationLicense.createMany({
+      data: [{ organizationId, ...rowOf(license) }],
+      skipDuplicates: true,
+    });
+    return created.count > 0;
+  }
+
   async clearLicense({ organizationId }: Readonly<{ organizationId: string }>): Promise<void> {
     await this.prisma.organizationLicense.upsert({
       where: { organizationId },

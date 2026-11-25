@@ -173,10 +173,10 @@ export class LicenseRegistryService {
     unusedOnly?: boolean;
   }): Promise<IssuedLicenseView> {
     const row = await this.getRow(input.id);
+    if (input.unusedOnly) return this.revokeUnused({ row, ...input });
     // An expired license can still be revoked: its term may be extended by a
     // reissue, and a leaked key should stay dead through that.
     this.refuseIfSettled(row);
-    if (input.unusedOnly) return this.revokeUnused({ row, ...input });
     // The key ends first. If the row update then fails, the license reads as
     // active with a dead key, which resolves to a refusal, and revoking again
     // finishes the job. The other order could leave a revoked license whose
@@ -193,9 +193,9 @@ export class LicenseRegistryService {
   }
 
   /**
-   * Revokes a key no install used, in one conditional write that a bind racing
-   * it cannot also win. The row goes first: an unbound row's key reaches no
-   * install, so retiring it after the write leaves nothing usable in between.
+   * Revokes a key no install used, in one conditional write a racing bind cannot
+   * also win. The row goes first: an unbound row's key reaches no install. A retry
+   * on a revoked unbound row retires the key again, so a failed retirement ends.
    */
   private async revokeUnused({
     row,
@@ -206,21 +206,28 @@ export class LicenseRegistryService {
     operatorId: string;
     reason: string;
   }): Promise<IssuedLicenseView> {
-    const revoked = await this.options.repository.revokeUnbound({
-      id: row.id,
-      at: this.options.now(),
-      revokedById: operatorId,
-      revokedReason: reason,
-    });
-    if (!revoked) {
-      const current = await this.getRow(row.id);
-      this.refuseIfSettled(current);
-      throw new LicenseInUseError();
+    if (!isRevokedUnbound(row)) {
+      this.refuseIfSettled(row);
+      const revoked = await this.options.repository.revokeUnbound({
+        id: row.id,
+        at: this.options.now(),
+        revokedById: operatorId,
+        revokedReason: reason,
+      });
+      if (!revoked) await this.refuseLostRevoke(row.id);
     }
     await this.retireManagedKey({ row, actorId: operatorId });
     const updated = await this.getRow(row.id);
     await this.syncBudget(updated, operatorId);
     return this.toView(updated);
+  }
+
+  /** Why an unused-key revoke lost its write; a row it finds revoked and unbound is fine. */
+  private async refuseLostRevoke(id: string): Promise<void> {
+    const current = await this.getRow(id);
+    if (isRevokedUnbound(current)) return;
+    this.refuseIfSettled(current);
+    throw new LicenseInUseError();
   }
 
   /**
@@ -553,4 +560,9 @@ export interface LicenseCustomers {
   findById(id: string): Promise<{ id: string; name: string } | null>;
   /** Organization creates a missing row and marks it a self-hosted customer from this fact. */
   recordSelfHostedCustomerLicensed(params: { id: string; name: string }): Promise<void>;
+}
+
+/** Revoked while no install held it: its key reaches nothing, so retiring it again is safe. */
+function isRevokedUnbound(row: IssuedLicenseRecord): boolean {
+  return row.revokedAt !== null && row.instanceId === null;
 }

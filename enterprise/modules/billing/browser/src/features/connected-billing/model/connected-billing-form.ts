@@ -111,17 +111,22 @@ const addYear = (day: string): string => Temporal.PlainDate.from(day).add({ year
 /**
  * The paid term a form starts on. A trial's starts when the trial ends (or
  * today, once it has ended); a renewal's starts when the current term ends.
- * Either runs one year.
+ * Either runs one year. Billing that stopped part way finishes its own term.
  */
 export function nextPaidTerm({
   account,
   license,
   today,
+  finished = true,
 }: {
   account: ConnectedBillingAccountView | null;
   license: LicenseBillingSectionProps;
   today: string;
+  finished?: boolean;
 }): { termStartsAt: string; termEndsAt: string } {
+  if (account && !finished) {
+    return { termStartsAt: isoDay(account.termStartsAt), termEndsAt: isoDay(account.termEndsAt) };
+  }
   const from = isoDay(account?.termEndsAt ?? license.expiresAt);
   const termStartsAt = from < today ? today : from;
   return { termStartsAt, termEndsAt: addYear(termStartsAt) };
