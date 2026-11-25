@@ -1569,7 +1569,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     When the member opens a From LangWatch board
     Then it has no "Add a widget" and no "Use this template", its title and description are plain text
     And each widget's menu holds only Export CSV, with no drag handle
-    And no "Make a copy" is offered; a quiet line says who can make their own copy
+    And no "Make a copy" is offered, and no quiet line shows
 
   @integration
   Scenario: From LangWatch: Make a copy, with the organization's Dashboards area off

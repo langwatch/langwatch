@@ -142,8 +142,8 @@ function OpenCuratedBoard({
   const mayEdit = library.isOpen && mayCreate;
   // A copy is saved and filled, which asks analytics:update in the project in view too.
   // Offered on the project address only; the organization address shows no copy path.
-  const mayCopy = !atOrganization && !library.isLoading && mayCreate && reader.mayEdit;
-  const showHint = !atOrganization && !library.isLoading && !mayEdit && !mayCopy;
+  const mayCopy = !mayEdit && !atOrganization && library.isOff && mayCreate && reader.mayEdit;
+  const showHint = !atOrganization && library.isOff && !mayCopy;
   const { createWithWidget } = useBoardFromTemplate({
     atOrganization,
     storeProject: store.storeProject,
@@ -172,19 +172,25 @@ function OpenCuratedBoard({
   } else if (mayCopy) {
     headerAction = (
       <HStack gap={2}>
-        {saved.loadError && (
+        {saved.loadError && !saved.namesKnown && (
           <>
             <Text textStyle="bodySm" color="fg.muted">
               Couldn't load your dashboards, so a copy can't be named yet.
             </Text>
-            <Button size="xs" variant="outline" onClick={saved.retry}>
+            <Button
+              size="xs"
+              variant="outline"
+              loading={saved.isRefreshing}
+              disabled={saved.isRefreshing}
+              onClick={saved.retry}
+            >
               Retry
             </Button>
           </>
         )}
         <MakeCopyButton
           isCopying={copy.creatingId === board.templateId}
-          disabled={saved.isLoading || !!saved.loadError}
+          disabled={!saved.namesKnown}
           onClick={() => void copy.duplicate(board)}
         />
       </HStack>

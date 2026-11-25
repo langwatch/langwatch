@@ -81,6 +81,35 @@ Feature: Organization-wide Dashboards area
     # Evidence: the quoted tRPC calls, with no dashboards or dashboardWidgets write unless
     # the member presses Make a copy
 
+  @integration
+  Scenario: Make a copy explains and retries when the saved boards fail to load
+    Given "the organization's Dashboards area" is off for "Acme"
+    And I may create and update dashboards in "Shop", and my saved boards fail to load once
+    When I open "/shop/dashboards/curated/<id>"
+    Then "Make a copy" is disabled, and the header says a copy can't be named yet, with "Retry"
+    When I press "Retry" and the boards load
+    Then "Make a copy" is enabled and the message is gone
+
+  @integration
+  Scenario: Make a copy is not offered to a member who may create but not update
+    Given "the organization's Dashboards area" is off for "Acme"
+    And I may create but not update dashboards in "Shop"
+    When I open "/shop/dashboards/curated/<id>"
+    Then no "Make a copy" is offered, and a quiet line says who can create and edit to copy it
+
+  @integration
+  Scenario: Make a copy waits for the saved boards to load
+    Given "the organization's Dashboards area" is off for "Acme"
+    And I may create and update dashboards in "Shop", and the saved boards are still loading
+    When I open "/shop/dashboards/curated/<id>"
+    Then "Make a copy" is disabled until the saved boards load
+
+  @integration
+  Scenario: Make a copy and the quiet line wait for the organization's flags
+    Given I may create and update dashboards in "Shop", and the organization's flags are loading
+    When I open "/shop/dashboards/curated/<id>"
+    Then neither "Make a copy" nor the quiet line shows until the flags answer
+
   # ---- The Coding agents rename: page titles (draft AC4; S0) ----
   @integration @unimplemented
   Scenario: Every Coding agents page title says Coding agents

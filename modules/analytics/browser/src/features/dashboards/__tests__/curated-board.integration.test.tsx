@@ -212,6 +212,7 @@ describe("given a member opens a From LangWatch board", () => {
     });
   });
 
+  /** @scenario "Make a copy and the quiet line wait for the organization's flags" */
   it("shows neither Make a copy nor the quiet line while the flags load", async () => {
     let answer = () => {};
     const flagsGate = new Promise<void>((resolve) => {
@@ -242,11 +243,7 @@ describe("given a member opens a From LangWatch board", () => {
       expect(screen.queryByRole("button", { name: "Add a widget" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Use this template" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Make a copy" })).toBeNull();
-      expect(
-        await screen.findByText(
-          "Members who can create and edit dashboards can make their own copy to edit it.",
-        ),
-      ).toBeInTheDocument();
+      expect(screen.queryByText(/can create and edit dashboards can make/)).toBeNull();
       expect(screen.queryByTitle("Edit name")).toBeNull();
       expect(screen.queryByTitle("Edit description")).toBeNull();
       expect(screen.queryByTitle("Drag to move")).toBeNull();
@@ -284,8 +281,14 @@ describe("given a member opens a From LangWatch board", () => {
       ]);
       expect(inputsTo(server, "dashboardWidgets.create")).toHaveLength(RELEASE.widgets.length);
       expect(screen.queryByRole("dialog")).toBeNull();
+      expect(host.langyAsks).toHaveLength(1);
+      expect(server.calls.filter(({ path }) => path === "boards.delete")).toEqual([]);
+      expect(inputsTo(server, "boards.update")).toEqual([
+        expect.objectContaining({ dashboardId: "board-1" }),
+      ]);
     });
 
+    /** @scenario "Make a copy explains and retries when the saved boards fail to load" */
     it("shows why Make a copy is off when the boards fail, and Retry", async () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       openCurated({ templateId: "release", organizationArea: false, boardsFailsOnce: true });
@@ -300,6 +303,7 @@ describe("given a member opens a From LangWatch board", () => {
       expect(screen.queryByText(/Couldn't load your dashboards/)).toBeNull();
     });
 
+    /** @scenario "Make a copy is not offered to a member who may create but not update" */
     it("offers no Make a copy to a member who may create but not update, and says so", async () => {
       const permissions = MEMBER.filter((permission) => permission !== "analytics:update");
       openCurated({ templateId: "release", organizationArea: false, permissions });
@@ -311,6 +315,7 @@ describe("given a member opens a From LangWatch board", () => {
       ).toBeInTheDocument();
     });
 
+    /** @scenario "Make a copy waits for the saved boards to load" */
     it("keeps Make a copy disabled until the saved boards have loaded", async () => {
       let load = () => {};
       const boardsGate = new Promise<void>((resolve) => {

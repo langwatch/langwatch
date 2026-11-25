@@ -13,7 +13,8 @@ import {
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 
-export type OrganizationLibraryState = { isOpen: boolean; isLoading: boolean };
+/** `isOff`: the area's flag is off, or its reads failed; a copy is offered only then. */
+export type OrganizationLibraryState = { isOpen: boolean; isOff: boolean; isLoading: boolean };
 
 /** `enabled` false asks nothing and answers shut. */
 export function useOrganizationLibraryOpen({
@@ -37,7 +38,12 @@ export function useOrganizationLibraryOpen({
     { flag: dashboardsFlag, organizationIds },
     options,
   );
-  if (!enabled) return { isOpen: false, isLoading: false };
+  if (!enabled) return { isOpen: false, isOff: false, isLoading: false };
   const area = organizationDashboardsArea({ organizationId, organizationArea, dashboards });
-  return { isOpen: area === "open", isLoading: area === "loading" };
+  const readFailed = organizationArea.isError || dashboards.isError;
+  return {
+    isOpen: area === "open",
+    isOff: area === "legacy" && !readFailed,
+    isLoading: area === "loading",
+  };
 }
