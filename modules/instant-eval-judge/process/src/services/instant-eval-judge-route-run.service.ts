@@ -24,26 +24,19 @@ import type {
 } from "../channels/instant-eval-classifier.channel.ts";
 import type { InstantEvalHostedDecisionsChannel } from "../channels/instant-eval-hosted-decisions.channel.ts";
 import type { InstantEvalLlmJudgeChannel } from "../channels/instant-eval-llm-judge.channel.ts";
-import {
-  instantEvalJudgeGateBranchOf,
-  instantEvalJudgeGateInputOf,
-  instantEvalJudgeGateQuestionOf,
-} from "../rules/instant-eval-judge-gate.rules.ts";
 import { instantEvalJudgeCallCostOf } from "../rules/instant-eval-judge-route-cost.rules.ts";
 import {
-  instantEvalDecisionAnswersOf,
-  instantEvalJudgeLegPermitOf,
   instantEvalJudgeLegsJoined,
   instantEvalRoutedVerdictsOf,
   isInstantEvalJudgeLegAnswered,
-  isInstantEvalJudgeLegStop,
   type InstantEvalJudgeAnsweredLeg,
   type InstantEvalJudgeFirstLeg,
   type InstantEvalJudgeLeg as Leg,
   type InstantEvalJudgeRoutePlan,
 } from "../rules/instant-eval-judge-route.rules.ts";
 import { isUnsureAnswer } from "../rules/instant-eval-judge-sureness.rules.ts";
-import { InstantEvalJudgeLegDeadlineService } from "./instant-eval-judge-leg-deadline.service.ts";
+import { InstantEvalJudgeDecisionLegService } from "./instant-eval-judge-decision-leg.service.ts";
+import { InstantEvalJudgeGatedLegsService } from "./instant-eval-judge-gated-legs.service.ts";
 import { InstantEvalJudgeLlmLegService } from "./instant-eval-judge-llm-leg.service.ts";
 
 export type InstantEvalJudgeRouteRunDeps = Readonly<{
@@ -65,8 +58,6 @@ export class InstantEvalJudgeRouteRunService {
   private readonly flags: string[] = [];
   private inputTokens = 0;
   private costNanoUsd = 0;
-  /** The longest limiter wait of the gate's side-by-side sends, ahead of the legs that answered. */
-  private gateWaitMs = 0;
 
   private constructor(input: {
     deps: InstantEvalJudgeRouteRunDeps;
@@ -162,11 +153,7 @@ export class InstantEvalJudgeRouteRunService {
     return this.escalateUnsure({ questions, first });
   }
 
-  /**
-   * A gated plan: the gate rates each question's case, then the primary answers the easy ones
-   * alone and the escalation the rest alone, side by side, with no sureness read. A failed branch
-   * is answered by the other backend, flagged; the hard branch is not an escalation (ADR-190 d11).
-   */
+  /** A gated plan: its gate, then each question's branch alone (ADR-190 decision 11). */
   private async judgeGated({
     questions,
     gate,
@@ -176,119 +163,19 @@ export class InstantEvalJudgeRouteRunService {
     gate: InstantEvalJudgeRouteGate;
     escalateTo: string;
   }): Promise<InstantEvalJudgement> {
-    const { primary } = this.plan;
-    const { easy, hard } = await this.gated({ questions, gate });
-    const easyAsk = this.askBranch({
-      questions: easy,
-      backend: primary,
-      other: escalateTo,
-      failedFlag: "primary_failed",
-    });
-    const hardAsk = this.askBranch({
-      questions: hard,
-      backend: escalateTo,
-      other: primary,
-      failedFlag: "gate_hard_failed",
-    });
-    // Both settle before a stop is rethrown, so a branch answering after the other stopped bills.
-    await Promise.allSettled([easyAsk, hardAsk]);
-    const [easyLegs, hardLegs] = [await easyAsk, await hardAsk];
-    const asked = [easyLegs.own, easyLegs.other, hardLegs.own, hardLegs.other].filter(
-      (leg): leg is Leg => leg !== undefined,
-    );
+    const { asked, escalated, waitMs } = await InstantEvalJudgeGatedLegsService.create({
+      plan: this.plan,
+      gate,
+      escalateTo,
+      logger: this.logger,
+      flag: (flag) => this.flags.push(flag),
+      ask: (input) => this.ask(input),
+      askOne: (input) => this.askOne(input),
+    }).ask(questions);
     const legs = asked.filter(isInstantEvalJudgeLegAnswered);
     const failed = asked.findLast((leg) => leg.outcome === "failed");
     if (legs.length === 0 && failed?.outcome === "failed") return this.nothingAnswered(failed);
-    const escalated = answersIn(easyLegs.other);
-    // The branches waited side by side, so the longer one; a branch's own two asks are in a row.
-    const waitMs = Math.max(waitOf(easyLegs), waitOf(hardLegs));
     return this.result({ questions, legs, escalated, waitMs });
-  }
-
-  /**
-   * Each question's branch, from one gate send per question: the gate reads the question as the
-   * task, so two questions never share a send. A gate that fails, times out or gives no score
-   * sends its question the hard way; only the caller's stop is rethrown, once every send settled.
-   */
-  private async gated({
-    questions,
-    gate,
-  }: {
-    questions: readonly InstantEvalQuestion[];
-    gate: InstantEvalJudgeRouteGate;
-  }): Promise<{ easy: InstantEvalQuestion[]; hard: InstantEvalQuestion[] }> {
-    const { job, fullText } = this.plan;
-    const sends = questions.map((question) => {
-      const asked = instantEvalJudgeGateQuestionOf({ name: gate.question, id: question.id });
-      const text = instantEvalJudgeGateInputOf({
-        job,
-        task: question.instructions,
-        text: fullText,
-      });
-      return this.askOne({ backend: gate.backend, questions: [asked], text });
-    });
-    await Promise.allSettled(sends);
-    const rated = await Promise.all(sends);
-    const easy: InstantEvalQuestion[] = [];
-    const hard: InstantEvalQuestion[] = [];
-    let isUnrated = false;
-    rated.forEach((leg, at) => {
-      const question = questions[at]!;
-      const verdict =
-        leg.outcome === "answered" ? leg.answers.get(question.id)?.verdict : undefined;
-      // The sends waited side by side; a send that failed reports no wait, as any failed leg.
-      if (leg.outcome === "answered") {
-        this.gateWaitMs = Math.max(this.gateWaitMs, leg.limiterWaitMs);
-      } else this.gateFailed({ backend: gate.backend, leg });
-      const { branch, hasScore } = instantEvalJudgeGateBranchOf({
-        verdict,
-        easyBelow: gate.easyBelow,
-      });
-      if (!hasScore) isUnrated = true;
-      (branch === "easy" ? easy : hard).push(question);
-    });
-    if (isUnrated) this.flags.push("gate_no_score");
-    if (easy.length > 0) this.flags.push("gate:easy");
-    if (hard.length > 0) this.flags.push("gate:hard");
-    return { easy, hard };
-  }
-
-  /** A gate that could not rate is never fatal; a channel's throw is logged, not rethrown. */
-  private gateFailed({
-    backend,
-    leg,
-  }: {
-    backend: string;
-    leg: Extract<Leg, { outcome: "failed" }>;
-  }): void {
-    this.flags.push(`${backend}_failed:${leg.reason}`);
-    if (leg.error !== undefined) {
-      this.logger.error({ backend, error: leg.error }, "Instant Evals router gate threw");
-    }
-  }
-
-  /**
-   * One branch's questions from its backend, and those it left from the other backend, flagged.
-   * Neither ask falls back onto the other's backend, so each is asked at most once per question.
-   */
-  private async askBranch({
-    questions,
-    backend,
-    other,
-    failedFlag,
-  }: {
-    questions: readonly InstantEvalQuestion[];
-    backend: string;
-    other: string;
-    failedFlag: string;
-  }): Promise<{ own?: Leg; other?: Leg }> {
-    if (questions.length === 0) return {};
-    const own = await this.ask({ backend, questions, skip: [other] });
-    const left =
-      own.outcome === "failed" ? questions : questions.filter((q) => !own.answers.has(q.id));
-    if (left.length === 0) return { own };
-    this.flags.push(failedFlag);
-    return { own, other: await this.ask({ backend: other, questions: left, skip: [backend] }) };
   }
 
   /**
@@ -423,105 +310,20 @@ export class InstantEvalJudgeRouteRunService {
         reasoningEffort: config.reasoningEffort,
       });
     }
-    const deadline = InstantEvalJudgeLegDeadlineService.create(config.timeoutMs);
-    try {
-      return await this.askDecisionModel({
-        backend,
-        kind: config.kind,
-        model: config.model,
-        questions,
-        deadline,
-        text,
-      });
-    } catch (error) {
-      if (this.signal?.aborted) throw error;
-      if (!isInstantEvalJudgeLegStop(error))
-        return { outcome: "failed", reason: "classifier_failed", error };
-      this.flags.push(`${backend}_timed_out`);
-      return { outcome: "failed", reason: "classifier_provider_unavailable" };
-    } finally {
-      deadline.stop();
-    }
-  }
-
-  private async askDecisionModel({
-    backend,
-    kind,
-    model,
-    questions,
-    deadline,
-    text: ownText,
-  }: {
-    backend: string;
-    kind: "jev" | "decisions";
-    model: string | undefined;
-    questions: readonly InstantEvalQuestion[];
-    deadline: InstantEvalJudgeLegDeadlineService;
-    text: string | undefined;
-  }): Promise<Leg> {
-    const text = ownText ?? this.textFor({ backend, kind });
-    const judgement = await this.callDecisionModel({ kind, model, text, questions, deadline });
-    if (!judgement) {
-      this.flags.push(`${backend}_unavailable`);
-      return { outcome: "failed", reason: "classifier_provider_unavailable" };
-    }
-    const { inputTokens, outputTokens = 0 } = judgement;
-    this.paid({ backend, inputTokens, outputTokens });
-    if (judgement.skippedReason) return { outcome: "failed", reason: judgement.skippedReason };
-    const answers = instantEvalDecisionAnswersOf({ questions, judgement, table: this.deps.table });
-    if (answers.size === 0) return { outcome: "failed", reason: "classifier_provider_unavailable" };
-    return {
-      outcome: "answered",
-      backend,
-      answers,
-      isTextTruncated: judgement.isTextTruncated,
-      limiterWaitMs: judgement.limiterWaitMs ?? 0,
-    };
-  }
-
-  /**
-   * The decision model's judgement, or undefined when this install holds no channel for it. Each
-   * send waits on the limiter (the hosted classifier's own bucket, a per-kind tenant share for
-   * Decisions) on the caller's stop alone, with the leg's clock paused meanwhile.
-   */
-  private async callDecisionModel({
-    kind,
-    model,
-    text,
-    questions,
-    deadline,
-  }: {
-    kind: "jev" | "decisions";
-    model: string | undefined;
-    text: string;
-    questions: readonly InstantEvalQuestion[];
-    deadline: InstantEvalJudgeLegDeadlineService;
-  }): Promise<InstantEvalJudgement | undefined> {
-    const { classifier, hostedDecisions } = this.deps;
-    const signal = deadline.signalWith(this.signal);
-    const limiter = deadline.pausing({ limiter: this.deps.limiter, signal: this.signal });
-    if (kind === "jev") {
-      return classifier?.classify({ projectId: this.projectId, text, questions, limiter }, signal);
-    }
-    if (!hostedDecisions || !model) return undefined;
-    const { projectId } = this;
-    await limiter.acquire(
-      instantEvalJudgeLegPermitOf({ projectId, pool: "decisions", text, questions }),
-    );
-    return hostedDecisions.classify({ text, questions, model }, signal);
-  }
-
-  /**
-   * The planned view for a leg whose kind the table allows on it, else the full trace: the plan
-   * checks only the primary and pair, so a fallback or a decision-kind escalation is checked here.
-   */
-  private textFor({ backend, kind }: { backend: string; kind: "jev" | "decisions" }): string {
-    const { inputView, text, fullText } = this.plan;
-    if (inputView === "full" || text === fullText) return text;
-    const allowed: readonly string[] = this.deps.table.inputViews.allowedKinds[inputView];
-    if (allowed.includes(kind)) return text;
-    this.flags.push(`${inputView}_view_refused:${backend}`);
-    return fullText;
+    const { table, classifier, hostedDecisions, limiter } = this.deps;
+    const leg = InstantEvalJudgeDecisionLegService.create({
+      table,
+      classifier,
+      hostedDecisions,
+      limiter,
+      projectId: this.projectId,
+      plan: this.plan,
+      signal: this.signal,
+      flag: (flag) => this.flags.push(flag),
+      paid: (spend) => this.paid(spend),
+    });
+    const { kind, model, timeoutMs } = config;
+    return leg.ask({ backend, kind, model, timeoutMs, questions, text });
   }
 
   /** One LLM call per question, in parallel; its answer is taken as sure. */
@@ -622,7 +424,7 @@ export class InstantEvalJudgeRouteRunService {
     return {
       verdicts,
       isTextTruncated: legs.some((leg) => leg.isTextTruncated),
-      limiterWaitMs: this.gateWaitMs + legsWaitMs,
+      limiterWaitMs: legsWaitMs,
       ...this.spent(),
       routing: this.routing({ answeredBy, escalated }),
     };
@@ -647,17 +449,4 @@ export class InstantEvalJudgeRouteRunService {
     const { mode, slot, inputView } = this.plan;
     return { answeredBy, escalated, mode, slot, inputView, flags: [...this.flags] };
   }
-}
-
-/** How many questions a leg answered; none for a leg that was not asked or failed. */
-function answersIn(leg: Leg | undefined): number {
-  return leg?.outcome === "answered" ? leg.answers.size : 0;
-}
-
-/** What one gated branch waited on the limiter: its own ask, then the other backend's. */
-function waitOf({ own, other }: { own?: Leg; other?: Leg }): number {
-  return [own, other].reduce(
-    (sum, leg) => sum + (leg?.outcome === "answered" ? leg.limiterWaitMs : 0),
-    0,
-  );
 }
