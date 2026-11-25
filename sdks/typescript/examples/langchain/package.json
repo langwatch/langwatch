@@ -18,7 +18,6 @@
     "@opentelemetry/sdk-node": "^0.217.0",
     "cli-markdown": "^3.5.1",
     "dotenv-cli": "^10.0.0",
-    "langchain": "^1.6.8",
     "langwatch": "file:../../"
   },
   "devDependencies": {

@@ -18,9 +18,8 @@
     "@opentelemetry/context-async-hooks": "^2.0.1",
     "@opentelemetry/sdk-node": "^0.217.0",
     "cli-markdown": "^3.5.1",
-    "langchain": "^1.6.8",
     "langwatch": "file:../../",
-    "zod": "^4.4.3"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "dotenv-cli": "^10.0.0",
