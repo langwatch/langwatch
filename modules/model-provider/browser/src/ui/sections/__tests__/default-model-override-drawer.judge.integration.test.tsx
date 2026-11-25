@@ -32,6 +32,7 @@ vi.mock("@langwatch/feature-flag-client", () => ({
 }));
 const JUDGE_ROUTER_FLAG = "release_instant_evals_judge_router";
 const OWN_DECISION_MODEL_FLAG = "release_instant_evals_own_decision_model";
+const JUDGE_PREVIEW_FLAG = "release_langwatch_judge_preview";
 const OWN_DECISION_MODEL_IDS = DECISION_MODELS.filter((entry) =>
   isOwnDecisionModelId(entry.id),
 ).map((entry) => entry.id);
@@ -191,6 +192,27 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
       expect(row.querySelector('[data-testid="model-option-subtitle"]')).toBeNull();
       expect(row).not.toHaveAttribute("aria-disabled", "true");
     }
+  });
+
+  /** @scenario "The drawer's Judge row offers LangWatch Judge (preview) where its flag is on" */
+  it("lists LangWatch Judge (preview) right after the inherit row, in the Judge row only", () => {
+    flagsOn.add(JUDGE_PREVIEW_FLAG);
+    renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+    const rows = within(judgeListbox()).getAllByRole("option", { hidden: true });
+    expect(rows[0]?.dataset.testid).toBe("provider-model-selector-inherit");
+    expect(rows[1]?.dataset.value).toBe("langwatch/judge-preview");
+    expect(rows[1]).toHaveTextContent("LangWatch Judge (preview)");
+    expect(rows[1]).toHaveTextContent("Optimized for scenario judge");
+    expect(optionValues("default").join("\n")).not.toContain("LangWatch Judge");
+    expect(optionValues("fast").join("\n")).not.toContain("LangWatch Judge");
+  });
+
+  /** @scenario "The drawer's Judge row offers LangWatch Judge (preview) where its flag is on" */
+  it("does not list it where the flag is off", () => {
+    renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+    expect(optionValues("judge").join("\n")).not.toContain("LangWatch Judge");
   });
 
   /** @scenario "An unset Judge row inherits the Default model" */

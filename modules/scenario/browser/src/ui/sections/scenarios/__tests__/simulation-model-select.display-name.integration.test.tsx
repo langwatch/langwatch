@@ -7,6 +7,11 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// The judge picker asks the judge preview flag; off in this suite.
+vi.mock("@langwatch/feature-flag-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));

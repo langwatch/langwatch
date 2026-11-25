@@ -12,6 +12,7 @@ import {
   INSTANT_EVAL_DECISION_FEATURE_KEY,
   isDecisionModelId,
   isOwnDecisionModelId,
+  picksLangWatchJudgeModel,
   LANGWATCH_DECISION_MODEL_ID,
   ModelDefaultValidationError,
   ModelProviderInvalidError,
@@ -49,6 +50,8 @@ type DecisionModelOptions = Readonly<{
   /** The row a Default models scope runs on, from that scope up only. */
   findProviderForScope: RowLookup;
   isOwnModelAllowed: OwnDecisionModelGate;
+  /** The judge preview flag for the organization. */
+  isJudgePreviewAllowed: OwnDecisionModelGate;
   now?: () => Instant;
 }>;
 
@@ -205,6 +208,7 @@ export class ModelProviderDecisionModelService {
     scopes: readonly ModelDefaultScope[];
     storedScopes?: readonly ModelDefaultScope[];
   }): Promise<void> {
+    await this.assertMayStoreJudgePreview({ organizationId, config, stored });
     const picks = ownDecisionPicksToCheck({ config, stored, scopes, storedScopes });
     if (picks.length === 0) return;
 
@@ -226,6 +230,24 @@ export class ModelProviderDecisionModelService {
           "for it. Add the key at that scope or above, or keep LangWatch Instant (preview).",
       );
     }
+  }
+
+  /** A new pick of LangWatch Judge (preview) needs its flag; a value kept as it was is let be. */
+  private async assertMayStoreJudgePreview({
+    organizationId,
+    config,
+    stored,
+  }: {
+    organizationId: string;
+    config: Readonly<Record<string, string>>;
+    stored?: Readonly<Record<string, string>> | undefined;
+  }): Promise<void> {
+    if (!picksLangWatchJudgeModel({ config, stored: stored ?? {} })) return;
+    if (await this.options.isJudgePreviewAllowed({ organizationId })) return;
+    throw new ModelDefaultValidationError(
+      "LangWatch Judge (preview) is not available for this organization yet. " +
+        "Pick another judge model.",
+    );
   }
 
   private async runsFromEvery({

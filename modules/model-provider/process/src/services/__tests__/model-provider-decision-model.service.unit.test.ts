@@ -63,6 +63,7 @@ function openAiRow(): ModelProvider {
 function harness({
   stored,
   isFlagOn = true,
+  isJudgePreviewOn = false,
   row = openAiRow(),
   rowsByProvider,
   rowsByScope = {},
@@ -71,6 +72,7 @@ function harness({
   /** The column value, or the error resolving it throws. */
   stored: string | Error;
   isFlagOn?: boolean;
+  isJudgePreviewOn?: boolean;
   row?: ModelProvider | null;
   /** When given, answers per provider instead of the one `row`; an absent provider has no row. */
   rowsByProvider?: Readonly<Record<string, ModelProvider>>;
@@ -109,6 +111,7 @@ function harness({
       return rowsByScope[`${scope.scopeType}:${scope.scopeId}`]?.[provider] ?? null;
     },
     isOwnModelAllowed: async () => isFlagOn,
+    isJudgePreviewAllowed: async () => isJudgePreviewOn,
     now: () => Temporal.Instant.fromEpochMilliseconds(nowMs),
   });
   return {
@@ -443,5 +446,41 @@ describe("ModelProviderDecisionModelService.listPickableForScopes", () => {
     await service.listPickableForScopes({ projectId: "proj_a", scopes: [PROJECT_A] });
 
     expect(providerLookups.length).toBe(new Set(providerLookups).size);
+  });
+});
+
+describe("assertMayStore with LangWatch Judge (preview)", () => {
+  const scopes = [{ scopeType: "ORGANIZATION" as const, scopeId: "org_1" }];
+  const config = { JUDGE: "langwatch/judge-preview" };
+
+  /** @scenario "Saving LangWatch Judge (preview) is refused where its flag is off" */
+  it("refuses a new pick where the flag is off, saying it is not available yet", async () => {
+    const { service } = harness({ stored: "openai/gpt-5.5" });
+
+    await expect(
+      service.assertMayStore({ organizationId: "org_1", config, scopes }),
+    ).rejects.toThrow("LangWatch Judge (preview) is not available for this organization yet");
+  });
+
+  /** @scenario "Saving LangWatch Judge (preview) is refused where its flag is off" */
+  it("lets a config that already held it save its other keys", async () => {
+    const { service } = harness({ stored: "openai/gpt-5.5" });
+
+    await expect(
+      service.assertMayStore({
+        organizationId: "org_1",
+        config: { ...config, DEFAULT: "openai/gpt-5.5" },
+        stored: config,
+        scopes,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("stores a new pick where the flag is on", async () => {
+    const { service } = harness({ stored: "openai/gpt-5.5", isJudgePreviewOn: true });
+
+    await expect(
+      service.assertMayStore({ organizationId: "org_1", config, scopes }),
+    ).resolves.toBeUndefined();
   });
 });

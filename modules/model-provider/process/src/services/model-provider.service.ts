@@ -94,6 +94,8 @@ interface ModelProviderServiceOptions {
   ids: ModelProviderIdService;
   /** The own-decision-model flag (ADR-182 decision 4). */
   isOwnDecisionModelAllowed: OwnDecisionModelGate;
+  /** The judge preview flag for the organization. */
+  isJudgePreviewAllowed: OwnDecisionModelGate;
 }
 
 /**
@@ -178,6 +180,7 @@ export class ModelProviderService {
       findProviderForProject: (input) => this.query.findProviderForProject(input),
       findProviderForScope: (input) => this.query.findProviderForScope(input),
       isOwnModelAllowed: options.isOwnDecisionModelAllowed,
+      isJudgePreviewAllowed: options.isJudgePreviewAllowed,
     });
     this.defaultWrites = ModelProviderDefaultsWriteService.create({
       defaults: options.defaults,

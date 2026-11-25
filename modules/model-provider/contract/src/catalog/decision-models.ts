@@ -22,6 +22,23 @@ export function isLangWatchJudgeModelId(id: string): boolean {
   return id === LANGWATCH_JUDGE_MODEL_ID;
 }
 
+/** The one feature the model serves: the scenario judge, and so the Judge column that feeds it. */
+export const LANGWATCH_JUDGE_FEATURE_KEY = "scenarios.judge";
+
+/** Whether a config about to be stored newly picks LangWatch Judge (preview) under any key. */
+export function picksLangWatchJudgeModel({
+  config,
+  stored = {},
+}: {
+  config: Readonly<Record<string, string>>;
+  /** What the config held before; a value kept as it was is not a new pick. */
+  stored?: Readonly<Record<string, string>>;
+}): boolean {
+  return Object.entries(config).some(
+    ([key, model]) => isLangWatchJudgeModelId(model) && stored[key] !== model,
+  );
+}
+
 /**
  * The id every LangWatch hosted pick is written as, in Default models and judge settings: the one
  * the previous release reads (expand then contract, ADR-182 amendment 2026-11-23). Where the
@@ -98,9 +115,9 @@ export type LangWatchDecisionPreview = Readonly<{
 }>;
 
 /**
- * LangWatch's decision models, first in the Instant Evals picker. LangWatch Instant (preview) is
- * hosted for every column; LangWatch Evals (preview) only for LLM judges; the others are listed as
- * coming soon. Making one pickable is adding its column here.
+ * LangWatch's decision models, first in the Instant Evals picker. LangWatch Instant (preview)
+ * fills that column, LangWatch Evals (preview) is for LLM judges only, and LangWatch Judge
+ * (preview) fills the Judge column. Making one pickable is adding its column here.
  */
 export const LANGWATCH_DECISION_PREVIEWS: readonly LangWatchDecisionPreview[] = [
   { id: LANGWATCH_DECISION_MODEL_ID, ...INSTANT_PREVIEW, fills: ["INSTANT_EVALS"] },
@@ -109,7 +126,8 @@ export const LANGWATCH_DECISION_PREVIEWS: readonly LangWatchDecisionPreview[] = 
     id: LANGWATCH_JUDGE_MODEL_ID,
     label: "LangWatch Judge (preview)",
     description: "Optimized for scenario judge",
-    fills: [],
+    // Pickable in the Judge column where the judge preview flag is on, never self-hosted.
+    fills: ["JUDGE"],
   },
 ];
 

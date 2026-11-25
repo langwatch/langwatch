@@ -127,6 +127,7 @@ async function writerOver({
       Promise.resolve(
         provider === "inception" && keyed.has(scopeKey(scope)) ? inceptionRow() : null,
       ),
+    isJudgePreviewAllowed: () => Promise.resolve(false),
     isOwnModelAllowed: () => Promise.resolve(isFlagOn),
   });
   return ModelProviderDefaultsWriteService.create({
@@ -140,6 +141,47 @@ async function writerOver({
     scopes,
   });
 }
+
+describe("ModelProviderDefaultsWriteService and LangWatch Judge (preview)", () => {
+  /** @scenario "Saving LangWatch Judge (preview) under another column is refused" */
+  it.each(["DEFAULT", "FAST", "INSTANT_EVALS"])("refuses it as the %s default", async (key) => {
+    const writer = await writerOver({ isFlagOn: true });
+
+    await expect(
+      writer.save({
+        config: { [key]: "langwatch/judge-preview" },
+        scopes: [SCOPE],
+        authorId: null,
+      }),
+    ).rejects.toMatchObject({ code: "validation_error" });
+  });
+
+  /** @scenario "Saving LangWatch Judge (preview) under another column is refused" */
+  it("says it can only be the Judge default", async () => {
+    const writer = await writerOver({ isFlagOn: true });
+
+    await expect(
+      writer.save({
+        config: { DEFAULT: "langwatch/judge-preview" },
+        scopes: [SCOPE],
+        authorId: null,
+      }),
+    ).rejects.toThrow("can only be the Judge default");
+  });
+
+  /** @scenario "Saving LangWatch Judge (preview) is refused where its flag is off" */
+  it("refuses it as the Judge default where its flag is off", async () => {
+    const writer = await writerOver({ isFlagOn: true });
+
+    await expect(
+      writer.save({
+        config: { JUDGE: "langwatch/judge-preview" },
+        scopes: [SCOPE],
+        authorId: null,
+      }),
+    ).rejects.toThrow("not available for this organization yet");
+  });
+});
 
 describe("ModelProviderDefaultsWriteService and the Instant Evals column", () => {
   describe("when the flag is off", () => {

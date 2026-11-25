@@ -2,6 +2,8 @@ import {
   DECISION_MODELS,
   decisionModelPickerTitle,
   isOwnDecisionModelId,
+  LANGWATCH_DECISION_PREVIEWS,
+  LANGWATCH_JUDGE_MODEL_ID,
   type DecisionModelEntry,
 } from "./catalog/decision-models.ts";
 import { findAliasTarget, isLatestAlias } from "./catalog/latest-aliases.ts";
@@ -43,6 +45,31 @@ export type ModelPickerOption = {
   /** A short tag beside the title, such as "Coming soon". */
   hint?: string;
 };
+
+/**
+ * LangWatch Judge (preview) as a judge picker's first row, where its flag is on. Its label and
+ * the line under it come from the catalogue, so every picker names it the same way.
+ */
+export function langwatchJudgePickerOption(): ModelPickerOption {
+  const preview = LANGWATCH_DECISION_PREVIEWS.find(({ id }) => id === LANGWATCH_JUDGE_MODEL_ID);
+  return {
+    label: preview?.label ?? LANGWATCH_JUDGE_MODEL_ID,
+    value: LANGWATCH_JUDGE_MODEL_ID,
+    subtitle: preview?.description ?? "",
+  };
+}
+
+/** A judge picker's rows: LangWatch Judge (preview) first where it is offered, then the LLMs. */
+export function judgePickerOptions({
+  llmOptions,
+  isJudgePreviewOffered,
+}: {
+  llmOptions: readonly ModelPickerOption[];
+  isJudgePreviewOffered: boolean;
+}): ModelPickerOption[] {
+  const llms = llmOptions.filter((option) => option.value !== LANGWATCH_JUDGE_MODEL_ID);
+  return isJudgePreviewOffered ? [langwatchJudgePickerOption(), ...llms] : llms;
+}
 
 /**
  * Alias entries (`<provider>/latest`, `<provider>/latest-mini`) read as
