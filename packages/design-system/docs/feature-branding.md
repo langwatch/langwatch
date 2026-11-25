@@ -45,8 +45,9 @@ and the mark on whatever the feature adds to other screens.
   are drawn as the mark is: solid, one curve for every crossing, a clean gap where a strand passes
   under another. The crossings sit together in one even braid, not spread across the canvas, and
   each strand ends on a dot level with the row it feeds. Never dotted or tangled.
-- **Projects look like projects.** A project is a round avatar with its initial, in the art as in
-  the app's project switcher, and the art's project colours are the app's avatar hues.
+- **Projects look like projects.** The empty state draws a project as the kit's square badge with
+  two letters; the Enterprise art keeps the round avatar. Project colours are the kit's orange, blue
+  and green (`feature.braids.project.*`), never purple. Not-yet-braided strands are dotted.
 - **Meaning through semantic tokens.** Errors, warnings and successes use `fg.error`,
   `fg.warning` and `fg.success`. A badge, outline or bar is never painted in the feature's lead,
   and a span bar keeps its span type's colour.

@@ -7,20 +7,38 @@ import { describe, expect, it } from "vitest";
 import { mergeQuerySources, withNewQuerySources } from "../widget-query-sources.rules.ts";
 
 const QUERY = { name: "main", sql: "SELECT 1" };
+const READS_SOURCES = {
+  name: "main",
+  sql: "SELECT count() FROM trace_metrics WHERE Source IN {dashboard_context_sources:Array(String)}",
+};
 
 describe("withNewQuerySources", () => {
   /** @scenario "AC200o Sources: a new widget's query counts application traces" */
   it("stores application on an unset query and keeps a list that is given", () => {
     expect(
       withNewQuerySources([
-        QUERY,
-        { ...QUERY, name: "turns", sources: [] },
-        { ...QUERY, sources: null },
+        READS_SOURCES,
+        { ...READS_SOURCES, name: "turns", sources: [] },
+        { ...READS_SOURCES, sources: null },
       ]),
     ).toEqual([
-      { ...QUERY, sources: ["application"] },
-      { ...QUERY, name: "turns", sources: [] },
-      { ...QUERY, sources: ["application"] },
+      { ...READS_SOURCES, sources: ["application"] },
+      { ...READS_SOURCES, name: "turns", sources: [] },
+      { ...READS_SOURCES, sources: ["application"] },
+    ]);
+  });
+
+  /** @scenario "AC200o Sources: a new widget's query counts application traces" */
+  it("stores no list on an unset query whose SQL never reads the sources parameter", () => {
+    const commented = { ...QUERY, sql: "SELECT 1 /* {dashboard_context_sources:Array(String)} */" };
+
+    expect(withNewQuerySources([QUERY, { ...QUERY, sources: null }, commented])).toEqual([
+      QUERY,
+      QUERY,
+      commented,
+    ]);
+    expect(withNewQuerySources([{ ...QUERY, sources: ["langy"] }])).toEqual([
+      { ...QUERY, sources: ["langy"] },
     ]);
   });
 });
@@ -82,6 +100,8 @@ describe("a query's projects", () => {
   /** @scenario "AC210 Compatibility: a widget saved before projects existed reads the board's project" */
   it("stores no projects on a query that had none", () => {
     expect(mergeQuerySources({ sent: [QUERY], stored: [QUERY] })).toEqual([QUERY]);
-    expect(withNewQuerySources([QUERY])).toEqual([{ ...QUERY, sources: ["application"] }]);
+    expect(withNewQuerySources([READS_SOURCES])).toEqual([
+      { ...READS_SOURCES, sources: ["application"] },
+    ]);
   });
 });

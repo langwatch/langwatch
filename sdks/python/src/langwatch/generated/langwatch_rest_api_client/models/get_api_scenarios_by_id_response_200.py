@@ -32,6 +32,10 @@ class GetApiScenariosByIdResponse200:
             servers that predate model overrides on this family.
         judge_model (None | str | Unset): The model that judges the run, or null for the project default. Absent on
             servers that predate model overrides on this family.
+        trace_quiet_period_ms (int | None | Unset): Milliseconds the agent's trace must stay unchanged before the judge
+            reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+        trace_wait_timeout_ms (int | None | Unset): Milliseconds the judge waits for the agent's trace before a verdict,
+            or null for the project's recommendation. Absent on servers that predate judge trace settings.
         max_turns (int | None | Unset): The most conversation turns a run of this scenario takes, or null for the
             default. Absent on servers that predate turn limits on this family.
         min_turns (int | None | Unset): The fewest conversation turns before the judge may end a run, or null for the
@@ -52,6 +56,8 @@ class GetApiScenariosByIdResponse200:
     platform_url: str
     simulator_model: None | str | Unset = UNSET
     judge_model: None | str | Unset = UNSET
+    trace_quiet_period_ms: int | None | Unset = UNSET
+    trace_wait_timeout_ms: int | None | Unset = UNSET
     max_turns: int | None | Unset = UNSET
     min_turns: int | None | Unset = UNSET
     test_suite_id: None | str | Unset = UNSET
@@ -86,6 +92,18 @@ class GetApiScenariosByIdResponse200:
             judge_model = UNSET
         else:
             judge_model = self.judge_model
+
+        trace_quiet_period_ms: int | None | Unset
+        if isinstance(self.trace_quiet_period_ms, Unset):
+            trace_quiet_period_ms = UNSET
+        else:
+            trace_quiet_period_ms = self.trace_quiet_period_ms
+
+        trace_wait_timeout_ms: int | None | Unset
+        if isinstance(self.trace_wait_timeout_ms, Unset):
+            trace_wait_timeout_ms = UNSET
+        else:
+            trace_wait_timeout_ms = self.trace_wait_timeout_ms
 
         max_turns: int | None | Unset
         if isinstance(self.max_turns, Unset):
@@ -126,6 +144,10 @@ class GetApiScenariosByIdResponse200:
             field_dict["simulatorModel"] = simulator_model
         if judge_model is not UNSET:
             field_dict["judgeModel"] = judge_model
+        if trace_quiet_period_ms is not UNSET:
+            field_dict["traceQuietPeriodMs"] = trace_quiet_period_ms
+        if trace_wait_timeout_ms is not UNSET:
+            field_dict["traceWaitTimeoutMs"] = trace_wait_timeout_ms
         if max_turns is not UNSET:
             field_dict["maxTurns"] = max_turns
         if min_turns is not UNSET:
@@ -182,6 +204,24 @@ class GetApiScenariosByIdResponse200:
 
         judge_model = _parse_judge_model(d.pop("judgeModel", UNSET))
 
+        def _parse_trace_quiet_period_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_quiet_period_ms = _parse_trace_quiet_period_ms(d.pop("traceQuietPeriodMs", UNSET))
+
+        def _parse_trace_wait_timeout_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_wait_timeout_ms = _parse_trace_wait_timeout_ms(d.pop("traceWaitTimeoutMs", UNSET))
+
         def _parse_max_turns(data: object) -> int | None | Unset:
             if data is None:
                 return data
@@ -226,6 +266,8 @@ class GetApiScenariosByIdResponse200:
             platform_url=platform_url,
             simulator_model=simulator_model,
             judge_model=judge_model,
+            trace_quiet_period_ms=trace_quiet_period_ms,
+            trace_wait_timeout_ms=trace_wait_timeout_ms,
             max_turns=max_turns,
             min_turns=min_turns,
             test_suite_id=test_suite_id,

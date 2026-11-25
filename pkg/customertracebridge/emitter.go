@@ -497,6 +497,12 @@ func canonicalModelID(provider aitrace.ProviderID, model string) string {
 	return string(provider) + "/" + model
 }
 
+// Tracer starts spans on the bridge's private provider. A span reaches a
+// project only when it carries langwatch.project_id, as BeginSpan's do.
+func (e *Emitter) Tracer() trace.Tracer {
+	return e.tracer
+}
+
 // Shutdown flushes pending spans to customer endpoints.
 func (e *Emitter) Shutdown(ctx context.Context) error {
 	if e.tp != nil {

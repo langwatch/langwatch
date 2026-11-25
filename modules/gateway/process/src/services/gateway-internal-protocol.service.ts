@@ -25,7 +25,7 @@ import {
   type GatewayPricedSpendResult,
   type GatewayInternalSpendSubmission,
   type VirtualKeyWithScopes,
-  type GatewayVirtualKeyRecord,
+  type GatewayPresentedVirtualKey,
 } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -43,6 +43,7 @@ import type { GatewayBudgetSpendRepository } from "../repositories/gateway-budge
 import type { GatewayChangeEventsRepository } from "../repositories/gateway-change-event.repository.ts";
 import type { GatewayInternalStoreRepository } from "../repositories/gateway-internal-store.repository.ts";
 import type { GatewayConfigMaterialiserService } from "./gateway-config-materialisation.service.ts";
+import type { GatewayGovernanceEventsService } from "./gateway-governance-events.service.ts";
 import type { GatewayGuardrailEvaluationService } from "./gateway-guardrail-evaluation.service.ts";
 import type { GatewayJwtService } from "./gateway-jwt.service.ts";
 
@@ -87,6 +88,8 @@ export type GatewayInternalProtocolMembers = Readonly<{
   spend: GatewayInternalSpendPipeline | undefined;
   /** Absent with no spend confirmation path; a booked session would then never bill. */
   realtimeSessions: GatewayRealtimeSessionCollaborators | undefined;
+  /** Records a key's first admitted request for nurturing; absent records none. */
+  firstRequests?: Pick<GatewayGovernanceEventsService, "recordVkFirstRequest">;
 }>;
 
 /** Callable boundary for the deployment-internal gateway protocol. */
@@ -103,7 +106,7 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     return new GatewayInternalProtocolService(members);
   }
 
-  findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null> {
+  findVirtualKeyBySecret(secret: string): Promise<GatewayPresentedVirtualKey | null> {
     return this.#members.virtualKeys.findBySecretInternal(secret);
   }
 

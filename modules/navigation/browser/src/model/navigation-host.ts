@@ -122,6 +122,11 @@ export abstract class NavigationHost {
   /** Fail-closed flag check, with the pending state kept. */
   abstract featureFlag(flag: ReleaseFlagToken): NavigationFlagReading;
 
+  /** The organisation already has braids, as authz answers it; false while unanswered. */
+  braidsPresent(): boolean {
+    return false;
+  }
+
   /**
    * What the application shows while a navigation decision is still being
    * made — belongs to the host's own chrome (logo, motion budget), the same

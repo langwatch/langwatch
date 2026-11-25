@@ -4,6 +4,7 @@ import {
   PII_REDACTION_SPEND_AGGREGATE_TYPE,
   PII_REDACTION_SPEND_PIPELINE_NAME,
 } from "@langwatch/data-privacy-contract/pii-redaction-spend";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
@@ -26,6 +27,7 @@ function process(role: "api" | "worker", googleCredentials?: string) {
         googleDlpDisabled: undefined,
         enforcement: undefined,
         nodeEnvironment: undefined,
+        isSaas: true,
         langevalsEndpoint: undefined,
         piiRedactionModelEndpoint: undefined,
       },
@@ -33,6 +35,7 @@ function process(role: "api" | "worker", googleCredentials?: string) {
     .provide({
       authz: createApiFixture<AuthzApi>(),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
+      entitlement: createApiFixture<EntitlementApi>(),
     });
 }
 

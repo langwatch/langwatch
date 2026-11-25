@@ -6,7 +6,7 @@ The server half of [stored-object](../README.md). Stored objects: uploads and st
 
 ## Installation
 
-`defineProcessModule("stored-object").withRepositories(storedObjectRepositories).withChannels(storedObjectChannels).withApi(StoredObjectModule).withTransports(storedObjectRest, storedObjectFileRest, storedObjectImageProxyRest, storedObjectTrpcTransport).withMigrations(…)`, `src/stored-object.module.ts:17`.
+`defineProcessModule("stored-object").withRepositories(storedObjectRepositories).withChannels(storedObjectChannels).withApi(StoredObjectModule).withTransports(storedObjectRest, storedObjectFileRest, storedObjectImageProxyRest, storedObjectTrpcTransport).withEventing(storedObjectEventing).withMigrations(…)`, `src/stored-object.module.ts:18`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -430,7 +430,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
-None: stored-object declares no pipeline, process manager, subscriber or task.
+### Pipeline `stored_object_maintenance` (aggregate `global`)
+
+Declared at `src/eventing/stored-object-maintenance.pipeline.ts:41`.
+
+| Kind            | Name                     | Handles                                                                            | Declared at                                             |
+| --------------- | ------------------------ | ---------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| process manager | `storedObjectUploadReap` | every 15 min (`UPLOAD_REAP_INTERVAL_MS = 15 * 60 * 1000`); intents `reap` (outbox) | `src/eventing/stored-object-maintenance.pipeline.ts:46` |
 
 ## Configuration
 

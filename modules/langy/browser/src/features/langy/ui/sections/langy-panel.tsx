@@ -718,6 +718,7 @@ function LangyPanel({
                         failure={failure}
                         organizationId={organizationId}
                         onGithubConnected={onGithubConnected}
+                        onShareLocalFolder={askCodeAccessAgain}
                       />
                     )}
                   </LangyConversationScroller>
@@ -728,6 +729,11 @@ function LangyPanel({
                     floating={floating}
                     presentation={failure.turnError}
                     onDismiss={engine.clearError}
+                  />
+                  <LangyComposerNotice
+                    floating={floating}
+                    presentation={model.unservedDefaultNotice}
+                    onDismiss={model.dismissUnservedDefault}
                   />
                   {view.timeTravel && (
                     <LangyTimeTravelVeil floating={floating} atMs={view.timeTravel.atMs} />

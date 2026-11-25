@@ -18,7 +18,7 @@ export interface SpanDataFloor {
 export const SPAN_HISTORY_REBUILDING_NOTICE = "Span history is still being rebuilt";
 
 /** A query that names `span_metrics` after FROM or JOIN, in any case, schema-qualified or not. */
-const READS_SPAN_METRICS = /\b(?:FROM|JOIN)\s+(?:analytics\.)?span_metrics\b/i;
+const READS_SPAN_METRICS = /\b(?:FROM|JOIN)\s+(?:[a-z_]+\.)?span_metrics\b/i;
 
 const DAY = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",

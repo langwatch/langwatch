@@ -12,6 +12,14 @@ export type VendorBases = Readonly<{
   databricksWorkspace: string | undefined;
   /** The one Dataverse environment address accepted beside the real Dynamics clouds, when one is named. */
   dataverseEnvironment: string | undefined;
+  /** Google's OAuth token endpoint origin; the token URL is this plus `/token`. */
+  googleOauthToken: string;
+  /** Replaces `https://{location}-aiplatform.googleapis.com` for every location, when one is named. */
+  vertexAiApi: string | undefined;
+  /** A Bedrock Agents control-plane endpoint in place of AWS's own, when one is named. */
+  bedrockAgent: string | undefined;
+  /** A Bedrock AgentCore control-plane endpoint in place of AWS's own, when one is named. */
+  bedrockAgentCoreControl: string | undefined;
 }>;
 
 export const REAL_VENDOR_BASES: VendorBases = {
@@ -21,6 +29,10 @@ export const REAL_VENDOR_BASES: VendorBases = {
   microsoftGraph: "https://graph.microsoft.com",
   databricksWorkspace: undefined,
   dataverseEnvironment: undefined,
+  googleOauthToken: "https://oauth2.googleapis.com",
+  vertexAiApi: undefined,
+  bedrockAgent: undefined,
+  bedrockAgentCoreControl: undefined,
 };
 
 function withoutTrailingSlash(value: string): string {
@@ -40,6 +52,10 @@ export function vendorBasesOf({
         | "microsoftGraphApiBase"
         | "databricksWorkspaceBase"
         | "dataverseEnvironmentBase"
+        | "googleOauthTokenBase"
+        | "vertexAiApiBase"
+        | "bedrockAgentEndpoint"
+        | "bedrockAgentCoreControlEndpoint"
       >
     | undefined;
 }): VendorBases {
@@ -56,6 +72,10 @@ export function vendorBasesOf({
     dataverseEnvironment: config?.dataverseEnvironmentBase
       ? withoutTrailingSlash(config.dataverseEnvironmentBase)
       : undefined,
+    googleOauthToken: pick(config?.googleOauthTokenBase, REAL_VENDOR_BASES.googleOauthToken),
+    vertexAiApi: config?.vertexAiApiBase ? withoutTrailingSlash(config.vertexAiApiBase) : undefined,
+    bedrockAgent: config?.bedrockAgentEndpoint || undefined,
+    bedrockAgentCoreControl: config?.bedrockAgentCoreControlEndpoint || undefined,
   };
 }
 
@@ -71,6 +91,8 @@ export function exemptOriginsOf({ bases }: { bases: VendorBases }): string[] {
     bases.microsoftGraph,
     bases.databricksWorkspace,
     bases.dataverseEnvironment,
+    bases.googleOauthToken,
+    bases.vertexAiApi,
   ];
   const real = new Set<string | undefined>(Object.values(REAL_VENDOR_BASES));
   return configured.flatMap((base) => {
