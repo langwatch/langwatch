@@ -389,7 +389,7 @@ ORDER BY first_at
 LIMIT 8`;
 
 const languageOutcomes = `SELECT o.outcome AS outcome, o.at AS at,
-    coalesce(nullIf(o.language, ''), 'Unknown') AS language
+    coalesce(nullIf(o.language, ''), 'Language not sent') AS language
   FROM (${outcomes({ ...PERIOD, withLanguage: true, fromTraceEvaluations: true })}) AS o`;
 
 /** Calls with an outcome and those that got the task done, per bucket and language. */

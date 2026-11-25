@@ -1,7 +1,7 @@
 import { performance } from "node:perf_hooks";
 
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import type { Cluster, Redis } from "ioredis";
 
 import {
@@ -73,7 +73,7 @@ function resolveFoldCacheTtlSeconds(configuredSeconds: number | undefined): numb
 
 function readUpdatedAt<State>(state: State): number {
   const value = (state as { UpdatedAt?: unknown })?.UpdatedAt;
-  return typeof value === "number" ? value : nowInstant().epochMilliseconds;
+  return typeof value === "number" ? value : nowEpochMs();
 }
 
 /**

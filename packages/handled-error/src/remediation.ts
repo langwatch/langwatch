@@ -33,6 +33,19 @@ const registry = {
       "A key that reads exactly one project, such as a project API key, needs none: it defaults to that project",
     ],
   },
+  billing_only_keeps_billing: {
+    tips: [
+      "To stop a Billing-only member paying, remove them from the organization",
+      "To keep them in the organization without Billing, change their organization role to a seat role first, then turn Billing off",
+    ],
+  },
+  billing_only_no_team_access: {
+    tips: [
+      "Send the Billing-only invite with no `teams` and no `teamIds`",
+      "For someone not yet in the organization who needs a team, invite them with a seat role instead, which uses a seat",
+      "For a current Billing-only member, change their organization role to a seat role first, then add them to the team",
+    ],
+  },
   projects_unreadable: {
     tips: [
       "Ask an admin to grant the key's owner `analytics:view` on a project, or use a key that has it",
@@ -63,6 +76,11 @@ const registry = {
   },
 
   // ---- dataset storage ----
+  stored_object_write_conflict: {
+    tips: [
+      "Another change to the same file landed while this one was written; send the request again",
+    ],
+  },
   private_dataplane_unavailable: {
     tips: [
       "Set the variable this error names (CLICKHOUSE_URL__<label>__<orgId> or DATAPLANE_S3__<label>__<orgId>) and restart the api and worker",
@@ -78,11 +96,36 @@ const registry = {
     ],
   },
 
+  storage_credentials_refused: {
+    tips: [
+      "On Azure Blob with a shared key, check AZURE_BLOB_ACCOUNT_NAME and AZURE_BLOB_ACCOUNT_KEY name the same account, then restart the api and worker",
+      "Under a token mode, check the identity's client id, tenant and secret or federated token; a role grant does not fix a credential Azure rejects",
+    ],
+    docsPath: "/self-hosting/configuration/environment-variables",
+  },
+
+  storage_permission_denied: {
+    tips: [
+      'Grant the identity "Storage Blob Data Contributor" on the storage account or the container',
+      'The control-plane "Contributor" role does not grant data access',
+    ],
+    docsPath: "/self-hosting/configuration/environment-variables",
+  },
+
   dataset_invalid_column: {
     tips: [
       "Add the column to the dataset, or remove it from the row, and send it again; retrying unchanged will fail identically",
       "The message names the dataset's valid columns",
     ],
+  },
+
+  // ---- data retention ----
+  data_retention_billed_through_billing: {
+    tips: [
+      "Ask someone with subscription:manage in the organization to set this length; it adds a storage line to the subscription",
+      "Or pick 90 days or less, which the plan includes",
+    ],
+    docsPath: "/platform/data-retention",
   },
 
   // ---- automations ----
@@ -96,10 +139,24 @@ const registry = {
   // ---- traces ----
   trace_not_found: {
     tips: [
-      "Check the trace id; traces are deleted after the retention window",
       "If you just sent this trace, retry in a few seconds; ingestion is asynchronous",
+      "The id was looked up as a trace id, a trace id prefix, a span id and a scenario run id, in this project and every project of the organisation you can read",
+      'Find it by what it contained instead: `langwatch trace search -q "<text>" --since 30d`',
+      "Traces are deleted after the project's retention window",
     ],
     docsPath: "/platform/data-retention",
+  },
+  scenario_run_has_many_traces: {
+    tips: [
+      "Open one of the listed traces: `langwatch trace get <traceId>`",
+      'List them all: `langwatch trace search --filter "scenarioRun:<scenarioRunId>" --since 30d`',
+    ],
+  },
+  trace_withheld_over_plan: {
+    tips: [
+      "Upgrade the plan on Settings > Subscription to show every held trace again",
+      "Or remove members on Settings > Members until they fit the plan",
+    ],
   },
   span_not_found: {
     tips: ["Check the span id; spans are deleted with their trace after the retention window"],
@@ -133,7 +190,12 @@ const registry = {
     ],
   },
   filter_field_unknown: {
-    tips: ["Use one of the fields listed in meta.knownFields", "Field names are case-sensitive"],
+    tips: [
+      "Use one of the fields listed in meta.knownFields; meta.hint names the likely one",
+      "Field names are case-sensitive",
+      "Text in the trace input or output has no field: search it with a quoted phrase and no field, or -q",
+      "`label:<name>` matches the trace's metadata labels",
+    ],
   },
   filter_value_refused: {
     tips: [
@@ -489,8 +551,15 @@ const registry = {
   braids_not_enabled: {
     tips: [
       "Braid management is not switched on for this organisation yet; retrying will not help",
-      "Braids that already exist keep applying to trace reads; ask LangWatch to switch braids on to create or change them",
+      "Removing a braid and revoking a signing key still work; ask LangWatch to switch braids on to create or change them",
     ],
+  },
+  braids_turned_off: {
+    tips: [
+      "On the Enterprise plan, an organisation admin can turn Braids on in the organisation's Braids settings",
+      "While Braids is off, existing braids are paused and kept; removing a braid and revoking a signing key still work",
+    ],
+    docsPath: "/features/braids",
   },
 
   // ---- personal workspace reads ----
@@ -569,6 +638,76 @@ const registry = {
       "Registry ids start with agentreg_; a LangWatch agent id is a different id",
     ],
     docsPath: "/governance/agent-registry",
+  },
+  agent_stop_already_open: {
+    tips: [
+      "Read the open stop with GET /api/governance/agents/{agentId}/stop",
+      "Approve, deny or restore it before requesting a new stop",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_not_found: {
+    tips: ["List stops with GET /api/governance/agent-stops and use an `id` from that list"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_not_pending: {
+    tips: ["Only a stop whose status is `pending_approval` takes an approval or a denial"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_not_restorable: {
+    tips: ["Restore a stop whose status is `quarantined`, `stop_failed` or `restore_failed`"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_not_retryable: {
+    tips: ["Retry a stop whose status is `quarantined`, `stop_failed` or `restore_failed`"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_plan_changed: {
+    tips: [
+      "Read the plan again with GET /api/governance/agents/{agentId}/stop-plan and confirm its targets",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_plan_conflict: {
+    tips: [
+      "Read the plan again with GET /api/governance/agents/{agentId}/stop-plan, apply your change to it and send its `version` as `expectedVersion`",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_plan_empty: {
+    tips: ["Set the agent's targets with PUT /api/governance/agents/{agentId}/stop-plan"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_self_approval: {
+    tips: ["Approve with a different API key, or have a person approve it in the Agents page"],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_target_invalid: {
+    tips: [
+      "A serving endpoint target names a Databricks Genie governance source of this organisation",
+      "A Bedrock target names an AWS connection of this organisation",
+      "A virtual key target names a virtual key of this organisation",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  agent_stop_target_not_found: {
+    tips: [
+      "A Bedrock target names the alias's region, agent id and alias id as the AWS console shows them",
+      "A serving endpoint target names an endpoint of the source's Databricks workspace",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  governance_aws_connection_in_use: {
+    tips: [
+      "Remove the Bedrock targets that use it from every stop plan, and restore the stops that still hold it",
+    ],
+    docsPath: "/governance/kill-switch",
+  },
+  governance_aws_connection_not_found: {
+    tips: [
+      "Create the AWS connection on the Agents page before naming it in a stop plan or an AWS agent source",
+    ],
+    docsPath: "/governance/kill-switch",
   },
   agent_offline: {
     tips: [
@@ -710,6 +849,12 @@ const registry = {
   },
 
   // ---- scenario runs ----
+  scenario_red_team_config_mismatch: {
+    tips: [
+      "Send kind red_team together with a redTeam config holding attackGoal and owaspIds",
+      "For a standard scenario, leave redTeam out",
+    ],
+  },
   scenario_reserved_set_id: {
     tips: [
       "Send the run without a setId; it is then recorded in the project's own one-off bucket",
@@ -816,6 +961,15 @@ const registry = {
       "Open Settings, then Default Models, and set a model for the role in meta.role",
       "Set it at the organization scope so every team and project inherits it; a project scope covers that project only",
       "Enabling a provider is not enough on its own: the role still needs a model chosen for it",
+    ],
+    docsPath: "/platform/model-providers",
+  },
+
+  ai_content_filtered: {
+    tips: [
+      "The provider's own content filter refused the input; on Azure OpenAI the answer is 400 content_filter, often a jailbreak (Prompt Shields) match on instruction-like text",
+      "Relax or adjust the content filter on the deployment the feature's model points at, or try other text",
+      "Retrying the same text fails the same way",
     ],
     docsPath: "/platform/model-providers",
   },
@@ -1000,7 +1154,7 @@ const registry = {
   },
   langy_agent_errored: {
     tips: [
-      "The model call was rejected upstream; check meta/reasons for the provider's typed failure, then retry",
+      "The reply failed before it finished; when meta/reasons name a cause, fix that first, then retry",
     ],
   },
   langy_turn_timeout: {
@@ -1041,6 +1195,12 @@ const registry = {
       "Retry shortly; if it persists, the judgements can be made later by running the same statement as a job",
     ],
   },
+  instant_eval_decision_model_key_invalid: {
+    tips: [
+      "Every row of the run was refused for the key of the project's own Instant Evals model",
+      "Check the key, and that the provider row is switched on, in Settings > Model Providers",
+    ],
+  },
   instant_eval_estimate_unavailable: {
     tips: [
       "The statement was accepted; working out how many rows it matches is what failed",
@@ -1052,6 +1212,13 @@ const registry = {
       "Read `meta.spentUsd` against `meta.budgetUsd`; the organization has spent its free Instant Evals allowance across every project",
       "Upgrade the organization to a paid plan under Settings, Plan & billing; judged queries and runs are then billed per input token",
     ],
+  },
+  instant_eval_gateway_budget_exceeded: {
+    tips: [
+      "Read `meta.scope` and `meta.budgetId`; that gateway budget is set to block, and Instant Evals count against it like gateway traffic",
+      "Compare `meta.spentUsd` with `meta.limitUsd`, then raise or remove the budget under AI Gateway, Budgets, or wait for its `meta.window` to reset",
+    ],
+    docsPath: "/features/instant-evals/limits-and-cost",
   },
   instant_eval_not_enabled: {
     tips: [

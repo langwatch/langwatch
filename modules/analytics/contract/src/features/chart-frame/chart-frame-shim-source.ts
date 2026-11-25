@@ -49,6 +49,7 @@ export function buildShimScript(): string {
     return authorMounted && Object.keys(pending).length === 0 && Object.keys(retryWaits).length === 0;
   }
 
+  var lastProblem = null;
   function post(message) {
     if (port) { port.postMessage(message); } else { buffered.push(message); }
   }
@@ -125,6 +126,19 @@ export function buildShimScript(): string {
     // frameBridge.ts's "lw:navigate" case and useDashboardWidgetChartNavigate.
     navigate: function (target, params) {
       post({ type: "lw:navigate", target: String(target), params: params || {} });
+    },
+    // Fire-and-forget: the host drafts Langy about a clicked mark. It drops the ask
+    // unless LW.dashboardContext.canAskLangy, and checks the subject itself.
+    askLangy: function (subject) {
+      post({ type: "lw:ask-langy", subject: subject || {} });
+    },
+    // Called on every render with what the widget draws; posted only when it changes, so the
+    // host hears each state once. The host checks the shape itself.
+    signal: function (state) {
+      var problem = !!(state && state.problem === true);
+      if (problem === lastProblem) return;
+      lastProblem = problem;
+      post({ type: "lw:signal", signal: { problem: problem } });
     }
   };
   window.LW = LW;

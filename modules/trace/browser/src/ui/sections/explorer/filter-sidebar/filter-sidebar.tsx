@@ -95,6 +95,7 @@ export const FilterSidebar: React.FC = () => {
     categoricals,
     facetItems,
     getValueStates,
+    displayStates,
     facetsLoading,
     descriptors,
     orderedKeys,
@@ -214,6 +215,7 @@ export const FilterSidebar: React.FC = () => {
             ast={ast}
             facetItemsByKey={facetItems}
             valueStateGetters={getValueStates}
+            displayStates={displayStates}
             toggleFacet={toggleFacet}
             excludeFacet={excludeFacet}
             setRange={setRange}
@@ -235,6 +237,7 @@ export const FilterSidebar: React.FC = () => {
       ast,
       facetItems,
       getValueStates,
+      displayStates,
       numericModeByKey,
       setNumericMode,
       toggleFacet,

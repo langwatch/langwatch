@@ -19,7 +19,8 @@ brand kit beside it.
 
 > One line: a **braid** is a shared grant from an owner project to a reader project. The reader's trace
 > view shows the owner's spans that match the braid's condition, inside traces the reader already has,
-> matched by trace id. Nothing is copied. Release 1 is Enterprise only, read-only, created by whoever holds
+> where a reader span and an owner span are parent and child, directly or through other owners that
+> braid into the reader (§3). Nothing is copied. Release 1 is Enterprise only, read-only, created by whoever holds
 > the new `braids:manage` permission on the owner (project and organisation admins), and ships with call
 > signing, so a condition can require that the reader really made the call.
 
@@ -73,6 +74,12 @@ a non-empty `where`, so an aggregate's grants are unchanged. Both projects live 
 is an `aggregate` or `internal_governance` project; a project never braids into itself. Each braid's grant
 gets a fresh id (`newAuthzGrantId`), as the shared attach does today; a retried request reuses its command
 id, never a derived grant id, so a braid removed and made again within one second is two grants.
+Under the reader's lock the service records each write (`AuthzBraidWrite`: organisation, command id,
+grant id, terms) before sending its attach: a repeat of a recorded command id answers that braid,
+resending the same command while the projection lags, and the identical-braid and condition-limit
+checks read recorded writes the projection has not landed, whatever their age, as live. A command
+id is scoped to the actor who sent it; a write is forgotten only when the ledger refused its attach,
+and a repeated change is refused once the braid it replaces is no longer live.
 
 **Several braids may join one pair** (decided by Alex, 2026-10-21), read as their union: an owner span
 shows when it matches any live braid's condition inside that braid's window. A braid identical to a live one
@@ -88,9 +95,10 @@ Refusals, each a `HandledError` from authz: `braid_into_itself`, `braid_across_o
 `braid_not_on_project`, `braid_condition_unsupported`, `braid_condition_too_large`,
 `braid_condition_limit_reached`.
 
-**Braids do not chain.** A proof holds only the grants whose principal is the project it is minted for. An
+**A grant does not pass on.** A proof holds only the grants whose principal is the project it is minted for. An
 aggregate reading a member sees none of the spans braided into that member, and a braid into the reader
-passes on none of the braids the owner itself receives.
+passes on none of the braids the owner itself receives. This is about grants, not call chains: a trace that
+runs through several owners is held hop by hop under §3 only where each owner braids into the reader itself.
 
 ### 2. Who may braid, and the door
 
@@ -170,8 +178,8 @@ beside the text. The ClickHouse client renders the tree; nothing parses OTTL at 
 
 Refused on save, each with a fix the admin can act on: `or`, `not`, `IsMatch`, any comparison but string
 equality, `!=` with a value, `== true`, and `== ""` (a missing key reads as `''` in a ClickHouse map, so it
-would match spans that never set the key). An empty condition is legal and braids every owner span that
-shares a trace id with the reader.
+would match spans that never set the key). An empty condition is legal and braids every owner span in
+a trace the reader holds (below).
 
 Rendering rules, each a security property:
 
@@ -186,12 +194,70 @@ Rendering rules, each a security property:
   inner subquery that carries its own `{{tenantScopeForLatestVersion:StartTime}}`, so the conditions get a
   marker of their own, written only on the outer select; the election marker renders tenants and windows
   alone.
-- **Owner spans only in traces the reader holds, enforced by the fence.** The conditions marker puts every
-  braid clause under one semi-join, `TraceId IN (SELECT TraceId FROM stored_spans WHERE TenantId IN
-<own> AND StartTime >= <earliest braid window start> ...)`, the reader bound as a parameter. The marker
-  names the read's trace id (`traceId=`) or its own lower bound (`sinceMs=`), which narrows the
-  semi-join to no wider than the outer read. A trace window read beside braids stays outside it. A
-  trace counts as held when the reader has a span of it on or after the earliest braid window's start.
+- **Owner spans only in traces the reader holds, enforced by the fence.** A trace is held for an owner
+  when one of that owner's spans in it is parent or child of a reader span, either way (decided by
+  Alex, 2026-11-18, ruling 1b, every braid, with or without a condition), or of a span of another owner
+  that is itself held for the reader (decided by Alex, 2026-11-18, "held through the chain when every
+  hop has a braid"). Every hop needs its own live braid into the reader: only braid owners' spans carry
+  the chain, so a project that braids nothing into the reader breaks it, and a braid from a deeper
+  owner alone holds nothing. A shared trace id alone holds nothing. Once a trace is held for an owner,
+  that owner's condition and window decide which of its spans show, not only the linked one.
+- **Which spans carry the chain: every span of a braided owner, not only matching ones.** The stricter
+  choice, matching spans only, would render every owner's condition and window inside every hop's
+  select. The guard refuses an `or` inside a fenced subquery, so the clauses could not be joined there,
+  and the largest legal proof's clauses (50 conditions of 16 terms) already take about 105 KB of a
+  107 KB statement: rendered again in each hop's probe select, four more copies, they would pass the
+  256 KiB statement budget twice over. Holding is per owner already: once an owner is held, any of its spans in the trace
+  carries the chain one hop further, from the earliest braid window's start.
+- **How the fence renders it, and its bound.** The conditions marker puts every braid clause under one
+  `(TenantId, TraceId) IN` the held set. Each span offers ports: `('down', SpanId)` where its children
+  attach and `('up', ParentSpanId)` where it attaches to its parent; an owner span probes the other ends,
+  `('down', ParentSpanId)` and `('up', SpanId)`, so a probe equals a port exactly when the two spans are
+  parent and child. Hop 1 matches owner spans (`TenantId IN <braid owners>`) against the reader's
+  ports; each later hop matches them against the ports of every owner span already held, plus a
+  `('self', TenantId)` port so an owner held at one hop stays held at the next. The hops are unrolled once
+  per distinct braid owner, up to `BRAID_HELD_MAX_HOPS` (4), each nesting the one before once: a chain
+  passes through each owner at most once, so more hops than owners would hold nothing more, and a
+  reader with one owner pays for one hop. The text grows with that bound, not with the braids, and stays
+  free of `or`. An owner further than the bound stays hidden in
+  that trace: the chain fails closed. The marker names the read's trace id (`traceId=`) or its own lower
+  bound (`sinceMs=`), which narrows every select to no wider than the outer read. A trace window read
+  beside braids stays outside them.
+- **An empty or all-zero span id never links.** Ingest keeps an empty `SpanId` or `ParentSpanId` as
+  sent (OTLP admission is a separate decision), and every root's parent is empty. So every held select
+  leaves out spans whose `SpanId` is `''` or `0000000000000000`, and an empty or all-zero parent takes
+  the tag `unparented-port` on a port and `unparented-probe` on a probe, which nothing on the other side
+  carries: neither id equals anything on either side. The preview's direct-link rule and the outside
+  parents' lookup apply the same test.
+- **What the held rule defends, and what it does not.** The reader chooses its own trace and span ids
+  at ingest, so under the earlier rule (any reader span with the trace id) anyone holding the reader's
+  ingest key and an owner trace id could send one span under that id and read every braided owner span
+  in it (issue #9682, D10). A forger now needs a span id from a braided owner's side of a real call: an
+  owner span's id, or the parent id an owner span names. Those travel only in the `traceparent` that
+  crosses the call. A leaked `traceparent` from a reader-to-owner call carries the reader's own span id,
+  so the reader already holds that trace and the leak adds nothing. A leaked `traceparent` of any other
+  call into or out of a braided owner does: a forged reader span reusing its span id, or naming it as
+  parent, creates the link. Through the chain, one real link to any braided owner in the trace is
+  enough: from it every braided owner within the bound that is linked onward is held too, each still
+  showing only spans that match its own braid. Electing the latest version per `(TenantId, SpanId)` does
+  not stop it, since the forged span is the reader's own and its only version. `Verified()` stays the
+  strong guarantee: it needs the reader's signing key, which no `traceparent` carries (§4).
+- **What the held rule costs.** One held set per hop, each two selects (owner probes, then the ports of
+  the owners it held), plus one select of the reader's ports: eight selects at the bound, against four
+  for the one-hop rule. Measured on ClickHouse 26.8 over 2.46 million spans in 24 hours, against the
+  earlier rule (any reader span with the trace id) on the same data: a one-trace read of 200,000 spans
+  took 0.22 s with one owner and 0.35 s with four (0.12 s before), about 71 to 77 MiB either way; a
+  window read (`sinceMs=`) took 3.1 s with one owner and 5.1 s with four (1.9 s and 2.2 s before), with
+  memory unchanged at about 1 GiB, 600 MiB of it the latest-version election itself. The cost is the
+  parent-and-child join, not the hop count. Issue #9688 records the links at ingest to make it a lookup.
+  That window read is the reader's Braids page count, so it runs under `max_execution_time` 10 s and
+  `max_memory_usage` 4 GiB, with no retry on timeout: past either it answers `clickhouse_overloaded`
+  and the page shows "Couldn't count spans" rather than holding a slow statement. The
+  statement stays constant in size (ADR-177 v4.7): owners and the lower bound are bound parameters, so
+  the held part does not grow with the number of braids. The latest-version election is untouched: the
+  held selects sit inside the conditions marker and filter only owner rows.
+- **Multi-hop calls still hold.** A reader span that calls the owner, whose span calls the reader again
+  in the same trace, is linked at both hops; every matching owner span in the trace shows.
 - **Owner rows leave only through the conditions marker.** Under braids the client refuses a plain
   `{{tenantScope}}` or `{{tenantSet}}` marker (`plain-marker-under-braids`), and accepts the election
   marker only right after `(TenantId, TraceId, SpanId, UpdatedAt) IN (SELECT TenantId, TraceId, SpanId,
@@ -258,8 +324,9 @@ Langy stay the reader's own in release 1, and a public share link shows only the
 
 - **The detail read keeps braids.** `narrowAuthorization` still fences an aggregate's detail read to one
   member (ADR-177 v4.5). For a plain project it keeps the own grant and the project's `span` braids.
-  Owner spans are matched per owner on `(TenantId, TraceId)` against the reader's trace, within the braid's
-  `from`/`until` window on `StartTime`, under the compiled condition.
+  Owner spans are matched per owner on `(TenantId, TraceId)` against the reader's trace, held under §3's
+  parent-and-child rule, hop by hop through owners that braid into the reader, within the braid's `from`/`until` window on `StartTime`, under the compiled
+  condition.
 - **TraceApi operations take the caller's proof.** Content reads stop minting an own-only proof in the trace
   app; the trace route gate extends to refuse a content read that mints its own.
 - **Per span, per owner.** Each span carries its owning project. Offloaded bodies resolve under that
@@ -292,9 +359,17 @@ The braid dialog previews what the reader will see before anything is saved.
   6). It uses the door's two-target declaration that the braid routes need (§2).
 - It compiles the unsaved condition and counts the **reader's** traces over the last 7 days: every owner
   span braided, some, or none; with `Verified()`, how many otherwise matching calls had no valid signature.
+  Only traces held under §3's rule count as braided; the rest count as none. Each project, under its own
+  proof, lists the parents of its spans that are not its own, and the other project, under its own
+  proof, says which of those are its spans; a trace with a match on either side is held. The preview
+  holds the two projects' proofs only, so it follows the direct link and not §3's chain: a trace the
+  owner reaches only through another braided owner counts as none here, though the reader sees it. The
+  preview may under-count chained traces; it never counts one the reader would not see.
   Latest versions, the condition outside the WHERE so traces with nothing braided stay in the count; bounded
   to the reader's own traces, so it stays cheap; debounced in the browser.
-- **Test a trace:** a trace id renders that one trace exactly as the reader will see it.
+- **Test a trace:** a trace id renders that one trace as the reader will see it through a direct link,
+  with no owner span marked braided when no reader span is parent or child of an owner span in it. An
+  owner held only through another braided owner shows unmarked here, for the reason the preview gives.
 - The dialog names how many people will see the spans: the count of the reader's members holding
   `traces:view`, read through `AuthzApi`.
 
@@ -332,6 +407,29 @@ by `honourSpanBraids`, which only the trace module's pause service imports
 (`langwatch/span-braid-honour-owner`). The fence reads a proof without the flag as carrying no braid, so
 a new read that skips the plan check shows none.
 
+**Release flag.** Braid management rolls out per organisation behind `release_braids`
+(modules/authz/specs/braids-release-flag.feature). While it is off, braids already made keep applying,
+and both Braids pages still open as a read-only list under a notice that Braids is not enabled
+(decided by Alex, 2026-11-18): the project page with Remove, the organisation page with "View in audit
+log" and a notice sending admins to the project page to remove one. Creating, changing, the preview, the "who may braid" setting and
+issuing or rotating a signing key refuse `braids_not_enabled`; listing and removing braids do not, so an
+admin can find and end a braid. Listing and revoking signing keys work whatever either switch says. An organisation admin can still turn the organisation's Braids setting off:
+`setBraidsEnabled` asks the flag only to turn it on, so existing braids can be paused without
+waiting for the flag. The settings menu shows Braids with the flag off only once braids exist.
+
+**The organisation turns Braids on** (decided by Alex, 2026-11-18: "Braids is on by default, but has
+to be enabled in settings"). `release_braids` defaults on and stays LangWatch's kill switch, its off
+behaviour as above. Each organisation also holds "Braids enabled", `braidsEnabled` on
+`AuthzOrganizationPolicy` beside `braidsOrganizationAdminsOnly`, default false, so every existing
+organisation starts off. Changing it is `setBraidsEnabled`: `organization:manage`, Enterprise, audited
+as `authz.organization_policy.braids_enabled_changed`, and it bumps the epoch. While it is off,
+creating and changing braids, the dialog's reads and issuing or rotating signing keys refuse
+`braids_turned_off` (with `release_braids` also off, `braids_not_enabled` answers first); listing and
+removing braids, listing and revoking signing keys, and reading the settings do not. Off also **pauses**
+braids the way leaving Enterprise does: the trace module's pause service asks the plan and then
+`AuthzApi.getOrganizationPolicy`, cached per organisation for no longer than the asking proof, so the
+spans stop showing within the proof bound and come back when it is turned on.
+
 ### 10. Order of work
 
 | #   | Release 1 package                                                                         | Owner                |
@@ -367,6 +465,7 @@ per-braid option.
 | `BRAID_CONDITION_MAX_TERMS`        | `16`                             | comparisons in one condition                                                               |
 | `BRAID_CONDITION_MAX_DEPTH`        | `4`                              | nested parentheses in one condition                                                        |
 | `BRAID_MAX_DISTINCT_CONDITIONS`    | `50`, confirmed by the size test | distinct compiled predicates one reader's proof may hold                                   |
+| `BRAID_HELD_MAX_HOPS`              | `4`                              | owner hops the held rule follows from a reader span; a further owner stays hidden          |
 | `BRAID_PREVIEW_WINDOW_MS`          | 7 days                           | the preview's look-back over the reader's traces                                           |
 | `BRAID_REVOCATION_BOUND_MS`        | `30000`                          | a removed braid stops showing within this; also the longest a proof carrying a braid lives |
 | `ADMIN_WORKSPACE_VIEW_DEDUP_MS`    | `300000`, reused                 | read audit dedup per actor, reader and owner                                               |
@@ -375,22 +474,22 @@ per-braid option.
 
 ## Invariants
 
-| Invariant                             | Meaning                                                                                           |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Only matching spans leave the owner   | An owner span that fails the condition, or falls outside the window, is never read for the reader |
-| Only into the reader's own traces     | An owner trace with no span in the reader is never listed or opened from the reader in release 1  |
-| A `span` window opens only span reads | A braid never widens a trace list, summary, analytics or log read (v4.9)                          |
-| Braids fail closed below Enterprise   | A proof the trace module's plan check did not honour reads no braid, whatever read it reaches     |
-| No forged verified mark               | A client-sent `langwatch.reserved.verified.*` is stripped; only verification at ingest writes one |
-| A signature is bound to its trace     | A signature copied into another trace does not verify; within its trace it travels down the chain |
-| Braid writes are serialised by reader | Concurrent writes into one reader run one at a time; a change replaces the braid it names or none |
-| Nobody braids past their reach        | The writer holds `braids:manage` on the owner and `traces:view` on the reader, asked at the door  |
-| Braids do not chain                   | No proof carries a grant whose principal is another project                                       |
-| Each span keeps its owner's privacy   | A braided span is never shown under the reader's looser policy                                    |
-| Same organisation, no aggregates      | Every braid joins two plain projects of one organisation                                          |
-| A removal shows within the bound      | No read, a held proof included, shows a removed braid's spans after `BRAID_REVOCATION_BOUND_MS`   |
-| A failed bump is reported, not hidden | A removal whose epoch bump failed is durable, reported as failed, and completed by repeating it   |
-| Values are parameters                 | No literal or key from a condition appears in statement text                                      |
+| Invariant                             | Meaning                                                                                                                                             |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Only matching spans leave the owner   | An owner span that fails the condition, or falls outside the window, is never read for the reader                                                   |
+| Only into the reader's own traces     | An owner span shows only where its owner is linked parent-and-child to the reader, directly or through at most `BRAID_HELD_MAX_HOPS` braided owners |
+| A `span` window opens only span reads | A braid never widens a trace list, summary, analytics or log read (v4.9)                                                                            |
+| Braids fail closed below Enterprise   | A proof the trace module's plan check did not honour reads no braid, whatever read it reaches                                                       |
+| No forged verified mark               | A client-sent `langwatch.reserved.verified.*` is stripped; only verification at ingest writes one                                                   |
+| A signature is bound to its trace     | A signature copied into another trace does not verify; within its trace it travels down the chain                                                   |
+| Braid writes are serialised by reader | Concurrent writes into one reader run one at a time; a change replaces the braid it names or none                                                   |
+| Nobody braids past their reach        | The writer holds `braids:manage` on the owner and `traces:view` on the reader, asked at the door                                                    |
+| A grant does not pass on              | No proof carries a grant whose principal is another project                                                                                         |
+| Each span keeps its owner's privacy   | A braided span is never shown under the reader's looser policy                                                                                      |
+| Same organisation, no aggregates      | Every braid joins two plain projects of one organisation                                                                                            |
+| A removal shows within the bound      | No read, a held proof included, shows a removed braid's spans after `BRAID_REVOCATION_BOUND_MS`                                                     |
+| A failed bump is reported, not hidden | A removal whose epoch bump failed is durable, reported as failed, and completed by repeating it                                                     |
+| Values are parameters                 | No literal or key from a condition appears in statement text                                                                                        |
 
 ## Gates
 
@@ -443,6 +542,7 @@ model SigningKey {
 model AuthzOrganizationPolicy {
   organizationId               String   @id
   braidsOrganizationAdminsOnly Boolean  @default(false)
+  braidsEnabled                Boolean  @default(false) // v1.24: off pauses braids (§9)
   updatedByUserId              String
   updatedAt                    DateTime @updatedAt
 }
@@ -645,3 +745,29 @@ not operations.
   alias reaches a subquery whose table lacks the column whatever the settings. The reader pins
   `prefer_column_name_to_alias` and `enable_global_with_statement` on every statement; neither a
   statement nor its caller can change them (§3).
+- v1.20 (2026-11-18, decided by Alex, ruling 1b on issue #9682 D10). A trace is held for a braid only
+  when a reader span and an owner span in it are parent and child, either way; a shared trace id no
+  longer holds it, since the reader chooses its own trace ids at ingest. It applies to every braid,
+  with or without a condition, and the condition still decides which owner spans show once held. The
+  fence renders it as one semi-join on the held (owner, trace) pairs (v1.22 extends it hop by hop); the preview and the test-trace read apply the same
+  rule; the threat that remains (a leaked `traceparent` of another call into or out of the owner) and
+  the cost are in §3.
+- v1.21 (2026-11-18, decided by Alex, option 2a). With `release_braids` off the Braids pages list
+  existing braids read-only (Remove on the project page) instead of answering not-found, and listing no longer asks the
+  flag (§9, "Release flag").
+- v1.22 (2026-11-18, decided by Alex, ruling 1b "held through the chain when every hop has a braid").
+  An owner is also held where its span is parent or child of a span of another owner already held,
+  every hop needing its own live braid into the reader; every span of a braided owner carries the
+  chain, matching or not, and the fence unrolls it to `BRAID_HELD_MAX_HOPS` (4) owner hops, failing
+  closed past them. The preview and Test a trace keep the direct link. Threat and cost in §3; the
+  "Braids do not chain" invariant is renamed "A grant does not pass on", its meaning unchanged (§1).
+- v1.23 (2026-11-18, from review, under the "never fail open" ruling). An empty or all-zero span id or
+  parent id never links a reader span to an owner span, in the fence and in the preview; the reader's
+  24-hour count runs under a 10 s and 4 GiB cap and answers `clickhouse_overloaded` past it (§3).
+- v1.24 (2026-11-18, decided by Alex: "Braids is on by default, but has to be enabled in settings").
+  `release_braids` defaults on as a kill switch; a new organisation setting, "Braids enabled"
+  (`AuthzOrganizationPolicy.braidsEnabled`, default false, expand-only migration
+  `20261118140000_braids_authz_organization_enabled`), is changed by an organisation admin on
+  Enterprise and audited. Off refuses management with `braids_turned_off` (`braids_not_enabled` first
+  while the release flag is off too) and pauses braids in the
+  trace read, as leaving Enterprise does; on resumes them (§9, "The organisation turns Braids on").

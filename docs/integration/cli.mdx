@@ -82,6 +82,8 @@ You'll see two questions:
 
 The browser shows an "Approve" or "Send API key" button (depending on the chosen mode); after you click, the credential is delivered back to the CLI over the same RFC 8628 device-code poll. **You never copy-paste a key.**
 
+The code in the link is valid for 15 minutes. If the command stops before you approve, for example when an agent's command times out, run the same `langwatch login` again (from the same folder for a project key login): it waits on the code it already printed instead of starting a new one, and picks up an approval you gave while no command was running.
+
 ### What the login key can access
 
 The AI-tools login mints a login key that inherits your own access. The authorize screen shows the scopes and permissions before you approve:
@@ -533,6 +535,14 @@ Each command uses the values differently:
 
 ```bash
 langwatch experiment run <experiment-slug> --dataset-version 1
+```
+
+To see how often each row passes when outputs vary, add `--repeat <n>`, from 1 to 5. The server runs every dataset row that many times against every target in one run. With `--wait`, the output lists each dataset row's pass rate per target, such as `Row 1 · support-prompt: 2/3 passed (67%)`, and the JSON output carries the same numbers under `rowPassRates`.
+
+A repetition fails when its target errors or any evaluator fails it, and one with no pass or fail verdict is left out of the count. A repeated run does not write its outputs back into the experiment's workbench; its results page numbers each row by dataset row and repetition and adds a Pass rate column.
+
+```bash
+langwatch experiment run <experiment-slug> --repeat 3 --wait
 ```
 
 ### Inspect simulation runs

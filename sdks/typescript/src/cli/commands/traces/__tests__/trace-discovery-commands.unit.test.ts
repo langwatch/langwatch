@@ -30,6 +30,10 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
+vi.mock("../../../utils/searchedProject", () => ({
+  searchedProjectSlug: vi.fn(async ({ project }: { project?: string }) => project ?? "acme-app"),
+}));
+
 vi.mock("ora", () => ({
   default: () => ({
     start: vi.fn().mockReturnThis(),
@@ -171,11 +175,9 @@ describe("traceFacetsCommand", () => {
     it("sends the field, prefix and limit as given", async () => {
       mockFacets.mockResolvedValue({ values: [], total: 0, hasMore: false });
       await traceFacetsCommand("model", { prefix: "gpt", limit: "5" });
-      expect(mockFacets).toHaveBeenCalledWith({
-        field: "model",
-        prefix: "gpt",
-        limit: 5,
-      });
+      expect(mockFacets).toHaveBeenCalledWith(
+        expect.objectContaining({ field: "model", prefix: "gpt", limit: 5 }),
+      );
     });
 
     it("refuses a limit that is not a whole number", async () => {
@@ -202,7 +204,56 @@ describe("traceFacetsCommand", () => {
       });
       const result = await traceFacetsCommand(undefined, {});
       expect((result as { data: { facets: { key: string }[] } }).data.facets[0]?.key).toBe("model");
-      expect(mockFacets).toHaveBeenCalledWith({});
+      expect(mockFacets).toHaveBeenCalledWith({
+        startDate: expect.stringMatching(/^\d+$/),
+        endDate: expect.stringMatching(/^\d+$/),
+      });
+    });
+  });
+
+  describe("when no window is given", () => {
+    it("reads the last 7 days, sent as epoch milliseconds", async () => {
+      mockFacets.mockResolvedValue({ values: [], total: 0, hasMore: false });
+      await traceFacetsCommand("model", {});
+      const query = mockFacets.mock.calls[0]![0] as { startDate: string; endDate: string };
+      expect(Number(query.endDate) - Number(query.startDate)).toBe(7 * 24 * 60 * 60 * 1000);
+    });
+  });
+
+  describe("when the window is a relative value", () => {
+    it("resolves --since before sending", async () => {
+      mockFacets.mockResolvedValue({ values: [], total: 0, hasMore: false });
+      await traceFacetsCommand("model", { since: "12h" });
+      const query = mockFacets.mock.calls[0]![0] as { startDate: string; endDate: string };
+      expect(Number(query.endDate) - Number(query.startDate)).toBe(12 * 60 * 60 * 1000);
+    });
+
+    it("refuses a value it cannot read before calling the API", async () => {
+      await expect(traceFacetsCommand("model", { startDate: "soonish" })).rejects.toThrow(
+        ProcessExitError,
+      );
+      expect(mockFacets).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a field holds nothing in the window", () => {
+    it("says which project and window it read and how to read further back", async () => {
+      mockFacets.mockResolvedValue({ values: [], total: 0, hasMore: false });
+      const result = (await traceFacetsCommand("model", {})) as {
+        data: Record<string, unknown>;
+        table: () => void;
+      };
+      expect(result.data.window).toMatchObject({ lookback: "7d", widened: false });
+      expect(result.data.searched).toMatchObject({ project: "acme-app" });
+      expect(result.data.widen).toBe("langwatch trace facets model --since 30d");
+
+      result.table();
+      const printed = vi
+        .mocked(console.log)
+        .mock.calls.map((c) => String(c[0]))
+        .join("\n");
+      expect(printed).toContain("Project: acme-app");
+      expect(printed).toContain("langwatch trace facets model --since 30d");
     });
   });
 });

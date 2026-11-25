@@ -44,6 +44,7 @@ import {
   type UserProfilesInput,
   type UserSsoStatus,
   type UserTourPreference,
+  setUserCodeAccessPreferenceInputSchema,
   type UserCodeAccessPreference,
   type UserNotificationPreference,
   type UserNotificationTopicInput,
@@ -212,6 +213,9 @@ export class UserService {
     return this.repository.create(createUserInputSchema.parse(input));
   }
 
+  recordCreated = (input: UserIdInput): Promise<void> =>
+    this.repository.appendCreatedFact(userIdInputSchema.parse(input).id);
+
   /**
    * The signup form's mint: its registered fact commits with the account. Born confirmed when a
    * spent mailbox proof confirmed the address.
@@ -367,9 +371,8 @@ export class UserService {
   }
 
   async setLangyCodeAccessPreference(input: UserIdInput & UserCodeAccessPreference): Promise<void> {
-    const parsed = userIdInputSchema.parse(input);
-
-    await this.repository.setLangyCodeAccessPreference(parsed.id, input.preference);
+    const parsed = setUserCodeAccessPreferenceInputSchema.parse(input);
+    await this.repository.setLangyCodeAccessPreference(parsed.id, parsed.preference);
   }
 
   dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference> {

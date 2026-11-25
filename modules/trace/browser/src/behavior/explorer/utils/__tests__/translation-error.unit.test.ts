@@ -1,5 +1,6 @@
 import {
   extractAiCallFailedInfo,
+  extractAiContentFilteredInfo,
   extractMissingModelInfo,
   extractProviderDisabledInfo,
 } from "@langwatch/browser-host/model-error";
@@ -13,12 +14,14 @@ import { shouldShowGenericTranslateError } from "../translation-error.ts";
 vi.mock("@langwatch/browser-host/model-error", () => ({
   extractMissingModelInfo: vi.fn(),
   extractAiCallFailedInfo: vi.fn(),
+  extractAiContentFilteredInfo: vi.fn(),
   extractProviderDisabledInfo: vi.fn(),
 }));
 
 const allReturnNull = () => {
   vi.mocked(extractMissingModelInfo).mockReturnValue(null);
   vi.mocked(extractAiCallFailedInfo).mockReturnValue(null);
+  vi.mocked(extractAiContentFilteredInfo).mockReturnValue(null);
   vi.mocked(extractProviderDisabledInfo).mockReturnValue(null);
 };
 
@@ -53,6 +56,18 @@ describe("shouldShowGenericTranslateError()", () => {
       // the customer. The handler is identified by `featureKey` and `role`; the
       // words come from the registry.
       vi.mocked(extractAiCallFailedInfo).mockReturnValue({
+        featureKey: "translate.text",
+        featureDisplayName: "Inline translation",
+        role: "FAST",
+      });
+
+      expect(shouldShowGenericTranslateError({})).toBe(false);
+    });
+  });
+
+  describe("when the content-filter handler already surfaces the failure", () => {
+    it("returns false so the toast is not duplicated", () => {
+      vi.mocked(extractAiContentFilteredInfo).mockReturnValue({
         featureKey: "translate.text",
         featureDisplayName: "Inline translation",
         role: "FAST",

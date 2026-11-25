@@ -1,6 +1,6 @@
 /**
  * Whoever started a checkout keeps paying: completion hands them the Billing role.
- * Spec: specs/licensing/billing-role.feature
+ * Specs: specs/licensing/billing-role.feature, specs/licensing/billing-only-invite.feature
  */
 import {
   BindingMissingError,
@@ -47,6 +47,20 @@ describe("BillingStarterRoleService", () => {
         source: "checkout",
         commandId: "billing-checkout:evt_1",
       }),
+    ]);
+  });
+
+  it("keeps Billing with a Billing-only member who completes the checkout", async () => {
+    const { service, writes } = starterRole();
+
+    await service.grantToStarter({
+      organizationId: ORG,
+      startedByUserId: "user-billing-only",
+      eventId: "evt_billing_only",
+    });
+
+    expect(writes).toEqual([
+      expect.objectContaining({ userId: "user-billing-only", holds: true, source: "checkout" }),
     ]);
   });
 

@@ -9,7 +9,7 @@ import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { browserModules } from "../../browser-modules.generated.ts";
-import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
+import { uiRouteDescriptors, uiMountedRouteTable } from "../ui-route-table";
 
 const { adminMenu, gatewayNavItems, governanceNavItems, projectNavItems } =
   await navigationWeb.installation.capabilities.chrome.load();
@@ -18,7 +18,7 @@ const CATCH_ALL = "*";
 const PLACEHOLDER = "[project]";
 
 const patterns = [
-  ...uiRouteDescriptors(uiRouteTable).map((descriptor) => descriptor.path),
+  ...uiRouteDescriptors(uiMountedRouteTable).map((descriptor) => descriptor.path),
   ...installedModuleScreens(browserModules).routes.project.map((route) => route.path),
 ].filter((path): path is string => typeof path === "string");
 

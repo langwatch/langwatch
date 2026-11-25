@@ -32,7 +32,7 @@ already relative to the module.
 ## Decision
 
 **One cache per user, keyed by what the transform depends on.** LangWatch's
-existing Vitest patch (`patches/vitest@5.0.1.patch`) changes `fsModuleCache`:
+existing Vitest patch (`patches/vitest@5.0.5.patch`) changes `fsModuleCache`:
 
 - The cache lives in `~/.cache/vitest/fs-module-cache` (`$XDG_CACHE_HOME` when
   set; `VITEST_FS_MODULE_CACHE_DIR` overrides it; a config's
@@ -66,7 +66,9 @@ different commits meet in one cache. An importer whose source did not change
 can still resolve an import to a file this checkout does not have (`./b` was
 `b.ts` there and is `b/index.ts` here). Before a cached module is used, the
 files its imports resolved to are checked; if one is missing, the module is
-transformed again.
+transformed again. Since Vitest 5.0.5 this check is Vitest's own: it resolves
+each cached import again and transforms the importer when one no longer
+resolves to the same file, so the patch adds none of its own.
 
 **Writes stay atomic.** Vitest already writes each entry to a temporary file
 and renames it into place, so concurrent writers from several worktrees leave
@@ -123,6 +125,7 @@ not proposed.
 >    source contains the token is not cached.
 > 3. Before using an entry, check that the files its imports resolved to exist
 >    in this checkout, since checkouts at different commits meet in one cache.
+>    (Vitest 5.0.5 does this itself.)
 > 4. Default the cache to a per-user directory (`$XDG_CACHE_HOME/vitest`, else
 >    `~/.cache/vitest`), one subdirectory per lockfile hash, and remove a
 >    subdirectory no run has used for a week instead of clearing the cache when
@@ -130,9 +133,9 @@ not proposed.
 >
 > In a monorepo of about 150 packages, a new worktree's first run of a
 > 77-test suite fell from 88 to 95 CPU-seconds to 52 to 62, the same as a warm
-> run. A working patch against 5.0.1, with an integration test that runs two
+> run. A working patch against 5.0.5, with an integration test that runs two
 > checkouts against one cache, is at
-> `https://github.com/langwatch/langwatch/blob/main/patches/vitest@5.0.1.patch`.
+> `https://github.com/langwatch/langwatch/blob/main/patches/vitest@5.0.5.patch`.
 > We are glad to turn it into a pull request if the direction is welcome.
 
 ## Consequences

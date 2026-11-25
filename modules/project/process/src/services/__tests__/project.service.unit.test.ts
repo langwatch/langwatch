@@ -31,6 +31,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   ProjectBackfillEntry,
   ProjectRepository,
+  ProjectSlugMove,
 } from "../../repositories/project.repository.ts";
 import { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import { ProjectCredentials } from "../project-credentials.service.ts";
@@ -130,6 +131,8 @@ class StubRepository implements ProjectRepository {
   existing: InternalProject | null = null;
   findInternalByOrganization = vi.fn(async () => this.existing);
   findInternalBySlug = vi.fn(async (_slug: string): Promise<InternalProject | null> => null);
+  findSlugHolders = vi.fn(async () => []);
+  replaceSlug = vi.fn(async (): Promise<ProjectSlugMove> => "gone");
   findLiveInternalIds = vi.fn(async (_input: { kind: string }): Promise<string[]> => []);
   createInternalOrFindWinner = vi.fn(async () => project);
   isPresenceEnabled = vi.fn(async () => true);

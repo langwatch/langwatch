@@ -120,10 +120,11 @@ Feature: CI/CD Execution of Platform Evaluations
     Then the run executes one cell at a time
     And the experiment's saved run options are unchanged
 
-  Scenario: A run call that names no concurrency uses the deployment's default
-    Given the deployment runs ten cells at once by default
+  Scenario: A run call that names no concurrency gets its share of the project cell budget
+    Given the project's cell budget is ten and no other run is active in the project
     When I POST to /api/experiments/my-evaluation/run
     Then the run executes up to ten cells at once
+    And EVAL_V3_CONCURRENCY applies only when the active runs cannot be read
 
   Scenario Outline: A run call with a concurrency outside 1 to 24 is refused
     When I POST to /api/experiments/my-evaluation/run with body:

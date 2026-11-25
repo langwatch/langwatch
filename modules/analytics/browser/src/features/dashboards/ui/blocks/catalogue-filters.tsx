@@ -33,9 +33,6 @@ export const TRUNK_ICONS: Readonly<Record<Trunk, LucideIcon>> = {
   Trust: BadgeCheck,
 };
 
-/** The agent types a chip row offers; coding-agent boards and widgets live elsewhere. */
-const CHIP_KINDS = AGENT_KINDS.filter((kind) => kind !== "coding");
-
 /** The finder's plain, centred search box. */
 export function CatalogueSearch({
   value,
@@ -185,7 +182,7 @@ export function AgentKindChips({
 }) {
   return (
     <ChipRow label="Agent types">
-      {CHIP_KINDS.flatMap((kind) => {
+      {AGENT_KINDS.flatMap((kind) => {
         const count = countOf(kind);
         const isPicked = picked === kind;
         if (count === 0 && !isPicked) return [];

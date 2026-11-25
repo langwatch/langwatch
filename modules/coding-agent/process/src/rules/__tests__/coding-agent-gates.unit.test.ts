@@ -12,6 +12,7 @@ import {
   gatePullRequestSessionTitles,
   gateSessionListCost,
   gateSessionListTitles,
+  gateSessionTitle,
 } from "../coding-agent-gates.rules.ts";
 
 function sessionListRow(over: Record<string, unknown> = {}) {
@@ -53,6 +54,21 @@ describe("the coding-agent read gates", () => {
       expect(rows[0]?.sessionId).toBe("session-a");
       expect(rows[0]?.inputTokens).toBe(100);
       expect(rows[0]?.costUsd).toBe(12.5);
+    });
+  });
+
+  describe("given a viewer who may not read captured content and a session a trace belongs to", () => {
+    const session = { sessionId: "session-a", title: "Fix the ACME login", titleSource: "agent" };
+
+    /** @scenario "A viewer who may not read captured content gets no title on a trace's session" */
+    it("blanks the session's name and leaves the rest of it intact", () => {
+      const gated = gateSessionTitle({ session, canReadCapturedContent: false });
+
+      expect(gated).toEqual({ sessionId: "session-a", title: "", titleSource: "" });
+    });
+
+    it("leaves the name where it is for a viewer who may read captured content", () => {
+      expect(gateSessionTitle({ session, canReadCapturedContent: true })).toEqual(session);
     });
   });
 

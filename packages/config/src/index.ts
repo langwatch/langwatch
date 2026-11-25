@@ -35,6 +35,7 @@ export {
   langevalsStagingTtlSeconds,
   langwatchDefaultModel,
   idpSimulatorUrl,
+  installMethod,
   LOCAL_GATEWAY_URL,
   localPasswords,
   logSettings,

@@ -452,6 +452,78 @@
       ],
       "title": "Top 20 slowest query hashes",
       "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "description": "Every dashboard widget run that failed, newest first, from the \"LangWatchQL failed\" log line: the projects it ran over, how it ended, and its board and widget. A cancelled run is left out. Level warn is the customer's query at fault (a memory or scan limit, a refused statement); error is ours (a timeout, the database down, a bug). Never the SQL text.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 7,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "${DS_CLOUDWATCH}"
+          },
+          "queryMode": "Logs",
+          "region": "default",
+          "logGroups": [
+            {
+              "arn": "$log_group"
+            }
+          ],
+          "refId": "A",
+          "expression": "fields @timestamp, projectId, projectIds.0, projectIds.1, projectIds.2, outcome, level, dashboardId, widgetId, queryHash\n| filter msg = \"LangWatchQL failed\" and caller = \"dashboard_widget\" and outcome != \"aborted\"\n| sort @timestamp desc\n| limit 100"
+        }
+      ],
+      "title": "Failed widget queries",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "cloudwatch",
+        "uid": "${DS_CLOUDWATCH}"
+      },
+      "description": "How many dashboard widget runs failed per project and outcome over the range, with the latest, so a customer whose boards keep failing stands out. A cancelled run is left out.",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 8,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "${DS_CLOUDWATCH}"
+          },
+          "queryMode": "Logs",
+          "region": "default",
+          "logGroups": [
+            {
+              "arn": "$log_group"
+            }
+          ],
+          "refId": "A",
+          "expression": "fields projectId, outcome\n| filter msg = \"LangWatchQL failed\" and caller = \"dashboard_widget\" and outcome != \"aborted\"\n| stats count(*) as failures, max(@timestamp) as lastFailedAt by projectId, outcome\n| sort failures desc\n| limit 50"
+        }
+      ],
+      "title": "Failed widget queries by project",
+      "type": "table"
     }
   ],
   "refresh": "1m",
@@ -483,7 +555,7 @@
           "text": "",
           "value": ""
         },
-        "description": "The CloudWatch log group the app's logs land in, for the slow-hash table.",
+        "description": "The CloudWatch log group the app's logs land in, for the slow-hash and failed-query tables.",
         "name": "log_group",
         "type": "textbox",
         "query": ""

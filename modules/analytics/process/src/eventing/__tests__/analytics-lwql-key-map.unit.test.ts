@@ -81,11 +81,17 @@ class RecordingKeyMapRepository extends LwqlKeyMapRepository {
     if (this.failWith) throw this.failWith;
     this.rows.push(row);
   }
+
+  async findKeyHashes({ tenantId }: { tenantId: string; sourceDatabase: string }) {
+    return this.rows.filter((row) => row.TenantId === tenantId).map((row) => row.KeyHash);
+  }
 }
 
-function keyMapOver(options: { configured?: boolean } = {}) {
+function keyMapOver(options: { configured?: boolean; lwqlKey?: string } = {}) {
   const repository = new RecordingKeyMapRepository();
-  const findById = vi.fn(async (id: string) => (id === PROJECT_ID ? project(id) : null));
+  const findById = vi.fn(async (id: string) =>
+    id === PROJECT_ID ? { ...project(id), lwqlKey: options.lwqlKey ?? `lwql-${id}` } : null,
+  );
   const service = LwqlKeyMapService.create({
     projects: createApiFixture<ProjectApi>({ findById }),
     ...(options.configured === false
@@ -203,6 +209,68 @@ describe("analytics' key-map reaction to a created project", () => {
 
       expect(findById).not.toHaveBeenCalled();
       expect(repository.rows).toEqual([]);
+    });
+  });
+});
+
+describe("ensuring a project's key-map row before a read", () => {
+  describe("when the map already holds the project's key hash", () => {
+    it("answers yes and writes nothing", async () => {
+      const { repository, service } = keyMapOver();
+      repository.rows.push({ KeyHash: expectedKeyHash, TenantId: PROJECT_ID });
+
+      await expect(service.ensureProject({ projectId: PROJECT_ID })).resolves.toBe(true);
+      expect(repository.rows).toHaveLength(1);
+    });
+  });
+
+  describe("when the map holds no row for the project", () => {
+    it("writes one row with the project's key hash and answers yes", async () => {
+      const { repository, service } = keyMapOver();
+
+      await expect(service.ensureProject({ projectId: PROJECT_ID })).resolves.toBe(true);
+      expect(repository.rows).toEqual([{ KeyHash: expectedKeyHash, TenantId: PROJECT_ID }]);
+    });
+  });
+
+  describe("when the row cannot be written", () => {
+    it("answers no instead of throwing", async () => {
+      const { repository, service } = keyMapOver();
+      repository.failWith = new Error("ClickHouse unavailable");
+
+      await expect(service.ensureProject({ projectId: PROJECT_ID })).resolves.toBe(false);
+    });
+  });
+
+  describe("when the key map cannot be read", () => {
+    it("answers no and writes nothing", async () => {
+      const { repository, service } = keyMapOver();
+      vi.spyOn(repository, "findKeyHashes").mockRejectedValue(new Error("ClickHouse down"));
+
+      await expect(service.ensureProject({ projectId: PROJECT_ID })).resolves.toBe(false);
+      expect(repository.rows).toEqual([]);
+    });
+  });
+
+  describe("when this deployment offers no LangWatchQL", () => {
+    it("answers no without reading the project", async () => {
+      const { findById, service } = keyMapOver({ configured: false });
+
+      await expect(service.ensureProject({ projectId: PROJECT_ID })).resolves.toBe(false);
+      expect(findById).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the project has a blank key or no longer exists", () => {
+    it("answers no and writes nothing", async () => {
+      const blank = keyMapOver({ lwqlKey: "" });
+      const gone = keyMapOver();
+
+      await expect(blank.service.ensureProject({ projectId: PROJECT_ID })).resolves.toBe(false);
+      await expect(gone.service.ensureProject({ projectId: "project-deleted" })).resolves.toBe(
+        false,
+      );
+      expect([...blank.repository.rows, ...gone.repository.rows]).toEqual([]);
     });
   });
 });
