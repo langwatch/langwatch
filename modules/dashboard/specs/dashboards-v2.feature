@@ -1773,11 +1773,15 @@ Feature: Dashboards v2 polish and bring-your-own-AI
   Scenario: AC121b Ask Langy: clicking opens the widget large beside Langy
     Given a widget card on a saved board or a From LangWatch board, with Langy available
     When the member clicks its "Ask Langy" button
-    Then a drawer opens from the left with the widget's chart drawn large over the board's period,
+    Then a drawer opens with the widget's chart drawn large over the board's period,
       under its name and description, with its Langy actions and its sources line
-    And the drawer stops short of Langy's panel, so the chart and the draft sit side by side
+    And Langy rides beside it as it rides beside the trace drawer: a docked panel pops up as the
+      drawer's floating companion, a floating panel hops to the left out of its way
+    And the draft about the widget and the widget's context stay in Langy while it pops up
     And clicking a bar, point or row in the large chart drafts Langy about that value, as on the card
-    And closing the drawer leaves the board as it was
+    And closing the drawer leaves the board as it was, and a docked panel returns to its dock
+    # Changed (2026-11-25): the drawer opened from the left beside a docked Langy; it now counts as
+    # an open drawer for Langy, so Langy pops up beside it (specs/langy/langy-panel-layout.feature)
 
   @unit
   Scenario: AC122 Ask Langy: a widget without a stored prompt gets a fallback
