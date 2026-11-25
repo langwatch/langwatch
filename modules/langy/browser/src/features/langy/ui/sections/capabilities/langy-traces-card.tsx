@@ -145,7 +145,7 @@ export function LangyTracesCard({ descriptor, input, output, projectSlug }: Capa
         search,
         // A `langwatch trace search` result — an absent window here is the
         // CLI's own 7-day default, not an unknown one.
-        unstatedWindow: "cli-last-24h",
+        unstatedWindow: "cli-default",
         lensId,
       })
     : null;

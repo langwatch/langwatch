@@ -615,7 +615,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "A pip project's manifest gets the package line" */
     it("writes the langwatch line into the requirements file itself, since a pip install writes no manifest", () => {
       expect(rendered).toContain(
-        "`uv add`, `npm install` and the other managers write it themselves; a pip install writes nothing, so for a pip project the manifest is `requirements.txt` (or the file the folder uses, such as `requirements/base.txt`) and you write the line into it yourself: read the version with `python -m pip show langwatch` through the interpreter the install worked with, then add `langwatch==<installed version>`, pinned the way the file pins its other packages, and unpinned when the file pins none of them.",
+        "`uv add`, `npm install` and the other managers write it themselves; a pip install writes nothing, so for a pip project the manifest is `requirements.txt` (or the file the folder uses, such as `requirements/base.txt`) and you write the line into it yourself: read the version with `<interpreter> -m pip show langwatch`, with the interpreter of the rung that worked, then add `langwatch==<installed version>`, pinned the way the file pins its other packages, and unpinned when the file pins none of them.",
       );
       // The commit stages that manifest, whatever the file is called.
       expect(rendered).toContain(
@@ -1133,7 +1133,7 @@ describe("the guided-onboarding skill", () => {
     /** @scenario "An installed SDK without the tracing API is an interpreter question, not a stop" */
     it("asks about the interpreter when the installed SDK has no tracing API", () => {
       expect(rendered).toContain(
-        'When the check fails, or the version the show command reads (`python -m pip show langwatch`, `uv pip show langwatch`) is below 1.3.0, the cause is the interpreter, and that is the third unlock question of "When a step fails", asked before any edit.',
+        'When the check fails, or the version the show command reads (`<interpreter> -m pip show langwatch`, `uv pip show langwatch`) is below 1.3.0, the cause is the interpreter, and that is the third unlock question of "When a step fails", asked before any edit.',
       );
       const failed = rendered.indexOf("### When a step fails");
       const section = rendered.slice(failed, rendered.indexOf("## coding: Coding agents"));

@@ -58,8 +58,8 @@ export function LangyTraceSampleCard({ input, output, digest, projectSlug }: Cap
     projectSlug,
     search,
     // This card renders a `langwatch trace search` result, so a search that
-    // named no window really did cover the CLI's last-24h default.
-    unstatedWindow: "cli-last-24h",
+    // named no window really did cover the CLI's 7-day default.
+    unstatedWindow: "cli-default",
     lensId,
   });
 
@@ -123,7 +123,7 @@ export function LangyTraceSampleCard({ input, output, digest, projectSlug }: Cap
                     search,
                     traceId: trace.id,
                     traceTimestamp: trace.startedAt,
-                    unstatedWindow: "cli-last-24h",
+                    unstatedWindow: "cli-default",
                   }) ?? undefined
                 }
                 primary={trace.input ?? trace.id}
@@ -265,7 +265,7 @@ function HydratedTraceSampleCard({
                 search,
                 traceId: row.id,
                 traceTimestamp: row.timestamp ?? null,
-                unstatedWindow: "cli-last-24h",
+                unstatedWindow: "cli-default",
               }) ?? undefined
             }
             primary={row.primary ?? row.id}

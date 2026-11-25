@@ -194,6 +194,17 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And it says not to report the change as verified when the wait runs out
     And it ties the search to the time noted at the start of the run with --start-date, so an older trace is not taken for this run's
 
+  # The debug recipe's re-check after a fix said only to re-run the errors
+  # search, so errors from before the fix still showed in the window, and an
+  # empty answer could not tell a fixed run from one that sent no trace.
+  @unit
+  Scenario: The debug recipe ties its re-check to the time the fix's run started
+    Given the debug-with-langwatch recipe
+    When its re-check after the fix is read
+    Then it notes the start time in epoch ms before generating fresh traffic
+    And it re-runs the search with --start-date set to that time, so the old errors in the window are not taken for this run's
+    And it confirms the new run produced a trace before it reads no errors as fixed
+
   # A filmed run put langwatch.setup() at the top of the entry file, above the
   # import that loaded the .env it had just written, and the agent died at
   # import with "LangWatch API key is required but not provided".

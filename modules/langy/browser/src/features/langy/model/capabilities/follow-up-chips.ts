@@ -100,7 +100,7 @@ export function deriveFollowUpChips({
     // absent window here is the CLI's own 7-day default rather than an
     // unknown one — the alert must match the traces the card just showed.
     const carriedHref = build
-      ? build({ projectSlug, search, unstatedWindow: "cli-last-24h" })
+      ? build({ projectSlug, search, unstatedWindow: "cli-default" })
       : null;
     if (carriedHref) {
       chips.push({

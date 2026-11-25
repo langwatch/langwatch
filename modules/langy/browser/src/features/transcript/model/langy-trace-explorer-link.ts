@@ -153,7 +153,7 @@ export function buildExplorerQuery(search: TraceSearchQuery): string | null {
  * What an ABSENT window means for a given caller — which is not the same question for
  * every caller, and answering it wrong invents a filter.
  */
-export type UnstatedWindow = "cli-last-24h" | "unknown";
+export type UnstatedWindow = "cli-default" | "unknown";
 
 /**
  * The Explorer's fragment for this search: the default lens, plus whatever survived of
@@ -173,7 +173,7 @@ function explorerFragment(
   } else if (
     search.startDate === undefined &&
     search.endDate === undefined &&
-    unstatedWindow === "cli-last-24h"
+    unstatedWindow === "cli-default"
   ) {
     // NEITHER bound named AND the caller vouches for the CLI's own default: the
     // search covered the last week and we can say so exactly — see

@@ -582,7 +582,7 @@ Feature: Langy guides the first setup after sign-up
       When the compiled guided-onboarding skill is read
       Then the manifest of a pip project is requirements.txt, or the requirements file the folder uses
       And a pip install writes no manifest, so Langy writes the langwatch line into that file itself
-      And the version comes from python -m pip show langwatch, run with the interpreter the install worked with
+      And the version comes from <interpreter> -m pip show langwatch, with the interpreter of the rung that worked
       And the line is pinned the way the file pins its other packages, and unpinned when the file pins none of them
       And the commit stages that manifest
 

@@ -372,7 +372,7 @@ describe("buildTraceExplorerHref", () => {
           buildTraceExplorerHref({
             projectSlug: "acme",
             search: { query: "x" },
-            unstatedWindow: "cli-last-24h",
+            unstatedWindow: "cli-default",
           })!,
         );
 
@@ -385,7 +385,7 @@ describe("buildTraceExplorerHref", () => {
         const href = buildTraceExplorerHref({
           projectSlug: "acme",
           search: {},
-          unstatedWindow: "cli-last-24h",
+          unstatedWindow: "cli-default",
         })!;
 
         expect(fragmentParams(href).get("preset")).toBe("7d");
@@ -498,7 +498,7 @@ describe("buildAutomationHref", () => {
           buildAutomationHref({
             projectSlug: "acme",
             search,
-            unstatedWindow: "cli-last-24h",
+            unstatedWindow: "cli-default",
           })!,
         );
 
@@ -511,7 +511,7 @@ describe("buildAutomationHref", () => {
           buildAutomationHref({
             projectSlug: "acme",
             search,
-            unstatedWindow: "cli-last-24h",
+            unstatedWindow: "cli-default",
           })!,
         );
 
@@ -541,7 +541,7 @@ describe("buildAutomationHref", () => {
         const href = buildAutomationHref({
           projectSlug: "acme",
           search,
-          unstatedWindow: "cli-last-24h",
+          unstatedWindow: "cli-default",
         })!;
 
         expect(href.startsWith("/acme/traces?")).toBe(true);
