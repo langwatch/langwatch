@@ -4,6 +4,7 @@
  * Spec: enterprise/modules/governance/specs/ocsf-siem.feature
  */
 import type { Named } from "@langwatch/module";
+import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 /** The OCSF schema version every event LangWatch builds is written against. */
@@ -71,10 +72,24 @@ function cursorField(decode: (cursor: string) => unknown) {
     .optional();
 }
 
+function isStorableInstant(iso: string): boolean {
+  try {
+    return Temporal.Instant.from(iso).epochMilliseconds >= 0;
+  } catch {
+    return false;
+  }
+}
+
+/** An instant the stores can hold: ClickHouse reads window bounds as unsigned epoch milliseconds. */
+const windowInstant = z.iso
+  .datetime({ offset: true })
+  .refine(isStorableInstant, { message: "Must be 1970-01-01T00:00:00Z or later" })
+  .optional();
+
 const windowFields = {
   limit: z.coerce.number().int().min(1).max(OCSF_EXPORT_PAGE_LIMIT_MAX).default(500),
-  since: z.iso.datetime({ offset: true }).optional(),
-  until: z.iso.datetime({ offset: true }).optional(),
+  since: windowInstant,
+  until: windowInstant,
 };
 
 const ocsfEventsQuerySchemaDefinition = z.object({
