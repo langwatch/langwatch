@@ -141,6 +141,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When a question is routed
     Then the gate's backend is asked one score question about how hard the case is to judge
     And its levels are sent by name, easiest first, and the score read back is the weighted mean level index
+    And a question that names its levels with any range other than 0 to the last level index is refused before any call
     And it reads the job, the question's first 3,000 characters and the full text
     And a text over 12,000 characters is shown as its first and last 6,000 with the cut length between
     And the wording and the cut are fixed under the question's name, so a threshold keeps its meaning

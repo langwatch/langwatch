@@ -237,7 +237,8 @@ const instantEvalScoreQuestionSchema = z
     range: z.object({ min: z.number(), max: z.number() }).readonly(),
     /**
      * Named levels, lowest first, sent to the judge in place of the numbers. The score read back
-     * is then a level index, so `range` is 0 to `levels.length - 1`. Only the router's gate asks.
+     * is then a level index, so `range` must be 0 to `levels.length - 1`; the wire refuses any
+     * other range before a call (`toClassifierQuestions`), as this schema parses nothing.
      */
     levels: z.array(z.string().min(1)).min(2).readonly().optional(),
   })

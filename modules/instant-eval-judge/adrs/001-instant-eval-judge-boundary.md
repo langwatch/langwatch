@@ -145,7 +145,9 @@ them (ADR-174 decision 7).
 
 ## Contracts and validation
 
-The question schemas are Zod. The scenarios under `specs/` are bound by the contract's unit tests.
+The question schemas are Zod. A score question may name its levels (`levels`, added for the
+router's gate, ADR-190 decision 11); its score is then a level index, so its range must be 0 to
+the last index, and the wire refuses any other range before a call. The scenarios under `specs/` are bound by the contract's unit tests.
 The process half binds the fold, judge call and spend scenarios of Instant Evals' judge model
 spec, and the classifier scenarios moved with the client. Its repository
 contract test runs every case against memory and Postgres.
