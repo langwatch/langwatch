@@ -174,6 +174,26 @@ const starsOf = (count: number) =>
 afterEach(cleanup);
 
 describe("the LLM Ops sidebar's Dashboards section", () => {
+  describe("given the member pinned a board with an icon and one without", () => {
+    /** @scenario "The starred list shows the board's icon" */
+    it("draws the icon in its row, and the default glyph in the other", async () => {
+      renderSection({
+        stars: [
+          { kind: "board", dashboard: { ...LATENCY, icon: "dollar-sign" } },
+          { kind: "board", dashboard: { ...LATENCY, id: "board-2", name: "Plain", icon: null } },
+        ],
+      });
+
+      const group = within(await screen.findByRole("region", { name: "Dashboards" }));
+      const iconOf = (name: string) =>
+        group.getByRole("link", { name }).querySelector("[data-board-icon]");
+      await group.findByRole("link", { name: "Latency" });
+      expect(iconOf("Latency")?.getAttribute("data-board-icon")).toBe("dollar-sign");
+      expect(iconOf("Plain")).toBeNull();
+      expect(group.getByRole("link", { name: "Plain" }).querySelector("svg")).not.toBeNull();
+    });
+  });
+
   describe("given the member pinned a board and a From LangWatch board", () => {
     /** @scenario "The LLM Ops sidebar has a Dashboards section listing the pinned dashboards" */
     it("titles itself Dashboards, lists both in the member's order, and an entry opens it", async () => {

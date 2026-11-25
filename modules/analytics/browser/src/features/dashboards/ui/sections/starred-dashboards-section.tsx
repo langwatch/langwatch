@@ -6,6 +6,7 @@
  */
 
 import type { StarredDashboardsProps } from "@langwatch/analytics-client";
+import type { DashboardIcon } from "@langwatch/dashboard-contract";
 import { SidebarSectionLabel } from "@langwatch/design-system/app-shell";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Box, HStack, VStack } from "@langwatch/design-system/primitives";
@@ -30,6 +31,7 @@ import {
 import { AddDashboardRow } from "../blocks/add-dashboard-row.tsx";
 import { SavedDashboardRow } from "../blocks/saved-dashboard-row.tsx";
 import { SIDEBAR_ROW_ICON_SIZE, SidebarLinkRow } from "../blocks/sidebar-link-row.tsx";
+import { BoardIconGlyph } from "../elements/board-icon-glyph.tsx";
 import { NewDashboardButton } from "../elements/new-dashboard-button.tsx";
 
 /** Rows shown before the rest sit behind "All pinned (N)": the sidebar stays short. */
@@ -147,7 +149,7 @@ function PinnedStarRow({ link }: { link: StarredLink }) {
       name={link.name}
       href={link.href}
       isActive={isOpenStar({ star: link.star, params })}
-      icon={<PinnedIcon />}
+      icon={<PinnedIcon icon={link.board?.icon} />}
       actions={{
         isStarred: favourites.isStarred(link.star),
         onToggleStar: () => favourites.toggleStar(link.star),
@@ -159,8 +161,15 @@ function PinnedStarRow({ link }: { link: StarredLink }) {
   );
 }
 
-function PinnedIcon() {
-  return <LayoutDashboard size={SIDEBAR_ROW_ICON_SIZE} strokeWidth={1.9} aria-hidden />;
+/** The board's own icon, or the generic board glyph when it has none. */
+function PinnedIcon({ icon }: { icon?: DashboardIcon | null }) {
+  return (
+    <BoardIconGlyph
+      icon={icon}
+      size={SIDEBAR_ROW_ICON_SIZE}
+      fallback={<LayoutDashboard size={SIDEBAR_ROW_ICON_SIZE} strokeWidth={1.9} aria-hidden />}
+    />
+  );
 }
 
 /** The saved-dashboards row menu on a pinned board: what this member may do with it. */
@@ -187,7 +196,7 @@ function ManagedBoardRow({
         name={link.name}
         href={link.href}
         isActive={isOpenStar({ star: link.star, params: host.route().params })}
-        icon={<PinnedIcon />}
+        icon={<PinnedIcon icon={link.board?.icon} />}
         actions={{
           isStarred: favourites.isStarred(link.star),
           onToggleStar: () => favourites.toggleStar(link.star),

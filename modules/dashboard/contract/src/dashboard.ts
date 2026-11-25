@@ -199,9 +199,17 @@ export interface DashboardStarSchema extends Named<typeof dashboardStarSchemaDef
 export const dashboardStarSchema: DashboardStarSchema = dashboardStarSchemaDefinition;
 export type DashboardStar = z.infer<typeof dashboardStarSchema>;
 
+/** A board as a star list carries it: the stored row and its icon, no home product. */
+const starredBoardSchemaDefinition = z
+  .object({ ...dashboardSchema.shape, icon: storedDashboardIconSchema })
+  .strict();
+export interface StarredBoardSchema extends Named<typeof starredBoardSchemaDefinition> {}
+export const starredBoardSchema: StarredBoardSchema = starredBoardSchemaDefinition;
+export type StarredBoard = z.infer<typeof starredBoardSchema>;
+
 /** One of the member's stars, in their order: a board with its row, or a template by id. */
 const starredDashboardSchemaDefinition = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("board"), dashboard: dashboardSchema }).strict(),
+  z.object({ kind: z.literal("board"), dashboard: starredBoardSchema }).strict(),
   z.object({ kind: z.literal("template"), templateId: dashboardTemplateIdSchema }).strict(),
 ]);
 export interface StarredDashboardSchema extends Named<typeof starredDashboardSchemaDefinition> {}

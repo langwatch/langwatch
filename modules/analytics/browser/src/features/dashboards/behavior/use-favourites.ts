@@ -45,6 +45,7 @@ export function useFavourites() {
             projectId: star.dashboard.projectId,
             name: star.dashboard.name,
             description: star.dashboard.description,
+            icon: star.dashboard.icon,
             createdById: star.dashboard.createdById,
             scope: star.dashboard.scope,
             organizationId: star.dashboard.organizationId,

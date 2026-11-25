@@ -50,6 +50,13 @@ Feature: Dashboard icons
     And the second keeps the default glyph
 
   @integration
+  Scenario: The starred list shows the board's icon
+    Given a member who starred a board whose icon is "dollar-sign" and another with none
+    Then boards.listStarred carries each board's icon
+    And the first starred sidebar row draws its icon
+    And the second keeps the default glyph
+
+  @integration
   Scenario: A server refuses an icon off the allow-list
     When a member updates or creates a board with the icon "not-an-icon"
     Then the call is refused and the board is unchanged
