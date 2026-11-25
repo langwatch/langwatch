@@ -56,7 +56,7 @@ function render() {
 }
 
 beforeEach(() => {
-  useLangyStore.setState({ draft: "" });
+  useLangyStore.setState({ draft: "", turnPhase: "idle" });
   useLangyComposerImages.setState({ images: [], lastSent: [] });
 });
 

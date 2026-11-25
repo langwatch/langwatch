@@ -38,7 +38,7 @@ function render() {
 
 beforeEach(() => {
   tracked.events.length = 0;
-  useLangyStore.setState({ draft: "" });
+  useLangyStore.setState({ draft: "", turnPhase: "idle" });
 });
 
 describe("useLangyPanelSend", () => {

@@ -109,6 +109,10 @@ import {
   useLangyPanelTransport,
 } from "../../behavior/panel/use-langy-panel-transport.ts";
 import {
+  holdQueueForStop,
+  useLangyQueuedFollowUp,
+} from "../../behavior/panel/use-langy-queued-follow-up.ts";
+import {
   useLangyGithubRedrive,
   useLangyOutlivedTurnError,
   useLangyTurnFailure,
@@ -157,6 +161,7 @@ import {
   useLangySetupScrollsToTop,
   waitingCardsAnchor,
 } from "./panel/langy-panel-view.tsx";
+import { LangyQueuedMessages } from "./panel/langy-queued-messages.tsx";
 import {
   useLangyCodeAccessReAsk,
   useLangyProposalApply,
@@ -424,6 +429,16 @@ function LangyPanel({
     sendMessage: engine.sendMessage,
     restoreDraftOnFailure,
   });
+  const queue = useLangyQueuedFollowUp({
+    isBusy,
+    failed: !!failure.turnError,
+    recovering: failure.recovery.isRecovering || failure.recovery.willAutoRecover,
+    send,
+  });
+  const stopTurn = () => {
+    holdQueueForStop();
+    handleStop();
+  };
   // Stable like `send`: only what the member types or picks here counts as a question asked.
   const sendFromComposer = useCallback(
     (text: string) => void send(text, { askedFrom: "composer" }),
@@ -561,13 +576,9 @@ function LangyPanel({
         />
       }
       queuedPrompt={live ? pendingPrompt : null}
-      workingLine={
-        <LangyTurnWorkingLineSlot
-          view={view}
-          activity={activity}
-          waits={waits}
-          hasInlineProgressOwner={hasInlineProgressOwner}
-        />
+      workingLine={null}
+      queuedMessages={
+        <LangyQueuedMessages live={live} paused={queue.paused} onSendNow={queue.sendNow} />
       }
     />
   );
@@ -727,6 +738,14 @@ function LangyPanel({
                   {activity.pinnedPlan && (
                     <LangyPinnedPlan floating={floating} plan={activity.pinnedPlan} />
                   )}
+                  <LangyTurnWorkingLineSlot
+                    floating={floating}
+                    view={view}
+                    activity={activity}
+                    waits={waits}
+                    hasInlineProgressOwner={hasInlineProgressOwner}
+                    onStop={stopTurn}
+                  />
                   <LangyComposerNotice
                     floating={floating}
                     presentation={failure.turnError}
@@ -753,7 +772,6 @@ function LangyPanel({
                         makeDefault.offer(picked);
                       }}
                       onSend={sendFromComposer}
-                      onStop={handleStop}
                       variant={floating ? "floating" : "sidebar"}
                       disabled={!projectId}
                       contextChips={allContextChips}
