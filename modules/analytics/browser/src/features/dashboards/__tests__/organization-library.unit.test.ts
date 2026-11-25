@@ -5,9 +5,10 @@
 
 import { describe, expect, it } from "vitest";
 
-import { MY_DASHBOARD_NAME } from "../model/boards.ts";
+import { MY_DASHBOARD_NAME, untitledBoardName } from "../model/boards.ts";
 import {
   boardMenuActions,
+  firstUntitledName,
   type BoardMenuHandlers,
   type LibraryBoard,
   libraryBoardPath,
@@ -44,6 +45,19 @@ const menuOf = (subject: LibraryBoard) =>
     mayDeleteInOwner: true,
     on: handlers,
   });
+
+describe("untitledBoardName", () => {
+  /** @scenario "AC162i A product sidebar's '+' in a project opens the new board in that project" */
+  it("offers the first number no listed board has, as the create dialog does", () => {
+    const taken = [MY_DASHBOARD_NAME, "Agent health", "Untitled dashboard 2"];
+
+    expect(untitledBoardName({ takenNames: taken })).toBe("Untitled dashboard 1");
+    expect(firstUntitledName(taken)).toBe("Untitled dashboard 1");
+    expect(untitledBoardName({ takenNames: [...taken, "Untitled dashboard 1"] })).toBe(
+      "Untitled dashboard 3",
+    );
+  });
+});
 
 describe("libraryBoardPath", () => {
   it("is the organization's for every scope, a Project board included", () => {

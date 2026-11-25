@@ -2,8 +2,17 @@
 
 import type { LangyAttachedContextType } from "./langy-slice.ts";
 
-/** One reference the asking module hands over with its question; `ref` is the chip's id too. */
-export type LangyAskContext = { kind: LangyAttachedContextType; ref: string; label: string };
+/**
+ * One reference the asking module hands over with its question; `ref` is the chip's id too.
+ * `key` names the thing apart from its text, such as `dashboard:<id>`: one key is listed once,
+ * the latest text replacing the earlier, and a page chip with that id is that chip.
+ */
+export type LangyAskContext = {
+  kind: LangyAttachedContextType;
+  ref: string;
+  label: string;
+  key?: string;
+};
 
 /** What a draft is about: a thing on screen (a dashboard), and an item within it (a widget). */
 export type LangyDraftAbout = { ref: string; itemRef?: string };

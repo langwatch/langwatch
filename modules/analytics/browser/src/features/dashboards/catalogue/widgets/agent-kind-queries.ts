@@ -520,19 +520,19 @@ ORDER BY bucket`;
 /** Prompt versions, new evaluators and changed online evaluations, newest first. */
 export const CHANGES_SQL = `SELECT at, kind, name
 FROM (
-  SELECT v.CreatedAt AS at, 'Prompt version' AS kind,
+  SELECT v.CreatedAt AS at, 'New prompt version' AS kind,
     concat(p.PromptName, ' v', toString(v.VersionNumber)) AS name
   FROM prompt_versions AS v
   LEFT JOIN prompts AS p ON p.PromptId = v.PromptId
   WHERE ${inPeriod("v.CreatedAt")}
   LIMIT 50
   UNION ALL
-  SELECT CreatedAt AS at, 'Evaluator added' AS kind, Name AS name
+  SELECT CreatedAt AS at, 'New automatic check' AS kind, Name AS name
   FROM evaluators
   WHERE ${inPeriod("CreatedAt")}
   LIMIT 50
   UNION ALL
-  SELECT UpdatedAt AS at, 'Online evaluation changed' AS kind, Name AS name
+  SELECT UpdatedAt AS at, 'Automatic check changed' AS kind, Name AS name
   FROM monitors
   WHERE ${inPeriod("UpdatedAt")}
   LIMIT 50

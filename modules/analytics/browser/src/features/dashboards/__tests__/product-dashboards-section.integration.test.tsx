@@ -6,7 +6,7 @@
  */
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
-import { screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
@@ -60,6 +60,7 @@ function render({
     if (call.path === "boards.listStarred") return Promise.resolve([]);
     if (call.path === "boards.storeProjects") return Promise.resolve(storeProjects);
     if (call.path === "boards.update") return Promise.resolve({});
+    if (call.path === "boards.getAll") return Promise.resolve([]);
     return NO_PROCEDURES(call);
   };
   renderDashboards({ element, host, answer });
@@ -116,7 +117,7 @@ describe("a product's Dashboards section", () => {
 
       const list = await screen.findByRole("list", { name: "Dashboards" });
       expect(linkNames(list)).toEqual([
-        "Agent health",
+        "My agent at a glance",
         "Only me board",
         "Organization board",
         "Project board",
@@ -182,12 +183,12 @@ describe("a product's Dashboards section", () => {
 
   describe("given LLM Ops with no saved board", () => {
     /** @scenario "Each product pins its own From LangWatch board first" */
-    it("pins Agent health to the top, links it to its curated address, and lists no From LangWatch group", async () => {
+    it("pins My agent at a glance to the top, links it to its curated address, and lists no From LangWatch group", async () => {
       render({ element: <ProductDashboardsSection product="llm-ops" />, listed: [] });
 
       const section = await screen.findByRole("region", { name: "Dashboards" });
       expect(within(section).queryByText("No dashboards yet")).toBeNull();
-      expect(within(section).getByRole("link", { name: "Agent health" })).toHaveAttribute(
+      expect(within(section).getByRole("link", { name: "My agent at a glance" })).toHaveAttribute(
         "href",
         "/test-project/dashboards/curated/cockpit",
       );
@@ -217,7 +218,7 @@ describe("a product's Dashboards section", () => {
 
       const section = await screen.findByRole("region", { name: "Dashboards" });
       expect(within(section).getByText("No dashboards yet")).toBeInTheDocument();
-      expect(within(section).queryByRole("link", { name: "Agent health" })).toBeNull();
+      expect(within(section).queryByRole("link", { name: "My agent at a glance" })).toBeNull();
       expect(within(section).queryByRole("link", { name: "Gateway costs" })).toBeNull();
     });
   });
@@ -239,7 +240,7 @@ describe("a product's Dashboards section", () => {
 
       const list = await screen.findByRole("list", { name: "Dashboards" });
       const items = within(list).getAllByRole("listitem");
-      expect(items[0]).toHaveTextContent("Agent health");
+      expect(items[0]).toHaveTextContent("My agent at a glance");
       expect(items[1]).toHaveTextContent("Project board");
       expect(items.at(-1)).toHaveTextContent("Add dashboard");
       expect(within(list).getByRole("button", { name: "Add dashboard" })).toBeVisible();
@@ -413,6 +414,87 @@ describe("a product's Dashboards section", () => {
       expect(move).toHaveAttribute("aria-disabled", "true");
       expect(screen.queryByRole("menuitem", { name: "Rename" })).toBeNull();
       expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
+    });
+  });
+
+  describe("given a new board open and not stored yet", () => {
+    /** @scenario "AC162h The product sidebar lists the new board while it is open" */
+    it("lists it first by its untitled name as the page in view, with no empty note", async () => {
+      render({
+        element: <ProductDashboardsSection product="llm-ops" />,
+        listed: [],
+        host: new StubAnalyticsHost({ route: { params: { dashboardId: "new" }, query: {} } }),
+      });
+
+      const list = await screen.findByRole("list", { name: "New dashboard" });
+      const row = await within(list).findByRole("link", { name: /Untitled dashboard/ });
+      expect(row).toHaveAttribute("aria-current", "page");
+      expect(screen.queryByText("No dashboards yet")).toBeNull();
+    });
+  });
+
+  describe("given LLM Ops in the project in view, which is the store project", () => {
+    /** @scenario "AC162i A product sidebar's '+' in a project opens the new board in that project" */
+    it("opens the board unsaved at the project's address and lists it by the name typed", async () => {
+      const host = new StubAnalyticsHost({
+        projectPermissions: { [IN_VIEW.id]: ["analytics:create", "analytics:update"] },
+      });
+      const { calls, user } = render({
+        element: <ProductDashboardsSection product="llm-ops" />,
+        listed: [],
+        host,
+        storeProjects: [IN_VIEW],
+      });
+
+      await user.click(await screen.findByRole("button", { name: "New dashboard" }));
+      const name = await screen.findByRole("textbox");
+      await user.clear(name);
+      await user.type(name, "Support costs");
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(host.navigations).toEqual([`/${IN_VIEW.slug}/dashboards/new`]);
+      // The sidebar as the app draws it at the new address.
+      cleanup();
+      render({
+        element: <ProductDashboardsSection product="llm-ops" />,
+        listed: [],
+        host: new StubAnalyticsHost({ route: { params: { dashboardId: "new" }, query: {} } }),
+        storeProjects: [IN_VIEW],
+      });
+      const list = await screen.findByRole("list", { name: "New dashboard" });
+      const row = within(list).getByRole("link", { name: "Support costs" });
+      expect(row).toHaveAttribute("aria-current", "page");
+      expect(calls.filter(({ path }) => path.startsWith("boards.create"))).toEqual([]);
+    });
+  });
+
+  describe("given Gateway, whose boards open in Dashboards", () => {
+    /** @scenario "AC162i A product sidebar's '+' in a project opens the new board in that project" */
+    it("opens the new board at /dashboards/new", async () => {
+      const host = new StubAnalyticsHost({
+        projectPermissions: { [IN_VIEW.id]: ["analytics:create", "analytics:update"] },
+      });
+      const { user } = render({
+        element: <ProductDashboardsSection product="gateway" />,
+        listed: [],
+        host,
+        storeProjects: [IN_VIEW],
+      });
+
+      await user.click(await screen.findByRole("button", { name: "New dashboard" }));
+      await user.click(await screen.findByRole("button", { name: "Create" }));
+
+      expect(host.navigations).toEqual(["/dashboards/new"]);
+    });
+  });
+
+  describe("given no new board open", () => {
+    /** @scenario "AC162h The product sidebar lists the new board while it is open" */
+    it("lists no new board row", async () => {
+      render({ element: <ProductDashboardsSection product="llm-ops" />, listed: [] });
+
+      expect(await screen.findByRole("link", { name: "My agent at a glance" })).toBeInTheDocument();
+      expect(screen.queryByRole("list", { name: "New dashboard" })).toBeNull();
     });
   });
 });

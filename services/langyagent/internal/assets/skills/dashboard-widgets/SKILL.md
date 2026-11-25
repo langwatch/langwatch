@@ -116,7 +116,7 @@ export default function Widget() {
 
 ### Drill-down: `LW.navigate`
 
-`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget. `target` is a route key, never a path: `"traces"` and `"trace"` take `params` keyed by filter field ids (e.g. `"metadata.user_id"`) or `traceId`, which the host resolves into the Trace Explorer URL; `"scenarios"`, `"onlineEvaluations"`, `"annotations"`, `"gatewayVirtualKeys"` and `"codingSessions"` open that page of the project and take no params.
+`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget. `target` is a route key, never a path: `"traces"` and `"trace"` take `params` keyed by filter field ids (e.g. `"metadata.user_id"`) or `traceId`, which the host resolves into the Trace Explorer URL; `"scenarios"`, `"onlineEvaluations"`, `"annotations"`, `"gatewayVirtualKeys"`, `"codingSessions"` and `"modelCosts"` (Settings, Model costs) open that page and take no params; `"metadataDocs"` opens the metadata and labels docs page in a new tab.
 
 `Leaderboard` wraps this for you: pass `navigateTo={{ target, params: (row) => ({ ... }) }}` and a row click navigates. An unknown `target` is ignored rather than erroring.
 

@@ -13,11 +13,13 @@ import { type ReactNode, useState } from "react";
 import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useBoardReader } from "../../behavior/use-board-access.ts";
 import { useBoardMenuActions } from "../../behavior/use-board-menu-actions.ts";
+import { useDraftBoard, useStartDraft } from "../../behavior/use-draft-board.ts";
 import { useLibraryBoardEdits } from "../../behavior/use-library-board-edits.ts";
 import { useLibraryCreate, useLibraryDuplicate } from "../../behavior/use-library-writes.ts";
 import { useProductDashboards } from "../../behavior/use-product-dashboards.ts";
+import { useSavedDashboards } from "../../behavior/use-saved-dashboards.ts";
 import { type StoreProject, useStoreProject } from "../../behavior/use-store-project.ts";
-import { dashboardTemplatesPath } from "../../model/boards.ts";
+import { dashboardTemplatesPath, DRAFT_SEGMENT, draftBoardPath } from "../../model/boards.ts";
 import {
   type LibraryBoard,
   libraryBoardPath,
@@ -50,19 +52,23 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
   if (!isLoaded) return null;
   const projectSlug = host.project()?.slug;
   const pinned = productDefaultBoard({ product, projectSlug });
-  // The same gate as the "+" above, so the dotted row never offers a create the "+" would not.
+  // One gate for the "+" and the dotted row, so neither offers a create the other would not.
   const canCreate =
     Boolean(store.storeProject) && hasSharingChoice({ product, mayShare: store.mayShare });
+  const isDraftOpen = projectSlug !== void 0 && host.route().params.dashboardId === DRAFT_SEGMENT;
 
   return (
     <VStack as="section" aria-label={LABEL} align="stretch" gap={0.5} width="full">
       <HStack minHeight="28px" paddingX={2} paddingTop={2.5} paddingBottom={0.5} gap={1}>
         <SidebarSectionLabel label={LABEL} />
-        {canCreate && (
-          <NewDashboardButton isCreating={false} onCreate={() => setIsNewDialogOpen(true)} />
-        )}
+        {canCreate && <NewDashboardButton onCreate={() => setIsNewDialogOpen(true)} />}
       </HStack>
-      {boards.length === 0 && !pinned && (
+      {isDraftOpen && (
+        <RowList label="New dashboard">
+          <DraftRow projectSlug={projectSlug} />
+        </RowList>
+      )}
+      {boards.length === 0 && !pinned && !isDraftOpen && (
         <Text textStyle="bodySm" color="fg.subtle" paddingX={2} paddingY="4px">
           No dashboards yet
         </Text>
@@ -87,7 +93,7 @@ export function ProductDashboardsSection({ product }: ProductDashboardsProps) {
           onMove={setPendingMove}
           onDelete={setPendingDelete}
         />
-        {canCreate && <AddDashboardRow isCreating={false} onAdd={() => setIsNewDialogOpen(true)} />}
+        {canCreate && <AddDashboardRow onAdd={() => setIsNewDialogOpen(true)} />}
       </RowList>
       {projectSlug && product === "llm-ops" && (
         <RowList label="Templates">
@@ -210,6 +216,21 @@ function BoardRow({
   );
 }
 
+/** The new board in view, listed while nothing is stored; its own row takes over once it is. */
+function DraftRow({ projectSlug }: { projectSlug: string }) {
+  const saved = useSavedDashboards();
+  const draft = useDraftBoard({ takenNames: saved.boards.map(({ name }) => name) });
+  if (draft.savedId !== void 0) return null;
+  return (
+    <SidebarLinkRow
+      name={draft.board.name}
+      href={draftBoardPath({ projectSlug })}
+      icon={<LayoutDashboard size={14} />}
+      isActive
+    />
+  );
+}
+
 /** "Show N more" / "Show less". */
 function ToggleRow({ onClick, children }: { onClick: () => void; children: ReactNode }) {
   return (
@@ -239,7 +260,10 @@ function RowList({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** The "+" opens the library's create dialog with the product fixed; made, the board opens. */
+/**
+ * The "+" opens the library's create dialog with the product fixed; made, the board opens
+ * unsaved. In LLM Ops inside the store project it opens in that project, so this sidebar lists it.
+ */
 function ProductNewDashboard({
   product,
   allBoards,
@@ -251,9 +275,20 @@ function ProductNewDashboard({
   store: StoreProject;
   onClose: () => void;
 }) {
+  const host = useAnalyticsHost();
   const creating = useLibraryCreate();
+  const startDraft = useStartDraft();
   const { organizationName } = useBoardReader();
   if (!store.storeProject) return null;
+  const inView = host.project();
+  const projectDraft =
+    product === "llm-ops" && inView?.id === store.storeProject.id ? inView : void 0;
+  const create: typeof creating.createBoard = projectDraft
+    ? (choices) => {
+        startDraft({ projectId: projectDraft.id, projectSlug: projectDraft.slug, ...choices });
+        return Promise.resolve(true);
+      }
+    : creating.createBoard;
   return (
     <NewDashboardDialog
       product={product}
@@ -262,7 +297,7 @@ function ProductNewDashboard({
       organizationName={organizationName}
       mayShare={store.mayShare}
       isCreating={creating.isCreating}
-      onCreate={creating.createBoard}
+      onCreate={create}
       onClose={onClose}
     />
   );

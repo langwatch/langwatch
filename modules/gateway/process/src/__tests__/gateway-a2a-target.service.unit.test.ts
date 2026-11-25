@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { AppendGatewayAuditInput } from "../repositories/gateway-audit.repository.ts";
 import { MemoryGatewayA2aTargetRepository } from "../repositories/memory/memory.gateway-a2a-target.repository.ts";
 import { MemoryGatewayChangeEventsRepository } from "../repositories/memory/memory.gateway-change-event.repository.ts";
+import { a2aTargetToDto } from "../rules/gateway-a2a-target.rules.ts";
 import {
   FOREIGN_PROJECT_ID,
   a2aTargetBase as base,
@@ -100,26 +101,29 @@ describe("GatewayA2aTargetService", () => {
     ).resolves.toMatchObject({ name: "billing" });
   });
 
-  it("lists an organization's and a project's targets without unsealing their headers", async () => {
-    const repository = sealedA2aTargetRepository();
-    const targets = service({ repository });
-    await repository.create({
+  /** @scenario "listed targets show their header names, never their values" */
+  it("lists an organization's and a project's targets with header names and no values", async () => {
+    const targets = service();
+    await targets.create({
       ...base,
       projectId: "p1",
       name: "billing",
-      upstreamHeaders: { "X-Token": "s3cret" },
+      upstreamHeaders: { "X-Agent-Tenant": "tenant-s3cret", "X-Agent-Region": "region-s3cret" },
     });
+    await targets.create({ ...base, projectId: "p1", name: "search" });
 
-    const listed = await targets.list(base.organizationId);
-    const projectListed = await targets.listForProject({
-      organizationId: base.organizationId,
-      projectId: "p1",
-    });
+    const listed = [
+      ...(await targets.list(base.organizationId)),
+      ...(await targets.listForProject({ organizationId: base.organizationId, projectId: "p1" })),
+    ].map(a2aTargetToDto);
 
-    expect([...listed, ...projectListed].map((target) => target.name)).toEqual([
-      "billing",
-      "billing",
+    expect(listed.map((target) => [target.name, target.upstreamHeaderNames])).toEqual([
+      ["billing", ["X-Agent-Region", "X-Agent-Tenant"]],
+      ["search", []],
+      ["billing", ["X-Agent-Region", "X-Agent-Tenant"]],
+      ["search", []],
     ]);
+    expect(JSON.stringify(listed)).not.toContain("s3cret");
   });
 
   /** @scenario "a target URL that holds credentials is refused at save time" */

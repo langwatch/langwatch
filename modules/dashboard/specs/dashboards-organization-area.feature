@@ -38,7 +38,7 @@ Feature: Organization-wide Dashboards area
     When I open "/dashboards", "/dashboards/<a board id>", "/dashboards/templates" or "/dashboards/curated/<id>"
     Then I see the same page the base commit of PR 9698 shows for that address
     And the Gateway, Governance and Coding agents sidebars are as the base commit draws them: the project's Dashboards section only where "Dashboards in every product" is on, and no "Starred dashboards" group
-    And the LLM Ops sidebar's Dashboards section lists my pins, at most 7, its "+" makes a board at once, and it has no "Browse templates"
+    And the LLM Ops sidebar's Dashboards section lists my pins, at most 7, its "+" opens a new board stored on its first edit, and it has no "Browse templates"
     And the Dashboards sidebar at "/shop/dashboards" is the one dashboards-v1 AC3 describes
     And "/shop/dashboards" lands on my My dashboard of "Shop", as today
     And switching project in the top bar on an Organization board at "/shop/dashboards/<id>" keeps the board open, re-read for the project switched to (D2)
@@ -212,8 +212,10 @@ Feature: Organization-wide Dashboards area
   @integration
   Scenario: A board made in the library is made at its scope in one write
     When I press "New dashboard" in the library and create a board with a name and who can see it
+    Then it opens unsaved at "/dashboards/new" and nothing is written (dashboards-v2 AC162)
+    When I make its first edit
     Then it is stored in my store project at that scope, in one write
-    And it opens at "/dashboards/<id>" whatever its scope, a Project board included (owner, 2026-11-23)
+    And the address moves to "/dashboards/<id>" without reloading the board, whatever its scope, a Project board included (owner, 2026-11-23)
     And a seat that may create dashboards there but not update them is refused an Only me or Organization board, and nothing is written
     # Evidence: the quoted boards.create and boards.createAtScope answers, and the refusal
 
@@ -614,8 +616,10 @@ Feature: Organization-wide Dashboards area
     And my store project is my last-used project where I may create, or with none used yet the first such project by name
     And with no project where I may create, no "New dashboard", "+", Duplicate, "Duplicate to edit" or template add is offered
     When I create it
-    Then a toast says "Dashboard created", it opens at "/dashboards/<id>" whatever its scope, it is listed in that product's sidebar and in the library, and its scope is the one I picked
-    # Evidence: screenshots of the dialog per product and of the toast, the quoted create answer, and a screenshot as a member who never opened a project
+    Then it opens unsaved at "/dashboards/new" under the name I typed
+    When I make its first edit
+    Then it is stored homed in that product at the scope I picked, it opens at "/dashboards/<id>", and it is listed in that product's sidebar and in the library
+    # Evidence: screenshots of the dialog per product, the quoted create answer, and a screenshot as a member who never opened a project
 
   @integration
   Scenario: A product's "+" fixes the product and says where the board lives

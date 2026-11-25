@@ -342,8 +342,8 @@ Feature: Product sidebars
     Given I may create dashboards in this project
     And Dashboards in every product is off
     When I press the "+" at the right of the "Dashboards" title
-    Then a new dashboard is made in this project and pinned to it for me
-    And it opens with "Add a widget" open
+    Then a new dashboard opens in this project with "Add a widget" open
+    And nothing is stored until its first edit, which stores it pinned to this project for me
     And a member who may not create dashboards sees no "+"
 
   @integration
@@ -360,13 +360,13 @@ Feature: Product sidebars
   Scenario: A double click leaves exactly one dashboard
     Given I may create dashboards in this project
     When I press the "+" or the "Add dashboard" item twice in quick succession
-    Then one dashboard is made, and the control ignores the second press while it is made
+    Then no dashboard is made by the presses, and the new dashboard's first edit makes exactly one
 
   @integration
   Scenario: A failed pin leaves exactly one dashboard
     Given I may create dashboards in this project
-    When the pin fails after the dashboard is made
-    Then that one dashboard still exists, opens with "Add a widget" open, and I see "Couldn't pin the dashboard"
+    When the pin fails after the new dashboard's first edit stores it
+    Then that one dashboard still exists and stays open, and I see "Couldn't pin the dashboard"
 
   @integration
   Scenario: With the pinned list unreadable, the Dashboards section keeps its title and plus and lists nothing
@@ -435,15 +435,15 @@ Feature: Product sidebars
     Given I opened a dashboard from LLM Ops
     Then the device remembers "llm-ops" for the organization, not "dashboards"
 
-  # Each product's Dashboards section pins one From LangWatch board on top. LLM Ops pins Agent
-  # health (opens under the project); Gateway pins Gateway costs and Coding agents pins Coding
+  # Each product's Dashboards section pins one From LangWatch board on top. LLM Ops pins My agent
+  # at a glance (opens under the project); Gateway pins Gateway costs and Coding agents pins Coding
   # agent costs (both open at the organization address); Governance pins none.
   @integration
   Scenario: Each product pins its own From LangWatch board first
     Given I can reach Dashboards in every product
     When I am in LLM Ops
-    Then the Dashboards section lists "Agent health" above my own boards
-    And it opens the From LangWatch board "Agent health" at its curated address
+    Then the Dashboards section lists "My agent at a glance" above my own boards
+    And it opens the From LangWatch board "My agent at a glance" at its curated address
     When I am in Gateway
     Then the Dashboards section lists "Gateway costs" above my own boards
     When I am in Coding agents
@@ -457,3 +457,45 @@ Feature: Product sidebars
     When I open the LLM Ops Dashboards section
     Then the last row is a dotted "Add dashboard" row
     And choosing it opens the same create dialog as the "+" button
+
+  # Product owner, 2026-11-24: an organization younger than three weeks never had the old
+  # Analytics, so the LLM Ops sidebar offers no Analytics entry that only leads to Dashboards.
+  # The age is read from the organization's createdAt: 21 days or more shows the entry, any
+  # younger hides it. Where the entry still opens the old Analytics (Dashboards out of reach,
+  # an aggregate project) it stays, as it is the only way there.
+  @integration
+  Scenario: An organization younger than three weeks has no Analytics entry in Observe
+    Given the Analytics entry leads to Dashboards
+    And my organization was created 2 days ago
+    When I am in LLM Ops
+    Then the Observe section shows no Analytics entry
+    And the Trace Explorer entry is still there
+
+  @integration
+  Scenario: An organization three weeks or older keeps the Analytics entry in Observe
+    Given the Analytics entry leads to Dashboards
+    And my organization was created 30 days ago
+    When I am in LLM Ops
+    Then the Observe section shows the Analytics entry
+
+  @integration
+  Scenario: A young organization keeps the Analytics entry where it opens the old Analytics
+    Given my organization was created 2 days ago
+    And Dashboards is out of reach for the project
+    When I am in LLM Ops
+    Then the Analytics entry opens /[project]/analytics
+
+  @unit
+  Scenario: An organization created exactly 21 days ago keeps the Analytics entry
+    Given my organization was created exactly 21 days ago
+    Then the Analytics entry is offered
+
+  @unit
+  Scenario: An organization one millisecond short of 21 days has no Analytics entry
+    Given my organization was created 21 days ago less one millisecond
+    Then the Analytics entry is not offered
+
+  @unit
+  Scenario: An organization whose creation date has not arrived keeps the Analytics entry
+    Given my organization's creation date is not known
+    Then the Analytics entry is offered

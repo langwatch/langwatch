@@ -89,7 +89,7 @@ describe("sharingTitle", () => {
 describe("a product's pinned From LangWatch board", () => {
   /** @scenario "Each product pins its own From LangWatch board first" */
   it.each([
-    { product: "llm-ops", name: "Agent health", href: "/shop/dashboards/curated/cockpit" },
+    { product: "llm-ops", name: "My agent at a glance", href: "/shop/dashboards/curated/cockpit" },
     { product: "gateway", name: "Gateway costs", href: "/dashboards/curated/gateway-costs" },
     { product: "me", name: "Coding agent costs", href: "/dashboards/curated/coding-costs" },
   ] as const)("pins $name in $product, linked to its address", ({ product, name, href }) => {
