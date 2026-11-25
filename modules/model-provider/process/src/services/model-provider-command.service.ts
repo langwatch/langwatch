@@ -29,10 +29,7 @@ import { nowInstant, toDate } from "@langwatch/time";
 import type { ModelProviderConnectionPingService } from "../features/credential-probe/services/model-provider-connection-ping.service.ts";
 import type { ModelProviderConnectionRateLimiter } from "../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
 import type { ModelProviderOnboardingDefaultsService } from "../features/defaults/services/model-provider-onboarding-defaults.service.ts";
-import type {
-  ModelImportResult,
-  ModelProviderModelImportService,
-} from "../features/served-models/services/model-provider-model-import.service.ts";
+import type { ModelProviderModelImportService } from "../features/served-models/services/model-provider-model-import.service.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
 import {
@@ -88,20 +85,14 @@ export class ModelProviderCommandService {
       routingHandle,
     });
     // Before the write and outside any transaction: this asks the provider over the network.
-    const modelImport = await this.options.modelImport?.importOnSave({ write: provider, existing });
-    const saved = await this.saveProvider(
-      modelImport ? withImportedModels(provider, modelImport) : provider,
-      existing,
-      routingHandle,
-    );
+    const imported = await this.options.modelImport?.importIntoSave({ provider, existing });
+    const saved = await this.saveProvider(imported?.provider ?? provider, existing, routingHandle);
 
     await this.seedOnboardingDefaults(existing, saved);
     await this.saveProjectDefault(parsed);
 
-    return {
-      ...this.withMaskedCredentials(saved),
-      ...(modelImport?.outcome && { modelImport: modelImport.outcome }),
-    };
+    const masked = this.withMaskedCredentials(saved);
+    return imported?.outcome ? { ...masked, modelImport: imported.outcome } : masked;
   }
 
   /** A write answers what a read answers: the caller already holds what it sent. */
@@ -504,19 +495,4 @@ export class ModelProviderCommandService {
       });
     }
   }
-}
-
-/** The provider value with what the save imported from its model listing folded in. */
-function withImportedModels(
-  provider: ModelProvider,
-  modelImport: ModelImportResult,
-): ModelProvider {
-  return {
-    ...provider,
-    ...(modelImport.customModels && { customModels: modelImport.customModels }),
-    ...(modelImport.customEmbeddingsModels && {
-      customEmbeddingsModels: modelImport.customEmbeddingsModels,
-    }),
-    ...(modelImport.lastListedModelIds && { lastListedModelIds: modelImport.lastListedModelIds }),
-  };
 }

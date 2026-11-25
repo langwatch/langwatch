@@ -27,7 +27,7 @@ type ModelImportWrite = Readonly<{
 }>;
 
 /** What the save writes from the import; a field left out keeps the save's own value. */
-export type ModelImportResult = Readonly<{
+type ModelImportResult = Readonly<{
   outcome?: ModelImportOutcome;
   customModels?: Model[];
   customEmbeddingsModels?: Model[];
@@ -52,7 +52,19 @@ export class ModelProviderModelImportService {
     private readonly connectionRateLimiter: ModelProviderConnectionRateLimiter,
   ) {}
 
-  async importOnSave({
+  /** The save's provider value with its listed models folded in, and what the import did. */
+  async importIntoSave({
+    provider,
+    existing,
+  }: {
+    provider: ModelProvider;
+    existing: ModelProvider | null;
+  }): Promise<{ provider: ModelProvider; outcome?: ModelImportOutcome }> {
+    const result = await this.importOnSave({ write: provider, existing });
+    return { provider: withImportedModels(provider, result), outcome: result.outcome };
+  }
+
+  private async importOnSave({
     write,
     existing,
   }: {
@@ -139,4 +151,16 @@ function isSameListingEndpoint({
   const stored = textOf(existing.customKeys?.[endpointKey]);
   if (stored === "" || endpoint === "") return stored === endpoint;
   return isSameEndpoint(stored, endpoint);
+}
+
+/** The provider value with what the save imported from its model listing folded in. */
+function withImportedModels(provider: ModelProvider, result: ModelImportResult): ModelProvider {
+  return {
+    ...provider,
+    ...(result.customModels && { customModels: result.customModels }),
+    ...(result.customEmbeddingsModels && {
+      customEmbeddingsModels: result.customEmbeddingsModels,
+    }),
+    ...(result.lastListedModelIds && { lastListedModelIds: result.lastListedModelIds }),
+  };
 }

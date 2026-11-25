@@ -147,12 +147,7 @@ export class ModelProviderService {
       credentialPolicy: options.credentialPolicy,
       catalog: options.catalog,
       connectionRateLimiter: options.connectionRateLimiter,
-      connectionPing: ModelProviderConnectionPingService.create({
-        channel: options.connectionPing,
-        codexChannel: options.codexGatewayPing,
-        secrets: options.secrets,
-        execution: this.execution,
-      }),
+      connectionPing: this.createConnectionPing(),
       writeAuthorization,
       onboardingDefaults: ModelProviderOnboardingDefaultsService.create({
         defaults: options.defaults,
@@ -201,6 +196,15 @@ export class ModelProviderService {
 
   static create(options: ModelProviderServiceOptions): ModelProviderService {
     return new ModelProviderService(options);
+  }
+
+  private createConnectionPing(): ModelProviderConnectionPingService {
+    return ModelProviderConnectionPingService.create({
+      channel: this.options.connectionPing,
+      codexChannel: this.options.codexGatewayPing,
+      secrets: this.options.secrets,
+      execution: this.execution,
+    });
   }
 
   countEnabledInScopes(input: {
