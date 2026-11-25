@@ -6585,6 +6585,11 @@ const presentations = {
     title: "The session was lost",
     describe: () => "Start a new message to continue.",
   },
+  invalid_images: {
+    title: "Langy can't read those images",
+    describe: () =>
+      "Attach up to 4 PNG, JPEG, GIF or WebP images of 5 MB or less each, then send again.",
+  },
   max_workers_reached: {
     title: "Busy right now",
     describe: () => "Try again in a moment.",
