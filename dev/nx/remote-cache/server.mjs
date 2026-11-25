@@ -50,28 +50,36 @@ const loadTaint = (ctx) => {
   state.loaded ??= (async () => {
     const key = taintKeyFor(scope);
     if (!key) return;
-    const hit = await store.get(key).catch(() => null);
+    // A marker that cannot be read counts as present: an unknown taint never writes pr/.
+    const hit = await store.get(key).catch(() => ({ body: Readable.from([]) }));
     if (!hit) return;
     hit.body.resume();
     state.tainted = true;
-    await writeMarker({ store, key });
+    state.markerStored = (await writeMarker({ store, key })) === 200;
   })();
   return state.loaded;
 };
 
-const markTainted = (ctx, found) => {
+// A laptop entry is served only once the branch's marker is stored, so a later job can
+// never miss the taint. If the marker cannot be stored, the entry is a miss.
+const mayServe = async (ctx, found) => {
   const { scope, state, store, log } = ctx;
   const key = taintKeyFor(scope);
-  if (!found.read.laptop || state.tainted || !key) return;
+  if (!found.read.laptop || !key || state.markerStored) return true;
   state.tainted = true;
-  log(`used a laptop entry (${found.key}); this branch no longer writes ${scope.write}`);
-  void writeMarker({ store, key });
+  state.markerStored = (await writeMarker({ store, key })) === 200;
+  if (state.markerStored)
+    log(`used a laptop entry (${found.key}); this branch no longer writes ${scope.write}`);
+  return state.markerStored;
 };
 
 const serveGet = async (ctx, hash, res) => {
   const found = await findEntry({ ...ctx, hash });
   if (!found) return void res.writeHead(404).end();
-  markTainted(ctx, found);
+  if (!(await mayServe(ctx, found))) {
+    found.hit.body.resume();
+    return void res.writeHead(404).end();
+  }
   const { length, body } = found.hit;
   res.writeHead(200, {
     "content-type": "application/octet-stream",

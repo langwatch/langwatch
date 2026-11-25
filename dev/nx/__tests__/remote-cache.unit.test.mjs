@@ -120,6 +120,35 @@ describe("Nx remote cache", () => {
     assert.ok(!store.objects.has("pr/444"));
   });
 
+  /** @scenario "A pull request that used a laptop entry stops writing pr/" */
+  it("never serves a laptop entry it could not mark, and never writes pr/ on an unknown marker", async () => {
+    const store = memoryStore();
+    store.objects.set("branch/feat_x/111", Buffer.from("laptop"));
+    const failing = {
+      get: store.get,
+      put: async (key, body, length, opts) =>
+        key.endsWith("tainted") ? 500 : store.put(key, body, length, opts),
+    };
+    const scope = cacheScope({
+      env: ci({ GITHUB_EVENT_NAME: "pull_request", GITHUB_HEAD_REF: "feat/x" }),
+    });
+    await withServer({ scope, store: failing }, async (port) => {
+      assert.equal((await call({ port, method: "GET", path: "/v1/cache/111" })).status, 404);
+    });
+    const unreadable = {
+      get: async (key) => {
+        if (key.endsWith("tainted")) throw new Error("no network");
+        return store.get(key);
+      },
+      put: store.put,
+    };
+    await withServer({ scope, store: unreadable }, async (port) => {
+      await call({ port, method: "PUT", path: "/v1/cache/555", body: Buffer.from("x") });
+    });
+    assert.ok(!store.objects.has("pr/555"));
+    assert.ok(store.objects.has("branch/feat_x/555"));
+  });
+
   /** @scenario "A laptop writes only its own branch" */
   it("lets a laptop write only its branch", () => {
     const scope = cacheScope({ env: {}, localBranch: "feat/x" });
