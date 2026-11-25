@@ -44,7 +44,8 @@ slice and the priced event's schema. There is no transport.
   its cost and the input tokens that cost covers (`routedInputTokens`). A call without one takes
   the single hosted classifier call.
 - `queryHoldPricing` returns the rate a judged query is held at: the dearest input rate any backend
-  the route table can reach, never below the classifier rate, at the one markup. It is computed
+  a search or LLM-judge route can reach (a scenario-only backend is left out), never below the
+  classifier rate, at the one markup. It is computed
   once at boot. It is a best-effort hold, not a hard cap on a routed query (ADR-190 decision 7).
 - `classify` is the unmetered call Instant Evals uses for its own runs and queries, which keep their
   own spend rule in wave 1.

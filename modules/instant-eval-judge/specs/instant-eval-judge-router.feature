@@ -131,7 +131,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When the deployment boots
     Then the entry must name an escalation, and neither a threshold nor a pair
     And the gate's backend must be a hosted classifier backend with no fallbacks
-    And the gate's question must be one the code names, and its threshold inside the question's levels
+    And the gate's question must be one the code names, and its threshold at most the question's top level
     And the gate's backend needs a price and a key like any backend the entry can call
     And an entry whose gate backend is switched off is unusable, so its mode falls back
 
@@ -153,6 +153,7 @@ Feature: Routing an Instant Evals judgement across decision models and LLMs
     When the gate scores the case at or above the threshold
     Then the escalation answers alone on the full text, and the primary is not called
     And the judgement counts one escalation, flags the branch taken and sums the gate's cost and that one call's
+    And the gate's limiter wait counts toward the judgement's limiter wait, with that one call's
     And a gated plan never shares its first send with another kind's plan
 
   @unit

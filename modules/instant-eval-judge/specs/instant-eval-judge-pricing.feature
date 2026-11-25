@@ -54,7 +54,7 @@ Feature: What the Instant Evals judge costs us, and what the customer is charged
   Scenario: A judged query is held at the dearest rate a route can reach
     Given a route table whose enabled backends have different input rates
     When a judged query's budget hold is priced
-    Then it is priced at the dearest base input rate any enabled backend or fallback reaches
+    Then it is priced at the dearest base input rate any enabled backend or fallback of a search or LLM-judge route reaches
     And never below the classifier's published rate, at the one markup
     And it is a best-effort hold, not a hard cap on what a routed query can spend
 
