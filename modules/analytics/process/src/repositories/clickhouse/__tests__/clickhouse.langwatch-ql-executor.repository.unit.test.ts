@@ -124,6 +124,20 @@ describe("given a floored statement on a deployment whose twin is not provisione
   });
 });
 
+describe("given a pass's read of a trace-ids twin on a deployment that lacks it", () => {
+  describe("when the server reports the twin as an unknown table function", () => {
+    /** @scenario "A pass reads its view as written while the trace-ids twin is not readable" */
+    it("refuses with lwql_unavailable, so the pass reads the statement as written", async () => {
+      queryMock.mockRejectedValueOnce(unknownTableFunction("analytics.traces__ids"));
+
+      const read =
+        "SELECT TraceId FROM analytics.traces__ids(lwql_trace_ids = " +
+        "{lwql_pass_trace_ids:Array(String)}) AS traces";
+      expect((await refusalOf(read)).code).toBe("lwql_unavailable");
+    });
+  });
+});
+
 /** The driver's error passed through untranslated, as an unmapped code 46 always was. */
 const UNMAPPED_UNKNOWN_FUNCTION = { code: "46", fault: undefined, httpStatus: undefined };
 
