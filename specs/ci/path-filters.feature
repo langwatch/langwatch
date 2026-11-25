@@ -68,6 +68,7 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
     Given a workflow declares "paths" under "push" but not under "pull_request"
     Then the path-filter guard does not treat it as filtered
 
+  @unit
   Scenario: CodeQL on a pull request runs only for workflow, auth and billing changes
     When a PR changes no file under .github/ and no auth or billing code
     Then codeql.yml does not run its analysis

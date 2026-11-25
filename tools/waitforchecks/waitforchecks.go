@@ -290,8 +290,8 @@ func (w Waiter) current(ctx context.Context) ([]checkRun, error) {
 	if w.Branch == "" {
 		return runs, nil
 	}
-	required, err := w.required(ctx)
-	if err != nil || len(required) == 0 {
+	required, found, err := w.required(ctx)
+	if err != nil || !found {
 		return runs, err
 	}
 	statuses, err := w.statuses(ctx)
@@ -312,21 +312,23 @@ type rule struct {
 }
 
 // required reads the status check names the rules on Branch require, minus
-// Exclude, in a stable order.
-func (w Waiter) required(ctx context.Context) ([]string, error) {
+// Exclude, in a stable order. found reports whether the rules require any
+// check at all, Exclude included: a branch that requires only the caller's
+// own check waits for nothing, not for every check.
+func (w Waiter) required(ctx context.Context) (names []string, found bool, err error) {
 	var rules []rule
 	endpoint := fmt.Sprintf("%s/repos/%s/rules/branches/%s?per_page=%d",
 		w.API, w.Repository, url.PathEscape(w.Branch), pageSize)
 	if err := w.get(ctx, endpoint, &rules); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	seen := map[string]bool{}
-	var names []string
 	for _, r := range rules {
 		if r.Type != "required_status_checks" {
 			continue
 		}
 		for _, check := range r.Parameters.RequiredStatusChecks {
+			found = true
 			if check.Context != w.Exclude && !seen[check.Context] {
 				seen[check.Context] = true
 				names = append(names, check.Context)
@@ -335,7 +337,7 @@ func (w Waiter) required(ctx context.Context) ([]string, error) {
 	}
 	sort.Strings(names)
 
-	return names, nil
+	return names, found, nil
 }
 
 type commitStatus struct {

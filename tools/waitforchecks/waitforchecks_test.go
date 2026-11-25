@@ -454,3 +454,13 @@ func TestWaitFallsBackToEveryCheckWhenTheBranchRequiresNone(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "go-ci (failure)")
 }
+
+// @scenario "A check the branch does not require never holds the review"
+func TestWaitWaitsForNothingWhenTheBranchRequiresOnlyTheReview(t *testing.T) {
+	api := &fakeAPI{
+		responses: []response{{200, []run{pending("lighthouse"), failed("go-ci")}}},
+		rules:     []string{"review"},
+	}
+
+	require.NoError(t, onBranch(waiter(t, api, time.Second)).Wait(context.Background()))
+}
