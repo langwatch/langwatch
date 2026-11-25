@@ -189,6 +189,16 @@ describe.skipIf(!url)("given application traces that name their release", () => 
       expect(atOf("Release v14.1")).toBe(at(PERIOD_START + V14_1_HOUR * HOUR));
     });
 
+    it("marks a version that follows the project's first version within hours", async () => {
+      await seed([
+        ...daily({ prefix: "first", fromHour: 3 * 24, days: 1, version: "v1" }),
+        ...daily({ prefix: "hotfix", fromHour: 3 * 24 + 12, days: 3, version: "v1.0.1" }),
+      ]);
+
+      const rows = await rowsOf({ label: "ship-rollout/changes", list: ["application"] });
+      expect(releaseLabels(rows)).toEqual(["Release v1.0.1"]);
+    });
+
     /** @scenario "A version only Langy's traces carry is not a release of the application" */
     it("lists no release for a version only Langy sent, and lists it under the langy list", async () => {
       const application = await rowsOf({ label: "ship-rollout/changes", list: ["application"] });

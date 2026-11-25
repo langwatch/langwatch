@@ -32,14 +32,15 @@ const VERSION_WINDOW = `OccurredAt >= subtractDays(${START}, ${NEW_MODEL_LOOKBAC
       AND AppVersion != ''`;
 
 // A release is the first trace of an application version (service.version, else
-// metadata.version), by the same rule as a model: the project's first version is no release.
+// metadata.version). Only the version(s) the window starts with are no release: any later
+// one is, even hours after the project's first trace.
 const NEW_RELEASES = `SELECT AppVersion AS ReleasedVersion, min(OccurredAt) AS first_seen
   FROM trace_metrics
   WHERE ${VERSION_WINDOW}
   GROUP BY ReleasedVersion
   HAVING first_seen >= ${START}
-    AND first_seen >= addDays((SELECT min(OccurredAt) FROM trace_metrics
-      WHERE ${VERSION_WINDOW}), 1)`;
+    AND first_seen > (SELECT min(OccurredAt) FROM trace_metrics
+      WHERE ${VERSION_WINDOW})`;
 
 /** Every change in the period, unordered, with the bucket a chart marks it on. */
 export const CHANGES_SQL = `SELECT ${bucketOf("v.CreatedAt")} AS bucket, toDateTime(v.CreatedAt) AS at,
