@@ -16,6 +16,16 @@ function contentBlockToText(block: unknown): string {
 }
 
 /**
+ * The role a request message reads as: a user turn made only of `tool_result` blocks is the
+ * tools answering, not the person, so it reads as `tool` and never as a prompt.
+ */
+export function requestMessageRole({ role, content }: { role: unknown; content: unknown }): string {
+  const named = typeof role === "string" ? role : "user";
+  if (named !== "user" || !Array.isArray(content) || content.length === 0) return named;
+  return content.every((block) => isRecord(block) && block.type === "tool_result") ? "tool" : named;
+}
+
+/**
  * Flatten one Anthropic message `content` to display text. Text/tool_result
  * blocks contribute their text; tool_use renders as `[tool_use: name]` so
  * the turn reads as conversation; thinking/images carry no text and drop.

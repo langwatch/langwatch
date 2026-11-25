@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import {
   escapeHtml,
   HEARTBEAT_INTERVAL_MS,
+  PROXY_DOOR_REQUEST_TIMEOUT_MS,
   renderConsolePage,
   startHeartbeat,
   startLivenessThread,
@@ -192,6 +193,8 @@ export async function openBootDoor({
     port,
     heartbeat: heartbeat.buffer,
     proxyPort: (page.address() as AddressInfo).port,
+    // The api behind this door holds each route's body to its own bound.
+    requestTimeoutMs: PROXY_DOOR_REQUEST_TIMEOUT_MS,
     logger: {
       info: () => undefined,
       error: (_fields, message) => report(`boot page: ${message}`),

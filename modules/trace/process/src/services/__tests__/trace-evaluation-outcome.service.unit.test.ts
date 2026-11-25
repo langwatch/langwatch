@@ -73,13 +73,16 @@ function run(over: Partial<EvaluationRunData> = {}): EvaluationRunData {
 }
 
 /** A stored trace, evaluation's runs as scripted, and every outcome the service records. */
-async function compose({ now }: { now?: () => number } = {}) {
+async function compose({
+  now,
+  storedTraceId = TRACE_ID,
+}: { now?: () => number; storedTraceId?: string } = {}) {
   const traces = MemoryTraceAnalyticsRepository.create();
   await traces.upsert({
     row: TraceAnalyticsFoldProjection.projectAnalyticsStateToRow({
       state: {
         ...projection.init(),
-        traceId: TRACE_ID,
+        traceId: storedTraceId,
         spanCount: 1,
         storageAnchorMs: TRACE_ANCHOR_MS,
         occurredAt: TRACE_ANCHOR_MS,
@@ -245,6 +248,26 @@ describe("TraceEvaluationOutcomeService", () => {
         expect(recorded).toEqual([]);
         expect(logger.warn).not.toHaveBeenCalled();
       });
+
+      /** @scenario "An evaluation of a trace not stored yet looks again a minute later, then every quarter hour" */
+      it("names a minute's wait when the evaluation is fresh", async () => {
+        const { outcomes } = await compose({ now: () => EVALUATED_AT + 5_000 });
+
+        await expect(outcomes.recordReported(unstored)).rejects.toMatchObject({
+          name: "EvaluatedTraceNotYetStoredError",
+          retryable: true,
+          retryAfterMs: 60_000,
+        });
+      });
+
+      /** @scenario "An evaluation of a trace not stored yet looks again a minute later, then every quarter hour" */
+      it("names a quarter hour's wait once the evaluation has waited a minute", async () => {
+        const { outcomes } = await compose({ now: () => EVALUATED_AT + 2 * 60_000 });
+
+        await expect(outcomes.recordReported(unstored)).rejects.toMatchObject({
+          retryAfterMs: 15 * 60_000,
+        });
+      });
     });
 
     describe("when it was appended longer ago than the wait", () => {
@@ -260,6 +283,70 @@ describe("TraceEvaluationOutcomeService", () => {
         expect(logger.warn).toHaveBeenCalledTimes(1);
       });
     });
+  });
+});
+
+describe("TraceEvaluationOutcomeService given an evaluation naming no trace", () => {
+  /** @scenario "An evaluation naming no trace is not retried" */
+  it("completes a report with a blank trace id at once, logging the skip", async () => {
+    const { outcomes, recorded, logger } = await compose({ now: () => EVALUATED_AT });
+
+    await outcomes.recordReported({
+      data: {
+        evaluationId: "evaluation-3",
+        evaluatorName: "Toxicity",
+        traceId: "  ",
+        isGuardrail: false,
+        status: "processed",
+        passed: true,
+        label: null,
+      },
+      context: event("evaluation-event-6"),
+    });
+
+    expect(recorded).toEqual([]);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("TraceEvaluationOutcomeService given an evaluation naming the all-zero trace", () => {
+  const ALL_ZERO_TRACE_ID = "00000000000000000000000000000000";
+
+  /** @scenario "An evaluation naming the all-zero trace looks for it once" */
+  it("records the outcome when a trace is stored under the all-zero id", async () => {
+    const { outcomes, recorded } = await compose({
+      now: () => EVALUATED_AT,
+      storedTraceId: ALL_ZERO_TRACE_ID,
+    });
+
+    await outcomes.recordReported({
+      data: {
+        evaluationId: "evaluation-3",
+        evaluatorName: "Toxicity",
+        traceId: ALL_ZERO_TRACE_ID,
+        isGuardrail: false,
+        status: "processed",
+        passed: true,
+        label: null,
+      },
+      context: event("evaluation-event-6"),
+    });
+
+    expect(recorded.map((each) => each.traceId)).toEqual([ALL_ZERO_TRACE_ID]);
+  });
+
+  /** @scenario "An evaluation naming the all-zero trace looks for it once" */
+  it("completes at once and logs the skip when no such trace is stored", async () => {
+    const { outcomes, recorded, evaluations, logger } = await compose({ now: () => EVALUATED_AT });
+    evaluations.runs.set(`${TENANT}:evaluation-1`, run({ traceId: ALL_ZERO_TRACE_ID }));
+
+    await outcomes.recordCompleted({
+      data: { evaluationId: "evaluation-1", status: "processed", passed: true, label: null },
+      context: event("evaluation-event-7"),
+    });
+
+    expect(recorded).toEqual([]);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
   });
 });
 

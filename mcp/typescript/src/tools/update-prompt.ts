@@ -4,17 +4,14 @@ import {
   updatePrompt as apiUpdatePrompt,
   type PromptDetailResponse,
   type PromptTag,
+  type PromptUpdateData,
 } from "../langwatch-api.ts";
 
 // Updates a prompt via PUT, creating a new version. Re-fetches the full prompt
 // to get tags since the mutation response doesn't include them.
-export async function handleUpdatePrompt(params: {
-  idOrHandle: string;
-  messages?: { role: string; content: string }[];
-  model?: string;
-  commitMessage: string;
-  tags?: string[];
-}): Promise<string> {
+export async function handleUpdatePrompt(
+  params: PromptUpdateData & { idOrHandle: string },
+): Promise<string> {
   const { idOrHandle, ...data } = params;
 
   let updated;

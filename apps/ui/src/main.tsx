@@ -54,7 +54,7 @@ import {
   loadUiRootHostServices,
   type UiRootHostServices,
 } from "./shell/ui-root-host-services";
-import { uiRouteTable } from "./shell/ui-route-table";
+import { uiMountedRouteTable } from "./shell/ui-route-table";
 import { UiSaasFooter } from "./shell/ui-saas-footer";
 import { uiShellLayouts } from "./shell/ui-shell-layouts";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
@@ -69,6 +69,9 @@ import {
 
 import "nprogress/nprogress.css";
 import "./styles/globals.scss";
+
+// Every file the entry imports has loaded and run: the boot report (vite/boot-report.ts) says so.
+document.dispatchEvent(new Event("lw-boot:entry"));
 
 /** A provider position no module has declared yet: an honest pass-through. */
 function UiPendingProvider({ children }: { children: ReactNode }) {
@@ -230,7 +233,7 @@ class BrowserUiShell extends UiShell {
         },
         pages: {
           loaders: uiUnservedPageLoaders,
-          table: uiRouteTable,
+          table: uiMountedRouteTable,
           shellLayouts: uiShellLayouts({ root: rootHostServices, config }),
           errorFallback: errorPages.page,
           rootErrorBoundary: errorPages.route,

@@ -128,7 +128,7 @@ function ledger({ now, epoch }: { now: () => number; epoch?: () => number }) {
 
 describe("the proof a reader's trace read carries", () => {
   describe("given specialists braided into orchestrator and orchestrator into frontdesk", () => {
-    /** @scenario "Braids do not chain" */
+    /** @scenario "A braid's grant does not pass on to a third project" */
     it("carries for frontdesk the braid from orchestrator and nothing braided into orchestrator", async () => {
       const { braid, mint } = ledger({ now: () => Date.parse("2026-10-20T00:00:00Z") });
       await braid({

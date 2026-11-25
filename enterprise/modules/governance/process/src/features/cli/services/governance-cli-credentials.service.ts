@@ -21,7 +21,7 @@ import {
   type EnsuredPersonalWorkspace,
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { UserApi } from "@langwatch/user-contract";
+import { codingAgentsPath, type UserApi } from "@langwatch/user-contract";
 
 import type { DefaultGovernanceAiToolCatalogService } from "../../../services/ai-tool-catalog.service.ts";
 import type { OrganizationSupportContactService } from "../../../services/organization-support-contact.service.ts";
@@ -178,6 +178,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
       limit_usd: blocker.limitUsd,
       spent_usd: blocker.spentUsd,
     });
+    const requestPath = codingAgentsPath({ page: "budget/request", query: params });
 
     return {
       outcome: "blocked",
@@ -185,7 +186,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
       limitUsd: blocker.limitUsd,
       spentUsd: blocker.spentUsd,
       period: blocker.window.toLowerCase(),
-      requestIncreaseUrl: `${this.consoleBaseUrl()}/me/budget/request?${params.toString()}`,
+      requestIncreaseUrl: `${this.consoleBaseUrl()}${requestPath}`,
       adminEmail,
     };
   }

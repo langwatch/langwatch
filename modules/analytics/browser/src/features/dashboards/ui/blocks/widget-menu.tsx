@@ -33,7 +33,8 @@ export function WidgetMenu({
    * when the reader may not see the widget's data and may not edit widgets either.
    */
   onEditCode?: () => void;
-  onCopyId: () => void;
+  /** Absent for a From LangWatch board's widget, which has no stored id. */
+  onCopyId?: () => void;
   onCopyApiSnippet?: () => void;
   /** Absent when the widget has nothing of its own to export. */
   exportCsv?: WidgetCsvExportItem;
@@ -58,9 +59,11 @@ export function WidgetMenu({
             <Code2 size={14} /> Edit code
           </Menu.Item>
         )}
-        <Menu.Item value="copy-id" onClick={onCopyId}>
-          <Hash size={14} /> Copy widget id
-        </Menu.Item>
+        {onCopyId && (
+          <Menu.Item value="copy-id" onClick={onCopyId}>
+            <Hash size={14} /> Copy widget id
+          </Menu.Item>
+        )}
         {onCopyApiSnippet && (
           <Menu.Item value="copy-api" onClick={onCopyApiSnippet}>
             <Braces size={14} /> Copy API snippet

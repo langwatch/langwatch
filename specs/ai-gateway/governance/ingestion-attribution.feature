@@ -100,7 +100,7 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
         searchable attributes (informational) but NEVER promoted to
         the RBAC-load-bearing `TenantId` field
     And users A / B / C — even if they are members of the same org —
-        cannot see these spans on their /me Traces explorer (because
+        cannot see these spans on their /coding-agents Traces explorer (because
         `TenantId` does not match their personalProjectId)
     And the org admin sees these spans only via the hidden Governance
         Project read path (per `governance:view` + the Layer-1 filter)

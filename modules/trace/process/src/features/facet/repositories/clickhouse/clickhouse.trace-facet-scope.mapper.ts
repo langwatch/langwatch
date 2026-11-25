@@ -3,7 +3,7 @@
  */
 
 import { tenantScope } from "@langwatch/clickhouse-client";
-import type { FacetTableName } from "@langwatch/trace-contract";
+import { type FacetTableName, latestTraceVersionOnly } from "@langwatch/trace-contract";
 
 import type { TraceFilterWhere } from "../../../../rules/trace-filter-hidden-origins.rules.ts";
 
@@ -51,12 +51,7 @@ export function scopeTraceFilterToTable({
       SELECT TenantId, TraceId
       FROM trace_summaries
       WHERE ${window}
-        AND (TenantId, TraceId, UpdatedAt) IN (
-          SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM trace_summaries
-          WHERE ${window}
-          GROUP BY TenantId, TraceId
-        )
+        AND ${latestTraceVersionOnly({ where: window })}
         AND (${filterWhere.sql})
     ))`,
     params: filterWhere.params,

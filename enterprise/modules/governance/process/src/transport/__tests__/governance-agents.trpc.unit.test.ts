@@ -31,6 +31,8 @@ const ROW = {
   lastActiveMinutesAgo: 60,
   health: null,
   registeredDaysAgo: 90,
+  posture: null,
+  platform: null,
 };
 
 function mount(options: { permits?: (permission: string) => boolean; unavailable?: boolean } = {}) {

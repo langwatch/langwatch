@@ -5,6 +5,7 @@
  * @see modules/instant-eval/specs/instant-eval-billing.feature
  */
 import type { LangWatchQLJudgementCall } from "@langwatch/analytics-contract";
+import { InstantEvalGatewayBudgetExceededError } from "@langwatch/instant-eval-contract";
 import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   type InstantEvalJudgement,
@@ -110,6 +111,7 @@ function harness({
   concurrency,
   recordJudgeSpend,
   holdPricing = INSTANT_EVAL_PRICING,
+  gatewayRefusal,
 }: {
   judge?: ScriptedJudge;
   spentNanoUsd?: number;
@@ -119,8 +121,11 @@ function harness({
   recordJudgeSpend?: (input: InstantEvalJudgeSpendRecord) => Promise<void>;
   /** What the judge says a query's hold is priced at: its dearest reachable rate. */
   holdPricing?: InstantEvalPricing;
+  /** What a gateway budget set to block refuses with, once it is reached. */
+  gatewayRefusal?: Error;
 } = {}) {
   const events: string[] = [];
+  const gatewayAsked: { projectId: string; inFlightUsd?: number }[] = [];
   const priced: InstantEvalJudgeSpendRecord[] = [];
   const records: InstantEvalJudgedSpend[] = [];
   const reservations = MemoryInstantEvalBudgetReservationsRepository.create({ now: () => AT });
@@ -162,6 +167,12 @@ function harness({
         await budget.release(input);
       },
     },
+    gatewayBudget: {
+      assertWithinGatewayBudget: async (input) => {
+        gatewayAsked.push(input);
+        if (gatewayRefusal) throw gatewayRefusal;
+      },
+    },
     spend: {
       recordSpend: async (record) => {
         records.push(record);
@@ -173,7 +184,7 @@ function harness({
     now: () => AT,
   });
 
-  return { service, judge, events, priced, records };
+  return { service, judge, events, priced, records, gatewayAsked };
 }
 
 async function refusalOf(run: () => Promise<unknown>): Promise<Record<string, unknown>> {
@@ -562,6 +573,34 @@ describe("InstantEvalQueryJudgingService.judgeQuery", () => {
       );
 
       expect(refusal.code).toBe("instant_eval_free_budget_exhausted");
+      expect(judge.requests).toHaveLength(0);
+    });
+  });
+
+  describe("given a project whose gateway budget set to block is reached", () => {
+    /** @scenario "A judged query is refused once a blocking budget is reached" */
+    it("refuses with instant_eval_gateway_budget_exceeded before anything is held or judged", async () => {
+      const { service, judge, events, gatewayAsked } = harness({
+        gatewayRefusal: new InstantEvalGatewayBudgetExceededError({
+          budgetId: "budget-1",
+          scope: "organization",
+          window: "month",
+          limitUsd: 100,
+          spentUsd: 100,
+        }),
+      });
+
+      const refusal = await refusalOf(() =>
+        service.judgeQuery({
+          projectId: "project-1",
+          judgements: [booleanCall("annoyed")],
+          rows: [{ annoyed: "one" }],
+        }),
+      );
+
+      expect(refusal.code).toBe("instant_eval_gateway_budget_exceeded");
+      expect(gatewayAsked).toEqual([{ projectId: "project-1" }]);
+      expect(events).toEqual([]);
       expect(judge.requests).toHaveLength(0);
     });
   });

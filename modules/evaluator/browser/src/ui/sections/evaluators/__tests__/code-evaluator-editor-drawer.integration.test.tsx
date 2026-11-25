@@ -144,7 +144,8 @@ describe("CodeEvaluatorEditorDrawer", () => {
         expect(await screen.findByTestId("code-evaluator-disabled-reason")).toHaveTextContent(
           "Add a name to create the evaluator.",
         );
-        expect(screen.getByTestId("code-evaluator-name")).toHaveFocus();
+        // The drawer's own focus handling can land after the click, so wait for the cursor.
+        await waitFor(() => expect(screen.getByTestId("code-evaluator-name")).toHaveFocus());
 
         // Filling the name satisfies it: the message clears as the author types.
         fireEvent.change(screen.getByTestId("code-evaluator-name"), {

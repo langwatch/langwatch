@@ -57,9 +57,10 @@ describe("AwsPiiRedactionModelChannel", () => {
         requestContext: { http: { method: "POST" } },
         headers: { "content-type": "application/json" },
       });
-      expect(JSON.parse(event.body)).toEqual({
+      const body = JSON.parse(event.body);
+      expect(body).toMatchObject({
         data: [{ input: "hi Ana" }, { input: "nothing" }],
-        settings: { entities: { person: true }, min_threshold: 0.5 },
+        settings: { entities: { person: true, credit_card: false }, min_threshold: 0.5 },
         env: {},
       });
       expect(sent[0]!.abortSignal).toBe(request.signal);

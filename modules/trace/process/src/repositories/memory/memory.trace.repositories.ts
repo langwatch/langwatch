@@ -155,6 +155,7 @@ export class MemoryTraceRepositories {
       evaluationAnalytics: MemoryTraceEvaluationAnalyticsRepository.create(),
       spanAnalytics: MemorySpanAnalyticsRepository.create(),
       spanAnalyticsFloor: MemorySpanAnalyticsFloorRepository.create(),
+      managedPromptVersionLedger: MemorySpanAnalyticsFloorRepository.create(),
       summaryFoldCache: MemoryTraceSummaryFoldCacheRepository.create(),
       analyticsFoldCache: MemoryTraceAnalyticsFoldCacheRepository.create(),
       spanStorage: MemorySpanStorageRepository.create(spans),

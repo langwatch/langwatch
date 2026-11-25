@@ -312,6 +312,11 @@ export class UserModule implements UserApi {
     return this.#users.create(input);
   }
 
+  /** An account Better Auth wrote itself: its created fact joins the outbox a mint uses. */
+  recordCreated(input: UserIdInput): Promise<void> {
+    return this.#users.recordCreated(input);
+  }
+
   /** Everything the account screen reads about one user. */
   getAccountInfo(input: UserIdInput): Promise<UserAccountInfo> {
     return this.#users.getAccountInfo(input);

@@ -1,6 +1,7 @@
 # Weekly digest emails
 
-Status: design frozen 2026-09-30. Requirements: `enterprise/modules/digest/specs/digest.feature`.
+Status: design frozen 2026-09-30; send, unsubscribe and operator switches built 2026-11-19 (digest
+ADR-001). Requirements: `enterprise/modules/digest/specs/digest.feature`.
 
 LangWatch Cloud sends each person one short weekly email about what their usage did that week, with an
 optional "what's new" card. Mail goes out through our own `NotificationApi.sendEmail`; no third party.
@@ -10,9 +11,9 @@ a hand-picked cohort, chosen from a gallery in Cloud admin that previews each pe
 ## Home
 
 A new enterprise module, `enterprise/modules/digest` (subjects `digest`, `digest-subscription`,
-`digest-send`). Enterprise, because it only runs where ops's cloud-ops capability is on: every route
-admits through `OpsApi.admitCloudAdmin` and answers `not_found` elsewhere (§3.5). Not `nurturing`: its
-ADR-001 forbids tables and peers, and the digest needs both.
+`digest-send`). Enterprise, because it only runs where ops's cloud-ops capability is on: every
+operator route admits through `OpsApi.admitCloudAdmin` and answers `not_found` elsewhere (§3.5). Not
+`nurturing`: its ADR-001 forbids tables and peers, and the digest needs both.
 
 ## Where the numbers come from
 
@@ -28,13 +29,14 @@ batched append (coding-agent's source subscribers are the precedent, ADR-056).
 | coding-agent span/log/metric facts contributed | per user: sessions (distinct `sessionId`, capped set in the fold), tokens, cost, active time; from the agents' own OTel metrics via the contract's name normalisation: lines, commits, pull requests (`*.pull_request.count`) |
 | evaluation completed                           | runs, passed, failed, errored, per evaluator (capped)                                                                                                                                                                         |
 | scenario simulation run finished               | runs, passed, failed per project                                                                                                                                                                                              |
-| suite run item completed                       | items, passed, failed                                                                                                                                                                                                         |
-| plan limit                                     | the one read at send: `EntitlementApi.getUsage`, once per enrolled organization                                                                                                                                               |
+| plan limit                                     | the one read at send: `EntitlementApi.getUsage`, for each member's send                                                                                                                                                       |
 
-Projections (fold, Postgres, five ISO weeks kept, older rows swept by the weekly wake):
+Suite items are not folded: no template reads them. Only projects of enrolled organizations fold.
+
+Projections (fold, Postgres, the sent week and its four-week baseline kept, older rows swept by the hourly wake):
 `DigestProjectWeek`, `DigestUserWeek`. Latency is a fixed bucket histogram so p50/p95 fold without
-keeping spans. Folds hold ids and numbers only; names and addresses are read from `UserApi` when
-an email is rendered, never stored (nurturing's rule).
+keeping spans. Folds hold ids and numbers only; names and addresses are read from `UserApi`,
+`OrganizationApi` and `ProjectApi` when an email is rendered, never stored (nurturing's rule).
 
 ## Templates (separate, in `@langwatch/mail`)
 
@@ -47,40 +49,55 @@ an email is rendered, never stored (nurturing's rule).
 | `digest-whats-new`         | anyone else     | fallback: this week's update and one nudge                                                                                                          |
 
 Each person gets one email a week: the first eligible template in the order above (`rules/`,
-pure). Every template carries the week's "what's new" card under the hero when one is published: title,
-gradient, body, one link. Thresholds are constants in `rules/`, tuned from the gallery.
+pure). Digest builds the picked template's props (`rules/digest-email.rules.ts`), the mail channel
+renders it with `@langwatch/mail` and sends it through `NotificationApi.sendEmail`. Every template
+carries the week's "what's new" card under the hero when one is published: title, gradient, body, one
+link. Thresholds are constants in `rules/`, tuned from the gallery.
+
+Until the "what's new" editor exists no card is published, so a person whose pick is
+`digest-whats-new` is sent nothing that week (no email, no `DigestSend` row).
 
 ## Tables (Postgres, owned by digest)
 
-- `DigestCohortOrganization` — organizations enrolled in the send (default: none, so nothing sends).
-- `DigestSubscription` — per user; `unsubscribedAt`, `unsubscribedFromSendId`. No row = subscribed.
-- `DigestProjectWeek`, `DigestUserWeek` — the fold projections above; the gallery and the send read them.
-- `DigestSend` — one per user per week: template, ISO week, links `{key: url}`, message id, sentAt.
-- `DigestClick` — send id, link key, at.
-- `DigestUpdate` — the "what's new" card: title, body, link, gradient, week it goes out.
-- `DigestSettings` — singleton: `armed` (the weekly send's master switch, default false).
+- `DigestCohortOrganization`: organizations enrolled in the send (default: none, so nothing sends).
+  Only their projects fold.
+- `DigestSubscription`: per user; `unsubscribedAt`, `unsubscribedFromSendId`. No row = subscribed.
+- `DigestProjectWeek`, `DigestUserWeek`: the fold projections above; the send reads them.
+- `DigestSend`: one per user per week (id `userId:isoWeek`), holding template, ISO week, sentAt.
+- `DigestSettings`: a singleton holding `armed` (the weekly send's master switch, default false) and the
+  last planned week.
+- Not built: `DigestClick` (send id, link key, at), `DigestUpdate` (the "what's new" card), and
+  `links` on `DigestSend`.
 
 ## Pipeline (`digest`)
 
-- Subscribers on trace, coding-agent, evaluation, scenario and suite events → `recordActivity` →
+- Subscribers on trace, coding-agent, evaluation and scenario events → `recordActivity` →
   the two weekly fold projections, all week long.
-- Scheduled process manager, hourly wake: after Monday 08:00 UTC, when last week's sends are not yet
-  planned and settings are armed, emit one `sendDigest` intent per enrolled member, keyed
-  `(userId, isoWeek)`, so a redelivery sends nothing. The intent reads the finished week's folds, picks
-  the template and sends. Unsubscribed users and members of organizations no longer enrolled are
-  skipped when the intent is handled. The same wake sweeps weeks older than five.
+- Scheduled process manager (`digest_send`), hourly wake: from Monday 08:00 UTC hands the outbox
+  one plan of last week, and before then none. When settings are armed and that week is not
+  yet planned, the plan asks one send per enrolled member, and each ask becomes one `sendDigest`
+  intent keyed `(userId, isoWeek)`, so a redelivery sends nothing. The intent reads the finished
+  week's folds, picks the template, renders it, claims the `DigestSend` row and, only if it took
+  the claim, sends it with the idempotency key `digest:{userId}:{isoWeek}`. Disarmed sends, unsubscribed users,
+  people with no address and members of organizations no longer enrolled are skipped when the intent
+  is handled. The same wake sweeps folds older than the sent week's four-week baseline.
 
 ## Transports
 
-- REST, unauthenticated, rate-limited as automation's unsubscribe pair is (ADR-031):
-  - `GET /api/digest/unsubscribe?token=` page data; `POST /api/digest/unsubscribe` RFC 8058 one-click.
-    The token is an HMAC over `(userId, sendId)` with the session secret; resubscribe from the same page.
-  - `GET /api/digest/c/:token` records a click and answers 302. The token names a send id and a link
-    key only; the target URL is read from `DigestSend.links`, so there is no open redirect.
-- tRPC `digest.*` (Cloud admin only): cohort list (sortable), preview a person's email for any
-  template, enrol/unenrol, refresh, edit the update, arm/disarm, send myself a test, metrics.
+- REST, unauthenticated, token-authorized (ADR-031's token format):
+  - `GET /api/digest/unsubscribe?token=` answers a page that changes nothing.
+  - `POST /api/digest/unsubscribe?token=` is the RFC 8058 one-click opt-out (the email's
+    `List-Unsubscribe` header and the page's button); `POST /api/digest/resubscribe?token=` undoes it
+    from the same page. The token is an HMAC over `(userId, sendId)` with the session secret.
+  - Not built: `GET /api/digest/c/:token` (record a click and redirect; the token names a send id and
+    a link key only, the target URL read from `DigestSend.links`, so there is no open redirect), and a
+    per-caller rate limit on that click route. The unsubscribe routes are limited per caller, as
+    automation's pair is, and past the limit answer 429 `digest_unsubscribe_rate_limited`.
+- tRPC `digest.*` (Cloud admin only, `ops:manage`): enrol/unenrol an organization, arm/disarm, send
+  myself a test of a member's email (to the operator's own address, `[Test]` in the subject, no
+  `DigestSend` row). Not built: cohort list, preview, refresh, the update editor, metrics.
 
-## Gallery: `/ops/cloud/digests` (digest's browser package, `requires: "ops:manage"`)
+## Gallery: `/ops/cloud/digests` (digest's browser package, `requires: "ops:manage"`; not built)
 
 - Cohort table from the current and last week's folds, sortable by: coding-agent cost, coding-agent sessions,
   traces this week, % of plan limit, scenario runs, members, template picked. Enrolled toggle per row.
