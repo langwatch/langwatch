@@ -1762,12 +1762,22 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a widget with a stored prompt, a description and named queries
     When the member clicks its "Ask Langy" button
     Then Langy opens with a draft to send, not a sent question
-    And the draft asks what the widget shows over the board's period in words, such as "the last 30 days"
+    And the draft is "Hey Langy, about the <widget name> chart: " with the cursor at its end
     And the open board and the widget are attached as context, the widget's carrying its stored
       prompt, its description, each query with its LangWatchQL and the period as instants
     And long LangWatchQL is cut with a marker so the widget's context stays within its bound
-    # Changed (2026-11-24): the queries and the period's instants moved out of the draft into
-    # the widget's context (AC247)
+    # Changed (2026-11-25): the draft is the short opener the reader finishes in their words
+    # (owner). Changed (2026-11-24): the queries and the period's instants moved out of the draft
+    # into the widget's context (AC247)
+
+  @unit @integration
+  Scenario: AC121c Ask Langy: the widget rides as a widget chip, its queries never in the text
+    Given a widget on a saved board, with its board and widget ids
+    When the member clicks its "Ask Langy" button
+    Then the attached context holds a "widget: <widget name>" chip of kind widget, beside the
+      board's chip
+    And the chip's ref names the widget's id, the board's id and name, and each query's LangWatchQL
+    And the draft text holds no SQL and no LangWatchQL, so the chip is removable like the others
 
   @integration
   Scenario: AC121b Ask Langy: clicking opens the widget large beside Langy

@@ -12,7 +12,7 @@ describe("describeChipContext", () => {
   it("says a widget hands over its data and queries, and a board the board", () => {
     const widget = describeChipContext({
       id: 'dashboard:widget "Traffic"',
-      kind: "dashboard",
+      kind: "widget",
       label: "widget: Traffic",
       ref: 'widget "Traffic"',
     });

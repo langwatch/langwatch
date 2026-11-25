@@ -100,13 +100,15 @@ function context({
   ref,
   label,
   key,
+  kind = "dashboard",
 }: {
   ref: string;
   label: string;
   key: string;
+  kind?: AnalyticsLangyContext["kind"];
 }): AnalyticsLangyContext {
   return {
-    kind: "dashboard",
+    kind,
     ref: ref.slice(0, MAX_REF_LENGTH),
     label: label.slice(0, MAX_LABEL_LENGTH),
     key: key.slice(0, MAX_REF_LENGTH),
@@ -237,6 +239,50 @@ export interface WidgetSubject {
   };
 }
 
+/** Index just past the string or quoted identifier that opens at `start`; doubled quotes escape. */
+function literalEnd({ sql, start }: { sql: string; start: number }): number {
+  const quote = sql[start];
+  let i = start + 1;
+  while (i < sql.length) {
+    if (sql[i] === quote) {
+      if (sql[i + 1] !== quote) return i + 1;
+      i += 2;
+    } else {
+      i += 1;
+    }
+  }
+  return sql.length;
+}
+
+/**
+ * Drops `--` and block comments outside literals. The ref is collapsed to one line on the
+ * server, so a line comment left in would swallow the query after it.
+ */
+export function stripLwqlComments(sql: string): string {
+  let out = "";
+  let i = 0;
+  while (i < sql.length) {
+    const [ch, next] = [sql[i], sql[i + 1]];
+    if (ch === "'" || ch === '"' || ch === "`") {
+      const end = literalEnd({ sql, start: i });
+      out += sql.slice(i, end);
+      i = end;
+    } else if (ch === "-" && next === "-") {
+      const newline = sql.indexOf("\n", i);
+      i = newline === -1 ? sql.length : newline;
+      out += " ";
+    } else if (ch === "/" && next === "*") {
+      const close = sql.indexOf("*/", i + 2);
+      i = close === -1 ? sql.length : close + 2;
+      out += " ";
+    } else {
+      out += ch;
+      i += 1;
+    }
+  }
+  return out;
+}
+
 function truncated({ sql, room }: { sql: string; room: number }): string {
   if (sql.length <= room) return sql;
   const marker = (cut: number) => ` -- [truncated: ${cut} more characters]`;
@@ -260,9 +306,9 @@ function fittedSql({ sqls, room }: { sqls: readonly string[]; room: number }): s
 }
 
 /**
- * The widget as Langy reads it, beside the visible draft: its description, how to answer it,
- * what was clicked, the period as instants and each query's LangWatchQL, cut to fit the
- * context's bound. The reader sees only its label; the draft stays in their words.
+ * The widget as a `widget` chip: its board and id, its title, its description, how to answer it,
+ * what was clicked, the period and each query's LangWatchQL, cut to fit the context's bound.
+ * The reader sees only the chip's label; the draft stays in their words.
  */
 export function widgetContext({
   widget,
@@ -271,15 +317,20 @@ export function widgetContext({
   focus,
 }: {
   widget: WidgetSubject;
-  board: Pick<BoardSubject, "id">;
+  board: BoardSubject;
   period: BoardPeriod;
   /** What the draft is about within the widget, such as the clicked value. */
   focus?: string;
 }): AnalyticsLangyContext {
   const { description, prompt, queries } = widget.definition;
+  const which =
+    widget.id === void 0
+      ? `widget ${JSON.stringify(widget.name)} (not saved yet)`
+      : `widget ${JSON.stringify(widget.name)} (id ${widget.id})`;
   const ref = (sqls: readonly string[]) =>
     [
-      `widget "${widget.name}"`,
+      which,
+      `on dashboard ${JSON.stringify(board.name)} (id ${board.id})`,
       ...(description ? [`description: ${description}`] : []),
       ...(prompt ? [`how to answer it: ${prompt}`] : []),
       ...(focus ? [`clicked: ${focus}`] : []),
@@ -292,10 +343,11 @@ export function widgetContext({
           ]
         : []),
     ].join("; ");
-  // Whole, as the widget runs it: a literal's spaces and the line a comment ends on both count.
-  const sqls = queries.map(({ sql }) => sql.trim());
+  // Comments go first: the ref is one line on the server, so a `--` would swallow what follows.
+  const sqls = queries.map(({ sql }) => stripLwqlComments(sql).trim());
   const room = MAX_REF_LENGTH - ref(queries.map(() => "")).length;
   return context({
+    kind: "widget",
     ref: ref(fittedSql({ sqls, room })),
     label: `${LANGY_WIDGET_CHIP_LABEL_PREFIX}${widget.name}`,
     // Clicks on different values of one widget are still that widget, listed once; another
@@ -321,9 +373,8 @@ function filled({ prompt, values }: { prompt: string; values: Readonly<Record<st
 const PLACEHOLDER = /\{[^{}]+\}/;
 
 /**
- * One widget's ask as a composer draft (AC121): what the card answers over the board's period,
- * in the reader's words. The stored prompt, the description and the queries ride in the
- * widget's context (AC247).
+ * One widget's ask as a composer draft (AC121): a short opener the reader finishes in their own
+ * words. The widget rides as a `widget` chip; its queries and period are in that chip (AC247).
  */
 export function widgetPromptDraft({
   widget,
@@ -334,10 +385,7 @@ export function widgetPromptDraft({
   board: BoardSubject;
   period: BoardPeriod;
 }): AnalyticsLangyAskRequest {
-  const prompt =
-    `What does "${widget.name}" show over ${boardPeriodInWords(period)}? Quote the real ` +
-    "numbers and tell me what stands out. If there is no data for the period, say so plainly " +
-    "rather than guessing.";
+  const prompt = `Hey Langy, about the ${widget.name} chart: `;
   return widgetDraft({ prompt, widget, board, period });
 }
 
@@ -789,7 +837,10 @@ export function askAboutStoredBoard({
   const draftKey = boardKey({ id: draftId });
   const storedKey = boardKey({ id: dashboardId });
   // Only the board's own context and the editor's name the board in their reference.
-  const namesBoard = (key: string) => key === draftKey || key.startsWith(`${draftKey}:editing:`);
+  const namesBoard = (key: string) =>
+    key === draftKey ||
+    key.startsWith(`${draftKey}:editing:`) ||
+    key.startsWith(`${draftKey}:widget:`);
   return {
     ...request,
     context: request.context.map((each) => ({

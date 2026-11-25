@@ -8,6 +8,7 @@ export const LANGY_RESOURCE_KINDS = [
   "prompt",
   "dataset",
   "dashboard",
+  "widget",
   "scenario",
   "evaluation",
   "workflow",
@@ -194,6 +195,9 @@ function describeResource(chip: LangyResourceContext): string | null {
         : null;
     case "trace":
       return ref ? `- the trace they have open, id: ${ref}` : `- ${label}`;
+    case "widget":
+      // The ref carries the board and widget ids, and the queries (LangWatchQL) to open.
+      return ref ? `- the dashboard widget they are asking about: ${ref}` : `- ${label}`;
     default:
       return ref ? `- the ${chip.kind} they have open, ref: ${ref}` : `- ${label}`;
   }

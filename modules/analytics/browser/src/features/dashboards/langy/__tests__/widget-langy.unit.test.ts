@@ -52,33 +52,44 @@ describe("widgetPromptDraft", () => {
      * @scenario "AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period"
      * @scenario "AC247 Langy drafts: the visible draft is in the reader's words, the queries ride in the context"
      */
-    it("drafts the question in words, with the board and the widget attached", () => {
+    it("drafts a short opener, with the board and the widget chip attached", () => {
       const request = widgetPromptDraft({
-        widget: widget({ prompt: PROMPT, description: "Requests per day" }),
+        widget: { id: "widget-1", ...widget({ prompt: PROMPT, description: "Requests per day" }) },
         board: BOARD,
         period: PERIOD,
       });
 
       expect(request.question).toBeUndefined();
-      expect(request.draft).toBe(
-        'What does "Traffic" show over the last 7 days? Quote the real numbers and tell me ' +
-          "what stands out. If there is no data for the period, say so plainly rather than guessing.",
-      );
+      expect(request.draft).toBe("Hey Langy, about the Traffic chart: ");
       expect(request.context).toEqual([
         expect.objectContaining({ kind: "dashboard", label: "Weekly review" }),
-        expect.objectContaining({ kind: "dashboard", label: "widget: Traffic" }),
+        expect.objectContaining({ kind: "widget", label: "widget: Traffic" }),
       ]);
       const ref = request.context[1]?.ref ?? "";
+      expect(ref).toContain('widget "Traffic" (id widget-1)');
+      expect(ref).toContain('on dashboard "Weekly review" (id board-1)');
       expect(ref).toContain("description: Requests per day");
       expect(ref).toContain(`how to answer it: ${PROMPT}`);
       expect(ref).toContain("period: 2026-09-01T00:00:00Z to 2026-09-08T00:00:00Z");
       expect(ref).toContain(`queries (LangWatchQL): series: ${SQL}`);
     });
+
+    /** @scenario "AC121c Ask Langy: the widget rides as a widget chip, its queries never in the text" */
+    it("keeps the query out of the draft text, whatever the query holds", () => {
+      const request = widgetPromptDraft({
+        widget: widget({ prompt: PROMPT }),
+        board: BOARD,
+        period: PERIOD,
+      });
+
+      expect(request.draft).not.toContain(SQL);
+      expect(request.draft).not.toMatch(/SELECT|LangWatchQL|FROM /);
+    });
   });
 
   describe("given a query with a comment line and spaces inside a literal", () => {
     /** @scenario "AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period" */
-    it("hands Langy the query as the widget runs it", () => {
+    it("hands Langy the query without its comment, keeping the literal's spaces", () => {
       const sql = "SELECT 'a  b' AS label -- why\nFROM trace_metrics";
       const request = widgetPromptDraft({
         widget: widget({ queries: [{ name: "main", sql: `  ${sql}\n` }] }),
@@ -86,7 +97,26 @@ describe("widgetPromptDraft", () => {
         period: PERIOD,
       });
 
-      expect(request.context[1]?.ref).toContain(`queries (LangWatchQL): main: ${sql}`);
+      expect(request.context[1]?.ref).toContain(
+        "main: SELECT 'a  b' AS label  \nFROM trace_metrics",
+      );
+      expect(request.context[1]?.ref).not.toContain("-- why");
+    });
+
+    /** @scenario "AC121 Ask Langy: clicking drafts the widget's prompt with its name, queries and the period" */
+    it("keeps the second query whole when the first ends in a line comment", () => {
+      const request = widgetPromptDraft({
+        widget: widget({
+          queries: [
+            { name: "first", sql: "SELECT 1 -- count them" },
+            { name: "second", sql: "SELECT 'two' FROM trace_metrics" },
+          ],
+        }),
+        board: BOARD,
+        period: PERIOD,
+      });
+
+      expect(request.context[1]?.ref).toContain("second: SELECT 'two' FROM trace_metrics");
     });
   });
 
@@ -115,11 +145,10 @@ describe("widgetPromptDraft", () => {
 
   describe("given a widget saved without a prompt", () => {
     /** @scenario "AC122 Ask Langy: a widget without a stored prompt gets a fallback" */
-    it("asks what the widget shows and to quote the real numbers, with no stored prompt", () => {
+    it("drafts the same opener, and the widget chip carries no stored prompt", () => {
       const request = widgetPromptDraft({ widget: widget({}), board: BOARD, period: PERIOD });
 
-      expect(request.draft).toMatch(/^What does "Traffic" show over the last 7 days\?/);
-      expect(request.draft).toContain("Quote the real numbers");
+      expect(request.draft).toBe("Hey Langy, about the Traffic chart: ");
       expect(request.context[1]?.ref).not.toContain("how to answer it");
       expect(request.context[1]?.ref).not.toContain("description:");
     });
@@ -196,7 +225,7 @@ describe("editor drafts and starting prompts", () => {
     expect(request.question).not.toContain(SQL);
     expect(request.context).toEqual([
       expect.objectContaining({ kind: "dashboard", label: "Traffic" }),
-      expect.objectContaining({ kind: "dashboard", label: "widget: Traffic" }),
+      expect.objectContaining({ kind: "widget", label: "widget: Traffic" }),
     ]);
     expect(request.context[0]?.ref).toContain('widget "Traffic" (id w-1)');
   });

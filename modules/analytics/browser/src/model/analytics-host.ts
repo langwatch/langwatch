@@ -71,7 +71,7 @@ export type AnalyticsAlertAuthoring = {
 
 /** One reference riding with a question to Langy, as self-describing text the agent reads. */
 export type AnalyticsLangyContext = {
-  kind: "dashboard";
+  kind: "dashboard" | "widget";
   ref: string;
   label: string;
   /** What it is apart from its text, so asking about it again lists it once. */
