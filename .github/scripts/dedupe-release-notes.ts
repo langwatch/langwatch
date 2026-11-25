@@ -3,16 +3,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-// Squash merges here carry COMMIT_MESSAGES, so a pull request whose commit
-// body opens with its own conventional-commit line parses as TWO release-note
-// entries against ONE sha: the subject entry carries the pull-request link,
-// the body entry does not. Release Please writes both, and #7206 shows the
-// pairs landing in every released section. This pass removes them again.
-//
-// It runs AFTER Release Please in release-please-sdks.yml over each release
-// branch's changelogs, so what a release PR merges is already deduplicated.
-// The keeper is deterministic: an entry naming the pull request GitHub says
-// merged the commit, else any pull-request-linked entry, else the first.
+// Release Please parses a squash commit's subject and each conventional-commit line in its body,
+// so one sha can yield two release-note entries. This pass, run after Release Please in
+// release-please-sdks.yml, keeps one: the entry naming the pull request GitHub says merged the
+// commit, else any pull-request-linked entry, else the first.
+// Spec: specs/ci/release-notes-dedupe.feature
 
 /** A trailing commit link, as Release Please renders it: `([abc1234](…/commit/<sha>))`. */
 const shaPattern = /\]\((https:\/\/[^)\s]*\/commit\/([0-9a-f]{7,40}))\)/;
@@ -20,7 +15,7 @@ const shaPattern = /\]\((https:\/\/[^)\s]*\/commit\/([0-9a-f]{7,40}))\)/;
 /** A top-level release-note bullet: Release Please writes `* `, a formatted changelog `- `. */
 const bulletPattern = /^[*-] /;
 
-/** A linked pull request number, as Release Please renders issue redirects: `([#123](…/issues/123))`. */
+/** A linked pull request number, as Release Please renders it: `([#123](…/issues/123))`. */
 const prLinkPattern = /https:\/\/[^)\s]*\/issues\/(\d+)/;
 
 /** The commit sha of a release-note bullet; null for any other line, even one linking a commit. */
@@ -57,13 +52,13 @@ export const dedupeChangelog = async (
 
   let sectionStart = 0;
   while (sectionStart < lines.length) {
-    if (!/^## /.test(lines[sectionStart] ?? "")) {
+    if (!(lines[sectionStart] ?? "").startsWith("## ")) {
       sectionStart += 1;
       continue;
     }
 
     let cursor = sectionStart + 1;
-    while (cursor < lines.length && !/^## /.test(lines[cursor] ?? "")) {
+    while (cursor < lines.length && !(lines[cursor] ?? "").startsWith("## ")) {
       cursor += 1;
     }
     await markSurplus(lines, sectionStart + 1, cursor, options, drop);
@@ -73,7 +68,7 @@ export const dedupeChangelog = async (
   if (drop.size === 0) return content;
 
   // Descending: each removal would shift every later index.
-  for (const index of [...drop].sort((a, b) => b - a)) {
+  for (const index of [...drop].toSorted((a, b) => b - a)) {
     lines.splice(index, 1);
   }
   return lines.join("\n");
@@ -119,10 +114,8 @@ const markSurplus = async (
 };
 
 /**
- * Which pull request a commit merged, through the association API: a squash
- * merge associates exactly the pull request that was merged, which is how two
- * entries naming two different numbers (#7346/#7347 in 3.16.0) get told apart.
- * Unavailable without credentials; the caller degrades to link-preference.
+ * Which pull requests a commit merged, through the association API, which tells apart two
+ * entries naming different numbers. Undefined without credentials (link preference then).
  */
 export const githubMergedPrs = (): ((sha: string) => Promise<number[]>) | undefined => {
   const token = process.env.GITHUB_TOKEN;

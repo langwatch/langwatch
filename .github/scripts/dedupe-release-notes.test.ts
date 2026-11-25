@@ -106,7 +106,7 @@ void describe("dedupe-release-notes", () => {
       });
       assert.equal(
         extractSha(
-          deduped.split("\n").find((l) => /^\* /.test(l) && l.includes(sha.slice(0, 7))) ?? "",
+          deduped.split("\n").find((l) => l.startsWith("* ") && l.includes(sha.slice(0, 7))) ?? "",
         ),
         sha,
       );
