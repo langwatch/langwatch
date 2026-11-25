@@ -1,5 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { stripAnsi, formatTable, formatRelativeTime } from "../formatting";
+
+import { stripAnsi, formatTable, formatRelativeTime, sanitizeTerminalText } from "../formatting";
+
+describe("sanitizeTerminalText()", () => {
+  describe("given text carrying terminal control sequences", () => {
+    it("replaces an embedded escape byte with the replacement character", () => {
+      expect(sanitizeTerminalText("safe\u001b[2Kmalicious")).toBe("safe\uFFFD[2Kmalicious");
+    });
+
+    it("neutralises a carriage return used to overwrite the line", () => {
+      expect(sanitizeTerminalText("real\rfake")).toBe("real fake");
+    });
+  });
+
+  describe("given ordinary text", () => {
+    it("returns it unchanged", () => {
+      expect(sanitizeTerminalText("My Widget")).toBe("My Widget");
+    });
+  });
+});
 
 describe("stripAnsi()", () => {
   it("removes ANSI color codes from a string", () => {
@@ -123,10 +142,7 @@ describe("formatTable()", () => {
 
     it("pads columns to align with the longest value", () => {
       formatTable({
-        data: [
-          { Col: "short" },
-          { Col: "a longer value" },
-        ],
+        data: [{ Col: "short" }, { Col: "a longer value" }],
         headers: ["Col"],
       });
 

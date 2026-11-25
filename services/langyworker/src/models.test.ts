@@ -1,6 +1,8 @@
+import { OPENAI_MODELS } from "@earendil-works/pi-ai/providers/openai.models";
 import { describe, expect, it } from "vitest";
-import { PROVIDER_ID, buildModelsJson } from "./models.js";
+
 import type { LangyWorkerModelConfig } from "./config.js";
+import { PROVIDER_ID, buildModelsJson } from "./models.js";
 
 const model: LangyWorkerModelConfig = {
   id: "gpt-5-mini",
@@ -36,7 +38,9 @@ describe("buildModelsJson", () => {
         model: { ...model, samplingParams: { temperature: 1 } } as LangyWorkerModelConfig,
         env: { OPENAI_BASE_URL: "http://x", OPENAI_API_KEY: "k" },
       });
-      const provider = generated.providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+      const provider = generated.providers[PROVIDER_ID] as {
+        models: Record<string, unknown>[];
+      };
       const entry = provider.models[0] as Record<string, unknown>;
       expect(entry.id).toBe("gpt-5-mini");
       expect(entry.reasoning).toBe(true);
@@ -97,7 +101,9 @@ describe("buildModelsJson", () => {
       expect(provider.baseUrl).toBe("http://127.0.0.1:41234");
       expect(entry.baseUrl).toBeUndefined();
       expect(entry.provider).toBeUndefined();
-      expect(JSON.stringify(buildModelsJson({ model: claude, env }))).not.toContain("api.anthropic.com");
+      expect(JSON.stringify(buildModelsJson({ model: claude, env }))).not.toContain(
+        "api.anthropic.com",
+      );
     });
 
     /** @scenario A known model's registry entry keeps pi's own catalog knowledge */
@@ -140,6 +146,157 @@ describe("buildModelsJson", () => {
           compat: { supportsStore: false },
         });
       }
+    });
+  });
+
+  describe("when an Anthropic Messages model pi's catalog does not list", () => {
+    const env = { ANTHROPIC_BASE_URL: "http://127.0.0.1:41234", ANTHROPIC_API_KEY: "k" };
+    const claude = (id: string, compat?: Record<string, unknown>): Record<string, unknown> => {
+      const provider = buildModelsJson({
+        model: {
+          id,
+          api: "anthropic-messages",
+          baseUrlEnv: "ANTHROPIC_BASE_URL",
+          apiKeyEnv: "ANTHROPIC_API_KEY",
+          reasoning: true,
+          ...(compat ? { compat } : {}),
+        },
+        env,
+      }).providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+      return provider.models[0] as Record<string, unknown>;
+    };
+
+    /** @scenario A Claude newer than pi's catalog still gets the adaptive thinking shape */
+    it("asks for adaptive thinking on Claude 4.6 and later", () => {
+      for (const id of [
+        "anthropic/claude-opus-5-5",
+        "anthropic/claude-sonnet-5-5",
+        "anthropic/claude-haiku-5-5",
+        "anthropic/claude-sonnet-4-6-20260101",
+        "anthropic/claude-opus-6",
+      ]) {
+        expect(claude(id).compat, id).toEqual({ forceAdaptiveThinking: true });
+      }
+    });
+
+    /** @scenario A Claude newer than pi's catalog still gets the adaptive thinking shape */
+    it("keeps the manager's own compat keys, which win over the default", () => {
+      expect(
+        claude("anthropic/claude-opus-5-5", {
+          supportsLongCacheRetention: true,
+          forceAdaptiveThinking: false,
+        }).compat,
+      ).toEqual({ forceAdaptiveThinking: false, supportsLongCacheRetention: true });
+    });
+
+    /** @scenario A Claude newer than pi's catalog still gets the adaptive thinking shape */
+    it("leaves an older Claude on the manager's config alone", () => {
+      for (const id of ["anthropic/claude-opus-4-20250514", "anthropic/claude-3-7-sonnet-latest"]) {
+        expect(claude(id).compat, id).toBeUndefined();
+      }
+    });
+  });
+
+  describe("when an OpenAI Responses model meets pi's catalog", () => {
+    const env = { OPENAI_BASE_URL: "http://127.0.0.1:41234/v1", OPENAI_API_KEY: "k" };
+    const openai = (id: string): Record<string, unknown> => {
+      const provider = buildModelsJson({
+        model: {
+          id,
+          api: "openai-responses",
+          baseUrlEnv: "OPENAI_BASE_URL",
+          apiKeyEnv: "OPENAI_API_KEY",
+          reasoning: true,
+          compat: { supportsLongCacheRetention: true },
+        },
+        env,
+      }).providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+      return provider.models[0] as Record<string, unknown>;
+    };
+
+    /** @scenario A model that does not reason is never sent reasoning fields */
+    it("takes the catalog's reasoning flag over the lane's blanket one", () => {
+      const notReasoning = Object.entries(OPENAI_MODELS)
+        .filter(([, entry]) => entry.api === "openai-responses" && entry.reasoning === false)
+        .map(([id]) => `openai/${id}`);
+      expect(notReasoning.length).toBeGreaterThan(0);
+      for (const id of notReasoning) {
+        expect(openai(id).reasoning, id).toBe(false);
+      }
+      expect(openai("openai/gpt-5.6-luna").reasoning).toBe(true);
+    });
+
+    /** @scenario A GPT newer than pi's catalog gets its newest sibling's shape */
+    it("gives a GPT newer than the catalog the newest same-tier sibling's shape", () => {
+      const sibling = openai("openai/gpt-5.6-luna");
+      for (const id of ["openai/gpt-6-luna", "openai/gpt-6.1-luna"]) {
+        const entry = openai(id);
+        expect(entry.id, id).toBe(id);
+        expect(entry.reasoning, id).toBe(true);
+        expect(entry.contextWindow, id).toBe(sibling.contextWindow);
+        expect(entry.thinkingLevelMap, id).toEqual(sibling.thinkingLevelMap);
+        expect(entry.input, id).toEqual(sibling.input);
+        expect(entry.compat, id).toMatchObject({ supportsLongCacheRetention: true });
+        expect(entry.name, id).toBeUndefined();
+        expect(entry.cost, id).toBeUndefined();
+      }
+      expect(openai("openai/gpt-6-terra").contextWindow).toBe(
+        openai("openai/gpt-5.6-terra").contextWindow,
+      );
+    });
+
+    /** @scenario A GPT newer than pi's catalog gets its newest sibling's shape */
+    it("leaves ids with no newer sibling to the manager's config", () => {
+      for (const id of ["openai/gpt-6-astra", "openai/gpt-6-sol-pro", "openai/my-finetune"]) {
+        expect(openai(id).contextWindow, id).toBeUndefined();
+      }
+    });
+  });
+
+  describe("when the manager leaves reasoning unsaid", () => {
+    const env = { LLM_BASE_URL: "http://127.0.0.1:41234", LLM_API_KEY: "k" };
+    const reasoningOf = (id: string, api: LangyWorkerModelConfig["api"], reasoning?: boolean) => {
+      const provider = buildModelsJson({
+        model: {
+          id,
+          api,
+          baseUrlEnv: "LLM_BASE_URL",
+          apiKeyEnv: "LLM_API_KEY",
+          ...(reasoning === undefined ? {} : { reasoning }),
+        },
+        env,
+      }).providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+      return provider.models[0]?.reasoning;
+    };
+    const [nonReasoningId] =
+      Object.entries(OPENAI_MODELS).find(
+        ([, entry]) => !entry.reasoning && entry.api === "openai-responses",
+      ) ?? [];
+
+    /** @scenario A model that cannot reason is never asked to */
+    it("takes reasoning off for a catalogued model that cannot reason", () => {
+      expect(nonReasoningId).toBeDefined();
+      expect(reasoningOf(`openai/${nonReasoningId}`, "openai-responses")).toBe(false);
+    });
+
+    /** @scenario A model that cannot reason is never asked to */
+    it("keeps reasoning on for a catalogued model that reasons", () => {
+      expect(reasoningOf("openai/gpt-5-mini", "openai-responses")).toBe(true);
+    });
+
+    /** @scenario A model that cannot reason is never asked to */
+    it("assumes reasoning for an uncatalogued Responses or Messages model", () => {
+      expect(reasoningOf("openai_codex/gpt-5-codex", "openai-responses")).toBe(true);
+      expect(reasoningOf("anthropic/claude-acme-1", "anthropic-messages")).toBe(true);
+    });
+
+    /** @scenario A model that cannot reason is never asked to */
+    it("leaves an uncatalogued chat-completions model without reasoning", () => {
+      expect(reasoningOf("gemini/gemini-2.5-pro", "openai-completions")).toBeUndefined();
+    });
+
+    it("lets an explicit setting win over the default", () => {
+      expect(reasoningOf("openai_codex/gpt-5-codex", "openai-responses", false)).toBe(false);
     });
   });
 

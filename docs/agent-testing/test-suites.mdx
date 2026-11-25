@@ -10,18 +10,23 @@ description: A test suite is a named group of scenarios you run together. It def
 The **Scenarios** tab lists the test suites of the project under **Test Suites** in the rail on the left. Press one to open its scenarios in the table. **New Test Suite** asks for a name only.
 
 <Frame>
-<img className="block" src="/images/agent-testing/test-suite-rail-menu.png" alt="The test suite rail with the row menu of the Refunds test suite open" />
+  <img
+    className="block"
+    src="/images/agent-testing/test-suite-rail-menu.png"
+    width="356"
+    alt="The test suite rail with the row menu of the Refunds test suite open"
+  />
 </Frame>
 
 The row menu of a test suite offers:
 
-| Action | What it does |
-|---|---|
-| **New scenario** | Opens the editor with this test suite preselected. |
-| **Run suite** | Opens the run dialog with every scenario of the test suite in scope. |
-| **Edit** | Opens the suite editor: the name, the fields and the evaluators. Past runs keep the old name. |
-| **Open recent runs** | Lists the latest runs of this test suite. |
-| **Archive suite** | Archives the test suite and the scenarios in it. Test runs are preserved. |
+| Action               | What it does                                                                                  |
+| -------------------- | --------------------------------------------------------------------------------------------- |
+| **New scenario**     | Opens the editor with this test suite preselected.                                            |
+| **Run suite**        | Opens the run dialog with every scenario of the test suite in scope.                          |
+| **Edit**             | Opens the suite editor: the name, the fields and the evaluators. Past runs keep the old name. |
+| **Open recent runs** | Lists the latest runs of this test suite. It appears when a scenario in it has a result in the selected period. |
+| **Archive suite**    | Archives the test suite and the scenarios in it. Test runs are preserved.                     |
 
 Every project has a **Default** test suite. A scenario saved with **No test suite** goes there.
 
@@ -31,12 +36,18 @@ Under the suite name, the header shows a chip per field and a chip per evaluator
 
 A test suite reads like a dataset. Beyond the situation and the criteria, it declares typed fields, and a scenario in it may carry a value for each. A blank value skips the evaluators that read it. A field holds what an [evaluator](/agent-testing/evaluators) compares against: the golden SQL query, the reference answer, the tables the answer had to be written against.
 
-**Edit suite** opens the suite editor. Under **Customize test suite**, **Add fields** opens the field rows: an identifier and a type each, with **Add field** for the next one and the arrows to reorder them.
+**Edit suite** opens the suite editor. Under **Customize test suite**, **Add fields** opens the field rows: an identifier and a type each, with **Add field** for the next one. Drag a row by the handle on its left to reorder the fields. The handle appears once the suite declares more than one field, and it takes the arrow keys when it has focus.
 
-| Setting | Rule |
-|---|---|
+<Frame>
+<img className="block" src="/images/agent-testing/suite-editor-evaluators.png" width="616" alt="The Edit test suite drawer with the field rows golden_sql and table_schema, each with a drag handle, a type of Text and a remove button, and the evaluator chips under them" />
+</Frame>
+
+The field rows of the `Case lookups` suite, with the drag handle on the left of each.
+
+| Setting        | Rule                                                                                                                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Identifier** | Lowercase letters, digits and underscores, starting with a letter, up to 64 characters, for example `golden_sql`. `situation`, `criteria`, `name`, `input` and `output` are reserved. |
-| **Type** | `text`, `number` or `boolean`. A text value is a growing text box on the scenario; a number a number input; a boolean a switch. |
+| **Type**       | `text`, `number` or `boolean`. A text value is a growing text box on the scenario; a number a number input; a boolean a switch.                                                       |
 
 A suite declares up to 30 fields. A field an attached evaluator still reads cannot be removed: detach the evaluator or change its mapping first. Removing a field keeps the values scenarios hold for it; the scenario editor lists them under **Not in this suite** until they are removed.
 
@@ -53,7 +64,12 @@ The evaluators attached to a suite run after every scenario run and report besid
 **Move to suite...** in the row menu of a scenario opens **Move to test suite**, which lists the test suites of the project. Select several rows and press **Move to suite** in the bar that appears to move them together. A scenario belongs to exactly one test suite.
 
 <Frame>
-<img className="block" src="/images/agent-testing/move-to-test-suite.png" alt="The Move to test suite dialog with the test suites of the project" />
+  <img
+    className="block"
+    src="/images/agent-testing/move-to-test-suite.png"
+    width="448"
+    alt="The Move to test suite dialog with the test suites of the project"
+  />
 </Frame>
 
 ## Test suites and labels
@@ -65,7 +81,11 @@ A test suite is the group you run before a release. A label is a tag on a scenar
 Scenarios written with the Scenario SDK and run from your own test runner report to the project and appear under **From Code** in the rail, one entry per `setId`. Their table is read-only and shows each scenario with its last run. Edit them in your repository. The platform lists them so their results appear next to the test suites written here.
 
 <Frame>
-<img className="block" src="/images/agent-testing/from-code-suite.png" alt="A From Code test suite, with its scenarios and their last runs" />
+  <img
+    className="block"
+    src="/images/agent-testing/from-code-suite.png"
+    alt="A From Code test suite, with its scenarios and their last runs"
+  />
 </Frame>
 
 ## From the CLI and the API

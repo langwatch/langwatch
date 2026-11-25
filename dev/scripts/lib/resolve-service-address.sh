@@ -2,71 +2,46 @@
 # Resolve the address a service is going to be dialed at, so `pnpm dev` starts
 # that service on the port something actually talks to.
 #
-# platform/app/scripts/start.sh runs before any Node entry point, and the shell
-# never loads platform/app/.env. The app does, with `override: true`
-# (platform/app/src/env-load.ts), so an address pinned in .env is what it dials
-# and the launcher cannot see it. Without this the launcher reads an unset
-# variable, derives a port from its own slot, starts a service there, and every
-# call fails while a healthy service sits on the other port.
+# dev/scripts/dev-stack.sh runs before any Node entry point, and the shell never
+# loads .env. The applications do, with `override: true`, so an address pinned
+# in .env is what they dial and the launcher cannot see it. Without this the
+# launcher reads an unset variable, derives a port from its own slot, starts a
+# service there, and every call fails while a healthy service sits on the other
+# port.
 #
-# Precedence mirrors env-load.ts exactly, because the goal is to predict what
-# the app will resolve: .env.portless (the haven overlay, loaded last) beats
-# .env, and both beat the calling shell. Leaving the variable untouched means
-# nothing pinned an address, which is the caller's cue to derive its own.
+# Precedence mirrors the applications' own load order, because the goal is to
+# predict what they will resolve: `.env` at the workspace root beats the calling
+# shell. Leaving the variable untouched means nothing pinned an address, which is
+# the caller's cue to derive its own.
+#
+# There is one file to read. Under haven the resolved address is injected into
+# each lane's environment rather than written to an overlay file, and this script
+# is the plain `pnpm dev` path, which haven does not run.
 #
 # Usage:
 #
-#   . "$(dirname "$0")/../../../dev/scripts/lib/resolve-service-address.sh"
-#   resolve_service_address LANGWATCH_NLP_SERVICE "$app_dir" nlpgo
+#   . "$(dirname "$0")/lib/resolve-service-address.sh"
+#   resolve_service_address LANGWATCH_NLP_SERVICE "$repo_root" nlpgo
 
-# Reads one variable out of one env file the way dotenv would: last assignment
-# wins, an optional `export` prefix, single or double quotes, and an inline
-# comment after an unquoted value.
-#
-# Prints the value and returns 0. Returns 1 when the file assigns the variable
-# nowhere, and 2 when it assigns it an empty value, which is a different answer:
-# dotenv gives the app an empty string there, so the file has cleared whatever a
-# lower-precedence file said rather than saying nothing about it.
+# The dotenv key parser, shared with the two ensure scripts.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env-file-keys.sh"
+
+# The three-state read this file's precedence rules are built on: 0 with the
+# value, 1 when the file assigns the variable nowhere, 2 when it assigns it an
+# empty value. Named here because the callers below read addresses, not keys.
 _service_address_from_env_file() {
-  local var="$1"
-  local file="$2"
-  [ -f "$file" ] || return 1
-
-  local assigned raw
-  assigned=$(sed -n -E "s/^[[:space:]]*(export[[:space:]]+)?${var}[[:space:]]*=.*\$/y/p" "$file" | tail -n 1)
-  [ -n "$assigned" ] || return 1
-
-  raw=$(sed -n -E "s/^[[:space:]]*(export[[:space:]]+)?${var}[[:space:]]*=[[:space:]]*(.*)\$/\\2/p" "$file" | tail -n 1)
-  raw="${raw%$'\r'}"
-
-  case "$raw" in
-    \"*)
-      raw="${raw#\"}"
-      raw="${raw%%\"*}"
-      ;;
-    \'*)
-      raw="${raw#\'}"
-      raw="${raw%%\'*}"
-      ;;
-    *)
-      raw="${raw%%#*}"
-      raw="${raw%"${raw##*[![:space:]]}"}"
-      ;;
-  esac
-
-  [ -n "$raw" ] || return 2
-  printf '%s' "$raw"
+  env_file_key_read "$1" "$2"
 }
 
 # Exports `var` with the address the app will read, and says where it came from.
 # Leaves it untouched when no env file pins one.
 resolve_service_address() {
   local var="$1"
-  local app_dir="${2:-.}"
+  local repo_root="${2:-.}"
   local label="${3:-$1}"
   local file value status
 
-  for file in "$app_dir/.env.portless" "$app_dir/.env"; do
+  for file in "$repo_root/.env"; do
     # `|| status=$?` keeps this out of `set -e`'s reach: a bare assignment from
     # a failing command substitution ends the caller's script.
     status=0

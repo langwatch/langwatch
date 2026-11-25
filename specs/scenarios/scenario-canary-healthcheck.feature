@@ -23,10 +23,11 @@ Feature: A scenario canary health check that fires a real run and says what brok
   orphaned by walking away from it.
 
   The scenario and target the canary runs are not server-side config: they are
-  named per request by a `?runPlanId=<SimulationSuite id>` query parameter,
-  pointing at a run plan (a suite with kind `run_plan`) that holds exactly one
-  scenario and exactly one target. The plan's own row supplies the project, so
-  nothing else on the request can redirect the run. A request with no runPlanId
+  named per request by a `?runPlanId=<SimulationSuite id or slug>` query
+  parameter, pointing at a run plan (a suite with kind `run_plan`) that holds
+  exactly one scenario and exactly one target. The plan is looked up inside the
+  project the API key belongs to, and the plan's own row supplies the scenario
+  and target, so nothing else on the request can redirect the run. A request with no runPlanId
   is a bad request (400) — distinct from a plan that does not resolve. A run
   that cannot even be launched — the launcher throws, or the named run plan is
   not found, or it does not hold exactly one scenario and one target — is
@@ -34,11 +35,14 @@ Feature: A scenario canary health check that fires a real run and says what brok
   escaping as a raw 500. The run plan is validated up front, before any run is
   queued.
 
-  Auth is the shared `CRON_API_KEY` secret (`validateInternalSecret`), checked
-  before any run is queued: a status-page poller has no user session and no
-  project API key, only this one shared secret. The route is declared as an
-  internal-secret endpoint, so the generated OpenAPI spec never advertises this
-  LLM-spend endpoint as needing no auth. A second request for the same run plan
+  Auth is the project API key (`X-Auth-Token`, or `Authorization: Bearer`),
+  exactly as on every sibling health probe (`/collector`, `/evaluations`,
+  `/processor`, `/triggers`, `/workflows`): a missing or unknown key is refused
+  with the same status and message the siblings give, before any run plan is
+  read or any run is queued. The project is taken from the key and never from
+  the request, so a run plan owned by another project does not resolve and
+  reports `run_failed` with no run launched. No new env var and no new auth
+  pattern is involved. A second request for the same run plan
   arriving while its canary is already running starts no second LLM run — it is
   told the probe is busy; the guard is keyed per run plan, so two monitors
   probing two different plans never block each other. Every response carries
@@ -116,32 +120,38 @@ Feature: A scenario canary health check that fires a real run and says what brok
     And the run inherits the model configured on the canary scenario record
 
   @integration
-  Scenario: A request with no auth secret is refused before any run is queued
-    Given the request carries no Authorization header
+  Scenario: A request with no project API key is refused before any run is queued
+    Given the request carries no X-Auth-Token and no Authorization header
     When the scenario canary endpoint is called
-    Then the response is 401
-    And no scenario run is queued
+    Then the response is 401, the same as a sibling health probe
+    And no project lookup and no scenario run is queued
 
   @integration
-  Scenario: A request with the wrong auth secret is refused before any run is queued
-    Given the request carries a bearer token that does not match the configured secret
+  Scenario: A request with an unknown project API key is refused before any run is queued
+    Given the request carries an X-Auth-Token or bearer token that matches no project
     When the scenario canary endpoint is called
-    Then the response is 403
+    Then the response is 401 with the same message a sibling health probe gives
     And no scenario run is queued
 
   @integration
   Scenario: An authenticated request triggers a real run through the shared queue path
-    Given a request carrying the correct internal secret
+    Given a request carrying a valid project API key and a runPlanId
     When the scenario canary endpoint is called
     Then the run is queued through the same queue path simulationRunnerRouter.run uses
     And the response is 200 with the queued scenarioRunId
 
   @integration
-  Scenario: Canary runs are confined to the run plan's own project regardless of caller input
-    Given a request carrying the correct internal secret and a runPlanId
+  Scenario: Canary runs are confined to the API key's own project regardless of caller input
+    Given a request carrying a valid project API key, a runPlanId, and a projectId query parameter naming another project
     When the scenario canary endpoint is called
-    Then the run is queued against the project id held on that run plan
-    And that project id is never taken from any other value on the caller's request
+    Then the run plan is looked up scoped to the project the API key resolved to
+    And the projectId on the query string is ignored
+
+  @unit
+  Scenario: A run plan may be named by its slug
+    Given a runPlanId equal to the slug of a valid run plan in the caller's project
+    When the probe runs the canary
+    Then the plan resolves by slug and the run is launched through it
 
   @unit
   Scenario: The probe abandons the retry once the total budget is spent
@@ -173,14 +183,7 @@ Feature: A scenario canary health check that fires a real run and says what brok
 
   @integration
   Scenario: A request with no runPlanId is a bad request
-    Given a request carrying the correct internal secret but no runPlanId
-    When the scenario canary endpoint is called
-    Then the response is 400
-    And no scenario run is queued
-
-  @integration
-  Scenario: A request with no projectId is a bad request
-    Given a request carrying the correct internal secret and a runPlanId but no projectId
+    Given a request carrying a valid project API key but no runPlanId
     When the scenario canary endpoint is called
     Then the response is 400
     And no scenario run is queued
@@ -202,10 +205,10 @@ Feature: A scenario canary health check that fires a real run and says what brok
     And no run is launched
 
   @integration
-  Scenario: The scenario canary route is declared internal-secret, never public
-    Given the scenario canary route gates in-handler on the internal secret
+  Scenario: The scenario canary route is declared public like its sibling health probes
+    Given the scenario canary route authenticates the project API key in-handler
     When its registered access policy is read
-    Then the policy is declared internal-secret, not a public endpoint
+    Then the policy is the same public-endpoint declaration its sibling health probes carry
 
   @unit
   Scenario: An archived run plan is rejected without launching a run
@@ -230,14 +233,14 @@ Feature: A scenario canary health check that fires a real run and says what brok
 
   @integration
   Scenario: A blank runPlanId is a bad request
-    Given a request carrying the correct internal secret and a blank or whitespace-only runPlanId
+    Given a request carrying a valid project API key and a blank or whitespace-only runPlanId
     When the scenario canary endpoint is called
     Then the response is 400
     And no scenario run is queued
 
   @integration
   Scenario: Canary responses are never cacheable
-    Given a request carrying the correct internal secret
+    Given any request, authenticated or not
     When the scenario canary endpoint returns any response
     Then the response carries Cache-Control no-store
 
@@ -258,7 +261,7 @@ Feature: A scenario canary health check that fires a real run and says what brok
 
   @integration
   Scenario: An implausibly long query parameter is a bad request
-    Given a request carrying the correct internal secret and a runPlanId longer than 128 characters
+    Given a request carrying a valid project API key and a runPlanId longer than 128 characters
     When the scenario canary endpoint is called
     Then the response is 400
     And no scenario run is queued

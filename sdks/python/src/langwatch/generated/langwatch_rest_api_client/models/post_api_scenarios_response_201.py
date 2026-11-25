@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -31,6 +30,10 @@ class PostApiScenariosResponse201:
             servers that predate model overrides on this family.
         judge_model (None | str | Unset): The model that judges the run, or null for the project default. Absent on
             servers that predate model overrides on this family.
+        trace_quiet_period_ms (int | None | Unset): Milliseconds the agent's trace must stay unchanged before the judge
+            reads it, or null for the project's recommendation. Absent on servers that predate judge trace settings.
+        trace_wait_timeout_ms (int | None | Unset): Milliseconds the judge waits for the agent's trace before a verdict,
+            or null for the project's recommendation. Absent on servers that predate judge trace settings.
         max_turns (int | None | Unset): The most conversation turns a run of this scenario takes, or null for the
             default. Absent on servers that predate turn limits on this family.
         min_turns (int | None | Unset): The fewest conversation turns before the judge may end a run, or null for the
@@ -51,11 +54,12 @@ class PostApiScenariosResponse201:
     platform_url: str
     simulator_model: None | str | Unset = UNSET
     judge_model: None | str | Unset = UNSET
+    trace_quiet_period_ms: int | None | Unset = UNSET
+    trace_wait_timeout_ms: int | None | Unset = UNSET
     max_turns: int | None | Unset = UNSET
     min_turns: int | None | Unset = UNSET
     test_suite_id: None | str | Unset = UNSET
     fields: PostApiScenariosResponse201Fields | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
@@ -87,6 +91,18 @@ class PostApiScenariosResponse201:
         else:
             judge_model = self.judge_model
 
+        trace_quiet_period_ms: int | None | Unset
+        if isinstance(self.trace_quiet_period_ms, Unset):
+            trace_quiet_period_ms = UNSET
+        else:
+            trace_quiet_period_ms = self.trace_quiet_period_ms
+
+        trace_wait_timeout_ms: int | None | Unset
+        if isinstance(self.trace_wait_timeout_ms, Unset):
+            trace_wait_timeout_ms = UNSET
+        else:
+            trace_wait_timeout_ms = self.trace_wait_timeout_ms
+
         max_turns: int | None | Unset
         if isinstance(self.max_turns, Unset):
             max_turns = UNSET
@@ -110,7 +126,7 @@ class PostApiScenariosResponse201:
             fields = self.fields.to_dict()
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -126,6 +142,10 @@ class PostApiScenariosResponse201:
             field_dict["simulatorModel"] = simulator_model
         if judge_model is not UNSET:
             field_dict["judgeModel"] = judge_model
+        if trace_quiet_period_ms is not UNSET:
+            field_dict["traceQuietPeriodMs"] = trace_quiet_period_ms
+        if trace_wait_timeout_ms is not UNSET:
+            field_dict["traceWaitTimeoutMs"] = trace_wait_timeout_ms
         if max_turns is not UNSET:
             field_dict["maxTurns"] = max_turns
         if min_turns is not UNSET:
@@ -180,6 +200,24 @@ class PostApiScenariosResponse201:
 
         judge_model = _parse_judge_model(d.pop("judgeModel", UNSET))
 
+        def _parse_trace_quiet_period_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_quiet_period_ms = _parse_trace_quiet_period_ms(d.pop("traceQuietPeriodMs", UNSET))
+
+        def _parse_trace_wait_timeout_ms(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        trace_wait_timeout_ms = _parse_trace_wait_timeout_ms(d.pop("traceWaitTimeoutMs", UNSET))
+
         def _parse_max_turns(data: object) -> int | None | Unset:
             if data is None:
                 return data
@@ -224,27 +262,12 @@ class PostApiScenariosResponse201:
             platform_url=platform_url,
             simulator_model=simulator_model,
             judge_model=judge_model,
+            trace_quiet_period_ms=trace_quiet_period_ms,
+            trace_wait_timeout_ms=trace_wait_timeout_ms,
             max_turns=max_turns,
             min_turns=min_turns,
             test_suite_id=test_suite_id,
             fields=fields,
         )
 
-        post_api_scenarios_response_201.additional_properties = d
         return post_api_scenarios_response_201
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

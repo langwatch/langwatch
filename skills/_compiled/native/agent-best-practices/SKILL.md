@@ -79,7 +79,7 @@ Ask light questions with options. Don't overwhelm: pick the top 2-3 most impactf
 After each improvement:
 
 1. Show what was accomplished
-2. Run any tests / re-query analytics to verify (`langwatch trace search`, `langwatch test-suite run <id|name> --target <type:id> --wait`, etc.)
+2. Run any tests / re-query analytics to verify (`langwatch trace search`, `langwatch test-suite run "<id|name>" --target <type:id> --wait`, etc.)
 3. Ask what to tackle next
 4. Stop when the user says "that's enough"
 

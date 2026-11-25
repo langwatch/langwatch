@@ -19,7 +19,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/pkg/providererr"
+	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
 // llmPrefix is the path segment separating the routing token from the
@@ -129,6 +132,13 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			// "gpt-…"; restore the full provider-prefixed id on the wire and
 			// the gateway routes it to the codex credential. See provision.go.
 			rewriteCodexModelBody(pr.Out, entry.info.Model)
+			// The gateway tiers its mirror by the Langy key, which a chat turn
+			// and a read-only run share; this turn's own tier withholds it.
+			// The worker's value never travels.
+			pr.Out.Header.Del(customertracebridge.HeaderLangyMirror)
+			if domain.NormalizeMirrorTier(entry.info.MirrorTier) == domain.MirrorTierSkip {
+				pr.Out.Header.Set(customertracebridge.HeaderLangyMirror, customertracebridge.LangyMirrorWithheld)
+			}
 			// Stamp a traceparent so the gateway's customer-facing gen_ai span
 			// joins the turn's trace, nested where the call really happened.
 			// The worker's own traceparent is never continued verbatim: its
@@ -159,6 +169,9 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			}
 			pr.SetXForwarded()
 		},
+		// A burst 429 is re-sent by the relay itself, with the provider's
+		// Retry-After, before anything reaches the worker (llmretry.go).
+		Transport: r.llmRetryTransport(entry),
 		// Negative ⇒ flush immediately after each write: SSE pass-through.
 		FlushInterval: -1,
 		// EVERY failed call is captured so the turn's terminal error frame
@@ -202,13 +215,18 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 // complexity. See the ModifyResponse call site for what it is responsible
 // for.
 func (r *Relay) captureLLMFailure(entry *workerEntry, resp *http.Response) error {
+	if resp.StatusCode < 400 && isEventStream(resp) {
+		promoteBareJSONStreamError(resp)
+	}
 	if resp.StatusCode < 400 {
-		if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
+		if isEventStream(resp) {
 			// A 200 stream can still fail: providers signal hard limits
 			// (OpenAI's insufficient_quota) as an in-stream error event
 			// after the stream opens. Watch the frames as they pass through
 			// untouched; a clean end clears the capture, an error event
-			// captures and latches (see llmStreamSniffer).
+			// captures and latches (see llmStreamSniffer). An answered
+			// stream is not a 429, so it ends a run of them.
+			entry.resetRateLimitStrikes()
 			resp.Body = newLLMStreamSniffer(resp.Body, entry, clog.Get(r.baseCtx))
 			return nil
 		}
@@ -397,6 +415,7 @@ var hardLimitReasonCodes = map[herr.Code]bool{
 	"codex_plan_limit":           true,
 	"insufficient_quota":         true,
 	"billing_hard_limit_reached": true,
+	ErrProviderOutOfCredit:       true,
 }
 
 // hasHardLimitReason walks a captured LLM error's code and reason chain for a
@@ -513,6 +532,10 @@ func decodeLLMErrorBody(peeked []byte, resp upstreamResponse) (e herr.E, typed b
 	return decodeProviderErrorBody(peeked, resp.status, resp.contentType), false
 }
 
+// gatewayProviderErrorCode is the gateway's fallback code when it has no
+// parsed provider body to forward (writeUpstreamError in aigateway's router).
+const gatewayProviderErrorCode = "provider_error"
+
 // decodeProviderErrorBody captures a body KNOWN to be provider-native, skipping
 // the gateway-envelope test that decodeLLMErrorBody opens with.
 //
@@ -544,7 +567,51 @@ func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr
 		// top-level error codes and do not belong in the generated code list.
 		e.Reasons = []error{herr.E{Code: code}}
 	}
+	if refusal, ok := credentialRefusalReason(status); ok && refusal != code {
+		e.Reasons = append(e.Reasons, herr.E{Code: refusal})
+	} else if code == gatewayProviderErrorCode && status > 0 {
+		// The gateway's generic envelope names no cause, so the status (a 404 is
+		// a missing model) still has to reach the panel.
+		e.Reasons = append(e.Reasons, herr.E{Code: upstreamHTTPReasonCode(status)})
+	}
+	if cause, ok := accountCauseReason(status, peeked); ok {
+		e.Reasons = append(e.Reasons, herr.E{Code: cause})
+	}
 	return e
+}
+
+// The account-level causes a provider body names in prose only (Anthropic's
+// spent balance is a 400 invalid_request_error), classified here so the panel
+// can say which one it was while the sentence itself stays behind.
+const (
+	// ErrProviderOutOfCredit marks a provider account with no credit or quota left.
+	ErrProviderOutOfCredit = herr.Code("llm_provider_out_of_credit")
+	// ErrProviderKeyRejected marks a key the provider refused on a status other than 401 or 403.
+	ErrProviderKeyRejected = herr.Code("llm_provider_key_rejected")
+)
+
+func accountCauseReason(status int, body []byte) (herr.Code, bool) {
+	switch {
+	case providererr.AccountExhausted(status, body):
+		return ErrProviderOutOfCredit, true
+	case providererr.KeyRejected(status, body):
+		// A 401 or 403 already carries its status reason (credentialRefusalReason).
+		_, statusSaysSo := credentialRefusalReason(status)
+		return ErrProviderKeyRejected, !statusSaysSo
+	}
+	return "", false
+}
+
+// credentialRefusalReason names a 401 or 403 next to the provider's own
+// discriminant. Every provider has its own vocabulary for a refused key
+// (Bedrock alone answers with a dozen exception names), and a client that
+// knows only some of them would read the rest as a failure worth retrying.
+// The status says "refused credential" in every dialect.
+func credentialRefusalReason(status int) (herr.Code, bool) {
+	if status != http.StatusUnauthorized && status != http.StatusForbidden {
+		return "", false
+	}
+	return upstreamReasonCodes[status], true
 }
 
 func providerErrorCode(body []byte) herr.Code {
@@ -585,7 +652,7 @@ func providerCodeCandidate(body []byte, path string) (herr.Code, bool) {
 // body carries no discriminant of its own (see providerErrorCode for that
 // case). Status 0 is never a real HTTP status; decodeProviderErrorBody passes
 // it for the SSE lane, where a terminal in-stream event has no status at all,
-// so every capture still carries exactly one reason.
+// so every capture still carries a reason.
 var upstreamReasonCodes = map[int]herr.Code{
 	0:                              "upstream_stream_error",
 	http.StatusBadRequest:          "upstream_bad_request",

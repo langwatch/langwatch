@@ -1,0 +1,358 @@
+name: pr-conventions
+
+# The checks that read a pull request rather than build it, in one job: its
+# title, a breaking change's scope, its deployment impact and the impact map
+# comment, plus linking the issue its branch names. Each check runs even when
+# one before it failed, so one push shows every finding.
+# Spec: specs/ci/deployment-impact-report.feature, specs/ci/breaking-change-scope.feature,
+# specs/ci/pr-impact-map.feature
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  # Its own job, outside the concurrency group below: it runs only when the pull
+  # request opens, and an edit straight after opening would otherwise cancel it.
+  issue-link:
+    if: github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+    timeout-minutes: 5
+    steps:
+      # A branch named issue<number>/<slug> gets "Resolves #<number>" in its body
+      # and its author assigned to the issue. Best-effort: a fork's token is read-only.
+      - name: Link the issue the branch names
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const match = pr.head.ref.match(/^issue(\d+)\//);
+            if (!match) {
+              core.info(`branch ${pr.head.ref} does not reference an issue, skipping`);
+              return;
+            }
+            const issueNumber = Number(match[1]);
+            const header = '# Related Issue';
+            if (!(pr.body ?? '').includes(header)) {
+              const body = `${header}\n\n- Resolves #${issueNumber}\n\n${pr.body ?? ''}`;
+              try {
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  body,
+                });
+              } catch (e) {
+                core.warning(`could not update PR body: ${e.message}`);
+              }
+            }
+            try {
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                assignees: [pr.user.login],
+              });
+            } catch (e) {
+              core.warning(`could not assign @${pr.user.login} to #${issueNumber}: ${e.message}`);
+            }
+
+  pr-conventions:
+    name: pr conventions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Write only for the impact map comment; it runs the pull request's own code, as before.
+    permissions:
+      contents: read
+      pull-requests: write
+    # Every check reads the pull request as it is now, so a newer event supersedes
+    # an older run, and two runs would race to post the impact map. Not
+    # `pr-conventions-<n>`: main's old title check holds that group until this merges.
+    concurrency:
+      group: pr-checks-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      # Full history: the deployment report reads both ends of the diff. Every event runs
+      # every check, so a later run can never report green for a block it did not re-read.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          sparse-checkout: |
+            /*
+            !/docs/media/
+            !/docs/images/
+          sparse-checkout-cone-mode: false
+
+      - name: Check the title
+        if: ${{ !cancelled() }}
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" found in the pull request title "{title}"
+            didn't match the configured pattern. Please ensure that the subject
+            doesn't start with an uppercase character.
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        if: ${{ !cancelled() }}
+        with:
+          node-version: "24.22.1"
+
+      # A squash merge puts the title in the subject and the branch's commit messages in
+      # the body, so those are where a breaking marker reaches main from. Both reach the
+      # guard as JSON strings, one per line, so a crafted title cannot escape into the shell.
+      - name: Check a breaking change stays in one release component
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          REPO: ${{ github.repository }}
+          ACKNOWLEDGED: ${{ contains(github.event.pull_request.labels.*.name, 'multi-component-major') }}
+        run: |
+          if [ "$ACKNOWLEDGED" = "true" ]; then
+            echo "multi-component-major label present, a major on every touched component is intended"
+            exit 0
+          fi
+          gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename' > "$RUNNER_TEMP/changed-files.txt"
+          gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].commit.message | @json' > "$RUNNER_TEMP/commit-messages.txt"
+          jq -Rn 'env.PR_TITLE' >> "$RUNNER_TEMP/commit-messages.txt"
+          node --experimental-strip-types .github/scripts/guard-breaking-change-scope.ts \
+            . "$RUNNER_TEMP/changed-files.txt" "$RUNNER_TEMP/commit-messages.txt"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: ${{ !cancelled() }}
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      # Blocks only on a fact that breaks an existing install; the operator-action label
+      # clears it. The verdict waits for the impact map below, so the report is posted first.
+      - name: Report the deployment impact
+        id: deploy
+        if: ${{ !cancelled() }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          ACKNOWLEDGED: ${{ contains(github.event.pull_request.labels.*.name, 'operator-action') }}
+        run: |
+          set -o pipefail
+          # 2 is a fact that breaks an install, reported after the impact map; 1 is an error.
+          # Built, not `go run`: go run turns every failing exit into 1.
+          go build -o "$RUNNER_TEMP/deployimpact" ./cmd/deployimpact
+          status=0
+          "$RUNNER_TEMP/deployimpact" -base "$BASE_SHA" -head "$HEAD_SHA" -acknowledged="$ACKNOWLEDGED" \
+            -out "$RUNNER_TEMP/deploy-impact.md" | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
+          if [ "$status" -eq 2 ]; then echo "blocked=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          exit "$status"
+
+      # A fork's token is read-only, so its comment would 403; it still gets the job summary.
+      # Describes the diff, never judges it: a failed post must not block a merge.
+      - name: Post the impact map
+        if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository }}
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const MARKER = "<!-- pr-impact-map -->";
+
+            const { classify, generatedMatcher, moduleOf } = require(
+              `${process.env.GITHUB_WORKSPACE}/.github/scripts/pr-impact-map-categories.cjs`
+            );
+            const { execFileSync } = require("node:child_process");
+            const { readFileSync } = require("node:fs");
+            const isGenerated = generatedMatcher(
+              readFileSync(`${process.env.GITHUB_WORKSPACE}/.gitattributes`, "utf8")
+            );
+
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const shortSha = pr.head.sha.slice(0, 7);
+
+            // `git diff --numstat` counts every file. The pulls/files API caps
+            // at 3000, and large restructures exceed it. -z keeps odd paths
+            // intact; binary files report "-" and count as zero lines.
+            const out = execFileSync(
+              "git",
+              ["diff", "--numstat", "-z", "--no-renames", `${pr.base.sha}...${pr.head.sha}`],
+              { encoding: "utf8", maxBuffer: 1 << 30 }
+            );
+            const files = out
+              .split("\0")
+              .filter(Boolean)
+              .map((entry) => {
+                const [adds, dels, ...rest] = entry.split("\t");
+                return {
+                  filename: rest.join("\t"),
+                  additions: Number(adds) || 0,
+                  deletions: Number(dels) || 0,
+                };
+              });
+            const totalAdditions = files.reduce((n, f) => n + f.additions, 0);
+            const totalDeletions = files.reduce((n, f) => n + f.deletions, 0);
+
+            const buckets = new Map();
+            const modules = new Map();
+            const add = (map, key, file) => {
+              const bucket = map.get(key) ?? { files: 0, additions: 0, deletions: 0 };
+              bucket.files += 1;
+              bucket.additions += file.additions;
+              bucket.deletions += file.deletions;
+              map.set(key, bucket);
+            };
+            for (const file of files) {
+              add(buckets, classify(file.filename, { isGenerated }), file);
+              const mod = moduleOf(file.filename);
+              if (mod) add(modules, mod, file);
+            }
+
+            const num = (n) => n.toLocaleString("en-US");
+            const rows = [...buckets.entries()].sort((a, b) => b[1].files - a[1].files);
+
+            let body;
+            if (files.length === 0) {
+              body = [
+                MARKER,
+                "### PR Impact Map",
+                "",
+                "No files changed.",
+              ].join("\n");
+            } else {
+              // Share is by file count, not lines: lockfiles and generated code
+              // dominate line counts and would make every dep bump look like a
+              // rewrite.
+              const BAR_WIDTH = 15;
+              const bar = (share) => {
+                const filled = Math.round(share * BAR_WIDTH);
+                return "█".repeat(filled) + "░".repeat(BAR_WIDTH - filled);
+              };
+
+              const table = rows.map(([name, b]) => {
+                const share = b.files / files.length;
+                const pct = Math.round(share * 100);
+                return [
+                  "  ",
+                  name.padEnd(20),
+                  String(b.files).padStart(5),
+                  ("+" + num(b.additions)).padStart(11),
+                  ("-" + num(b.deletions)).padStart(10),
+                  "   ",
+                  bar(share),
+                  " ",
+                  (pct + "%").padStart(4),
+                ].join("");
+              });
+
+              const topModules = [...modules.entries()]
+                .sort((a, b) => b[1].files - a[1].files || a[0].localeCompare(b[0]))
+                .slice(0, 8);
+              const moduleTable = topModules.length === 0 ? [] : [
+                "",
+                "  " + "Module".padEnd(20) + "Files".padStart(5) +
+                  "Added".padStart(11) + "Removed".padStart(10),
+                "  " + "-".repeat(46),
+                ...topModules.map(([name, b]) =>
+                  "  " + name.padEnd(20) + String(b.files).padStart(5) +
+                  ("+" + num(b.additions)).padStart(11) +
+                  ("-" + num(b.deletions)).padStart(10)),
+                ...(modules.size > topModules.length
+                  ? [`  ... and ${modules.size - topModules.length} more modules`]
+                  : []),
+              ];
+
+              const header =
+                "  " + "Category".padEnd(20) + "Files".padStart(5) +
+                "Added".padStart(11) + "Removed".padStart(10) + "   Share";
+              const rule = "  " + "-".repeat(66);
+
+              const totals =
+                "  " + "Total".padEnd(20) + String(files.length).padStart(5) +
+                ("+" + num(totalAdditions)).padStart(11) +
+                ("-" + num(totalDeletions)).padStart(10);
+
+              const fileWord = files.length === 1 ? "file" : "files";
+              const title =
+                `PR Impact Map · ${num(files.length)} ${fileWord} · ` +
+                `+${num(totalAdditions)} / -${num(totalDeletions)} · ${shortSha}`;
+
+              body = [
+                MARKER,
+                "### PR Impact Map",
+                "",
+                "```",
+                title,
+                "-".repeat(title.length),
+                "",
+                header,
+                rule,
+                ...table,
+                rule,
+                totals,
+                ...moduleTable,
+                "```",
+                "",
+                `<sub>Updated for \`${shortSha}\` · ${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC</sub>`,
+              ].join("\n");
+            }
+
+            // The deployment impact, computed by the step before (cmd/deployimpact).
+            const deployReport = `${process.env.RUNNER_TEMP}/deploy-impact.md`;
+            if (require("node:fs").existsSync(deployReport)) {
+              body += "\n\n" + readFileSync(deployReport, "utf8");
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            const existing = comments.find(
+              (c) => c.user?.login === "github-actions[bot]" && c.body?.includes(MARKER)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+              core.info(`Updated impact map comment ${existing.id} on PR #${pr.number}.`);
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body,
+              });
+              core.info(`Created impact map comment on PR #${pr.number}.`);
+            }
+
+      - name: Fail when the deployment impact breaks an existing install
+        if: ${{ !cancelled() && steps.deploy.outputs.blocked == 'true' }}
+        run: |
+          echo "::error::The deployment impact report lists a fact that breaks an existing install. Change the code, or have a maintainer add the operator-action label."
+          exit 1

@@ -87,6 +87,18 @@ Feature: Langy runs on the model the project chose
     Then it offers the models that provider serves
     And it offers no model from a provider nobody connected
 
+  # The picker locks while a turn runs, and the locked pill collapses to a
+  # provider glyph. That is the moment someone most wants to know which model is
+  # answering, and the greyed glyph was the only thing left to read. Hovering it
+  # now names the model and says the lock ends with the turn.
+  @integration
+  Scenario: The model in use stays visible while Langy is working
+    Given a turn is running and the composer's model picker is locked
+    When the user hovers the model pill
+    Then it names the provider and model the turn is running on
+    And it says the model can be switched once the turn stops
+    And the picker still does not open
+
   # The default model is resolved from the project's configuration, which can
   # name a provider nobody connected here. Seeding it put a model in the pill
   # that the pill's own menu never offered, and every send died at the gateway
@@ -97,6 +109,32 @@ Feature: Langy runs on the model the project chose
     When the composer seeds its model
     Then it holds the first model the project's providers serve
     And a model the project can serve is seeded unchanged
+
+  @unit
+  Scenario: The composer waits for the resolved default before seeding
+    Given the project's providers answered before the resolved Langy default
+    When the composer seeds its model
+    Then it holds no model until the default answers
+    And then it holds the resolved default, not the first model in the menu
+
+  # A seed is not a pick. When the menu answered before the default was
+  # reachable (the allowlist or the provider list landed late), the composer
+  # used to keep the first model of the menu for the whole session, so a
+  # default made the day before looked lost.
+  @unit
+  Scenario: A seed taken before the default was reachable gives way to the default
+    Given the composer seeded a model while the resolved default was not yet in its menu
+    And the user has not picked a model and no reopened conversation set one
+    When the project's menu then serves the resolved default
+    Then the composer holds the resolved default
+    And a model the user picked is never replaced
+
+  @unit
+  Scenario: A default no provider serves is named, not swapped silently
+    Given Langy's resolved default is a model none of the project's providers serves
+    When every model read has answered
+    Then a notice above the composer names the default and the model this chat uses instead
+    And the user can dismiss it
 
   @unit
   Scenario: The composer follows a default-model change made in settings
@@ -156,3 +194,27 @@ Feature: Langy runs on the model the project chose
     Given the user picked a model for one conversation
     When the user starts a new conversation or switches to another
     Then the pick does not follow to the other conversation
+
+  # Resolution itself (parity with main's getVercelAIModel for langy.chat):
+  # the model the Langy feature key resolves to, on a provider that is present
+  # and enabled. Anything else refuses, and the turn answers model-not-configured.
+
+  @unit
+  Scenario: A turn resolves the model the project configured for Langy
+    Given the project's Langy model resolves to a model on an enabled provider
+    When a turn resolves its model
+    Then the turn runs on that model's full id
+
+  @unit
+  Scenario: A Langy model on a disabled provider is refused
+    Given the project's Langy model resolves to a model on a disabled provider
+    When a turn resolves its model
+    Then the resolution is refused
+
+  # Riding beside a drawer (trace details, the online evaluation editor) the
+  # panel is raised above the drawer, which put it above its own model list.
+  @integration
+  Scenario: The model list opens above the panel when Langy rides beside a drawer
+    Given Langy is open beside a drawer
+    When the composer's model picker opens
+    Then the model list is drawn on the overlay layer, above the panel and the drawer

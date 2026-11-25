@@ -1,6 +1,12 @@
 # D05 — Self-service SSO onboarding + identity surfaces
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D04 + **authz precondition checklist (hard)** · Flag: `SELF_SERVE_SSO` (per-org)
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D04 + **authz precondition checklist (hard)** · Flag: `SELF_SERVE_SSO` (per-org)
+
+> **Historical (marked 2026-10-05):** written against main's monolith, before `platform/app` was
+> deleted. Paths under `src/server/`, `server/app-layer/` and `packages/authz*` describe that tree.
+> Today a feature is a module (ARCHITECTURE.md §3), pipelines are `definePipeline` in
+> `modules/<name>/process/src/eventing` (§9), and the permission registry is
+> `packages/authorization/src/registry.ts`. Check the current tree before treating a path below as live.
 
 # Overview
 
@@ -18,7 +24,7 @@ Enterprise SSO onboarding stops being a support ticket. Org admins register and 
 
 **Registry permissions (authz API, no seam):**
 
-- `sso:view`, `sso:manage`, `scim:view`, `scim:manage` registered in `packages/authz/src/registry.ts` (org-scope only, org-exclusive like governance). The registry is a shared package, not app code: `server/authz/registry.ts` does not exist and never did — app-side authorization (the tRPC middleware, the engine gate, the grants runtime) lives at `server/app-layer/authz`, and it consumes the registry rather than holding it.
+- `sso:view`, `sso:manage` registered in `packages/authz/src/registry.ts` (org-scope only, org-exclusive like governance). They gate directory sync too: the directory provisions against a connection, so a second pair would have been a second name for one job. The registry is a shared package, not app code: `server/authz/registry.ts` does not exist and never did — app-side authorization (the tRPC middleware, the engine gate, the grants runtime) lives at `server/app-layer/authz`, and it consumes the registry rather than holding it.
 - IT-admin custom role = `CustomRole` row holding only those permissions, bound at org scope.
 - All tRPC gating via `.permission()`/`authz.require`; all UI gating via `useCan`/`RequireCan`.
 
@@ -92,7 +98,7 @@ them re-opened by the implementation:
      all — the only thing left that needs them is somebody completing a test
      sign-in, which is the entire point of a test sign-in. Attestation is a
      D04 amendment (below). This is the bulk of the value: it is what makes
-     cloud onboarding easy for *us*, and it is the safety net that ends DB
+     cloud onboarding easy for _us_, and it is the safety net that ends DB
      surgery.
    - **Tier 2 — self-hosted self-serve, licence-gated.** A self-hosted
      customer cannot reach our operators at all, so they self-serve or they

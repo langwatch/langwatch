@@ -1,11 +1,9 @@
 import {
   listAnnotations as apiListAnnotations,
   getAnnotationsByTrace as apiGetByTrace,
-} from "../langwatch-api-annotations.js";
+} from "../langwatch-api-annotations.ts";
 
-export async function handleListAnnotations(params: {
-  traceId?: string;
-}): Promise<string> {
+export async function handleListAnnotations(params: { traceId?: string }): Promise<string> {
   const annotations = params.traceId
     ? await apiGetByTrace(params.traceId)
     : await apiListAnnotations();
@@ -20,7 +18,12 @@ export async function handleListAnnotations(params: {
   lines.push(`# Annotations (${annotations.length} total)\n`);
 
   for (const a of annotations) {
-    const rating = a.isThumbsUp === true ? "👍" : a.isThumbsUp === false ? "👎" : "—";
+    let rating = "—";
+    if (a.isThumbsUp === true) {
+      rating = "👍";
+    } else if (a.isThumbsUp === false) {
+      rating = "👎";
+    }
     lines.push(`## Annotation ${a.id ?? "—"}`);
     lines.push(`**Trace ID**: ${a.traceId ?? "—"}`);
     lines.push(`**Rating**: ${rating}`);

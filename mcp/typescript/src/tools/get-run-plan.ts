@@ -1,6 +1,6 @@
-import { getRunPlan as apiGetRunPlan } from "../langwatch-api-run-plans.js";
-import { describeRunPlanScope } from "./format-run-plan.js";
-import { formatEvaluatorAttachments } from "./format-suite-details.js";
+import { getRunPlan as apiGetRunPlan } from "../langwatch-api-run-plans.ts";
+import { describeRunPlanScope } from "./format-run-plan.ts";
+import { formatEvaluatorAttachments } from "./format-suite-details.ts";
 
 /**
  * Handles the platform_get_run_plan MCP tool invocation.
@@ -39,9 +39,7 @@ export async function handleGetRunPlan(params: {
     const overrides = Object.entries(target.runParameters ?? {})
       .map(([name, value]) => `${name}=${String(value)}`)
       .join(", ");
-    lines.push(
-      `- ${target.type}:${target.referenceId}${overrides ? ` (${overrides})` : ""}`,
-    );
+    lines.push(`- ${target.type}:${target.referenceId}${overrides ? ` (${overrides})` : ""}`);
   }
 
   if (plan.scenarioIds.length > 0) {

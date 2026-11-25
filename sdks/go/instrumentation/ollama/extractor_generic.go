@@ -1,6 +1,7 @@
 package ollama
 
 import (
+	"encoding/json"
 	"strings"
 
 	langwatch "github.com/langwatch/langwatch/sdks/go"
@@ -39,8 +40,13 @@ func (genericExtractor) ExtractRequest(span *langwatch.Span, raw []byte, capture
 		span.SetName("ollama." + model)
 	}
 
-	if opts, ok := body["options"].(otelhttp.JSONObject); ok {
-		span.SetGenAIRequestParams(optionsFromMap(opts))
+	// A malformed option is skipped; the rest still decode.
+	var req struct {
+		Options *optionsParams `json:"options"`
+	}
+	_ = json.Unmarshal(raw, &req)
+	if req.Options != nil {
+		span.SetGenAIRequestParams(req.Options.toGenAIRequestParams())
 	}
 
 	if capture.CaptureInput() {
@@ -66,7 +72,7 @@ func (genericExtractor) ExtractNonStreaming(span *langwatch.Span, raw []byte, ca
 	case otelhttp.HasKey(body, "embeddings") || otelhttp.HasKey(body, "embedding"):
 		embeddingsExtractor{}.ExtractNonStreaming(span, raw, capture)
 	default:
-		genericRecordResponse(span, body, capture)
+		genericRecordResponse(span, body, raw, capture)
 	}
 }
 
@@ -77,14 +83,14 @@ func (genericExtractor) NewStreamAccumulator() otelhttp.StreamAccumulator {
 // genericRecordResponse records what it can from an unrecognised Ollama response
 // body: the model, the done reason, any token counts, and the raw body as JSON
 // output (gated by capture).
-func genericRecordResponse(span *langwatch.Span, body otelhttp.JSONObject, capture langwatch.DataCaptureMode) {
+func genericRecordResponse(span *langwatch.Span, body otelhttp.JSONObject, raw []byte, capture langwatch.DataCaptureMode) {
 	if model, ok := otelhttp.GetString(body, "model"); ok {
 		span.SetResponseModel(model)
 	}
 	if reason, ok := otelhttp.GetString(body, "done_reason"); ok && reason != "" {
 		span.SetGenAIResponseFinishReasons(reason)
 	}
-	recordUsage(span, metricsFromMap(body))
+	recordUsage(span, metricsFrom(raw))
 
 	if capture.CaptureOutput() {
 		span.SetOutputJSON(body)
@@ -127,7 +133,7 @@ func (a *genericStreamAccumulator) Consume(line string) {
 			a.sawAnyOutput = true
 		}
 	}
-	a.metrics.mergeFromMap(event)
+	a.metrics.merge(metricsFrom([]byte(line)))
 }
 
 func (a *genericStreamAccumulator) Finish(span *langwatch.Span, capture langwatch.DataCaptureMode) {
@@ -144,40 +150,6 @@ func (a *genericStreamAccumulator) Finish(span *langwatch.Span, capture langwatc
 	}
 }
 
-// optionsFromMap reads Ollama generation options out of an untyped options map.
-func optionsFromMap(opts otelhttp.JSONObject) langwatch.GenAIRequestParams {
-	params := langwatch.GenAIRequestParams{}
-	if v, ok := otelhttp.GetInt(opts, "num_predict"); ok {
-		params.MaxTokens = langwatch.Int(v)
-	}
-	if v, ok := otelhttp.GetFloat64(opts, "temperature"); ok {
-		params.Temperature = langwatch.Float64(v)
-	}
-	if v, ok := otelhttp.GetFloat64(opts, "top_p"); ok {
-		params.TopP = langwatch.Float64(v)
-	}
-	if v, ok := otelhttp.GetFloat64(opts, "top_k"); ok {
-		params.TopK = langwatch.Float64(v)
-	}
-	if v, ok := otelhttp.GetInt(opts, "seed"); ok {
-		params.Seed = langwatch.Int(v)
-	}
-	if v, ok := otelhttp.GetFloat64(opts, "frequency_penalty"); ok {
-		params.FrequencyPenalty = langwatch.Float64(v)
-	}
-	if v, ok := otelhttp.GetFloat64(opts, "presence_penalty"); ok {
-		params.PresencePenalty = langwatch.Float64(v)
-	}
-	if stop, ok := opts["stop"].([]any); ok {
-		for _, s := range stop {
-			if str, ok := s.(string); ok {
-				params.StopSequences = append(params.StopSequences, str)
-			}
-		}
-	}
-	return params
-}
-
 // streamRequestedFromBody reads the stream flag from an untyped request body,
 // defaulting to true (Ollama streams by default) when absent.
 func streamRequestedFromBody(body otelhttp.JSONObject) bool {
@@ -187,35 +159,10 @@ func streamRequestedFromBody(body otelhttp.JSONObject) bool {
 	return true
 }
 
-// metricsFromMap reads Ollama's token + duration fields out of an untyped body.
-func metricsFromMap(body otelhttp.JSONObject) metricsPayload {
+// metricsFrom decodes Ollama's token and duration fields from a body. A
+// malformed field is skipped and the rest still decode.
+func metricsFrom(raw []byte) metricsPayload {
 	var m metricsPayload
-	m.mergeFromMap(body)
+	_ = json.Unmarshal(raw, &m)
 	return m
-}
-
-// mergeFromMap folds any present token / duration fields from an untyped body
-// into m, overwriting only when a non-zero value is found. The durations are
-// nanoseconds on the Ollama wire — a one-second call is already 1e9 and a
-// multi-second call exceeds the int32 range — so they are read through GetInt64,
-// which does not truncate on 32-bit builds (GOARCH=386, 32-bit ARM).
-func (m *metricsPayload) mergeFromMap(body otelhttp.JSONObject) {
-	if v, ok := otelhttp.GetInt(body, "prompt_eval_count"); ok && v > 0 {
-		m.PromptEvalCount = v
-	}
-	if v, ok := otelhttp.GetInt(body, "eval_count"); ok && v > 0 {
-		m.EvalCount = v
-	}
-	if v, ok := otelhttp.GetInt64(body, "total_duration"); ok && v > 0 {
-		m.TotalDuration = v
-	}
-	if v, ok := otelhttp.GetInt64(body, "load_duration"); ok && v > 0 {
-		m.LoadDuration = v
-	}
-	if v, ok := otelhttp.GetInt64(body, "prompt_eval_duration"); ok && v > 0 {
-		m.PromptEvalDuration = v
-	}
-	if v, ok := otelhttp.GetInt64(body, "eval_duration"); ok && v > 0 {
-		m.EvalDuration = v
-	}
 }

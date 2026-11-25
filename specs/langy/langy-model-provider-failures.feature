@@ -19,7 +19,18 @@ Feature: A turn that the model provider refused says so
     Scenario: A rate-limited model reads as the provider being busy
       Given a turn that failed because the model provider is rate limiting
       When the customer reads the card
-      Then it says the provider is rate limiting and to wait a moment
+      Then it says the provider is rate limiting and to wait a minute, or to pick a model with more room
+      And it offers to try again
+
+    # The proxy files a provider-native failure body under its own code with
+    # the provider's discriminant beneath it, and only falls back to the
+    # status reason when the body names nothing. A tokens-per-minute limit
+    # on a small Azure deployment answers a guided turn exactly that way.
+    @unit
+    Scenario: A rate limit filed under the provider's own code reads the same way
+      Given a turn that failed with the proxy's upstream code carrying the provider's own rate limit code, and no status reason
+      When the customer reads the card
+      Then it is the provider card saying the provider is rate limiting
       And it offers to try again
 
     @unit
@@ -28,6 +39,139 @@ Feature: A turn that the model provider refused says so
       When the customer reads the card
       Then it says the provider is temporarily unavailable
       And it offers another model as a way around it
+
+    # A Bedrock key without access to the chosen model answers 403 with its
+    # own "access_denied" code, so the proxy files that code under its own
+    # upstream code and no status reason. The card said only "Langy's reply
+    # failed", and the customer had no way to know the provider refused.
+    @unit
+    Scenario: A model the provider refuses to this key reads as a credential to check
+      Given a turn that failed with the proxy's upstream code carrying the provider's own "access_denied" code
+      When the customer reads the card
+      Then it is the provider card saying the provider refused this key or its access to the model
+      And it offers to open the model settings
+      And it does not offer to try again
+
+    # Every provider names a refused key its own way (Bedrock answers a wrong
+    # AWS secret with "InvalidSignatureException"). The proxy files the 401 or
+    # 403 status reason next to the provider's code, so a name the client has
+    # no entry for still reads as a refused credential.
+    @unit
+    Scenario: A refused credential in a dialect the client does not know still reads as a credential to check
+      Given a turn the provider refused with a 401 or 403 and its own code for it
+      When the customer reads the card
+      Then it is the provider card saying the provider refused this key or its access to the model
+      And its headline says the provider rejected the API key
+      And it offers to open the model settings
+      And it does not offer to try again
+
+    @unit
+    Scenario: A model the provider does not know reads as a model to check
+      Given a turn that failed with the proxy's upstream code carrying the provider's own "model_not_found" code
+      When the customer reads the card
+      Then it is the provider card saying the provider does not serve that model
+      And it offers to open the model settings
+
+    # The gateway writes its generic "provider_error" envelope when it has no
+    # parsed provider body, which names no cause; the status still does.
+    @unit
+    Scenario: A missing model behind the gateway's generic provider error still reads as a missing model
+      Given the provider answers 404 and the gateway forwards its generic "provider_error" envelope
+      When the proxy records the failure
+      Then it carries "provider_error" and "upstream_not_found" as reasons
+      And the customer reads the card saying the provider does not serve that model, with the model settings offered
+
+    @unit
+    Scenario: Any failure filed under the proxy's upstream code reads as the provider's
+      Given a turn that failed with the proxy's upstream code carrying a provider code the client does not classify
+      When the customer reads the card
+      Then it is the provider card, not "Langy's reply failed"
+      And it offers to try again
+
+    # Bedrock refuses a request it cannot parse with a 400 ValidationException
+    # ("Expected toolResult blocks at messages.2.content"). The same request
+    # is refused the same way on every try, so the card offers another model
+    # rather than another try. The provider's sentence stays off the card for
+    # the reason above; the trace carries it.
+    @unit
+    Scenario: A request the provider refuses as invalid reads as the provider's, with another model as the way out
+      Given a turn that failed with the proxy's upstream code carrying the provider's own "ValidationException" code
+      When the customer reads the card
+      Then it is the provider card saying the provider refused the request as invalid
+      And it offers to open the model settings
+      And it does not offer to try again
+
+    # Anthropic refuses a request shape a model does not take (Claude 5.5 and
+    # the legacy thinking shape) with a 400 invalid_request_error. The same
+    # request fails the same way every time, and people retried 3 to 5 times.
+    @unit
+    Scenario: A request the provider refuses with a plain 400 offers no retry
+      Given a turn that failed with the proxy's upstream code carrying "invalid_request_error" or a bare 400 status reason
+      When the customer reads the card
+      Then it offers to open the model settings
+      And it does not offer to try again
+
+    # Anthropic files a spent balance under the same 400 invalid_request_error,
+    # with only its sentence telling the two apart. The proxy reads that sentence
+    # where it stands and files a reason of its own, so the sentence never travels.
+    @unit
+    Scenario: A spent balance or a refused key a provider names only in prose rides as a typed reason
+      Given the provider answers with a spent balance, a quota error, or a 400 naming an invalid key
+      When the proxy records the failure
+      Then it carries "llm_provider_out_of_credit" or "llm_provider_key_rejected" as a reason
+      And a 400 that names neither carries no such reason
+      And the provider's sentence is not recorded
+
+    # The AI gateway replaces a spent balance's message with its own
+    # exhausted-access message, so the proxy's sentence check never matched
+    # and the card fell back to the invalid-request copy.
+    @unit
+    Scenario: A spent balance behind the AI gateway still rides as out of credit
+      Given the provider answers a streaming call with its 400 credit balance error
+      And the AI gateway forwards it with its own exhausted-access message
+      When the proxy records the failure
+      Then it carries "llm_provider_out_of_credit" as a reason
+      And the agent's SDK gets a 400 it does not retry
+
+    @unit
+    Scenario: A spent provider balance reads as the account to top up, with no retry
+      Given a turn that failed with the proxy's "llm_provider_out_of_credit" reason
+      When the customer reads the card
+      Then its headline says the provider account is out of credit
+      And it says to check the provider's billing, or pick a model from a different provider
+      And it offers to open the model settings
+      And it does not offer to try again
+
+    @unit
+    Scenario: A plan or quota limit that resets reads as no allowance left
+      Given a turn that failed with a provider's quota, usage limit or plan limit code
+      When the customer reads the card
+      Then its headline says the provider account has no allowance left
+      And it does not say the account is out of credit
+
+    @unit
+    Scenario: A key the provider refuses on a 400 reads as a credential to check
+      Given a turn that failed with the proxy's "llm_provider_key_rejected" reason
+      When the customer reads the card
+      Then its headline says the provider rejected the API key
+      And it offers to open the model settings
+
+    # A failure the gateway names in its own envelope rather than forwarding
+    # the provider's body: "provider_error" when the provider answered with
+    # something unusable, "provider_timeout" and
+    # "provider_connection_failed" when it never answered at all.
+    @unit
+    Scenario: A failure the gateway files as the provider's reads as the provider card
+      Given a turn that failed with the gateway's "provider_error" code
+      When the customer reads the card
+      Then it is the provider card, not "Langy's reply failed"
+      And it offers to try again
+
+    @unit
+    Scenario: A provider the gateway could not reach reads as the provider being down
+      Given a turn that failed with the gateway's "provider_timeout" code
+      When the customer reads the card
+      Then it says the provider is temporarily unavailable
 
   Rule: A model this project cannot serve says so, and offers the settings
 
@@ -54,6 +198,77 @@ Feature: A turn that the model provider refused says so
       Given a turn that failed because the provider for the chosen model is off
       When the customer reads the card
       Then it says the model has no provider connected in this project
+
+  Rule: A turn an AI gateway spending limit refused says whose limit it is
+
+    When an AI gateway budget blocks the call, the gateway answers 402 with
+    the code "budget_exceeded" and names the budget's scope and window. The
+    turn reaches the panel as a failed agent turn with that reason beneath it.
+    The block holds until the window resets or an admin raises the limit, so
+    another try fails the same way.
+
+    @unit
+    Scenario: A spending limit reads as the limit, not as a failed reply
+      Given a turn that failed because the team's monthly AI gateway budget is spent
+      When the customer reads the card
+      Then the title says the team's monthly AI spending limit is reached
+      And it says when the limit resets and that an admin can raise it
+      And it offers to open the AI gateway budgets
+      And it does not offer to try again
+
+    @unit
+    Scenario: A spending limit with no named scope still reads as a spending limit
+      Given a turn that failed on an AI gateway budget that named no scope or window
+      When the customer reads the card
+      Then the title says the AI spending limit is reached
+      And it does not offer to try again
+
+    @unit
+    Scenario: A spending limit on the live stream reads the same as after a refresh
+      Given a turn whose live stream error carries the gateway's budget reason
+      When the customer reads the card before refreshing
+      Then the card is the spending limit card
+
+  Rule: A provider that is not set up says which setting is missing
+
+    A third case, apart from a refusal and from having no provider: the
+    provider exists and is switched on, and it is missing something it needs to
+    make any call. The usual one is an API key that never got stored. The
+    gateway stops the call before it leaves, so no provider refused anything
+    and the same turn fails the same way until the setting is added.
+
+    The card says which setting is missing and links to the model provider
+    settings.
+    Only two things are read off the gateway's answer: which problem it named,
+    from a fixed set, and the model id. Its sentence is never shown.
+
+    @integration
+    Scenario: A provider with no API key saved reads as a key to add
+      Given a turn that failed because the provider for the chosen model has no API key saved
+      When the customer reads the card
+      Then it says the provider is enabled with no API key saved
+      And it links to the model provider settings
+      And it does not offer to try again
+
+    @integration
+    Scenario: Each missing provider setting has its own sentence
+      Given a turn that failed because the provider has no endpoint, or no deployment for the model
+      When the customer reads the card
+      Then it names the endpoint, or the deployment and the model, as the thing to add
+
+    @integration
+    Scenario: A provider setup failure with no named problem still points at the settings
+      Given a turn that failed with the gateway's provider setup code and no problem named
+      When the customer reads the card
+      Then it says no provider is configured for the model
+      And it links to the model provider settings
+
+    @integration
+    Scenario: The card never repeats what the gateway or the provider wrote
+      Given a turn that failed with the gateway's provider setup code
+      And the answer carries a message, and a problem this client does not know
+      When the customer reads the card
+      Then neither is shown
 
   Rule: A more specific failure keeps its own card
 

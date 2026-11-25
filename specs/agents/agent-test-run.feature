@@ -45,6 +45,14 @@ Feature: Test agent with one scripted run
       And no scenario row is read
 
     @unit
+    Scenario: The worker prefetches a queued test run without a scenario row
+      Given a queued run with the agent test scenario id of an HTTP agent
+      When the worker prepares it
+      Then it reads the project and the agent, never a scenario row
+      And the child starts with the run's key
+      And an agent that is gone fails the run on the agent, not on a missing scenario
+
+    @unit
     Scenario: A child job with a script parses without model params
       Given a child job payload that carries a script and no model params
       When the child parses it
@@ -106,6 +114,12 @@ Feature: Test agent with one scripted run
     Scenario: The REST route schedules the same run
       When "POST /api/v1/agents/:id/test" is called with a project key
       Then the answer carries the scenario run id and the batch run id
+
+    @integration
+    Scenario: The REST route starts the run as the caller's person and the key they called with
+      When "POST /api/v1/agents/:id/test" is called with a member's personal access token
+      Then the run is started as that member, naming the token's key, so the run's key holds no more
+      And a key that acts as nobody starts the run with no person, naming that key
 
   Rule: A connected agent no process is holding cannot be tested
 
@@ -202,6 +216,12 @@ Feature: Test agent with one scripted run
       When "Test agent" is chosen from the card menu
       Then the refusal is shown with the registry's title and no raw message
 
+    @integration
+    Scenario: Voice and prompt agent cards do not offer Test agent
+      Given the agents page with a voice agent and a prompt agent
+      When either card's menu is opened
+      Then no "Test agent" item is offered
+
   Rule: The drawer test panel sends "ping" by default
 
     @integration
@@ -222,6 +242,36 @@ Feature: Test agent with one scripted run
     Scenario: A draft has no test panel
       Given the HTTP agent editor drawer open for a new agent
       Then no "Test agent" panel is shown
+
+  Rule: A test turn overrides the code defaults with values typed for it
+
+    # A connected agent registers the defaults its code declares. The panel
+    # keeps them as the baseline and takes per-turn overrides on one line,
+    # the way the Run dialog does for a scenario. A name left out reads the
+    # code default; a name the agent does not declare, or a value outside
+    # its options, is refused by name before any instance is reached.
+
+    @integration
+    Scenario: The connected agent drawer test turn takes parameter overrides
+      Given an online connected agent that declares a parameter with a default
+      When the test panel is opened
+      Then a parameters field suggests the declared name and its default
+      And starting the test with "model=gpt-5" typed sends the turn with that value
+      And starting the test with the field empty sends the turn with no parameter, so the code default applies
+
+    @unit
+    Scenario: A test turn naming an undeclared parameter is refused
+      Given a connected agent that declares the parameter model
+      When a test turn is sent with a value for a parameter it does not declare
+      Then the turn is refused as scenario_parameter_unknown
+      And no instance is reached
+
+    @unit
+    Scenario: A test turn value outside the declared options is refused
+      Given a connected agent whose model parameter has options gpt-4 and gpt-5
+      When a test turn is sent with model=gpt-6
+      Then the turn is refused as scenario_parameter_option_invalid
+      And no instance is reached
 
   Rule: A turn answers inside the platform call deadline
 

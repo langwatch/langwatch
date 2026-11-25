@@ -1,0 +1,11 @@
+/**
+ * The governance section's shared "ask the providers again" control. Import from here rather than
+ * the file, so the module path stays stable if the component grows siblings: import {
+ * GovernanceSyncButton } from "../../../features/agents/sync/index.ts";
+ */
+export { GovernanceSyncButton, type GovernanceSyncState } from "./governance-sync-button";
+export {
+  type GovernanceSyncStatus,
+  type GovernanceSyncUnavailable,
+  governanceSyncStatus,
+} from "./sync-control-state";

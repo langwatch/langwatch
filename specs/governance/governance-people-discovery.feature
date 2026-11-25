@@ -1,0 +1,318 @@
+@governance @identity
+Feature: Provider rows become discovered people
+  Every pulled row already names who did the thing — an email on an OpenAI
+  cost line, a directory id on a Copilot transcript, whatever Databricks put
+  in executed_by. Until now those names were read for money and audit and
+  then forgotten: nothing wrote them down as people, so the match engine
+  swept an empty list and the People screen had nobody to show. This is the
+  feed the engine spec promised — "the trigger arrives with the feed that
+  discovers people" — minus the trigger, which stays a button a person
+  presses (governance-people-screen.feature).
+  Decision: ADR-128 sections 10 and 11.
+
+  Background:
+    Given an organization with a pull source delivering events
+
+  # ── Discovery ─────────────────────────────────────────────────────────────
+
+  @integration
+  Scenario: An actor on a pulled row becomes a discovered person
+    When a pulled event names an actor this organization has never seen
+    Then a discovered person exists for that provider and identifier
+    And their first-seen and last-seen are the event's own time
+    # The event's time, not the pull's. A backfill of July read in September
+    # discovers people who were active in July.
+
+  @integration
+  Scenario: Seeing the same actor again moves last-seen forward only
+    Given a discovered person seen before
+    When a later pulled event names the same actor
+    Then their last-seen moves to the later event's time
+    And their first-seen stays where it was
+
+  @integration
+  Scenario: The same identifier on two providers is two discovered people
+    When two different providers both name the same email
+    Then each provider gets its own discovered person
+    # "m.silva on Anthropic" and "m.silva on OpenAI" are two claims by two
+    # systems. The match engine is what may decide they are one human.
+
+  @integration
+  Scenario: A row naming nobody discovers nobody
+    When a pulled event carries an empty actor
+    Then no discovered person is written
+    # Seat reports deliberately name no person; inventing one would attribute
+    # the tenant's procurement to a blank string.
+
+  @unit
+  Scenario: A bare-UUID Databricks actor is recorded as a machine login
+    When a Databricks event's actor is a bare UUID
+    Then the discovered record's kind is machine login, not person
+    # Deterministic per ADR-128 §10: under app-only auth humans surface as
+    # emails and service principals as UUIDs. Never guessed from name shape,
+    # and never per-provider generalized — a Copilot directory id is a person.
+
+  @integration
+  Scenario: An erased identifier is never re-discovered
+    Given a person who has been erased
+    When the next pull reads a window that still contains their activity
+    Then no discovered person row carries their identifier in plain text
+    # The same do-not-reimport list that keeps their money rows out keeps
+    # their person row out. Discovery running before that check would undo
+    # every erasure on the next thirty-day re-read.
+
+  @integration
+  Scenario: Discovery failing does not cost the run its events
+    When writing a discovered person fails
+    Then the pulled events are still recorded
+    And the failure is logged
+    # Discovery is a side-channel of the pull, not its purpose. The next run
+    # sees the same actor again; audit rows missed are gone for good.
+
+  # ── The directory read ────────────────────────────────────────────────────
+  # The Copilot source's tenant app can also read the directory itself —
+  # who exists, their name, their department. Same credential, one more
+  # consent (User.Read.All), so it is off until switched on.
+
+  @unit
+  Scenario: The directory is not read unless switched on
+    Given a Copilot source with the directory read left off
+    When the source runs
+    Then no directory request is made
+
+  @unit
+  Scenario: The directory is read once a day, not once a tick
+    Given a Copilot source with the directory read switched on
+    And the directory was already read today
+    When the source runs again today
+    Then no directory request is made
+    # A directory changes on people-time. Reading it every two minutes asks
+    # Graph four hundred times for the same answer.
+
+  @unit
+  Scenario: A directory read that fails holds the day and delivers the rest
+    Given a Copilot source with the directory read switched on
+    When the directory request fails
+    Then the run still delivers its conversations
+    And the directory day is held to be retried, not marked read
+    # Same contract as the seat read, including naming HTTP 403 for what it
+    # is: consent never granted, not a role misassigned.
+
+  # ── What one directory page is worth ──────────────────────────────────────
+  # The read is one paged listing of a tenant's own people, and the ways it
+  # goes wrong all look alike from the outside: an empty tenant, a page the
+  # reader could not parse, and a page that arrived from somewhere else all
+  # deliver zero people. Telling them apart is the whole job below, because
+  # only one of the three is a fact about the tenant.
+
+  @unit
+  Scenario: A directory page hands back its rows and the link to the next one
+    Given a directory page of people that names a next page
+    When the page is read
+    Then the people on it are returned
+    And the link to the next page is returned beside them
+
+  @unit
+  Scenario: A directory row that cannot be read costs the row, not the page
+    Given a directory page carrying one readable person and one row that is not
+    When the page is read
+    Then the readable person is returned
+    And the unreadable row is counted
+    # Dropping the page instead would lose a whole tenant's morning over one
+    # malformed record, and counting it is what makes the loss visible.
+
+  @unit
+  Scenario: A directory row carrying nothing but an id is still a person
+    Given a directory row that carries an id and no other field
+    When the page is read
+    Then that person is returned
+    And no row is counted as unreadable
+    # The directory omits fields it has no value for rather than sending them
+    # empty, so a sparse row is the ordinary case, not a broken one.
+
+  @unit
+  Scenario: A directory answer that is not a page is malformed, not an empty tenant
+    Given an answer to the directory read that is not a page of people at all
+    When the answer is read
+    Then the answer is called malformed
+    And no people are returned
+    # An empty tenant and an unreadable answer both yield nobody. Recording
+    # the second as the first would report a company as having no staff.
+
+  @unit
+  Scenario: A directory answer that is not a page holds the day rather than emptying the tenant
+    Given a Copilot source with the directory read switched on
+    When the directory answers with something that is not a page of people
+    Then no directory rows are recorded
+    And the directory day is held to be retried, not marked read
+
+  @unit
+  Scenario: A directory row is recorded against the person and the day
+    Given the directory names a person, their address and their department
+    When the row is shaped into a record
+    Then the record is identified by that person and that day
+    And the record names the person by their directory id, not their address
+    And the record carries what the directory said about them
+    # The id is what the tenant's other rows call the same human, and what an
+    # erasure of this provider suppresses. An address is neither.
+
+  @unit
+  Scenario: A directory field the tenant left empty is recorded empty
+    Given a directory row whose name, address and department are all absent
+    When the row is shaped into a record
+    Then each absent field is recorded as empty text
+    # Never the word "undefined". These land in display text a person reads.
+
+  @unit
+  Scenario: A directory read records a row per person beside the conversations
+    Given a Copilot source with the directory read switched on
+    When the source runs
+    Then a directory record is delivered for each person
+    And the conversations are delivered alongside them
+    And the day is marked read
+
+  @unit
+  Scenario: The directory read asks only for the fields it records
+    Given a Copilot source with the directory read switched on
+    When the source reads the directory
+    Then the request names only the fields the record carries
+    And the request refuses to follow a redirect
+    # The request carries the tenant's token; a redirect would hand it to
+    # whoever answered. Asking for nothing more than is recorded keeps the
+    # blast radius of that token to what the feature actually needs.
+
+  @unit
+  Scenario: A directory spanning pages is read to the end and counted as one day
+    Given a directory whose people span two pages
+    When the source reads it
+    Then everybody on both pages is recorded
+    And the day is marked read once
+
+  @unit
+  Scenario: A next-page link is followed only when it is Microsoft Graph over https
+    Given candidate next-page links, one of them the real directory over https
+    When each is checked before being followed
+    Then only the real directory over https is accepted
+    # Plain http, a lookalike host, an embedded credential and a stray port
+    # are each refused on their own. The token rides this request, so the
+    # check is on the authority, not on the text of the link.
+
+  @unit
+  Scenario: A directory next-page link off Microsoft Graph is refused and the day held
+    Given a Copilot source with the directory read switched on
+    And the directory answers with a next-page link that is not the directory
+    When the source reads it
+    Then the link is not followed
+    And no directory rows are recorded
+    And the conversations are still delivered
+    And the directory day is held to be retried, not marked read
+
+  @integration
+  Scenario: A directory row enriches a discovered person's display text
+    Given a discovered person whose display text is a bare directory id
+    When the directory names that id with a person's name
+    Then the discovered person's display text becomes that name
+    # A Copilot transcript knows people only as GUIDs. The directory is the
+    # one source that knows what the GUID is called.
+
+  @integration
+  Scenario: A directory row records the department it names on the person
+    Given the directory names a person and the department they are filed under
+    When the pull is recorded
+    Then the discovered person carries that department
+    # The department the directory asserts is the only department fact that
+    # exists for somebody holding no LangWatch account, which on a fresh
+    # tenant is nearly everybody. Kept on the person, not on a Department row:
+    # see the department scenarios below for the entity the org actually
+    # attributes spend by.
+
+  @integration
+  Scenario: A later directory row naming no department keeps the recorded one
+    Given a discovered person whose recorded department came from the directory
+    When a later directory row for them names no department
+    Then the recorded department is unchanged
+    # Same widen-only posture as the display text. The read is idempotent and
+    # daily, and the pullers spell a missing field as blank, so a blanking
+    # write would erase a real department every morning for anyone the tenant
+    # filed under nothing.
+
+  @integration
+  Scenario: Erasing a person removes the department the directory gave them
+    Given a discovered person carrying a directory department
+    When their identity is erased
+    Then the row keeps its spend but carries no department
+    # The department describes the person, not the money. Nothing rolls up by
+    # it, so keeping it buys the surviving row nothing and leaves a personal
+    # detail on somebody we were asked to forget.
+
+  # ── Departments ride the directory row ────────────────────────────────────
+  # The directory's department field lands on the SAME entities the SCIM
+  # costCenter push writes: resolve the department by name (creating it if
+  # new), assign the member. No parallel department shape, no free text.
+
+  @integration
+  Scenario: A directory department lands on the member it proves
+    Given a directory row whose identity proves a platform member
+    And the row carries a department name that already exists
+    When the directory sync runs
+    Then that member is assigned to that department
+    # Proof is the same standard the match engine accepts: the directory id
+    # the org's own SSO connection recorded, or an address the member has
+    # confirmed. An unconfirmed address assigns nobody.
+
+  @integration
+  Scenario: A department the organization has not created yet is created
+    Given a directory row naming a department that does not exist
+    When the directory sync runs
+    Then an active department with that name exists
+    And the proven member is assigned to it
+    # resolveByNameOrCreate — the identical call SCIM costCenter provisioning
+    # makes, so an IdP-run org and a directory-pull org build the same shape.
+
+  @integration
+  Scenario: A blank directory department leaves the member's assignment alone
+    Given a member an admin assigned to a department by hand
+    And the directory row for that member carries no department
+    When the directory sync runs
+    Then the member's assignment is untouched
+    # Deliberately weaker than SCIM push, which clears on empty. A pull is an
+    # observation, not a provisioning command: Entra tenants routinely leave
+    # the field blank, and blank must not erase an admin's hand-work daily.
+
+  @integration
+  Scenario: Conflicting directory and confirmed email proof changes no department
+    Given a directory row whose directory id identifies one platform member
+    And its email is confirmed by a different platform member
+    And both members already have department assignments
+    And the row names a new nonblank department
+    When the directory sync runs
+    Then neither member's assignment or dated department history changes
+    And no department is created from the conflicting row
+    # This correction preserves directory-only assignment. It does not change
+    # identity-link review; it stops assignment from ignoring conflicting proof.
+
+  @unit
+  Scenario: An accepted identity link outranks a disagreeing directory row
+    Given a discovered person whose accepted identity link names one member
+    And the directory identifier on their row names a different member
+    When the directory sync runs
+    Then the department lands on the member the accepted link names
+    # The link is somebody's dated, reviewable answer to "who is this?", and
+    # the sync now hands it to the same conflict rule the match engine uses.
+    # Without it a stale directory identifier silently re-files a person's
+    # department under another account.
+
+  @integration
+  Scenario: A directory row proving no member assigns nobody
+    Given a directory row whose identity proves no platform member
+    When the directory sync runs
+    Then no department assignment is made
+    And the row's person is still discovered
+    # They appear on the People screen as discovered; the day they are linked,
+    # the next directory read assigns their department without anyone asking.
+
+  @integration
+  Scenario: An erased identifier in the directory is skipped entirely
+    Given a person who has been erased
+    When the directory read returns a row naming their identifier
+    Then no discovered person, display text, or assignment is written from it

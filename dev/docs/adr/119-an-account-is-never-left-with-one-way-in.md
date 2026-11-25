@@ -4,11 +4,11 @@
 
 **Status:** Proposed
 
-**Program:** Identity platform redesign — epic `../identity-platform-redesign.md`,
+**Program:** Identity platform redesign — epic `../plans/identity-platform-redesign.md`,
 plan `../identity-platform/delivery-plan.md`, deliverable
 `D07-passkeys.md`. Specs: `specs/identity/passkeys.feature`.
 
-**Builds on:** ADR-117 (the front door, whose credential step now creates
+**Builds on:** ADR-117 (the auth screens, whose credential step now creates
 passkey-only accounts), ADR-101 (the identifier model, whose detach guards this
 complements).
 
@@ -47,7 +47,7 @@ Three parts.
 writing no row at all.
 
 This looks redundant and is the fix for the silent no-op: password reset
-updates credential rows *in place*, so recovery needs a row to land on. A row
+updates credential rows _in place_, so recovery needs a row to land on. A row
 holding a null password is refused by sign-in exactly as a missing one is —
 better-auth hashes a dummy and answers "invalid email or password", so even the
 timing does not differ — and it makes the account recoverable.

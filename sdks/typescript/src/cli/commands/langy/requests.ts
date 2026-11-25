@@ -1,42 +1,34 @@
 /**
- * Finding the Langy conversation that asked for this folder, and approving it.
- *
- * The CLI signs in with the device session, lists the control requests the
- * user has open, and asks in the terminal. Approving posts what the CLI knows
- * about the folder and receives the Langy session key the socket connects
- * with. With nothing open it waits, so the order of the two steps, the ask in
- * the chat and the command here, does not matter.
- *
- * @see specs/typescript-sdk/cli-langy-share-control.feature
+ * Finding the Langy conversation that asked for this folder, and approving
+ * it: posts what the CLI knows and receives the session key the socket
+ * connects with. With nothing open it waits.
  */
 
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import chalk from "chalk";
 import prompts from "prompts";
+
 import type { WorkspaceInfo } from "../../../agent/local-control-protocol";
+import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
 import { buildAuthHeaders } from "../../../internal/api/auth";
 import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
 import { langwatchFetch } from "../../../internal/http/langwatchFetch";
-import { resolveCredentials } from "../../utils/apiKey";
+import {
+  type LoginElsewhere,
+  loginElsewhereMessage as sessionElsewhereMessage,
+  loginMadeElsewhere,
+  resolvePersonCredentials,
+} from "../../utils/apiKey";
 import { isLoggedIn, loadConfig } from "../../utils/governance/config";
-import {
-  askBox,
-  createStdinKeySource,
-  type BoxCard,
-  type KeySource,
-} from "./approval";
+import { untrustedCertHint } from "../../utils/localDevCa";
+import { NOTHING_YET_AFTER_MS, nonEmpty } from "./account";
+import { askBox, createStdinKeySource, type BoxCard, type KeySource } from "./approval";
 import { LocalCallFailure } from "./errors";
-import {
-  askedAgo,
-  consoleWriter,
-  noticeRows,
-  terminalWidth,
-  wrapWords,
-  type UiWriter,
-} from "./ui";
+import { askedAgo, consoleWriter, noticeRows, terminalWidth, wrapWords, type UiWriter } from "./ui";
 
 /** How often the CLI looks again while it waits for a request. */
 export const REQUEST_POLL_INTERVAL_MS = 5_000;
@@ -59,7 +51,15 @@ export interface ApprovedControl {
   conversation: { id: string; title: string; url: string };
 }
 
-export class ShareControlError extends Error {}
+export class ShareControlError extends Error {
+  /** The HTTP status of the refusal, when the platform answered with one. */
+  readonly status?: number;
+
+  constructor(message: string, { status }: { status?: number } = {}) {
+    super(message);
+    if (status !== undefined) this.status = status;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // The folder
@@ -108,14 +108,37 @@ const quiet = (command: string, args: string[], cwd: string): string | null => {
 };
 
 /** The lockfile that says which package manager the folder uses. */
+/** The file's text, or nothing when it is not there or cannot be read. */
+function readText(file: string): string {
+  try {
+    return fs.readFileSync(file, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * uv owns a Python folder when its lock file is there, `pyproject.toml` has `[tool.uv]`, or
+ * `pyvenv.cfg` has a `uv =` line. The last matters most: a uv venv has no pip, so only `uv add`
+ * works.
+ */
+function uvOwns(root: string): boolean {
+  if (fs.existsSync(path.join(root, "uv.lock"))) return true;
+  const pyproject = readText(path.join(root, "pyproject.toml"));
+  if (/^\[tool\.uv[\].]/m.test(pyproject)) return true;
+  return /^uv\s*=/m.test(readText(path.join(root, ".venv", "pyvenv.cfg")));
+}
+
 export function packageManagerOf(root: string): string | undefined {
-  const lockfiles: Array<[string, string]> = [
+  // uv wins over every other signal: a folder with a JS lockfile beside its
+  // Python project still installs the Python package through uv.
+  if (uvOwns(root)) return "uv";
+  const lockfiles: [string, string][] = [
     ["pnpm-lock.yaml", "pnpm"],
     ["yarn.lock", "yarn"],
     ["bun.lockb", "bun"],
     ["bun.lock", "bun"],
     ["package-lock.json", "npm"],
-    ["uv.lock", "uv"],
     ["poetry.lock", "poetry"],
     ["Pipfile.lock", "pipenv"],
     ["requirements.txt", "pip"],
@@ -123,7 +146,8 @@ export function packageManagerOf(root: string): string | undefined {
     ["Cargo.lock", "cargo"],
   ];
   for (const [file, manager] of lockfiles) {
-    if (fs.existsSync(path.join(root, file))) return manager;
+    const lockfilePath = path.join(root, file);
+    if (fs.existsSync(lockfilePath)) return manager;
   }
   return undefined;
 }
@@ -134,23 +158,20 @@ export function packageManagerOf(root: string): string | undefined {
  * shares its folder, the skill just learns less about it.
  */
 export function describeWorkspace(root: string): WorkspaceInfo {
-  const inside = quiet("git", ["rev-parse", "--is-inside-work-tree"], root);
-  const isRepository = inside === "true";
-  const branch = isRepository
-    ? quiet("git", ["rev-parse", "--abbrev-ref", "HEAD"], root)
-    : null;
-  const remote = isRepository
-    ? quiet("git", ["remote", "get-url", "origin"], root)
-    : null;
-  const status = isRepository
-    ? quiet("git", ["status", "--porcelain"], root)
-    : null;
-  const python =
-    quiet("python3", ["--version"], root) ?? quiet("python", ["--version"], root);
+  // rev-parse fails the same way when git is missing and when the folder is
+  // not a repository; only with git present does the failure say so.
+  const gitPresent = quiet("git", ["--version"], root) !== null;
+  const isRepository =
+    gitPresent && quiet("git", ["rev-parse", "--is-inside-work-tree"], root) === "true";
+  const branch = isRepository ? quiet("git", ["rev-parse", "--abbrev-ref", "HEAD"], root) : null;
+  const remote = isRepository ? quiet("git", ["remote", "get-url", "origin"], root) : null;
+  const status = isRepository ? quiet("git", ["status", "--porcelain"], root) : null;
+  const python = quiet("python3", ["--version"], root) ?? quiet("python", ["--version"], root);
   const manager = packageManagerOf(root);
   return {
     root,
     name: path.basename(root),
+    ...(gitPresent ? { gitRepository: isRepository } : {}),
     ...(branch ? { gitBranch: branch } : {}),
     ...(remote ? { gitRemote: remote } : {}),
     ...(status === null ? {} : { gitDirty: status !== "" }),
@@ -173,10 +194,7 @@ export function isGitRepository(root: string): boolean {
 
 export interface ControlApi {
   list: () => Promise<ControlRequest[]>;
-  approve: (input: {
-    requestId: string;
-    workspace: WorkspaceInfo;
-  }) => Promise<ApprovedControl>;
+  approve: (input: { requestId: string; workspace: WorkspaceInfo }) => Promise<ApprovedControl>;
   cancel: (input: { requestId: string }) => Promise<void>;
 }
 
@@ -222,6 +240,7 @@ export function createControlApi({
     if (!response.ok) {
       throw new ShareControlError(
         refusalText(body) ?? `LangWatch answered ${response.status} for ${urlPath}`,
+        { status: response.status },
       );
     }
     return body;
@@ -247,6 +266,25 @@ export function createControlApi({
   };
 }
 
+/**
+ * Whether the platform takes the login's key. Only a 401 says it does not:
+ * any other failure is left for the request list to report in its own words.
+ */
+export async function platformTakesTheKey(
+  credentials: PersonCredentials,
+  { fetchImpl }: { fetchImpl?: typeof fetch } = {},
+): Promise<boolean> {
+  try {
+    await createControlApi({
+      ...credentials,
+      ...(fetchImpl === undefined ? {} : { fetchImpl }),
+    }).list();
+    return true;
+  } catch (error) {
+    return !(error instanceof ShareControlError && error.status === 401);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // The terminal
 // ---------------------------------------------------------------------------
@@ -260,66 +298,141 @@ export function hasDeviceSession(): boolean {
   }
 }
 
+/** What the command says when the sign-in left no login it can use. */
+export const SIGN_IN_FAILED_MESSAGE =
+  "Could not sign you in, so this folder is not shared. Run `langwatch login --device`, then run `langwatch langy --share-control` again.";
+
+/** The sign-in failure with its real cause; an untrusted certificate gets its fix, not a retry. */
+export function signInFailure(error: unknown): string {
+  const reason = error instanceof Error ? formatApiErrorMessage({ error }).trim() : "";
+  const certHint = untrustedCertHint(error);
+  if (certHint) return `Could not sign you in: ${reason}. ${certHint}`;
+  return reason === "" ? SIGN_IN_FAILED_MESSAGE : `${SIGN_IN_FAILED_MESSAGE} (${reason})`;
+}
+
 /**
- * Signs in when the machine has no device session, then resolves the
- * credentials. The login is the standard flow, called rather than repeated.
+ * What the command says when the login belongs to another address. A project
+ * key is no way out here, since the command acts as a person.
+ */
+export const loginElsewhereMessage = (elsewhere: LoginElsewhere): string =>
+  sessionElsewhereMessage({
+    ...elsewhere,
+    outcome: ", so this folder is not shared",
+    canUseApiKey: false,
+  });
+
+export type PersonCredentials = {
+  apiKey: string;
+  endpoint: string;
+  projectId?: string;
+};
+
+/**
+ * The command's credentials: the device login only, never `LANGWATCH_API_KEY`, which names no
+ * person. An unusable login runs the device login once; a login made against another address ends
+ * the command.
  */
 export async function ensureSignedIn({
   login,
+  isAccepted = async () => true,
 }: {
   login: (options: { device: boolean }) => Promise<void>;
-}): Promise<{ apiKey: string; endpoint: string; projectId?: string }> {
-  if (!hasDeviceSession() && !process.env.LANGWATCH_API_KEY?.trim()) {
-    console.log(
-      chalk.gray("No login on this machine yet. Signing in first."),
-    );
-    await login({ device: true });
+  /** Whether the platform takes the login's key. Defaults to yes. */
+  isAccepted?: (credentials: PersonCredentials) => Promise<boolean>;
+}): Promise<PersonCredentials> {
+  const elsewhere = loginMadeElsewhere();
+  if (elsewhere) throw new ShareControlError(loginElsewhereMessage(elsewhere));
+
+  const usableLogin = async () => {
+    const found = await resolvePersonCredentials();
+    return found && (await isAccepted(found)) ? found : undefined;
+  };
+
+  const hadLogin = hasDeviceSession();
+  let credentials = await usableLogin();
+  if (!credentials) {
+    await signInAgain({ login, hadLogin });
+    credentials = await usableLogin();
+    if (!credentials) throw new ShareControlError(SIGN_IN_FAILED_MESSAGE);
   }
-  const credentials = await resolveCredentials();
+  console.log(chalk.gray(loginLine()));
   return {
     apiKey: credentials.apiKey,
     endpoint: credentials.endpoint,
-    ...(credentials.projectId === undefined
-      ? {}
-      : { projectId: credentials.projectId }),
+    ...(credentials.projectId === undefined ? {} : { projectId: credentials.projectId }),
   };
 }
 
-const requestTitle = (
-  request: ControlRequest,
-  root: string,
-  now: number = Date.now(),
-): string =>
+async function signInAgain({
+  login,
+  hadLogin,
+}: {
+  login: (options: { device: boolean }) => Promise<void>;
+  hadLogin: boolean;
+}): Promise<void> {
+  console.log(
+    chalk.gray(
+      hadLogin
+        ? "The login on this machine can no longer be used. Signing in again."
+        : "No login on this machine yet. Signing in first.",
+    ),
+  );
+  try {
+    await login({ device: true });
+  } catch (error) {
+    throw new ShareControlError(signInFailure(error));
+  }
+}
+
+/**
+ * The one line that says who the command acts as: the person and their
+ * organization, as the login recorded them. A request is answered on its own
+ * project, so no project and no --project belong in this line.
+ */
+export function loginLine(): string {
+  let cfg: ReturnType<typeof loadConfig> | undefined;
+  try {
+    cfg = loadConfig();
+  } catch {
+    cfg = undefined;
+  }
+  const person = nonEmpty(cfg?.user?.name) ?? nonEmpty(cfg?.user?.email);
+  const organization = nonEmpty(cfg?.organization?.name);
+  if (person && organization) {
+    return `Using your login as ${person} at ${organization}.`;
+  }
+  if (person) return `Using your login as ${person}.`;
+  return "Using your login.";
+}
+
+const requestTitle = (request: ControlRequest, root: string, now: number = Date.now()): string =>
   `Langy session "${request.conversationTitle}" (project ${request.projectName}, ${askedAgo(request.createdAt, now)}) is requesting control over ${root}`;
 
 /**
- * One row per conversation, newest first.
- *
- * The same chat can raise the card again, and a request the developer never
- * answered stays open for its fifteen minutes. Two rows with the same title
- * only make the developer guess, so the older one is dropped and the newest
- * one stands for the conversation.
+ * One row per conversation, newest first: the same chat can raise the card
+ * again, and two rows with the same title only make the developer guess.
  */
-export function collapseByConversation(
-  requests: ControlRequest[],
-): ControlRequest[] {
+export function collapseByConversation(requests: ControlRequest[]): ControlRequest[] {
   const newest = new Map<string, ControlRequest>();
   for (const request of requests) {
     const held = newest.get(request.conversationId);
-    if (!held || Date.parse(request.createdAt) > Date.parse(held.createdAt)) {
+    if (!held) {
       newest.set(request.conversationId, request);
+    } else {
+      const requestCreatedAt = Date.parse(request.createdAt);
+      const heldCreatedAt = Date.parse(held.createdAt);
+      if (requestCreatedAt > heldCreatedAt) {
+        newest.set(request.conversationId, request);
+      }
     }
   }
-  return [...newest.values()].sort(
+  return [...newest.values()].toSorted(
     (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
   );
 }
 
 /** What one row of the picker reads under its title. */
-export function requestRowDescription(
-  request: ControlRequest,
-  now: number = Date.now(),
-): string {
+export function requestRowDescription(request: ControlRequest, now: number = Date.now()): string {
   return `project ${request.projectName}, ${askedAgo(request.createdAt, now)}`;
 }
 
@@ -334,8 +447,7 @@ export const shareRequestTitle = (root: string): string =>
   `Langy wants to work in ${path.basename(root)}`;
 
 /** The footer of a box that asks for this folder. */
-const REQUEST_HINT =
-  "Enter or a number to answer · ↑↓ to choose · Esc to leave the request open";
+const REQUEST_HINT = "Enter or a number to answer · ↑↓ to choose · Esc to leave the request open";
 
 /** What the terminal says when the developer answered nothing. */
 const LEFT_OPEN_NOTICE =
@@ -389,13 +501,8 @@ export function requestPickerCard({
 
 /**
  * Shows the open requests and asks what to do. One request offers to share
- * the folder and to cancel; several become a picker over their titles and
- * projects first.
- *
- * The question is drawn in the same boxed idiom as the permission selector,
- * and settles into one notice, so the first screen of the session reads like
- * every screen after it. Off a terminal there is nothing to draw on, so the
- * question stays the list the prompts package renders.
+ * the folder and to cancel; several become a picker over titles and
+ * projects. Drawn in the same boxed idiom as the permission selector.
  */
 export async function chooseRequest({
   requests,
@@ -507,10 +614,7 @@ async function chooseWithPrompts({
   console.log("");
   // The question is the one thing the developer has to read before they
   // answer, so it wraps where the words end rather than where the column does.
-  for (const line of wrapWords(
-    requestTitle(request, root, now),
-    terminalWidth(),
-  )) {
+  for (const line of wrapWords(requestTitle(request, root, now), terminalWidth())) {
     console.log(line);
   }
   const answer = await ask({
@@ -544,6 +648,8 @@ export async function waitForRequests({
       setTimeout(resolve, ms);
     }),
   attempts = Number.POSITIVE_INFINITY,
+  onNothingYet,
+  nothingYetAfterMs = NOTHING_YET_AFTER_MS,
 }: {
   api: ControlApi;
   intervalMs?: number;
@@ -551,8 +657,13 @@ export async function waitForRequests({
   sleep?: (ms: number) => Promise<void>;
   /** For tests: how many times the list is read before giving up. */
   attempts?: number;
+  /** Said once, after `nothingYetAfterMs` of waiting with nothing; the wait goes on. */
+  onNothingYet?: () => void;
+  nothingYetAfterMs?: number;
 }): Promise<ControlRequest[]> {
   let announced = false;
+  let toldNothingYet = false;
+  let waitedMs = 0;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const requests = await api.list();
     if (requests.length > 0) return requests;
@@ -560,7 +671,12 @@ export async function waitForRequests({
       announced = true;
       onWaiting?.();
     }
+    if (!toldNothingYet && waitedMs >= nothingYetAfterMs) {
+      toldNothingYet = true;
+      onNothingYet?.();
+    }
     await sleep(intervalMs);
+    waitedMs += intervalMs;
   }
   return [];
 }
@@ -570,9 +686,7 @@ export const asShareControlError = (error: unknown): ShareControlError =>
   error instanceof ShareControlError
     ? error
     : new ShareControlError(
-        error instanceof LocalCallFailure || error instanceof Error
-          ? error.message
-          : String(error),
+        error instanceof LocalCallFailure || error instanceof Error ? error.message : String(error),
       );
 
 /**
@@ -588,7 +702,10 @@ function refusalText(body: unknown): string | undefined {
     code?: unknown;
   };
   if (Array.isArray(tips)) {
-    const lines = tips.filter((t): t is string => typeof t === "string" && t !== "");
+    const lines = tips
+      .filter((t): t is string => typeof t === "string" && t.trim() !== "")
+      .map((t) => t.trim())
+      .map((t) => (/[.!?]$/.test(t) ? t : `${t}.`));
     if (lines.length > 0) return lines.join(" ");
   }
   if (typeof message === "string" && message !== "" && message !== code) {

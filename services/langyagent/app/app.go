@@ -243,14 +243,25 @@ func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Cont
 		)
 		return func(context.Context) {}, nil
 	}
-	worker, err := a.pool.Acquire(ctx, req.ConversationID, req.Credentials)
+	worker, err := a.pool.Acquire(ctx, req.ConversationID, req.TurnID, req.Credentials)
 	if err != nil {
 		if errors.Is(err, domain.ErrMaxWorkers) {
 			a.atCapacity(ctx)
 			return nil, herr.NewLight(ctx, domain.ErrMaxWorkers, nil)
 		}
+		// A keyless dispatch that needs a spawn is the designed fallback of the
+		// probe-then-mint flow: the control plane mints a key on the 428 and
+		// re-sends, and the turn runs. It is logged as that outcome, without a
+		// stacktrace; any other acquire failure is a real error.
+		if errors.Is(err, domain.ErrCredentialsRequired) {
+			clog.Get(ctx).Info("worker needs a spawn but the dispatch carried no session key; the control plane mints one and re-sends",
+				zap.String("conversation_id", req.ConversationID),
+				zap.String("turn_id", req.TurnID),
+			)
+			return nil, err
+		}
 		clog.Get(ctx).Error("acquire worker failed", zap.Error(err))
-		return nil, err // already a herr from the pool (e.g. ErrCredentialsRequired)
+		return nil, err // already a herr from the pool
 	}
 	// Per-conversation in-flight guard, turnId-idempotent (review "F"). The
 	// worker's agent session is single-stream — two concurrent DIFFERENT turns
@@ -433,8 +444,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 		}
 		failure = &domain.TurnFailure{Code: "agent_error", Message: failureMessage}
 		turnSpan.RecordError(streamErr)
-		he := herr.NewLight(ctx, domain.ErrAgentError,
-			herr.M{"message": "the agent hit an error before finishing"}, reasons...)
+		he := agentErrorHerr(ctx, reasons)
 		f, mErr := frames.ErrorFromHerr(he)
 		if mErr != nil {
 			clog.Get(ctx).Warn("build error frame failed", zap.Error(mErr))
@@ -567,4 +577,23 @@ func (a *App) atCapacity(ctx context.Context) {
 		return
 	}
 	a.telemetry.AtCapacity(ctx)
+}
+
+// agentErrorHerr is the wire herr for a turn the agent reported failed. With
+// no captured cause nothing says the provider refused the call, and a resend
+// often works, so the error is retryable; with causes, any retryable one decides.
+func agentErrorHerr(ctx context.Context, reasons []error) herr.E {
+	he := herr.NewLight(ctx, domain.ErrAgentError,
+		herr.M{"message": "the agent hit an error before finishing"}, reasons...)
+	return he.WithRetryable(len(reasons) == 0 || anyRetryable(reasons))
+}
+
+func anyRetryable(reasons []error) bool {
+	for _, reason := range reasons {
+		var he herr.E
+		if errors.As(reason, &he) && he.Retryable {
+			return true
+		}
+	}
+	return false
 }

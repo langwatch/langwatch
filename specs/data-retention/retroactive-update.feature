@@ -16,22 +16,41 @@ Feature: Retroactive retention changes
     And existing spans still have _retention_days = 49
 
   Scenario: Explicit retroactive update applies to existing data
-    When the admin adds a retention policy of 91 days with the "Apply this change to existing data" switch enabled
-    And confirms in the "Apply retention to existing data?" dialog
+    When the admin adds a shorter retention policy of 91 days
+    And chooses "Apply now" when asked to apply it to stored data
     Then a ClickHouse mutation is issued for each trace-category table
     And the mutation updates _retention_days = 91 for this tenant
-    And the update applies uniformly to every retention-managed table including event_log
+    And the event_log mutation updates only trace-class rows
+    And the event_log mutation preserves every security row classified as indefinite
+
+  @unit
+  Scenario: Retroactive updates select the matching event-log category
+    When the admin applies a retention change to existing scenario data
+    Then simulation_runs and suite_runs are updated
+    And only simulation-run, simulation-set, and suite-run rows in event_log are updated
+    When the admin applies a retention change to existing experiment data
+    Then experiment_runs and experiment_run_items are updated
+    And only experiment-run rows in event_log are updated
 
   Scenario: Retroactive update progress is tracked
     When a retroactive update is in progress
     Then the UI shows a progress entry per table from system.mutations
     And the progress shows the parts still pending counting down to zero
 
-  Scenario: Rate-limited to one mutation per tenant per table
+  @unit
+  Scenario: Rate-limited to one mutation per tenant, category, and table
     Given a retroactive update is in progress for stored_spans
     When the admin attempts another retroactive update for stored_spans
     Then the request is rejected with a rate-limit error
     And the error indicates the existing mutation must complete first
+
+  @unit
+  Scenario: Event-log category mutations can run in parallel
+    Given a trace-category event_log mutation is in progress
+    When scenario and experiment retroactive updates start for the same tenant
+    Then neither update is blocked by the trace-category event_log mutation
+    And each event_log mutation carries its explicit retention category
+    And progress reports trace, scenario, and experiment event_log mutations under their own categories
 
   Scenario: Conflict error names the mutation IDs callers can kill
     Given retroactive updates are in progress for stored_spans and trace_summaries
@@ -40,14 +59,13 @@ Feature: Retroactive retention changes
     And the caller can act on those ids without parsing the message text
 
   Scenario: Retroactive apply requires confirmation
-    When the admin saves a retention policy with the "Apply this change to existing data" switch enabled
-    Then a confirmation dialog warns that any rows older than the new retention become eligible for deletion on the next background merge
-    And the retroactive update does not proceed until the admin confirms
+    When the admin saves a shorter retention policy with stored data past it
+    Then a prompt names how many stored traces the new period would remove
+    And the retroactive update does not proceed until the admin chooses "Apply now"
 
   Scenario: Saving without retroactive apply leaves existing data untouched
-    When the admin saves a retention policy with the "Apply this change to existing data" switch disabled
-    Then no confirmation dialog is shown
-    And the scope rule is persisted without issuing any ClickHouse mutation
+    When the admin saves a shorter retention policy and chooses "Not now"
+    Then the scope rule is persisted without issuing any ClickHouse mutation
     And only newly ingested rows are stamped with the new _retention_days
 
   Scenario: Stuck mutation can be killed

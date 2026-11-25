@@ -5,6 +5,7 @@ Feature: Project Secrets CLI Commands
 
   Background:
     Given I have a valid LANGWATCH_API_KEY configured
+    And the CLI uses the versioned Secret RPC API
 
   Scenario: List secrets
     Given my project has secrets configured

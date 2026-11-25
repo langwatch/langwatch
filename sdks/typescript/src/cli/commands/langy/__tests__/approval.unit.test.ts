@@ -1,14 +1,10 @@
 /**
- * The permission selector: what the box says, and what each key answers.
- *
- * The box is rendered through a fake writer and driven through a fake
- * keypress source, so the test reads the words and the answer rather than the
- * escape sequences.
- *
+ * Permission selector box rendering and key handling.
  * @see specs/typescript-sdk/cli-langy-share-control.feature
  */
 
 import { describe, expect, it } from "vitest";
+
 import type { LocalCall } from "../../../../agent/local-control-protocol";
 import {
   approvalCardFor,
@@ -85,6 +81,12 @@ const bashCall = (command: string): LocalCall => ({
   params: { command },
 });
 
+const paramsFor = (tool: LocalCall["tool"]) => {
+  if (tool === "local_bash") return { command: "x" };
+  if (tool === "local_edit") return { path: ".env", edits: [] };
+  return { path: ".env" };
+};
+
 const card: ApprovalCard = approvalCardFor({
   call: bashCall("uv run pytest"),
   workspaceName: "acme-support-dogfood",
@@ -112,13 +114,13 @@ describe("the options a permission ask offers", () => {
   describe("when a chain would grant several patterns", () => {
     /** @scenario "A chain names every pattern the grant would cover" */
     it("names every one of them", () => {
-      expect(approvalOptions(["git fetch", "git checkout"])[0]?.label).toBe(
-        'Yes, allow "git fetch" and "git checkout" for this session',
+      expect(approvalOptions(["uv sync", "uv run"])[0]?.label).toBe(
+        'Yes, allow "uv sync" and "uv run" for this session',
       );
     });
   });
 
-  const limits: Array<[number, string]> = [
+  const limits: [number, string][] = [
     [30, "Stops after 30 seconds if it has not finished."],
     [60, "Stops after 1 minute if it has not finished."],
     [300, "Stops after 5 minutes if it has not finished."],
@@ -147,9 +149,7 @@ describe("the box the selector draws", () => {
     expect(drawn).toContainEqual(
       expect.stringContaining('❯ 1. Yes, allow "uv run" for this session'),
     );
-    expect(drawn).toContainEqual(
-      expect.stringContaining("2. Yes, this time only"),
-    );
+    expect(drawn).toContainEqual(expect.stringContaining("2. Yes, this time only"));
     expect(drawn).toContainEqual(
       expect.stringContaining("3. No, and tell Langy what to do instead"),
     );
@@ -203,7 +203,7 @@ describe("the box the selector draws", () => {
       );
     });
 
-    const sentences: Array<[string, string[], string | null]> = [
+    const sentences: [string, string[], string | null][] = [
       [
         "one pattern",
         [".venv/bin/python -c"],
@@ -211,8 +211,8 @@ describe("the box the selector draws", () => {
       ],
       [
         "a chain",
-        ["git add", "git commit", "git push"],
-        'The session grant covers every command that starts with "git add", "git commit" and "git push".',
+        ["uv sync", "uv run", "gh pr"],
+        'The session grant covers every command that starts with "uv sync", "uv run" and "gh pr".',
       ],
       [
         "a pattern over the whole command name",
@@ -223,7 +223,7 @@ describe("the box the selector draws", () => {
     ];
     for (const [what, patterns, sentence] of sentences) {
       describe(`when the grant is ${what}`, () => {
-        it(sentence === null ? "says nothing" : "reads what it covers", () => {
+        it("reads what it covers, or says nothing when it covers nothing", () => {
           expect(grantCoverageSentence(patterns)).toBe(sentence);
         });
       });
@@ -234,11 +234,11 @@ describe("the box the selector draws", () => {
     it("wraps the label inside the frame", () => {
       const drawn = renderBox({
         card: approvalCardFor({
-          call: bashCall("git add . && git commit -m x && git push"),
+          call: bashCall("uv sync && uv run pytest && gh pr create --title x"),
           workspaceName: "acme",
-          summary: "git add . && git commit -m x && git push",
-          reason: "This changes the git repository and reaches the network.",
-          patterns: ["git add", "git commit", "git push", "gh pr", "uv run"],
+          summary: "uv sync && uv run pytest && gh pr create --title x",
+          reason: "This installs packages and reaches the network.",
+          patterns: ["uv sync", "uv run", "gh pr", "pnpm install", "make build"],
         }),
         selected: 0,
         width: 60,
@@ -246,7 +246,7 @@ describe("the box the selector draws", () => {
 
       for (const line of drawn) expect(line.length).toBe(60);
       expect(bodyText(drawn)).toContain(
-        'Yes, allow "git add", "git commit", "git push", "gh pr" and "uv run" for this session',
+        'Yes, allow "uv sync", "uv run", "gh pr", "pnpm install" and "make build" for this session',
       );
     });
   });
@@ -258,9 +258,7 @@ describe("the box the selector draws", () => {
 
       expect(first).toHaveLength(second.length);
       expect(second.filter((line) => line.includes("❯"))).toHaveLength(1);
-      expect(
-        second.find((line) => line.includes("❯")),
-      ).toContain("2. Yes, this time only");
+      expect(second.find((line) => line.includes("❯"))).toContain("2. Yes, this time only");
     });
   });
 
@@ -278,9 +276,7 @@ describe("the box the selector draws", () => {
 });
 
 describe("given a permission selector open in the terminal", () => {
-  const open = (
-    over: { card?: ApprovalCard; reason?: string } = {},
-  ) => {
+  const open = (over: { card?: ApprovalCard; reason?: string } = {}) => {
     const screen = fakeScreen();
     const keys = fakeKeys();
     const asked: string[] = [];
@@ -325,7 +321,7 @@ describe("given a permission selector open in the terminal", () => {
   });
 
   describe("when a digit is pressed", () => {
-    const digits: Array<[string, "allow_pattern" | "allow_once" | "deny"]> = [
+    const digits: [string, "allow_pattern" | "allow_once" | "deny"][] = [
       ["1", "allow_pattern"],
       ["2", "allow_once"],
       ["3", "deny"],
@@ -446,23 +442,20 @@ describe("createTerminalApprovals", () => {
 });
 
 describe("the card a file call produces", () => {
-  const titles: Array<[LocalCall["tool"], string]> = [
+  const titles: [LocalCall["tool"], string][] = [
     ["local_bash", "Langy wants to run in acme"],
     ["local_edit", "Langy wants to change a file in acme"],
     ["local_read", "Langy wants to read a file in acme"],
+    ["local_langwatch_env", "Langy wants to write a file in acme"],
   ];
   for (const [tool, title] of titles) {
     describe(`when the call is ${tool}`, () => {
+      /** @scenario "The credentials write says it writes" */
       it(`the heading reads ${title}`, () => {
         const call = {
           ...envelope,
           tool,
-          params:
-            tool === "local_bash"
-              ? { command: "x" }
-              : tool === "local_edit"
-                ? { path: ".env", edits: [] }
-                : { path: ".env" },
+          params: paramsFor(tool),
         } as LocalCall;
 
         expect(

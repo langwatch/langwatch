@@ -15,7 +15,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/scim-tokens/{id}".format(
+        "url": "/api/v1/scim-tokens/{id}".format(
             id=quote(str(id), safe=""),
         ),
     }

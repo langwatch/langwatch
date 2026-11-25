@@ -4,7 +4,7 @@ Feature: Subscription service refactor
   continues using the old factory until Part 4.
 
   # Parity status: 5 of 6 scenarios bound to existing unit tests in
-  # platform/app/ee/billing/__tests__/subscription.service.unit.test.ts.
+  # enterprise/modules/billing/process/src/__tests__/subscription.service.unit.test.ts.
   # The remaining 1 @unimplemented scenario is UPDATE-class per AUDIT_MANIFEST
   # — implementation diverged from the spec wording (no co-existence with old
   # factory; the new class IS the service). Tracked under #3458.
@@ -29,13 +29,6 @@ Feature: Subscription service refactor
     Then a pending subscription record is created
     And a Stripe checkout session is created
     And the checkout URL is returned
-
-  @unit
-  Scenario: EESubscriptionService cancels subscription when downgrading to free
-    Given an organization with an active subscription
-    When createOrUpdateSubscription is called with FREE plan
-    Then the Stripe subscription is cancelled
-    And the subscription status is updated to CANCELLED
 
   @unit
   Scenario: EESubscriptionService creates billing portal session

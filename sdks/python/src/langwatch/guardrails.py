@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 
-import langwatch.evaluations
+from langwatch import evaluation
+from langwatch.evaluation import _merge_keyword_data
 from langwatch.types import Conversation, RAGChunk
 
 
@@ -16,13 +17,15 @@ def evaluate(
     contexts = contexts or []
     conversation = conversation or []
 
-    return langwatch.evaluations.evaluate(
+    return evaluation.evaluate(
         slug=slug,
-        input=input,
-        output=output,
-        expected_output=expected_output,
-        contexts=contexts,
-        conversation=conversation,
+        data=_merge_keyword_data(
+            input=input,
+            output=output,
+            expected_output=expected_output,
+            contexts=contexts,
+            conversation=conversation,
+        ),
         settings=settings,
         as_guardrail=True,
     )
@@ -40,13 +43,15 @@ async def async_evaluate(
     contexts = contexts or []
     conversation = conversation or []
 
-    return await langwatch.evaluations.async_evaluate(
+    return await evaluation.async_evaluate(
         slug=slug,
-        input=input,
-        output=output,
-        expected_output=expected_output,
-        contexts=contexts,
-        conversation=conversation,
+        data=_merge_keyword_data(
+            input=input,
+            output=output,
+            expected_output=expected_output,
+            contexts=contexts,
+            conversation=conversation,
+        ),
         settings=settings,
         as_guardrail=True,
     )

@@ -22,12 +22,13 @@ T = TypeVar("T", bound="PostApiTracesSearchBody")
 class PostApiTracesSearchBody:
     """
     Attributes:
-        start_date (float | str):
-        end_date (float | str):
+        start_date (float | str): Epoch milliseconds, or an ISO 8601 date string.
+        end_date (float | str): Epoch milliseconds, or an ISO 8601 date string.
         query (str | Unset):
         filters (PostApiTracesSearchBodyFilters | Unset):
         trace_ids (list[str] | Unset):
         negate_filters (bool | Unset):
+        exclude_origins (list[str] | Unset):
         page_offset (float | Unset): Removed. Offset pagination is no longer supported and any value other than 0 is
             rejected. Page with the scrollId returned by the previous response instead. The field remains on the schema so
             that sending it produces an explanatory error rather than being silently discarded.
@@ -37,10 +38,15 @@ class PostApiTracesSearchBody:
         sort_direction (str | Unset):
         updated_at (float | Unset):
         scroll_id (None | str | Unset):
+        filter_ (str | Unset): A trace filter string in the same language the Trace Explorer's search bar speaks —
+            `status:error AND model:gpt-*`, `trace.attribute.langwatch.user_id:alice`, a quoted phrase for free text.
+            Combined with `filters`/`query`/`traceIds` rather than replacing them, so every condition sent must hold. A
+            malformed filter, or one naming a field the language does not have, is a 422 that names the `filter` field.
         format_ (PostApiTracesSearchBodyFormat | Unset): Output format: 'digest' (AI-readable trace digest) or 'json'
             (full raw data)
         include_spans (bool | Unset): When true, fetches full span data for each trace. Useful for bulk export. Default
-            false.
+            false. A page with spans holds at most 100 traces, and that is its default; a larger `pageSize` is refused with
+            422 `trace_page_size_too_large`. When a response carries a `scrollId`, send it to fetch the next page.
         llm_mode (bool | Unset):
         date_field (PostApiTracesSearchBodyDateField | Unset): Which timestamp the startDate/endDate window filters on.
             'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last
@@ -62,6 +68,7 @@ class PostApiTracesSearchBody:
     filters: PostApiTracesSearchBodyFilters | Unset = UNSET
     trace_ids: list[str] | Unset = UNSET
     negate_filters: bool | Unset = UNSET
+    exclude_origins: list[str] | Unset = UNSET
     page_offset: float | Unset = UNSET
     page_size: int | Unset = UNSET
     group_by: str | Unset = UNSET
@@ -69,6 +76,7 @@ class PostApiTracesSearchBody:
     sort_direction: str | Unset = UNSET
     updated_at: float | Unset = UNSET
     scroll_id: None | str | Unset = UNSET
+    filter_: str | Unset = UNSET
     format_: PostApiTracesSearchBodyFormat | Unset = UNSET
     include_spans: bool | Unset = UNSET
     llm_mode: bool | Unset = UNSET
@@ -96,6 +104,10 @@ class PostApiTracesSearchBody:
 
         negate_filters = self.negate_filters
 
+        exclude_origins: list[str] | Unset = UNSET
+        if not isinstance(self.exclude_origins, Unset):
+            exclude_origins = self.exclude_origins
+
         page_offset = self.page_offset
 
         page_size = self.page_size
@@ -113,6 +125,8 @@ class PostApiTracesSearchBody:
             scroll_id = UNSET
         else:
             scroll_id = self.scroll_id
+
+        filter_ = self.filter_
 
         format_: str | Unset = UNSET
         if not isinstance(self.format_, Unset):
@@ -150,6 +164,8 @@ class PostApiTracesSearchBody:
             field_dict["traceIds"] = trace_ids
         if negate_filters is not UNSET:
             field_dict["negateFilters"] = negate_filters
+        if exclude_origins is not UNSET:
+            field_dict["excludeOrigins"] = exclude_origins
         if page_offset is not UNSET:
             field_dict["pageOffset"] = page_offset
         if page_size is not UNSET:
@@ -164,6 +180,8 @@ class PostApiTracesSearchBody:
             field_dict["updatedAt"] = updated_at
         if scroll_id is not UNSET:
             field_dict["scrollId"] = scroll_id
+        if filter_ is not UNSET:
+            field_dict["filter"] = filter_
         if format_ is not UNSET:
             field_dict["format"] = format_
         if include_spans is not UNSET:
@@ -208,6 +226,8 @@ class PostApiTracesSearchBody:
 
         negate_filters = d.pop("negateFilters", UNSET)
 
+        exclude_origins = cast(list[str], d.pop("excludeOrigins", UNSET))
+
         page_offset = d.pop("pageOffset", UNSET)
 
         page_size = d.pop("pageSize", UNSET)
@@ -228,6 +248,8 @@ class PostApiTracesSearchBody:
             return cast(None | str | Unset, data)
 
         scroll_id = _parse_scroll_id(d.pop("scrollId", UNSET))
+
+        filter_ = d.pop("filter", UNSET)
 
         _format_ = d.pop("format", UNSET)
         format_: PostApiTracesSearchBodyFormat | Unset
@@ -263,6 +285,7 @@ class PostApiTracesSearchBody:
             filters=filters,
             trace_ids=trace_ids,
             negate_filters=negate_filters,
+            exclude_origins=exclude_origins,
             page_offset=page_offset,
             page_size=page_size,
             group_by=group_by,
@@ -270,6 +293,7 @@ class PostApiTracesSearchBody:
             sort_direction=sort_direction,
             updated_at=updated_at,
             scroll_id=scroll_id,
+            filter_=filter_,
             format_=format_,
             include_spans=include_spans,
             llm_mode=llm_mode,

@@ -1,0 +1,226 @@
+"use client";
+
+import type { BoxProps, CollectionItem } from "@chakra-ui/react";
+import { Box, Select as ChakraSelect, Portal } from "@chakra-ui/react";
+import * as React from "react";
+
+import { OverlayDepthContext, useOverlayZIndex } from "../../overlays/depth.ts";
+import { useOverlayPortalTarget } from "../../overlays/portal-target.ts";
+import { CloseButton } from "../overlays/close-button.tsx";
+
+interface SelectTriggerProps extends ChakraSelect.ControlProps {
+  clearable?: boolean;
+}
+
+export const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerProps>(
+  function SelectTrigger(props, ref) {
+    // `aria-label` belongs on the focusable trigger BUTTON (so it's the control's
+    // accessible name), not the Control wrapper that `...rest` spreads onto.
+    const {
+      children,
+      clearable,
+      "aria-label": ariaLabel,
+      "aria-describedby": ariaDescribedBy,
+      ...rest
+    } = props;
+    return (
+      <ChakraSelect.Control {...rest}>
+        <ChakraSelect.Trigger ref={ref} aria-label={ariaLabel} aria-describedby={ariaDescribedBy}>
+          {children}
+        </ChakraSelect.Trigger>
+        <ChakraSelect.IndicatorGroup>
+          {clearable && <SelectClearTrigger />}
+          <ChakraSelect.Indicator />
+        </ChakraSelect.IndicatorGroup>
+      </ChakraSelect.Control>
+    );
+  },
+);
+
+const SelectClearTrigger = React.forwardRef<HTMLButtonElement, ChakraSelect.ClearTriggerProps>(
+  function SelectClearTrigger(props, ref) {
+    return (
+      <ChakraSelect.ClearTrigger asChild {...props} ref={ref}>
+        <CloseButton
+          size="xs"
+          variant="plain"
+          focusVisibleRing="inside"
+          focusRingWidth="2px"
+          pointerEvents="auto"
+        />
+      </ChakraSelect.ClearTrigger>
+    );
+  },
+);
+
+interface SelectContentProps extends ChakraSelect.ContentProps {
+  portalled?: boolean;
+  portalRef?: React.RefObject<HTMLElement | null>;
+}
+
+export const SelectContent = React.forwardRef<HTMLDivElement, SelectContentProps>(
+  function SelectContent(props, ref) {
+    const { portalled = true, portalRef, ...rest } = props;
+    const { zIndex, depth } = useOverlayZIndex();
+    const overlayTarget = useOverlayPortalTarget();
+    return (
+      <Portal disabled={!portalled} container={portalRef ?? overlayTarget}>
+        <ChakraSelect.Positioner
+          ref={(node: HTMLElement | null) => {
+            if (node) {
+              // Zag.js sets --z-index inline based on layer stack order, which
+              // can place selects behind dialogs. Force it higher. See #2519.
+              node.style.setProperty("z-index", zIndex, "important");
+            }
+          }}
+        >
+          <OverlayDepthContext.Provider value={depth}>
+            <ChakraSelect.Content {...rest} ref={ref} />
+          </OverlayDepthContext.Provider>
+        </ChakraSelect.Positioner>
+      </Portal>
+    );
+  },
+);
+
+export const SelectItem = React.forwardRef<HTMLDivElement, ChakraSelect.ItemProps>(
+  function SelectItem(props, ref) {
+    const { item, children, ...rest } = props;
+    return (
+      <ChakraSelect.Item key={item.value} item={item} {...rest} ref={ref}>
+        {children}
+        <ChakraSelect.ItemIndicator />
+      </ChakraSelect.Item>
+    );
+  },
+);
+
+interface SelectValueTextProps extends Omit<
+  ChakraSelect.ValueTextProps,
+  "children" | "placeholder"
+> {
+  children?(items: CollectionItem[]): React.ReactNode;
+  placeholder?: React.ReactNode;
+}
+
+export const SelectValueText = React.forwardRef<HTMLSpanElement, SelectValueTextProps>(
+  function SelectValueText(props, ref) {
+    const { placeholder, ...rest } = props;
+    return (
+      <ChakraSelect.ValueText {...rest} ref={ref}>
+        <ChakraSelect.Context>
+          {(select) => {
+            const items = select.selectedItems;
+            if (items.length === 0) return placeholder;
+            if (props.children) return props.children(items);
+            if (items.length === 1) return select.collection.stringifyItem(items[0]);
+            return `${items.length} selected`;
+          }}
+        </ChakraSelect.Context>
+      </ChakraSelect.ValueText>
+    );
+  },
+);
+
+export const SelectRoot = React.forwardRef<HTMLDivElement, ChakraSelect.RootProps>(
+  function SelectRoot(props, ref) {
+    return (
+      <ChakraSelect.Root
+        {...props}
+        ref={ref}
+        positioning={{ sameWidth: true, ...props.positioning }}
+      >
+        {props.asChild ? (
+          props.children
+        ) : (
+          <>
+            <ChakraSelect.HiddenSelect />
+            {props.children}
+          </>
+        )}
+      </ChakraSelect.Root>
+    );
+  },
+);
+
+interface SelectItemGroupProps extends ChakraSelect.ItemGroupProps {
+  label: React.ReactNode;
+}
+
+export const SelectItemGroup = React.forwardRef<HTMLDivElement, SelectItemGroupProps>(
+  function SelectItemGroup(props, ref) {
+    const { children, label, ...rest } = props;
+    return (
+      <ChakraSelect.ItemGroup {...rest} ref={ref}>
+        <ChakraSelect.ItemGroupLabel>{label}</ChakraSelect.ItemGroupLabel>
+        {children}
+      </ChakraSelect.ItemGroup>
+    );
+  },
+);
+
+/**
+ * The rows under a fixed header, such as a search field: put it in a `Select.Content` given
+ * `overflow="hidden"`, so only the rows scroll and none passes behind the header. Pair it with
+ * `scrollToListItem` on `Select.Root`, which keeps the highlighted row in view.
+ */
+export const SelectList = React.forwardRef<HTMLDivElement, BoxProps>(
+  function SelectList(props, ref) {
+    return (
+      <Box
+        display="flex"
+        flexDirection="column"
+        flex="1"
+        minHeight={0}
+        overflowY="auto"
+        {...props}
+        ref={ref}
+      />
+    );
+  },
+);
+
+/** `Select.Root`'s `scrollToIndexFn` for rows in a `Select.List`, whose content does not scroll. */
+export const scrollToListItem = ({
+  getElement,
+}: {
+  getElement: () => HTMLElement | null;
+}): void => {
+  // Absent where nothing lays out (jsdom), as Zag's own scroll checks first.
+  getElement()?.scrollIntoView?.({ block: "nearest" });
+};
+
+export const SelectLabel = ChakraSelect.Label;
+export const SelectItemText = ChakraSelect.ItemText;
+
+export const Select: {
+  Root: typeof SelectRoot;
+  Trigger: typeof SelectTrigger;
+  Content: typeof SelectContent;
+  List: typeof SelectList;
+  Item: typeof SelectItem;
+  ValueText: typeof SelectValueText;
+  ItemGroup: typeof SelectItemGroup;
+  Label: typeof SelectLabel;
+  ItemText: typeof SelectItemText;
+  Indicator: typeof ChakraSelect.Indicator;
+  HiddenSelect: typeof ChakraSelect.HiddenSelect;
+  Control: typeof ChakraSelect.Control;
+  IndicatorGroup: typeof ChakraSelect.IndicatorGroup;
+  ItemIndicator: typeof ChakraSelect.ItemIndicator;
+} = {
+  Root: SelectRoot,
+  Trigger: SelectTrigger,
+  Content: SelectContent,
+  List: SelectList,
+  Item: SelectItem,
+  ValueText: SelectValueText,
+  ItemGroup: SelectItemGroup,
+  Label: SelectLabel,
+  ItemText: SelectItemText,
+  Indicator: ChakraSelect.Indicator,
+  HiddenSelect: ChakraSelect.HiddenSelect,
+  Control: ChakraSelect.Control,
+  IndicatorGroup: ChakraSelect.IndicatorGroup,
+  ItemIndicator: ChakraSelect.ItemIndicator,
+};

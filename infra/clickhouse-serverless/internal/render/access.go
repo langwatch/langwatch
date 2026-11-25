@@ -2,6 +2,8 @@ package render
 
 import (
 	"path/filepath"
+
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
 
 // customSettingsPrefixesConfig maps to custom-settings-prefixes.yaml.
@@ -22,47 +24,115 @@ func renderCustomSettingsPrefixes(configD string) error {
 	})
 }
 
-// accessManagementConfig maps to zz-access-management.yaml: the access-DDL
-// grants the `default` (admin) user needs to create the LangWatchQL access
-// model through SQL.
-type accessManagementConfig struct {
-	Users accessManagementUsers `yaml:"users"`
+// accessManagementFile sets what the `default` (admin) user may do with access
+// entities and named collections. The `zz-` prefix is load-bearing: users.d
+// merges in lexicographic order and the later file wins over the stock
+// users.xml, which grants both flags.
+const accessManagementFile = "zz-access-management.yaml"
+
+// renderedCollectionGrants is what default keeps in rendered mode: use and see
+// the collections the rendered model delivers (lwql_postgres and its
+// per-database aliases), never create, alter or drop one.
+var renderedCollectionGrants = []string{
+	"GRANT ALL ON *.*",
+	"REVOKE ACCESS MANAGEMENT, NAMED COLLECTION ADMIN ON *.*",
+	"GRANT NAMED COLLECTION, SHOW NAMED COLLECTIONS ON lwql_postgres*",
 }
 
-type accessManagementUsers struct {
-	Default accessManagementGrants `yaml:"default"`
-}
-
-type accessManagementGrants struct {
-	AccessManagement       int `yaml:"access_management"`
-	NamedCollectionControl int `yaml:"named_collection_control"`
-	ShowNamedCollections   int `yaml:"show_named_collections"`
-	// show_named_collections_secrets is deliberately absent — see the doc on
-	// renderAccessManagement.
-}
-
-// renderAccessManagement writes zz-access-management.yaml granting the
-// `default` (admin) user the right to create users, profiles, row policies and
-// named collections through SQL — what the app's LangWatchQL self-provisioning
-// runs at boot. Nothing here widens what any *other* user can do.
-//
-// show_named_collections_secrets is deliberately NOT granted, for parity with
-// the SaaS renderer: the lwql_postgres named collection holds a plaintext
-// PostgreSQL password (ClickHouse must dial PG with the real value), and that
-// grant would expose it through SHOW CREATE NAMED COLLECTION. show_named_collections
-// (existence, secrets redacted) is enough for administration.
-//
-// The `zz-` prefix is load-bearing: users.d files merge in lexicographic
-// order and the later file wins, so this must sort after any file declaring
-// `access_management: 0` for the same user.
-func renderAccessManagement(usersD string) error {
-	return writeYAML(filepath.Join(usersD, "zz-access-management.yaml"), accessManagementConfig{
-		Users: accessManagementUsers{
-			Default: accessManagementGrants{
-				AccessManagement:       1,
-				NamedCollectionControl: 1,
-				ShowNamedCollections:   1,
-			},
-		},
+// renderAccessManagement: sql mode gets the access-DDL flags; rendered mode
+// (LWQL_ACCESS_DIR) gets a grants list instead, and ClickHouse refuses one
+// beside the flags, so they are removed; DEFAULT_USER_ACCESS_MANAGEMENT=false
+// sets both to 0, and =true keeps the flags even in rendered mode. The secrets
+// grant is never given: it would expose the PostgreSQL password via SHOW CREATE.
+func renderAccessManagement(input *config.Input, usersD string) error {
+	var user map[string]any
+	explicit := input.DefaultUserAccessManagement != nil
+	switch {
+	case !input.GrantsDefaultAccessManagement():
+		user = map[string]any{"access_management": 0, "named_collection_control": 0}
+	case input.LWQLAccessDir != "" && !explicit:
+		remove := map[string]string{"@remove": "1"}
+		user = map[string]any{
+			"access_management":        remove,
+			"named_collection_control": remove,
+			"show_named_collections":   remove,
+			"grants":                   map[string]any{"query": renderedCollectionGrants},
+		}
+	default:
+		user = map[string]any{
+			"access_management":        1,
+			"named_collection_control": 1,
+			"show_named_collections":   1,
+		}
+	}
+	return writeYAML(filepath.Join(usersD, accessManagementFile), map[string]any{
+		"users": map[string]any{"default": user},
 	})
+}
+
+// accessControlConfig maps to access-control.yaml: the two server-level
+// preconditions the app's self-provisioned SQL access model depends on —
+// access_control_improvements.settings_constraints_replace_previous (lets the
+// app's settings profile mark custom_api_key_hash changeable_in_readonly) and,
+// in replicated mode only, user_defined_zookeeper_path (the Keeper-backed
+// store for the app's SQL identity functions, ADR-136). Neither key is itself
+// part of the access model (so both survived the deletion of the
+// rendered-LWQL path, issue #8258).
+//
+// No `zz-` prefix: unlike users.d/zz-access-management.yaml, where the prefix
+// is load-bearing (it must sort after any file declaring access_management: 0
+// for the same user), nothing else in config.d sets access_control_improvements
+// or user_defined_zookeeper_path, so this file's position in config.d's merge
+// order does not matter.
+type accessControlConfig struct {
+	AccessControlImprovements accessControlImprovements `yaml:"access_control_improvements"`
+	// UserDefinedZooKeeperPath is a pointer so it is omitted (rather than
+	// rendered empty) on a standalone server — see the doc on
+	// serverUserDefinedZooKeeperPath.
+	UserDefinedZooKeeperPath *string `yaml:"user_defined_zookeeper_path,omitempty"`
+}
+
+type accessControlImprovements struct {
+	SettingsConstraintsReplacePrevious bool `yaml:"settings_constraints_replace_previous"`
+}
+
+// serverUserDefinedZooKeeperPath is where the SQL user-defined function store
+// lives in Keeper when replicated. The app's LangWatchQL functions are SQL
+// user-defined functions created by DDL — the one part of the access model
+// that cannot be static config, because ClickHouse has no XML form of
+// CREATE FUNCTION for a SQL UDF (the config-time form,
+// user_defined_executable_functions_config, forks a process per call).
+//
+// A CREATE FUNCTION writes the server's local disk store, so on a
+// multi-replica cluster it lands on the replica that ran it and nowhere
+// else. Pointing the store at Keeper makes one create reach every replica,
+// and makes a replica rebuilt or rejoined later pick the functions up at
+// boot — which an ON CLUSTER broadcast, writing each local store at the
+// moment it runs, would not. ClickHouse does not list this key in
+// system.server_settings, so the app looks for this node in system.zookeeper
+// before relying on it: keep the path in step with the app's probe (ADR-136).
+const serverUserDefinedZooKeeperPath = "/clickhouse/user_defined"
+
+// renderAccessControl writes access-control.yaml, unconditionally (no LWQL
+// password gate — the app self-provisions the access model regardless of how
+// this server is reached):
+//
+//   - access_control_improvements.settings_constraints_replace_previous is what
+//     lets the app's `<database>_profile` settings profile (`langwatch_profile`
+//     by default) mark custom_api_key_hash changeable_in_readonly under
+//     readonly=1; without it the server rejects the profile.
+//   - user_defined_zookeeper_path, written only in replicated mode: on a
+//     single node there is no Keeper to reach, and declaring the path would
+//     make the function store depend on an ensemble that is not there.
+func renderAccessControl(input *config.Input, configD string) error {
+	settings := accessControlConfig{
+		AccessControlImprovements: accessControlImprovements{
+			SettingsConstraintsReplacePrevious: true,
+		},
+	}
+	if input.Replicated {
+		path := serverUserDefinedZooKeeperPath
+		settings.UserDefinedZooKeeperPath = &path
+	}
+	return writeYAML(filepath.Join(configD, "access-control.yaml"), settings)
 }

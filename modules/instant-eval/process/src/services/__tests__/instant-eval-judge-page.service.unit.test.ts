@@ -1,0 +1,836 @@
+/**
+ * Judging one page: what it sends, what it writes, and where it says the next
+ * page starts — including when a stop reaches it part way.
+ * @see modules/instant-eval/specs/instant-eval-pipeline.feature
+ */
+
+import { HandledError } from "@langwatch/handled-error";
+import {
+  InstantEvalDecisionModelKeyInvalidError,
+  InstantEvalGatewayBudgetExceededError,
+} from "@langwatch/instant-eval-contract";
+import {
+  INSTANT_EVAL_PRICING,
+  INSTANT_EVAL_CLASSIFIER_LIMITS,
+  InstantEvalClassifierUnavailableError,
+  InstantEvalFreeBudgetExhaustedError,
+  instantEvalSkipped,
+  type InstantEvalJudgement,
+} from "@langwatch/instant-eval-judge-contract";
+import { Temporal } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import { instantEvalRunRow } from "../../__tests__/instant-eval.fixtures.ts";
+import type {
+  InstantEvalClassifyRequest,
+  InstantEvalJudgeChannel,
+} from "../../channels/instant-eval-judging.channel.ts";
+import type { InstantEvalCancellationRepository } from "../../repositories/instant-eval-cancellation.repository.ts";
+import type { InstantEvalJudgmentRecord } from "../../repositories/instant-eval-judgments.repository.ts";
+import { MemoryInstantEvalRunRepository } from "../../repositories/memory/memory.instant-eval-run.repository.ts";
+import {
+  INSTANT_EVAL_CANCEL_POLL_MS,
+  INSTANT_EVAL_PAGE_SETTLE_MS,
+} from "../../rules/instant-eval-page-stop.rules.ts";
+import type {
+  InstantEvalKeyPage,
+  InstantEvalRowKey,
+} from "../../rules/instant-eval-row-keys.rules.ts";
+import type { InstantEvalTextSource } from "../instant-eval-estimate.service.ts";
+import { InstantEvalJudgePageService } from "../instant-eval-judge-page.service.ts";
+import type { InstantEvalRowSourceService } from "../instant-eval-row-source.service.ts";
+import { InstantEvalRunContextService } from "../instant-eval-run-context.service.ts";
+
+const PROJECT_ID = "project-1";
+const RUN_ID = "run-1";
+const AT = Temporal.Instant.from("2026-09-18T10:00:00Z");
+const PROTECTIONS = {
+  catalogue: { permissions: [] },
+  canSeeCosts: true,
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
+} as const;
+
+const QUESTION = {
+  id: "annoyed",
+  function: "eval_boolean",
+  kind: "boolean",
+  reads: "probability",
+  question: { id: "annoyed", kind: "boolean", instructions: "was the customer annoyed?" },
+};
+
+const SECOND_QUESTION = {
+  ...QUESTION,
+  id: "polite",
+  question: { id: "polite", kind: "boolean", instructions: "was the agent polite?" },
+};
+
+const INPUT = {
+  runId: RUN_ID,
+  projectId: PROJECT_ID,
+  page: 0,
+  afterTraceId: null,
+  afterSpanId: null,
+  pageSize: 500,
+  remaining: 1_000,
+  keyColumns: [] as readonly string[],
+  deadlineAt: null,
+};
+
+function rowKey(traceId: string, spanId = ""): InstantEvalRowKey {
+  return { traceId, threadId: "thread-1", spanId, occurredAt: null };
+}
+
+/** The key pass, answering one fixed page and recording what it was asked. */
+class ScriptedKeys implements Pick<InstantEvalRowSourceService, "keys"> {
+  readonly asked: { limit: number }[] = [];
+
+  constructor(private readonly page: InstantEvalKeyPage) {}
+
+  async keys(input: { limit: number }): Promise<InstantEvalKeyPage> {
+    this.asked.push({ limit: input.limit });
+
+    return this.page;
+  }
+}
+
+/** The whole selection's keys in order, cut into pages after a cursor as the key pass does. */
+class PagedKeys implements Pick<InstantEvalRowSourceService, "keys"> {
+  constructor(private readonly all: readonly InstantEvalRowKey[]) {}
+
+  async keys(input: {
+    limit: number;
+    after?: { traceId: string; spanId: string | null };
+  }): Promise<InstantEvalKeyPage> {
+    const { after } = input;
+    const start = after
+      ? this.all.findIndex((key) => key.traceId === after.traceId && key.spanId === after.spanId) +
+        1
+      : 0;
+    const end = start + input.limit;
+
+    return { keys: this.all.slice(start, end), hasMore: end < this.all.length };
+  }
+}
+
+/** The extraction half, answering the page's rows with their texts in place. */
+class ScriptedTexts implements InstantEvalTextSource {
+  readonly asked: string[][] = [];
+
+  constructor(private readonly rows: readonly Record<string, unknown>[]) {}
+
+  async texts(input: { traceIds: readonly string[] }): Promise<readonly Record<string, unknown>[]> {
+    this.asked.push([...input.traceIds]);
+
+    return this.rows;
+  }
+}
+
+type Answer = (input: {
+  request: InstantEvalClassifyRequest;
+  index: number;
+  signal?: AbortSignal;
+}) => Promise<InstantEvalJudgement>;
+
+/** The judge, answering per request so a test can fail or hang one of them. */
+class ScriptedJudge implements InstantEvalJudgeChannel {
+  readonly limits = INSTANT_EVAL_CLASSIFIER_LIMITS;
+  readonly pricing = INSTANT_EVAL_PRICING;
+  readonly requests: InstantEvalClassifyRequest[] = [];
+
+  constructor(private readonly answer: Answer) {}
+
+  async classify(
+    request: InstantEvalClassifyRequest,
+    signal?: AbortSignal,
+  ): Promise<InstantEvalJudgement> {
+    const index = this.requests.length;
+    this.requests.push(request);
+
+    return this.answer({ request, index, ...(signal ? { signal } : {}) });
+  }
+}
+
+/** The judgements written, kept as they were handed over. */
+class CapturedJudgments {
+  readonly written: InstantEvalJudgmentRecord[][] = [];
+
+  constructor(private readonly onInsert?: () => void) {}
+
+  async insert(records: readonly InstantEvalJudgmentRecord[]): Promise<void> {
+    this.onInsert?.();
+    this.written.push([...records]);
+  }
+}
+
+/** A cancel nobody has asked for until a test asks for it. */
+class ScriptedCancellation implements InstantEvalCancellationRepository {
+  isCancelled = false;
+  reads = 0;
+
+  async request(): Promise<void> {
+    this.isCancelled = true;
+  }
+
+  async isRequested(): Promise<boolean> {
+    this.reads += 1;
+
+    return this.isCancelled;
+  }
+}
+
+function judged(probability: number, inputTokens = 100): InstantEvalJudgement {
+  return {
+    verdicts: [{ questionId: "annoyed", probability }],
+    inputTokens,
+    isTextTruncated: false,
+  };
+}
+
+async function judging({
+  keyPage = { keys: [], hasMore: false },
+  keySource = new ScriptedKeys(keyPage),
+  rows,
+  answer = async () => judged(0.9),
+  questions = [QUESTION],
+  cancellation = new ScriptedCancellation(),
+  concurrency = 4,
+  now = () => AT.epochMilliseconds,
+  assertWithinBudget = async () => undefined,
+  assertWithinGatewayBudget = async () => undefined,
+  onInsert,
+  runCostUsd = 0,
+  isOwnDecisionModel = true,
+}: {
+  keyPage?: InstantEvalKeyPage;
+  keySource?: Pick<InstantEvalRowSourceService, "keys">;
+  rows: readonly Record<string, unknown>[];
+  answer?: Answer;
+  cancellation?: ScriptedCancellation;
+  questions?: readonly (typeof QUESTION)[];
+  concurrency?: number;
+  now?: () => number;
+  assertWithinBudget?: (input: { inFlightUsd?: number | undefined }) => Promise<undefined>;
+  assertWithinGatewayBudget?: (input: { inFlightUsd?: number | undefined }) => Promise<undefined>;
+  onInsert?: () => void;
+  /** The running row's routed cost so far; zero on an unrouted run, as on main. */
+  runCostUsd?: number;
+  /** Whether the project judges on its own decision model rather than LangWatch's. */
+  isOwnDecisionModel?: boolean;
+}): Promise<{
+  service: InstantEvalJudgePageService;
+  judge: ScriptedJudge;
+  judgments: CapturedJudgments;
+  texts: ScriptedTexts;
+  cancellation: ScriptedCancellation;
+}> {
+  const runs = MemoryInstantEvalRunRepository.create(() => AT);
+  await runs.write(
+    instantEvalRunRow({
+      id: RUN_ID,
+      projectId: PROJECT_ID,
+      questions,
+      plan: questions.map((question) => ({
+        column: question.id,
+        function: "eval_boolean",
+        options: [],
+      })),
+      tokens: 0,
+      costUsd: runCostUsd,
+    }),
+  );
+  const judge = new ScriptedJudge(answer);
+  const judgments = new CapturedJudgments(onInsert);
+  const texts = new ScriptedTexts(rows);
+
+  return {
+    service: InstantEvalJudgePageService.create({
+      context: InstantEvalRunContextService.create({
+        runs,
+        peers: {
+          findProjectCaller: async () => ({ id: PROJECT_ID, lwqlKey: "key-1" }),
+          resolveProjectProtections: async () => PROTECTIONS,
+          isQueryIdentityAvailable: () => true,
+        },
+      }),
+      rowSource: keySource,
+      textSource: texts,
+      judge,
+      judgments,
+      cancellation,
+      budget: { assertWithinBudget },
+      gatewayBudget: { assertWithinGatewayBudget },
+      ownModels: { isOwnDecisionModel: async () => isOwnDecisionModel },
+      concurrency,
+      now,
+    }),
+    judge,
+    judgments,
+    texts,
+    cancellation,
+  };
+}
+
+describe("given a page of rows whose texts were extracted", () => {
+  describe("when it is judged", () => {
+    it("writes one judgement per row and question, and reports the page's keys", async () => {
+      const { service, judgments } = await judging({
+        keyPage: { keys: [rowKey("t1"), rowKey("t2")], hasMore: true },
+        rows: [
+          { TraceId: "t1", annoyed: "the first conversation" },
+          { TraceId: "t2", annoyed: "the second conversation" },
+        ],
+      });
+
+      const outcome = await service.judgePage(INPUT);
+
+      expect(outcome).toMatchObject({
+        rows: 2,
+        matched: 2,
+        failed: 0,
+        skipped: 0,
+        requests: 2,
+        inputTokens: 200,
+        cursor: "t2",
+        cursorSpanId: null,
+        hasNextPage: true,
+      });
+      expect(judgments.written[0]).toMatchObject([
+        { TraceId: "t1", QuestionId: "annoyed", Status: "judged", Passed: 1, Probability: 0.9 },
+        { TraceId: "t2", QuestionId: "annoyed", Status: "judged", Passed: 1, Probability: 0.9 },
+      ]);
+    });
+
+    it("asks the extraction half only about the traces the page owns", async () => {
+      const { service, texts } = await judging({
+        keyPage: { keys: [rowKey("t1"), rowKey("t1")], hasMore: false },
+        rows: [{ TraceId: "t1", annoyed: "one" }],
+      });
+
+      await service.judgePage(INPUT);
+
+      expect(texts.asked).toEqual([["t1"]]);
+    });
+
+    /** @scenario "A page drops the rows of a trace it shares with the next page" */
+    it("drops a neighbour's span rows before anything is judged", async () => {
+      const { service, judge, judgments } = await judging({
+        keyPage: { keys: [rowKey("t1", "s1")], hasMore: true },
+        rows: [
+          { TraceId: "t1", SpanId: "s1", annoyed: "ours" },
+          { TraceId: "t1", SpanId: "s2", annoyed: "the next page's" },
+        ],
+      });
+
+      await service.judgePage(INPUT);
+
+      expect(judge.requests.map((request) => request.text)).toEqual(["ours"]);
+      expect(judgments.written[0]).toHaveLength(1);
+    });
+
+    it("asks every question about one text in a single request", async () => {
+      const { service, judge } = await judging({
+        keyPage: { keys: [rowKey("t1")], hasMore: false },
+        rows: [{ TraceId: "t1", annoyed: "one text", polite: "one text" }],
+        questions: [QUESTION, SECOND_QUESTION],
+      });
+
+      await service.judgePage(INPUT);
+
+      expect(judge.requests).toHaveLength(1);
+      expect(judge.requests[0]?.questions.map((question) => question.id)).toEqual([
+        "annoyed",
+        "polite",
+      ]);
+    });
+  });
+});
+
+describe("given a statement with two rows per trace", () => {
+  describe("when the run is driven to its end with a page that cuts a trace in two", () => {
+    /** @scenario "A run over several rows per trace judges every row" */
+    it("judges every row once, none skipped by the page boundary", async () => {
+      const keys = ["t1", "t2", "t3"].flatMap((traceId) => [
+        rowKey(traceId, "s1"),
+        rowKey(traceId, "s2"),
+      ]);
+      const { service, judge } = await judging({
+        keySource: new PagedKeys(keys),
+        rows: keys.map((key) => ({
+          TraceId: key.traceId,
+          SpanId: key.spanId,
+          annoyed: `${key.traceId}/${key.spanId}`,
+        })),
+      });
+
+      let input: Parameters<InstantEvalJudgePageService["judgePage"]>[0] = {
+        ...INPUT,
+        pageSize: 3,
+        remaining: keys.length,
+        keyColumns: ["SpanId"],
+      };
+      for (let page = 0; page < keys.length; page += 1) {
+        const outcome = await service.judgePage(input);
+        if (!outcome.hasNextPage) break;
+        input = { ...input, afterTraceId: outcome.cursor, afterSpanId: outcome.cursorSpanId };
+      }
+
+      expect(judge.requests.map((request) => request.text).toSorted()).toEqual(
+        keys.map((key) => `${key.traceId}/${key.spanId}`),
+      );
+    });
+  });
+});
+
+describe("given a judge that declines every text", () => {
+  describe("when the page is judged", () => {
+    it("writes the rows as skipped, naming the reason it gave", async () => {
+      const { service, judgments } = await judging({
+        keyPage: { keys: [rowKey("t1")], hasMore: false },
+        rows: [{ TraceId: "t1", annoyed: "a conversation" }],
+        answer: async () => ({
+          verdicts: [],
+          skippedReason: "classifier_not_configured" as const,
+          inputTokens: 0,
+          isTextTruncated: false,
+        }),
+      });
+
+      const outcome = await service.judgePage(INPUT);
+
+      expect(outcome).toMatchObject({ rows: 1, skipped: 1, failed: 0, matched: 0 });
+      expect(judgments.written[0]?.[0]).toMatchObject({
+        Status: "skipped",
+        Error: "classifier_not_configured",
+        Probability: null,
+      });
+    });
+  });
+});
+
+/** A unit the own decision model's provider refused for its key. */
+const KEY_REFUSED = instantEvalSkipped("classifier_key_invalid");
+
+const TWO_ROWS = {
+  keyPage: { keys: [rowKey("t1"), rowKey("t2")], hasMore: true },
+  rows: [
+    { TraceId: "t1", annoyed: "one" },
+    { TraceId: "t2", annoyed: "two" },
+  ],
+};
+
+describe("given an own decision model whose key is refused for every row", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A run page whose every row was refused for the decision model's key fails with that reason" */
+    /** @scenario "A run whose own decision model refused the key for every row fails" */
+    it("throws the key refusal and writes nothing", async () => {
+      const { service, judgments } = await judging({
+        ...TWO_ROWS,
+        answer: async () => KEY_REFUSED,
+      });
+
+      const page = service.judgePage(INPUT);
+
+      await expect(page).rejects.toThrow(InstantEvalDecisionModelKeyInvalidError);
+      await expect(page).rejects.toMatchObject({
+        code: "instant_eval_decision_model_key_invalid",
+        fault: "customer",
+      });
+      expect(judgments.written).toEqual([]);
+    });
+  });
+});
+
+describe("given an own decision model whose key is refused for only some rows", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A run page with only some rows refused for the key, or skipped for another reason, is recorded" */
+    it("records the page with the refused rows as skips", async () => {
+      const { service, judgments } = await judging({
+        ...TWO_ROWS,
+        answer: async ({ index }) => (index === 0 ? judged(0.9) : KEY_REFUSED),
+        concurrency: 1,
+      });
+
+      const outcome = await service.judgePage(INPUT);
+
+      expect(outcome).toMatchObject({ rows: 2, matched: 1, skipped: 1, failed: 0 });
+      expect(judgments.written[0]).toMatchObject([
+        { TraceId: "t1", Status: "judged" },
+        { TraceId: "t2", Status: "skipped", Error: "classifier_key_invalid" },
+      ]);
+    });
+  });
+});
+
+describe("given LangWatch's own decision model whose key is refused for every row", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A run page refused for LangWatch's own key is recorded, not blamed on the customer" */
+    it("records the rows as skips rather than failing the run", async () => {
+      const { service, judgments } = await judging({
+        ...TWO_ROWS,
+        answer: async () => KEY_REFUSED,
+        isOwnDecisionModel: false,
+      });
+
+      const outcome = await service.judgePage(INPUT);
+
+      expect(outcome).toMatchObject({ rows: 2, skipped: 2, failed: 0 });
+      expect(judgments.written).toHaveLength(1);
+    });
+  });
+});
+
+describe("given a deployment with no classifier for every row", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A run page with only some rows refused for the key, or skipped for another reason, is recorded" */
+    it("records the rows as skips rather than failing the run", async () => {
+      const { service, judgments } = await judging({
+        ...TWO_ROWS,
+        answer: async () => instantEvalSkipped("classifier_not_configured"),
+      });
+
+      const outcome = await service.judgePage(INPUT);
+
+      expect(outcome).toMatchObject({ rows: 2, skipped: 2, failed: 0 });
+      expect(judgments.written).toHaveLength(1);
+    });
+  });
+});
+
+describe("given a judge that loses more than half the page", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A page that mostly failed is thrown so the queue delivers it again" */
+    it("throws rather than recording a mostly empty page", async () => {
+      const { service, judgments } = await judging({
+        keyPage: { keys: [rowKey("t1"), rowKey("t2"), rowKey("t3")], hasMore: false },
+        rows: [
+          { TraceId: "t1", annoyed: "one" },
+          { TraceId: "t2", annoyed: "two" },
+          { TraceId: "t3", annoyed: "three" },
+        ],
+        answer: async ({ index }) => {
+          if (index === 0) return judged(0.9);
+
+          throw new Error("the judge is down");
+        },
+      });
+
+      await expect(service.judgePage(INPUT)).rejects.toThrow(/lost \d+% of its judgements/);
+      expect(judgments.written).toEqual([]);
+    });
+  });
+});
+
+describe("given a judge that answers nothing at all", () => {
+  describe("when the page is judged", () => {
+    it("refuses the page rather than writing one of nulls", async () => {
+      const { service, judgments } = await judging({
+        keyPage: { keys: [rowKey("t1")], hasMore: false },
+        rows: [{ TraceId: "t1", annoyed: "one" }],
+        answer: async () => {
+          throw new Error("the judge is down");
+        },
+      });
+
+      await expect(service.judgePage(INPUT)).rejects.toThrow(InstantEvalClassifierUnavailableError);
+      expect(judgments.written).toEqual([]);
+    });
+  });
+});
+
+/** A handled reason the hosted judge fails with when LangWatch is not reached. */
+class UnreachableError extends HandledError {
+  constructor() {
+    super("connect_unreachable", "LangWatch-hosted services were not reached", {
+      httpStatus: 503,
+      fault: "customer",
+    });
+  }
+}
+
+describe("given a judge that fails every row with the same handled reason", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A page the judge could not answer at all fails with the judge's own reason" */
+    it("throws that reason so the failed run carries its code", async () => {
+      const { service, judgments } = await judging({
+        keyPage: { keys: [rowKey("t1"), rowKey("t2")], hasMore: false },
+        rows: [
+          { TraceId: "t1", annoyed: "one" },
+          { TraceId: "t2", annoyed: "two" },
+        ],
+        answer: async () => {
+          throw new UnreachableError();
+        },
+      });
+
+      await expect(service.judgePage(INPUT)).rejects.toMatchObject({ code: "connect_unreachable" });
+      expect(judgments.written).toEqual([]);
+    });
+  });
+});
+
+describe("given a judge that fails every row for different reasons", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A page the judge could not answer for mixed reasons fails as the judge being unavailable" */
+    it("throws the judge being unavailable", async () => {
+      const { service } = await judging({
+        keyPage: { keys: [rowKey("t1"), rowKey("t2")], hasMore: false },
+        rows: [
+          { TraceId: "t1", annoyed: "one" },
+          { TraceId: "t2", annoyed: "two" },
+        ],
+        answer: async ({ index }) => {
+          if (index === 0) {
+            throw new UnreachableError();
+          }
+          throw new Error("the judge is down");
+        },
+      });
+
+      await expect(service.judgePage(INPUT)).rejects.toThrow(InstantEvalClassifierUnavailableError);
+    });
+  });
+});
+
+describe("given a run whose organization has spent its allowance", () => {
+  describe("when the next page comes up", () => {
+    it("refuses before reading anything, so a stopped run is never reported complete", async () => {
+      const { service, judge, texts } = await judging({
+        keyPage: { keys: [rowKey("t1")], hasMore: true },
+        rows: [{ TraceId: "t1", annoyed: "one" }],
+        assertWithinBudget: async () => {
+          throw new InstantEvalFreeBudgetExhaustedError({ spentUsd: 2, budgetUsd: 1 });
+        },
+      });
+
+      await expect(service.judgePage(INPUT)).rejects.toThrow(InstantEvalFreeBudgetExhaustedError);
+      expect(texts.asked).toEqual([]);
+      expect(judge.requests).toEqual([]);
+    });
+  });
+});
+
+describe("given a run whose spend so far reaches a gateway budget set to block", () => {
+  describe("when the next page comes up", () => {
+    /** @scenario "A run under way stops between pages once its spend reaches a blocking budget" */
+    it("refuses before reading anything, projecting the run's own spend", async () => {
+      const checked: number[] = [];
+      const { service, judge, texts } = await judging({
+        keyPage: { keys: [rowKey("t1")], hasMore: true },
+        rows: [{ TraceId: "t1", annoyed: "one" }],
+        runCostUsd: 0.002,
+        assertWithinGatewayBudget: async ({ inFlightUsd }) => {
+          checked.push(inFlightUsd ?? 0);
+          throw new InstantEvalGatewayBudgetExceededError({
+            budgetId: "budget-1",
+            scope: "project",
+            window: "month",
+            limitUsd: 5,
+            spentUsd: 5,
+          });
+        },
+      });
+
+      await expect(service.judgePage(INPUT)).rejects.toThrow(InstantEvalGatewayBudgetExceededError);
+      // $0.002 of routed cost at the 1.3 markup, the same figure the free budget is asked with.
+      expect(checked).toEqual([0.0026]);
+      expect(texts.asked).toEqual([]);
+      expect(judge.requests).toEqual([]);
+    });
+  });
+});
+
+describe("given a routed run whose cost so far came with no input tokens", () => {
+  describe("when the next page checks the budget", () => {
+    /** @scenario "A routed cost with no input tokens is still billed" */
+    it("counts that cost at the markup, never as nothing spent", async () => {
+      const checked: number[] = [];
+      const { service } = await judging({
+        keyPage: { keys: [], hasMore: false },
+        rows: [],
+        runCostUsd: 0.002,
+        assertWithinBudget: async ({ inFlightUsd }) => {
+          checked.push(inFlightUsd ?? 0);
+          return undefined;
+        },
+      });
+
+      await service.judgePage(INPUT);
+
+      // $0.002 of routed cost at the 1.3 markup.
+      expect(checked).toEqual([0.0026]);
+    });
+  });
+});
+
+describe("given a run cancelled before the page started", () => {
+  describe("when the page comes up", () => {
+    it("judges nothing and reports no next page", async () => {
+      const { service, judge, cancellation } = await judging({
+        keyPage: { keys: [rowKey("t1")], hasMore: true },
+        rows: [{ TraceId: "t1", annoyed: "one" }],
+      });
+      await cancellation.request();
+
+      const outcome = await service.judgePage(INPUT);
+
+      expect(outcome).toMatchObject({ rows: 0, requests: 0, hasNextPage: false, cursor: null });
+      expect(judge.requests).toEqual([]);
+    });
+  });
+});
+
+describe("given a page intent whose lease has less than the margin left", () => {
+  describe("when the page is judged", () => {
+    /** @scenario "A page with no lease left is not started" */
+    it("throws without reading or judging, so a fresh lease delivers it again", async () => {
+      const { service, judge, texts } = await judging({
+        keyPage: { keys: [rowKey("t1")], hasMore: true },
+        rows: [{ TraceId: "t1", annoyed: "one" }],
+      });
+
+      await expect(
+        service.judgePage({ ...INPUT, deadlineAt: AT.epochMilliseconds + 1_000 }),
+      ).rejects.toThrow(/no lease left/);
+      expect(judge.requests).toEqual([]);
+      expect(texts.asked).toEqual([]);
+    });
+  });
+});
+
+describe("given a page cancelled while it was judging", () => {
+  describe("when it is written", () => {
+    /** @scenario "A page cancelled part way ends the run where it got to" */
+    it("keeps what answered, names the stop on the rest, and reports no next page", async () => {
+      vi.useFakeTimers();
+      const cancellation = new ScriptedCancellation();
+      try {
+        const scripted = await judging({
+          cancellation,
+          keyPage: { keys: [rowKey("t1"), rowKey("t2"), rowKey("t3")], hasMore: true },
+          rows: [
+            { TraceId: "t1", annoyed: "one" },
+            { TraceId: "t2", annoyed: "two" },
+            { TraceId: "t3", annoyed: "three" },
+          ],
+          concurrency: 1,
+          answer: async ({ index, signal }) => {
+            if (index === 0) return judged(0.9);
+            await cancellation.request();
+            // The watch polls on its own interval; the page sees the stop only
+            // once that interval has come round.
+            await vi.advanceTimersByTimeAsync(2_000);
+            if (signal?.aborted) throw new DOMException("stopped", "AbortError");
+
+            return judged(0.1);
+          },
+        });
+
+        const outcome = await scripted.service.judgePage(INPUT);
+
+        expect(scripted.judgments.written[0]).toMatchObject([
+          { TraceId: "t1", Status: "judged", Probability: 0.9 },
+        ]);
+        expect(outcome).toMatchObject({ rows: 1, cursor: "t1", hasNextPage: false });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+});
+
+describe("given a page cancelled after every answered row was refused for the key", () => {
+  describe("when it is written", () => {
+    /** @scenario "A page cancelled part way ends the run where it got to" */
+    it("cuts the page at the stop instead of failing the run", async () => {
+      vi.useFakeTimers();
+      const cancellation = new ScriptedCancellation();
+      try {
+        const scripted = await judging({
+          cancellation,
+          ...TWO_ROWS,
+          concurrency: 1,
+          answer: async ({ index, signal }) => {
+            if (index === 0) return KEY_REFUSED;
+            await cancellation.request();
+            await vi.advanceTimersByTimeAsync(2_000);
+            if (signal?.aborted) throw new DOMException("stopped", "AbortError");
+
+            return KEY_REFUSED;
+          },
+        });
+
+        const outcome = await scripted.service.judgePage(INPUT);
+
+        expect(outcome).toMatchObject({ rows: 1, skipped: 1, cursor: "t1", hasNextPage: false });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+});
+
+describe("given a page intent leased for a while", () => {
+  /** A lease that leaves the page this many milliseconds to judge in. */
+  const leasedFor = (ms: number) =>
+    AT.epochMilliseconds + INSTANT_EVAL_PAGE_SETTLE_MS + INSTANT_EVAL_CANCEL_POLL_MS + ms;
+  const untilStopped = (signal: AbortSignal | undefined) =>
+    new Promise<InstantEvalJudgement>((_resolve, reject) => {
+      signal?.addEventListener("abort", () => reject(new DOMException("stopped", "AbortError")));
+    });
+  const threeRows = {
+    keyPage: { keys: [rowKey("t1"), rowKey("t2"), rowKey("t3")], hasMore: true },
+    rows: [
+      { TraceId: "t1", annoyed: "one" },
+      { TraceId: "t2", annoyed: "two" },
+      { TraceId: "t3", annoyed: "three" },
+    ],
+    concurrency: 1,
+  };
+
+  describe("when the lease runs down while the page is judging", () => {
+    /** @scenario "A page judges under a deadline inside its lease" */
+    it("stops before the lease lapses and reports where to resume", async () => {
+      const { service, judgments } = await judging({
+        ...threeRows,
+        answer: async ({ index, signal }) => (index === 0 ? judged(0.9) : untilStopped(signal)),
+      });
+
+      const outcome = await service.judgePage({ ...INPUT, deadlineAt: leasedFor(50) });
+
+      expect(judgments.written[0]).toMatchObject([{ TraceId: "t1", Status: "judged" }]);
+      expect(outcome).toMatchObject({ rows: 1, cursor: "t1", hasNextPage: true });
+    });
+  });
+
+  describe("when the deadline lands before any row answered", () => {
+    /** @scenario "A page judges under a deadline inside its lease" */
+    it("writes nothing and keeps the cursor where the page started", async () => {
+      const { service, judgments } = await judging({
+        ...threeRows,
+        answer: async ({ signal }) => untilStopped(signal),
+      });
+
+      const outcome = await service.judgePage({ ...INPUT, deadlineAt: leasedFor(50) });
+
+      expect(judgments.written.flat()).toEqual([]);
+      expect(outcome).toMatchObject({ rows: 0, cursor: null, hasNextPage: true });
+    });
+  });
+});
+
+describe("given judgements that cannot be written", () => {
+  describe("when the page is judged", () => {
+    it("fails the page, so the redelivery writes them before it is recorded", async () => {
+      const { service } = await judging({
+        keyPage: { keys: [rowKey("t1")], hasMore: false },
+        rows: [{ TraceId: "t1", annoyed: "one" }],
+        onInsert: () => {
+          throw new Error("the judgements table is unreachable");
+        },
+      });
+
+      await expect(service.judgePage(INPUT)).rejects.toThrow(/unreachable/);
+    });
+  });
+});

@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-if TYPE_CHECKING:
-    from ..models.post_api_governance_ingestion_templates_response_400_error import (
-        PostApiGovernanceIngestionTemplatesResponse400Error,
-    )
-
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="PostApiGovernanceIngestionTemplatesResponse400")
 
@@ -19,14 +15,18 @@ T = TypeVar("T", bound="PostApiGovernanceIngestionTemplatesResponse400")
 class PostApiGovernanceIngestionTemplatesResponse400:
     """
     Attributes:
-        error (PostApiGovernanceIngestionTemplatesResponse400Error):
+        error (str):
+        message (str | Unset):
     """
 
-    error: PostApiGovernanceIngestionTemplatesResponse400Error
+    error: str
+    message: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        error = self.error.to_dict()
+        error = self.error
+
+        message = self.message
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -35,20 +35,21 @@ class PostApiGovernanceIngestionTemplatesResponse400:
                 "error": error,
             }
         )
+        if message is not UNSET:
+            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.post_api_governance_ingestion_templates_response_400_error import (
-            PostApiGovernanceIngestionTemplatesResponse400Error,
-        )
-
         d = dict(src_dict)
-        error = PostApiGovernanceIngestionTemplatesResponse400Error.from_dict(d.pop("error"))
+        error = d.pop("error")
+
+        message = d.pop("message", UNSET)
 
         post_api_governance_ingestion_templates_response_400 = cls(
             error=error,
+            message=message,
         )
 
         post_api_governance_ingestion_templates_response_400.additional_properties = d

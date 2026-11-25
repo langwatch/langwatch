@@ -1,7 +1,6 @@
 /**
- * What the session context hook does when the collector rejects its key: the
- * one path where the hook repairs the device rather than staying silent.
- *
+ * What the session context hook does when the collector rejects its key:
+ * the one path where the hook repairs the device rather than staying silent.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
@@ -10,13 +9,7 @@ import * as path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  ENDPOINT,
-  installHookHarness,
-  NOW,
-  type PostedRequest,
-  SESSION_ID,
-} from "./hook-harness";
+import { ENDPOINT, installHookHarness, NOW, type PostedRequest, SESSION_ID } from "./hook-harness";
 
 const hook = installHookHarness();
 const { posted } = hook;
@@ -37,6 +30,7 @@ const DECLINED = { status: "declined" } as const;
 const FAILED = { status: "failed" } as const;
 /** The platform said a person revoked the key on purpose. */
 const WITHHELD = { status: "withheld" } as const;
+const EXPIRED = { status: "expired" } as const;
 
 /** A collector that rejects the old bearer and accepts the fresh one. */
 const rotatedCollector: typeof fetch = ((
@@ -67,7 +61,7 @@ describe("the session context hook's self-heal", () => {
       });
 
       expect(healRevokedKey).toHaveBeenCalledWith({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: OLD,
       });
       expect(posted.map((request) => request.headers.Authorization)).toEqual([
@@ -112,6 +106,31 @@ describe("the session context hook's self-heal", () => {
       });
 
       expect(hook.stdout).toEqual([]);
+      expect(hook.exits).toEqual([]);
+    });
+  });
+
+  describe("given a rejected key on a tool pinned to a project", () => {
+    /** @scenario "A rejected pinned key is reported rather than healed" */
+    it("tells the user the pinned key was rejected and mints nothing", async () => {
+      const healRevokedKey = vi.fn().mockResolvedValue(DECLINED);
+
+      await hook.runHook({
+        shouldOmitExporterEnv: true,
+        fetchImpl: hook.collector(401),
+        healRevokedKey,
+        readCliConfig: () => ({
+          control_plane_url: "https://app.example.com",
+          tool_project_keys: { claude: { secret: "sk-lw-pinned_secret" } },
+        }),
+      });
+
+      expect(healRevokedKey).not.toHaveBeenCalled();
+      expect(posted).toHaveLength(1);
+      expect(hook.stdout).toHaveLength(1);
+      expect(JSON.parse(hook.stdout[0]!)).toEqual({
+        systemMessage: expect.stringContaining("pinned"),
+      });
       expect(hook.exits).toEqual([]);
     });
   });
@@ -213,11 +232,7 @@ describe("the session context hook's self-heal", () => {
 
       expect(healRevokedKey).toHaveBeenCalledTimes(1);
       // The takeover marker is not left behind to cost the next window.
-      expect(
-        fs.existsSync(
-          path.join(hook.stateDir, "heal-claude_code.json.takeover"),
-        ),
-      ).toBe(false);
+      expect(fs.existsSync(path.join(hook.stateDir, "heal-claude_code.json.takeover"))).toBe(false);
     });
 
     /** @scenario "A hook that loses the takeover leaves the winner's claim alone" */
@@ -227,14 +242,8 @@ describe("the session context hook's self-heal", () => {
       // write, so it stands down on the marker rather than on the claim.
       fs.mkdirSync(hook.stateDir, { recursive: true });
       const claim = path.join(hook.stateDir, "heal-claude_code.json");
-      fs.writeFileSync(
-        claim,
-        JSON.stringify({ attemptedAt: NOW - 11 * 60_000 }),
-      );
-      fs.writeFileSync(
-        `${claim}.takeover`,
-        JSON.stringify({ attemptedAt: NOW }),
-      );
+      fs.writeFileSync(claim, JSON.stringify({ attemptedAt: NOW - 11 * 60_000 }));
+      fs.writeFileSync(`${claim}.takeover`, JSON.stringify({ attemptedAt: NOW }));
       const healRevokedKey = vi.fn().mockResolvedValue(DECLINED);
 
       await hook.runHook({
@@ -262,7 +271,7 @@ describe("the session context hook's self-heal", () => {
       });
 
       expect(healRevokedKey).toHaveBeenCalledWith({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: undefined,
       });
       expect(hook.stdout).toEqual([]);
@@ -271,19 +280,14 @@ describe("the session context hook's self-heal", () => {
 
     /** @scenario "A decline does not spend the heal throttle" */
     it("does not spend the throttle, so the next repairable 401 still heals", async () => {
-      const healRevokedKey = vi
-        .fn()
-        .mockResolvedValueOnce(DECLINED)
-        .mockResolvedValueOnce(HEALED);
+      const healRevokedKey = vi.fn().mockResolvedValueOnce(DECLINED).mockResolvedValueOnce(HEALED);
 
       // First session: no bearer to reject, so the healer declines.
       await hook.runHook({
         fetchImpl: hook.collector(401),
         healRevokedKey,
       });
-      expect(
-        fs.existsSync(path.join(hook.stateDir, "heal-claude_code.json")),
-      ).toBe(false);
+      expect(fs.existsSync(path.join(hook.stateDir, "heal-claude_code.json"))).toBe(false);
 
       // Second session, inside the ten-minute window, now carrying the key the
       // collector rejects. It must still be healed.
@@ -295,7 +299,7 @@ describe("the session context hook's self-heal", () => {
 
       expect(healRevokedKey).toHaveBeenCalledTimes(2);
       expect(healRevokedKey).toHaveBeenLastCalledWith({
-        agent: "claude_code",
+        sourceType: "claude_code",
         rejectedToken: OLD,
       });
       expect(hook.stdout).toHaveLength(1);
@@ -311,10 +315,25 @@ describe("the session context hook's self-heal", () => {
         healRevokedKey: vi.fn().mockResolvedValue(FAILED),
       });
 
-      expect(
-        fs.existsSync(path.join(hook.stateDir, "heal-claude_code.json")),
-      ).toBe(true);
+      expect(fs.existsSync(path.join(hook.stateDir, "heal-claude_code.json"))).toBe(true);
       expect(hook.stdout).toEqual([]);
+    });
+  });
+
+  describe("given a device the platform refuses to authenticate", () => {
+    /** @scenario "A signed-out device is told to sign in again" */
+    it("tells the user to sign the machine in again", async () => {
+      await hook.runHook({
+        env: OLD_KEY_ENV,
+        fetchImpl: rotatedCollector,
+        healRevokedKey: vi.fn().mockResolvedValue(EXPIRED),
+      });
+
+      expect(hook.stdout).toHaveLength(1);
+      const notice = JSON.parse(hook.stdout[0]!) as { systemMessage: string };
+      expect(notice.systemMessage).toContain("signed out");
+      expect(notice.systemMessage).toContain("langwatch login --device");
+      expect(hook.exits).toEqual([]);
     });
   });
 
@@ -327,9 +346,7 @@ describe("the session context hook's self-heal", () => {
         healRevokedKey: vi.fn().mockResolvedValue(WITHHELD),
       });
 
-      expect(posted.map((request) => request.headers.Authorization)).toEqual([
-        `Bearer ${OLD}`,
-      ]);
+      expect(posted.map((request) => request.headers.Authorization)).toEqual([`Bearer ${OLD}`]);
       expect(hook.stdout).toHaveLength(1);
       const notice = JSON.parse(hook.stdout[0]!) as { systemMessage: string };
       expect(notice.systemMessage).toContain("revoked");
@@ -354,9 +371,7 @@ describe("the session context hook's self-heal", () => {
       });
 
       expect(healRevokedKey).toHaveBeenCalledTimes(1);
-      expect(
-        fs.existsSync(path.join(hook.stateDir, "heal-claude_code.json")),
-      ).toBe(true);
+      expect(fs.existsSync(path.join(hook.stateDir, "heal-claude_code.json"))).toBe(true);
     });
   });
 

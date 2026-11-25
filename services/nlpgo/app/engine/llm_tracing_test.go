@@ -54,7 +54,8 @@ func TestStartLLMSpan_NameAndReservedAttrs(t *testing.T) {
 	assert.Equal(t, "llm", attrs["langwatch.span.type"],
 		"span.type must be 'llm' — Studio's drawer groups by this exact reserved value to render LLM-flavored rows")
 	assert.Equal(t, "openai", attrs["gen_ai.system"])
-	assert.Equal(t, "gpt-5-mini", attrs["gen_ai.request.model"])
+	assert.Equal(t, "openai/gpt-5-mini", attrs["gen_ai.request.model"],
+		"the model must carry its provider prefix, as the SDK and gateway spans do, so one model is one row when traces are grouped by model")
 	assert.EqualValues(t, 12, attrs["gen_ai.usage.input_tokens"])
 	assert.EqualValues(t, 1, attrs["gen_ai.usage.output_tokens"])
 	assert.InDelta(t, 0.00018, toFloat(attrs["langwatch.cost"]), 1e-9)
@@ -79,6 +80,29 @@ func TestStartLLMSpan_NameAndReservedAttrs(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(outJSON), &outMsg))
 	assert.Equal(t, "assistant", outMsg.Role)
 	assert.Equal(t, "4", outMsg.Content)
+}
+
+// @scenario "A Studio or playground model call names the model with its provider"
+func TestStartLLMSpan_ModelID(t *testing.T) {
+	cases := []struct {
+		name, model, provider, want string
+	}{
+		{"prefixes a bare model with its provider", "gpt-5.6-terra", "openai", "openai/gpt-5.6-terra"},
+		{"prefixes a model with slashes of its own", "Qwen/Qwen2.5-32B-Instruct", "custom", "custom/Qwen/Qwen2.5-32B-Instruct"},
+		{"keeps a model that already starts with its provider", "openai/gpt-5-mini", "openai", "openai/gpt-5-mini"},
+		{"keeps the model when the provider is unknown", "gpt-5-mini", "", "gpt-5-mini"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := withRecorder(t)
+			_, llmSpan := startLLMSpan(context.Background(), tc.model, tc.provider, nil)
+			endLLMSpan(llmSpan, &app.LLMResponse{Content: "ok"}, nil)
+			spans := rec.Ended()
+			require.Len(t, spans, 1)
+			assert.Equal(t, tc.want, attrMap(spans[0].Attributes())["gen_ai.request.model"])
+			assert.Equal(t, tc.want, spans[0].Name(), "the span name spells the model the same way")
+		})
+	}
 }
 
 // TestEndLLMSpan_ErrorPathDoesNotStampOutput pins the error-path
@@ -139,6 +163,47 @@ func TestEndLLMSpan_NilResponseNilErrorIsTreatedAsError(t *testing.T) {
 	assert.Contains(t, attrs, "error.message")
 	assert.NotContains(t, attrs, "langwatch.output",
 		"no output to stamp — there's no real assistant reply on a contract break")
+}
+
+// @scenario "The LLM span carries cache counts only when the reply has them"
+func TestEndLLMSpan_StampsCacheCountsOnlyWhenPresent(t *testing.T) {
+	tests := []struct {
+		name         string
+		usage        app.Usage
+		wantRead     int64
+		wantCreation int64
+	}{
+		{"both counts", app.Usage{PromptTokens: 100, CacheReadInputTokens: 80, CacheCreationInputTokens: 15}, 80, 15},
+		{"zero counts", app.Usage{PromptTokens: 100}, 0, 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := withRecorder(t)
+
+			tracer := otelapi.Tracer(tracerName)
+			parentCtx, parent := tracer.Start(context.Background(), "test-parent")
+			defer parent.End()
+
+			_, llmSpan := startLLMSpan(parentCtx, "gpt-5-mini", "openai", []app.ChatMessage{
+				{Role: "user", Content: "hi"},
+			})
+			endLLMSpan(llmSpan, &app.LLMResponse{Content: "ok", Usage: tc.usage}, nil)
+
+			spans := rec.Ended()
+			require.Len(t, spans, 1)
+			attrs := attrMap(spans[0].Attributes())
+			if tc.wantRead == 0 {
+				assert.NotContains(t, attrs, "gen_ai.usage.cache_read.input_tokens")
+			} else {
+				assert.EqualValues(t, tc.wantRead, attrs["gen_ai.usage.cache_read.input_tokens"])
+			}
+			if tc.wantCreation == 0 {
+				assert.NotContains(t, attrs, "gen_ai.usage.cache_creation.input_tokens")
+			} else {
+				assert.EqualValues(t, tc.wantCreation, attrs["gen_ai.usage.cache_creation.input_tokens"])
+			}
+		})
+	}
 }
 
 // toFloat coerces an attribute value (recorder serializes numbers as

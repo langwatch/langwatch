@@ -8,16 +8,19 @@ sidebarTitle: AWS Bedrock
 
 Open **Settings > Model Providers**, click **Add Model Provider** and select **Bedrock**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-| Field | Value |
-|---|---|
-| `AWS_ACCESS_KEY_ID` | The access key id of an IAM user. |
-| `AWS_SECRET_ACCESS_KEY` | The matching secret access key. |
-| `AWS_REGION_NAME` | The region the models are enabled in, for example `us-east-1`. |
+| Field                   | Value                                                          |
+| ----------------------- | -------------------------------------------------------------- |
+| `AWS_ACCESS_KEY_ID`     | The access key id of an IAM user.                              |
+| `AWS_SECRET_ACCESS_KEY` | The matching secret access key.                                |
+| `AWS_REGION_NAME`       | The region the models are enabled in, for example `us-east-1`. |
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
 <Frame caption="The Bedrock row: access key id, secret access key and region.">
-  <img src="/images/ai-gateway/model-provider-bedrock-form.png" alt="The Bedrock provider drawer with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_REGION_NAME eu-central-1" />
+  <img
+    src="/images/ai-gateway/model-provider-bedrock-form.png"
+    alt="The Bedrock provider drawer with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_REGION_NAME eu-central-1"
+  />
 </Frame>
 
 All three fields are required. The form has no field for a session token, so use a long-lived IAM user key and not a temporary role session credential. The form has no field for a VPC endpoint.
@@ -44,13 +47,13 @@ curl https://gateway.langwatch.ai/v1/chat/completions \
 
 ## Endpoints
 
-| Endpoint | Served |
-|---|---|
-| `POST /v1/chat/completions` | Yes |
-| `POST /v1/messages` | Yes, translated |
-| `POST /v1/embeddings` | Yes, for Bedrock embedding models |
+| Endpoint                                               | Served                                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `POST /v1/chat/completions`                            | Yes                                                                                              |
+| `POST /v1/messages`                                    | Yes, translated                                                                                  |
+| `POST /v1/embeddings`                                  | Yes, for Bedrock embedding models                                                                |
 | `POST /v1/images/generations`, `POST /v1/images/edits` | No. Bedrock answers `400` with "The provided model identifier is invalid." for every image model |
-| `GET /v1/models` | Yes, the ids under Custom Models |
+| `GET /v1/models`                                       | Yes, the ids under Custom Models                                                                 |
 
 `cache_control` blocks on Anthropic models become Converse `cachePoint` markers, and the cache token counts come back in `usage`. See [Cache control](/ai-gateway/cache-control).
 

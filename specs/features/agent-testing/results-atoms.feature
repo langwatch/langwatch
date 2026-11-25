@@ -82,6 +82,14 @@ Feature: The results atom
     inputs instead, resolved to scenario ids before the query runs, and the
     page names a scenario from the id the atom already carries.
 
+  @unit
+  Scenario: An atom with its evaluator results is one the Results tab accepts
+    Given a run whose evaluators reported results
+    And a run no evaluator ran on
+    When the atom of each run is read
+    Then the Results tab's page of atoms accepts both
+    And each atom carries one entry per evaluator that ran
+
   @integration
   Scenario: An atom carries the target the run was pointed at
     Given a run pointed at a prompt target

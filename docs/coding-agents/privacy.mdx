@@ -35,7 +35,7 @@ Permissions gate what any viewer sees even inside an allowed project: a viewer w
 
 ## What the organization can remove
 
-An organization that must not store conversational content sets input, output and system instructions to **Drop** in the [data privacy policy](/ai-governance/data-privacy). LangWatch strips dropped content at ingestion, before storage, on every ingestion path, coding-agent telemetry included.
+An organization that must not store conversational content sets input, output and system instructions to **Drop** in the [data privacy policy](/platform/data-privacy). LangWatch strips dropped content at ingestion, before storage, on every ingestion path, coding-agent telemetry included.
 
 What survives is metadata: model, tokens, cost, latency, timings, status, identity. The rollups keep working, and no person can read what was asked or answered.
 
@@ -55,4 +55,4 @@ Credentials that appear in prompts or tool output are replaced with a `[SECRET]`
 
 Stored data expires on a schedule the organization sets, resolved per project. See [Data retention](/platform/data-retention).
 
-**Also check:** [Data privacy policy](/ai-governance/data-privacy) for the full policy reference: scopes, dispositions, audiences and PII redaction.
+**Also check:** [Data privacy policy](/platform/data-privacy) for the full policy reference: scopes, dispositions, audiences and PII redaction.

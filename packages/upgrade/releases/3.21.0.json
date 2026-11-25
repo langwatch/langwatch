@@ -1,0 +1,1079 @@
+{
+  "release": "3.21.0",
+  "previous": "3.20.1",
+  "cutAt": "2026-10-21T23:21:19+02:00",
+  "steps": [
+    {
+      "id": "prisma:20261001120001_organization_instant_evals_opt_in",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: organization instant evals opt in"
+    },
+    {
+      "id": "prisma:20261001120002_developer_seat",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: developer seat"
+    },
+    {
+      "id": "prisma:20261002090000_join_request_origin",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: join request origin"
+    },
+    {
+      "id": "prisma:20261006120000_process_outbox_lease_by_process_index",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: process outbox lease by process index"
+    },
+    {
+      "id": "prisma:20261006120001_grant_condition",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "share",
+      "description": "Postgres schema: grant condition"
+    },
+    {
+      "id": "prisma:20261006120002_project_aggregate_rule",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "project",
+      "description": "Postgres schema: project aggregate rule"
+    },
+    {
+      "id": "prisma:20261006150001_authz_user_standing",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: authz user standing"
+    },
+    {
+      "id": "prisma:20261006150002_gateway_trace_export_key",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: gateway trace export key"
+    },
+    {
+      "id": "prisma:20261006150003_api_key_system_managed",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: api key system managed"
+    },
+    {
+      "id": "prisma:20261006160000_organization_dataset_attachment_max_mb",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: organization dataset attachment max mb"
+    },
+    {
+      "id": "prisma:20261006170500_audit_log_idempotency_key",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "audit-log",
+      "description": "Postgres schema: audit log idempotency key"
+    },
+    {
+      "id": "prisma:20261006170501_web_push",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "notification",
+      "description": "Postgres schema: web push"
+    },
+    {
+      "id": "prisma:20261006170502_stored_objects",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "stored-object",
+      "description": "Postgres schema: stored objects"
+    },
+    {
+      "id": "prisma:20261006170503_feature_flag_experiment_settings",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "feature-flag",
+      "description": "Postgres schema: feature flag experiment settings"
+    },
+    {
+      "id": "prisma:20261006170504_sso_authentication_activity_provider_account_id",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: sso authentication activity provider account id"
+    },
+    {
+      "id": "prisma:20261006170505_project_active_day",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: project active day"
+    },
+    {
+      "id": "prisma:20261006170506_virtual_key_connect_services",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: virtual key connect services"
+    },
+    {
+      "id": "prisma:20261006170507_virtual_key_license_facts",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: virtual key license facts"
+    },
+    {
+      "id": "prisma:20261006170508_gateway_connect_upstream",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: gateway connect upstream"
+    },
+    {
+      "id": "prisma:20261006170509_dataset_source_stored_object",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "dataset",
+      "description": "Postgres schema: dataset source stored object"
+    },
+    {
+      "id": "prisma:20261006170510_issued_license_seats_raised_from",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: issued license seats raised from"
+    },
+    {
+      "id": "prisma:20261006170511_connected_seat_change_not_onboarded",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: connected seat change not onboarded"
+    },
+    {
+      "id": "prisma:20261006170512_role_name_live_unique_bindings_not_unique",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: role name live unique bindings not unique"
+    },
+    {
+      "id": "prisma:20261006170513_slack_connection_claim",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "slack",
+      "description": "Postgres schema: slack connection claim"
+    },
+    {
+      "id": "prisma:20261006170514_nurturing_read_model",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: nurturing read model"
+    },
+    {
+      "id": "prisma:20261006170515_nurturing_simulation_run_count",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "nurturing",
+      "description": "Postgres schema: nurturing simulation run count"
+    },
+    {
+      "id": "prisma:20261006170516_billing_checkpoint_counted_event_id",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: billing checkpoint counted event id"
+    },
+    {
+      "id": "prisma:20261006170517_user_notification_preferences",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "user",
+      "description": "Postgres schema: user notification preferences"
+    },
+    {
+      "id": "prisma:20261006170518_trace_ingest_source_billing",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: trace ingest source billing"
+    },
+    {
+      "id": "prisma:20261006170519_virtual_key_license_instance_id",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: virtual key license instance id"
+    },
+    {
+      "id": "prisma:20261006170520_virtual_key_license_expires_at",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: virtual key license expires at"
+    },
+    {
+      "id": "prisma:20261006170521_connected_seat_change_currency_optional",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: connected seat change currency optional"
+    },
+    {
+      "id": "prisma:20261006170522_connected_seat_change_organization_id",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: connected seat change organization id"
+    },
+    {
+      "id": "prisma:20261006170527_data_privacy_project_scope",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: data privacy project scope"
+    },
+    {
+      "id": "prisma:20261006180001_gateway_realtime_session_metering",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: gateway realtime session metering"
+    },
+    {
+      "id": "prisma:20261007140000_scim_sso_connection_view",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: scim sso connection view"
+    },
+    {
+      "id": "prisma:20261007140001_instant_eval_judge_tables",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: instant eval judge tables"
+    },
+    {
+      "id": "prisma:20261008150000_data_retention_project_scope",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: data retention project scope"
+    },
+    {
+      "id": "prisma:20261008180000_licensing_organization_license",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "licensing",
+      "description": "Postgres schema: licensing organization license"
+    },
+    {
+      "id": "prisma:20261008180001_auth_sign_in_security",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "auth",
+      "description": "Postgres schema: auth sign in security"
+    },
+    {
+      "id": "prisma:20261008180002_webhook_endpoint_signature_scheme",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "webhook",
+      "description": "Postgres schema: webhook endpoint signature scheme"
+    },
+    {
+      "id": "prisma:20261009120000_webhook_endpoint_idempotency_key",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "webhook",
+      "description": "Postgres schema: webhook endpoint idempotency key"
+    },
+    {
+      "id": "prisma:20261009140000_virtual_key_license_id",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: virtual key license id"
+    },
+    {
+      "id": "prisma:20261009160000_webhook_endpoint_allow_self_signed_certificate",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "webhook",
+      "description": "Postgres schema: webhook endpoint allow self signed certificate"
+    },
+    {
+      "id": "prisma:20261010120000_join_request_connection_id",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: join request connection id"
+    },
+    {
+      "id": "prisma:20261010150000_issued_license_lite_seats_unlimited",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: issued license lite seats unlimited"
+    },
+    {
+      "id": "prisma:20261010160000_activation_code_lite_seats_unlimited",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: activation code lite seats unlimited"
+    },
+    {
+      "id": "prisma:20261010170000_organization_kind",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: organization kind"
+    },
+    {
+      "id": "prisma:20261011120000_sign_in_provider_mount",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: sign in provider mount"
+    },
+    {
+      "id": "prisma:20261011140000_verification_token_value_not_unique",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: verification token value not unique"
+    },
+    {
+      "id": "prisma:20261011160000_organization_private_dataplane",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: organization private dataplane"
+    },
+    {
+      "id": "prisma:20261012120000_session_started_by_sign_up",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "auth",
+      "description": "Postgres schema: session started by sign up"
+    },
+    {
+      "id": "prisma:20261012210000_authz_engine_switch",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: authz engine switch"
+    },
+    {
+      "id": "prisma:20261012210100_identity_sign_in_switch",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: identity sign in switch"
+    },
+    {
+      "id": "prisma:20261012210101_dashboard_visibility",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "dashboard",
+      "description": "Postgres schema: dashboard visibility"
+    },
+    {
+      "id": "prisma:20261012210102_dashboard_favourites",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "dashboard",
+      "description": "Postgres schema: dashboard favourites"
+    },
+    {
+      "id": "prisma:20261012210103_dashboard_favourite_template",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "dashboard",
+      "description": "Postgres schema: dashboard favourite template"
+    },
+    {
+      "id": "prisma:20261012210104_dashboard_my_dashboard_starred",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "dashboard",
+      "description": "Postgres schema: dashboard my dashboard starred"
+    },
+    {
+      "id": "prisma:20261012210105_dashboard_scope",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "dashboard",
+      "description": "Postgres schema: dashboard scope"
+    },
+    {
+      "id": "prisma:20261012210106_insight_projections",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "insight",
+      "description": "Postgres schema: insight projections"
+    },
+    {
+      "id": "prisma:20261012210107_insight_board_and_replay",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "insight",
+      "description": "Postgres schema: insight board and replay"
+    },
+    {
+      "id": "prisma:20261012210108_insight_owner",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "insight",
+      "description": "Postgres schema: insight owner"
+    },
+    {
+      "id": "prisma:20261012210109_langy_conversation_origin",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: langy conversation origin"
+    },
+    {
+      "id": "prisma:20261012210110_insight_daily_schedule",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "insight",
+      "description": "Postgres schema: insight daily schedule"
+    },
+    {
+      "id": "prisma:20261012210111_insight_finding_key",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "insight",
+      "description": "Postgres schema: insight finding key"
+    },
+    {
+      "id": "prisma:20261012210112_insight_daily_schedule_off_reason",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "insight",
+      "description": "Postgres schema: insight daily schedule off reason"
+    },
+    {
+      "id": "prisma:20261014150000_process_manager_sweep_age_indexes",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: process manager sweep age indexes"
+    },
+    {
+      "id": "prisma:20261015120000_dashboards_v2_tables",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "dashboard",
+      "description": "Postgres schema: dashboards v2 tables"
+    },
+    {
+      "id": "prisma:20261020120000_upgrade_diagnostics",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: upgrade diagnostics"
+    },
+    {
+      "id": "clickhouse:00101",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "scenario",
+      "description": "ClickHouse schema: add simulation runs criteria"
+    },
+    {
+      "id": "clickhouse:00102",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "governance",
+      "description": "ClickHouse schema: create governance cost rollup charges"
+    },
+    {
+      "id": "clickhouse:00103",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "trace",
+      "description": "ClickHouse schema: trace summaries updated at index"
+    },
+    {
+      "id": "clickhouse:00104",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "entitlement",
+      "description": "ClickHouse schema: create usage trace meter"
+    },
+    {
+      "id": "clickhouse:00105",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "experiment",
+      "description": "ClickHouse schema: add experiment runs expected results"
+    },
+    {
+      "id": "clickhouse:00109",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "trace",
+      "description": "ClickHouse schema: add trace unpriced cost"
+    },
+    {
+      "id": "clickhouse:00110",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "trace",
+      "description": "ClickHouse schema: trace id indexes"
+    },
+    {
+      "id": "clickhouse:00111",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "ClickHouse schema: event log id index"
+    },
+    {
+      "id": "clickhouse:00112",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "evaluation",
+      "description": "ClickHouse schema: evaluation id indexes"
+    },
+    {
+      "id": "clickhouse:00113",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "analytics",
+      "description": "ClickHouse schema: analytics id indexes"
+    },
+    {
+      "id": "clickhouse:00114",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "experiment",
+      "description": "ClickHouse schema: experiment id indexes"
+    },
+    {
+      "id": "clickhouse:00115",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "scenario",
+      "description": "ClickHouse schema: scenario id indexes"
+    },
+    {
+      "id": "clickhouse:00116",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "suite",
+      "description": "ClickHouse schema: suite id indexes"
+    },
+    {
+      "id": "clickhouse:00117",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "coding-agent",
+      "description": "ClickHouse schema: coding agent id indexes"
+    },
+    {
+      "id": "clickhouse:00118",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "gateway",
+      "description": "ClickHouse schema: gateway id indexes"
+    },
+    {
+      "id": "clickhouse:00119",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "experiment",
+      "description": "ClickHouse schema: experiment second id index"
+    },
+    {
+      "id": "clickhouse:00120",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "scenario",
+      "description": "ClickHouse schema: scenario second id index"
+    },
+    {
+      "id": "clickhouse:00121",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "evaluation",
+      "description": "ClickHouse schema: evaluation second id index"
+    },
+    {
+      "id": "clickhouse:00122",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "evaluation",
+      "description": "ClickHouse schema: add evaluation runs attempts"
+    },
+    {
+      "id": "agent:move-http-credentials-to-secrets",
+      "kind": "data",
+      "mode": "background",
+      "owner": "agent",
+      "description": "Stores credentials typed into HTTP agents as project secrets.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "analytics:fill-lwql-project-keys",
+      "kind": "data",
+      "mode": "background",
+      "owner": "analytics",
+      "description": "Fills LangWatchQL's key map with every project's key that it lacks."
+    },
+    {
+      "id": "analytics:fill-id-indexes",
+      "kind": "data",
+      "mode": "background",
+      "owner": "analytics",
+      "description": "Fills the evaluation analytics id index from rows older than its view, then turns the lookup on per ClickHouse target.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "annotation:record-trace-annotations",
+      "kind": "data",
+      "mode": "background",
+      "owner": "annotation",
+      "description": "Records every existing annotation on its trace, so has-annotation search agrees with them.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "authz:engine",
+      "kind": "tenant",
+      "mode": "background",
+      "owner": "authz",
+      "description": "Turns each organization's existing access into the authorization engine's own records, verifies the engine gives the same answers, and then has the engine answer permission checks for that organization.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "authz:carry-over-engine-switch",
+      "kind": "data",
+      "mode": "background",
+      "owner": "authz",
+      "description": "Copies which organizations the authorization engine answers for from the migration state table into authz's own engine switch.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "automation:import-slack-connections",
+      "kind": "tenant",
+      "mode": "background",
+      "owner": "automation",
+      "description": "Moves each Slack automation's stored secret onto a Slack connection. Delivery does not change."
+    },
+    {
+      "id": "automation:reconcile-report-schedules",
+      "kind": "data",
+      "mode": "background",
+      "owner": "automation",
+      "description": "Gives every active report automation its schedule; reports already scheduled or paused are left alone."
+    },
+    {
+      "id": "automation:reconcile-report-schedules-after-rollout",
+      "kind": "data",
+      "mode": "background",
+      "owner": "automation",
+      "description": "Gives every active report automation its schedule; reports already scheduled or paused are left alone. Runs again once older images stop serving.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "automation:reconcile-slack-claims",
+      "kind": "data",
+      "mode": "background",
+      "owner": "automation",
+      "description": "Claims each active Slack automation's connection and releases claims no active automation holds.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "automation:unwrap-trigger-json-text",
+      "kind": "data",
+      "mode": "background",
+      "owner": "automation",
+      "description": "Rewrites automation filters and action settings an earlier release saved as quoted JSON text into JSON objects; text that is not a JSON object is left as it is.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "billing:record-usage-billing-catch-up",
+      "kind": "data",
+      "mode": "background",
+      "owner": "billing",
+      "description": "Records whether the meter bills each organisation, the fact the Instant Evals judge folds.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "billing:fill-seat-change-organizations",
+      "kind": "data",
+      "mode": "background",
+      "owner": "billing",
+      "description": "Names the organization on each connected seat change recorded before seat changes stored it, from its billing account.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "coding-agent:fill-id-indexes",
+      "kind": "data",
+      "mode": "background",
+      "owner": "coding-agent",
+      "description": "Fills the id indexes of coding-agent sessions, events and trace mappings from older rows, then marks them ready on each ClickHouse target.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "data-retention:keep-control-plane-events-forever",
+      "kind": "data",
+      "mode": "background",
+      "owner": "data-retention",
+      "description": "Keeps every event that is not customer telemetry forever, including those already stamped to expire.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "dataset:move-content-to-object-storage",
+      "kind": "data",
+      "mode": "background",
+      "owner": "dataset",
+      "description": "Moves each dataset's content out of Postgres and into object-storage chunks.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "evaluation:fill-id-indexes",
+      "kind": "data",
+      "mode": "background",
+      "owner": "evaluation",
+      "description": "Fills the evaluation run id index from rows older than its view, then turns the lookup on per ClickHouse target.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "evaluation:fill-second-id-indexes",
+      "kind": "data",
+      "mode": "background",
+      "owner": "evaluation",
+      "description": "Fills the second id index of evaluation runs (by trace id) from older rows, then marks it ready on each ClickHouse target.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "experiment:fill-id-indexes",
+      "kind": "data",
+      "mode": "background",
+      "owner": "experiment",
+      "description": "Fills the id indexes of experiment runs and DSPy steps from older rows, then marks them ready on each ClickHouse target.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "experiment:fill-second-id-indexes",
+      "kind": "data",
+      "mode": "background",
+      "owner": "experiment",
+      "description": "Fills the second id index of experiment runs (by experiment id) from older rows, then marks it ready on each ClickHouse target.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "gateway:fill-id-indexes",
+      "kind": "data",
+      "mode": "background",
+      "owner": "gateway",
+      "description": "Fills the id indexes of gateway spend and the budget ledger from older rows, then marks them ready on each ClickHouse target.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "governance:record-coding-assistant-billing",
+      "kind": "data",
+      "mode": "background",
+      "owner": "governance",
+      "description": "Records each organisation's coding-assistant billed facts, which trace folds at ingest.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "governance:migrate-anomaly-webhook-destinations",
+      "kind": "data",
+      "mode": "background",
+      "owner": "governance",
+      "description": "Annotates each inline anomaly webhook destination with a legacy-scheme endpoint.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "governance:replay-cost-charges",
+      "kind": "data",
+      "mode": "background",
+      "owner": "governance",
+      "description": "Fills the cost drift check's charge map from pulled usage over the settling window.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "identity:identifier-backfill",
+      "kind": "tenant",
+      "mode": "background",
+      "owner": "identity",
+      "description": "Records each member's existing sign-in methods as identity history and verifies the recorded data matches their accounts. Sign-in behavior does not change.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "identity:secret-heal",
+      "kind": "tenant",
+      "mode": "background",
+      "owner": "identity",
+      "description": "Keeps each member's stored sign-in credentials in step across the two places they can be written during the migration, so a password changed at any moment keeps working. Sign-in behavior does not change.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "identity:connection-grandfather",
+      "kind": "tenant",
+      "mode": "background",
+      "owner": "identity",
+      "description": "Records each organization's existing enterprise sign-in setup as connection history, and checks that it routes people exactly where the current setup does. Sign-in behavior does not change.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "identity:sso-domain-ownership-backfill",
+      "kind": "tenant",
+      "mode": "background",
+      "owner": "identity",
+      "description": "Records which organization owns each email domain its single sign-on connection has already proved, so sign-ins for those domains reach the connection. Domains that were never proved are not affected.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "identity:reopen-unproven-accounts-after-rollout",
+      "kind": "data",
+      "mode": "background",
+      "owner": "identity",
+      "description": "Returns accounts an older image finalized during the rollout to the legacy sign-in path.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "identity:carry-over-sign-in-switch",
+      "kind": "data",
+      "mode": "background",
+      "owner": "identity",
+      "description": "Copies which users sign in on the identifier path from the migration state table into identity's own sign-in switch.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "instant-eval:copy-judge-spend",
+      "kind": "data",
+      "mode": "background",
+      "owner": "instant-eval",
+      "description": "Copies each organisation's confirmed Instant Evals ledger spend into the judge's own spend, once per request.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "licensing:copy-organization-licenses",
+      "kind": "data",
+      "mode": "background",
+      "owner": "licensing",
+      "description": "Copies each organization's licence key and its dates into licensing's own licence table, overwriting a row that differs.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "model-provider:seal-plaintext-custom-keys",
+      "kind": "data",
+      "mode": "background",
+      "owner": "model-provider",
+      "description": "Encrypts model provider API keys still stored in plaintext.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "ops:copy-automation-migration-state",
+      "kind": "data",
+      "mode": "blocking",
+      "owner": "ops",
+      "description": "Carries organizations that finished or were enrolled in the Slack connections migration over to its new step, so it does not run for them again and keeps its enrolments."
+    },
+    {
+      "id": "ops:copy-identity-authz-migration-state",
+      "kind": "data",
+      "mode": "background",
+      "owner": "ops",
+      "description": "Carries users and organizations that finished, were rolled back in or were enrolled in the sign-in, credential repair, SSO and authorization engine migrations over to their new steps, so none runs for them again."
+    },
+    {
+      "id": "ops:recopy-identity-authz-migration-state-after-rollout",
+      "kind": "data",
+      "mode": "background",
+      "owner": "ops",
+      "description": "Carries over what an older image changed in the sign-in, credential repair, SSO and authorization engine migrations during the rollout, once no older image is running.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "ops:checkup-canary-project",
+      "kind": "data",
+      "mode": "background",
+      "owner": "ops",
+      "description": "Creates the hidden system organization and the project the Ops checkup's canaries run in, so they never write into a customer's project."
+    },
+    {
+      "id": "ops:seed-platform-operators",
+      "kind": "data",
+      "mode": "background",
+      "owner": "ops",
+      "description": "Grants the platform-operator role to the verified users a still-set ADMIN_EMAILS names, while nobody holds it."
+    },
+    {
+      "id": "ops:fill-event-log-id-index",
+      "kind": "data",
+      "mode": "background",
+      "owner": "ops",
+      "description": "Fills the event log's aggregate index from older events, then marks it ready on each ClickHouse target.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "organization:record-presence-settings",
+      "kind": "data",
+      "mode": "background",
+      "owner": "organization",
+      "description": "Records every existing organization's presence setting, for presence to fold.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "project:record-created-facts",
+      "kind": "data",
+      "mode": "background",
+      "owner": "project",
+      "description": "Records every existing project as created, and each live project's department and presence setting.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "prompt:seed-tags-for-untagged-organizations",
+      "kind": "tenant",
+      "mode": "background",
+      "owner": "prompt",
+      "description": "Seeds the production and staging prompt tags for every organization that has none."
+    },
+    {
+      "id": "scenario:close-stalled-runs",
+      "kind": "data",
+      "mode": "background",
+      "owner": "scenario",
+      "description": "Closes historical simulation runs that never received a terminal event.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "scenario:fill-id-indexes",
+      "kind": "data",
+      "mode": "background",
+      "owner": "scenario",
+      "description": "Fills the id index of simulation runs from older rows, then marks them ready on each ClickHouse target.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "scenario:fill-second-id-indexes",
+      "kind": "data",
+      "mode": "background",
+      "owner": "scenario",
+      "description": "Fills the second id indexes of simulation runs (by batch run id, by scenario set id) from older rows, then marks them ready on each ClickHouse target.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "scim:replay-sso-connection-view",
+      "kind": "data",
+      "mode": "background",
+      "owner": "scim",
+      "description": "Fills SCIM's SSO connection view from identity's connection log at deploy.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "stored-object:import-clickhouse-index",
+      "kind": "tenant",
+      "mode": "background",
+      "owner": "stored-object",
+      "description": "Copies each project's latest Stored Object metadata from the ClickHouse index into Postgres.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "suite:replay-scenario-facts-for-open-runs",
+      "kind": "data",
+      "mode": "background",
+      "owner": "suite",
+      "description": "Counts scenario runs that suite runs open at deploy missed during the cut.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "suite:fill-id-indexes",
+      "kind": "data",
+      "mode": "background",
+      "owner": "suite",
+      "description": "Fills the id index of suite runs from older rows, then marks them ready on each ClickHouse target.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "topic:seed-topic-model-history",
+      "kind": "data",
+      "mode": "background",
+      "owner": "topic",
+      "description": "Records each project's existing topics on the topic stream so clustering owns them.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "topic:seed-clustering-schedules",
+      "kind": "data",
+      "mode": "background",
+      "owner": "topic",
+      "description": "Schedules daily topic clustering for every eligible project that has none yet.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "trace:track-updated-at-index-materialisation",
+      "kind": "data",
+      "mode": "background",
+      "owner": "trace",
+      "description": "Waits for ClickHouse to build the trace summaries updated-at index over existing rows.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "trace:send-month-trace-ids",
+      "kind": "data",
+      "mode": "background",
+      "owner": "trace",
+      "description": "Sends each project's trace ids seen so far this month, so plan trace limits count from a complete month.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "trace:fill-id-indexes",
+      "kind": "data",
+      "mode": "background",
+      "owner": "trace",
+      "description": "Fills the trace id indexes from rows older than their views, then marks them ready.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "user:record-created-facts",
+      "kind": "data",
+      "mode": "background",
+      "owner": "user",
+      "description": "Records every existing account's created fact and re-states its standing, for peers to read.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "user:lower-case-stored-addresses",
+      "kind": "data",
+      "mode": "background",
+      "owner": "user",
+      "description": "Lower-cases every stored account address; when another account already holds the lower-cased address, the account is left as it is and listed in the step report for an admin to fix by hand.",
+      "needsOldWritersGone": false
+    },
+    {
+      "id": "workflow:record-current-version-fields",
+      "kind": "data",
+      "mode": "background",
+      "owner": "workflow",
+      "description": "Records each live workflow's current version with its fields for agent.",
+      "needsOldWritersGone": true
+    },
+    {
+      "id": "workflow:move-http-credentials-to-secrets",
+      "kind": "data",
+      "mode": "background",
+      "owner": "workflow",
+      "description": "Stores credentials typed into workflow HTTP nodes as project secrets.",
+      "needsOldWritersGone": true
+    }
+  ]
+}

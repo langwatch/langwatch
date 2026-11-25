@@ -3,6 +3,9 @@ package system
 import (
 	"os"
 	"os/exec"
+	"runtime"
+	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 )
@@ -60,4 +63,29 @@ func TestOwnsGroup(t *testing.T) {
 			}
 		})
 	})
+}
+
+func TestTotalMemoryMatchesTheSysctl(t *testing.T) {
+	got := System{}.TotalMemory()
+	if runtime.GOOS != "darwin" {
+		t.Skip("hw.memsize is a darwin sysctl")
+	}
+	out, err := exec.Command("sysctl", "-n", "hw.memsize").Output()
+	if err != nil {
+		t.Skipf("sysctl unavailable: %v", err)
+	}
+	want, err := strconv.ParseUint(strings.TrimSpace(string(out)), 10, 64)
+	if err != nil || want == 0 {
+		t.Fatalf("unreadable sysctl output %q", out)
+	}
+	if got != want {
+		t.Fatalf("TotalMemory() = %d, sysctl says %d", got, want)
+	}
+}
+
+func TestParseLsofCwdsReadsPidThenPath(t *testing.T) {
+	got := parseLsofCwds("p35038\nfcwd\nn/w/tools/dev-runtime\np53235\nfcwd\nn/w2/tools/dev-runtime\n")
+	if len(got) != 2 || got[35038] != "/w/tools/dev-runtime" || got[53235] != "/w2/tools/dev-runtime" {
+		t.Fatalf("parseLsofCwds = %v", got)
+	}
 }

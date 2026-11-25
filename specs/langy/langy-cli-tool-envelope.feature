@@ -110,10 +110,22 @@ Feature: Langy recognises its own CLI behind a shell tool call
     @unit
     Scenario: A failure card says what went wrong in the user's terms
       When Langy's tool call fails because the caller's access does not cover the action
-      Then the card says the access does not cover the action
-      And the card names the missing access in plain words as a detail
-      And the card offers the next step the platform recommends
+      Then the card names the missing permission in plain words
+      And it then tells the reader who to ask for it
       And the card never shows an internal permission name as its headline
+
+    @unit
+    Scenario: A reader who lost access is told so
+      When Langy's tool call is refused because the reader's access was removed or reduced mid-conversation
+      Then a removed membership says they no longer have access to this project
+      And a reduced permission says only that action is no longer available, named when it has plain words
+      And it tells the reader who to ask
+
+    @unit
+    Scenario: A seat limit keeps the platform's own sentence
+      When Langy's tool call is refused because the reader's seat does not include the action
+      Then the card shows the platform's sentence naming the seat
+      And it tells the reader to ask whoever manages seats, not for a permission
 
     # The sandbox's `gh` has no login when the GitHub App is not installed, and
     # it says so in its own words: "To get started with GitHub CLI, please run:
@@ -133,6 +145,17 @@ Feature: Langy recognises its own CLI behind a shell tool call
       When a tool call in the shared local folder fails because gh has no login
       Then the card shows what gh said
       And the card does not claim the LangWatch GitHub App is missing
+
+    # The shell that delegates a command to the shared folder is registered as
+    # `bash`, the same name the sandbox shell answers to, so the name alone
+    # cannot say where a command ran. The settled call carries a marker that
+    # can, and that marker is what decides the card.
+    @unit
+    Scenario: A shell command that ran in the shared folder keeps gh's own instruction
+      When a shell call marked as run in the shared folder fails because gh has no login
+      Then the card shows what gh said
+      And the card does not claim the LangWatch GitHub App is missing
+      And an unmarked shell call with the same failure still says the GitHub App is missing
 
     # The card draws its conclusions from what the failure IS, never from
     # matching the English it happens to be phrased in — that pins user copy to
@@ -155,6 +178,49 @@ Feature: Langy recognises its own CLI behind a shell tool call
     Scenario: A refused permission reads as a permissions problem
       When Langy's tool call is refused because the caller's access does not cover it
       Then the card says the access does not cover the action
+
+    # 401 (unauthorized), missing_api_key and not_authenticated are Langy's own
+    # sandbox key, which the reader cannot see or fix. 403 (forbidden) stays the
+    # reader's access.
+    @unit
+    Scenario: Langy's own refused credential reads as an internal error
+      When Langy's tool call fails because Langy's own key is missing or refused
+      Then the card says Langy hit an internal error
+      And it never says the reader lacks access
+      And it never tells the reader to sign in or set a key
+      And opening the failed step never shows the CLI's sign-in steps
+
+    @unit
+    Scenario: A missing key on the developer's own machine keeps the CLI's own words
+      When a tool call in the shared local folder fails because no API key is set
+      Then the card says what the CLI said
+      And it keeps the CLI's next steps
+
+    # Text mode prints the CLI's missing-key lines with no JSON and no code.
+    @unit
+    Scenario: Langy's own missing key printed as plain text reads as an internal error
+      When Langy's tool call fails and the CLI printed only its missing-key text
+      Then the card says Langy hit an internal error
+      And it never tells the reader to sign in or set a key
+      And opening the failed step never shows the CLI's sign-in steps
+
+    # The match is a whole output line, so a tool that only echoes the CLI's
+    # words (a grep hit, a printed log) is not mistaken for Langy's own key.
+    @unit
+    Scenario: A sandbox tool that only echoes the CLI's missing-key line keeps its own words
+      When Langy's tool call fails and its output carries the CLI's missing-key line inside other text on the same line
+      Then the card is not read as Langy's own missing key
+
+    @unit
+    Scenario: A missing key printed as plain text on the developer's own machine keeps the CLI's own words
+      When a tool call in the shared local folder fails and the CLI printed only its not-logged-in text
+      Then the card shows the CLI's own sign-in instructions
+
+    @unit
+    Scenario: The card's copy of the CLI's missing-key lines matches the CLI
+      Given the card recognises the CLI's missing-key lines by their exact wording
+      When the CLI's own source is read
+      Then each line the card matches is printed there word for word
 
     @unit
     Scenario: A refusal on the same status for a different reason keeps its own words

@@ -1,2 +1,4 @@
-# Bun-compiled binaries (scripts/build-binary.ts). dist/ is ignored repo-wide.
+# Bun-compiled binaries now default to <repo root>/.bin/langy-worker/, ignored
+# there. This covers the older out/ path so a stale build from before the move
+# can never be committed. dist/ is ignored repo-wide.
 out/

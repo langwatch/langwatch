@@ -1,0 +1,114 @@
+/**
+ * @vitest-environment node
+ * Characterisation of `POST /api/unsubscribe` through the real REST runtime.
+ */
+import {
+  UnsubscribeLinkInvalidError,
+  UnsubscribeRateLimitedError,
+  type AutomationApi,
+} from "@langwatch/automation-contract";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { createCanonicalAutomationApp } from "../../app/__tests__/automation-app.fixture.ts";
+import { mountUnsubscribeRest } from "./automation-rest.harness.ts";
+
+const resources: ReturnType<typeof createCanonicalAutomationApp>["resources"][] = [];
+
+afterEach(async () => {
+  await Promise.all(resources.splice(0).map((resource) => resource.close()));
+});
+
+type Accepted = Parameters<AutomationApi["acceptUnsubscribe"]>[0];
+
+function mount(accept: (input: Accepted) => Promise<void>) {
+  const spent: Accepted[] = [];
+
+  return {
+    spent,
+    ...mountUnsubscribeRest({
+      acceptUnsubscribe: async (input) => {
+        spent.push(input);
+
+        return accept(input);
+      },
+    }),
+  };
+}
+
+describe("given the one-click unsubscribe door", () => {
+  describe("when a mail client posts a valid token", () => {
+    it("answers 200 and spends it against the trigger scope", async () => {
+      const api = mount(async () => undefined);
+
+      const response = await api.send("POST", "/api/unsubscribe?token=t_valid");
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ ok: true });
+      expect(api.spent).toEqual([
+        { token: "t_valid", scope: "trigger", callerAddress: "10.0.0.1", via: "one-click" },
+      ]);
+    });
+  });
+
+  describe("when the link carries no token", () => {
+    it("refuses it as an invalid link", async () => {
+      const fixture = createCanonicalAutomationApp();
+      resources.push(fixture.resources);
+      const api = mountUnsubscribeRest({
+        acceptUnsubscribe: (input) => fixture.app.acceptUnsubscribe(input),
+      });
+
+      const response = await api.send("POST", "/api/unsubscribe");
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: "unsubscribe_link_invalid" });
+    });
+  });
+
+  describe("when the token is tampered with", () => {
+    it("answers 400, distinct from the 500 a write failure gets", async () => {
+      const refusing = mount(async () => {
+        throw new UnsubscribeLinkInvalidError("This unsubscribe link is invalid.", 400);
+      });
+      const broken = mount(async () => {
+        throw new Error("connection reset");
+      });
+
+      const tampered = await refusing.send("POST", "/api/unsubscribe?token=t_bad");
+      expect(tampered.status).toBe(400);
+      expect(await tampered.json()).toMatchObject({ code: "unsubscribe_link_invalid" });
+
+      const failed = await broken.send("POST", "/api/unsubscribe?token=t_valid");
+      expect(failed.status).toBe(500);
+      expect(await failed.json()).toMatchObject({ code: "internal_error" });
+    });
+  });
+
+  describe("when the caller has already filled the window", () => {
+    it("answers 429 with the unsubscribe_rate_limited code", async () => {
+      const api = mount(async () => {
+        throw new UnsubscribeRateLimitedError();
+      });
+
+      const response = await api.send("POST", "/api/unsubscribe?token=t_valid");
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toMatchObject({ code: "unsubscribe_rate_limited" });
+    });
+  });
+
+  describe.each(["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "DELETE"])(
+    "when the method is %s",
+    (method) => {
+      it("answers 405 with an Allow header rather than a bare 404", async () => {
+        const api = mount(async () => undefined);
+
+        const response = await api.send(method, "/api/unsubscribe?token=t_valid");
+
+        expect(response.status).toBe(405);
+        expect(response.headers.get("allow")).toBe("POST");
+        expect(api.spent).toEqual([]);
+      });
+    },
+  );
+});

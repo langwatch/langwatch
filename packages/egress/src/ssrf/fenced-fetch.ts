@@ -1,0 +1,464 @@
+import dns, { type LookupAddress } from "node:dns";
+import { isIP } from "node:net";
+
+import { createLogger } from "@langwatch/observability";
+import {
+  Agent,
+  type Dispatcher,
+  Pool,
+  type Response as FetchResponse,
+  ProxyAgent,
+  fetch as undiciFetch,
+} from "undici";
+
+import { type OutboundProxyConfig, resolveProxyForDestination } from "../proxy/outbound-proxy.ts";
+import { classify } from "./address.ts";
+import {
+  redactUrlForLog,
+  type SsrfUrlValidator,
+  type SsrfValidationResult,
+} from "./url-validator.ts";
+
+/**
+ * Pins the connection to the policy-judged IP so the hostname cannot be
+ * re-resolved after the decision, while `Host`/TLS servername keep the original.
+ * With no judged IP, every address resolved at connect time is checked first.
+ */
+
+/**
+ * Redirects are `manual`, always: `followRedirects: false` refuses every
+ * hop; each hop is otherwise re-validated through `revalidate` (a caller
+ * parameter, since this module has no environment) up to `MAX_REDIRECTS`.
+ */
+
+/**
+ * Two independent timeout bounds, both opt-in: `init.signal` carries across
+ * every hop; `headersTimeoutMs` / `bodyTimeoutMs` back it as a socket-level
+ * backstop if the signal drops. Omitted, undici's 300s defaults apply.
+ */
+
+const logger = createLogger("langwatch:ssrfProtection");
+
+/** How many hops a followed redirect chain may take before it is abandoned. */
+const MAX_REDIRECTS = 10;
+
+/**
+ * Whether TLS certificates are verified on this deployment. Tied to
+ * `IS_SAAS`, separately from the address policy, because on-prem operators
+ * often use self-signed certificates — unrelated to private-address reachability.
+ */
+export interface EgressTlsPolicy {
+  rejectUnauthorized: boolean;
+}
+
+type ErrorFormatter = (hostname: string, port: number, message: string) => string;
+
+const CONNECTION_ERROR_FORMATTERS: Record<string, ErrorFormatter> = {
+  ECONNREFUSED: (h, p) => `Connection refused - is the server running at ${h}:${p}?`,
+  ENOTFOUND: (h) => `Could not resolve hostname: ${h}`,
+  ETIMEDOUT: (h, p) => `Connection timed out while connecting to ${h}:${p}`,
+  ECONNRESET: (h, p) => `Connection was reset by ${h}:${p}`,
+  CERT_HAS_EXPIRED: (h, _p, m) => `TLS certificate error for ${h}: ${m}`,
+  DEPTH_ZERO_SELF_SIGNED_CERT: (h, _p, m) => `TLS certificate error for ${h}: ${m}`,
+  UNABLE_TO_VERIFY_LEAF_SIGNATURE: (h, _p, m) => `TLS certificate error for ${h}: ${m}`,
+};
+
+function formatConnectionError(err: Error, hostname: string, port: number): Error {
+  const code = (err as NodeJS.ErrnoException).code ?? "UNKNOWN";
+  const formatter = CONNECTION_ERROR_FORMATTERS[code];
+  const message = formatter
+    ? formatter(hostname, port, err.message)
+    : `Connection failed to ${hostname}:${port}: ${err.message}`;
+  return new Error(message);
+}
+
+/**
+ * The outbound proxy setting could not be turned into a proxy. A class, so the
+ * catch below does not blame the destination. It carries no cause: the parse
+ * error repeats the setting's value, which may hold proxy credentials.
+ */
+export class OutboundProxyMisconfiguredError extends Error {
+  constructor() {
+    super("The outbound proxy setting (HTTPS_PROXY or HTTP_PROXY) is not a valid proxy URL");
+    this.name = "OutboundProxyMisconfiguredError";
+  }
+}
+
+/**
+ * The operator's proxy failed this hop: it could not be reached, or it refused
+ * the tunnel. Names the proxy's host and port, never its credentials, so the
+ * destination is not blamed for the deployment's own network.
+ */
+export class OutboundProxyUnreachableError extends Error {
+  constructor({ proxy, detail }: { proxy: URL; detail: string }) {
+    super(`The outbound proxy at ${proxy.host} failed: ${detail}`);
+    this.name = "OutboundProxyUnreachableError";
+  }
+}
+
+/** Whether a failure, or any cause under it, came from the proxy rather than the destination. */
+function isProxyFailure({ error, proxy }: { error: unknown; proxy: URL }): boolean {
+  const port = Number(proxy.port || (proxy.protocol === "https:" ? 443 : 80));
+  for (let at = error; at instanceof Error; at = (at as { cause?: unknown }).cause) {
+    if (/^Proxy response \(\d+\)/.test(at.message)) return true;
+    const failed = at as { port?: unknown; hostname?: unknown; address?: unknown };
+    if (failed.hostname === proxy.hostname) return true;
+    if (failed.port === port && failed.address !== undefined) return true;
+  }
+  return false;
+}
+
+/**
+ * The receiver redirected and this caller declined the hop. A class, not a
+ * message, so it passes untouched through the catch below that rewrites
+ * every plain `Error` as "Connection failed" via `formatConnectionError`.
+ */
+export class RedirectRefusedError extends Error {
+  constructor(
+    message = "Redirects are not followed for this destination — the endpoint must answer directly.",
+  ) {
+    super(message);
+    this.name = "RedirectRefusedError";
+  }
+}
+
+export interface FencedFetchOptions extends RequestInit {
+  _redirectCount?: number;
+  /**
+   * Set false to refuse redirects outright: a 3xx carrying a Location throws
+   * instead of hopping. What every customer-supplied destination passes.
+   */
+  followRedirects?: boolean;
+  /**
+   * The policy the NEXT hop is judged by, when redirects are followed at all.
+   * Absent while `followRedirects` is not false means a redirect cannot be
+   * evaluated, and an unevaluable hop is refused.
+   */
+  revalidate?: SsrfUrlValidator;
+  /** Socket-level bound on how long the receiver may take to send headers. */
+  headersTimeoutMs?: number;
+  /** Socket-level bound on inactivity while streaming the response body. */
+  bodyTimeoutMs?: number;
+  /** The deployment's outbound proxy. Absent, or excluded by `NO_PROXY`: the pinned connection. */
+  proxy?: OutboundProxyConfig;
+  /**
+   * A judged hop the caller routes around `proxy`, on the pinned connection.
+   * Asked per hop, redirects included. A route, never a policy: the hop was
+   * already judged, and the pinned socket still refuses a metadata address.
+   */
+  bypassProxy?: (hop: SsrfValidationResult) => boolean;
+}
+
+interface AgentTimeoutOptions {
+  headersTimeout?: number;
+  bodyTimeout?: number;
+}
+
+function resolveAgentTimeouts(init: FencedFetchOptions | undefined): AgentTimeoutOptions {
+  const timeouts: AgentTimeoutOptions = {};
+  if (init?.headersTimeoutMs !== undefined) {
+    timeouts.headersTimeout = init.headersTimeoutMs;
+  }
+  if (init?.bodyTimeoutMs !== undefined) {
+    timeouts.bodyTimeout = init.bodyTimeoutMs;
+  }
+  return timeouts;
+}
+
+/** Headers that belong to the origin they were written for, never carried to another. */
+const ORIGIN_BOUND_HEADERS = ["authorization", "cookie", "proxy-authorization", "host"];
+
+const METADATA_REFUSAL =
+  "This hostname resolves to a cloud metadata endpoint, which is not allowed for security reasons";
+
+/** The pinned address, or every address the system resolver gives, each one checked. */
+function resolveForConnect({
+  hostname,
+  pinnedIp,
+  done,
+}: {
+  hostname: string;
+  pinnedIp: string | null;
+  done: (err: Error | null, addresses: LookupAddress[]) => void;
+}): void {
+  const check = (addresses: LookupAddress[]) => {
+    if (addresses.length === 0)
+      return done(new Error(`Could not resolve hostname: ${hostname}`), []);
+    if (addresses.some(({ address }) => classify(address) === "metadata")) {
+      return done(new Error(METADATA_REFUSAL), []);
+    }
+    done(null, addresses);
+  };
+  if (pinnedIp) return check([{ address: pinnedIp, family: isIP(pinnedIp) === 6 ? 6 : 4 }]);
+  dns.lookup(hostname, { all: true }, (err, addresses) => (err ? done(err, []) : check(addresses)));
+}
+
+function createGuardedAgent({
+  pinnedIp,
+  tls,
+  timeouts,
+}: {
+  pinnedIp: string | null;
+  tls: EgressTlsPolicy;
+  timeouts: AgentTimeoutOptions;
+}): Agent {
+  return new Agent({
+    ...timeouts,
+    connect: {
+      rejectUnauthorized: tls.rejectUnauthorized,
+      lookup: (hostname, options, callback) => {
+        resolveForConnect({
+          hostname,
+          pinnedIp,
+          done: (err, addresses) => {
+            const first = addresses[0];
+            if (err || !first) return callback(err, []);
+            if (options.all) return callback(null, addresses);
+            callback(null, first.address, first.family);
+          },
+        });
+      },
+    },
+  });
+}
+
+/** A tunnel through the operator's proxy, with the same TLS and timeout policy as a pinned hop. */
+function createProxyAgent({
+  proxyUrl,
+  tls,
+  timeouts,
+}: {
+  proxyUrl: string;
+  tls: EgressTlsPolicy;
+  timeouts: AgentTimeoutOptions;
+}): ProxyAgent {
+  return new ProxyAgent({
+    ...timeouts,
+    uri: proxyUrl,
+    requestTls: { rejectUnauthorized: tls.rejectUnauthorized },
+    // The client to the proxy gets the same bounds, so a stalled CONNECT times out too.
+    clientFactory: (origin, options) => new Pool(origin, { ...options, ...timeouts }),
+  });
+}
+
+/**
+ * How this hop travels: through the proxy for its scheme when one applies to
+ * its host, else pinned. The policy has already judged the hop; the proxy only carries it and
+ * resolves the name itself, so the operator's proxy owns that address.
+ */
+function createDispatcher({
+  validated,
+  init,
+  tls,
+}: {
+  validated: SsrfValidationResult;
+  init: FencedFetchOptions | undefined;
+  tls: EgressTlsPolicy;
+}): { dispatcher: Dispatcher; proxy: URL | undefined } {
+  const timeouts = resolveAgentTimeouts(init);
+  const proxyUrl =
+    init?.proxy && !init.bypassProxy?.(validated)
+      ? resolveProxyForDestination({
+          config: init.proxy,
+          hostname: validated.hostname,
+          protocol: validated.protocol,
+        })
+      : undefined;
+  if (proxyUrl) {
+    logger.debug(
+      { hostname: validated.hostname },
+      "Sending the judged hop through the outbound proxy",
+    );
+    try {
+      return {
+        dispatcher: createProxyAgent({ proxyUrl, tls, timeouts }),
+        proxy: new URL(proxyUrl),
+      };
+    } catch {
+      throw new OutboundProxyMisconfiguredError();
+    }
+  }
+
+  const resolvedIp = getResolvedIpForPinning(validated);
+  const dispatcher = createGuardedAgent({
+    pinnedIp: resolvedIp && isIP(resolvedIp) !== 0 ? resolvedIp : null,
+    tls,
+    timeouts,
+  });
+  return { dispatcher, proxy: undefined };
+}
+
+function getResolvedIpForPinning(result: SsrfValidationResult): string | null {
+  switch (result.type) {
+    case "resolved":
+      return result.resolvedIp;
+    case "allowlisted":
+      return result.resolvedIp ?? null;
+    case "unresolved":
+      return null;
+  }
+}
+
+/**
+ * Fetches an already-validated destination at its validated address. TLS
+ * policy is a required argument, not a default: a package has no deployment
+ * to read one from, and a wrong default breaks receivers or stops verifying.
+ */
+export async function fetchValidatedDestination(
+  validated: SsrfValidationResult,
+  init: FencedFetchOptions | undefined,
+  tls: EgressTlsPolicy,
+): Promise<FetchResponse> {
+  const headers = new Headers(init?.headers);
+  const redirectCount = init?._redirectCount ?? 0;
+
+  if (!headers.has("Host")) {
+    headers.set("Host", validated.hostname);
+  }
+
+  const requestUrl = `${validated.protocol}//${validated.hostname}:${validated.port}${validated.path}`;
+  let dispatcher: Dispatcher | undefined;
+  let proxy: URL | undefined;
+
+  try {
+    // Inside the try, so the dispatcher is destroyed on every later failure.
+    ({ dispatcher, proxy } = createDispatcher({ validated, init, tls }));
+    const response = await undiciFetch(requestUrl, {
+      method: init?.method,
+      // Entries, not the `Headers` instance: two copies of the undici types
+      // are reachable here (this package's, and `@types/node`'s), and a
+      // consumer with both in scope cannot assign one's `Headers` to the
+      // other's parameter even though they're the same object at runtime.
+      headers: [...headers],
+      body: init?.body as string | undefined,
+      // Without this the caller's AbortSignal.timeout(...) is silently dropped
+      // and undici's 300s default is the only bound — across every hop.
+      signal: init?.signal,
+      redirect: "manual",
+      dispatcher,
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (location) {
+        void dispatcher.destroy().catch(() => undefined);
+        return await followRedirect({
+          status: response.status,
+          location,
+          validated,
+          init,
+          tls,
+          redirectCount,
+        });
+      }
+    }
+
+    // Graceful: the socket closes once the caller has read the body.
+    void dispatcher.close().catch(() => undefined);
+    return response;
+  } catch (err) {
+    void dispatcher?.destroy().catch(() => undefined);
+    throw failureFor({ err, validated, proxy });
+  }
+}
+
+/**
+ * What a failed hop throws. Our own refusals and the operator's proxy pass
+ * through; a failure the proxy caused names the proxy; anything else is
+ * rewritten as "Connection failed to host:port: …", a socket problem's shape.
+ */
+function failureFor({
+  err,
+  validated,
+  proxy,
+}: {
+  err: unknown;
+  validated: SsrfValidationResult;
+  proxy: URL | undefined;
+}): unknown {
+  if (
+    err instanceof RedirectRefusedError ||
+    err instanceof OutboundProxyMisconfiguredError ||
+    err instanceof OutboundProxyUnreachableError ||
+    !(err instanceof Error)
+  ) {
+    return err;
+  }
+  const cause = (err as Error & { cause?: Error }).cause;
+  if (proxy && isProxyFailure({ error: err, proxy })) {
+    return new OutboundProxyUnreachableError({ proxy, detail: (cause ?? err).message });
+  }
+  return formatConnectionError(cause ?? err, validated.hostname, validated.port);
+}
+
+async function followRedirect({
+  status,
+  location,
+  validated,
+  init,
+  tls,
+  redirectCount,
+}: {
+  status: number;
+  location: string;
+  validated: SsrfValidationResult;
+  init: FencedFetchOptions | undefined;
+  tls: EgressTlsPolicy;
+  redirectCount: number;
+}): Promise<FetchResponse> {
+  if (init?.followRedirects === false) {
+    throw new RedirectRefusedError();
+  }
+  if (redirectCount >= MAX_REDIRECTS) {
+    throw new Error(`Too many redirects (max ${MAX_REDIRECTS})`);
+  }
+  if (!init?.revalidate) {
+    // Fail closed. The hop is a destination nothing has judged, and a package
+    // that guessed here would be admitting an address on the receiver's say-so.
+    throw new RedirectRefusedError(
+      "Redirects are not followed without an address policy to judge the next hop.",
+    );
+  }
+
+  const redirectUrl = new URL(location, validated.originalUrl).toString();
+
+  logger.debug(
+    {
+      originalUrl: redactUrlForLog(validated.originalUrl),
+      redirectUrl: redactUrlForLog(redirectUrl),
+      redirectCount: redirectCount + 1,
+    },
+    "Following redirect with SSRF validation",
+  );
+
+  const redirectValidated = await init.revalidate(redirectUrl);
+
+  // `signal` and the socket-level bounds are carried into every hop, so one
+  // caller deadline bounds the WHOLE chain rather than each hop independently.
+  const redirectInit: FencedFetchOptions = {
+    ...init,
+    signal: init.signal,
+    headersTimeoutMs: init.headersTimeoutMs,
+    bodyTimeoutMs: init.bodyTimeoutMs,
+    _redirectCount: redirectCount + 1,
+  };
+
+  if (new URL(redirectUrl).origin !== new URL(validated.originalUrl).origin) {
+    const headers = new Headers(init.headers);
+    for (const name of ORIGIN_BOUND_HEADERS) headers.delete(name);
+    redirectInit.headers = [...headers];
+  }
+
+  // The method downgrade every HTTP client makes: 303 always becomes a GET, and
+  // so does a POST through a redirect that is not 307 or 308. Carrying the body
+  // through would re-send it to an address the original request never named.
+  if (status === 303) {
+    redirectInit.method = "GET";
+    redirectInit.body = undefined;
+  } else if (status !== 307 && status !== 308 && init.method === "POST") {
+    redirectInit.method = "GET";
+    redirectInit.body = undefined;
+  }
+
+  return fetchValidatedDestination(redirectValidated, redirectInit, tls);
+}

@@ -1,0 +1,209 @@
+import { Link } from "@langwatch/browser-host/link";
+import { Card } from "@langwatch/design-system/card";
+import { CopyButton } from "@langwatch/design-system/copy-button";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Switch } from "@langwatch/design-system/switch";
+import type { UpgradeDiagnosticsAutoSend, UsageReportPreview } from "@langwatch/ops-contract";
+import { ExternalLink, Send } from "lucide-react";
+
+import { CheckupSection, CheckupSectionRow } from "../elements/checkup-section.tsx";
+
+const DOCS_URL = "https://docs.langwatch.ai/self-hosting/data-and-telemetry";
+
+/** The switches a report change names; each is an opt-out. */
+export type UsageReportSwitchChange = {
+  optionalMetricsOptOut?: boolean;
+  hostnameOptOut?: boolean;
+};
+
+/**
+ * What we send: the exact report the sender posts, its two switches (plus the automatic upgrade
+ * diagnostics one) and a copy button, so a security review reads the payload rather than a
+ * sentence about it. Spec: specs/self-hosting/checkup/checkup.feature, "What we send".
+ */
+export function UsageReportSection({
+  report,
+  canManage,
+  isSaving,
+  onSwitch,
+  autoSend,
+  onAutoSend,
+}: {
+  report: UsageReportPreview;
+  canManage: boolean;
+  isSaving: boolean;
+  onSwitch: (change: UsageReportSwitchChange) => void;
+  /** Absent for anyone but an install admin, and until it has loaded. */
+  autoSend?: UpgradeDiagnosticsAutoSend | undefined;
+  onAutoSend: (enabled: boolean) => void;
+}) {
+  const pretty = JSON.stringify(report.payload, null, 2);
+  const { switches } = report;
+
+  return (
+    <CheckupSection
+      icon={<Send size={18} />}
+      title={
+        switches
+          ? "What this install sends to LangWatch"
+          : "What your organization adds to this install's usage report"
+      }
+      description={descriptionOf(report)}
+      testId="checkup-usage-report"
+    >
+      <VStack align="stretch" gap={3} width="full">
+        {switches ? (
+          <UsageReportSwitchRows
+            switches={switches}
+            canManage={canManage}
+            isSaving={isSaving}
+            onSwitch={onSwitch}
+          />
+        ) : null}
+        {switches && autoSend ? (
+          <UpgradeDiagnosticsAutoSendRow
+            autoSend={autoSend}
+            canManage={canManage}
+            isSaving={isSaving}
+            onAutoSend={onAutoSend}
+          />
+        ) : null}
+
+        <HStack justify="space-between" align="center" paddingTop={2}>
+          <Text fontSize="sm" color="fg.muted">
+            {report.nextReportAt
+              ? `Next report at ${report.nextReportAt}. Schema version ${report.schemaVersion}.`
+              : `Schema version ${report.schemaVersion}.`}{" "}
+            <Link href={DOCS_URL} target="_blank" rel="noopener noreferrer" color="orange.fg">
+              Every field explained <ExternalLink size={12} />
+            </Link>
+          </Text>
+          <CopyButton value={pretty} label="Usage report" aria-label="Copy usage report" />
+        </HStack>
+        <Card variant="frame" padding="sm">
+          <Box
+            as="pre"
+            data-testid="checkup-usage-report-payload"
+            fontFamily="mono"
+            fontSize="xs"
+            maxHeight="480px"
+            overflow="auto"
+            whiteSpace="pre"
+          >
+            {pretty}
+          </Box>
+        </Card>
+      </VStack>
+    </CheckupSection>
+  );
+}
+
+/** The opt-outs, shown to an organization or install admin, who reads the whole report. */
+function UsageReportSwitchRows({
+  switches,
+  canManage,
+  isSaving,
+  onSwitch,
+}: {
+  switches: NonNullable<UsageReportPreview["switches"]>;
+  canManage: boolean;
+  isSaving: boolean;
+  onSwitch: (change: UsageReportSwitchChange) => void;
+}) {
+  return (
+    <>
+      <CheckupSectionRow testId="checkup-switch-optional">
+        <HStack width="full" justify="space-between" align="start" gap={4}>
+          <VStack align="start" gap={0}>
+            <Text fontWeight="medium">Usage counts and onboarding dates</Text>
+            <Text fontSize="sm" color="fg.muted">
+              What the install is used for and how far it got. Off leaves the release, the counts of
+              organizations and projects, and the sign-in method.
+            </Text>
+          </VStack>
+          <Switch
+            checked={switches.optional}
+            disabled={!canManage || isSaving}
+            aria-label="Send usage counts and onboarding dates"
+            inputProps={{ "data-testid": "checkup-switch-optional-input" }}
+            onCheckedChange={(event) => onSwitch({ optionalMetricsOptOut: !event.checked })}
+          />
+        </HStack>
+      </CheckupSectionRow>
+      <CheckupSectionRow testId="checkup-switch-hostname">
+        <HStack width="full" justify="space-between" align="start" gap={4}>
+          <VStack align="start" gap={0}>
+            <Text fontWeight="medium">Hostname</Text>
+            <Text fontSize="sm" color="fg.muted">
+              The address this install answers on. It names your own network, so it has a switch of
+              its own.
+            </Text>
+          </VStack>
+          <Switch
+            checked={switches.hostname}
+            disabled={!canManage || isSaving}
+            aria-label="Send hostname"
+            inputProps={{ "data-testid": "checkup-switch-hostname-input" }}
+            onCheckedChange={(event) => onSwitch({ hostnameOptOut: !event.checked })}
+          />
+        </HStack>
+      </CheckupSectionRow>
+    </>
+  );
+}
+
+/**
+ * The automatic upgrade diagnostics switch. Not part of the report: it has its own query and
+ * mutation, and sits here because it is also something this install sends.
+ */
+function UpgradeDiagnosticsAutoSendRow({
+  autoSend,
+  canManage,
+  isSaving,
+  onAutoSend,
+}: {
+  autoSend: UpgradeDiagnosticsAutoSend;
+  canManage: boolean;
+  isSaving: boolean;
+  onAutoSend: (enabled: boolean) => void;
+}) {
+  return (
+    <CheckupSectionRow testId="checkup-switch-upgrade-diagnostics">
+      <HStack width="full" justify="space-between" align="start" gap={4}>
+        <VStack align="start" gap={0}>
+          <Text fontWeight="medium">Upgrade diagnostics</Text>
+          <Text fontSize="sm" color="fg.muted">
+            When an upgrade step fails, send its details to the LangWatch team so we can fix it.
+            Secrets are masked, but the step's error, report and log lines can still mention an
+            identifier such as a project id. Off, you can still send them from the step.
+          </Text>
+        </VStack>
+        <Switch
+          checked={autoSend.enabled}
+          disabled={!canManage || isSaving}
+          aria-label="Always send upgrade diagnostics to LangWatch"
+          inputProps={{ "data-testid": "checkup-switch-upgrade-diagnostics-input" }}
+          onCheckedChange={(event) => onAutoSend(event.checked)}
+        />
+      </HStack>
+    </CheckupSectionRow>
+  );
+}
+
+function descriptionOf(report: UsageReportPreview): string {
+  if (!report.switches || report.endpoint === undefined) {
+    return "Your organization's figures in the daily usage report. An organization admin sees the whole report and where it goes.";
+  }
+  if (report.disabled) {
+    return "Usage reporting is switched off with DISABLE_USAGE_STATS. This is the report that would be sent.";
+  }
+  return `One report a day to ${hostOf(report.endpoint)}, counts and metadata only.`;
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}

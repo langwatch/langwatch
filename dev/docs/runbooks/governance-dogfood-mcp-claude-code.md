@@ -35,7 +35,7 @@ explicitly when prompted by the MCP client. The PKCE entrypoint is
 `/api/mcp/authorize` — `claude mcp add` can be configured to start at
 that URL; it will redirect through `/auth/signin` if the browser
 session isn't already established. The `userId` lands in the OAuth
-token cache and propagates through `resolveSessionContext` → 
+token cache and propagates through `resolveSessionContext` →
 `registerGovernanceMcpTools` → `ctx.callerUserId`.
 
 After `claude mcp add`, `claude mcp list` should show `langwatch`
@@ -47,14 +47,20 @@ the next conversation.
 In a fresh `claude` session:
 
 > "Use the LangWatch governance MCP tools to list the ingestion templates
-> on my org, then dump the platform OTTL for the claude_code template."
+> on my org, then show me one of them."
 
 Claude Code should call:
 
-1. `mcp__langwatch__governance_ingestion_templates_admin_list` (returns 3 platform
-   rows with `ottlRules` populated)
-2. `mcp__langwatch__governance_ingestion_templates_get` with `id: <claude_code-id>`
-   (returns a single row)
+1. `mcp__langwatch__governance_ingestion_templates_list` (returns the org's
+   templates with `ottlRules` empty)
+2. `mcp__langwatch__governance_ingestion_templates_get` with `id: <template-id>`
+   (returns a single row, `ottlRules` empty as well)
+
+A template's OTTL rules are organization configuration: only `aiTools:manage`
+reads them, through the console's admin catalogue or
+`GET /api/v1/governance/ingestion-templates/:id`. A project-apiKey session asking
+`mcp__langwatch__governance_ingestion_templates_admin_list` is refused with
+`AUTH_REQUIRED`.
 
 **Verify** — query Postgres:
 
@@ -84,7 +90,7 @@ Claude Code should call:
    row with id `<custom-id>`
 2. `mcp__langwatch__governance_ingestion_templates_update_ottl_rules`
    with `id: <custom-id>` and `ottl_rules: 'delete_key(attributes,
-   "claude.code.session_id")'`
+"claude.code.session_id")'`
 3. `mcp__langwatch__governance_ingestion_templates_archive` with
    `id: <custom-id>`
 
@@ -159,12 +165,15 @@ of record (andre 199226d77 + 5fcadd586 + 391cfd989).
 
 ## Cross-references
 
-- `platform/app/scripts/dogfood/governance/mcp-client-probe.ts` — the
-  fixture-fast-loop equivalent of this runbook (no OAuth, project-apiKey
-  Bearer only — read tools + AUTH_REQUIRED negative case).
-- `platform/app/src/mcp/__tests__/governance-tools.audit-uniform.integration.test.ts` —
-  service-layer audit-uniform regression (asserts metadata.surface=mcp
-  on create + install).
+- The fixture-fast-loop equivalent of this runbook (no OAuth, project-apiKey
+  Bearer only — read tools + AUTH_REQUIRED negative case) was
+  `scripts/dogfood/governance/mcp-client-probe.ts` in the platform monolith. It
+  did not survive the split; nothing replaces it yet.
+- The service-layer audit-uniform regression (asserts metadata.surface=mcp on
+  create + install) likewise has no successor in the new layout. The governance
+  MCP tools themselves now live in
+  `enterprise/modules/governance/process/src/transport/api-mcp/governance-tools.api.ts`,
+  mounted by `apps/api/src/features/mcp/hosted-mcp.mount.ts`.
 - `feedback_fixtures_dont_replace_real_user_dogfood.md` — rchaves nudge
   memory; this runbook is the real-user-track companion to the probe.
 - `feedback_tsx_watch_no_auto_reload_on_git_pull.md` — if the tools

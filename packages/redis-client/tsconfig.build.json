@@ -1,0 +1,29 @@
+{
+  "extends": ["./tsconfig.json", "../../tsconfig.emit.json"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "paths": {
+      "@langwatch/redis-client": ["./src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
+
+  "references": [
+    {
+      "path": "../secrets/tsconfig.build.json"
+    }
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/test-harness",
+        "@langwatch/time",
+        "@langwatch/vitest-config"
+      ]
+    }
+  }
+}

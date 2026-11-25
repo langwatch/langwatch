@@ -15,7 +15,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/projects/{id}/api-key".format(
+        "url": "/api/v1/projects/{id}/api-key".format(
             id=quote(str(id), safe=""),
         ),
     }
@@ -38,10 +38,6 @@ def _parse_response(
     if response.status_code == 403:
         response_403 = cast(Any, None)
         return response_403
-
-    if response.status_code == 404:
-        response_404 = cast(Any, None)
-        return response_404
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -70,8 +66,8 @@ def sync_detailed(
 ) -> Response[Any | GetProjectApiKeyResponse200]:
     """Get the project API key
 
-     Read the project's API key, the credential SDKs and the ingestion endpoints authenticate with.
-    Requires an admin API key holding project:update on this project.
+     Deprecated. Project base keys can be revealed only by a signed-in project administrator in the
+    browser or an approved device flow. Organization API keys are always refused with 403.
 
     Args:
         id (str):
@@ -102,8 +98,8 @@ def sync(
 ) -> Any | GetProjectApiKeyResponse200 | None:
     """Get the project API key
 
-     Read the project's API key, the credential SDKs and the ingestion endpoints authenticate with.
-    Requires an admin API key holding project:update on this project.
+     Deprecated. Project base keys can be revealed only by a signed-in project administrator in the
+    browser or an approved device flow. Organization API keys are always refused with 403.
 
     Args:
         id (str):
@@ -129,8 +125,8 @@ async def asyncio_detailed(
 ) -> Response[Any | GetProjectApiKeyResponse200]:
     """Get the project API key
 
-     Read the project's API key, the credential SDKs and the ingestion endpoints authenticate with.
-    Requires an admin API key holding project:update on this project.
+     Deprecated. Project base keys can be revealed only by a signed-in project administrator in the
+    browser or an approved device flow. Organization API keys are always refused with 403.
 
     Args:
         id (str):
@@ -159,8 +155,8 @@ async def asyncio(
 ) -> Any | GetProjectApiKeyResponse200 | None:
     """Get the project API key
 
-     Read the project's API key, the credential SDKs and the ingestion endpoints authenticate with.
-    Requires an admin API key holding project:update on this project.
+     Deprecated. Project base keys can be revealed only by a signed-in project administrator in the
+    browser or an approved device flow. Organization API keys are always refused with 403.
 
     Args:
         id (str):

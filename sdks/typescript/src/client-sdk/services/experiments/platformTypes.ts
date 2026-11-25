@@ -17,26 +17,40 @@ export type ExperimentRunSummary = {
     finishedAt?: number;
     stoppedAt?: number;
   };
-  targets?: Array<{
+  targets?: {
     targetId: string;
     name: string;
     passed: number;
     failed: number;
     avgLatency: number;
     totalCost: number;
-  }>;
-  evaluators?: Array<{
+  }[];
+  evaluators?: {
     evaluatorId: string;
     name: string;
     passed: number;
     failed: number;
+    /** Cells where the evaluator crashed and gave no verdict; absent on older servers. */
+    errored?: number;
+    /** 0 when the evaluator gave no verdict at all; check passed + failed before showing it. */
     passRate: number;
     avgScore?: number;
-  }>;
+  }[];
   totalPassed?: number;
   totalFailed?: number;
   passRate?: number;
   totalCost?: number;
+};
+
+/**
+ * Experiment-only run options: the workflow evaluate endpoint has no such field.
+ */
+export type ExperimentConcurrencyOptions = {
+  /**
+   * Cells (one row against one target) run at once for this run only, 1 to 24; the
+   * experiment's saved setting is untouched. Defaults to the server's. 1 runs them in order.
+   */
+  concurrency?: number;
 };
 
 /**
@@ -55,20 +69,23 @@ export type RunExperimentOptions = {
    * Callback for progress updates
    */
   onProgress?: (progress: number, total: number) => void;
+  /**
+   * Version of the experiment's saved dataset to run. Overrides the version the
+   * experiment pins; without either, the run saves and reads the current content.
+   */
+  datasetVersion?: number;
 };
 
 /**
  * Inputs that override a platform experiment or workflow run on the server.
- *
- * `data` and `datasetId` are mutually exclusive (the backend rejects passing
- * both). `parameters` overrides target parameters (e.g. prompt variables) and
- * `rowIndices` restricts execution to a subset of the configured dataset.
+ * `data`/`datasetId` are mutually exclusive (backend rejects both).
+ * `parameters` overrides target params; `rowIndices` subsets the dataset.
  */
 export type RunWithResultsOptions = {
   /**
    * Inline rows to evaluate. Mutually exclusive with `datasetId`.
    */
-  data?: Array<Record<string, unknown>>;
+  data?: Record<string, unknown>[];
   /**
    * Id of a saved dataset to evaluate. Mutually exclusive with `data`.
    */
@@ -139,6 +156,19 @@ export type ExperimentRunWithResults = {
 };
 
 /**
+ * How `printSummary` decides whether to fail the process.
+ */
+export type PrintSummaryOptions = {
+  /** Call process.exit(1) on failure. Default true. */
+  exitOnFailure?: boolean;
+  /**
+   * Also fail when an evaluator returned a failing verdict or errored instead of judging,
+   * or when the server sent no evaluator results. Default false.
+   */
+  failOnEvaluatorFailures?: boolean;
+};
+
+/**
  * Final result of a platform experiment run
  */
 export type ExperimentRunResult = {
@@ -151,10 +181,12 @@ export type ExperimentRunResult = {
   runUrl: string;
   summary: ExperimentRunSummary;
   /**
-   * Print a CI-friendly summary of the results
-   * @param exitOnFailure - If true (default), calls process.exit(1) when there are failures
+   * Print a CI-friendly summary of the results. Exits 1 when a cell errored; pass
+   * `{ failOnEvaluatorFailures: true }` to also exit 1 when an evaluation failed or an
+   * evaluator errored.
+   * @param options - `exitOnFailure` (default true), or the options object
    */
-  printSummary: (exitOnFailure?: boolean) => void;
+  printSummary: (options?: boolean | PrintSummaryOptions) => void;
   /**
    * Human-readable string representation
    */

@@ -1,0 +1,1257 @@
+/**
+ * Isolation proof, part 2: PG-resident data reached via engine tables stays row-policed.
+ * @see specs/lwql/api.feature
+ * @see specs/lwql/isolation.feature
+ * @see specs/lwql/postgres-catalog.feature
+ * @vitest-environment node
+ */
+
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import type { LangWatchQLMemberWindow } from "@langwatch/analytics-contract";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import {
+  ADMIT_EVERY_PLACEMENT,
+  EVERY_CATALOGUE_PERMISSION,
+  TEST_RUN_TELEMETRY,
+} from "../../app/__tests__/analytics.fixture.ts";
+import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../../features/provisioning/services/langwatch-ql-postgres-mapping.service.ts";
+import { LangWatchQLPostgresViewsService } from "../../features/provisioning/services/langwatch-ql-postgres-views.service.ts";
+import { LangWatchQLViewProvisioningService } from "../../features/provisioning/services/langwatch-ql-view-provisioning.service.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../features/provisioning/services/langwatch-ql-view-statements.service.ts";
+import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
+import { scopeLangWatchQL } from "../../rules/langwatch-ql-query-scope.rules.ts";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
+import {
+  CLICKHOUSE_ERROR_CODE,
+  expectClickHouseError,
+  expectOnlyTenantA,
+  expectPostgresError,
+  expectRestrictedIdentity,
+  expectTenantScopedRead,
+  expectZeroRowsWithControl,
+  type LangWatchQLClickHouseHarness,
+  type LangWatchQLPostgresHarness,
+  LWQL_CLICKHOUSE_TEST_IMAGE,
+  LWQL_TEST_POSTGRES_CONNECTION_LIMIT,
+  lwqlTestNamedCollection,
+  mapPostgresIntoClickHouse,
+  PG_EXCLUDED_COLUMN,
+  PG_MAPPED_TABLE,
+  PG_MAPPED_TENANT_COLUMN,
+  PG_MAPPED_VIEW,
+  POSTGRES_SQLSTATE,
+  recordSeedControl,
+  runStatement,
+  selectRows,
+  selectScalar,
+  startLangWatchQLClickHouse,
+  startLangWatchQLPostgres,
+  statementsLoggedSince,
+  UNMAPPED_KEY_HASH,
+} from "./lwql-clickhouse-harness.ts";
+
+const postgresViews = LangWatchQLPostgresViewsService.create();
+const viewProvisioning = LangWatchQLViewProvisioningService.create();
+const lwqlCapability = LangWatchQLCapabilityService.create();
+
+const catalogShapes = LangWatchQLCatalogShapesService.create();
+
+/** The PostgreSQL-resident half of the shipped catalog, provisioned whole. */
+const POSTGRES_VIEWS = catalogShapes.postgresViews(LWQL_VIEW_CATALOG);
+
+/** Where operators read the LangWatchQL access model (ADR-200: the boundary is documented). */
+const ACCESS_MODEL_DOCS = fileURLToPath(
+  new URL("../../../../../../charts/langwatch/README.md", import.meta.url),
+);
+
+let harness: LangWatchQLClickHouseHarness;
+let postgres: LangWatchQLPostgresHarness;
+/** The restricted identity carrying tenant-a's valid key-hash context. */
+let tenantA: ClickHouseClient;
+let database: string;
+
+beforeAll(async () => {
+  postgres = await startLangWatchQLPostgres();
+  harness = await startLangWatchQLClickHouse({
+    suite: "pgengine",
+    image: LWQL_CLICKHOUSE_TEST_IMAGE,
+  });
+  database = harness.names.database;
+  await mapPostgresIntoClickHouse({ harness, postgres });
+  // The LangWatchQL views over the engine tables — the objects a caller names.
+  // Only the PostgreSQL-resident half: the ClickHouse-resident entries read
+  // migrated fact tables this suite does not stand up.
+  await harness.applyAsAdmin(
+    viewProvisioning.setupStatements({
+      names: harness.names,
+      sourceDatabase: harness.factDatabase,
+      views: POSTGRES_VIEWS,
+      dedup: SHIPPED_LWQL_DEDUP,
+    }),
+  );
+  // Grants and row policies come from the single access-model emitter (ADR-159).
+  // `extraViews`, not `views`: every apply re-mints the whole model, so it must
+  // keep the base fixture's grants or the native `traces` reads lose theirs.
+  await harness.applyAccessModel({
+    extraViews: POSTGRES_VIEWS,
+    sourceDatabase: harness.factDatabase,
+  });
+  tenantA = await harness.restrictedClient({
+    keyHash: harness.tenantA.keyHash,
+  });
+}, 240_000);
+
+afterAll(async () => {
+  await harness?.stop();
+  await postgres?.stop();
+});
+
+describe("given the PostgreSQL-resident catalog mapped into ClickHouse through the server-side named collection", () => {
+  describe("when the restricted identity carries a valid key-hash context", () => {
+    /** @scenario "A PG-resident table is readable through ClickHouse only within the caller's tenant rows" */
+    it("reads its own tenant's mapped rows and none of the other tenant's", async () => {
+      await expectRestrictedIdentity({ client: tenantA, names: harness.names });
+      const control = await recordSeedControl({
+        harness,
+        table: PG_MAPPED_TABLE,
+        tenantColumn: PG_MAPPED_TENANT_COLUMN,
+      });
+
+      const rows = await selectRows<{
+        AnnotationId: string;
+        TenantId: string;
+      }>(
+        tenantA,
+        `SELECT AnnotationId, ${PG_MAPPED_TENANT_COLUMN} FROM ${database}.${PG_MAPPED_TABLE} ORDER BY AnnotationId`,
+      );
+
+      expectOnlyTenantA({
+        rows,
+        tenantColumn: PG_MAPPED_TENANT_COLUMN,
+        harness,
+        context: "mapped table baseline read",
+      });
+      expect(rows).toHaveLength(control.tenantA);
+    });
+
+    /**
+     * Every mapped dataset, not only the one the rest of the file probes: a
+     * dimension added to the catalog without a policy would be a silent
+     * cross-tenant read, and this is what turns that into a failure.
+     *
+     * Deliberately reads the *engine tables* and not the LangWatchQL views over
+     * them. The view carries its own tenant predicate, so a view read would
+     * come back correctly scoped even with the row policy missing entirely —
+     * it would assert the two layers together and prove neither. The engine
+     * table has only the policy, which is the layer this case is about.
+     */
+    /** @scenario "Every PostgreSQL-resident view in the catalog is tenant-scoped" */
+    it("scopes every PostgreSQL-resident dataset to the caller's tenant", async () => {
+      expect(
+        POSTGRES_VIEWS.length,
+        "the catalog carries no PostgreSQL-resident datasets — this whole file would be vacuous",
+      ).toBeGreaterThan(0);
+
+      for (const view of POSTGRES_VIEWS) {
+        await expectTenantScopedRead({
+          harness,
+          client: tenantA,
+          table: view.sourceTable,
+          tenantColumn: PG_MAPPED_TENANT_COLUMN,
+          context: `mapped table behind ${view.name}`,
+          query: `SELECT ${PG_MAPPED_TENANT_COLUMN} FROM ${database}.${view.sourceTable}`,
+        });
+      }
+    });
+
+    /**
+     * The column the approved view omits is unreachable, not merely unselected:
+     * the PG role has no grant on the base table, so there is no path to it.
+     */
+    /** @scenario "A column the approved view excludes is unreachable through the mapping" */
+    it("cannot reach a column the approved view excludes", async () => {
+      await expectClickHouseError(
+        () =>
+          selectRows(tenantA, `SELECT ${PG_EXCLUDED_COLUMN} FROM ${database}.${PG_MAPPED_VIEW}`),
+        CLICKHOUSE_ERROR_CODE.UNKNOWN_IDENTIFIER,
+        "content-excluded column",
+      );
+
+      // Every excluded column of every mapped dataset, by its seeded marker:
+      // the exclusion policy is per column, so proving one says nothing about
+      // the prompt text or the evaluated rows.
+      for (const view of POSTGRES_VIEWS) {
+        const serialised = JSON.stringify(
+          await selectRows(tenantA, `SELECT * FROM ${database}.${view.name}`),
+        );
+        expect(
+          serialised.includes("excluded-"),
+          `${view.name}: an excluded column's data reached the LangWatchQL schema`,
+        ).toBe(false);
+      }
+    });
+  });
+
+  describe("when a caller queries an organization-scoped view", () => {
+    /** Walks Organization -> Team -> Project; two organizations make the negative case real. */
+    /** @scenario "An organization-scoped view never shows another organization's rows" */
+    it("returns only the caller's own organization's virtual keys", async () => {
+      const read = (client: ClickHouseClient) =>
+        selectRows<{ TenantId: string; VirtualKeyId: string; Name: string }>(
+          client,
+          `SELECT TenantId, VirtualKeyId, Name FROM ${database}.virtual_keys ORDER BY VirtualKeyId`,
+        );
+      const tenantB = await harness.restrictedClient({ keyHash: harness.tenantB.keyHash });
+
+      const rowsA = await read(tenantA);
+      const rowsB = await read(tenantB);
+
+      expect(rowsA.map((row) => [row.TenantId, row.Name])).toEqual([
+        [harness.tenantA.tenantId, `VK ${harness.tenantA.tenantId}`],
+      ]);
+      expect(rowsB.map((row) => [row.TenantId, row.Name])).toEqual([
+        [harness.tenantB.tenantId, `VK ${harness.tenantB.tenantId}`],
+      ]);
+    });
+  });
+
+  describe("when a caller asks for traffic by topic name", () => {
+    it("lists only the caller's own project's topics", async () => {
+      const rows = await selectRows<{ TopicId: string; TopicName: string }>(
+        tenantA,
+        `SELECT TopicId, TopicName FROM ${database}.topics ORDER BY TopicId`,
+      );
+
+      expect(rows.map((row) => row.TopicId)).toEqual([
+        `${harness.tenantA.tenantId}-topic-1`,
+        `${harness.tenantA.tenantId}-topic-2`,
+      ]);
+      for (const row of rows) {
+        expect(row.TopicName.startsWith(`Topic ${harness.tenantA.tenantId}`)).toBe(true);
+      }
+    });
+  });
+
+  describe("when the key-hash context matches no key-map entry", () => {
+    /** @scenario "Garbage key context yields zero rows from a PG-engine mapped table" */
+    it("returns zero rows from the mapped table", async () => {
+      await expectZeroRowsWithControl({
+        harness,
+        keyHash: UNMAPPED_KEY_HASH,
+        table: PG_MAPPED_TABLE,
+        tenantColumn: PG_MAPPED_TENANT_COLUMN,
+        context: "garbage key against the mapped table",
+      });
+    });
+
+    /** @scenario "Empty key context yields zero rows from a PG-engine mapped table" */
+    it("returns zero rows from the mapped table for an empty context", async () => {
+      await expectZeroRowsWithControl({
+        harness,
+        keyHash: "",
+        table: PG_MAPPED_TABLE,
+        tenantColumn: PG_MAPPED_TENANT_COLUMN,
+        context: "empty key against the mapped table",
+      });
+    });
+  });
+
+  describe("when the mapped table is nested in a compound query shape", () => {
+    /** @scenario "Row policy on a PG-engine mapped table holds under CTE, UNION, JOIN, and subquery shapes" */
+    it("scopes the mapped table through a CTE", async () => {
+      await expectTenantScopedRead({
+        harness,
+        client: tenantA,
+        table: PG_MAPPED_TABLE,
+        tenantColumn: PG_MAPPED_TENANT_COLUMN,
+        context: "mapped table in a CTE",
+        query:
+          `WITH scoped AS (SELECT AnnotationId, ${PG_MAPPED_TENANT_COLUMN} FROM ${database}.${PG_MAPPED_TABLE}) ` +
+          `SELECT AnnotationId, ${PG_MAPPED_TENANT_COLUMN} FROM scoped ORDER BY AnnotationId`,
+      });
+    });
+
+    /** @scenario "Row policy on a PG-engine mapped table holds under CTE, UNION, JOIN, and subquery shapes" */
+    it("scopes every branch of a UNION ALL mixing the mapped table with a native one", async () => {
+      await recordSeedControl({
+        harness,
+        table: "traces",
+        tenantColumn: "TenantId",
+      });
+      await expectTenantScopedRead({
+        harness,
+        client: tenantA,
+        table: PG_MAPPED_TABLE,
+        tenantColumn: PG_MAPPED_TENANT_COLUMN,
+        resultTenantColumn: "tenant",
+        context: "mapped table in a UNION ALL",
+        query:
+          `SELECT ${PG_MAPPED_TENANT_COLUMN} AS tenant FROM ${database}.${PG_MAPPED_TABLE} ` +
+          `UNION ALL SELECT TenantId AS tenant FROM ${database}.traces`,
+      });
+    });
+
+    /** @scenario "Row policy on a PG-engine mapped table holds under CTE, UNION, JOIN, and subquery shapes" */
+    it("scopes both sides of a JOIN between the mapped table and a ClickHouse fact table", async () => {
+      await recordSeedControl({
+        harness,
+        table: PG_MAPPED_TABLE,
+        tenantColumn: PG_MAPPED_TENANT_COLUMN,
+      });
+      await recordSeedControl({
+        harness,
+        table: "traces",
+        tenantColumn: "TenantId",
+      });
+
+      const rows = await selectRows<{
+        annotationTenant: string;
+        traceTenant: string;
+      }>(
+        tenantA,
+        `SELECT a.${PG_MAPPED_TENANT_COLUMN} AS annotationTenant, t.TenantId AS traceTenant ` +
+          `FROM ${database}.${PG_MAPPED_TABLE} AS a ` +
+          `INNER JOIN ${database}.traces AS t ON t.TraceId = a.TraceId`,
+      );
+
+      expectOnlyTenantA({
+        rows,
+        tenantColumn: "annotationTenant",
+        harness,
+        context: "mapped-table join side",
+      });
+      expectOnlyTenantA({
+        rows,
+        tenantColumn: "traceTenant",
+        harness,
+        context: "fact-table join side",
+      });
+    });
+
+    /** @scenario "Row policy on a PG-engine mapped table holds under CTE, UNION, JOIN, and subquery shapes" */
+    it("scopes the mapped table in IN and scalar subquery positions", async () => {
+      await expectTenantScopedRead({
+        harness,
+        client: tenantA,
+        table: PG_MAPPED_TABLE,
+        tenantColumn: PG_MAPPED_TENANT_COLUMN,
+        context: "mapped table in an IN subquery",
+        query:
+          `SELECT ${PG_MAPPED_TENANT_COLUMN} FROM ${database}.${PG_MAPPED_TABLE} ` +
+          `WHERE TraceId IN (SELECT TraceId FROM ${database}.traces)`,
+      });
+
+      const scalar = await selectScalar<string>(
+        tenantA,
+        `SELECT (SELECT DISTINCT ${PG_MAPPED_TENANT_COLUMN} FROM ${database}.${PG_MAPPED_TABLE}) AS value`,
+      );
+      expect(scalar).toBe(harness.tenantA.tenantId);
+    });
+  });
+
+  describe("when the restricted identity attempts to write through the mapping", () => {
+    /** @scenario "The restricted identity cannot write through a PG-engine mapped table" */
+    it("rejects an INSERT into the mapped table by grants", async () => {
+      await expectClickHouseError(
+        runStatement(
+          tenantA,
+          `INSERT INTO ${database}.${PG_MAPPED_TABLE} VALUES ` +
+            `('${harness.tenantB.tenantId}', 'injected', 'trace', true, ` +
+            `'2026-01-01 00:00:00', '2026-01-01 00:00:00')`,
+        ),
+        CLICKHOUSE_ERROR_CODE.ACCESS_DENIED,
+        "INSERT into the mapped table",
+      );
+
+      // Nothing reached PostgreSQL: the base table is unchanged.
+      const rows = await postgres.asAdmin(
+        `SELECT count(*) FROM public."${postgres.baseTable}" WHERE "id" = 'injected'`,
+      );
+      expect(rows.exitCode).toBe(0);
+      expect(rows.stdout.trim()).toBe("0");
+    });
+  });
+
+  describe("when a write is attempted on PostgreSQL as the dedicated role", () => {
+    /** @scenario "The dedicated PG role is read-only at the PostgreSQL layer" */
+    it("rejects writes and reads only the explicitly approved view", async () => {
+      // Positive control: the role can read what it is meant to read, so the
+      // rejections below are about privilege rather than a broken connection.
+      const approved = await postgres.asReader(
+        `SELECT count(*) FROM public."${postgres.approvedView}"`,
+      );
+      expect(approved.exitCode, approved.stderr).toBe(0);
+      expect(Number(approved.stdout.trim())).toBeGreaterThan(0);
+
+      expectPostgresError(
+        await postgres.asReader(`SELECT count(*) FROM public."${postgres.baseTable}"`),
+        POSTGRES_SQLSTATE.INSUFFICIENT_PRIVILEGE,
+        "reading the base table behind the approved view",
+      );
+      expectPostgresError(
+        await postgres.asReader(
+          `INSERT INTO public."${postgres.baseTable}" VALUES ` +
+            `('x','tenant-a','t',true,NULL,NULL,now(),now())`,
+        ),
+        POSTGRES_SQLSTATE.READ_ONLY_TRANSACTION,
+        "inserting as the dedicated role",
+      );
+      expectPostgresError(
+        await postgres.asReader("CREATE TABLE lwql_probe (x int)"),
+        POSTGRES_SQLSTATE.READ_ONLY_TRANSACTION,
+        "creating a table as the dedicated role",
+      );
+
+      const readOnly = await postgres.asReader(
+        "SELECT current_setting('default_transaction_read_only')",
+      );
+      expect(readOnly.stdout.trim()).toBe("on");
+    });
+
+    /**
+     * The two ceilings that bound what the analytics path can take from the
+     * primary. Read back from the server rather than asserted against the
+     * statement text, because a `CONNECTION LIMIT` that never applied would
+     * still be present in the SQL that tried to set it.
+     */
+    /** @scenario "The dedicated PG role is bounded by a statement timeout and a connection cap" */
+    it("carries a statement timeout and a connection cap on the primary", async () => {
+      const timeout = await postgres.asReader("SELECT current_setting('statement_timeout')");
+      expect(timeout.exitCode, timeout.stderr).toBe(0);
+      expect(timeout.stdout.trim()).toBe("10s");
+
+      // The cap is derived from the catalog, not chosen: every mapped table
+      // holds its own connection pool open, so a number sized for one dataset
+      // is exhausted by six — and it fails by refusing the role's next login,
+      // not by queueing.
+      const limit = await postgres.asAdmin(
+        `SELECT rolconnlimit FROM pg_roles WHERE rolname = '${postgres.readerRole}'`,
+      );
+      expect(limit.exitCode, limit.stderr).toBe(0);
+      expect(Number(limit.stdout.trim())).toBe(LWQL_TEST_POSTGRES_CONNECTION_LIMIT);
+      // And the shipped one-deployment derivation clears one catalog's demand,
+      // which is the property production depends on.
+      expect(
+        postgresViews.readerConnectionLimit(),
+        "the cap does not clear the pools the catalog's mapped tables hold open",
+      ).toBeGreaterThan(POSTGRES_VIEWS.length * DEFAULT_POSTGRES_ENGINE_POOL_SIZE - 1);
+
+      // The timeout is enforced, not merely configured.
+      expectPostgresError(
+        await postgres.asReader("SELECT pg_sleep(12)"),
+        POSTGRES_SQLSTATE.QUERY_CANCELED,
+        "a query outrunning the role's statement timeout",
+      );
+    });
+  });
+
+  describe("when the restricted identity inspects the mapping", () => {
+    /** @scenario "PG connection credentials are not exposed to the restricted identity" */
+    it("reveals the collection name but no PostgreSQL credential", async () => {
+      const shown = await selectRows<{ statement: string }>(
+        tenantA,
+        `SHOW CREATE TABLE ${database}.${PG_MAPPED_TABLE}`,
+      );
+      const definition = JSON.stringify(shown);
+
+      // Positive control: we are looking at the mapped table's real definition.
+      expect(definition).toContain("PostgreSQL(");
+      expect(definition).toContain(postgres.approvedView);
+
+      for (const secret of [
+        postgres.readerPassword,
+        postgres.readerRole,
+        String(postgres.container.getPort()),
+        "host.docker.internal",
+      ]) {
+        expect(
+          definition.includes(secret),
+          `the mapped table definition leaked "${secret}" to the restricted identity`,
+        ).toBe(false);
+      }
+
+      await expectClickHouseError(
+        () => selectRows(tenantA, "SELECT * FROM system.named_collections"),
+        CLICKHOUSE_ERROR_CODE.ACCESS_DENIED,
+        "reading the server's named collections",
+      );
+
+      // The collection can only be used through the objects an administrator
+      // built with it, never through a table function the caller writes.
+      await expectClickHouseError(
+        () =>
+          selectRows(
+            tenantA,
+            `SELECT * FROM postgresql(${lwqlTestNamedCollection(harness.names)}, table='${postgres.baseTable}')`,
+          ),
+        CLICKHOUSE_ERROR_CODE.ACCESS_DENIED,
+        "using the named collection through a table function",
+      );
+    });
+  });
+
+  describe("when the load the mapping places on PostgreSQL is measured", () => {
+    /**
+     * The finding the LangWatchQL view's tenant predicate exists to fix, pinned
+     * here rather than argued from prose.
+     *
+     * The security property holds on the bare engine table — a garbage key
+     * returns nothing — but the containment property does not: ClickHouse does
+     * NOT push the row policy's predicate down, so a read of the engine table
+     * scans the whole approved view on the primary and filters afterwards,
+     * including a read that is about to return zero rows.
+     */
+    /** @scenario "The row-policy predicate is not pushed down to PostgreSQL" */
+    it("scans the whole approved view on PostgreSQL even for a key that can match no row", async () => {
+      const before = await postgres.readLog();
+      const client = await harness.restrictedClient({
+        keyHash: UNMAPPED_KEY_HASH,
+      });
+      const rows = await selectRows(client, `SELECT count() FROM ${database}.${PG_MAPPED_TABLE}`);
+      expect(rows).toHaveLength(1);
+
+      const statements = statementsLoggedSince(before, await postgres.readLog());
+      const scans = statements.filter((statement) => statement.includes(postgres.approvedView));
+      // Without this the whole measurement passes vacuously on an empty delta.
+      expect(
+        scans.length,
+        "no statement against the approved view was logged — the measurement captured nothing",
+      ).toBeGreaterThan(0);
+
+      for (const scan of scans) {
+        expect(
+          /\bWHERE\b/i.test(scan),
+          `the row policy predicate now pushes down ("${scan}") — the LangWatchQL view's tenant predicate may no longer be needed`,
+        ).toBe(false);
+      }
+      expect(
+        statements.some((statement) => /^BEGIN READ ONLY$/i.test(statement)),
+        "reads are not wrapped in a read-only transaction",
+      ).toBe(true);
+    });
+
+    /**
+     * The control for the finding above: a predicate the *caller* wrote does
+     * push down, so the absent WHERE is specific to the policy predicate rather
+     * than a sign that pushdown is off altogether.
+     */
+    /** @scenario "A predicate in the submitted SQL is pushed down to PostgreSQL" */
+    it("does push the caller's own predicate down to PostgreSQL", async () => {
+      const before = await postgres.readLog();
+      await selectRows(
+        tenantA,
+        `SELECT AnnotationId FROM ${database}.${PG_MAPPED_TABLE} ` +
+          `WHERE TraceId = '${harness.tenantA.tenantId}-trace-1'`,
+      );
+
+      const statements = statementsLoggedSince(before, await postgres.readLog());
+      const scans = statements.filter((statement) => statement.includes(postgres.approvedView));
+      expect(scans.length).toBeGreaterThan(0);
+      expect(
+        scans.some((scan) => scan.includes("TraceId")),
+        "the caller's predicate did not reach PostgreSQL at all",
+      ).toBe(true);
+    });
+
+    /**
+     * The fix. The LangWatchQL view carries a tenant predicate that ClickHouse
+     * folds to a constant and sends, so the primary is asked for one tenant's
+     * rows rather than every tenant's — with the caller's SQL untouched.
+     */
+    /** @scenario "The LangWatchQL view sends a tenant predicate PostgreSQL can use" */
+    it("pushes the caller's tenant down to PostgreSQL when the LangWatchQL view is read", async () => {
+      const before = await postgres.readLog();
+      await selectRows(tenantA, `SELECT count() FROM ${database}.${PG_MAPPED_VIEW}`);
+
+      const scans = statementsLoggedSince(before, await postgres.readLog()).filter((statement) =>
+        statement.includes(postgres.approvedView),
+      );
+      expect(
+        scans.length,
+        "no statement against the approved view was logged — the measurement captured nothing",
+      ).toBeGreaterThan(0);
+      for (const scan of scans) {
+        expect(
+          scan.includes(`>= '${harness.tenantA.tenantId}'`) &&
+            scan.includes(`<= '${harness.tenantA.tenantId}'`),
+          `the LangWatchQL view's tenant predicate did not reach PostgreSQL ("${scan}")`,
+        ).toBe(true);
+      }
+      // The caller's tenant, never the other one, and never the raw secret.
+      const joined = scans.join("\n");
+      expect(joined).not.toContain(harness.tenantB.tenantId);
+      expect(joined).not.toContain(harness.tenantA.rawSecret);
+    });
+
+    /**
+     * The containment, as rows off the primary rather than as statement text.
+     *
+     * This is the measurement the projection-fallback decision turns on: the
+     * engine table costs every tenant's rows, the LangWatchQL view costs the
+     * caller's, and an unknown key costs none.
+     */
+    /** @scenario "The LangWatchQL view bounds what PostgreSQL reads to the caller's tenant" */
+    it("reads fewer rows off the primary through the view than through the engine table", async () => {
+      const measure = async (relation: string, keyHash: string) => {
+        await postgres.resetStatistics();
+        const client = await harness.restrictedClient({ keyHash });
+        await selectRows(client, `SELECT count() FROM ${database}.${relation}`);
+        await postgres.flushStatistics();
+        return postgres.rowsRead(postgres.baseTable);
+      };
+
+      const withoutPredicate = await measure(PG_MAPPED_TABLE, harness.tenantA.keyHash);
+      const withPredicate = await measure(PG_MAPPED_VIEW, harness.tenantA.keyHash);
+      const unknownKey = await measure(PG_MAPPED_VIEW, UNMAPPED_KEY_HASH);
+
+      // Control: the unpredicated read must actually have cost something, or
+      // "fewer" below is a comparison between two zeroes.
+      expect(
+        withoutPredicate,
+        "reading the engine table cost no rows on the primary — the comparison is vacuous",
+      ).toBeGreaterThan(0);
+      expect(withPredicate).toBeLessThan(withoutPredicate);
+      expect(unknownKey).toBe(0);
+    }, 120_000);
+
+    /**
+     * The safety property, proven rather than argued: the pushed-down predicate
+     * is a performance control that cannot become a security hole.
+     *
+     * A view whose predicate names the *wrong* tenant makes PostgreSQL read and
+     * ship that tenant's rows — asserted from the statement PostgreSQL received
+     * and from the rows it read, so the predicate demonstrably did reach it —
+     * and the caller still receives none, because the row policy on the engine
+     * table underneath is what decides the answer.
+     */
+    /** @scenario "A wrong tenant predicate costs a wrong read and never a wrong answer" */
+    it("returns zero rows when the pushed-down predicate names a foreign tenant", async () => {
+      const probe = `${PG_MAPPED_VIEW}_wrong_tenant_probe`;
+      try {
+        await harness.applyAsAdmin([
+          `CREATE OR REPLACE VIEW ${database}.${probe}\n` +
+            `SQL SECURITY INVOKER\n` +
+            `AS SELECT src.${PG_MAPPED_TENANT_COLUMN} AS ${PG_MAPPED_TENANT_COLUMN}, ` +
+            `src.AnnotationId AS AnnotationId\n` +
+            `FROM ${database}.${PG_MAPPED_TABLE} AS src\n` +
+            `WHERE src.${PG_MAPPED_TENANT_COLUMN} = '${harness.tenantB.tenantId}'`,
+          `GRANT SELECT ON ${database}.${probe} TO ${harness.names.restrictedUser}`,
+        ]);
+
+        const control = await recordSeedControl({
+          harness,
+          table: PG_MAPPED_TABLE,
+          tenantColumn: PG_MAPPED_TENANT_COLUMN,
+        });
+        await postgres.resetStatistics();
+        const before = await postgres.readLog();
+
+        const rows = await selectRows(tenantA, `SELECT * FROM ${database}.${probe}`);
+
+        const scans = statementsLoggedSince(before, await postgres.readLog()).filter((statement) =>
+          statement.includes(postgres.approvedView),
+        );
+        await postgres.flushStatistics();
+        const rowsReadOnPrimary = await postgres.rowsRead(postgres.baseTable);
+
+        // The foreign predicate really did reach PostgreSQL, and PostgreSQL
+        // really did read those rows: without both, "zero rows out" would prove
+        // nothing about what the predicate can and cannot do.
+        expect(
+          scans.some((scan) => scan.includes(`= '${harness.tenantB.tenantId}'`)),
+          `the foreign predicate never reached PostgreSQL:\n${scans.join("\n")}`,
+        ).toBe(true);
+        expect(
+          rowsReadOnPrimary,
+          "PostgreSQL read nothing, so the row policy was never the thing that filtered",
+        ).toBeGreaterThan(0);
+
+        expect(
+          rows,
+          `expected zero rows while ${control.tenantB} foreign rows were fetched`,
+        ).toHaveLength(0);
+      } finally {
+        // Same discipline as the DEFINER-view probe in
+        // `tenantIsolation.integration.test.ts`: the grant outlives the drop,
+        // and a container this suite reuses across runs would otherwise keep
+        // both the probe view and its grant on the restricted user forever.
+        await harness.applyAsAdmin([
+          `REVOKE SELECT ON ${database}.${probe} FROM ${harness.names.restrictedUser}`,
+          `DROP TABLE IF EXISTS ${database}.${probe}`,
+        ]);
+      }
+    }, 120_000);
+  });
+
+  describe("when a group project's session carries every member's key hash", () => {
+    /** @scenario "A group project reads every member through a PostgreSQL-resident view" */
+    it("reads every member's rows and sends PostgreSQL a range spanning them", async () => {
+      const control = await recordSeedControl({
+        harness,
+        table: PG_MAPPED_TABLE,
+        tenantColumn: PG_MAPPED_TENANT_COLUMN,
+      });
+      const group = await harness.restrictedClient({
+        keyHash: `${harness.tenantA.keyHash},${harness.tenantB.keyHash}`,
+      });
+      const before = await postgres.readLog();
+
+      const rows = await selectRows<{ TenantId: string }>(
+        group,
+        `SELECT ${PG_MAPPED_TENANT_COLUMN} FROM ${database}.${PG_MAPPED_VIEW}`,
+      );
+
+      const tenants = (tenantId: string) => rows.filter((row) => row.TenantId === tenantId).length;
+      expect(tenants(harness.tenantA.tenantId)).toBe(control.tenantA);
+      expect(tenants(harness.tenantB.tenantId)).toBe(control.tenantB);
+      expect(rows).toHaveLength(control.tenantA + control.tenantB);
+
+      const [low, high] = [harness.tenantA.tenantId, harness.tenantB.tenantId].toSorted();
+      const scans = statementsLoggedSince(before, await postgres.readLog()).filter((statement) =>
+        statement.includes(postgres.approvedView),
+      );
+      expect(scans.length).toBeGreaterThan(0);
+      for (const scan of scans) {
+        expect(
+          scan.includes(`>= '${low}'`) && scan.includes(`<= '${high}'`),
+          `the group's tenant range did not reach PostgreSQL ("${scan}")`,
+        ).toBe(true);
+      }
+    });
+  });
+
+  describe("when the key map holds a duplicate row for the caller's key", () => {
+    /**
+     * The bug this pins: the key map is `ORDER BY KeyHash` with no uniqueness
+     * enforced, so a retried provisioning step or a re-issued key can leave two
+     * rows the key map's own self-policy admits for the same hash. The LangWatchQL
+     * view's tenant predicate (`postgresTenantPredicate` in `../views.ts`) is a
+     * min/max range over exactly that self-policed read — when it was one
+     * bare scalar, two admitted rows made the subquery return two rows and
+     * ClickHouse rejected the whole read with
+     * `Code: 125. INCORRECT_RESULT_OF_SCALAR_SUBQUERY`, taking out every
+     * PostgreSQL-resident dataset for the affected key at once.
+     */
+    /** @scenario "A duplicate key-map row does not break a PostgreSQL-resident read" */
+    it("reads its own tenant's rows through a PG-resident view when its key hash is duplicated", async () => {
+      const control = await recordSeedControl({
+        harness,
+        table: PG_MAPPED_TABLE,
+        tenantColumn: PG_MAPPED_TENANT_COLUMN,
+      });
+
+      try {
+        // A retried provisioning step or a re-issued key: same hash, same
+        // tenant — duplicates are copies, per the module comment this pins —
+        // a second row alongside the one every other test in this file
+        // depends on.
+        await harness.admin.insert({
+          table: `${database}.${harness.names.keyMapTable}`,
+          format: "JSONEachRow",
+          values: [
+            {
+              KeyHash: harness.tenantA.keyHash,
+              TenantId: harness.tenantA.tenantId,
+            },
+          ],
+        });
+
+        let thrown: unknown;
+        let rows: { AnnotationId: string; TenantId: string }[] = [];
+        try {
+          rows = await selectRows<{ AnnotationId: string; TenantId: string }>(
+            tenantA,
+            `SELECT AnnotationId, ${PG_MAPPED_TENANT_COLUMN} FROM ${database}.${PG_MAPPED_VIEW} ORDER BY AnnotationId`,
+          );
+        } catch (error) {
+          thrown = error;
+        }
+
+        expect(
+          thrown,
+          `reading the PG-resident view with a duplicated key-map row was rejected: ${String(thrown)}`,
+        ).toBeUndefined();
+        expectOnlyTenantA({
+          rows,
+          tenantColumn: PG_MAPPED_TENANT_COLUMN,
+          harness,
+          context: "PG-resident view read behind a duplicated key-map row",
+        });
+        expect(rows).toHaveLength(control.tenantA);
+      } finally {
+        // Both rows share a hash, so restoring means clearing it entirely and
+        // reseeding the single row — the same recipe
+        // `tenantIsolation.integration.test.ts` uses to restore a revoked key,
+        // so a reused container is not left holding the duplicate.
+        await harness.applyAsAdmin([
+          `ALTER TABLE ${database}.${harness.names.keyMapTable} ` +
+            `DELETE WHERE KeyHash = '${harness.tenantA.keyHash}' SETTINGS mutations_sync = 2`,
+        ]);
+        await harness.admin.insert({
+          table: `${database}.${harness.names.keyMapTable}`,
+          format: "JSONEachRow",
+          values: [
+            {
+              KeyHash: harness.tenantA.keyHash,
+              TenantId: harness.tenantA.tenantId,
+            },
+          ],
+        });
+      }
+
+      const restored = await selectScalar<string>(
+        tenantA,
+        `SELECT count() AS value FROM ${database}.${PG_MAPPED_VIEW}`,
+      );
+      expect(
+        Number(restored),
+        "the key map was not restored, later tests would still see the duplicate",
+      ).toBe(control.tenantA);
+    });
+  });
+
+  describe("when a project has a private conversation and a shared one", () => {
+    /** The generic seed's conversation is the shared one; only the private one is seeded here. */
+    const sharedConversationId = () => `${harness.tenantA.tenantId}-conversationId`;
+    const privateConversationId = () => `${harness.tenantA.tenantId}-private-conversation`;
+    const LANGY_VIEWS = [
+      "langy_conversation_projections",
+      "langy_conversation_turn_projections",
+      "langy_message_projections",
+      "langy_turn_requests",
+      "langy_active_turns",
+    ];
+
+    const privateSeedStatements = (): string[] => {
+      const tenantId = harness.tenantA.tenantId;
+      const conversationId = privateConversationId();
+      const userId = `${tenantId}-user-b`;
+      const turnId = `${tenantId}-private-turn-1`;
+      const requestId = `${tenantId}-private-req-1`;
+      return [
+        `INSERT INTO "LangyConversationProjection" (` +
+          `id, "projectId", "conversationId", "userId", "titleSource", "status", ` +
+          `"isShared", "messageCount", "createdAt", "updatedAt", "occurredAt", ` +
+          `"acceptedAt", "lastEventId", "projectionVersion") VALUES (` +
+          `'${tenantId}-private-conv', '${tenantId}', '${conversationId}', '${userId}', ` +
+          `'user', 'active', false, 0, 1700000000000, 1700000000000, 1700000000000, ` +
+          `1700000000000, 'evt-private-1', '1')`,
+        `INSERT INTO "LangyConversationTurnProjection" (` +
+          `id, "projectId", "conversationId", "turnId", "status", "questionParts", ` +
+          `"answerParts", "toolCalls", "createdAt", "updatedAt", "occurredAt", ` +
+          `"acceptedAt", "lastEventId", "projectionVersion") VALUES (` +
+          `'${tenantId}-private-turn', '${tenantId}', '${conversationId}', '${turnId}', ` +
+          `'completed', '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, 1700000000000, ` +
+          `1700000000000, 1700000000000, 1700000000000, 'evt-private-turn-1', '1')`,
+        `INSERT INTO "LangyMessageProjection" (` +
+          `id, "projectId", "conversationId", "messageId", "role", "parts", ` +
+          `"sourceEventId", "occurredAt", "acceptedAt", "createdAt", "updatedAt") VALUES (` +
+          `'${tenantId}-private-msg', '${tenantId}', '${conversationId}', ` +
+          `'${tenantId}-private-msg-1', 'user', '[]'::jsonb, 'evt-private-msg-1', ` +
+          `1700000000000, 1700000000000, 1700000000000, 1700000000000)`,
+        `INSERT INTO "LangyTurnRequest" (` +
+          `id, "projectId", "userId", "requestId", "conversationId", "turnId", ` +
+          `"status", "leaseOwner", "leaseExpiresAt") VALUES (` +
+          `'${tenantId}-private-req', '${tenantId}', '${userId}', '${requestId}', ` +
+          `'${conversationId}', '${turnId}', 'completed', 'worker-1', now())`,
+        `INSERT INTO "LangyActiveTurn" (` +
+          `id, "projectId", "conversationId", "turnId", "requestId", "userId", ` +
+          `"status", "leaseOwner", "leaseExpiresAt") VALUES (` +
+          `'${tenantId}-private-active', '${tenantId}', '${conversationId}', '${turnId}', ` +
+          `'${requestId}', '${userId}', 'active', 'worker-1', now() + interval '1 hour')`,
+      ];
+    };
+
+    const deletePrivateSeed = async (): Promise<void> => {
+      for (const table of [
+        "LangyActiveTurn",
+        "LangyTurnRequest",
+        "LangyMessageProjection",
+        "LangyConversationTurnProjection",
+        "LangyConversationProjection",
+      ]) {
+        await postgres.asAdmin(
+          `DELETE FROM "${table}" WHERE "conversationId" = '${privateConversationId()}'`,
+        );
+      }
+    };
+
+    /** @scenario "Per-user visibility is enforced at the approved view" */
+    it("shows the shared conversation and hides the private one, across all five Langy views", async () => {
+      for (const sql of privateSeedStatements()) {
+        const result = await postgres.asAdmin(sql);
+        expect(result.exitCode, `seeding failed: ${sql}\n${result.stderr}`).toBe(0);
+      }
+
+      try {
+        for (const view of LANGY_VIEWS) {
+          const serialised = JSON.stringify(
+            await selectRows(tenantA, `SELECT * FROM ${database}.${view}`),
+          );
+          expect(
+            serialised.includes(privateConversationId()),
+            `${view}: the private conversation's data reached the caller`,
+          ).toBe(false);
+          expect(
+            serialised.includes(sharedConversationId()),
+            `${view}: the shared conversation never reached the caller`,
+          ).toBe(true);
+        }
+      } finally {
+        await deletePrivateSeed();
+      }
+    }, 60_000);
+  });
+
+  describe("when a project has an Only me board and a Project board", () => {
+    /** The generic seed's board is the Project one; only the Only me board is seeded here. */
+    const projectBoardId = () => `${harness.tenantA.tenantId}-DashboardsV2-1`;
+    const onlyMeBoardId = () => `${harness.tenantA.tenantId}-only-me-board`;
+    const onlyMeWidgetId = () => `${harness.tenantA.tenantId}-only-me-widget`;
+    const projectWidgetId = () => `${harness.tenantA.tenantId}-project-board-widget`;
+
+    const boardSeedStatements = (): string[] => {
+      const tenantId = harness.tenantA.tenantId;
+      return [
+        `INSERT INTO "DashboardsV2" (id, "projectId", name, scope) VALUES (` +
+          `'${onlyMeBoardId()}', '${tenantId}', 'Only me board', 'PRIVATE')`,
+        `INSERT INTO "DashboardWidget" (id, "projectId", "dashboardId", name, definition) VALUES ` +
+          `('${onlyMeWidgetId()}', '${tenantId}', '${onlyMeBoardId()}', 'Only me widget', '{}'::jsonb), ` +
+          `('${projectWidgetId()}', '${tenantId}', '${projectBoardId()}', 'Project widget', '{}'::jsonb)`,
+      ];
+    };
+
+    const deleteBoardSeed = async (): Promise<void> => {
+      await postgres.asAdmin(
+        `DELETE FROM "DashboardWidget" WHERE id IN ('${onlyMeWidgetId()}', '${projectWidgetId()}')`,
+      );
+      await postgres.asAdmin(`DELETE FROM "DashboardsV2" WHERE id = '${onlyMeBoardId()}'`);
+    };
+
+    /** @scenario "Per-user visibility is enforced at the approved view" */
+    it("hides the Only me board and its widgets, and shows the Project board and its widgets", async () => {
+      for (const sql of boardSeedStatements()) {
+        const result = await postgres.asAdmin(sql);
+        expect(result.exitCode, `seeding failed: ${sql}\n${result.stderr}`).toBe(0);
+      }
+
+      try {
+        const boardIds = (
+          await selectRows<{ DashboardId: string }>(
+            tenantA,
+            `SELECT DashboardId FROM ${database}.dashboards_v2`,
+          )
+        ).map((row) => row.DashboardId);
+        expect(boardIds, "dashboards_v2: the Only me board reached the caller").not.toContain(
+          onlyMeBoardId(),
+        );
+        expect(boardIds, "dashboards_v2: the Project board never reached the caller").toContain(
+          projectBoardId(),
+        );
+
+        const widgetIds = (
+          await selectRows<{ DashboardWidgetId: string }>(
+            tenantA,
+            `SELECT DashboardWidgetId FROM ${database}.dashboard_widgets`,
+          )
+        ).map((row) => row.DashboardWidgetId);
+        expect(
+          widgetIds,
+          "dashboard_widgets: a widget on the Only me board reached the caller",
+        ).not.toContain(onlyMeWidgetId());
+        expect(
+          widgetIds,
+          "dashboard_widgets: a widget on the Project board never reached the caller",
+        ).toContain(projectWidgetId());
+      } finally {
+        await deleteBoardSeed();
+      }
+    }, 60_000);
+  });
+
+  describe("when a user granted the source tables has no row policy", () => {
+    /** @scenario "A user with no row policy is the boundary, and it is documented" */
+    it("reads every tenant's rows, and the access-model docs say only the restricted identity is isolated", async () => {
+      const user = `${harness.names.restrictedUser}_no_policy`;
+      const password = "no-policy-reader-password";
+      await harness.applyAsAdmin([
+        `DROP USER IF EXISTS ${user}`,
+        `CREATE USER ${user} IDENTIFIED WITH plaintext_password BY '${password}'`,
+        `GRANT SELECT ON ${harness.factDatabase}.* TO ${user}`,
+        `GRANT SELECT ON ${database}.${PG_MAPPED_TABLE} TO ${user}`,
+      ]);
+      const reader = createClient({
+        url: harness.container.getHttpUrl(),
+        username: user,
+        password,
+      });
+      try {
+        const facts = await recordSeedControl({
+          harness,
+          table: "traces",
+          tenantColumn: "TenantId",
+        });
+        const mapped = await recordSeedControl({
+          harness,
+          table: PG_MAPPED_TABLE,
+          tenantColumn: PG_MAPPED_TENANT_COLUMN,
+        });
+        const countOf = async (client: ClickHouseClient, table: string) =>
+          Number(
+            (await selectRows<{ n: string }>(client, `SELECT count() AS n FROM ${table}`))[0]?.n,
+          );
+        const traces = `${harness.factDatabase}.traces`;
+        const mappedTable = `${database}.${PG_MAPPED_TABLE}`;
+
+        expect(facts.tenantB, "tenant B must have source rows to read").toBeGreaterThan(0);
+        expect(mapped.tenantB, "tenant B must have mapped rows to read").toBeGreaterThan(0);
+        // Every tenant's rows, the seeded two among them: the admin's own count of the table.
+        expect(await countOf(reader, traces)).toBe(await countOf(harness.admin, traces));
+        expect(await countOf(reader, traces)).toBeGreaterThanOrEqual(facts.tenantA + facts.tenantB);
+        expect(await countOf(reader, mappedTable)).toBe(await countOf(harness.admin, mappedTable));
+        expect(await countOf(reader, mappedTable)).toBeGreaterThanOrEqual(
+          mapped.tenantA + mapped.tenantB,
+        );
+      } finally {
+        await reader.close();
+      }
+
+      const accessModelDocs = readFileSync(ACCESS_MODEL_DOCS, "utf8");
+      expect(accessModelDocs).toContain(
+        "Only the restricted `langwatch_lwql` identity is isolated by tenant",
+      );
+    });
+  });
+});
+
+describe("given an organization with three projects, two of them readable sibling projects, and one organization-level gateway budget", () => {
+  describe("when a caller reads two sibling projects of one organization in one query", () => {
+    /**
+     * The organization fan-out emits one row per project, so the budget appears once per sibling
+     * the caller reads. tasks#1212: a multi-project SUM must still count it once.
+     */
+    const ORGANIZATION_ID = "lwql-fanout-org";
+    const TEAM_ID = "lwql-fanout-team";
+    const BUDGET_ID = "lwql-fanout-budget";
+    const LIMIT_USD = 250;
+    const SIBLINGS = [1, 2].map((index) => ({
+      id: `lwql-fanout-project-${index}`,
+      lwqlKey: `raw-lwql-key-FANOUT-DO-NOT-LOG-${index}`,
+    }));
+    /**
+     * A third project of the same organization, in the key map but never in the caller's key set.
+     */
+    const UNREADABLE = { id: "lwql-fanout-project-3", lwqlKey: "raw-lwql-key-FANOUT-DO-NOT-LOG-3" };
+    const SEEDED = [...SIBLINGS, UNREADABLE];
+    const keyHashes = () =>
+      SEEDED.map(({ lwqlKey }) => lwqlCapability.tenantCapability({ secret: lwqlKey }));
+    const keyMapTable = () => `${harness.factDatabase}.${harness.names.keyMapTable}`;
+
+    const seedStatements = (): string[] => [
+      `INSERT INTO "Organization" ("id", "name", "slug") ` +
+        `VALUES ('${ORGANIZATION_ID}', 'Fan-out org', '${ORGANIZATION_ID}-slug')`,
+      `INSERT INTO "Team" ("id", "name", "slug", "organizationId") ` +
+        `VALUES ('${TEAM_ID}', 'Fan-out team', '${TEAM_ID}-slug', '${ORGANIZATION_ID}')`,
+      `INSERT INTO "Project" ` +
+        `("id", "name", "slug", "apiKey", "lwqlKey", "teamId", "language", "framework") VALUES ` +
+        SEEDED.map(
+          ({ id }) =>
+            `('${id}', 'Project ${id}', '${id}-slug', 'excluded-apikey-of-${id}', ` +
+            `'excluded-lwqlkey-of-${id}', '${TEAM_ID}', 'python', 'openai')`,
+        ).join(", "),
+      `INSERT INTO "GatewayBudget" ` +
+        `("id", "organizationId", "scopeType", "scopeId", "name", "window", "limitUsd", ` +
+        `"resetsAt", "createdById") VALUES ('${BUDGET_ID}', '${ORGANIZATION_ID}', ` +
+        `'ORGANIZATION', '${ORGANIZATION_ID}', 'Fan-out budget', 'MONTH', ${LIMIT_USD}, ` +
+        `'2027-01-01T00:00:00Z', 'lwql-fanout-user')`,
+    ];
+
+    const cleanupStatements = (): string[] => [
+      `DELETE FROM "GatewayBudget" WHERE "id" = '${BUDGET_ID}'`,
+      `DELETE FROM "Project" WHERE "teamId" = '${TEAM_ID}'`,
+      `DELETE FROM "Team" WHERE "id" = '${TEAM_ID}'`,
+      `DELETE FROM "Organization" WHERE "id" = '${ORGANIZATION_ID}'`,
+    ];
+
+    /** Runs every delete, the key map's too, before asserting, so one failure hides no other. */
+    const deleteSeed = async (): Promise<void> => {
+      const failures: string[] = [];
+      for (const sql of cleanupStatements()) {
+        const result = await postgres.asAdmin(sql);
+        if (result.exitCode !== 0) failures.push(`cleanup failed: ${sql}\n${result.stderr}`);
+      }
+      const quotedHashes = keyHashes().map((hash) => `'${hash}'`);
+      try {
+        await harness.applyAsAdmin([
+          `ALTER TABLE ${keyMapTable()} DELETE WHERE KeyHash IN (${quotedHashes.join(", ")}) ` +
+            "SETTINGS mutations_sync = 2",
+        ]);
+      } catch (error) {
+        failures.push(`key-map cleanup failed: ${String(error)}`);
+      }
+      expect(failures, "seed cleanup left rows behind").toEqual([]);
+    };
+
+    let service: LangWatchQLService;
+
+    const PROTECTIONS = {
+      catalogue: EVERY_CATALOGUE_PERMISSION,
+      canSeeCosts: true,
+      canSeeCapturedInput: true,
+      canSeeCapturedOutput: true,
+    };
+
+    const sumBudget = async (
+      projects: typeof SIBLINGS,
+      memberWindows?: readonly LangWatchQLMemberWindow[],
+    ) => {
+      const result = await service.executeForProjects({
+        projects,
+        ...(memberWindows ? { memberWindows } : {}),
+        protections: PROTECTIONS,
+        sql:
+          "SELECT sum(LimitUsd) AS total, count() AS n FROM gateway_budgets " +
+          `WHERE GatewayBudgetId = '${BUDGET_ID}'`,
+      });
+      return result.rows.map((row) => ({ total: Number(row.total), n: Number(row.n) }));
+    };
+
+    const readSiblings = async (sql: string) => {
+      const result = await service.executeForProjects({
+        projects: SIBLINGS,
+        protections: PROTECTIONS,
+        sql,
+      });
+      return result.rows;
+    };
+
+    beforeAll(async () => {
+      service = LangWatchQLService.create({
+        runTelemetry: TEST_RUN_TELEMETRY,
+        placement: ADMIT_EVERY_PLACEMENT,
+        executor: ClickHouseLangWatchQLExecutorRepository.create({
+          connection: {
+            ...harness.restrictedConnection(),
+            database,
+            tenantSetting: harness.names.tenantSetting,
+          },
+        }),
+        database,
+        views: POSTGRES_VIEWS,
+      });
+      for (const sql of seedStatements()) {
+        const seeded = await postgres.asAdmin(sql);
+        if (seeded.exitCode !== 0) throw new Error(`seeding failed: ${sql}\n${seeded.stderr}`);
+      }
+      await harness.admin.insert({
+        table: keyMapTable(),
+        format: "JSONEachRow",
+        values: SEEDED.map(({ id }, index) => ({ KeyHash: keyHashes()[index], TenantId: id })),
+      });
+    }, 60_000);
+
+    // A failed cleanup reports as an afterAll error, never in place of a test's own failure.
+    afterAll(async () => {
+      try {
+        // Undefined at runtime when beforeAll failed before creating it.
+        await service?.close();
+      } finally {
+        await deleteSeed();
+      }
+    }, 60_000);
+
+    /** @scenario "An organization-level row is counted once in a multi-project query" */
+    it("sums the organization's budget limit once and counts one budget", async () => {
+      const rows = await sumBudget(SIBLINGS);
+      expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
+    }, 60_000);
+
+    /** @scenario "A single project still reads its organization's row once" */
+    it.each(SIBLINGS.map((sibling) => [sibling.id, sibling] as const))(
+      "reads the budget once when %s is the only project in the query",
+      async (_id, sibling) => {
+        const rows = await sumBudget([sibling]);
+        expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
+      },
+      60_000,
+    );
+
+    /** @scenario "A multi-project read filters and groups an organization-level row under the lowest project only" */
+    it("puts the budget under the lower project id when filtering or grouping by TenantId", async () => {
+      const [kept, sibling] = SIBLINGS;
+      if (!kept || !sibling) throw new Error("the fan-out suite needs two sibling projects");
+      const ofBudget = `FROM gateway_budgets WHERE GatewayBudgetId = '${BUDGET_ID}'`;
+      const countUnder = async (tenantId: string) => {
+        const rows = await readSiblings(
+          `SELECT count() AS n ${ofBudget} AND TenantId = '${tenantId}'`,
+        );
+        return rows.map((row) => Number(row.n));
+      };
+      expect(await countUnder(kept.id), "filter on the lower project id").toEqual([1]);
+      expect(await countUnder(sibling.id), "filter on the other project's id").toEqual([0]);
+      const groupSql = `SELECT TenantId AS tenant, count() AS n ${ofBudget} GROUP BY TenantId`;
+      const grouped = (await readSiblings(groupSql)).map((row) => ({
+        tenant: String(row.tenant),
+        n: Number(row.n),
+      }));
+      expect(grouped, `got ${JSON.stringify(grouped)}`).toEqual([{ tenant: kept.id, n: 1 }]);
+    }, 60_000);
+
+    /** @scenario "A member window on the kept copy does not hide a row a sibling's window admits" */
+    it("reads the budget once when only the sibling whose copy is not kept admits it", async () => {
+      // The view keeps the lowest project's copy, here project 1, whose window opens after the
+      // budget was created; project 2 is shared for its whole history and so admits it.
+      const [kept, sibling] = SIBLINGS;
+      if (!kept || !sibling) throw new Error("the fan-out suite needs two sibling projects");
+      const rows = await sumBudget(SIBLINGS, [
+        { projectId: kept.id, from: Date.parse("2100-01-01T00:00:00.000Z") },
+        { projectId: sibling.id, from: 0 },
+      ]);
+      expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: LIMIT_USD, n: 1 }]);
+    }, 60_000);
+
+    /** @scenario "A member window cannot admit a row through a project the caller cannot read" */
+    it("reads nothing when only an unreadable sibling's window would admit the budget", async () => {
+      // Below the service, which drops a window outside the caller's projects: here project 3's
+      // window reaches the predicate, so only the engine table's row policy keeps its copy out.
+      // Both readable siblings open after the budget was created; project 3 would admit it.
+      const opensAfterTheBudget = Date.parse("2100-01-01T00:00:00.000Z");
+      const sql = scopeLangWatchQL({
+        sql:
+          `SELECT sum(LimitUsd) AS total, count() AS n FROM ${database}.gateway_budgets ` +
+          `WHERE GatewayBudgetId = '${BUDGET_ID}'`,
+        database,
+        views: POSTGRES_VIEWS,
+        memberWindows: [
+          ...SIBLINGS.map(({ id }) => ({ projectId: id, from: opensAfterTheBudget })),
+          { projectId: UNREADABLE.id, from: 0 },
+        ],
+      });
+      expect(sql, "the window predicate must name the unreadable project").toContain(
+        `TenantId IN ('${UNREADABLE.id}')`,
+      );
+      const reader = await harness.restrictedClient({
+        keyHash: lwqlCapability.tenantCapabilitySet({
+          secrets: SIBLINGS.map(({ lwqlKey }) => lwqlKey),
+        }),
+      });
+      try {
+        const rows = (await selectRows<{ total: unknown; n: unknown }>(reader, sql)).map((row) => ({
+          total: Number(row.total),
+          n: Number(row.n),
+        }));
+        // An aggregate with no GROUP BY answers one row even over no input rows.
+        expect(rows, `got ${JSON.stringify(rows)}`).toEqual([{ total: 0, n: 0 }]);
+      } finally {
+        await reader.close();
+      }
+    }, 60_000);
+  });
+});

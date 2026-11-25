@@ -6,7 +6,9 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { LocalCallFailure } from "../errors";
 import {
   editFile,
@@ -17,6 +19,7 @@ import {
   listDirectory,
   readFile,
   writeFile,
+  writeLangwatchEnv,
 } from "../fs-ops";
 
 describe("given a shared folder with a link that leaves it", () => {
@@ -40,10 +43,7 @@ describe("given a shared folder with a link that leaves it", () => {
     fs.mkdirSync(path.join(root, "build"));
     fs.writeFileSync(path.join(root, "build", "app.py"), "print('built')\n");
     fs.mkdirSync(path.join(root, "node_modules", "left"), { recursive: true });
-    fs.writeFileSync(
-      path.join(root, "node_modules", "left", "app.py"),
-      "print('vendor')\n",
-    );
+    fs.writeFileSync(path.join(root, "node_modules", "left", "app.py"), "print('vendor')\n");
     fs.symlinkSync(outside, path.join(root, "escape"));
   });
 
@@ -83,9 +83,7 @@ describe("given a shared folder with a link that leaves it", () => {
     });
 
     it("allows a path inside the folder", () => {
-      expect(insideRoot({ target: "src/app.py", root })).toBe(
-        path.join(root, "src", "app.py"),
-      );
+      expect(insideRoot({ target: "src/app.py", root })).toBe(path.join(root, "src", "app.py"));
     });
   });
 
@@ -122,9 +120,7 @@ describe("given a shared folder with a link that leaves it", () => {
         root,
       });
       expect(answer).toContain("src/deep/new.py");
-      expect(fs.readFileSync(path.join(root, "src/deep/new.py"), "utf8")).toBe(
-        "print('x')\n",
-      );
+      expect(fs.readFileSync(path.join(root, "src/deep/new.py"), "utf8")).toBe("print('x')\n");
     });
   });
 
@@ -138,9 +134,7 @@ describe("given a shared folder with a link that leaves it", () => {
         root,
       });
       expect(answer).toContain("1 edit");
-      expect(fs.readFileSync(path.join(root, "README.md"), "utf8")).toContain(
-        "# Acme Shop",
-      );
+      expect(fs.readFileSync(path.join(root, "README.md"), "utf8")).toContain("# Acme Shop");
     });
 
     it("refuses an old text that is not there", () => {
@@ -173,9 +167,96 @@ describe("given a shared folder with a link that leaves it", () => {
         thrown = error;
       }
       expect((thrown as LocalCallFailure).message).toContain("2 times");
-      expect(fs.readFileSync(path.join(root, "src/app.py"), "utf8")).toContain(
-        "print('hello')",
+      expect(fs.readFileSync(path.join(root, "src/app.py"), "utf8")).toContain("print('hello')");
+    });
+  });
+
+  describe("when an edit appends to a file", () => {
+    /** @scenario "An edit can append to the end of a file" */
+    it("adds the text as the last line and keeps the rest", () => {
+      const answer = editFile({
+        params: { path: "README.md", edits: [{ append: "Second line" }] },
+        root,
+      });
+      expect(answer).toContain("1 edit");
+      expect(fs.readFileSync(path.join(root, "README.md"), "utf8")).toBe("# Acme\nSecond line\n");
+    });
+
+    it("creates the file when there is none", () => {
+      editFile({
+        params: { path: "notes/todo.txt", edits: [{ append: "one\ntwo" }] },
+        root,
+      });
+      expect(fs.readFileSync(path.join(root, "notes/todo.txt"), "utf8")).toBe("one\ntwo\n");
+    });
+
+    it("still refuses a replacement in a file that is not there", () => {
+      let thrown: unknown;
+      try {
+        editFile({
+          params: {
+            path: "missing.txt",
+            edits: [{ oldText: "a", newText: "b" }, { append: "c" }],
+          },
+          root,
+        });
+      } catch (error) {
+        thrown = error;
+      }
+      expect((thrown as LocalCallFailure).code).toBe("not_found");
+      expect(fs.existsSync(path.join(root, "missing.txt"))).toBe(false);
+    });
+  });
+
+  describe("when the LangWatch credentials are written", () => {
+    const params = { path: ".env" };
+
+    /** @scenario "The app gets the project's key through the developer's own login" */
+    it("sets both variables and keeps every other line", () => {
+      fs.writeFileSync(
+        path.join(root, ".env"),
+        "OPENAI_API_KEY=sk-openai\nLANGWATCH_API_KEY=old-key\n",
       );
+      const answer = writeLangwatchEnv({
+        params,
+        root,
+        apiKey: "sk-lw-project-key",
+        endpoint: "http://localhost:5560",
+        projectName: "Acme Shop",
+      });
+      expect(fs.readFileSync(path.join(root, ".env"), "utf8")).toBe(
+        "OPENAI_API_KEY=sk-openai\nLANGWATCH_API_KEY=sk-lw-project-key\nLANGWATCH_ENDPOINT=http://localhost:5560\n",
+      );
+      expect(answer).toBe(
+        "Set LANGWATCH_API_KEY and LANGWATCH_ENDPOINT in .env for project Acme Shop.",
+      );
+      expect(answer).not.toContain("sk-lw-project-key");
+    });
+
+    it("creates the file when there is none", () => {
+      writeLangwatchEnv({
+        params: {},
+        root,
+        apiKey: "sk-lw-project-key",
+        endpoint: "http://localhost:5560",
+        projectName: "Acme Shop",
+      });
+      expect(fs.readFileSync(path.join(root, ".env"), "utf8")).toBe(
+        "LANGWATCH_API_KEY=sk-lw-project-key\nLANGWATCH_ENDPOINT=http://localhost:5560\n",
+      );
+    });
+
+    it("refuses a file outside the folder", () => {
+      expect(() =>
+        writeLangwatchEnv({
+          params: { path: "escape/.env" },
+          root,
+          apiKey: "sk-lw-project-key",
+          endpoint: "http://localhost:5560",
+          projectName: "Acme Shop",
+        }),
+      ).toThrow(LocalCallFailure);
+      expect(fs.existsSync(path.join(outside, ".env"))).toBe(false);
     });
   });
 
@@ -198,12 +279,25 @@ describe("given a shared folder with a link that leaves it", () => {
     });
 
     it("honors the glob and the literal flag", () => {
-      expect(
-        grep({ params: { pattern: "print", glob: "*.md" }, root }),
-      ).toContain("No line matches");
-      expect(
-        grep({ params: { pattern: "print('hello')", literal: true }, root }),
-      ).toContain("src/app.py");
+      expect(grep({ params: { pattern: "print", glob: "*.md" }, root })).toContain(
+        "No line matches",
+      );
+      expect(grep({ params: { pattern: "print('hello')", literal: true }, root })).toContain(
+        "src/app.py",
+      );
+    });
+
+    /** @scenario "A search pattern that is not a valid regular expression is searched as plain text" */
+    it("searches a pattern that does not compile as plain text and says so", () => {
+      const found = grep({ params: { pattern: "print(" }, root });
+      expect(found).toContain("src/app.py:2:");
+      expect(found).toContain("searched as plain text");
+    });
+
+    it("still reads a valid pattern as a regular expression, with no note", () => {
+      const found = grep({ params: { pattern: "pri.t\\(" }, root });
+      expect(found).toContain("src/app.py:2:");
+      expect(found).not.toContain("plain text");
     });
   });
 

@@ -1,0 +1,110 @@
+/**
+ * @vitest-environment jsdom
+ * The two sign-in security cards: each keeps its own draft and hands the
+ * whole settings object back on save.
+ * @see specs/identity/org-session-lifetime.feature
+ */
+import "@testing-library/jest-dom/vitest";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { SIGN_IN_SECURITY_OFF } from "../../../model/sign-in-security.ts";
+import { SessionLimitCard, SignInLockoutCard } from "../sign-in-security-cards.tsx";
+
+afterEach(cleanup);
+
+const renderCard = (card: React.ReactNode) =>
+  render(<DesignSystemProvider forcedTheme="light">{card}</DesignSystemProvider>);
+
+describe("the account lockout card", () => {
+  describe("given lockout is off", () => {
+    /** @scenario The threshold is offered with the numbers the control asks for */
+    it("offers the lock and saves the offered threshold", async () => {
+      const onSave = vi.fn();
+      renderCard(
+        <SignInLockoutCard settings={SIGN_IN_SECURITY_OFF} saving={false} onSave={onSave} />,
+      );
+
+      expect(screen.getByTestId("sign-in-lockout-save")).toBeDisabled();
+      await userEvent.click(screen.getByTestId("sign-in-lockout-save"));
+      expect(onSave).not.toHaveBeenCalled();
+      // userEvent, not fireEvent: Chakra's radio group only hears a real click.
+      await userEvent.click(screen.getByText("Temporary lockout"));
+      expect((screen.getByTestId("sign-in-lockout-attempts") as HTMLInputElement).value).toBe("5");
+      expect((screen.getByTestId("sign-in-lockout-minutes") as HTMLInputElement).value).toBe("30");
+      expect(screen.getByText("Applies to new sign-ins.")).toBeTruthy();
+      expect(onSave).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByTestId("sign-in-lockout-save"));
+
+      expect(onSave).toHaveBeenCalledWith({
+        ...SIGN_IN_SECURITY_OFF,
+        lockoutAfterFailedAttempts: 5,
+        lockoutMinutes: 30,
+      });
+    });
+  });
+});
+
+describe("the session limits card", () => {
+  describe("given session limits are off and custom limits are chosen", () => {
+    /** @scenario "The window is offered with the numbers the control asks for" */
+    it("offers an idle timeout of one day, a maximum left unset, and says saving signs out the idle", async () => {
+      renderCard(
+        <SessionLimitCard settings={SIGN_IN_SECURITY_OFF} saving={false} onSave={vi.fn()} />,
+      );
+
+      await userEvent.click(screen.getByText("Custom session limits"));
+
+      expect((screen.getByTestId("session-limit-idle") as HTMLInputElement).value).toBe("1440");
+      expect((screen.getByTestId("session-limit-maximum") as HTMLInputElement).value).toBe("");
+      expect(screen.getByTestId("session-limit-save")).toBeTruthy();
+      expect(
+        screen.getByText("Saving signs out sessions already past the new limit."),
+      ).toBeTruthy();
+    });
+  });
+
+  describe("given a maximum shorter than the idle timeout", () => {
+    it("warns that it would never be reached and prevents saving", async () => {
+      const onSave = vi.fn();
+      renderCard(
+        <SessionLimitCard
+          settings={{ ...SIGN_IN_SECURITY_OFF, sessionIdleTimeoutMinutes: 60 }}
+          saving={false}
+          onSave={onSave}
+        />,
+      );
+
+      fireEvent.change(screen.getByTestId("session-limit-maximum"), { target: { value: "30" } });
+
+      expect(screen.getByTestId("session-limit-unreachable")).toBeTruthy();
+      expect(screen.getByTestId("session-limit-save")).toBeDisabled();
+      await userEvent.click(screen.getByTestId("session-limit-save"));
+      expect(onSave).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a sensible window", () => {
+    it("saves both numbers", () => {
+      const onSave = vi.fn();
+      renderCard(
+        <SessionLimitCard
+          settings={{ ...SIGN_IN_SECURITY_OFF, sessionIdleTimeoutMinutes: 60 }}
+          saving={false}
+          onSave={onSave}
+        />,
+      );
+
+      fireEvent.change(screen.getByTestId("session-limit-maximum"), { target: { value: "480" } });
+      fireEvent.click(screen.getByTestId("session-limit-save"));
+
+      expect(onSave).toHaveBeenCalledWith({
+        ...SIGN_IN_SECURITY_OFF,
+        sessionIdleTimeoutMinutes: 60,
+        sessionMaxLifetimeMinutes: 480,
+      });
+    });
+  });
+});

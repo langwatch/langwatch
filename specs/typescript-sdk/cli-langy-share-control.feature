@@ -16,8 +16,108 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
     Scenario: The command signs in when there is no session
       Given no device session on this machine
       When I run "langwatch langy --share-control"
-      Then the CLI runs the login flow first
-      And continues to the request list after the login
+      Then the CLI prints "No login on this machine yet. Signing in first."
+      And the CLI runs the device login right away
+      And continues to the request list with the new login's key
+
+    # The sign-in is a step of sharing the folder. The AI tools, the model
+    # providers and the budgets belong to `langwatch login`.
+    @unit
+    Scenario: The sign-in inside the command prints only what signing in needs
+      Given no device session on this machine
+      When I run "langwatch langy --share-control" and approve the login in the browser
+      Then the CLI prints the address to open and the code to enter
+      And the CLI prints who I am logged in as
+      And the CLI prints no login header, no AI tools, no model providers, no budgets and no dashboard line
+
+    # Langy writes the project's key into the folder's .env during the setup.
+    # That key carries no person, so it can never list or approve a request
+    # addressed to me; the login on this machine is who I am.
+    @unit
+    Scenario: The login answers before a project key found in the folder
+      Given a device session on this machine
+      And the folder's .env carries the project's key
+      When I run "langwatch langy --share-control"
+      Then the request list is read with my login's key
+      And no login flow runs
+
+    # The same rule for a key exported in the shell. Nothing in a key tells
+    # the command line whether a person stands behind it: a project key and a
+    # key a person created look alike from here. So the command never takes
+    # LANGWATCH_API_KEY, from the folder's .env or from the shell, and the
+    # device login is its one credential.
+    @unit
+    Scenario: A key in the environment never stands in for the login
+      Given no device session on this machine
+      And LANGWATCH_API_KEY is set, in the shell or in the folder's .env
+      When I run "langwatch langy --share-control"
+      Then the CLI runs the device login right away
+      And the request list is never read with that key
+
+    # A login the server refuses, one that holds no login key, or one whose
+    # key the platform answers with a 401 cannot act as me.
+    @unit
+    Scenario: A login that cannot be used signs in again
+      Given a device session on this machine that cannot be used
+      And the folder's .env carries the project's key
+      When I run "langwatch langy --share-control"
+      Then the CLI prints "The login on this machine can no longer be used. Signing in again."
+      And the CLI runs the device login right away
+      And continues to the request list with the new login's key
+
+    # The key in the folder is what Langy set up for the app's own tracing,
+    # and every other command still reads it exactly as before.
+    @unit
+    Scenario: The folder's .env is left as it is
+      Given the folder's .env carries the project's key
+      When I run "langwatch langy --share-control", with or without a sign-in
+      Then the folder's .env holds the same bytes as before
+      And LANGWATCH_API_KEY in the environment is the same as before
+
+    @unit
+    Scenario: A sign-in that leaves no usable login ends with what to run
+      Given no device session on this machine
+      And the device login fails or leaves no login key
+      When I run "langwatch langy --share-control"
+      Then the command ends with "Could not sign you in, so this folder is not shared. Run `langwatch login --device`, then run `langwatch langy --share-control` again."
+      And no request list is read
+
+    @unit
+    Scenario: A sign-in refused for an untrusted certificate names the certificate fix
+      Given no device session on this machine
+      And the device login fails because the server's TLS certificate is not trusted
+      When I run "langwatch langy --share-control"
+      Then the command ends with the certificate error and NODE_EXTRA_CA_CERTS=~/.portless/ca.pem
+      And it does not ask me to run a second command
+
+    # LANGWATCH_ENDPOINT decides which LangWatch a command talks to, and a
+    # folder's .env can set it. My login key opens everything I can reach, so
+    # it goes to the address that issued it and to no other, whoever wrote
+    # the folder's .env. Replacing the login on my machine is my call.
+    @unit
+    Scenario: The login's key is never sent to another address than its own
+      Given a device session on this machine made against one LangWatch address
+      And LANGWATCH_ENDPOINT, in the shell or in the folder's .env, names another address
+      When I run "langwatch langy --share-control"
+      Then no request carries the login's key to that other address
+      And the command ends naming both addresses and what to run to sign in to the other one
+      And the login on this machine is left as it is
+
+    @unit
+    Scenario: Two spellings of one address are the same address
+      Given a device session on this machine made against "https://app.acme.test"
+      And LANGWATCH_ENDPOINT is "https://APP.acme.test/"
+      When I run "langwatch langy --share-control"
+      Then the command uses the login as it is
+
+    # A request is addressed to me and answered on its own project, so the
+    # line says who I am, not which project the login reads by default.
+    @unit
+    Scenario: The command names the login it uses
+      Given a device session on this machine as Riley at ACME
+      When I run "langwatch langy --share-control"
+      Then the CLI prints "Using your login as Riley at ACME."
+      And no line mentions a project, an API key or a --project flag
 
     @unit
     Scenario: An open request is shown with the conversation and the folder
@@ -43,6 +143,12 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       And the second option cancels the request
       When I confirm the first option
       Then the box is erased and one notice says the folder is shared
+
+    @unit
+    Scenario: A refusal with several tips prints as sentences
+      Given the platform refuses a request with two tips
+      When the command prints the refusal
+      Then each tip ends with a full stop before the next one starts
 
     @unit
     Scenario: Cancelling tells the conversation
@@ -71,6 +177,81 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       When I run "langwatch langy --share-control"
       Then the terminal reads that it is waiting for a Langy conversation to ask for this folder
       And a request recorded later appears without restarting the command
+
+    # The terminal lists only its login's own requests, so a login that is not
+    # the person who asked Langy waits for ever. The card's command names who
+    # asked with --as, and the terminal compares that with its login.
+    @unit
+    Scenario: A login that is not the asker's offers to sign in as the asker
+      Given a device session on this machine as riley@acme.test
+      When I run "langwatch langy --share-control --as sam@acme.test"
+      Then the CLI prints "Signed in as riley@acme.test, the request came from sam@acme.test."
+      And asks "Sign in as sam@acme.test?"
+      When I answer yes
+      Then the CLI runs the device login right away
+      And the request list is read with the new login's key
+
+    @unit
+    Scenario: A sign-in that lands on the same login says so and keeps waiting
+      Given a device session on this machine as riley@acme.test
+      When I run "langwatch langy --share-control --as sam@acme.test" and answer yes
+      And the browser approves the login as riley@acme.test again
+      Then the CLI says it is still signed in as riley@acme.test
+      And keeps waiting with the key that sign-in saved
+
+    @unit
+    Scenario: A sign-in that lands on a third login names it and waits with it
+      Given a device session on this machine as riley@acme.test
+      When I run "langwatch langy --share-control --as sam@acme.test" and answer yes
+      And the browser approves the login as jo@acme.test
+      Then the CLI prints "Now signed in as jo@acme.test, not sam@acme.test."
+      And keeps waiting with the login as jo@acme.test
+
+    @unit
+    Scenario: A sign-in that fails after saving a login names the saved login
+      Given a device session on this machine as riley@acme.test
+      When I run "langwatch langy --share-control --as sam@acme.test" and answer yes
+      And the sign-in saves a login as sam@acme.test and then fails
+      Then the CLI says it could not finish and is now signed in as sam@acme.test
+      And keeps waiting with the login as sam@acme.test
+
+    @unit
+    Scenario: A login that recorded no email asks nothing
+      Given a device session on this machine that recorded no email
+      When I run "langwatch langy --share-control --as sam@acme.test"
+      Then the CLI asks no question about the login
+      And the thirty-second notice is what names the login
+
+    @unit
+    Scenario: Keeping the other login keeps waiting
+      Given a device session on this machine as riley@acme.test
+      When I run "langwatch langy --share-control --as sam@acme.test" and answer no
+      Then the CLI says requests made by sam@acme.test do not reach this terminal
+      And keeps waiting with the login as riley@acme.test
+
+    @unit
+    Scenario: The asker's own login asks nothing
+      Given a device session on this machine as riley@acme.test
+      When I run "langwatch langy --share-control --as Riley@ACME.test"
+      Then the CLI asks no question about the login
+
+    @unit
+    Scenario: Output that is not a terminal says how to switch instead of asking
+      Given a device session on this machine as riley@acme.test
+      And the command's input is not a terminal
+      When I run "langwatch langy --share-control --as sam@acme.test"
+      Then the CLI prints the mismatch and what to run to sign in as sam@acme.test
+      And asks nothing and keeps waiting
+
+    # The fallback for a command run without --as, or a request that never comes.
+    @unit
+    Scenario: Nothing arriving for thirty seconds names the login and how to switch
+      Given a device session on this machine as riley@acme.test at ACME
+      And no conversation recorded a control request for me
+      When I run "langwatch langy --share-control" and thirty seconds pass
+      Then the CLI prints "No Langy request has reached riley@acme.test at ACME yet."
+      And says how to sign in as the account that asked Langy
+      And keeps waiting, and says this only once
 
     @unit
     Scenario: The folder is the current directory, reported as its real path

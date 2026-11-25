@@ -1,0 +1,93 @@
+import type { AgentApi } from "@langwatch/agent-contract";
+/**
+ * @vitest-environment node
+ * `POST /api/v1/agents/connect/frames`: refused before the transport (ADR-128).
+ * @see specs/agents/connected-agents.feature
+ */
+import { createRestRuntime, canonicalErrorResponse } from "@langwatch/api/rest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
+import { Hono } from "hono";
+import { describe, expect, it, vi } from "vitest";
+
+import { createAgentConnectRest } from "../agent-connect.rest.ts";
+import { connectCredentialsContext, connectDoor } from "./agent-connect-door.fixture.ts";
+
+function buildApi(relayMaxPayloadMb?: number) {
+  const framesSpy = vi.fn(async () => ({ accepted: 1 }));
+  const app = createApiFixture<AgentApi>({ connectFrames: framesSpy });
+  const runtime = createRestRuntime({
+    audit: { record: () => {} },
+    authorization: restTestAuthorization(),
+    identity: connectDoor(),
+  } as never);
+  const hono = new Hono();
+  hono.route(
+    "/",
+    runtime.mount(createAgentConnectRest(relayMaxPayloadMb).router(), {
+      app: () => app,
+      onError: canonicalErrorResponse,
+      middlewareContext: [connectCredentialsContext],
+    }),
+  );
+  return {
+    hono: {
+      request: (path: string, init?: RequestInit) => hono.request(`http://api.test${path}`, init),
+    },
+    framesSpy,
+  };
+}
+
+const headers = { "content-type": "application/json", authorization: "Bearer sk-lw-anything" };
+
+describe("POST /connect/frames", () => {
+  describe("when the body carries no ack, result or deregister frame", () => {
+    /** @scenario "A frames body the endpoint does not take is refused as a protocol frame" */
+    it("answers main's protocol_invalid frame", async () => {
+      const { hono, framesSpy } = buildApi();
+
+      const response = await hono.request("/api/v1/agents/connect/frames", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ frames: [{ type: "not-a-real-frame" }] }),
+      });
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({
+        frame: { type: "refused", protocol: 1, code: "protocol_invalid" },
+      });
+      expect(framesSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the body is above the frame cap", () => {
+    /** @scenario "A frames body above the cap names the limit alone" */
+    it("is refused with agent_payload_too_large naming the limit and no measured size", async () => {
+      // A 1 mebibyte cap, well under the oversized body below.
+      const { hono, framesSpy } = buildApi(1);
+
+      const response = await hono.request("/api/v1/agents/connect/frames", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          frames: [
+            {
+              type: "result",
+              protocol: 1,
+              callId: "call_1",
+              output: "x".repeat(2 * 1024 * 1024),
+            },
+          ],
+        }),
+      });
+
+      expect(response.status).toBe(413);
+      const body = (await response.json()) as { code: string; message: string };
+      expect(body.code).toBe("agent_payload_too_large");
+      // The cap stopped the read, so the message names only the limit —
+      // never a measured size, which the cap never let it weigh.
+      expect(body.message).toMatch(/^The result is above the limit of \d+ bytes\.$/);
+      expect(framesSpy).not.toHaveBeenCalled();
+    });
+  });
+});

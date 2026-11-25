@@ -1,0 +1,114 @@
+import {
+  compactNumber,
+  formatCost,
+  formatTokens,
+} from "@langwatch/design-system/display-formatters";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
+import { type EmptyNext, NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type React from "react";
+
+import {
+  type DetailPayload,
+  MODEL_FIGURES_NOT_KNOWN,
+  MODEL_FIGURES_NOT_KNOWN_REASON,
+} from "../../model/pull-request-detail.ts";
+import { MISSING_VALUE } from "./cells/missing-value.tsx";
+import { Section } from "./detail-section.tsx";
+
+type ModelUsage = DetailPayload["modelBreakdown"][number];
+
+/** The AI units a model consumed (Copilot's meter): a count beside its cost, never part of it. */
+const AiUnitsText: React.FC<{ aiUnits: number | null }> = ({ aiUnits }) =>
+  aiUnits !== null && aiUnits > 0 ? (
+    <Text fontSize="sm" color="fg.muted">
+      <FormattedNumber value={aiUnits} unit="AI units">
+        {compactNumber({ value: aiUnits })}
+      </FormattedNumber>{" "}
+      AI units
+    </Text>
+  ) : null;
+
+/**
+ * One model's line: what it consumed, and a bar scaled against the heaviest
+ * model on the pull request. An entry with unknown totals says so, with why on
+ * hover — drawing a figure or bar would claim what the read didn't.
+ */
+const ModelRow: React.FC<{ model: ModelUsage; peak: number }> = ({ model, peak }) => (
+  <VStack align="stretch" gap={1}>
+    <HStack justify="space-between" gap={3}>
+      <Text fontSize="sm" truncate>
+        {model.model}
+      </Text>
+      {model.tokensKnown ? (
+        <HStack gap={3} flexShrink={0}>
+          <Text fontSize="sm" color="fg.muted">
+            <FormattedNumber value={model.totalTokens} unit="tokens">
+              {formatTokens(model.totalTokens)}
+            </FormattedNumber>{" "}
+            tokens
+          </Text>
+          <AiUnitsText aiUnits={model.aiUnits} />
+          <Text fontSize="sm" color="fg.muted">
+            {model.costUsd === null ? (
+              MISSING_VALUE
+            ) : (
+              <FormattedNumber value={model.costUsd} currency="USD">
+                {formatCost(model.costUsd)}
+              </FormattedNumber>
+            )}
+          </Text>
+        </HStack>
+      ) : (
+        <Tooltip content={MODEL_FIGURES_NOT_KNOWN_REASON} positioning={{ placement: "left" }}>
+          <Text fontSize="sm" color="fg.subtle" cursor="help" tabIndex={0} flexShrink={0}>
+            {MODEL_FIGURES_NOT_KNOWN}
+          </Text>
+        </Tooltip>
+      )}
+    </HStack>
+    {model.tokensKnown ? (
+      <Box height="3px" bg="border.subtle" borderRadius="full" overflow="hidden">
+        <Box
+          height="full"
+          width={`${peak > 0 ? (model.totalTokens / peak) * 100 : 0}%`}
+          bg="blue.fg"
+          borderRadius="full"
+        />
+      </Box>
+    ) : null}
+  </VStack>
+);
+
+const MODELS_NEXT: EmptyNext = [
+  {
+    kind: "docs",
+    label: "How usage is attributed",
+    href: "https://docs.langwatch.ai/coding-agents/repository-and-pr-attribution",
+  },
+];
+
+/** What each model consumed, heaviest first. */
+export const ModelsSection: React.FC<{
+  models: DetailPayload["modelBreakdown"];
+}> = ({ models }) => {
+  const peak = models.reduce((max, model) => Math.max(max, model.totalTokens), 0);
+  return (
+    <Section title="Models">
+      {models.length === 0 ? (
+        <NoDataInfoBlock
+          size="line"
+          title="No model data for this pull request yet"
+          next={MODELS_NEXT}
+        />
+      ) : (
+        <VStack align="stretch" gap={3}>
+          {models.map((model) => (
+            <ModelRow key={model.model} model={model} peak={peak} />
+          ))}
+        </VStack>
+      )}
+    </Section>
+  );
+};

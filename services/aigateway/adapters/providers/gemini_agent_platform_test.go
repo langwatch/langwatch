@@ -119,3 +119,47 @@ func TestCompatRegistryResolvesGeminiEndpointConfig(t *testing.T) {
 		t.Fatalf("registry returned baseType %q, want Gemini", endpoint.baseType)
 	}
 }
+
+// @scenario "A Gemini or Vertex provider with a base URL reaches that host instead of Google's"
+func TestGeminiBaseURLOverrideReplacesGoogleHost(t *testing.T) {
+	bare := domain.Credential{ProviderID: domain.ProviderGemini, APIKey: "llmsim", Extra: map[string]string{"base_url": "http://127.0.0.1:21651/v1"}}
+	if got := mapProvider(bare); !strings.HasPrefix(string(got), geminiCompatPrefix) {
+		t.Fatalf("mapProvider(gemini with base_url) = %q, want a derived provider", got)
+	}
+	if endpoint, _ := geminiAgentPlatformEndpointForCred(bare); endpoint.baseURL != "http://127.0.0.1:21651/v1" || endpoint.keyless {
+		t.Fatalf("a bare key keeps the override as the API root: %+v", endpoint)
+	}
+	root := bare
+	root.Extra = map[string]string{"base_url": "http://127.0.0.1:21651/"}
+	if endpoint, _ := geminiAgentPlatformEndpointForCred(root); endpoint.baseURL != "http://127.0.0.1:21651/v1beta" {
+		t.Fatalf("a host-only override gets Gemini's /v1beta: %q", endpoint.baseURL)
+	}
+
+	door := agentPlatformCred()
+	door.Extra["base_url"] = "http://127.0.0.1:21651/v1"
+	want := "http://127.0.0.1:21651/v1/projects/acme-123/locations/us-central1/publishers/google"
+	if endpoint, _ := geminiAgentPlatformEndpointForCred(door); endpoint.baseURL != want {
+		t.Fatalf("the Agent Platform door keeps its path on the override host: %q, want %q", endpoint.baseURL, want)
+	}
+}
+
+// @scenario "A Gemini or Vertex provider with a base URL reaches that host instead of Google's"
+func TestVertexBaseURLOverrideTakesTheDerivedGeminiProvider(t *testing.T) {
+	cred := domain.Credential{ProviderID: domain.ProviderVertex, Extra: map[string]string{"project_id": "p1", "region": "us-central1"}}
+	if got := mapProvider(cred); got != bfschemas.Vertex {
+		t.Fatalf("vertex without an override stays stock: %q", got)
+	}
+	cred.Extra["base_url"] = "http://127.0.0.1:21651"
+	got := mapProvider(cred)
+	if !strings.HasPrefix(string(got), geminiCompatPrefix) {
+		t.Fatalf("vertex with base_url = %q, want a derived Gemini-type provider", got)
+	}
+	endpoint, _ := compatEndpointForCred(cred)
+	if endpoint.baseURL != "http://127.0.0.1:21651/v1/projects/p1/locations/us-central1/publishers/google" || !endpoint.keyless {
+		t.Fatalf("vertex override endpoint: %+v", endpoint)
+	}
+	cred.APIKey = `{"type":"service_account"}`
+	if endpoint, _ := compatEndpointForCred(cred); !endpoint.keyless {
+		t.Fatal("service-account JSON in the key slot is never sent as an API key")
+	}
+}

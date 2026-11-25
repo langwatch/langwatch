@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { makeRequest } from "./langwatch-api.js";
-import { requestPublicJson } from "./public-http-request.js";
+import { makeRequest } from "./langwatch-api.ts";
+import { requestPublicJson } from "./public-http-request.ts";
 
 /**
  * The run parameters a call carries: a flat record of scalars. The platform
@@ -106,10 +106,7 @@ export async function listAgents(params?: {
 }
 
 export async function getAgent(id: string): Promise<AgentSummary> {
-  return makeRequest(
-    "GET",
-    `/api/v1/agents/${encodeURIComponent(id)}`,
-  ) as Promise<AgentSummary>;
+  return makeRequest("GET", `/api/v1/agents/${encodeURIComponent(id)}`) as Promise<AgentSummary>;
 }
 
 export async function createAgent(data: {
@@ -160,10 +157,9 @@ export interface AgentTestRunResponse {
 }
 
 /**
- * Runs one scripted scenario against an agent: the user sends "ping", the
- * agent answers, and the run succeeds when the answer arrives. The project
- * gains no scenario, run plan or test suite, and the answer carries the run
- * ids to follow.
+ * Runs one scripted "ping" scenario against an agent and succeeds when
+ * the answer arrives. Creates no scenario, run plan or test suite; the
+ * response carries the run ids to follow.
  */
 export async function testAgent(id: string): Promise<AgentTestRunResponse> {
   return makeRequest(
@@ -177,14 +173,15 @@ const isMessageList = (value: unknown): value is AgentCallMessage[] =>
   Array.isArray(value) &&
   value.every(
     (item) =>
-      typeof item === "object" && item !== null && typeof (item as AgentCallMessage).role === "string",
+      typeof item === "object" &&
+      item !== null &&
+      typeof (item as AgentCallMessage).role === "string",
   );
 
 /**
- * The relay body for a connected agent: `message` is one user turn, `input`
- * is the body itself (it must carry `messages`), `parameters` are the run
- * parameters and `threadId` continues a conversation. A string is the
- * refusal, so the tool can answer it.
+ * The relay body for a connected agent: `message` is one user turn,
+ * `input` is the raw body (must carry `messages`), `parameters` are run
+ * parameters, `threadId` continues a conversation. A string is a refusal.
  */
 export function buildRelayBody({
   input,
@@ -218,7 +215,7 @@ export function buildRelayBody({
     }
     inputParams = parsed.data;
   }
-  if (inputParams || parameters) body.params = { ...(inputParams ?? {}), ...(parameters ?? {}) };
+  if (inputParams || parameters) body.params = { ...inputParams, ...parameters };
   return body;
 }
 
@@ -279,14 +276,14 @@ export async function runAgent({
     );
   }
 
-  const { runWorkflow } = await import("./langwatch-api-workflows.js");
+  const { runWorkflow } = await import("./langwatch-api-workflows.ts");
   const result = await runWorkflow(workflowId, input);
   return { agentType: agent.type, result };
 }
 
 export async function deleteAgent(id: string): Promise<{ id: string; name: string }> {
-  return makeRequest(
-    "DELETE",
-    `/api/v1/agents/${encodeURIComponent(id)}`,
-  ) as Promise<{ id: string; name: string }>;
+  return makeRequest("DELETE", `/api/v1/agents/${encodeURIComponent(id)}`) as Promise<{
+    id: string;
+    name: string;
+  }>;
 }

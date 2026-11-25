@@ -1,19 +1,26 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
+from ..models.create_agent_response_201_not_selectable_reason_type_0 import (
+    CreateAgentResponse201NotSelectableReasonType0,
+)
 from ..models.create_agent_response_201_status import CreateAgentResponse201Status
 from ..models.create_agent_response_201_type import CreateAgentResponse201Type
 
 if TYPE_CHECKING:
     from ..models.create_agent_response_201_config_type_0 import CreateAgentResponse201ConfigType0
+    from ..models.create_agent_response_201_created_by_type_0 import CreateAgentResponse201CreatedByType0
     from ..models.create_agent_response_201_instances_item import CreateAgentResponse201InstancesItem
+    from ..models.create_agent_response_201_labels_item import CreateAgentResponse201LabelsItem
     from ..models.create_agent_response_201_owner_type_0 import CreateAgentResponse201OwnerType0
     from ..models.create_agent_response_201_parameters_item import CreateAgentResponse201ParametersItem
+    from ..models.create_agent_response_201_updated_by_type_0 import CreateAgentResponse201UpdatedByType0
 
 
 T = TypeVar("T", bound="CreateAgentResponse201")
@@ -34,7 +41,8 @@ class CreateAgentResponse201:
             against it. Null when the agent is shared.
         host_label (None | str): The machine a development agent registered from with a project or service key. Null
             when the agent is personal or shared.
-        last_seen_at (None | str): When an instance of a connected agent was last connected. Null for every other kind.
+        last_seen_at (datetime.datetime | None): When an instance of a connected agent was last connected. Null for
+            every other kind.
         parameters (list[CreateAgentResponse201ParametersItem]): The run parameters a connected agent declares from its
             function signature: name, type, options, default and description. Empty for every other kind.
         owner (CreateAgentResponse201OwnerType0 | None): The person a personal development agent belongs to. Null when
@@ -43,8 +51,21 @@ class CreateAgentResponse201:
             connected; offline otherwise, and always for every other kind.
         instances (list[CreateAgentResponse201InstancesItem]): The processes currently connected for a connected agent:
             hostname, user, pid, SDK and how many calls each has in flight. Empty for every other kind.
-        created_at (str):
-        updated_at (str):
+        selectable (bool): Whether the credential making this request can run simulations against the agent. False for a
+            personal development agent that belongs to somebody else, which is listed all the same so it can be told apart
+            from the other agents of the same name.
+        not_selectable_reason (CreateAgentResponse201NotSelectableReasonType0 | None): Why the agent cannot be run by
+            this credential. Null when it can.
+        version (int | None): The version this response shows: the latest, unless a label or a version was asked for.
+            Null for connected agents, which are versioned by their code.
+        labels (list[CreateAgentResponse201LabelsItem]): The deploy labels the agent carries, such as production, and
+            the version each points at.
+        created_by (CreateAgentResponse201CreatedByType0 | None): The user who created the agent. Null when an API key
+            created it, or it predates creators being recorded.
+        updated_by (CreateAgentResponse201UpdatedByType0 | None): The user who changed the agent last. Null when an API
+            key changed it.
+        created_at (datetime.datetime):
+        updated_at (datetime.datetime):
         platform_url (str):
     """
 
@@ -55,19 +76,26 @@ class CreateAgentResponse201:
     environment: None | str
     owner_user_id: None | str
     host_label: None | str
-    last_seen_at: None | str
+    last_seen_at: datetime.datetime | None
     parameters: list[CreateAgentResponse201ParametersItem]
     owner: CreateAgentResponse201OwnerType0 | None
     status: CreateAgentResponse201Status
     instances: list[CreateAgentResponse201InstancesItem]
-    created_at: str
-    updated_at: str
+    selectable: bool
+    not_selectable_reason: CreateAgentResponse201NotSelectableReasonType0 | None
+    version: int | None
+    labels: list[CreateAgentResponse201LabelsItem]
+    created_by: CreateAgentResponse201CreatedByType0 | None
+    updated_by: CreateAgentResponse201UpdatedByType0 | None
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
     platform_url: str
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.create_agent_response_201_config_type_0 import CreateAgentResponse201ConfigType0
+        from ..models.create_agent_response_201_created_by_type_0 import CreateAgentResponse201CreatedByType0
         from ..models.create_agent_response_201_owner_type_0 import CreateAgentResponse201OwnerType0
+        from ..models.create_agent_response_201_updated_by_type_0 import CreateAgentResponse201UpdatedByType0
 
         id = self.id
 
@@ -91,7 +119,10 @@ class CreateAgentResponse201:
         host_label = self.host_label
 
         last_seen_at: None | str
-        last_seen_at = self.last_seen_at
+        if isinstance(self.last_seen_at, datetime.datetime):
+            last_seen_at = self.last_seen_at.isoformat()
+        else:
+            last_seen_at = self.last_seen_at
 
         parameters = []
         for parameters_item_data in self.parameters:
@@ -111,14 +142,42 @@ class CreateAgentResponse201:
             instances_item = instances_item_data.to_dict()
             instances.append(instances_item)
 
-        created_at = self.created_at
+        selectable = self.selectable
 
-        updated_at = self.updated_at
+        not_selectable_reason: None | str
+        if isinstance(self.not_selectable_reason, CreateAgentResponse201NotSelectableReasonType0):
+            not_selectable_reason = self.not_selectable_reason.value
+        else:
+            not_selectable_reason = self.not_selectable_reason
+
+        version: int | None
+        version = self.version
+
+        labels = []
+        for labels_item_data in self.labels:
+            labels_item = labels_item_data.to_dict()
+            labels.append(labels_item)
+
+        created_by: dict[str, Any] | None
+        if isinstance(self.created_by, CreateAgentResponse201CreatedByType0):
+            created_by = self.created_by.to_dict()
+        else:
+            created_by = self.created_by
+
+        updated_by: dict[str, Any] | None
+        if isinstance(self.updated_by, CreateAgentResponse201UpdatedByType0):
+            updated_by = self.updated_by.to_dict()
+        else:
+            updated_by = self.updated_by
+
+        created_at = self.created_at.isoformat()
+
+        updated_at = self.updated_at.isoformat()
 
         platform_url = self.platform_url
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -133,6 +192,12 @@ class CreateAgentResponse201:
                 "owner": owner,
                 "status": status,
                 "instances": instances,
+                "selectable": selectable,
+                "notSelectableReason": not_selectable_reason,
+                "version": version,
+                "labels": labels,
+                "createdBy": created_by,
+                "updatedBy": updated_by,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
                 "platformUrl": platform_url,
@@ -144,9 +209,12 @@ class CreateAgentResponse201:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.create_agent_response_201_config_type_0 import CreateAgentResponse201ConfigType0
+        from ..models.create_agent_response_201_created_by_type_0 import CreateAgentResponse201CreatedByType0
         from ..models.create_agent_response_201_instances_item import CreateAgentResponse201InstancesItem
+        from ..models.create_agent_response_201_labels_item import CreateAgentResponse201LabelsItem
         from ..models.create_agent_response_201_owner_type_0 import CreateAgentResponse201OwnerType0
         from ..models.create_agent_response_201_parameters_item import CreateAgentResponse201ParametersItem
+        from ..models.create_agent_response_201_updated_by_type_0 import CreateAgentResponse201UpdatedByType0
 
         d = dict(src_dict)
         id = d.pop("id")
@@ -191,10 +259,18 @@ class CreateAgentResponse201:
 
         host_label = _parse_host_label(d.pop("hostLabel"))
 
-        def _parse_last_seen_at(data: object) -> None | str:
+        def _parse_last_seen_at(data: object) -> datetime.datetime | None:
             if data is None:
                 return data
-            return cast(None | str, data)
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                last_seen_at_type_0 = isoparse(data)
+
+                return last_seen_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None, data)
 
         last_seen_at = _parse_last_seen_at(d.pop("lastSeenAt"))
 
@@ -229,9 +305,70 @@ class CreateAgentResponse201:
 
             instances.append(instances_item)
 
-        created_at = d.pop("createdAt")
+        selectable = d.pop("selectable")
 
-        updated_at = d.pop("updatedAt")
+        def _parse_not_selectable_reason(data: object) -> CreateAgentResponse201NotSelectableReasonType0 | None:
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                not_selectable_reason_type_0 = CreateAgentResponse201NotSelectableReasonType0(data)
+
+                return not_selectable_reason_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(CreateAgentResponse201NotSelectableReasonType0 | None, data)
+
+        not_selectable_reason = _parse_not_selectable_reason(d.pop("notSelectableReason"))
+
+        def _parse_version(data: object) -> int | None:
+            if data is None:
+                return data
+            return cast(int | None, data)
+
+        version = _parse_version(d.pop("version"))
+
+        labels = []
+        _labels = d.pop("labels")
+        for labels_item_data in _labels:
+            labels_item = CreateAgentResponse201LabelsItem.from_dict(labels_item_data)
+
+            labels.append(labels_item)
+
+        def _parse_created_by(data: object) -> CreateAgentResponse201CreatedByType0 | None:
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                created_by_type_0 = CreateAgentResponse201CreatedByType0.from_dict(data)
+
+                return created_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(CreateAgentResponse201CreatedByType0 | None, data)
+
+        created_by = _parse_created_by(d.pop("createdBy"))
+
+        def _parse_updated_by(data: object) -> CreateAgentResponse201UpdatedByType0 | None:
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                updated_by_type_0 = CreateAgentResponse201UpdatedByType0.from_dict(data)
+
+                return updated_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(CreateAgentResponse201UpdatedByType0 | None, data)
+
+        updated_by = _parse_updated_by(d.pop("updatedBy"))
+
+        created_at = isoparse(d.pop("createdAt"))
+
+        updated_at = isoparse(d.pop("updatedAt"))
 
         platform_url = d.pop("platformUrl")
 
@@ -248,26 +385,15 @@ class CreateAgentResponse201:
             owner=owner,
             status=status,
             instances=instances,
+            selectable=selectable,
+            not_selectable_reason=not_selectable_reason,
+            version=version,
+            labels=labels,
+            created_by=created_by,
+            updated_by=updated_by,
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,
         )
 
-        create_agent_response_201.additional_properties = d
         return create_agent_response_201
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

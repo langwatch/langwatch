@@ -1,8 +1,7 @@
 /**
  * Handoff digest: a bounded plain-text rendering of the conversation for the
- * resumed worker's context seed. Newest messages are kept whole (up to a
- * per-message cap), oldest are dropped first; a truncation marker records the
- * drop. Hard bound: DIGEST_MAX_BYTES (64KB).
+ * resumed worker's context seed. Newest messages are kept whole, oldest
+ * dropped first with a truncation marker. Hard bound: DIGEST_MAX_BYTES (64KB).
  */
 
 import { truncateToBytes } from "./protocol.js";
@@ -65,8 +64,7 @@ export function renderMessageLine(message: DigestibleMessage): string | undefine
   if (Buffer.byteLength(line, "utf8") <= DIGEST_MESSAGE_MAX_BYTES) return line;
   // The marker is part of the per-message budget, not an addition to it: the
   // per-message cap is what buildHandoffDigest counts against the whole digest.
-  const budget =
-    DIGEST_MESSAGE_MAX_BYTES - Buffer.byteLength(MESSAGE_TRUNCATION_MARKER, "utf8");
+  const budget = DIGEST_MESSAGE_MAX_BYTES - Buffer.byteLength(MESSAGE_TRUNCATION_MARKER, "utf8");
   return `${truncateToBytes({ text: line, maxBytes: budget })}${MESSAGE_TRUNCATION_MARKER}`;
 }
 

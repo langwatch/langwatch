@@ -10,7 +10,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   #     agent_responded final answer, the langy_conversation_updated broadcast,
   #     ephemeral status/progress. It survives refresh (the buffered tail is the
   #     resume state). UNCHANGED.
-  #   - Stream B (speed, ephemeral): raw opencode text-delta tokens, minimally
+  #   - Stream B (speed, ephemeral): raw agent text-delta tokens, minimally
   #     parsed, streamed straight to the browser over a per-turn Redis pub/sub
   #     channel. Not persisted; dies on disconnect.
   #
@@ -28,7 +28,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
 
   @unimplemented
   Scenario: The manager emits a raw token frame for a text delta
-    Given the worker's opencode stream produces a text delta for the routed session
+    Given the pi agent's stream produces a text delta for the routed turn
     When the manager forwards the turn
     Then it writes a compact raw token frame carrying the delta text verbatim
     And it still forwards the full parsed event as before
@@ -36,16 +36,16 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
 
   @unimplemented
   Scenario: The manager emits no raw token frame for a non-text event
-    Given the worker's opencode stream produces a tool-call or lifecycle event
+    Given the pi agent's stream produces a tool-call or lifecycle event
     When the manager forwards the turn
     Then it forwards the full parsed event
     And it writes no raw token frame for that event
 
   @unit
   Scenario: Terminal detection and session routing are unchanged by the fast frame
-    Given the worker's opencode stream produces a terminal event
+    Given the pi agent's stream produces a terminal event
     Then the turn stream still ends on the terminal event
-    And events for another worker's session are still not forwarded
+    And events for another turn are still not forwarded
 
   # ---------------------------------------------------------------------------
   # Manager: the pre-first-frame status names the true transition
@@ -96,7 +96,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # user sees Langy think, live, and when the turn settles the thinking is gone.
   @unit
   Scenario: The manager emits a reasoning frame for a reasoning delta
-    Given the worker's opencode stream produces a reasoning delta for the routed session
+    Given the pi agent's stream produces a reasoning delta for the routed turn
     When the manager forwards the turn
     Then it writes a reasoning frame carrying the thinking text
     And a reasoning delta is not treated as an answer token
@@ -293,3 +293,16 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     When a moment passes with tokens still pending
     Then the pending text is flushed without waiting for the batch to fill
     And a fast stream still batches, so the stream write volume stays bounded
+
+  # The proof that a turn is alive is the heartbeat, and the buffer's TTL
+  # moves with it, not with appends alone. A tool call the agent waits on, a
+  # suite run, a build, produces no appends for as long as it takes, and a
+  # TTL that only appends refresh would let a turn quiet for longer than the
+  # TTL lose its whole buffer under a worker beating the entire time.
+  @unit
+  Scenario: A turn that goes quiet inside one tool call keeps its live edge
+    Given a turn whose tool call runs longer than the buffer's TTL
+    And the worker keeps beating for the whole wait
+    When the agent writes to the live edge again on the far side of the wait
+    Then a tab attaching then replays the whole turn, that entry included
+    And a turn that stops beating still lets its buffer lapse

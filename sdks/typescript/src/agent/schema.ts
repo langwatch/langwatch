@@ -1,11 +1,6 @@
 /**
- * The run parameters an agent declares, and the values a call supplies.
- *
- * Three forms are accepted: a definition map, any Standard JSON Schema object
- * (read through `"~standard".jsonSchema`, so zod 4, valibot and arktype work
- * without this package importing them), or a plain JSON Schema. A schema
- * library instance that offers no JSON Schema converter is refused with the
- * three forms named, because the SDK never takes a zod instance as a value.
+ * Run parameters: three forms accepted (definition map, Standard JSON Schema,
+ * or plain JSON Schema); no direct library instances.
  */
 
 import type { AgentParameterValue, JsonSchemaObject } from "./protocol";
@@ -29,9 +24,8 @@ export type ParameterDefinitions = Record<string, ParameterDefinition>;
 
 /**
  * The Standard JSON Schema converter an object exposes under `"~standard"`.
- * Method syntax on purpose: a library narrows `target` to its own union, and
- * a method parameter is checked bivariantly, so zod 4, valibot and arktype
- * all fit without the SDK naming any of them.
+ * Method syntax on purpose: a method parameter is checked bivariantly, so
+ * zod 4, valibot and arktype all fit without the SDK naming any of them.
  */
 export interface StandardJsonSchemaConverter {
   input?(options: { readonly target: string }): Record<string, unknown>;
@@ -41,18 +35,17 @@ export interface StandardJsonSchemaConverter {
 /** One problem a Standard Schema `validate` reports. */
 export interface StandardSchemaIssue {
   readonly message: string;
-  readonly path?: ReadonlyArray<PropertyKey | { readonly key: PropertyKey }> | undefined;
+  readonly path?: readonly (PropertyKey | { readonly key: PropertyKey })[] | undefined;
 }
 
 export type StandardSchemaResult<O> =
   | { readonly value: O; readonly issues?: undefined }
-  | { readonly issues: ReadonlyArray<StandardSchemaIssue> };
+  | { readonly issues: readonly StandardSchemaIssue[] };
 
 /**
- * Any object that implements the Standard JSON Schema interface. When it also
- * implements Standard Schema (`validate`), the values of every call go
- * through it before the handler runs, so a zod 4 schema validates, fills its
- * defaults and types `params` in one place.
+ * Any object implementing the Standard JSON Schema interface. When it also
+ * implements Standard Schema (`validate`), every call's values pass through
+ * it first, so a zod 4 schema validates, fills defaults and types `params`.
  */
 export interface StandardJsonSchema<O = unknown> {
   readonly "~standard": {
@@ -63,15 +56,21 @@ export interface StandardJsonSchema<O = unknown> {
   };
 }
 
+/** The `output` field of a Standard Schema `types` entry, narrowed to a param record. */
+type StandardOutputOf<T> =
+  NonNullable<T> extends { readonly output: infer O }
+    ? O extends Record<string, unknown>
+      ? O
+      : Record<string, AgentParameterValue>
+    : Record<string, AgentParameterValue>;
+
 /** The `params` type a Standard Schema object gives the handler: its parsed output. */
-export type InferStandardOutput<S> = S extends { readonly "~standard": { readonly types?: infer T } }
+export type InferStandardOutput<S> = S extends {
+  readonly "~standard": { readonly types?: infer T };
+}
   ? [NonNullable<T>] extends [never]
     ? Record<string, AgentParameterValue>
-    : NonNullable<T> extends { readonly output: infer O }
-      ? O extends Record<string, unknown>
-        ? O
-        : Record<string, AgentParameterValue>
-      : Record<string, AgentParameterValue>
+    : StandardOutputOf<T>
   : Record<string, AgentParameterValue>;
 
 /** Every form `parameters` accepts. */
@@ -144,10 +143,14 @@ const readStandardJsonSchema = (input: StandardJsonSchema): JsonSchemaObject => 
   const options = { target: "draft-2020-12" };
   const schema = converter.input?.(options) ?? converter.output?.(options);
   if (schema === undefined) {
-    throw new AgentParameterError(`the "~standard".jsonSchema converter has no input function; ${ACCEPTED_FORMS}`);
+    throw new AgentParameterError(
+      `the "~standard".jsonSchema converter has no input function; ${ACCEPTED_FORMS}`,
+    );
   }
   if (!isRecord(schema)) {
-    throw new AgentParameterError(`the "~standard".jsonSchema converter returned no object; ${ACCEPTED_FORMS}`);
+    throw new AgentParameterError(
+      `the "~standard".jsonSchema converter returned no object; ${ACCEPTED_FORMS}`,
+    );
   }
   return schema;
 };
@@ -210,17 +213,15 @@ const coerce = ({
   value: AgentParameterValue;
 }): AgentParameterValue => {
   if (spec.type === "number") {
-    const asNumber = typeof value === "number" ? value : Number(value);
-    if (typeof value === "boolean" || !Number.isFinite(asNumber) || String(value).trim() === "") {
-      throw new AgentParameterError(`parameter "${spec.name}" must be a number, got ${JSON.stringify(value)}`);
-    }
-    return asNumber;
+    return coerceNumber(spec.name, value);
   }
   if (spec.type === "boolean") {
     if (typeof value === "boolean") return value;
     if (value === "true") return true;
     if (value === "false") return false;
-    throw new AgentParameterError(`parameter "${spec.name}" must be true or false, got ${JSON.stringify(value)}`);
+    throw new AgentParameterError(
+      `parameter "${spec.name}" must be true or false, got ${JSON.stringify(value)}`,
+    );
   }
   const asString = typeof value === "string" ? value : String(value);
   if (spec.options && !spec.options.includes(asString)) {
@@ -232,10 +233,9 @@ const coerce = ({
 };
 
 /**
- * The values the handler receives: every declared parameter, from the call or
- * from its default. A required parameter with no value, or a value of the
- * wrong type or outside the options, is refused with `agent_parameter_invalid`
- * before the handler runs. Names the schema does not declare pass through.
+ * The values the handler receives: every declared parameter, from the call
+ * or its default. A required parameter with no value, wrong type, or
+ * outside the options is refused with `agent_parameter_invalid`.
  */
 export function resolveParameterValues({
   specs,
@@ -244,7 +244,7 @@ export function resolveParameterValues({
   specs: ParameterSpec[];
   supplied: Record<string, AgentParameterValue> | undefined;
 }): Record<string, AgentParameterValue> {
-  const values: Record<string, AgentParameterValue> = { ...(supplied ?? {}) };
+  const values: Record<string, AgentParameterValue> = { ...supplied };
   for (const spec of specs) {
     const value = values[spec.name];
     if (value === undefined) {
@@ -253,7 +253,9 @@ export function resolveParameterValues({
         continue;
       }
       if (!spec.required) continue;
-      throw new AgentParameterError(`parameter "${spec.name}" is required and the run did not supply it`);
+      throw new AgentParameterError(
+        `parameter "${spec.name}" is required and the run did not supply it`,
+      );
     }
     values[spec.name] = coerce({ spec, value });
   }
@@ -269,9 +271,8 @@ const issuePath = (issue: StandardSchemaIssue): string =>
 
 /**
  * The values after the schema's own `validate`: a zod 4 schema refines,
- * fills its defaults and strips what it does not declare. A refusal names
- * every issue with its path. Names the schema does not declare pass through
- * untouched, so a scenario-declared parameter still reaches the handler.
+ * fills defaults and strips what it doesn't declare. A refusal names every
+ * issue's path; undeclared names pass through untouched.
  */
 export async function validateParameterValues({
   schema,
@@ -292,7 +293,9 @@ export async function validateParameterValues({
       .join("; ");
     throw new AgentParameterError(`parameters refused by the schema: ${detail}`);
   }
-  const parsed = isRecord(result.value) ? (result.value as Record<string, AgentParameterValue>) : {};
+  const parsed = isRecord(result.value)
+    ? (result.value as Record<string, AgentParameterValue>)
+    : {};
   return { ...values, ...parsed };
 }
 
@@ -317,4 +320,25 @@ export function createParameterReader({
     const values = resolveParameterValues({ specs, supplied });
     return schema ? validateParameterValues({ schema, values }) : values;
   };
+}
+
+function coerceNumber(name: string, value: AgentParameterValue): number {
+  const asNumber = typeof value === "number" ? value : Number(value);
+  if (typeof value === "boolean") {
+    throw new AgentParameterError(
+      `parameter "${name}" must be a number, got ${JSON.stringify(value)}`,
+    );
+  }
+  if (!Number.isFinite(asNumber)) {
+    throw new AgentParameterError(
+      `parameter "${name}" must be a number, got ${JSON.stringify(value)}`,
+    );
+  }
+  const stringValue = String(value).trim();
+  if (stringValue === "") {
+    throw new AgentParameterError(
+      `parameter "${name}" must be a number, got ${JSON.stringify(value)}`,
+    );
+  }
+  return asNumber;
 }

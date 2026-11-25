@@ -1,0 +1,34 @@
+{
+  "extends": ["./tsconfig.json", "../../../../tsconfig.emit.json"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "paths": {}
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**"
+  ],
+  "references": [
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/browser/tsconfig.build.json"
+    }
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/vitest-config"]
+    }
+  }
+}

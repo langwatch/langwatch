@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 from ..models.create_organization_invites_response_201_invites_item_role import (
     CreateOrganizationInvitesResponse201InvitesItemRole,
@@ -27,11 +28,11 @@ class CreateOrganizationInvitesResponse201InvitesItem:
         email (str):
         role (CreateOrganizationInvitesResponse201InvitesItemRole):
         status (str):
-        expiration (None | str):
+        expiration (datetime.datetime | None):
         invite_code (str):
         invite_url (str):
         teams (list[CreateOrganizationInvitesResponse201InvitesItemTeamsItem]):
-        created_at (str):
+        created_at (datetime.datetime):
         email_not_sent (bool):
     """
 
@@ -39,13 +40,12 @@ class CreateOrganizationInvitesResponse201InvitesItem:
     email: str
     role: CreateOrganizationInvitesResponse201InvitesItemRole
     status: str
-    expiration: None | str
+    expiration: datetime.datetime | None
     invite_code: str
     invite_url: str
     teams: list[CreateOrganizationInvitesResponse201InvitesItemTeamsItem]
-    created_at: str
+    created_at: datetime.datetime
     email_not_sent: bool
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
@@ -57,7 +57,10 @@ class CreateOrganizationInvitesResponse201InvitesItem:
         status = self.status
 
         expiration: None | str
-        expiration = self.expiration
+        if isinstance(self.expiration, datetime.datetime):
+            expiration = self.expiration.isoformat()
+        else:
+            expiration = self.expiration
 
         invite_code = self.invite_code
 
@@ -68,12 +71,12 @@ class CreateOrganizationInvitesResponse201InvitesItem:
             teams_item = teams_item_data.to_dict()
             teams.append(teams_item)
 
-        created_at = self.created_at
+        created_at = self.created_at.isoformat()
 
         email_not_sent = self.email_not_sent
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -106,10 +109,18 @@ class CreateOrganizationInvitesResponse201InvitesItem:
 
         status = d.pop("status")
 
-        def _parse_expiration(data: object) -> None | str:
+        def _parse_expiration(data: object) -> datetime.datetime | None:
             if data is None:
                 return data
-            return cast(None | str, data)
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                expiration_type_0 = isoparse(data)
+
+                return expiration_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None, data)
 
         expiration = _parse_expiration(d.pop("expiration"))
 
@@ -124,7 +135,7 @@ class CreateOrganizationInvitesResponse201InvitesItem:
 
             teams.append(teams_item)
 
-        created_at = d.pop("createdAt")
+        created_at = isoparse(d.pop("createdAt"))
 
         email_not_sent = d.pop("emailNotSent")
 
@@ -141,21 +152,4 @@ class CreateOrganizationInvitesResponse201InvitesItem:
             email_not_sent=email_not_sent,
         )
 
-        create_organization_invites_response_201_invites_item.additional_properties = d
         return create_organization_invites_response_201_invites_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

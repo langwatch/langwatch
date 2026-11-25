@@ -1,0 +1,561 @@
+/**
+ * Tests for computeBatchAggregates - aggregate statistics computation
+ */
+import { describe, expect, it } from "vitest";
+
+import {
+  computeAllBatchAggregates,
+  computeBatchTargetAggregates,
+} from "../ui/sections/batch-evaluation-results.aggregates.ts";
+import {
+  type BatchResultRow,
+  type BatchTargetColumn,
+  transformBatchEvaluationData,
+} from "../ui/sections/batch-evaluation-results.types.ts";
+import { WHOLE_RUN_COMPLETENESS } from "./run-completeness.fixture.ts";
+
+describe("computeBatchTargetAggregates", () => {
+  const createTargetColumn = (id: string): BatchTargetColumn => ({
+    id,
+    name: id,
+    type: "custom",
+    outputFields: ["output"],
+  });
+
+  describe("given a run that holds rows 1 to 5 of the dataset", () => {
+    /** @scenario "A run of some rows counts only the rows it holds" */
+    it("reports 5 rows, not the 6 positions up to row 5", () => {
+      const data = transformBatchEvaluationData({
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "project-1",
+        completeness: WHOLE_RUN_COMPLETENESS,
+        dataset: [1, 2, 3, 4, 5].map((index) => ({ index, entry: { question: `Q${index}` } })),
+        evaluations: [1, 2, 3, 4, 5].map((index) => ({
+          evaluator: "exact",
+          name: "Exact",
+          index,
+          status: "processed" as const,
+          passed: true,
+        })),
+        timestamps: { createdAt: 0, updatedAt: 0 },
+      });
+
+      const [aggregate] = [...computeAllBatchAggregates(data).values()];
+
+      expect(aggregate?.totalRows).toBe(5);
+      expect(aggregate?.completedRows).toBe(5);
+    });
+  });
+
+  describe("given a stopped run's plan", () => {
+    const stoppedRun = ({
+      answered,
+      total,
+      expectedCells,
+    }: {
+      answered: Record<string, number[]>;
+      total: number | null;
+      expectedCells: number | null;
+    }) => {
+      const cells = Object.entries(answered).flatMap(([targetId, rows]) =>
+        rows.map((index) => ({ targetId, index })),
+      );
+      return transformBatchEvaluationData({
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "project-1",
+        total,
+        targets: Object.keys(answered).map((id) => ({ id, name: id, type: "prompt" })),
+        completeness: {
+          complete: true,
+          dataset: { received: cells.length, expected: expectedCells },
+          evaluations: { received: 0, expected: null },
+        },
+        dataset: cells.map(({ targetId, index }) => ({
+          index,
+          targetId,
+          entry: { question: `Q${index}` },
+          predicted: { output: `A${index}` },
+        })),
+        evaluations: [],
+        timestamps: { createdAt: 0, updatedAt: 0, stoppedAt: 1 },
+      });
+    };
+
+    it("counts each of two targets against its share of the planned cells", () => {
+      const data = stoppedRun({
+        answered: { a: [0, 1, 2, 3, 4], b: [0, 1, 2, 3, 4] },
+        total: 20,
+        expectedCells: null,
+      });
+
+      const aggregates = computeAllBatchAggregates(data);
+
+      expect(aggregates.get("a")).toMatchObject({ completedRows: 5, totalRows: 10 });
+      expect(aggregates.get("b")).toMatchObject({ completedRows: 5, totalRows: 10 });
+    });
+
+    it("takes the reported cell count when the run recorded no total", () => {
+      const data = stoppedRun({ answered: { a: [0, 1, 2, 4, 6] }, total: null, expectedCells: 10 });
+
+      const [aggregate] = [...computeAllBatchAggregates(data).values()];
+
+      expect(aggregate).toMatchObject({ completedRows: 5, totalRows: 10 });
+    });
+
+    it("never counts fewer rows than the run holds", () => {
+      const data = stoppedRun({ answered: { a: [0, 1, 2, 3] }, total: 2, expectedCells: null });
+
+      const [aggregate] = [...computeAllBatchAggregates(data).values()];
+
+      expect(aggregate).toMatchObject({ completedRows: 4, totalRows: 4 });
+    });
+  });
+
+  describe("given a finished run of two targets and a comparison evaluator", () => {
+    /** The plan adds one comparison cell per row: 10 rows plan 2 x 10 + 10 = 30 cells. */
+    it("counts each target against the dataset rows, not the comparison cells", () => {
+      const rows = Array.from({ length: 10 }, (_, index) => index);
+      const data = transformBatchEvaluationData({
+        experimentId: "exp-1",
+        runId: "run-1",
+        projectId: "project-1",
+        total: 30,
+        progress: 30,
+        targets: ["a", "b"].map((id) => ({ id, name: id, type: "prompt" })),
+        completeness: WHOLE_RUN_COMPLETENESS,
+        dataset: rows.flatMap((index) =>
+          ["a", "b"].map((targetId) => ({
+            index,
+            targetId,
+            entry: { question: `Q${index}` },
+            predicted: { output: `${targetId} ${index}` },
+          })),
+        ),
+        evaluations: rows.map((index) => ({
+          evaluator: "langevals/select_best_compare",
+          name: "Comparison",
+          status: "processed" as const,
+          index,
+          targetId: "a",
+          label: "a",
+          inputs: { candidates: [{ id: "a" }, { id: "b" }] },
+        })),
+        timestamps: { createdAt: 0, updatedAt: 0, finishedAt: 1 },
+      });
+
+      const aggregates = computeAllBatchAggregates(data);
+
+      expect(aggregates.get("a")).toMatchObject({ completedRows: 10, totalRows: 10 });
+      expect(aggregates.get("b")).toMatchObject({ completedRows: 10, totalRows: 10 });
+    });
+  });
+
+  describe("when counting completedRows", () => {
+    it("counts rows with output as completed", () => {
+      const targetCol = createTargetColumn("gpt-4");
+      const rows: BatchResultRow[] = [
+        {
+          index: 0,
+          datasetEntry: { question: "Q1" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: { output: "Answer" },
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [],
+            },
+          },
+        },
+      ];
+
+      const result = computeBatchTargetAggregates(targetCol, rows);
+
+      expect(result.completedRows).toBe(1);
+      expect(result.totalRows).toBe(1);
+    });
+
+    it("counts rows with errors as completed", () => {
+      const targetCol = createTargetColumn("gpt-4");
+      const rows: BatchResultRow[] = [
+        {
+          index: 0,
+          datasetEntry: { question: "Q1" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: null,
+              cost: null,
+              duration: null,
+              error: "Some error",
+              traceId: null,
+              evaluatorResults: [],
+            },
+          },
+        },
+      ];
+
+      const result = computeBatchTargetAggregates(targetCol, rows);
+
+      expect(result.completedRows).toBe(1);
+      expect(result.errorRows).toBe(1);
+    });
+
+    it("counts rows with ONLY evaluator results as completed (API evaluations)", () => {
+      // This is the key case: API evaluations may have no output/error,
+      // but DO have evaluator results. These should count as completed.
+      const targetCol = createTargetColumn("gpt-4");
+      const rows: BatchResultRow[] = [
+        {
+          index: 0,
+          datasetEntry: { question: "Q1" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: null, // No output!
+              cost: null,
+              duration: null,
+              error: null, // No error!
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "quality",
+                  evaluatorName: "Quality",
+                  status: "processed",
+                  score: 0.9,
+                  passed: null,
+                },
+              ],
+            },
+          },
+        },
+        {
+          index: 1,
+          datasetEntry: { question: "Q2" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: null,
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "quality",
+                  evaluatorName: "Quality",
+                  status: "processed",
+                  score: 0.85,
+                  passed: null,
+                },
+              ],
+            },
+          },
+        },
+      ];
+
+      const result = computeBatchTargetAggregates(targetCol, rows);
+
+      // Both rows should be counted as completed
+      expect(result.completedRows).toBe(2);
+      expect(result.totalRows).toBe(2);
+      expect(result.errorRows).toBe(0);
+    });
+
+    it("does not count rows without output, error, OR evaluator results", () => {
+      const targetCol = createTargetColumn("gpt-4");
+      const rows: BatchResultRow[] = [
+        {
+          index: 0,
+          datasetEntry: { question: "Q1" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: null,
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [], // Empty!
+            },
+          },
+        },
+      ];
+
+      const result = computeBatchTargetAggregates(targetCol, rows);
+
+      expect(result.completedRows).toBe(0);
+      expect(result.totalRows).toBe(1);
+    });
+  });
+
+  describe("when deriving evaluator aggregates from API evaluations", () => {
+    it("computes average score from evaluator results", () => {
+      const targetCol = createTargetColumn("gpt-4");
+      const rows: BatchResultRow[] = [
+        {
+          index: 0,
+          datasetEntry: { question: "Q1" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: null,
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "quality",
+                  evaluatorName: "Quality",
+                  status: "processed",
+                  score: 0.9,
+                  passed: null,
+                },
+              ],
+            },
+          },
+        },
+        {
+          index: 1,
+          datasetEntry: { question: "Q2" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: null,
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "quality",
+                  evaluatorName: "Quality",
+                  status: "processed",
+                  score: 0.8,
+                  passed: null,
+                },
+              ],
+            },
+          },
+        },
+      ];
+
+      const result = computeBatchTargetAggregates(targetCol, rows);
+
+      // Average score should be (0.9 + 0.8) / 2 = 0.85
+      expect(result.overallAverageScore).toBeCloseTo(0.85, 3);
+      expect(result.evaluators).toHaveLength(1);
+      expect(result.evaluators[0]?.averageScore).toBeCloseTo(0.85, 3);
+    });
+
+    it("computes correct scores per target (not global)", () => {
+      // Create two targets with DIFFERENT scores
+      const gpt4Col = createTargetColumn("gpt-4");
+      const claudeCol = createTargetColumn("claude-3");
+
+      const rows: BatchResultRow[] = [
+        {
+          index: 0,
+          datasetEntry: { question: "Q1" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: null,
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "quality",
+                  evaluatorName: "Quality",
+                  status: "processed",
+                  score: 0.95,
+                  passed: null,
+                },
+              ],
+            },
+            "claude-3": {
+              targetId: "claude-3",
+              output: null,
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "quality",
+                  evaluatorName: "Quality",
+                  status: "processed",
+                  score: 0.5,
+                  passed: null,
+                },
+              ],
+            },
+          },
+        },
+      ];
+
+      const gpt4Result = computeBatchTargetAggregates(gpt4Col, rows);
+      const claudeResult = computeBatchTargetAggregates(claudeCol, rows);
+
+      // GPT-4 should have high score
+      expect(gpt4Result.overallAverageScore).toBeCloseTo(0.95, 3);
+      // Claude should have low score
+      expect(claudeResult.overallAverageScore).toBeCloseTo(0.5, 3);
+      // They should be DIFFERENT
+      expect(gpt4Result.overallAverageScore).not.toEqual(claudeResult.overallAverageScore);
+    });
+  });
+
+  describe("when computing the pass rate", () => {
+    it("returns null passRate when all evaluator results have passed: null", () => {
+      // This is the key case: evaluators like response_length only produce scores
+      // and have passed: null for all results. We should NOT show 0% pass rate.
+      const targetCol = createTargetColumn("gpt-4");
+      const rows: BatchResultRow[] = [
+        {
+          index: 0,
+          datasetEntry: { question: "Q1" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: { output: "Answer" },
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "response_length",
+                  evaluatorName: "response_length",
+                  status: "processed",
+                  score: 11,
+                  passed: null, // NO pass/fail - just a score
+                },
+              ],
+            },
+          },
+        },
+        {
+          index: 1,
+          datasetEntry: { question: "Q2" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: { output: "Another" },
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "response_length",
+                  evaluatorName: "response_length",
+                  status: "processed",
+                  score: 7,
+                  passed: null, // NO pass/fail - just a score
+                },
+              ],
+            },
+          },
+        },
+      ];
+
+      const result = computeBatchTargetAggregates(targetCol, rows);
+
+      // response_length evaluator should have null passRate (not 0!)
+      expect(result.evaluators).toHaveLength(1);
+      expect(result.evaluators[0]?.evaluatorId).toBe("response_length");
+      expect(result.evaluators[0]?.passRate).toBeNull();
+      // Overall pass rate should also be null
+      expect(result.overallPassRate).toBeNull();
+      // But score should still be computed
+      expect(result.evaluators[0]?.averageScore).toBeCloseTo(9, 1);
+    });
+
+    it("computes passRate only from results with explicit true/false", () => {
+      const targetCol = createTargetColumn("gpt-4");
+      const rows: BatchResultRow[] = [
+        {
+          index: 0,
+          datasetEntry: { question: "Q1" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: { output: "Answer" },
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "exact_match",
+                  evaluatorName: "exact_match",
+                  status: "processed",
+                  score: 1,
+                  passed: true, // Has explicit pass
+                },
+                {
+                  evaluatorId: "response_length",
+                  evaluatorName: "response_length",
+                  status: "processed",
+                  score: 11,
+                  passed: null, // No pass/fail
+                },
+              ],
+            },
+          },
+        },
+        {
+          index: 1,
+          datasetEntry: { question: "Q2" },
+          targets: {
+            "gpt-4": {
+              targetId: "gpt-4",
+              output: { output: "Wrong" },
+              cost: null,
+              duration: null,
+              error: null,
+              traceId: null,
+              evaluatorResults: [
+                {
+                  evaluatorId: "exact_match",
+                  evaluatorName: "exact_match",
+                  status: "processed",
+                  score: 0,
+                  passed: false, // Has explicit fail
+                },
+                {
+                  evaluatorId: "response_length",
+                  evaluatorName: "response_length",
+                  status: "processed",
+                  score: 5,
+                  passed: null, // No pass/fail
+                },
+              ],
+            },
+          },
+        },
+      ];
+
+      const result = computeBatchTargetAggregates(targetCol, rows);
+
+      // exact_match should have 50% pass rate (1/2)
+      const exactMatch = result.evaluators.find((e) => e.evaluatorId === "exact_match");
+      expect(exactMatch?.passRate).toBe(50);
+
+      // response_length should have null pass rate
+      const responseLength = result.evaluators.find((e) => e.evaluatorId === "response_length");
+      expect(responseLength?.passRate).toBeNull();
+
+      // Overall pass rate should only count exact_match (1 pass, 1 fail = 50%)
+      expect(result.overallPassRate).toBe(50);
+    });
+  });
+});

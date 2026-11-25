@@ -1,0 +1,494 @@
+/**
+ * The token buffer's hybrid flush policy.
+ * @see specs/langy/langy-dual-stream.feature
+ */
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { LANGY_EMPTY_TURN_FALLBACK } from "../../../rules/langy-empty-turn.rules.ts";
+import { LANGY_STREAMING } from "../../../rules/langy-streaming-constants.rules.ts";
+import type { LangyStreamRedis } from "../../langy-token-buffer.repository.ts";
+import { LangyTokenBufferRedisRepository } from "../redis.langy-token-buffer.repository.ts";
+
+interface RecordedEntry {
+  type: string;
+  text?: string;
+}
+
+/**
+ * A stream that reads back what was written, keyed the way redis keys it.
+ * `xrange` used to return `[]` unconditionally, which quietly made any
+ * assertion about reading the stream a test of the fake instead of the code.
+ */
+function makeRedis(): { redis: LangyStreamRedis; entries: RecordedEntry[] } {
+  const entries: RecordedEntry[] = [];
+  const streams = new Map<string, [string, string[]][]>();
+  let seq = 0;
+  const redis = redisDouble({
+    xadd: async (...args: unknown[]) => {
+      const key = String(args[0]);
+      const payload = String(args[args.length - 1]);
+      entries.push(JSON.parse(payload) as RecordedEntry);
+      const id = `1-${++seq}`;
+      const rows = streams.get(key) ?? [];
+      rows.push([id, ["p", payload]]);
+      streams.set(key, rows);
+      return id;
+    },
+    xrange: async (...args: unknown[]) => streams.get(String(args[0])) ?? [],
+    expire: async () => 1,
+    set: async () => "OK",
+    get: async () => null,
+  });
+  return { redis, entries };
+}
+
+/** A stream whose keys lapse on the (fake) clock, so a TTL that is not refreshed shows. */
+function makeExpiringRedis(): LangyStreamRedis {
+  const streams = new Map<string, [string, string[]][]>();
+  const expiresAt = new Map<string, number>();
+  let seq = 0;
+  const rowsOf = (key: string) => {
+    const at = expiresAt.get(key);
+    if (at !== undefined && at <= Date.now()) {
+      streams.delete(key);
+      expiresAt.delete(key);
+    }
+    return streams.get(key) ?? [];
+  };
+  return redisDouble({
+    xadd: async (...args: unknown[]) => {
+      const key = String(args[0]);
+      const rows = rowsOf(key);
+      const id = `1-${++seq}`;
+      rows.push([id, ["p", String(args[args.length - 1])]]);
+      streams.set(key, rows);
+      return id;
+    },
+    xrange: async (...args: unknown[]) => rowsOf(String(args[0])),
+    expire: async (...args: unknown[]) => {
+      const key = String(args[0]);
+      if (rowsOf(key).length === 0) return 0;
+      expiresAt.set(key, Date.now() + Number(args[1]) * 1000);
+      return 1;
+    },
+    set: async () => "OK",
+    get: async () => null,
+  });
+}
+
+const ids = { conversationId: "conv_1", turnId: "turn_1" };
+const deltas = (entries: RecordedEntry[]) => entries.filter((entry) => entry.type === "delta");
+const reasoning = (entries: RecordedEntry[]) =>
+  entries.filter((entry) => entry.type === "reasoning");
+
+describe("LangyTokenBufferRedisRepository hybrid flush", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("given a turn that starts producing text", () => {
+    describe("when the first delta arrives", () => {
+      /** @scenario "The first token of a turn renders immediately" */
+      it("flushes it to the stream immediately, without waiting for a batch", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        await buffer.appendChunk({ ...ids, text: "Hello" });
+
+        expect(deltas(entries)).toEqual([{ type: "delta", text: "Hello" }]);
+      });
+    });
+
+    describe("when later tokens trickle in below the batch size", () => {
+      /** @scenario "Buffered tokens flush on a short clock, not only on volume" */
+      it("flushes the pending text on the clock instead of holding it for the batch", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        await buffer.appendChunk({ ...ids, text: "Hello" }); // first flush
+        await buffer.appendChunk({ ...ids, text: " there" });
+        await buffer.appendChunk({ ...ids, text: " friend" });
+
+        // Below CHUNK_TOKENS, so nothing flushed yet...
+        expect(deltas(entries)).toHaveLength(1);
+
+        // ...until the time arm fires.
+        await vi.advanceTimersByTimeAsync(LANGY_STREAMING.FLUSH_AFTER_MS + 5);
+
+        expect(deltas(entries)).toEqual([
+          { type: "delta", text: "Hello" },
+          { type: "delta", text: " there friend" },
+        ]);
+      });
+
+      /** @scenario "Buffered tokens flush on a short clock, not only on volume" */
+      it("arms the clock once per pending batch, keeping stream write volume bounded", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        await buffer.appendChunk({ ...ids, text: "first" }); // immediate
+        // A steady trickle across one FLUSH_AFTER_MS window.
+        for (let i = 0; i < 10; i++) {
+          await buffer.appendChunk({ ...ids, text: ` t${i}` });
+          await vi.advanceTimersByTimeAsync(LANGY_STREAMING.FLUSH_AFTER_MS / 10);
+        }
+        await vi.advanceTimersByTimeAsync(LANGY_STREAMING.FLUSH_AFTER_MS);
+
+        // One immediate flush + at most a couple of timed flushes — never one
+        // XADD per token.
+        expect(deltas(entries).length).toBeLessThanOrEqual(3);
+        // And nothing was lost: the concatenation is the full text.
+        expect(
+          deltas(entries)
+            .map((d) => d.text)
+            .join(""),
+        ).toBe("first t0 t1 t2 t3 t4 t5 t6 t7 t8 t9");
+      });
+    });
+
+    describe("when a fast stream fills the batch before the clock fires", () => {
+      it("flushes on size and does not double-flush when the clock later fires", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        await buffer.appendChunk({ ...ids, text: "go" }); // immediate first flush
+        const words = Array.from({ length: LANGY_STREAMING.CHUNK_TOKENS }, (_, i) => `w${i}`).join(
+          " ",
+        );
+        await buffer.appendChunk({ ...ids, text: words });
+
+        // Size arm flushed synchronously.
+        expect(deltas(entries)).toHaveLength(2);
+
+        // The armed timer was cleared by the flush — no empty third delta.
+        await vi.advanceTimersByTimeAsync(LANGY_STREAMING.FLUSH_AFTER_MS * 2);
+        expect(deltas(entries)).toHaveLength(2);
+      });
+    });
+
+    describe("when the turn ends with tokens still pending", () => {
+      it("drains the tail on the terminal marker, in order, before the end entry", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        await buffer.appendChunk({ ...ids, text: "first" });
+        await buffer.appendChunk({ ...ids, text: " tail" });
+        await buffer.markEnd(ids);
+
+        expect(entries.map((entry) => entry.type)).toEqual(["delta", "delta", "end"]);
+        expect(deltas(entries).map((d) => d.text)).toEqual(["first", " tail"]);
+      });
+    });
+  });
+
+  describe("given a provider streams reasoning token by token", () => {
+    it("coalesces the live-only reasoning tail, then drains it before the terminal marker", async () => {
+      const { redis, entries } = makeRedis();
+      const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+      await buffer.appendReasoning({ ...ids, text: "I will " });
+      await buffer.appendReasoning({ ...ids, text: "inspect this." });
+
+      expect(reasoning(entries)).toEqual([]);
+      await buffer.markEnd(ids);
+
+      expect(reasoning(entries)).toEqual([{ type: "reasoning", text: "I will inspect this." }]);
+      expect(entries.at(-1)?.type).toBe("end");
+    });
+  });
+
+  describe("given Langy thinks out loud while it writes a reply", () => {
+    /** @scenario "Thinking narrated alongside the answer stays out of the reply" */
+    it("streams the thinking as reasoning frames and keeps the reply to the answer alone, in order", async () => {
+      const { redis, entries } = makeRedis();
+      const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+      await buffer.appendReasoning({ ...ids, text: "Let me check the traces first. " });
+      await buffer.appendChunk({ ...ids, text: "Found 3 failing traces." });
+      await buffer.appendReasoning({ ...ids, text: "Now I will summarise." });
+      await buffer.appendChunk({ ...ids, text: " They all time out." });
+      const { backstopped } = await buffer.markEnd({ ...ids, backstopSilentTurn: true });
+
+      expect(
+        reasoning(entries)
+          .map((r) => r.text)
+          .join(""),
+      ).toBe("Let me check the traces first. Now I will summarise.");
+      expect(deltas(entries).map((d) => d.text)).toEqual([
+        "Found 3 failing traces.",
+        " They all time out.",
+      ]);
+      const reply = deltas(entries)
+        .map((d) => d.text)
+        .join("");
+      expect(reply).toBe("Found 3 failing traces. They all time out.");
+      expect(reply).not.toContain("check the traces first");
+      expect(reply).not.toContain("summarise");
+      expect(backstopped).toBe(false);
+    });
+  });
+
+  describe("given a turn said its lines with the say tool", () => {
+    describe("when the turn reaches its terminal marker", () => {
+      /** @scenario "A turn whose lines were all said with the say tool is not an empty turn" */
+      it("appends no fallback line", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        await buffer.appendTool({
+          ...ids,
+          id: "say_1",
+          name: "say",
+          phase: "end",
+          input: { text: "I checked the traces and found nothing failing." },
+        });
+        const { backstopped } = await buffer.markEnd({ ...ids, backstopSilentTurn: true });
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([]);
+        expect(entries.at(-1)?.type).toBe("end");
+      });
+    });
+  });
+
+  describe("given a turn ends without the agent writing any text", () => {
+    describe("when the turn reaches its terminal marker", () => {
+      /** @scenario A turn never ends silently */
+      it("emits a visible fallback line before the terminal marker", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        // Tool cards but no prose: the exact shape of the blank replies seen in
+        // production, where the turn succeeds and the panel shows nothing.
+        await buffer.appendTool({
+          ...ids,
+          id: "call_1",
+          name: "bash",
+          phase: "end",
+        });
+        await buffer.markEnd({ ...ids, backstopSilentTurn: true });
+
+        expect(deltas(entries)).toEqual([{ type: "delta", text: LANGY_EMPTY_TURN_FALLBACK }]);
+        expect(entries.at(-1)?.type).toBe("end");
+      });
+
+      /** @scenario "A turn that ends on a card says what the card is waiting for" */
+      it("says what the card is waiting for when the turn ends on one", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        await buffer.appendLocalPermission({
+          ...ids,
+          entry: {
+            waitId: "lwait_1",
+            callId: "call_1",
+            summary: "uv sync",
+            pattern: "uv",
+            patterns: ["uv"],
+            reason: "Installs packages",
+            skipOffered: true,
+            workspaceName: "acme-app",
+            hostname: "rogerio-mbp",
+            status: "pending",
+          },
+        });
+        const { text } = await buffer.markEnd({
+          ...ids,
+          backstopSilentTurn: true,
+        });
+
+        expect(text).toContain("waiting for your answer");
+        expect(text).not.toBe(LANGY_EMPTY_TURN_FALLBACK);
+        expect(deltas(entries).at(-1)?.text).toBe(text);
+      });
+
+      /** @scenario "A turn that ends on a card says what the card is waiting for" */
+      it("names the code access card when the turn ends on that one", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        await buffer.appendTool({
+          ...ids,
+          id: "call_1",
+          name: "code_access",
+          phase: "end",
+        });
+        await buffer.markEnd({ ...ids, backstopSilentTurn: true });
+
+        expect(deltas(entries).at(-1)?.text).toContain("how I should reach your code");
+      });
+
+      /** @scenario A turn never ends silently */
+      it("counts a whitespace-only delta as no text at all", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        // Whitespace is truthy, so this used to satisfy the has-written check
+        // while the panel still rendered nothing the user could read.
+        await buffer.appendChunk({ ...ids, text: "\n\n  " });
+        await buffer.markEnd({ ...ids, backstopSilentTurn: true });
+
+        expect(
+          deltas(entries)
+            .map((entry) => entry.text)
+            .join(""),
+        ).toContain(LANGY_EMPTY_TURN_FALLBACK);
+      });
+    });
+
+    describe("when the stream ends for a reason other than the turn finishing", () => {
+      /** @scenario A stream that ends without the turn finishing says nothing */
+      it("stays silent on a user stop, which lands on a partial answer", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        // stopTurn ends the stream on its own buffer instance, one that never
+        // saw a chunk. Reading that as "the turn wrote no reply" put the
+        // fallback after every single stop, including the ones with a real
+        // half-answer above them.
+        const { backstopped } = await buffer.markEnd(ids);
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([]);
+        expect(entries.at(-1)?.type).toBe("end");
+      });
+    });
+  });
+
+  describe("given the worker reconnects part way through a turn", () => {
+    describe("when the turn finishes on a buffer that never saw the deltas", () => {
+      /** @scenario A turn never ends silently */
+      it("reads the stream rather than its own memory, and stays quiet", async () => {
+        // One redis, two buffers: a buffer is built per relay request, so the
+        // instance that ends the stream is not always the one that filled it.
+        const { redis, entries } = makeRedis();
+        const streamed = LangyTokenBufferRedisRepository.create({ redis });
+        const ending = LangyTokenBufferRedisRepository.create({ redis });
+
+        await streamed.appendChunk({ ...ids, text: "Found 3 failing traces." });
+        await streamed.flush(ids);
+        const { backstopped } = await ending.markEnd({
+          ...ids,
+          backstopSilentTurn: true,
+        });
+
+        expect(backstopped).toBe(false);
+        expect(deltas(entries)).toEqual([{ type: "delta", text: "Found 3 failing traces." }]);
+      });
+    });
+  });
+
+  describe("given a turn where the agent did write text", () => {
+    describe("when the turn reaches its terminal marker", () => {
+      it("stays out of the way", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        await buffer.appendChunk({ ...ids, text: "Found 3 failing traces." });
+        await buffer.markEnd(ids);
+
+        expect(deltas(entries)).toEqual([{ type: "delta", text: "Found 3 failing traces." }]);
+      });
+
+      it("keeps the whitespace that separates two words", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        await buffer.appendChunk({ ...ids, text: "Found" });
+        await buffer.appendChunk({ ...ids, text: " " });
+        await buffer.appendChunk({ ...ids, text: "3 traces." });
+        await buffer.markEnd(ids);
+
+        expect(
+          deltas(entries)
+            .map((entry) => entry.text)
+            .join(""),
+        ).toBe("Found 3 traces.");
+      });
+    });
+  });
+
+  describe("given an earlier turn of the conversation answered", () => {
+    describe("when a later turn ends silently", () => {
+      it("emits the fallback again", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+        await buffer.appendChunk({ ...ids, text: "First answer." });
+        await buffer.markEnd({ ...ids, backstopSilentTurn: true });
+
+        const second = { conversationId: "conv_1", turnId: "turn_2" };
+        await buffer.markEnd({ ...second, backstopSilentTurn: true });
+
+        expect(deltas(entries).at(-1)).toEqual({
+          type: "delta",
+          text: LANGY_EMPTY_TURN_FALLBACK,
+        });
+      });
+    });
+  });
+
+  describe("given the agent dispatches a UI action", () => {
+    it("lands the typed entry on the live stream exactly as given", async () => {
+      const { redis, entries } = makeRedis();
+      const buffer = LangyTokenBufferRedisRepository.create({ redis });
+
+      await buffer.appendUiAction({
+        ...ids,
+        actionId: "a1",
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
+      });
+
+      expect(entries.at(-1)).toEqual({
+        type: "ui",
+        actionId: "a1",
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
+      });
+    });
+  });
+
+  describe("given a turn whose tool call outlasts the buffer's TTL", () => {
+    const ttlMs = LANGY_STREAMING.STREAM_TTL_SECONDS * 1000;
+    const uiAction = (actionId: string) => ({
+      ...ids,
+      actionId,
+      kind: "workbench.duplicateTarget",
+      payload: { targetId: "t1" },
+    });
+
+    /** @scenario "A turn that goes quiet inside one tool call keeps its live edge" */
+    it("replays the whole turn to a tab attaching after the wait, while the worker kept beating", async () => {
+      const buffer = LangyTokenBufferRedisRepository.create({ redis: makeExpiringRedis() });
+      await buffer.appendUiAction(uiAction("before_the_wait"));
+
+      for (let beat = 0; beat < 7; beat += 1) {
+        vi.advanceTimersByTime(ttlMs / 3);
+        await buffer.heartbeat(ids);
+      }
+      await buffer.appendUiAction(uiAction("after_the_wait"));
+
+      const { reads } = await buffer.readTail(ids);
+      expect(reads.map((read) => read.entry)).toEqual([
+        expect.objectContaining({ actionId: "before_the_wait" }),
+        expect.objectContaining({ actionId: "after_the_wait" }),
+      ]);
+    });
+
+    /** @scenario "A turn that goes quiet inside one tool call keeps its live edge" */
+    it("lets the buffer lapse when the worker stops beating", async () => {
+      const buffer = LangyTokenBufferRedisRepository.create({ redis: makeExpiringRedis() });
+      await buffer.appendUiAction(uiAction("before_the_wait"));
+
+      vi.advanceTimersByTime(ttlMs + 1_000);
+
+      const { reads } = await buffer.readTail(ids);
+      expect(reads).toEqual([]);
+    });
+  });
+});

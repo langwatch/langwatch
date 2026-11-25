@@ -39,8 +39,11 @@ global:
       drop:
         - ALL
     readOnlyRootFilesystem: true
-  ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
+  ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, PII redaction model, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
+  ## @param global.nodeHeapCeiling.enabled [default: true] Give the app and workers containers a JavaScript heap of three quarters of their memory limit (NODE_OPTIONS=--max-old-space-size-percentage=75). Rendered only for a container with a memory limit and no NODE_OPTIONS in its extraEnvs. Set false when NODE_OPTIONS reaches the containers another way, such as extraEnvFrom: the chart's entry would replace it.
+  nodeHeapCeiling:
+    enabled: true
 
   # ServiceAccount for the first-party workloads that touch object storage
   # (app and workers; the cron pods only curl the app over HTTP, so they are
@@ -69,7 +72,7 @@ global:
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
   ## @param global.scheduling.affinity [object] Affinity rules for all pods.
   ## @param global.scheduling.tolerations [array] Tolerations applied to all pods.
-  ## @param global.scheduling.priorityClassName [string] PriorityClass for every pod this chart renders (app, workers, nlp, langevals, cronjobs, and the bundled postgresql/redis). Set a per-component priorityClassName to override. Bundled SUBCHARTS (gateway, langyagent, clickhouse) manage their own scheduling and are not covered.
+  ## @param global.scheduling.priorityClassName [string] PriorityClass for every pod this chart renders (app, workers, nlp, langevals, PII redaction model, cronjobs, and the bundled postgresql/redis). Set a per-component priorityClassName to override. Bundled SUBCHARTS (gateway, langyagent, clickhouse) manage their own scheduling and are not covered.
   scheduling:
     nodeSelector: {}
     affinity: {}
@@ -94,7 +97,7 @@ autogen:
   # Custom secret names for each service (auto-generated if not specified)
   secretNames:
     # Single canonical Secret holding every chart-materialised value: the
-    # app keys (credentialsEncryptionKey, cronApiKey, nextAuthSecret,
+    # app keys (credentialsEncryptionKey, nextAuthSecret,
     # virtualKeyPepper) AND the AI gateway shared-auth keys
     # (LW_GATEWAY_INTERNAL_SECRET, LW_GATEWAY_JWT_SECRET) when
     # gateway.chartManaged=true. langwatch-app and the gateway pod both
@@ -121,15 +124,24 @@ secrets:
     # Key for credentials encryption (used by app)
     ## @param secrets.secretKeys.credentialsEncryptionKey [string] Key name for credentials encryption.
     credentialsEncryptionKey: "credentialsEncryptionKey"
-    # Key for cron API key (used by app and cronjobs)
-    ## @param secrets.secretKeys.cronApiKey [string] Key name for cron API key.
-    cronApiKey: "cronApiKey"
+    # Key holding the previous credentials encryption key during a rotation.
+    # Empty means the Secret carries none and CREDENTIALS_SECRET_PREVIOUS is
+    # not set.
+    ## @param secrets.secretKeys.credentialsEncryptionKeyPrevious [string] Key name for the previous credentials encryption key, set only during a rotation.
+    credentialsEncryptionKeyPrevious: ""
     # Key for NextAuth secret (used by app)
     ## @param secrets.secretKeys.nextAuthSecret [string] Key name for NextAuth secret.
     nextAuthSecret: "nextAuthSecret"
     # Key for AI Gateway virtual-key pepper (used by app only)
     ## @param secrets.secretKeys.virtualKeyPepper [string] Key name for AI Gateway virtual-key pepper.
     virtualKeyPepper: "virtualKeyPepper"
+    # LangWatchQL passwords, read from secrets.existingSecret (or the app Secret
+    # you create with autogen off). Remap them when your secret store cannot use
+    # these names, for example Azure Key Vault through ExternalSecret dataFrom.
+    ## @param secrets.secretKeys.lwqlClickhousePassword [string] Key name for the LangWatchQL ClickHouse password.
+    lwqlClickhousePassword: "LWQL_CLICKHOUSE_PASSWORD"
+    ## @param secrets.secretKeys.lwqlPostgresReaderPassword [string] Key name for the LangWatchQL PostgreSQL reader password.
+    lwqlPostgresReaderPassword: "LWQL_POSTGRES_READER_PASSWORD"
 
 # =============================================================================
 # Container Image Configurations
@@ -143,21 +155,30 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.17.0 # x-release-please-version
+    tag: 3.28.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.17.0 # x-release-please-version
+    tag: 3.28.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.17.0 # x-release-please-version
+    tag: 3.28.0 # x-release-please-version
+    pullPolicy: IfNotPresent
+  # The PII redaction model's public image (piiRedactionModel below), used
+  # only when piiRedactionModel.enabled.
+  ## @param images.pii_redaction_model.repository [string] PII redaction model image repository.
+  ## @param images.pii_redaction_model.tag [string] PII redaction model image tag.
+  ## @param images.pii_redaction_model.pullPolicy [string] PII redaction model image pull policy.
+  pii_redaction_model:
+    repository: langwatch/pii-redaction-model
+    tag: 3.28.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -166,6 +187,19 @@ images:
 # Core settings for the main LangWatch application service
 ## @section LangWatch app
 app:
+  ## @param app.migrations.preRoll [default: true] With app.storedObjects.localFilesystem.serializeUpgrades
+  ## active only: apply this release's migrations in a pre-upgrade Job on the new image, before
+  ## any Deployment rolls (ADR-155). Otherwise the new worker pods run `pnpm task upgrade` themselves.
+  ## @param app.migrations.preRollTimeoutSeconds [default: 2100] activeDeadlineSeconds for that Job. Run `helm upgrade --timeout 45m` (no shorter than this plus a margin): Helm's own hook timeout is 5 minutes and fails the release while the Job still runs.
+  ## @param app.migrations.oldWritersGoneHook [default: false] After the app and workers finish rolling out, a post-upgrade Job records that writers from before the serving roster have stopped (pnpm task upgrade old-writers-gone). Needs a Role reading the two Deployments and its own ServiceAccount token, projected into its kubectl container only.
+  ## @param app.migrations.oldWritersGoneHookTimeoutSeconds [default: 1800] How long it waits for the rollouts; past it nothing is asserted and the grace applies.
+  ## @param app.migrations.oldWritersGoneHookImage [string, default: alpine/k8s:1.34.9] Image of its rollout wait. Needs sh and kubectl.
+  migrations:
+    preRoll: true
+    preRollTimeoutSeconds: 2100
+    oldWritersGoneHook: false
+    oldWritersGoneHookTimeoutSeconds: 1800
+    oldWritersGoneHookImage: alpine/k8s:1.34.9
   # Telemetry identity for the app pods. Becomes the OTel resource
   # `service.name` and the `service` field on stdout log lines, which log
   # shipping promotes to the Loki `service_name` label.
@@ -180,13 +214,25 @@ app:
   replicaCount: 1
 
   # Shutdown budget — same shape and the same rule as workers.* below. The app
-  # shares the workers' entrypoint watchdog and can host the worker stack
-  # itself (the `all` process role), so it is sized the same way. A web-only
-  # pod drains in well under this; the grace period is a ceiling, not a wait.
+  # runs its own process now (apps/api; the workers are apps/worker in their own
+  # Deployment) and is sized the same way, because the clock has the same shape:
+  # the queue drains for this value (SHUTDOWN_DRAIN_TIMEOUT_MS) and the process
+  # deadline (PROCESS_SHUTDOWN_DEADLINE_MS) is this value plus 20s.
+  # The API drains in well under this; the grace period is a ceiling, not a
+  # wait.
   ## @param app.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
   shutdownDrainSeconds: 25
-  ## @param app.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
-  terminationGracePeriodSeconds: 55
+  ## @param app.terminationGracePeriodSeconds [default: 65] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30, and preStopSleepSeconds + shutdownDrainSeconds + 25.
+  terminationGracePeriodSeconds: 65
+  # Seconds the app container sleeps in preStop before it gets SIGTERM, so the
+  # Service endpoint removal reaches every load balancer and proxy before the
+  # process stops accepting requests. A cloud load balancer can keep routing to
+  # a pod for over 10s after its endpoint goes. Spent inside
+  # terminationGracePeriodSeconds. 0 turns it off; an extraLifecycle.preStop replaces it.
+  # Left unset it is 15, shortened to whatever a pinned terminationGracePeriodSeconds
+  # has room for; a value set here must fit, or the chart refuses to render.
+  ## @param app.preStopSleepSeconds [nullable, default: 15] Seconds to sleep before SIGTERM so endpoint removal propagates. Unset, shortened to fit a pinned grace period.
+  preStopSleepSeconds: null
 
   # Kubernetes service configuration
   # See: https://kubespec.dev/v1/Service
@@ -211,6 +257,22 @@ app:
   ## @param app.nodeEnv [string] Node.js environment override (falls back to global.env if empty).
   nodeEnv: ""
 
+  # Proxy hops whose X-Forwarded-For chain the app reads the caller's address
+  # from (sign-in and ingest rate limits, audit rows). The default trusts the
+  # private and loopback ranges, where an in-cluster ingress controller sits.
+  # Narrow it to your ingress or load balancer when anything outside it can
+  # reach the app from a private address (a load balancer that rewrites the
+  # source address does). Empty trusts no hop: the socket peer is the caller.
+  ## @param app.trustedProxyAddresses [string] Comma-separated trusted proxy addresses or IPv4/IPv6 CIDR ranges. A forwarding header is read only from a peer inside this set.
+  trustedProxyAddresses: "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128,fc00::/7"
+
+  # Read the caller's address from Cloudflare's CF-Connecting-IP header. Only
+  # from a peer inside trustedProxyAddresses, so set that to Cloudflare's
+  # published ranges as well; the app refuses to start with this on and no
+  # trusted proxy addresses.
+  ## @param app.trustCloudflareClientIp [boolean] Honour CF-Connecting-IP from a trusted proxy peer (TRUST_CLOUDFLARE_CLIENT_IP).
+  trustCloudflareClientIp: false
+
   # Encryption key for securing sensitive credentials
   # This key is used to encrypt/decrypt stored API keys and secrets
   ## @extra app.credentialsEncryptionKey Configuration for credentials encryption.
@@ -219,15 +281,17 @@ app:
   credentialsEncryptionKey:
     value: ""
     secretKeyRef: { name: "", key: "" }
-
-  # API key for internal cron job authentication
-  # Used by scheduled tasks to authenticate with the application
-  ## @extra app.cronApiKey API key used by cron jobs for authentication.
-  ## @param app.cronApiKey.value [string] Cron API key value.
-  ## @param app.cronApiKey.secretKeyRef [object] Reference to a secret holding the cron API key.
-  cronApiKey:
-    value: ""
-    secretKeyRef: { name: "", key: "" }
+    # The key being rotated away from. Set it together with the new key above
+    # so the app, the workers and the migration Jobs can still decrypt data
+    # written under the old one (CREDENTIALS_SECRET_PREVIOUS). Same format as
+    # the key itself: 64 hex characters. Remove it once the rotation is done.
+    # autogen never generates it.
+    ## @extra app.credentialsEncryptionKey.previous Previous credentials encryption key, set only during a rotation.
+    ## @param app.credentialsEncryptionKey.previous.value [string] Previous encryption key value (not recommended in production).
+    ## @param app.credentialsEncryptionKey.previous.secretKeyRef [object] Reference to a secret holding the previous encryption key.
+    previous:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
 
   # Pepper used when hashing AI Gateway virtual-key secrets (HMAC-SHA256).
   # Control-plane only — this value is NEVER shared with the gateway pod.
@@ -261,18 +325,19 @@ app:
   # commit-prefixed CDN base — e.g. "https://cdn.langwatch.ai/git-<short-sha>/" — so
   # a rolling deploy never strands a browser on a 404: every past build's assets
   # remain under their own immutable prefix. The deploy pipeline both uploads
-  # dist/client/assets to that prefix and sets this value for the same SHA. See
+  # apps/ui's dist/client/assets to that prefix and sets this value for the same
+  # SHA. See
   # ADR-086. Rendered into the LANGWATCH_ASSET_BASE env var when non-empty.
   ## @param app.assetBase [string, default: ""] CDN base URL for content-hashed assets; empty = serve same-origin from the pod.
   assetBase: ""
 
   # Feature flags to enable/disable specific functionality
   ## @extra app.features Feature flags for the app.
-  ## @param app.features.skipEnvValidation [default: false] Skip env var validation (dev only).
+  ## @param app.features.skipEnvValidation [default: false] Deprecated and inert: no process reads SKIP_ENV_VALIDATION any more.
   ## @param app.features.disableStrictPiiRedaction [default: false] Skip the strict PII redaction pass (Presidio analysis service). Native secrets and essential PII redaction still run.
   ## @param app.features.topicClustering [default: true] Enable automatic topic clustering.
   features:
-    # Skip environment variable validation (useful for development)
+    # Deprecated and inert. Kept so existing values files still render.
     skipEnvValidation: false
     # Skip the strict PII redaction pass (Presidio analysis service) to shed
     # analysis-service load. Native secrets and essential PII redaction still
@@ -292,26 +357,11 @@ app:
   upstreams:
     nlp: { scheme: http, port: 5561 }
     langevals: { scheme: http, port: 5562 }
-  # AI model evaluator configurations
-  # These enable integration with various AI providers for evaluation tasks
+  # Server-wide provider credentials. Model providers for evaluators are
+  # configured per project in Settings > Model Providers, not here.
   ## @extra app.evaluators Evaluator providers configuration.
   evaluators:
-    # Azure OpenAI integration for model evaluation
-    ## @extra app.evaluators.azureOpenAI Azure OpenAI evaluator configuration.
-    ## @param app.evaluators.azureOpenAI.enabled [default: false] Enable Azure OpenAI evaluator.
-    ## @param app.evaluators.azureOpenAI.endpoint.value [string] Azure OpenAI endpoint.
-    ## @param app.evaluators.azureOpenAI.apiKey.value [string] Azure OpenAI API key.
-    azureOpenAI:
-      enabled: false
-      endpoint:
-        value: ""
-        ## @param app.evaluators.azureOpenAI.endpoint.secretKeyRef [object] Secret ref for Azure OpenAI endpoint.
-        secretKeyRef: { name: "", key: "" }
-      apiKey:
-        value: ""
-        ## @param app.evaluators.azureOpenAI.apiKey.secretKeyRef [object] Secret ref for Azure OpenAI API key.
-        secretKeyRef: { name: "", key: "" }
-    # Google AI integration for model evaluation
+    # Google service account used for Google Cloud DLP PII redaction
     ## @extra app.evaluators.google Google evaluator configuration.
     ## @param app.evaluators.google.enabled [default: false] Enable Google evaluator.
     ## @param app.evaluators.google.credentials.value [string] Google credentials JSON (base64 or inline).
@@ -328,6 +378,7 @@ app:
   ## @param app.dataplane.enabled [default: false] Enable dataset object storage.
   ## @param app.dataplane.provider [string, default: awsS3] Object storage provider. Options: awsS3, azureBlob.
   ## @param app.dataplane.bucket [string, default: langwatch-dataset] Bucket name for datasets (awsS3 provider).
+  ## @param app.dataplane.uploads [string, default: ""] Where browsers and SDKs send upload bytes, rendered as STORED_OBJECTS_UPLOADS: direct (the bucket's endpoint, the default when empty) or through-langwatch (LangWatch's signed upload route, for a bucket only reachable inside the cluster).
   dataplane:
     enabled: false
     # Storage provider to use. Options: awsS3 (default), azureBlob.
@@ -337,16 +388,28 @@ app:
     # by providers.azureBlob.authMode; mirrors the awsS3 shape.
     provider: awsS3
     bucket: "langwatch-dataset" # Bucket name for dataset storage
+    # Where clients send upload bytes. Empty or `direct`: browsers and SDKs PUT
+    # straight to the bucket's endpoint, so that endpoint must be reachable from
+    # them, with a CORS rule for the app's origin. `through-langwatch`: they PUT
+    # to LangWatch, which streams the bytes into the bucket; use it when the
+    # bucket is only reachable inside the cluster. With ingress.className nginx
+    # the chart routes that path through its own Ingress (see ingress.uploads).
+    uploads: ""
 
     # Provider-specific configurations
     providers:
       # AWS S3 configuration for dataset storage
       ## @extra app.dataplane.providers.awsS3 AWS S3 provider configuration.
       ## @param app.dataplane.providers.awsS3.endpoint.value [string] Custom S3 endpoint.
+      ## @param app.dataplane.providers.awsS3.region.value [string] S3 region, rendered as S3_REGION. Unset, a regional AWS endpoint names its own, other endpoints use auto, AWS_REGION or the AWS profile wins next, else the bucket's own region is looked up once. GovCloud and China need it set.
       ## @param app.dataplane.providers.awsS3.accessKeyId.value [string] S3 access key ID (not recommended in production — use accessKeyId.secretKeyRef).
       ## @param app.dataplane.providers.awsS3.secretAccessKey.value [string] S3 secret access key (not recommended in production — use secretAccessKey.secretKeyRef).
       ## @param app.dataplane.providers.awsS3.keySalt.value [string] Optional key salt.
       awsS3:
+        region:
+          value: ""
+          ## @param app.dataplane.providers.awsS3.region.secretKeyRef [object] Secret ref for the S3 region.
+          secretKeyRef: { name: "", key: "" }
         endpoint:
           value: ""
           ## @param app.dataplane.providers.awsS3.endpoint.secretKeyRef [object] Secret ref for custom S3 endpoint.
@@ -401,7 +464,7 @@ app:
           value: ""
           ## @param app.dataplane.providers.azureBlob.container.secretKeyRef [object] Secret ref for the Azure Blob container name.
           secretKeyRef: { name: "", key: "" }
-        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Confirms the container has a lifecycle rule deleting `trace-blobs/spool/` blobs after 3 days. The ADR-022 trace spool refuses to write to Azure until this is true, because a crash between the spool write and its delete is bounded only by that rule and the app cannot verify a management-plane policy with a data-plane key. Leave false unless you have created the policy.
+        ## @param app.dataplane.providers.azureBlob.spoolRetentionConfirmed [boolean] Earlier spelling of `app.dataplane.objectRetentionConfirmed`, still honoured: either one confirms. It stops being read in 3.23.
         spoolRetentionConfirmed: false
         # Optional. Override the blob endpoint for sovereign clouds
         # (*.usgovcloudapi.net, *.chinacloudapi.cn), private endpoints, or an
@@ -457,6 +520,31 @@ app:
     # that lands.
     ## @param app.dataplane.legacyAzureRead [default: false] Keep Azure settings for reads after moving writes back to S3.
     legacyAzureRead: false
+
+    # Object-storage lifecycle table (ADR-172). The app writes transient or
+    # oversized payloads under these prefixes and relies on a lifecycle rule on
+    # the bucket or container to expire whatever is left behind. Create one rule
+    # per row: expire after the stated days, and do not shorten it.
+    #
+    #   Prefix                           Written by                    Eager delete  Lifecycle rule
+    #   trace-blobs/spool/               trace spool (ADR-022)         yes           expire after 3 days
+    #   langevals-staging/               evaluation, langevals bodies  yes           expire after 3 days
+    #   studio-staging/                  workflow studio payloads      yes           expire after 3 days
+    #   group-queue/                     group-queue S3 tier           no            expire after 7 days
+    #   evaluation-inputs/r<days>/       evaluation inputs             no            one rule per class: r90 after 90
+    #                                                                                days, r180 after 180, r365 after
+    #                                                                                365, r730 after 730
+    #   evaluation-inputs/r-indefinite/  evaluation inputs             no            none (kept for ever)
+    #   upgrade-diagnostics/             licensing, LangWatch Cloud    no            expire after 30 days
+    #                                    only (received bundles)
+    #
+    # S3 and compatible stores accept oversized writes. Azure needs you to
+    # confirm the rules below exist (today the trace spool refuses until then;
+    # other kinds follow), because the app holds a data-plane key
+    # and cannot read a management-plane policy back. The local filesystem
+    # refuses them always. A refused payload stays bounded: a preview or inline.
+    ## @param app.dataplane.objectRetentionConfirmed [boolean, default: false] Confirms the Azure container has a lifecycle rule for every prefix in the table above. Emitted as `OBJECT_RETENTION_CONFIRMED`.
+    objectRetentionConfirmed: false
 
   # Stored Objects - externalized byte content (audio, image, PDF, document).
   # By default, uses a local-filesystem PVC so the chart works plug-and-play
@@ -593,26 +681,60 @@ app:
   # security surface (SSO, SCIM provisioning, audit logs) and support.
   # See https://docs.langwatch.ai/self-hosting/licensing
   #
-  # The alternative to setting it here is activating the same key per
+  # app.license.key takes either form LangWatch issues, detected by shape:
+  # an activation code (LW-XXXX-XXXX-XXXX-XXXX), redeemed once at startup over
+  # outbound HTTPS to connect.langwatch.ai and stored on the oldest
+  # organization, or a signed license key, which works offline and applies to
+  # the whole instance.
+  #
+  # The alternative to setting it here is entering the same code or key per
   # organization in Settings > License, which suits a single-tenant install
   # but has to be repeated for every organization the instance hosts.
   ## @extra app.license Enterprise license configuration.
-  ## @param app.license.key.value [string] License key issued by LangWatch.
-  ## @param app.license.key.secretKeyRef [object] Secret ref holding the license key.
-  ## @param app.license.publicKey.value [string] Verification key, only for a private signing chain.
-  ## @param app.license.publicKey.secretKeyRef [object] Secret ref holding the verification key.
+  ## @param app.license.key.value [string] Signed license key or activation code issued by LangWatch.
+  ## @param app.license.key.secretKeyRef [object] Secret ref holding the signed license key or activation code.
   license:
     key:
       value: ""
       secretKeyRef: { name: "", key: "" }
-    # Overrides the built-in verification key. Almost no deployment sets this:
-    # it exists for installs that LangWatch issues licenses to from a separate
-    # signing chain. Replacing this key does not grant an Enterprise License,
-    # and a key that verifies only against a replaced value is not one; see
-    # platform/app/ee/LICENSE.md.
-    publicKey:
-      value: ""
-      secretKeyRef: { name: "", key: "" }
+
+  # LangWatch-hosted services this install may call with the license it holds.
+  #
+  # There is no switch that turns these on. The license decides: one that names
+  # a hosted service can reach it, one that names none reaches nothing. So a
+  # default render carries no LANGWATCH_CONNECT_ variable and an install on an
+  # offline license calls nothing, which an operator checks against the license
+  # blob rather than against this file.
+  #
+  # `disabled` is the escape hatch an audit asks for: set it and this install
+  # calls LangWatch for nothing at all, hosted services and usage reporting
+  # alike, whatever its license says.
+  # See https://docs.langwatch.ai/self-hosting/connect
+  ## @extra app.connect Connected hosted services configuration.
+  ## @param app.connect.disabled [boolean] Switches hosted services and usage reporting off entirely.
+  ## @param app.connect.gatewayEndpoint [string] Where hosted services are called. Empty uses the published endpoint.
+  ## @param app.connect.licenseEndpoint [string] Where the license registers itself. Empty uses the published endpoint.
+  ## @param app.connect.instanceId [string] Identity this install presents. Empty uses the id minted into its own database.
+  connect:
+    disabled: false
+    gatewayEndpoint: ""
+    licenseEndpoint: ""
+    # Set this only when an operator has a reason to name the identity. The
+    # default is minted once into this install's own database, so it survives
+    # restarts, backups and hostname changes; a second install with a database
+    # of its own presents another id and is refused as the wrong instance.
+    instanceId: ""
+
+  # Who can create an account and who can create an organization.
+  ## @extra app.signUp Self sign-up restrictions.
+  ## @param app.signUp.mode [string, default: open] `open` lets anybody who reaches the install sign up; `invite_only` admits only invited addresses, ADMIN_EMAILS, and the first account on an install with no users when ADMIN_EMAILS is empty (still subject to allowedDomains).
+  ## @param app.signUp.allowedDomains [array] Email domains allowed to sign up. Empty means any. Invited addresses and ADMIN_EMAILS are admitted whatever their domain.
+  signUp:
+    # Rendered as SIGN_UP_MODE. With invite_only, only an instance administrator
+    # (ADMIN_EMAILS) can create an organization once the first one exists.
+    mode: open
+    # Rendered as SIGN_UP_ALLOWED_DOMAINS, comma-separated.
+    allowedDomains: []
 
   # NextAuth.js authentication configuration
   # Handles user authentication and session management
@@ -622,7 +744,7 @@ app:
   ## @param app.nextAuth.secret.value [string] NextAuth secret value (not recommended inline for production).
   nextAuth:
     # Authentication provider to use. This value is passed to the app verbatim
-    # as NEXTAUTH_PROVIDER, so it has to be one the app recognises:
+    # as AUTH_PROVIDER, so it has to be one the app recognises:
     #   email (default), google, github, gitlab, azure-ad, auth0, okta,
     #   cognito, onelogin, oidc
     # Note that Azure AD is 'azure-ad' here while its credentials live under
@@ -942,18 +1064,17 @@ app:
 # =============================================================================
 # Configuration for running BullMQ background workers in a separate pod.
 # Workers are always deployed as their own Deployment; the main app
-# pod never starts in-process workers (START_WORKERS=false).
-# Uses the same container image as the app but runs `pnpm start:workers`.
+# pod never runs jobs, since apps/worker is its own application.
+# Uses the same container image as the app, started from the apps/worker working directory.
 ## @section Workers
 workers:
-
   # See app.otel — named separately so worker telemetry is distinguishable.
   ## @extra workers.otel OpenTelemetry identity for the workers.
   ## @param workers.otel.serviceName [string, default: langwatch-workers] Service name reported in traces and logs.
   otel:
     serviceName: langwatch-workers
 
-  ## @param workers.enabled [default: true] Deploy the workers Deployment + PDB.
+  ## @param workers.enabled [default: true] Deploy the workers Deployment + PDB. false runs the worker as a sidecar in each app pod.
   enabled: true
 
   # Number of worker replicas
@@ -962,8 +1083,9 @@ workers:
   replicaCount: 1
 
   # Shutdown budget. shutdownDrainSeconds is how long the GroupQueue may wait
-  # for in-flight jobs to finish their ClickHouse writes; it must match the
-  # app's own SHUTDOWN_DRAIN_TIMEOUT_MS, which the chart sets from this value.
+  # for in-flight jobs to finish their ClickHouse writes. The chart passes it
+  # to the queue as SHUTDOWN_DRAIN_TIMEOUT_MS and sets the process deadline
+  # (PROCESS_SHUTDOWN_DEADLINE_MS) to this value plus 20s.
   #
   # terminationGracePeriodSeconds is the kubelet's SIGKILL clock and must cover
   # the drain plus 5s for App.close, 15s for process teardown and 10s of
@@ -1071,7 +1193,6 @@ workers:
   ## @param workers.extraVolumeMounts [array] Additional volume mounts for workers container.
   extraVolumeMounts: []
 
-
 # =============================================================================
 # LangWatch NLP Service Configuration
 # =============================================================================
@@ -1122,6 +1243,22 @@ langwatch_nlp:
   security:
     blockLocalHTTPCalls: false
     allowedProxyHosts: []
+
+  # Shared credential the app, the workers and this service authenticate the
+  # app -> NLP hop with. All three read the key below from the app Secret
+  # (secrets.existingSecret when you supply one, the chart-generated Secret
+  # otherwise), so they always hold the same value. With autogen on, the chart
+  # generates it and keeps it stable across upgrades.
+  #
+  # The env var name is fixed at LANGWATCH_NLP_INTERNAL_SECRET on all three.
+  # Only the Secret key is configurable, for installs whose app Secret is
+  # written by external-secrets or terraform under another name. A Secret with
+  # no such key leaves the variable unset, the NLP service then accepts
+  # unauthenticated requests, and the install keeps working.
+  ## @extra langwatch_nlp.secrets Where the app <-> NLP service credential comes from.
+  ## @param langwatch_nlp.secrets.internalSecretKey [string, default: LANGWATCH_NLP_INTERNAL_SECRET] Key of the app Secret holding the shared value the app, the workers and the NLP service authenticate with. Rename it only when you supply the app Secret yourself and it stores the value under another key.
+  secrets:
+    internalSecretKey: LANGWATCH_NLP_INTERNAL_SECRET
 
   # Ceiling on how long a workflow code block may run inside the sandboxed
   # Python subprocess before nlpgo kills it. Held at or below 710 on purpose:
@@ -1399,6 +1536,79 @@ langevals:
   extraVolumeMounts: []
 
 # =============================================================================
+# PII Redaction Model
+# =============================================================================
+# The model the app and workers call for Strict PII analysis instead of
+# Presidio; any failure falls back to Presidio. Off by default; see the chart
+# README. Sizing and measured memory: docs/self-hosting/configuration/sizing-and-scaling.mdx
+## @section PII redaction model service
+piiRedactionModel:
+  ## @param piiRedactionModel.enabled [default: false] Deploy the PII redaction model (Deployment, Service and PDB) and point the app and workers at it.
+  enabled: false
+
+  # Like enabled, it forces release_pii_redaction_model_enabled: Strict
+  # organizations with an Enterprise license go to the model, the rest stay on
+  # Presidio. Self-hosted calls are never priced.
+  ## @param piiRedactionModel.externalEndpoint [string] PII_REDACTION_MODEL_ENDPOINT for a model this release does not deploy: an http(s) address, or a Lambda alias ARN when global.serviceAccount carries an IAM role allowed lambda:InvokeFunction. Ignored when enabled. Like enabled, it routes Strict organizations with an Enterprise license to the model; the rest stay on Presidio.
+  externalEndpoint: ""
+
+  ## @param piiRedactionModel.imagePullSecrets [array] Optional, only for a private mirror of images.pii_redaction_model (the default image is public), e.g. [{ name: my-registry }].
+  imagePullSecrets: []
+
+  ## @param piiRedactionModel.replicaCount [default: 1] Number of PII redaction model replicas.
+  replicaCount: 1
+  ## @extra piiRedactionModel.service Service for the PII redaction model.
+  ## @param piiRedactionModel.service.port [default: 8080] Service port.
+  service: { port: 8080 }
+  ## @extra piiRedactionModel.resources Resource requests and limits.
+  ## @param piiRedactionModel.resources.requests.cpu [string, default: 2] Requested CPU.
+  ## @param piiRedactionModel.resources.requests.memory [string, default: 7Gi] Requested memory.
+  ## @param piiRedactionModel.resources.limits.cpu [string, default: 4] CPU limit (the model's threads follow it).
+  ## @param piiRedactionModel.resources.limits.memory [string, default: 7Gi] Memory limit.
+  resources:
+    requests: { cpu: 2, memory: 7Gi }
+    limits: { cpu: 4, memory: 7Gi }
+  ## @param piiRedactionModel.terminationGracePeriodSeconds [default: 80] Time a stopping pod gets to answer requests in flight: 30 s body read + the 45 s request deadline + 5 s.
+  terminationGracePeriodSeconds: 80
+  ## @param piiRedactionModel.scratchSizeLimit [string, default: 256Mi] Size cap for the /tmp emptyDir under the read-only root filesystem.
+  scratchSizeLimit: 256Mi
+
+  ## @param piiRedactionModel.podSecurityContext [object] Pod security context overrides.
+  podSecurityContext: {}
+  ## @param piiRedactionModel.containerSecurityContext [object] Container security context overrides.
+  containerSecurityContext: {}
+  ## @param piiRedactionModel.podDisruptionBudget [object] PodDisruptionBudget spec overrides (rendered with more than one replica).
+  podDisruptionBudget: {}
+  ## @param piiRedactionModel.nodeSelector [object] Node selector overrides.
+  nodeSelector: {}
+  ## @param piiRedactionModel.tolerations [array] Tolerations overrides.
+  tolerations: []
+  ## @param piiRedactionModel.affinity [object] Affinity overrides.
+  affinity: {}
+  ## @param piiRedactionModel.topologySpreadConstraints [array] Topology spread constraints.
+  topologySpreadConstraints: []
+  ## @param piiRedactionModel.priorityClassName [string] PriorityClass for PII redaction model pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
+  ## @extra piiRedactionModel.pod Pod-level metadata.
+  pod:
+    ## @param piiRedactionModel.pod.annotations [object] Additional pod annotations.
+    annotations: {}
+    ## @param piiRedactionModel.pod.labels [object] Additional pod labels.
+    labels: {}
+  ## @extra piiRedactionModel.deployment Deployment-level metadata and strategy.
+  deployment:
+    ## @param piiRedactionModel.deployment.annotations [object] Additional deployment annotations.
+    annotations: {}
+    ## @param piiRedactionModel.deployment.labels [object] Additional deployment labels.
+    labels: {}
+    ## @param piiRedactionModel.deployment.strategy [object] Deployment strategy overrides.
+    strategy: {}
+    ## @param piiRedactionModel.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
+    revisionHistoryLimit: 10
+  ## @param piiRedactionModel.extraEnvs [array] Additional environment variables for the model container. An entry named PII_COMPONENTS, PII_WARMUP, PII_MAX_CONCURRENT_REQUESTS or PII_REQUEST_TIMEOUT_SECONDS replaces the chart's value (raise terminationGracePeriodSeconds with a longer timeout). PORT is refused.
+  extraEnvs: []
+
+# =============================================================================
 # CronJobs Configuration
 # =============================================================================
 # Scheduled tasks that run automatically to maintain LangWatch
@@ -1419,11 +1629,11 @@ cronjobs:
   # See: https://kubespec.dev/batch/v1/CronJob#spec.jobTemplate.spec.template.spec.containers.image
   ## @extra cronjobs.image Cron job image.
   ## @param cronjobs.image.repository [string, default: curlimages/curl] Image repository.
-  ## @param cronjobs.image.tag [string, default: 8.12.1] Image tag.
+  ## @param cronjobs.image.tag [string, default: 8.23.0] Image tag.
   ## @param cronjobs.image.pullPolicy [string, default: IfNotPresent] Image pull policy.
   image:
     repository: curlimages/curl
-    tag: "8.12.1"
+    tag: "8.23.0"
     pullPolicy: IfNotPresent
 
   # Resource requirements for cron job pods
@@ -1567,7 +1777,7 @@ ingress:
 
   # Ingress annotations for specific behaviors
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#metadata.annotations
-  ## @param ingress.annotations [object] Additional ingress annotations.
+  ## @param ingress.annotations [object] Additional ingress annotations. With className nginx the app Ingress also gets proxy-read-timeout and proxy-send-timeout of 120 s; set either here to override.
   annotations: {}
 
   # Extra labels applied to the Ingress and to the blackhole Service that backs
@@ -1614,6 +1824,41 @@ ingress:
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#spec.tls
   ## @param ingress.tls [array] TLS configuration for HTTPS.
   tls: []
+
+  # AI Gateway host on the same Ingress settings. When `host` is set, the chart
+  # renders a second Ingress, `<release>-gateway-ingress`, with this
+  # ingress's className, labels and annotations, routing /v1 (Prefix) and
+  # /health (Exact) on that host to the `<release>-gateway` Service. It is a
+  # separate object because controllers such as ingress-nginx apply
+  # annotations per Ingress, and the gateway needs streaming settings the app
+  # does not. With className nginx the chart adds proxy buffering off,
+  # 3600s read/send timeouts and a 32m body size to it. The match is on the
+  # value of className: an empty className on a cluster whose default
+  # IngressClass is ingress-nginx gets none of them, so set nginx explicitly
+  # (or put the annotations in ingress.gateway.annotations).
+  gateway:
+    ## @param ingress.gateway.host [string, default: ""] Hostname for the AI Gateway, e.g. gateway.your-corp.com. Empty renders no gateway Ingress. Requires ingress.enabled.
+    host: ""
+    tls:
+      ## @param ingress.gateway.tls.secretName [string, default: ""] TLS Secret for the gateway host. Empty serves the host without a tls entry.
+      secretName: ""
+    ## @param ingress.gateway.annotations [object] Annotations for the gateway Ingress only, applied over ingress.annotations and the nginx defaults.
+    annotations: {}
+
+  # Upload route on the app hosts. The chart renders a second Ingress,
+  # `<release>-uploads-ingress`, routing /api/stored-objects/uploads (Prefix)
+  # on every ingress.hosts host to the app Service, with ingress.annotations
+  # (minus rewrites and the host-scoped server-snippet). A host whose own
+  # paths already route exactly /api/stored-objects/uploads is left out. When className
+  # contains "nginx" it adds request buffering off, a 5121m body limit (the
+  # 5 GiB upload limit and headroom) and 3600s read/send timeouts: nginx's 1m
+  # default on the app Ingress would refuse almost every file. Other classes
+  # get only ingress.uploads.annotations on top.
+  uploads:
+    ## @param ingress.uploads.enabled [nullable] Render the uploads Ingress. Unset: on when ingress.className is nginx. true: on for any class (an empty default class, nginx-internal). false: off.
+    enabled: null
+    ## @param ingress.uploads.annotations [object] Annotations for the uploads Ingress only, applied over ingress.annotations and the nginx upload defaults.
+    annotations: {}
 
 # =============================================================================
 # System Dependencies Configuration
@@ -1692,10 +1937,10 @@ prometheus:
     # Image configuration (prometheus-community default: prom/prometheus)
     ## @extra prometheus.server.image Image configuration.
     ## @param prometheus.server.image.repository [string, default: quay.io/prometheus/prometheus] Image repository.
-    ## @param prometheus.server.image.tag [string, default: v3.2.1] Image tag.
+    ## @param prometheus.server.image.tag [string, default: v3.5.5] Image tag.
     image:
       repository: quay.io/prometheus/prometheus
-      tag: v3.2.1
+      tag: v3.5.5
 
     # Number of Prometheus replicas
     # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
@@ -1822,8 +2067,8 @@ postgresql:
   image:
     ## @param postgresql.image.repository [string, default: postgres] Image repository.
     repository: postgres
-    ## @param postgresql.image.tag [string, default: "17.5"] Image tag.
-    tag: "17.5"
+    ## @param postgresql.image.tag [string, default: "17.11"] Image tag.
+    tag: "17.11"
     ## @param postgresql.image.pullPolicy [string, default: IfNotPresent] Image pull policy.
     pullPolicy: IfNotPresent
 
@@ -1860,88 +2105,6 @@ clickhouse:
   ## @param clickhouse.chartManaged [default: true] Manage ClickHouse via this chart using the clickhouse-serverless subchart (false = external).
   chartManaged: true
 
-  # NOT the same as the root `lwql` key (see the LangWatchQL section below):
-  # root `lwql.enabled` is the FEATURE switch (does LangWatchQL run at all, on
-  # either provisioning path); this `clickhouse.lwqlAccessModel` block is the
-  # chart-managed-ClickHouse RENDER switch plus its secret-key wiring — it tells
-  # the clickhouse-serverless subchart to render the access model as config.
-  #
-  # LangWatchQL access model, rendered as ClickHouse config by the
-  # clickhouse-serverless subchart. Helm cannot derive this from the parent's
-  # lwql.enabled, so it is set here to match that default: for chart-managed
-  # ClickHouse the subchart is the ONLY provisioner (the app self-provisions only
-  # for external/BYO ClickHouse), so this must be on or LangWatchQL goes
-  # unprovisioned. langwatch.lwql.provisioningGuard fails the render if this is
-  # turned off while lwql.enabled stays true.
-  lwqlAccessModel:
-    ## @param clickhouse.lwqlAccessModel.enabled [default: true] Render the LangWatchQL access model (langwatch_lwql user, lwql_restricted profile, row policies, lwql_postgres named collection) as ClickHouse config for chart-managed ClickHouse.
-    enabled: true
-    # ClickHouse database that holds the LangWatchQL objects. Single source of
-    # truth: the clickhouse-serverless subchart renders the access model into
-    # this database, and the app/workers read it back via LWQL_DATABASE (both
-    # resolve this same value). Matches the app's own `langwatch` default.
-    ## @param clickhouse.lwqlAccessModel.database [default: langwatch] Database holding the LangWatchQL objects; the subchart provisions here and the app queries here (LWQL_DATABASE).
-    database: langwatch
-    # Design C: whoever owns the ClickHouse server owns the LangWatchQL access
-    # model, so for chart-managed ClickHouse the LWQL passwords live in the
-    # ClickHouse credentials Secret — the one templates/clickhouse/url-secret.yaml
-    # writes (autogen) or the operator pre-creates (clickhouse.auth.existingSecret).
-    # Left EMPTY so the clickhouse-serverless subchart falls back to that Secret
-    # by its own default, which tracks the real Secret name across every preset
-    # (no hardcoded name to drift when secrets.existingSecret is renamed). The
-    # app and workers read the SAME Secret/keys via langwatch.clickhouse.lwqlSecretName,
-    # so the query password can never disagree with the one the pod created the
-    # langwatch_lwql user from. Set this only to point the pod at a DIFFERENT
-    # Secret you own (external-secrets, terraform) — you then own its keys too.
-    ## @param clickhouse.lwqlAccessModel.existingSecret [string, default: ""] Secret the ClickHouse pod mounts the LWQL passwords from. Empty resolves to the ClickHouse credentials Secret (auth.existingSecret, else the autogen-managed <release>-clickhouse). Set only to redirect the mount at a Secret you own — it also redirects langwatch.clickhouse.lwqlSecretName, so the app/workers read LWQL_CLICKHOUSE_PASSWORD from this same Secret.
-    existingSecret: ""
-    ## @param clickhouse.lwqlAccessModel.passwordSecretKey [string, default: lwql_password] Key holding the langwatch_lwql user password. Matches the subchart's default projection and the key url-secret.yaml writes.
-    passwordSecretKey: lwql_password
-    # lwql_postgres named collection — the ClickHouse -> PostgreSQL bridge that
-    # backs the api-key -> tenant map. It must reach the SAME PostgreSQL the app
-    # dials via DATABASE_URL, and it connects as a DEDICATED read-only role
-    # (`lwql_ro`), never the PostgreSQL superuser: the app converges that role
-    # from the reader password (LWQL_POSTGRES_READER_PASSWORD, the same
-    # `lwql_pg_password` key the subchart mounts here) at deploy time, granting it
-    # SELECT on the approved views only. A superuser bridge would both fail to
-    # authenticate (its password lives under `postgres-password`, not this key)
-    # and discard that reader isolation.
-    #
-    # CHART-MANAGED PostgreSQL (postgresql.chartManaged: true, the default):
-    # `host` below defaults to the chart's own PostgreSQL Service. THIS parent
-    # chart composes '<release>-postgresql' as its own default (a tpl string the
-    # subchart only evaluates — the subchart never guesses a host), so the
-    # collection renders and works out of the box. `database` must equal
-    # postgresql.auth.database, and `user` must stay `lwql_ro` — the render fails
-    # if either drifts while the bridge dials this Service, since Helm cannot
-    # derive one subchart value from a parent one and the app converges exactly
-    # that reader.
-    #
-    # EXTERNAL PostgreSQL (postgresql.chartManaged: false): leaving `host` at ""
-    # DISABLES the bridge — a supported, deliberate posture, not a fallback (no
-    # shipped LangWatchQL view reads through it yet, langwatch-saas#7387). NOTES.txt
-    # and a langwatch.io/lwql-postgres-bridge: disabled annotation on the app
-    # Deployment say so loudly. A PARTIAL override (host left "" but
-    # .database/.user/.passwordSecretKey changed) still fails the render as a likely
-    # forgotten host. Setting an explicit non-empty `host` turns the bridge live
-    # against your PostgreSQL and now REQUIRES clickhouse.lwqlAccessModel.existingSecret
-    # to point at a Secret you own carrying BOTH `lwql_pg_password` (the lwql_ro
-    # reader password ClickHouse dials your PostgreSQL with) AND `lwql_password`
-    # (the langwatch_lwql ClickHouse identity password) — the chart never
-    # provisions a reader on a PostgreSQL it does not own and will not autogenerate
-    # a password nobody set there, so the render fails otherwise. Set `database` to
-    # your instance's, and keep `user: lwql_ro` unless you provision a different
-    # reader yourself.
-    postgres:
-      ## @param clickhouse.lwqlAccessModel.postgres.host [string, default: "{{ .Release.Name }}-postgresql"] PostgreSQL host the lwql_postgres bridge dials, tpl'd by the clickhouse-serverless subchart. Defaults to the chart-managed PostgreSQL Service so a default install works out of the box. Every external-PostgreSQL example/profile resets this to "" to disable the bridge (no shipped LangWatchQL view reads through it yet, langwatch-saas#7387) instead of failing the render — but a PARTIAL override (only .database/.user/.passwordSecretKey changed while this stays empty) still fails the render as a likely mistake.
-      host: '{{ .Release.Name }}-postgresql'
-      ## @param clickhouse.lwqlAccessModel.postgres.database [default: langwatch] PostgreSQL database the bridge reads. Must equal postgresql.auth.database for chart-managed PostgreSQL; set to your instance's database for an external PostgreSQL.
-      database: langwatch
-      ## @param clickhouse.lwqlAccessModel.postgres.user [default: lwql_ro] PostgreSQL role the bridge connects as — a dedicated read-only reader the app converges (never the superuser). Keep the default unless you provision your own reader on an external PostgreSQL.
-      user: lwql_ro
-      ## @param clickhouse.lwqlAccessModel.postgres.passwordSecretKey [string, default: lwql_pg_password] Key holding the lwql_ro reader password. Matches the subchart's default projection and the key the app reads as LWQL_POSTGRES_READER_PASSWORD; mounted whenever the bridge renders.
-      passwordSecretKey: lwql_pg_password
-
   # ---------------------------------------------------------------------------
   # External ClickHouse (when chartManaged: false)
   # ---------------------------------------------------------------------------
@@ -1955,6 +2118,15 @@ clickhouse:
       secretKeyRef: { name: "", key: "" }
     ## @param clickhouse.external.cluster [string] Cluster name for ON CLUSTER DDL (omit for non-replicated).
     cluster: ""
+    ## @param clickhouse.external.serverNodes [default: 1] Nodes serving client queries.
+    serverNodes: 1
+    ## @param clickhouse.external.serverMaxConcurrentQueries [default: 300] Per-node max_concurrent_queries.
+    serverMaxConcurrentQueries: 300
+
+  ## @extra clickhouse.client Client pool sizing shared by app and worker processes.
+  client:
+    ## @param clickhouse.client.maxOpenConnections [string] Explicit per-client override. Empty derives from fleet capacity.
+    maxOpenConnections: ""
 
   # ---------------------------------------------------------------------------
   # Chart-managed subchart configuration (clickhouse-serverless)
@@ -2062,42 +2234,93 @@ clickhouse:
     ## @param clickhouse.scheduling.tolerations [array] Tolerations for ClickHouse pods.
     tolerations: []
 
+  # ---------------------------------------------------------------------------
+  # LangWatchQL access-model delivery (issue #8258)
+  # ---------------------------------------------------------------------------
+  # The app owns the LangWatchQL access model in code; on chart-managed
+  # ClickHouse it is DELIVERED to every replica (not provisioned by DDL on the
+  # one pod behind the Service). The <release>-lwql-access-render Job writes the
+  # rendered files into the Secret <release>-lwql-clickhouse-access, and every
+  # ClickHouse pod mounts them here. Nested single-file (subPath) mounts, so they
+  # coexist with the files ch-config renders into config.d / users.d at startup.
+  #
+  # optional:false is DELIBERATE. The Secret is written at runtime by the
+  # main-phase <release>-lwql-access-render Job, not by a chart Secret manifest,
+  # so on a first install it does not exist yet when these pods are created. A
+  # required mount does NOT hard-fail in that window — the kubelet retries a
+  # missing required Secret (FailedMount events, pod stays in ContainerCreating)
+  # and starts the pod once the Job writes it, exactly as the install race needs.
+  # What optional:false BUYS us: if the render Job never delivers the access model
+  # (a broken render, a bad token, RBAC drift), ClickHouse stays visibly not-Ready
+  # and `helm install --wait --wait-for-jobs` fails, instead of ClickHouse coming
+  # up healthy with NO LWQL access set — the silent-success failure that shipped
+  # once and was only caught much later by an in-cluster row-count assertion.
+  #
+  # The mount is NOT delivered through the operator-facing extraVolumes /
+  # extraVolumeMounts: Helm replaces lists wholesale, so an operator adding one
+  # extra volume there would silently drop the LWQL mount. It rides its own
+  # value instead — clickhouse.lwqlAccess.secretName — which the subchart
+  # StatefulSet renders unconditionally into the pod (see that chart's
+  # statefulset.yaml), leaving extraVolumes free for operators. The value is a
+  # template string rendered through `tpl ... $`, so it calls the parent helper
+  # directly — the single source of truth for the Secret name, no drift.
+  ## @param clickhouse.lwqlAccess.secretName [string] Secret carrying the rendered LWQL access files; mounted unconditionally into every ClickHouse pod. Rendered from the parent helper — leave as-is.
+  lwqlAccess:
+    secretName: '{{ include "langwatch.lwql.accessSecretName" $ }}'
+  ## @param clickhouse.extraVolumes [array] Extra volumes for the ClickHouse pod.
+  extraVolumes: []
+  ## @param clickhouse.extraVolumeMounts [array] Extra mounts for the ClickHouse container.
+  extraVolumeMounts: []
+
+  # Roll every ClickHouse pod when the app catalog (hence the rendered access
+  # model) changes, so an upgrade re-mounts the freshly rendered Secret.
+  # Kubernetes does not propagate Secret updates into a subPath mount, so a pod
+  # only picks up a changed model on (re)start; this annotation, bumped in
+  # release lockstep with the app image, is what forces that restart on upgrade.
+  # ClickHouse 25.10 hot-reloads users.d/config.d from disk in ~3s, but that
+  # only helps a non-subPath mount, which ch-config's writable config dirs
+  # preclude here. A values-only upgrade at the same version does NOT roll
+  # ClickHouse; rotate a live secret with `kubectl rollout restart statefulset`.
+  ## @param clickhouse.podAnnotations [object] Annotations on the ClickHouse pod template (carries the LWQL catalog version so upgrades re-mount the access Secret).
+  podAnnotations:
+    langwatch.com/lwql-access-catalog: "3.28.0" # x-release-please-version
+
 # =============================================================================
 # LangWatchQL (LWQL) Configuration
 # =============================================================================
 # The governed analytics SQL API. Its backend is the restricted ClickHouse
-# identity (langwatch_lwql), the lwql_restricted settings profile, the tenant
-# row policies, the lwql_postgres named collection and the caller-facing views.
-# The `release_lwql_workbench` feature flag still gates the HTTP endpoint; the
-# backend objects exist regardless.
+# identity (langwatch_lwql), the <database>_profile settings profile
+# (langwatch_profile by default), the tenant row policies, the lwql_postgres
+# named collection and the caller-facing views.
+# The `release_lwql_workbench` feature flag gates the HTTP endpoint and is on by
+# default on a self-hosted install; the backend objects exist regardless.
 #
-# Ownership follows one rule (Design C, langwatch-saas#1168): whoever owns the
-# ClickHouse server owns the access model, and exactly one provisioner writes
-# each entity name.
+# One rule, one owner (issue #8258): the APPLICATION owns the access model in
+# code. How it reaches ClickHouse depends on the posture:
 #
-#   - Chart-managed ClickHouse (clickhouse.chartManaged=true, the default):
-#     the clickhouse-serverless subchart renders the whole access model as
-#     ClickHouse config at pod boot (clickhouse.lwqlAccessModel.enabled, default true). The
-#     app does NOT run provisioning DDL — a second SQL owner of the same names
-#     is startup-fatal (named-collection collision) or wedges access entities
-#     (error 495 on every repair statement). Works at any replica count.
-#   - External / BYO ClickHouse (clickhouse.chartManaged=false): the chart
-#     cannot render config into a server it does not run, so the app
-#     self-provisions the same objects via SQL DDL on every boot, and degrades
-#     to a logged, fail-closed refusal if the server rejects a statement. This
-#     requires a ClickHouse whose admin user may run access-management DDL.
+#   - Chart-managed ClickHouse (default): RENDERED delivery. The
+#     <release>-lwql-access-render Job renders the model and writes it into the
+#     Secret <release>-lwql-clickhouse-access, which every ClickHouse pod mounts
+#     (see clickhouse.lwqlAccess.secretName above, rendered into the pod by the
+#     subchart StatefulSet), so every replica carries the whole
+#     set. No access SQL DDL runs; the ClickHouse identity holds no ACCESS
+#     MANAGEMENT. This is LWQL_ACCESS_MODEL_MODE=rendered (the default when
+#     unset); the chart never sets the variable for chart-managed ClickHouse.
+#   - Bring-your-own ClickHouse: SQL DDL. The chart cannot write the server's
+#     config files, so the app self-provisions via SQL DDL, degrading to a
+#     logged, fail-closed refusal if the server rejects a statement. Select it
+#     with LWQL_ACCESS_MODEL_MODE=sql (see examples/overlays/clickhouse-external.yaml),
+#     which needs an admin user allowed access-management DDL.
 #
-# Either way the app authenticates as langwatch_lwql at query time, so the two
-# stable passwords (chart-generated) reach the app on both paths.
+# `lwql.enabled` is the only switch here: the chart's remaining job is handing
+# the app the two passwords (LWQL_CLICKHOUSE_PASSWORD, LWQL_POSTGRES_READER_PASSWORD)
+# it converges the identities with.
 ## @section LangWatchQL (LWQL)
-# NOT the same as `clickhouse.lwqlAccessModel` (in the ClickHouse section above):
-# this root `lwql` key is the FEATURE switch (turns LangWatchQL on/off regardless
-# of who provisions it), while `clickhouse.lwqlAccessModel` is the chart-managed-
-# ClickHouse RENDER switch that tells the clickhouse-serverless subchart to render
-# the access model as config. Both default true so the two agree out of the box.
 lwql:
-  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Chart-managed ClickHouse renders it as config via the clickhouse-serverless subchart; external ClickHouse has the app self-provision it. The feature flag still gates the endpoint.
+  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Delivered as rendered config to every pod on chart-managed ClickHouse (default), or via SQL DDL on bring-your-own ClickHouse (LWQL_ACCESS_MODEL_MODE=sql). The feature flag, on by default on a self-hosted install, gates the endpoint.
   enabled: true
+  ## @param lwql.imagePullSecrets [array] Pull secrets for the app image the access-render Job runs. That Job uses its own ServiceAccount, so secrets on the namespace default ServiceAccount do not reach it (same reason app.storedObjects.localFilesystem.serializeUpgradesPullSecrets exists).
+  imagePullSecrets: []
 
 # =============================================================================
 # Redis Configuration
@@ -2139,12 +2362,12 @@ redis:
       secretKeyRef: { name: "", key: "" }
 
   # Redis container image (official Docker Hub image)
-  ## @extra redis.image Redis container image.
+  ## @extra redis.image Redis container image. Valkey 9.1 via examples/overlays/redis-valkey.yaml.
   image:
-    ## @param redis.image.repository [string, default: redis] Image repository.
+    ## @param redis.image.repository [string, default: redis] Image repository (valkey/valkey for Valkey).
     repository: redis
-    ## @param redis.image.tag [string, default: "8.0"] Image tag.
-    tag: "8.0"
+    ## @param redis.image.tag [string, default: "8.10.3"] Image tag ("9.1" with valkey/valkey).
+    tag: "8.10.3"
     ## @param redis.image.pullPolicy [string, default: IfNotPresent] Image pull policy.
     pullPolicy: IfNotPresent
 
@@ -2171,13 +2394,16 @@ redis:
       size: 10Gi
       storageClass: ""
 
+    ## @param redis.master.maxmemory [string] Explicit --maxmemory (bytes, or a k, M, G, T, Ki, Mi, Gi, Ti size). Empty means half of redis.master.resources.limits.memory, so a snapshot's copied pages still fit under the container limit.
+    maxmemory: ""
+
     # Resource requirements for Redis
     # See: https://kubespec.dev/v1/Pod#spec.containers.resources
     ## @extra redis.master.resources Resource requests and limits.
     ## @param redis.master.resources.requests.cpu [string, default: 250m] Requested CPU.
     ## @param redis.master.resources.requests.memory [string, default: 256Mi] Requested memory.
     ## @param redis.master.resources.limits.cpu [string, default: 500m] CPU limit.
-    ## @param redis.master.resources.limits.memory [string, default: 512Mi] Memory limit.
+    ## @param redis.master.resources.limits.memory [string, default: 512Mi] Memory limit. Redis starts with --maxmemory at half of this, because a background snapshot copies changed pages and memory briefly approaches double; with noeviction Redis then refuses writes well before the limit, which makes an OOM kill much less likely. With no memory limit and no redis.master.maxmemory, Redis starts without a ceiling.
     resources:
       requests:
         cpu: 250m
@@ -2203,17 +2429,17 @@ gateway:
   ## @param gateway.chartManaged [default: true] Lift the AI gateway pod as part of this chart (false = external or off).
   chartManaged: true
 
-  ## @param gateway.publicUrl [string, default: ""] Externally-reachable URL of the AI Gateway (e.g. https://gateway.your-corp.com). The control plane hands this to CLI users (langwatch claude/codex/cursor) at login. REQUIRED for self-hosted CLI/agentic use: without it the CLI falls back to http://localhost:5563, which a developer laptop cannot reach against a remote cluster. Leave empty to auto-derive from gateway.ingress.host when you set your own host. Set LANGWATCH_GATEWAY_URL on the client to override per-user.
+  ## @param gateway.publicUrl [string, default: ""] Externally-reachable URL of the AI Gateway (e.g. https://gateway.your-corp.com). The control plane hands this to CLI users (langwatch claude/codex/cursor) at login. REQUIRED for self-hosted CLI/agentic use: without it the CLI falls back to http://localhost:5563, which a developer laptop cannot reach against a remote cluster. Leave empty to auto-derive from gateway.ingress.host when you set your own host. The gateway also uses it as A2A_PUBLIC_BASE_URL, the base of the URLs in proxied A2A Agent Cards; without it the gateway refuses Agent Card calls (a2a_public_url_unset), even when ingress.gateway.host publishes the gateway. Set LANGWATCH_GATEWAY_URL on the client to override per-user.
   publicUrl: ""
 
   ## @param gateway.internalUrl [string, default: ""] URL the control plane itself uses to reach the gateway, from inside the cluster. Distinct from publicUrl, which is for browsers and laptops: an install with no gateway ingress still needs this, and Langy refuses every turn without it. Empty derives the Service this chart renders, so set it only for a gateway that lives outside this release or behind a mesh address.
   internalUrl: ""
 
-  # The gateway needs its OWN externally-reachable endpoint, separate from
-  # the main app — point a second ingress / load balancer at gateway.ingress
-  # below (the LLM clients hit the gateway, the browser hits the app). The
-  # gateway subchart ships ingress.enabled=true with a SaaS placeholder host;
-  # override gateway.ingress.host with your domain.
+  # The gateway needs its OWN externally-reachable hostname, separate from
+  # the main app: LLM clients hit the gateway, the browser hits the app.
+  # Publish it with ingress.gateway.host on the app Ingress, or route to the
+  # `<release>-gateway` Service (port 80) yourself and set gateway.publicUrl.
+  # Routes, timeouts and body size: docs/self-hosting/deployment/routing.
 
   # The gateway subchart defaults (image, probes, HPA, NetworkPolicy,
   # PDB, SecurityContext) live in charts/gateway/values.yaml. Common
@@ -2224,16 +2450,24 @@ gateway:
     baseUrl: ""
 
   ## @param gateway.secrets.existingSecretName [string, default: langwatch-app-secrets] Name of the Secret the gateway pod mounts for LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET. this release collapsed gateway-auth into the umbrella's app Secret so both langwatch-app and the gateway pod mount the SAME Secret. Default matches the autogen app-secret name when release name is `langwatch`. If you override the release name OR set `autogen.secretNames.app` / `secrets.existingSecret`, set this to the same Secret name so the gateway subchart bridges to it.
+  ## @param gateway.secrets.internalSecretKey [string, default: LW_GATEWAY_INTERNAL_SECRET] Key in that Secret holding the gateway internal secret. The app and the gateway pod both read this key.
+  ## @param gateway.secrets.jwtSecretKey [string, default: LW_GATEWAY_JWT_SECRET] Key in that Secret holding the gateway JWT secret. The app and the gateway pod both read this key.
   secrets:
     existingSecretName: langwatch-app-secrets
+    internalSecretKey: LW_GATEWAY_INTERNAL_SECRET
+    jwtSecretKey: LW_GATEWAY_JWT_SECRET
 
   ## @param gateway.security.blockLocalHTTPCalls [default: false] Reject tenant-supplied provider endpoints resolving to local/private networks. Keep false for local/self-hosted installs that intentionally use private services; set true for SaaS together with a restrictive gateway NetworkPolicy.
   ## @param gateway.security.requireHTTPSCustomEndpoints [default: false] Require HTTPS for customer-configured provider endpoints. Hosted-cloud hardening; disabled by default for self-hosted compatibility.
   ## @param gateway.security.allowedProxyHosts [array, default: []] Exact private endpoint hostnames allowed when blockLocalHTTPCalls is enabled. Cloud metadata remains blocked.
+  ## @param gateway.security.extraCACertsConfigMap [string, default: ""] ConfigMap of extra PEM CA certificates the gateway trusts beside the public roots, for provider endpoints on a private CA. Mounted at /etc/langwatch/ca and named in SSL_CERT_DIR.
+  ## @param gateway.security.corsAllowedOrigins [array, default: []] Browser origins allowed to call the gateway /v1 routes directly (CORS). Exact origins such as https://app.example.com, or a single "*". Empty sends no CORS headers.
   security:
     blockLocalHTTPCalls: false
     requireHTTPSCustomEndpoints: false
     allowedProxyHosts: []
+    extraCACertsConfigMap: ""
+    corsAllowedOrigins: []
 
   # Trace export is OFF by default to keep the chart safe to install
   # without out-of-band auth-token plumbing. Earlier defaults pointed

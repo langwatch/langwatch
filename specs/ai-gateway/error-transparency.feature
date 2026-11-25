@@ -210,6 +210,45 @@ Feature: AI Gateway — transparent upstream error forwarding
       | the provider slot has no deployment map            | provider_config_invalid     |
       | the provider does not implement the operation      | provider_config_invalid     |
 
+  # A provider row can be stored enabled with no credentials. It reaches the
+  # gateway as a slot whose API key is empty, the engine drops the key and
+  # answers "no keys found that support model", and the customer was told to
+  # check the models and deployments of a provider that had no key at all. The
+  # engine uses that one sentence for a missing key and for a key that lists
+  # other models, so the gateway checks the credential itself before dispatch.
+  #
+  # Bindings: services/aigateway/adapters/providers/credential_gap_test.go
+  @bdd @error-transparency @unit
+  Scenario: A provider saved without its API key is refused before dispatch and says so
+    Given a provider slot that authenticates with an API key and holds none
+    When the client calls the gateway with "vk-demo"
+    Then the error code is "provider_config_invalid" with the problem "api_key_missing"
+    And the message says the provider has no API key saved
+    And it does not tell the customer to check their models or deployments
+    And no request is sent to the provider
+
+  # One code covers several different settings to change, so the answer names
+  # which: the client picks its sentence from the problem, and the remediation
+  # steps are written for it.
+  #
+  # Bindings: services/aigateway/adapters/providers/credential_gap_test.go,
+  # services/aigateway/domain/remediation_test.go,
+  # platform/app/src/features/errors/logic/__tests__/presentation.unit.test.ts
+  @bdd @error-transparency @unit
+  Scenario Outline: Each provider setup gap gets its own instruction
+    Given a request fails because <gap>
+    When the gateway answers the caller
+    Then the error code is "provider_config_invalid" with the problem "<problem>"
+    And the customer reads an instruction naming <setting> in the model provider settings
+
+    Examples:
+      | gap                                                  | problem               | setting                |
+      | the provider holds no API key                        | api_key_missing       | the API key            |
+      | the provider holds no endpoint URL                   | endpoint_missing      | the endpoint           |
+      | the provider maps no deployment for the model        | deployment_missing    | the deployment mapping |
+      | the provider has no API for this kind of request     | operation_unsupported | another provider       |
+      | the provider is complete and still serves no such model | model_not_served   | the model              |
+
   @bdd @error-transparency @unit
   Scenario: A genuine timeout is still called a timeout
     Given the engine stamps the failure with its request-timed-out signal
@@ -382,6 +421,50 @@ Feature: AI Gateway — transparent upstream error forwarding
     When the client calls the gateway with "vk-demo"
     Then the gateway responds 503 with error code "circuit_open" and fault "provider"
     And never 500 "internal_error"
+
+  # The raw-forward stream lanes (/v1/messages to an Anthropic-wire provider,
+  # Gemini passthrough) once streamed a rejected request's error body as a 200
+  # event stream of bare JSON. SDKs read that as a stream that ended early and
+  # retried a spent credit balance as if it were transient.
+  @bdd @error-transparency @integration
+  Scenario: A streaming request the provider rejects at once is answered with the provider's status
+    Given the provider account behind "vk-demo" has a depleted credit balance
+    And the provider answers a streaming /v1/messages request with its 400 credit balance error
+    When the client sends that streaming request through the gateway
+    Then the gateway responds 400 with an application/json error body, not a 200 event stream
+    And the body keeps the provider's error type and the governance message
+    And the body carries the error code "provider_account_exhausted" for callers to classify on
+    And the provider's x-should-retry header is forwarded
+
+  @bdd @error-transparency @integration
+  Scenario: A streaming request the provider accepts still streams
+    Given the provider answers a streaming /v1/messages request with a 200 event stream
+    When the client sends that streaming request through the gateway
+    Then the gateway streams the provider's frames unchanged
+
+  # Bindings: services/aigateway/adapters/providers/bifrost_rejected_stream_test.go
+  @bdd @error-transparency @unit
+  Scenario: A rejected stream's error body is reassembled across chunks and bounded
+    Given the provider streams its rejection body in more than one chunk
+    When the gateway reads the rejection
+    Then the error body is the chunks joined in order
+    And a body past 64 KiB is cut at 64 KiB and the rest of the stream is drained
+
+  @bdd @error-transparency @unit
+  Scenario: A plain-text provider error body reaches the client as a JSON error
+    Given the provider refuses a call with HTTP 402 and the plain-text body "Account balance too low."
+    And the provider sent no Content-Type of its own
+    When the gateway forwards the error
+    Then the client receives HTTP 402 with a JSON error envelope
+    And the envelope message is "Account balance too low."
+
+  @bdd @error-transparency @unit
+  Scenario: A governance message survives a plain-text provider error body
+    Given the provider refuses a call with HTTP 402 and a plain-text body
+    And the gateway already set the governance message for account exhaustion
+    When the gateway forwards the error
+    Then the envelope message is the governance message
+    And the provider's billing text is not in the response
 
   # ==========================================================================
   # End-to-end: the real wrapper must fail fast, not retry-loop

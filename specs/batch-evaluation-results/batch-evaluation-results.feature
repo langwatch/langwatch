@@ -6,7 +6,7 @@ Feature: Batch Evaluation Results Visualization
 
   # Many scenarios in this file are bound below to existing JSDOM
   # render tests under
-  # `platform/app/src/components/batch-evaluation-results/__tests__/`:
+  # `[gone] src/components/batch-evaluation-results/__tests__/`:
   #   * BatchEvaluationResultsTable.test.tsx — table rendering +
   #     loading skeleton + empty state + dataset/target columns.
   #   * BatchTargetCell.test.tsx — output display + cost/duration,
@@ -91,6 +91,37 @@ Feature: Batch Evaluation Results Visualization
     Given a saved run holds results for every row of the dataset
     When the results table renders the column header
     Then the header shows the score with no row count beside it
+
+  # A run of some rows holds them at their dataset positions, so rows 10 to 14
+  # arrive as indices 10 to 14. The page keeps rows positional so two runs line
+  # up row for row, but the positions the run holds nothing for are padding,
+  # not rows: counting them made a run of 5 rows report 6, or 15.
+
+  @unit
+  Scenario: A run of some rows counts only the rows it holds
+    Given a run that holds rows 1 to 5 of the dataset
+    When its results are summarised
+    Then the run reports 5 rows
+
+  @unit
+  Scenario: The results table shows only the rows a run holds, under their dataset numbers
+    Given a run that holds rows 0, 2 and 5 of the dataset
+    When the results table is built
+    Then it shows three rows
+    And they keep their dataset positions, so a comparison lines them up row for row
+
+  @integration
+  Scenario: A comparison of runs of some rows shows only the rows some run holds
+    Given two runs that hold only dataset rows 3 and 4 between them
+    When I compare them
+    Then the comparison shows two rows, numbered 4 and 5
+    And each row shows the answers of the runs that hold it
+
+  @unit
+  Scenario: CSV holds only the rows a run holds
+    Given a run that holds rows 1 to 5 of the dataset
+    When I export to CSV
+    Then the CSV has 5 data rows
 
   @unimplemented
   Scenario: Display error state in target cell

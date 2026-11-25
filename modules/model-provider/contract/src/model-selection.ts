@@ -1,0 +1,354 @@
+/** Which models a picker offers, from the providers a project has stored. Pure: consumers fetch. */
+import { isCodexModel, isModelAllowedForFeature } from "./catalog/codex-restrictions.ts";
+import {
+  canonicalModelId,
+  findDecisionModel,
+  isOwnDecisionModelId,
+} from "./catalog/decision-models.ts";
+import { isLatestAlias } from "./catalog/latest-aliases.ts";
+import { allLitellmModels, isChatSurfaceCatalogModel } from "./catalog/model-catalog.ts";
+import type { ModelOption } from "./model-options.ts";
+import { buildCustomModelDisplayNames, modelDisplayLabel } from "./model-provider-display-names.ts";
+import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "./model-provider-registry.ts";
+
+export type ModelOptionGroup = {
+  provider: string;
+  /** The group's heading when it is not the provider's own name. */
+  label?: string;
+  models: ModelOption[];
+};
+
+/**
+ * A model LangWatch serves itself, so a project needs no provider of its own to pick it. Its line
+ * is the catalogue's, unless it sets its own: one id may be offered under two names.
+ */
+export type BuiltInModel = { value: string; label: string; description?: string };
+
+/**
+ * The heading built-in models are listed under. Not "LangWatch": an own decision model in it
+ * runs on the project's provider, which its icon names, as a chat model's does.
+ */
+export const BUILT_IN_MODELS_GROUP_LABEL = "Decision models";
+
+/**
+ * The built-in group's key. A constant, never a model id's prefix: an own-key decision model
+ * reads `openai/decisions:<name>`, and keying on that collided with the provider's own group.
+ */
+export const BUILT_IN_MODELS_GROUP_KEY = "langwatch-built-in";
+
+/**
+ * Whether only a built-in offer can serve this model: the catalogue's own-key decision models,
+ * whose ids carry a provider's prefix that would otherwise vouch for a model the judge can no
+ * longer run. A custom model its owner happened to name `decisions:…` is not one of them.
+ */
+export const isServedOnlyAsBuiltIn = (model: string): boolean => isOwnDecisionModelId(model);
+
+const PROVIDER_NOT_ENABLED_REMEDY =
+  "provider isn't enabled here. Re-add the provider or pick a different model to use it.";
+
+const DECISION_MODEL_WITHDRAWN_REMEDY =
+  "This decision model is no longer available to this project. Pick a different model.";
+
+/**
+ * Why the project cannot run the chosen model, with the remedy that works: re-adding a provider
+ * cannot bring back a decision model the catalogue no longer offers, and that provider may well
+ * be enabled already.
+ */
+export const unavailableModelReason = ({ model }: { model: string }): string =>
+  isServedOnlyAsBuiltIn(model)
+    ? DECISION_MODEL_WITHDRAWN_REMEDY
+    : `${model.split("/")[0] ?? ""} ${PROVIDER_NOT_ENABLED_REMEDY}`;
+
+export type GroupedModelOptions = ModelOptionGroup[];
+
+/**
+ * Fail-closed gate for restricted-provider models (codex today): a picker
+ * only offers them when it declares a licensed `featureKey`. Exported for tests.
+ */
+export const filterRestrictedModels = ({
+  models,
+  featureKey,
+}: {
+  models: string[];
+  featureKey?: string | undefined;
+}): string[] =>
+  models.filter((model) =>
+    featureKey === undefined
+      ? !isCodexModel(model)
+      : isModelAllowedForFeature({ modelId: model, featureKey }),
+  );
+
+const SCOPE_RANK = { PROJECT: 3, TEAM: 2, ORGANIZATION: 1 } as const;
+const scopeRank = (scopeType?: string): number =>
+  SCOPE_RANK[scopeType as keyof typeof SCOPE_RANK] ?? 0;
+
+/**
+ * Provider keys whose registry models in `mode` must not be offered, because the row
+ * `resolveServingRow` actually picks (its scope-collapse winner, not the union of rows) cannot
+ * serve them.
+ */
+export const providersWithoutRegistryModels = (
+  rows: {
+    provider: string;
+    enabled: boolean;
+    scopeType?: string | undefined;
+    embeddingsUnsupported?: boolean | undefined;
+  }[],
+  mode: "chat" | "embedding",
+): Set<string> => {
+  const unavailable = new Set<string>();
+  if (mode !== "embedding") return unavailable;
+
+  const byProvider = new Map<string, typeof rows>();
+  for (const row of rows) {
+    if (!row.enabled) continue;
+    const group = byProvider.get(row.provider);
+    if (group) {
+      group.push(row);
+    } else {
+      byProvider.set(row.provider, [row]);
+    }
+  }
+
+  for (const [provider, group] of byProvider) {
+    const topTier = Math.max(...group.map((r) => scopeRank(r.scopeType)));
+    const contenders = group.filter((r) => scopeRank(r.scopeType) === topTier);
+    if (contenders.some((r) => r.embeddingsUnsupported)) {
+      unavailable.add(provider);
+    }
+  }
+  return unavailable;
+};
+
+/**
+ * A real union by model id: the first row that declares a model wins.
+ * Concatenating instead put one model in the picker twice.
+ */
+const unionCustomModels = <T extends { modelId: string }>(
+  first: readonly T[] | null | undefined,
+  second: readonly T[] | null | undefined,
+): T[] => {
+  const byModelId = new Map<string, T>();
+  for (const model of [...(first ?? []), ...(second ?? [])]) {
+    if (!byModelId.has(model.modelId)) byModelId.set(model.modelId, model);
+  }
+  return [...byModelId.values()];
+};
+
+/**
+ * Adapt the array shape into the legacy `Record<provider, config>` shape
+ * `getCustomModels` expects, merging multi-scope rows (enabled if any is,
+ * custom model lists union).
+ */
+const mergeProviderRowsByKey = (
+  rows: readonly MaybeStoredModelProvider[],
+): Record<string, MaybeStoredModelProvider> => {
+  const byKey: Record<string, MaybeStoredModelProvider> = {};
+  for (const row of rows) {
+    const existing = byKey[row.provider];
+    if (!existing) {
+      byKey[row.provider] = row;
+      continue;
+    }
+    byKey[row.provider] = {
+      ...existing,
+      enabled: existing.enabled || row.enabled,
+      customModels: unionCustomModels(existing.customModels, row.customModels),
+      customEmbeddingsModels: unionCustomModels(
+        existing.customEmbeddingsModels,
+        row.customEmbeddingsModels,
+      ),
+      servedModels: existing.servedModels ?? row.servedModels ?? null,
+    };
+  }
+  return byKey;
+};
+
+/** Custom model ids across every provider row, whether or not the row is enabled. */
+const allCustomModelIds = (
+  providersByKey: Record<string, MaybeStoredModelProvider>,
+  mode: "chat" | "embedding",
+): Set<string> => {
+  const ids = new Set<string>();
+  for (const [providerKey, config] of Object.entries(providersByKey)) {
+    const customList = mode === "chat" ? config.customModels : config.customEmbeddingsModels;
+    for (const model of customList ?? []) ids.add(`${providerKey}/${model.modelId}`);
+  }
+
+  return ids;
+};
+
+/** One group per provider, custom models at the top of each. */
+const groupOptionsByProvider = (selectOptions: ModelOption[]): GroupedModelOptions => {
+  const byProvider: Record<string, ModelOption[]> = {};
+  for (const option of selectOptions) {
+    const provider = option.value.split("/")[0]!;
+    byProvider[provider] ??= [];
+    byProvider[provider].push(option);
+  }
+
+  return Object.entries(byProvider).map(([provider, models]) => ({
+    provider,
+    models: [...models.filter((m) => m.isCustom), ...models.filter((m) => !m.isCustom)],
+  }));
+};
+
+/** Every custom model id an enabled provider declares for this mode. */
+const enabledCustomModelIds = (
+  modelProviders: Record<string, MaybeStoredModelProvider>,
+  mode: "chat" | "embedding",
+): string[] => {
+  const ids: string[] = [];
+  for (const [providerKey, config] of Object.entries(modelProviders)) {
+    if (!config.enabled) continue;
+
+    const customList = mode === "chat" ? config.customModels : config.customEmbeddingsModels;
+    for (const model of customList ?? []) ids.push(`${providerKey}/${model.modelId}`);
+  }
+
+  return ids;
+};
+
+/**
+ * Per provider key, the bare ids its own model list answered with, or none to trust the catalogue.
+ * A list sharing no id with the catalogue names models another way (a proxy's own aliases), so it
+ * proves nothing about which catalogue ids answer and the catalogue is kept.
+ */
+const servedModelSets = (
+  modelProviders: Record<string, MaybeStoredModelProvider>,
+  options: string[],
+): Map<string, Set<string>> => {
+  const sets = new Map<string, Set<string>>();
+  for (const [providerKey, config] of Object.entries(modelProviders)) {
+    if (!config.servedModels?.length) continue;
+    const served = new Set(config.servedModels);
+    const prefix = `${providerKey}/`;
+    const overlaps = options.some(
+      (option) => option.startsWith(prefix) && served.has(option.slice(prefix.length)),
+    );
+    if (overlaps) sets.set(providerKey, served);
+  }
+  return sets;
+};
+
+/** Whether the provider's own model list, when known, carries this registry id. */
+const isServedByProvider = (option: string, served: Map<string, Set<string>>): boolean => {
+  const provider = option.split("/")[0]!;
+  const set = served.get(provider);
+  if (!set || isLatestAlias(option)) return true;
+  return set.has(option.slice(provider.length + 1));
+};
+
+/** Combines registry models (`options`, filtered by `mode`) with custom models, custom first. */
+export const getCustomModels = (
+  modelProviders: Record<string, MaybeStoredModelProvider>,
+  options: string[],
+  mode: "chat" | "embedding" = "chat",
+): string[] => {
+  const customModelIds = enabledCustomModelIds(modelProviders, mode);
+  const registryModelIds: string[] = [];
+  const customSet = new Set(customModelIds);
+  const served = servedModelSets(modelProviders, options);
+
+  // Include registry models from enabled providers, filtered by mode
+  for (const option of options) {
+    const provider = option.split("/")[0]!;
+    if (!modelProviders[provider]?.enabled) continue;
+
+    const registryMode = allLitellmModels[option]?.mode;
+    if (registryMode && registryMode !== mode) continue;
+    if (mode === "chat" && !isChatSurfaceCatalogModel(option)) continue;
+    if (!isServedByProvider(option, served)) continue;
+
+    // Skip if already added as a custom model (same ID)
+    if (customSet.has(option)) continue;
+
+    registryModelIds.push(option);
+  }
+
+  return [...customModelIds, ...registryModelIds];
+};
+
+/**
+ * The picker's options for `mode`, flat and grouped by provider, custom models first.
+ * Built-in models come before every provider's, under their own heading.
+ */
+export function modelSelectionFrom({
+  providers,
+  options,
+  mode,
+  featureKey,
+  builtInModels = [],
+}: {
+  providers: readonly MaybeStoredModelProvider[];
+  options: string[];
+  mode: "chat" | "embedding";
+  featureKey: string | undefined;
+  builtInModels?: readonly BuiltInModel[];
+}): { selectOptions: ModelOption[]; groupedByProvider: GroupedModelOptions } {
+  const providersByKey = mergeProviderRowsByKey(providers);
+  const customModelIdSet = allCustomModelIds(providersByKey, mode);
+  // Gemini's Agent Platform door serves chat but not embeddings (404 on :batchEmbedContents),
+  // so registry embedding models are dropped; explicit custom models stay.
+  const withoutRegistryModels = providersWithoutRegistryModels([...providers], mode);
+  const allModels = filterRestrictedModels({
+    models: getCustomModels(providersByKey, options, mode),
+    featureKey,
+  }).filter(
+    (model) => customModelIdSet.has(model) || !withoutRegistryModels.has(model.split("/")[0]!),
+  );
+  const displayNames = buildCustomModelDisplayNames([...providers]);
+  const selectOptions: ModelOption[] = allModels.map((modelValue) => ({
+    label: modelDisplayLabel({ fullModelId: modelValue, displayNames }),
+    value: modelValue,
+    isDisabled: false,
+    mode,
+    isCustom: customModelIdSet.has(modelValue),
+  }));
+  // A decision model's line, and a shorter row title where it has one, come from the catalogue.
+  const builtInOptions: ModelOption[] = builtInModels.map(({ value, label, description }) => {
+    const entry = findDecisionModel(value);
+    const subtitle = description ?? entry?.description;
+    return {
+      label: entry?.pickerLabel ?? label,
+      value,
+      isDisabled: false,
+      mode,
+      isBuiltIn: true,
+      ...(subtitle ? { subtitle } : {}),
+    };
+  });
+  const builtInGroups: GroupedModelOptions =
+    builtInOptions.length === 0
+      ? []
+      : [
+          {
+            provider: BUILT_IN_MODELS_GROUP_KEY,
+            label: BUILT_IN_MODELS_GROUP_LABEL,
+            models: builtInOptions,
+          },
+        ];
+  return {
+    selectOptions: [...builtInOptions, ...selectOptions],
+    groupedByProvider: [...builtInGroups, ...groupOptionsByProvider(selectOptions)],
+  };
+}
+
+/**
+ * The options a stored model selects, best first: the one with its exact id, then the ones it reads
+ * as (a legacy LangWatch id, ADR-182). Exact first, so two names on related ids stay apart.
+ */
+export function findSelectedOptions<T extends { value: string }>({
+  options,
+  model,
+}: {
+  options: readonly T[];
+  model: string;
+}): T[] {
+  const canonical = canonicalModelId(model);
+  const exact = options.filter((option) => option.value === model);
+  const read = options.filter(
+    (option) => option.value !== model && canonicalModelId(option.value) === canonical,
+  );
+  return [...exact, ...read];
+}

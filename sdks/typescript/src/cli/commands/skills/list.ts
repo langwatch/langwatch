@@ -3,9 +3,11 @@
  * installed state at the target root (default ~/.agents).
  */
 import * as fs from "node:fs";
+
 import chalk from "chalk";
-import { printResult, type RawOutputFlags } from "../../utils/output";
+
 import { formatTable } from "../../utils/formatting";
+import { printResult, type RawOutputFlags } from "../../utils/output";
 import {
   resolveSkillsRoot,
   skillFilePath,
@@ -18,9 +20,7 @@ export interface SkillsListOptions extends RawOutputFlags {
   dir?: string;
 }
 
-export const skillsListCommand = async (
-  options: SkillsListOptions = {},
-): Promise<void> => {
+export const skillsListCommand = async (options: SkillsListOptions = {}): Promise<void> => {
   const root = resolveSkillsRoot(options.dir);
   const skills = SKILLS_BUNDLE.map((skill) => ({
     slug: skill.isRecipe ? `recipes/${skill.slug}` : skill.slug,
@@ -42,9 +42,7 @@ export const skillsListCommand = async (
           headers: ["SLUG", "INSTALLED", "DESCRIPTION"],
           colorMap: { SLUG: chalk.cyan },
         });
-        console.log(
-          chalk.gray(`\nInstall root: ${root} (bundle v${SKILLS_BUNDLE_VERSION})`),
-        );
+        console.log(chalk.gray(`\nInstall root: ${root} (bundle v${SKILLS_BUNDLE_VERSION})`));
       },
     },
   );

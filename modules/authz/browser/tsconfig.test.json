@@ -1,0 +1,47 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
+  },
+  "include": [
+    "src/**/__tests__/**/*.ts",
+    "src/**/__mocks__/**/*.ts",
+    "src/**/tests/**/*.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.*.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.*.ts",
+    "src/**/*.stories.ts",
+    "src/**/*.stories.*.ts",
+    "src/**/*.bench.ts",
+    "src/**/*.bench.*.ts",
+    "src/**/__bench__/**/*.ts",
+    "src/**/testing.ts",
+    "src/**/__tests__/**/*.tsx",
+    "src/**/__mocks__/**/*.tsx",
+    "src/**/tests/**/*.tsx",
+    "src/**/*.test.tsx",
+    "src/**/*.test.*.tsx",
+    "src/**/*.spec.tsx",
+    "src/**/*.spec.*.tsx",
+    "src/**/*.stories.tsx",
+    "src/**/*.stories.*.tsx",
+    "src/**/*.bench.tsx",
+    "src/**/*.bench.*.tsx",
+    "src/**/__bench__/**/*.tsx",
+    "src/**/testing.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "vitest.setup.ts"
+  ],
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/billing/client/tsconfig.build.json"
+    }
+  ]
+}

@@ -3,8 +3,12 @@ import { describe, it, expect, vi } from "vitest";
 import {
   GovernanceCliError,
   SESSION_EXPIRED_MESSAGE,
+  adminListIngestionTemplates,
+  archiveIngestionTemplate,
   cloneIngestionTemplateFromPlatform,
   getBudgetOverview,
+  getIngestionTemplate,
+  managementCredentialsOrRefusal,
   getCliBootstrap,
   getEventsForSource,
   getGovernanceStatus,
@@ -18,6 +22,13 @@ const baseCfg = (token: string | undefined = "at_x"): GovernanceConfig => ({
   gateway_url: "http://gw.example",
   control_plane_url: "http://app.example",
   access_token: token,
+});
+
+/** A device login's key, acting in its personal project, as the management door takes it. */
+const loginKeyCredentials = async () => ({
+  apiKey: "sk-lw-lookup_secret",
+  endpoint: "http://app.example",
+  projectId: "project_personal",
 });
 
 const ok = (body: unknown): Response =>
@@ -38,18 +49,19 @@ interface SeenCall {
   acceptHeader: string | undefined;
 }
 
+function requestUrl(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
 function spyFetch(response: Response): {
   fetchImpl: typeof fetch;
   seen: SeenCall[];
 } {
   const seen: SeenCall[] = [];
   const fetchImpl: typeof fetch = async (input, init) => {
-    const url =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
+    const url = requestUrl(input);
     const headers = (init?.headers ?? {}) as Record<string, string>;
     seen.push({
       url,
@@ -69,9 +81,7 @@ describe("cli-api — auth contract", () => {
         ...baseCfg(),
         access_token: undefined,
       };
-      await expect(
-        listIngestionSources(cfgNoToken, { fetchImpl }),
-      ).rejects.toMatchObject({
+      await expect(listIngestionSources(cfgNoToken, { fetchImpl })).rejects.toMatchObject({
         name: "GovernanceCliError",
         status: 401,
         code: "not_logged_in",
@@ -88,14 +98,34 @@ describe("cli-api — auth contract", () => {
       // `status` control-flow surface is unchanged; the CLI's composed
       // re-login message is reused verbatim.
       const { fetchImpl } = spyFetch(status(401, { error: "unauthorized" }));
-      await expect(
-        getGovernanceStatus(baseCfg(), { fetchImpl }),
-      ).rejects.toMatchObject({
+      await expect(getGovernanceStatus(baseCfg(), { fetchImpl })).rejects.toMatchObject({
         name: "LangWatchHandledError",
         status: 401,
         code: "unauthorized",
         message: SESSION_EXPIRED_MESSAGE,
       });
+    });
+  });
+
+  describe("when the server answers 402 with the plan refusal", () => {
+    /** @scenario "CLI surfaces the upgrade URL in stderr on 402" */
+    it("names the plan in the message and puts the upgrade URL on its own line", async () => {
+      const { fetchImpl } = spyFetch(
+        status(402, {
+          error: "payment_required",
+          error_description: "Ingestion sources require an Enterprise plan",
+          upgrade_url: "https://app.test/settings/subscription",
+        }),
+      );
+      const failure = await listIngestionSources(baseCfg(), { fetchImpl }).then(
+        () => {
+          throw new Error("expected the listing to be refused");
+        },
+        (error: unknown) => error as { status: number; code: string; message: string },
+      );
+      expect(failure).toMatchObject({ status: 402, code: "payment_required" });
+      expect(failure.message).toContain("Ingestion sources require an Enterprise plan");
+      expect(failure.message.split("\n")).toContain("    https://app.test/settings/subscription");
     });
   });
 
@@ -129,15 +159,10 @@ describe("cli-api — auth contract", () => {
 
     it("refreshes and retries once, so the caller never sees the 401", async () => {
       const cfg = { ...baseCfg("at_old"), refresh_token: "rt_old" };
-      const responses = [
-        status(401, { error: "unauthorized" }),
-        ok({ hasPersonalVKs: true }),
-      ];
+      const responses = [status(401, { error: "unauthorized" }), ok({ hasPersonalVKs: true })];
       const authHeaders: (string | undefined)[] = [];
       const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
-        authHeaders.push(
-          (init?.headers as Record<string, string> | undefined)?.Authorization,
-        );
+        authHeaders.push((init?.headers as Record<string, string> | undefined)?.Authorization);
         return responses.shift()!;
       }) as unknown as typeof fetch;
 
@@ -203,9 +228,7 @@ describe("cli-api — auth contract", () => {
           error_description: "IngestionSource not found",
         }),
       );
-      await expect(
-        getSourceHealth(baseCfg(), "missing-id", { fetchImpl }),
-      ).rejects.toMatchObject({
+      await expect(getSourceHealth(baseCfg(), "missing-id", { fetchImpl })).rejects.toMatchObject({
         name: "LangWatchHandledError",
         status: 404,
         code: "not_found",
@@ -218,9 +241,7 @@ describe("cli-api — auth contract", () => {
       // own generic GovernanceCliError — still handled-error-shaped for the
       // render pipeline, but the CLI's fallback rather than a server-named one.
       const { fetchImpl } = spyFetch(status(404));
-      await expect(
-        getSourceHealth(baseCfg(), "missing-id", { fetchImpl }),
-      ).rejects.toMatchObject({
+      await expect(getSourceHealth(baseCfg(), "missing-id", { fetchImpl })).rejects.toMatchObject({
         name: "GovernanceCliError",
         status: 404,
         code: "not_found",
@@ -232,9 +253,7 @@ describe("cli-api — auth contract", () => {
   describe("when the server returns 5xx", () => {
     it("throws with the status code in the message", async () => {
       const { fetchImpl } = spyFetch(status(503, "service unavailable"));
-      const err = await getGovernanceStatus(baseCfg(), { fetchImpl }).catch(
-        (e: unknown) => e,
-      );
+      const err = await getGovernanceStatus(baseCfg(), { fetchImpl }).catch((e: unknown) => e);
       expect(err).toBeInstanceOf(GovernanceCliError);
       expect((err as GovernanceCliError).status).toBe(503);
       expect((err as GovernanceCliError).message).toContain("503");
@@ -243,14 +262,12 @@ describe("cli-api — auth contract", () => {
 });
 
 describe("cli-api — request shape", () => {
-  describe("listIngestionSources", () => {
+  describe("listIngestionSources()", () => {
     it("hits /api/auth/cli/governance/ingest/sources without query params by default", async () => {
       const { fetchImpl, seen } = spyFetch(ok({ sources: [] }));
       await listIngestionSources(baseCfg(), { fetchImpl });
       expect(seen).toHaveLength(1);
-      expect(seen[0]!.url).toBe(
-        "http://app.example/api/auth/cli/governance/ingest/sources",
-      );
+      expect(seen[0]!.url).toBe("http://app.example/api/auth/cli/governance/ingest/sources");
     });
 
     it("appends ?include_archived=1 when includeArchived is set", async () => {
@@ -295,13 +312,11 @@ describe("cli-api — request shape", () => {
         { ...baseCfg(), control_plane_url: "http://app.example/" },
         { fetchImpl },
       );
-      expect(seen[0]!.url).toBe(
-        "http://app.example/api/auth/cli/governance/ingest/sources",
-      );
+      expect(seen[0]!.url).toBe("http://app.example/api/auth/cli/governance/ingest/sources");
     });
   });
 
-  describe("getEventsForSource", () => {
+  describe("getEventsForSource()", () => {
     it("URL-encodes the sourceId in the path", async () => {
       const { fetchImpl, seen } = spyFetch(ok({ events: [] }));
       await getEventsForSource(baseCfg(), "src/with spaces", { fetchImpl });
@@ -353,7 +368,7 @@ describe("cli-api — request shape", () => {
     });
   });
 
-  describe("getSourceHealth", () => {
+  describe("getSourceHealth()", () => {
     it("hits the /:id/health endpoint and returns the {source, health} envelope verbatim", async () => {
       const fixture = {
         source: { id: "src-1", name: "Source 1", status: "active" },
@@ -373,7 +388,7 @@ describe("cli-api — request shape", () => {
     });
   });
 
-  describe("getGovernanceStatus", () => {
+  describe("getGovernanceStatus()", () => {
     it("hits /governance/status and returns the {setup} envelope", async () => {
       const fixture = {
         setup: {
@@ -387,14 +402,12 @@ describe("cli-api — request shape", () => {
       };
       const { fetchImpl, seen } = spyFetch(ok(fixture));
       const out = await getGovernanceStatus(baseCfg(), { fetchImpl });
-      expect(seen[0]!.url).toBe(
-        "http://app.example/api/auth/cli/governance/status",
-      );
+      expect(seen[0]!.url).toBe("http://app.example/api/auth/cli/governance/status");
       expect(out).toEqual(fixture);
     });
   });
 
-  describe("getCliBootstrap", () => {
+  describe("getCliBootstrap()", () => {
     it("hits /api/auth/cli/bootstrap and returns the {tools, providers, budget} payload", async () => {
       const fixture = {
         tools: [
@@ -419,25 +432,19 @@ describe("cli-api — request shape", () => {
     });
 
     it("returns null on 404 — graceful degrade for older self-hosters without the REST adapter", async () => {
-      const { fetchImpl } = spyFetch(
-        status(404, { error_description: "Not found" }),
-      );
+      const { fetchImpl } = spyFetch(status(404, { error_description: "Not found" }));
       const out = await getCliBootstrap(baseCfg(), { fetchImpl });
       expect(out).toBeNull();
     });
 
     it("propagates 401 unauthorized errors so the caller can surface a re-login hint", async () => {
       const { fetchImpl } = spyFetch(status(401));
-      await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(
-        GovernanceCliError,
-      );
+      await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(GovernanceCliError);
     });
 
     it("propagates 5xx errors with the status in the message", async () => {
       const { fetchImpl } = spyFetch(status(500, { msg: "boom" }));
-      await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(
-        /500/,
-      );
+      await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(/500/);
     });
   });
   describe("when the caller sets a request timeout", () => {
@@ -452,9 +459,9 @@ describe("cli-api — request shape", () => {
           );
         });
 
-      await expect(
-        getBudgetOverview(baseCfg(), { fetchImpl, timeoutMs: 20 }),
-      ).rejects.toThrow(/abort/i);
+      await expect(getBudgetOverview(baseCfg(), { fetchImpl, timeoutMs: 20 })).rejects.toThrow(
+        /abort/i,
+      );
     });
 
     it("passes no signal when the caller sets no timeout", async () => {
@@ -468,19 +475,16 @@ describe("cli-api — request shape", () => {
       expect(sawSignal).toBeUndefined();
     });
   });
-  describe("ingestion-templates clone-from-platform", () => {
+  describe("when cloning an ingestion template from the platform", () => {
     /**
-     * The command posted to `/ingestion-templates/clone-from-platform`. The
-     * route is `/ingestion-templates/clone`, which is also what the spec and
-     * the governance guide document, so the command 404'd every time it ran.
-     *
-     * The stub answers 404 for any path the app does not register, so a caller
-     * reaching for one fails here the way it failed in production.
+     * The command posted to `/ingestion-templates/clone-from-platform`. The route is
+     * `/ingestion-templates/clone`, which is also what the spec and the governance guide
+     * document, so the command 404'd every time it ran.
      */
     const REGISTERED_TEMPLATE_PATHS = new Set([
-      "/api/governance/ingestion-templates",
-      "/api/governance/ingestion-templates/admin",
-      "/api/governance/ingestion-templates/clone",
+      "/api/v1/governance/ingestion-templates",
+      "/api/v1/governance/ingestion-templates/admin",
+      "/api/v1/governance/ingestion-templates/clone",
     ]);
 
     const onlyRealRoutes = (): {
@@ -489,12 +493,7 @@ describe("cli-api — request shape", () => {
     } => {
       const seen: SeenCall[] = [];
       const fetchImpl: typeof fetch = async (input, init) => {
-        const url =
-          typeof input === "string"
-            ? input
-            : input instanceof URL
-              ? input.toString()
-              : input.url;
+        const url = requestUrl(input);
         const headers = (init?.headers ?? {}) as Record<string, string>;
         seen.push({
           url,
@@ -513,16 +512,135 @@ describe("cli-api — request shape", () => {
     it("posts to the route the app actually serves", async () => {
       const { fetchImpl, seen } = onlyRealRoutes();
 
-      const out = await cloneIngestionTemplateFromPlatform(
-        baseCfg(),
-        "tpl_platform",
-        { fetchImpl },
-      );
+      const out = await cloneIngestionTemplateFromPlatform("tpl_platform", {
+        fetchImpl,
+        managementCredentials: loginKeyCredentials,
+      });
 
-      expect(seen[0]!.url).toBe(
-        "http://app.example/api/governance/ingestion-templates/clone",
-      );
+      expect(seen[0]!.url).toBe("http://app.example/api/v1/governance/ingestion-templates/clone");
       expect(out).toEqual({ id: "tpl_new" });
+    });
+  });
+});
+
+describe("cli-api — ingestion template answers", () => {
+  /** One row as the admin route answers it (`ingestionTemplateDtoSchema`). */
+  const templateRow = (id: string) => ({
+    id,
+    slug: `${id}-slug`,
+    source_type: "otel_generic",
+    display_name: `Template ${id}`,
+    description: null,
+    icon_asset: null,
+    credential_schema: null,
+    ottl_rules: 'set(attributes["x"], 1)',
+    platform_published: false,
+    enabled: true,
+    organization_id: "org_1",
+  });
+
+  /** The management door: an API key acting in a project, never the device access token. */
+  const managementDoor = (answer: unknown) => {
+    const seen: { url: string; authorization?: string }[] = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      seen.push({ url: requestUrl(input), authorization: headers.authorization });
+      const isProjectScopedKey =
+        headers.authorization ===
+        `Basic ${Buffer.from("project_personal:sk-lw-lookup_secret").toString("base64")}`;
+      return isProjectScopedKey ? ok(answer) : status(401, { error: "invalid_credentials" });
+    };
+    return { fetchImpl, seen };
+  };
+
+  describe("when reading one template", () => {
+    /** @scenario "Template commands sign in with the login key in its project" */
+    it("sends the login key in its project, never the device access token", async () => {
+      const { fetchImpl, seen } = managementDoor({ ingestion_template: templateRow("tpl_a") });
+
+      const row = await getIngestionTemplate("tpl_a", {
+        fetchImpl,
+        managementCredentials: loginKeyCredentials,
+      });
+
+      expect(row.id).toBe("tpl_a");
+      expect(seen[0]!.authorization).toBe(
+        `Basic ${Buffer.from("project_personal:sk-lw-lookup_secret").toString("base64")}`,
+      );
+    });
+  });
+
+  describe("when the admin list route answers with two templates", () => {
+    /** @scenario "Listing templates as an admin returns every row the app answers with" */
+    it("returns both rows, asked with the login key in its project", async () => {
+      const { fetchImpl, seen } = managementDoor({
+        data: [templateRow("tpl_a"), templateRow("tpl_b")],
+      });
+
+      const rows = await adminListIngestionTemplates({
+        fetchImpl,
+        managementCredentials: loginKeyCredentials,
+      });
+
+      expect(seen[0]!.url).toBe("http://app.example/api/v1/governance/ingestion-templates/admin");
+      expect(rows.map((row) => row.id)).toEqual(["tpl_a", "tpl_b"]);
+    });
+  });
+
+  describe("when archiving an org-authored template", () => {
+    /** @scenario "Archiving a template reads the answer the app sends" */
+    it("returns the archived answer", async () => {
+      const { fetchImpl } = managementDoor({ archived: true });
+
+      const answer = await archiveIngestionTemplate("tpl_a", {
+        fetchImpl,
+        managementCredentials: loginKeyCredentials,
+      });
+
+      expect(answer).toEqual({ archived: true });
+    });
+  });
+
+  describe("when the login cannot act in a project", () => {
+    const credentials = {
+      apiKey: "sk-lw-lookup_secret",
+      endpoint: "http://app.example",
+      projectId: "project_personal",
+    };
+
+    it("names the other address when the login belongs to one", () => {
+      expect(() =>
+        managementCredentialsOrRefusal({
+          elsewhere: { loginEndpoint: "http://a.example", endpoint: "http://b.example" },
+          credentials,
+          isSignedIn: true,
+        }),
+      ).toThrow(
+        expect.objectContaining({
+          code: "login_endpoint_mismatch",
+          message: expect.stringContaining("http://a.example"),
+        }),
+      );
+    });
+
+    it("says a signed-in login holds no login key, rather than not logged in", () => {
+      expect(() =>
+        managementCredentialsOrRefusal({
+          elsewhere: undefined,
+          credentials: undefined,
+          isSignedIn: true,
+        }),
+      ).toThrow(expect.objectContaining({ message: expect.stringContaining("no login key") }));
+    });
+
+    it("refuses a login key with no project instead of reading LANGWATCH_PROJECT_ID", () => {
+      expect(() =>
+        managementCredentialsOrRefusal({
+          elsewhere: undefined,
+          credentials: { ...credentials, projectId: undefined },
+          isSignedIn: true,
+        }),
+      ).toThrow(expect.objectContaining({ code: "personal_project_unknown" }));
     });
   });
 });

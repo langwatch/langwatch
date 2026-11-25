@@ -1,0 +1,71 @@
+import type { Named } from "@langwatch/module";
+import {
+  planDispatchCeilingsShape,
+  planPricesShape,
+  planSeatsAndVolumeShape,
+} from "@langwatch/plans";
+import { z } from "zod";
+
+export const planSourceSchema = z.enum(["license", "subscription", "free"]);
+
+const moneyByCurrencySchemaDefinition = z.object({
+  USD: z.number(),
+  EUR: z.number(),
+});
+export interface MoneyByCurrencySchema extends Named<typeof moneyByCurrencySchemaDefinition> {}
+export const moneyByCurrencySchema: MoneyByCurrencySchema = moneyByCurrencySchemaDefinition;
+
+/**
+ * An organization that fell to Free by cancelling or by an unpaid renewal while holding more
+ * members than Free allows: traces it records from `sinceMs` on are stored but withheld.
+ */
+const overPlanSchemaDefinition = z.object({
+  sinceMs: z.number().int(),
+  members: z.number().int().nonnegative(),
+  maxMembers: z.number().int().nonnegative(),
+});
+export interface OverPlanSchema extends Named<typeof overPlanSchemaDefinition> {}
+export const overPlanSchema: OverPlanSchema = overPlanSchemaDefinition;
+export type OverPlan = z.infer<typeof overPlanSchema>;
+
+const planSchemaDefinition = z.object({
+  planSource: planSourceSchema,
+  type: z.string(),
+  name: z.string(),
+  free: z.boolean(),
+  visibilityDays: z.number().nullable().optional(),
+  /** Set while over plan (specs/billing/over-plan-trace-withholding.feature). */
+  overPlan: overPlanSchema.nullable().optional(),
+  /** True while a failed payment is unpaid and before the pause: no new members or seats. */
+  additionsHeldForPayment: z.boolean().optional(),
+  /** True while a failed payment is unpaid, before or after the pause; its banner comes first. */
+  paymentFailed: z.boolean().optional(),
+  trialDays: z.number().optional(),
+  daysSinceCreation: z.number().optional(),
+  overrideAddingLimitations: z.boolean().optional(),
+  ...planSeatsAndVolumeShape,
+  /** Cloud Free creation caps; absent means uncapped (plan-creation-caps.ts). */
+  maxScenarios: z.number().optional(),
+  maxScenarioSets: z.number().optional(),
+  maxEvaluators: z.number().optional(),
+  webhookEndpointsEnabled: z.boolean().optional(),
+  ...planDispatchCeilingsShape,
+  usageUnit: z.string().optional(),
+  ...planPricesShape,
+});
+export interface PlanSchema extends Named<typeof planSchemaDefinition> {}
+export const planSchema: PlanSchema = planSchemaDefinition;
+
+export type PlanSource = z.infer<typeof planSourceSchema>;
+export type MoneyByCurrency = z.infer<typeof moneyByCurrencySchema>;
+export type Plan = z.infer<typeof planSchema>;
+
+/** Compatibility name while existing consumers migrate to `Plan`. */
+export type PlanInfo = Plan;
+
+/**
+ * How an organization is billed, restated from the Postgres enum
+ * `PricingModel`: a portable contract cannot depend on the generated client.
+ */
+export const PricingModel = { TIERED: "TIERED", SEAT_EVENT: "SEAT_EVENT" } as const;
+export type PricingModel = (typeof PricingModel)[keyof typeof PricingModel];

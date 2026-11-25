@@ -8,7 +8,7 @@ keywords: vercel ai sdk, langwatch, tracing, observability, vercel, ai, sdk
 import TypeScriptIntro from "/snippets/typescript-intro.mdx";
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
 <TypeScriptIntro />
@@ -31,12 +31,13 @@ yarn add langwatch ai @ai-sdk/openai
 ```bash bun
 bun add langwatch ai @ai-sdk/openai
 ```
+
 </CodeGroup>
 
 ## Usage
 
 <Info>
-The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+  The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
 </Info>
 
 Set up observability and enable telemetry on your Vercel AI SDK calls:
@@ -50,7 +51,7 @@ setupObservability({ serviceName: "<project_name>" });
 
 async function main(message: string): Promise<string> {
   const response = await generateText({
-    model: openai("gpt-5-mini"),
+    model: openai("gpt-6-luna"),
     prompt: message,
     experimental_telemetry: { isEnabled: true },
   });
@@ -67,18 +68,18 @@ The Vercel AI SDK automatically sends traces to LangWatch when `experimental_tel
 Pass `experimental_telemetry.metadata` to tag the call. LangWatch reads these
 keys from it:
 
-| Key | What it does |
-|---|---|
-| `labels` | An array of labels. Filter the trace list by them. |
-| `thread_id` | Groups the call into a conversation with every other call that sends the same id. |
-| `user_id` | The end user the call belongs to. |
-| `customer_id` | The customer or tenant the call belongs to. |
+| Key           | What it does                                                                      |
+| ------------- | --------------------------------------------------------------------------------- |
+| `labels`      | An array of labels. Filter the trace list by them.                                |
+| `thread_id`   | Groups the call into a conversation with every other call that sends the same id. |
+| `user_id`     | The end user the call belongs to.                                                 |
+| `customer_id` | The customer or tenant the call belongs to.                                       |
 
 Any other key becomes custom metadata on the trace, filterable by its own name.
 
 ```typescript
 const response = await generateText({
-  model: openai("gpt-5-mini"),
+  model: openai("gpt-6-luna"),
   prompt: message,
   experimental_telemetry: {
     isEnabled: true,
@@ -104,6 +105,12 @@ span attribute wins over the one you pass here. Labels are the exception: the
 two sets are combined, so the trace keeps both. See
 [Capturing Metadata and Attributes](/integration/typescript/tutorials/capturing-metadata)
 for the attribute names.
+
+## Check it worked
+
+Run the example. The SDK flushes pending spans when the process exits. Then open your project in LangWatch: a new trace appears in the traces list within a few seconds. Open it to see the `generateText` call and its model request as spans.
+
+If no trace appears, check that `LANGWATCH_API_KEY` is set in the environment the process runs in.
 
 ## Related
 

@@ -1,18 +1,15 @@
-import chalk from "chalk";
 import fs from "fs";
+
+import chalk from "chalk";
+
 import {
   OrganizationApiService,
   type InviteInput,
 } from "@/client-sdk/services/organization/organization-api.service";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { formatTable } from "../../utils/formatting";
-import {
-  composeInvitesFromFlags,
-  parseInvitesJson,
-} from "../../utils/managementInvites";
+import { composeInvitesFromFlags, parseInvitesJson } from "../../utils/managementInvites";
 import type { CommandResult } from "../../utils/output";
 import { counted, runManagement, withParsedFlags } from "../management/_shared";
 
@@ -34,24 +31,17 @@ const readStdin = (): Promise<string> =>
   });
 
 /**
- * The batch the caller described, whichever way they described it.
- *
- * Repeated flags are the ergonomic form for the common case (a few people onto
- * the same teams); the JSON forms carry per-person team assignments and custom
- * roles. Both produce the same request, so a run that started as flags can be
- * captured as JSON without changing what happens.
+ * The batch the caller described, whichever way they described it. Repeated
+ * flags suit the common case; JSON carries per-person teams and custom
+ * roles. Both produce the same request, so flags and JSON are interchangeable.
  */
-const resolveInvites = async (
-  options: CreateInvitesOptions,
-): Promise<InviteInput[]> => {
+const resolveInvites = async (options: CreateInvitesOptions): Promise<InviteInput[]> => {
   const jsonSources = [options.json, options.file, options.readFromStdin].filter(
     (source) => source !== undefined && source !== false,
   );
   if (jsonSources.length > 1) {
     reportCommandError({
-      error: commandValidationError(
-        "Pass only one of --json, --file or --stdin.",
-      ),
+      error: commandValidationError("Pass only one of --json, --file or --stdin."),
     });
     process.exit(1);
   }
@@ -106,9 +96,7 @@ export const createInvitesCommand = async (
       if (result.invites.some((invite) => invite.emailNotSent)) {
         console.log();
         console.log(
-          chalk.yellow(
-            "Some invite emails could not be sent. Share the links above directly.",
-          ),
+          chalk.yellow("Some invite emails could not be sent. Share the links above directly."),
         );
       }
       console.log();

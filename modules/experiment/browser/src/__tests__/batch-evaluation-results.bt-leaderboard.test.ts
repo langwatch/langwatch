@@ -1,0 +1,475 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  computeBTLeaderboard,
+  type PairwiseComparison,
+} from "../model/batch-evaluation-results.bt-leaderboard.ts";
+
+/**
+ * Build a comparisons list where `winner` beat each `loser` once. Helper
+ * keeps the fixture code below readable.
+ */
+const wins = (winner: string, losers: string[], times = 1): PairwiseComparison[] => {
+  const out: PairwiseComparison[] = [];
+  for (let k = 0; k < times; k++) {
+    for (const l of losers) {
+      out.push({ candidates: [winner, l], winner });
+    }
+  }
+  return out;
+};
+
+const ties = (a: string, b: string, times = 1): PairwiseComparison[] => {
+  const out: PairwiseComparison[] = [];
+  for (let k = 0; k < times; k++) out.push({ candidates: [a, b], winner: "tie" });
+  return out;
+};
+
+/** Largest |actual − expected| / |expected| across two equally long lists. */
+const largestRelativeGap = (actual: number[], expected: number[]): number => {
+  if (actual.length !== expected.length) return Infinity;
+  return Math.max(
+    ...actual.map((value, i) => Math.abs(value - expected[i]!) / Math.abs(expected[i]!)),
+  );
+};
+
+describe("computeBTLeaderboard", () => {
+  it("returns empty leaderboard for empty input", () => {
+    const result = computeBTLeaderboard({
+      comparisons: [],
+      variantIds: [],
+    });
+    expect(result.entries).toEqual([]);
+    expect(result.comparisonCount).toBe(0);
+    expect(result.hasDegenerate).toBe(false);
+    // Nothing was fitted, so nothing converged and nothing was placed on one
+    // scale. The trust panel draws both of these as ticks, and a run holding
+    // no comparisons must not be told "Ranking settled" and "Everything is on
+    // one scale" — green because nothing was checked is the failure that
+    // panel exists to prevent.
+    expect(result.didConverge).toBe(false);
+    expect(result.comparability.identifiable).toBe(false);
+  });
+
+  /** @scenario "The compact card ranks variants by Bradley-Terry score" */
+  it("ranks three variants by transitive dominance (no degenerate)", () => {
+    // A clearly > B > C, with cross-pair evidence on every edge.
+    const data: PairwiseComparison[] = [
+      ...wins("A", ["B"], 7),
+      ...wins("B", ["A"], 3),
+      ...wins("B", ["C"], 7),
+      ...wins("C", ["B"], 3),
+      ...wins("A", ["C"], 8),
+      ...wins("C", ["A"], 2),
+    ];
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B", "C"],
+      bootstrapSamples: 0,
+    });
+
+    expect(result.hasDegenerate).toBe(false);
+    expect(result.didConverge).toBe(true);
+    const ranked = result.entries.map((e) => e.variantId);
+    expect(ranked).toEqual(["A", "B", "C"]);
+
+    const scoreA = result.entries[0]!.score;
+    const scoreB = result.entries[1]!.score;
+    const scoreC = result.entries[2]!.score;
+    expect(scoreA).toBeGreaterThan(scoreB);
+    expect(scoreB).toBeGreaterThan(scoreC);
+  });
+
+  it("scores two evenly-matched variants near zero (symmetry)", () => {
+    const data: PairwiseComparison[] = [...wins("A", ["B"], 50), ...wins("B", ["A"], 50)];
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B"],
+      bootstrapSamples: 0,
+    });
+    expect(result.entries[0]!.score).toBeCloseTo(0, 6);
+    expect(result.entries[1]!.score).toBeCloseTo(0, 6);
+    expect(result.entries[0]!.strength).toBeCloseTo(1, 6);
+  });
+
+  /** @scenario "Ties count as half a win and half a loss" */
+  it("treats ties as 0.5 win + 0.5 loss (LMSYS convention)", () => {
+    // Pure ties between A and B → identical scores, half-wins recorded.
+    const result = computeBTLeaderboard({
+      comparisons: ties("A", "B", 20),
+      variantIds: ["A", "B"],
+      bootstrapSamples: 0,
+    });
+    expect(result.entries[0]!.wins).toBe(10);
+    expect(result.entries[0]!.losses).toBe(10);
+    expect(result.entries[0]!.winRate).toBe(0.5);
+    expect(result.entries[0]!.score).toBeCloseTo(0, 6);
+    expect(result.entries[1]!.score).toBeCloseTo(0, 6);
+    // Tie weight present in the matrix.
+    expect(result.winMatrix.A!.B).toBe(10);
+    expect(result.winMatrix.B!.A).toBe(10);
+  });
+
+  /** @scenario "A variant that always wins is flagged, not left to break the math" */
+  it("flags variants with no losses as degenerate and still ranks them", () => {
+    // A wins every match against B and C; no upsets.
+    const data: PairwiseComparison[] = [
+      ...wins("A", ["B"], 5),
+      ...wins("A", ["C"], 5),
+      ...wins("B", ["C"], 3),
+      ...wins("C", ["B"], 2),
+    ];
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B", "C"],
+      bootstrapSamples: 0,
+    });
+    expect(result.hasDegenerate).toBe(true);
+    const aEntry = result.entries.find((e) => e.variantId === "A")!;
+    expect(aEntry.isDegenerate).toBe(true);
+    expect(aEntry.losses).toBe(0);
+    // Degenerate sinks past healthy variants — but A still wins on smoothed MLE
+    // because B and C are also touched by smoothing. The point is: no crash,
+    // finite score.
+    expect(Number.isFinite(aEntry.score)).toBe(true);
+  });
+
+  it("handles select_best N-way rows (winner beats all other candidates)", () => {
+    // Single 3-way row: A wins, contributes 1 vs B and 1 vs C.
+    const data: PairwiseComparison[] = [
+      { candidates: ["A", "B", "C"], winner: "A" },
+      { candidates: ["A", "B", "C"], winner: "A" },
+      { candidates: ["A", "B", "C"], winner: "B" },
+    ];
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B", "C"],
+      bootstrapSamples: 0,
+    });
+    expect(result.winMatrix.A!.B).toBe(2);
+    expect(result.winMatrix.A!.C).toBe(2);
+    expect(result.winMatrix.B!.A).toBe(1);
+    expect(result.winMatrix.B!.C).toBe(1);
+    expect(result.comparisonCount).toBe(3);
+  });
+
+  /** @scenario "A skipped row contributes no evidence either way" */
+  it("skips rows with winner=null (pending/error)", () => {
+    const data: PairwiseComparison[] = [
+      { candidates: ["A", "B"], winner: "A" },
+      { candidates: ["A", "B"], winner: null },
+      { candidates: ["A", "B"], winner: null },
+    ];
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B"],
+      bootstrapSamples: 0,
+    });
+    expect(result.comparisonCount).toBe(1);
+  });
+
+  /** @scenario "The leaderboard table shows a confidence interval per variant" */
+  it("produces deterministic bootstrap CIs for a fixed seed", () => {
+    const data: PairwiseComparison[] = [...wins("A", ["B"], 8), ...wins("B", ["A"], 4)];
+    const r1 = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B"],
+      bootstrapSamples: 100,
+      seed: 42,
+    });
+    const r2 = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B"],
+      bootstrapSamples: 100,
+      seed: 42,
+    });
+    expect(r1.entries[0]!.scoreCI).not.toBeNull();
+    expect(r1.entries[0]!.scoreCI).toEqual(r2.entries[0]!.scoreCI);
+    expect(r1.entries[1]!.scoreCI).toEqual(r2.entries[1]!.scoreCI);
+  });
+
+  describe("when the resample count changes", () => {
+    // Guards the wiring between `bootstrapSamples` and the resample loop.
+    const data: PairwiseComparison[] = [...wins("A", ["B"], 8), ...wins("B", ["A"], 4)];
+
+    it("collapses the interval to a point for a single resample", () => {
+      const result = computeBTLeaderboard({
+        comparisons: data,
+        variantIds: ["A", "B"],
+        bootstrapSamples: 1,
+        seed: 42,
+      });
+      const ci = result.entries[0]!.scoreCI;
+      expect(ci).not.toBeNull();
+      expect(ci![0]).toBe(ci![1]);
+    });
+
+    it("spreads the interval for many resamples", () => {
+      const result = computeBTLeaderboard({
+        comparisons: data,
+        variantIds: ["A", "B"],
+        bootstrapSamples: 200,
+        seed: 42,
+      });
+      const ci = result.entries[0]!.scoreCI;
+      expect(ci).not.toBeNull();
+      expect(ci![0]).toBeLessThan(ci![1]);
+    });
+  });
+
+  it("returns null CI when bootstrap is disabled", () => {
+    const data: PairwiseComparison[] = [...wins("A", ["B"], 5), ...wins("B", ["A"], 5)];
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B"],
+      bootstrapSamples: 0,
+    });
+    expect(result.entries[0]!.scoreCI).toBeNull();
+    expect(result.entries[1]!.scoreCI).toBeNull();
+  });
+
+  describe("given the default thousand resamples and seed", () => {
+    // Recorded from the fit before it moved onto typed arrays, which performs the same
+    // operations in the same order. Math.log and Math.exp differ in the last digit
+    // between platforms, so the pin is 1e-9 of each value rather than exact.
+    const comparisons: PairwiseComparison[] = [
+      ...wins("A", ["B"], 9),
+      ...wins("B", ["A"], 5),
+      ...wins("B", ["C"], 8),
+      ...wins("C", ["B"], 4),
+      ...wins("A", ["C"], 7),
+      ...wins("C", ["A"], 3),
+      ...wins("D", ["A"], 2),
+      ...wins("A", ["D"], 6),
+      ...wins("C", ["D"], 5),
+      ...wins("D", ["C"], 4),
+      ...ties("A", "B", 3),
+      ...ties("C", "D", 2),
+      ...["A", "B", "A", "C", "D", "A"].map((winner) => ({
+        candidates: ["A", "B", "C", "D"],
+        winner,
+      })),
+    ];
+
+    it("keeps every score and interval as recorded", () => {
+      const result = computeBTLeaderboard({ comparisons, variantIds: ["A", "B", "C", "D"] });
+      const differences = result.scoreDifferenceCI!;
+
+      expect(result.entries.map((e) => e.variantId)).toEqual(["A", "B", "C", "D"]);
+      expect(
+        largestRelativeGap(
+          [
+            ...result.entries.flatMap((e) => [e.score, ...e.scoreCI!]),
+            ...differences.A!.B!,
+            ...differences.A!.C!,
+            ...differences.A!.D!,
+            ...differences.C!.D!,
+          ],
+          [
+            114.14701602253214, 28.259283108064963, 220.7461236679491, 18.9145034769108,
+            -84.87384285943924, 123.88630846314871, -59.163494891806444, -162.7774568453376,
+            33.16015155773397, -73.89802460763654, -225.76971323082347, 42.995436912312016,
+            -37.51742624635518, 237.63031467781698, 40.230066879197175, 352.911154739249,
+            16.594535275844542, 423.6238186793849, -158.91875063816465, 210.3365772619937,
+          ],
+        ),
+      ).toBeLessThan(1e-9);
+      expect(result.bootstrapNonConvergence).toBe(0);
+    });
+
+    it("keeps a smoothed, degenerate field's intervals as recorded", () => {
+      const result = computeBTLeaderboard({
+        comparisons: [...wins("A", ["B", "C"], 6), ...wins("B", ["C"], 4), ...wins("C", ["B"], 3)],
+        variantIds: ["A", "B", "C"],
+      });
+
+      expect(result.entries.map((e) => e.variantId)).toEqual(["B", "C", "A"]);
+      expect(
+        largestRelativeGap(
+          [
+            ...result.entries.flatMap((e) => [e.score, ...e.scoreCI!]),
+            ...result.scoreDifferenceCI!.B!.C!,
+          ],
+          [
+            -129.30223094297995, -255.07197502055595, -20.89813360122564, -168.37554914048062,
+            -299.5007664095226, -58.726263603871864, 297.6777800834606, 251.49186241711848,
+            346.0864130089249, -189.5404787251107, 272.11856363269874,
+          ],
+        ),
+      ).toBeLessThan(1e-9);
+      expect(result.bootstrapNonConvergence).toBe(0);
+    });
+  });
+
+  /** @scenario "Sample size gating matters more as variants grow" */
+  it("exposes minMatchups for sample-size gating", () => {
+    // A: 10 matchups, B: 10, C: 4. UI should warn (C < 30).
+    const data: PairwiseComparison[] = [
+      ...wins("A", ["B"], 5),
+      ...wins("B", ["A"], 3),
+      ...wins("A", ["C"], 1),
+      ...wins("C", ["A"], 1),
+      ...wins("B", ["C"], 1),
+      ...wins("C", ["B"], 1),
+    ];
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B", "C"],
+      bootstrapSamples: 0,
+    });
+    expect(result.minMatchups).toBe(4);
+    const cEntry = result.entries.find((e) => e.variantId === "C")!;
+    expect(cEntry.matchups).toBe(4);
+  });
+
+  it("ignores comparisons that reference an unknown variant id", () => {
+    const data: PairwiseComparison[] = [
+      ...wins("A", ["B"]),
+      { candidates: ["A", "Z"], winner: "Z" },
+    ];
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B"],
+      bootstrapSamples: 0,
+    });
+    // Z dropped → only the A>B row contributes, and the count says so.
+    expect(result.comparisonCount).toBe(1);
+    expect(result.winMatrix.A!.B).toBe(1);
+    const aEntry = result.entries.find((e) => e.variantId === "A")!;
+    const bEntry = result.entries.find((e) => e.variantId === "B")!;
+    expect(aEntry.wins + bEntry.wins).toBe(1);
+  });
+
+  /** @scenario "A three-way tie row is not counted in the leaderboard" */
+  it("drops N>2 'tie' rows (semantics ambiguous)", () => {
+    const data: PairwiseComparison[] = [
+      { candidates: ["A", "B", "C"], winner: "tie" },
+      { candidates: ["A", "B"], winner: "tie" },
+    ];
+    const result = computeBTLeaderboard({
+      comparisons: data,
+      variantIds: ["A", "B", "C"],
+      bootstrapSamples: 0,
+    });
+    // Only the 2-way tie contributes.
+    expect(result.winMatrix.A!.B).toBe(0.5);
+    expect(result.winMatrix.B!.A).toBe(0.5);
+    expect(result.winMatrix.A!.C).toBe(0);
+    expect(result.winMatrix.C!.A).toBe(0);
+  });
+});
+
+describe("computeBTLeaderboard bootstrap stability", () => {
+  describe("given a small sample where a resample can wipe out a variant's wins", () => {
+    // The regime this feature explicitly warns about (under 30 matchups) was
+    // the regime where the interval was fabricated: a replicate containing a
+    // zero-win variant sent its score to -Infinity and its opponent's to
+    // ~+120000. Those bounds are FINITE, so isFinite() guards downstream let
+    // them through, and the verdict then reads every pair as overlapping.
+    const comparisons = [
+      ...Array.from({ length: 8 }, () => ({
+        candidates: ["a", "b"],
+        winner: "a",
+      })),
+      ...Array.from({ length: 2 }, () => ({
+        candidates: ["a", "b"],
+        winner: "b",
+      })),
+    ];
+
+    it("produces intervals that stay within a plausible range", () => {
+      const result = computeBTLeaderboard({
+        comparisons: comparisons,
+        variantIds: ["a", "b"],
+        bootstrapSamples: 200,
+        seed: 1,
+      });
+
+      for (const entry of result.entries) {
+        expect(entry.scoreCI).not.toBeNull();
+        const [lower, upper] = entry.scoreCI!;
+        expect(Number.isFinite(lower)).toBe(true);
+        expect(Number.isFinite(upper)).toBe(true);
+        // Elo-style points. Anything past a few thousand is divergence, not
+        // uncertainty — the pre-fix values were ~60000.
+        expect(Math.abs(lower)).toBeLessThan(2000);
+        expect(Math.abs(upper)).toBeLessThan(2000);
+      }
+    });
+
+    it("keeps the interval ordered", () => {
+      const result = computeBTLeaderboard({
+        comparisons: comparisons,
+        variantIds: ["a", "b"],
+        bootstrapSamples: 200,
+        seed: 1,
+      });
+
+      for (const entry of result.entries) {
+        const [lower, upper] = entry.scoreCI!;
+        expect(lower).toBeLessThanOrEqual(upper);
+      }
+    });
+  });
+});
+
+describe("computeBTLeaderboard — the Elo scale the UI promises", () => {
+  describe("given one variant with ten-to-one odds over another", () => {
+    it("puts exactly 400 points between them", () => {
+      // Step 1's help text tells the reader "A 400-point gap is roughly 10:1
+      // odds; 0 is a coin flip". That promise rests entirely on the 400 in
+      // `400 * Math.log10(strength)`, and nothing was holding it — halving
+      // the constant rescaled every score in the product while every test
+      // still passed, quietly making the sentence false.
+      const comparisons = [
+        ...Array.from({ length: 100 }, () => ({
+          candidates: ["a", "b"],
+          winner: "a",
+        })),
+        ...Array.from({ length: 10 }, () => ({
+          candidates: ["a", "b"],
+          winner: "b",
+        })),
+      ];
+
+      const leaderboard = computeBTLeaderboard({
+        comparisons,
+        variantIds: ["a", "b"],
+        bootstrapSamples: 0,
+      });
+
+      const a = leaderboard.entries.find((e) => e.variantId === "a")!;
+      const b = leaderboard.entries.find((e) => e.variantId === "b")!;
+
+      // 100:10 wins means the fitted strengths sit at 10:1, and
+      // 400 * log10(10) is 400.
+      expect(a.strength / b.strength).toBeCloseTo(10, 4);
+      expect(a.score - b.score).toBeCloseTo(400, 3);
+    });
+  });
+
+  describe("given two variants that split their matchups evenly", () => {
+    it("puts them both at zero, the coin-flip the same sentence promises", () => {
+      const comparisons = [
+        ...Array.from({ length: 20 }, () => ({
+          candidates: ["a", "b"],
+          winner: "a",
+        })),
+        ...Array.from({ length: 20 }, () => ({
+          candidates: ["a", "b"],
+          winner: "b",
+        })),
+      ];
+
+      const leaderboard = computeBTLeaderboard({
+        comparisons,
+        variantIds: ["a", "b"],
+        bootstrapSamples: 0,
+      });
+
+      for (const entry of leaderboard.entries) {
+        expect(entry.score).toBeCloseTo(0, 6);
+      }
+    });
+  });
+});

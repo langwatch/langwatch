@@ -24,3 +24,31 @@ Feature: Every settings page keeps the settings chrome
     Scenario: No page the Settings menu opens is left without it
       Given every page that Settings can open
       Then each of them keeps the settings chrome
+
+    @integration
+    Scenario: An address under Settings that names no page keeps it
+      Given I open a settings address that names no page
+      Then the not-found page opens inside the settings chrome
+      And the settings menu is still beside it
+
+    @unit
+    Scenario: No settings page wraps itself in a second copy of the sidebar
+      Given every route file under a settings section
+      Then none of them re-applies a page-level settings layout of its own
+
+    @unit
+    Scenario: An address that only forwards is not framed on the way past
+      Given a settings address whose page moved into a tab of another page
+      When somebody opens the old address
+      Then they are forwarded to the page it moved to
+      And no settings frame is drawn around the forwarding itself
+
+  Rule: a settings page reads in one centred column
+
+    @unit
+    Scenario: On a wide window the column sits in the middle
+      Given a settings page on a window wider than the settings column
+      When the page opens
+      Then its body sits in one column with equal space either side
+      And the header's title and actions line up with that column's edges
+      And the header's rule still spans the full width

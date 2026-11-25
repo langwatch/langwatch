@@ -1,17 +1,15 @@
 import type { RunPlanRunBody } from "@/client-sdk/services/run-plans";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
-import { parseRunNoteFlag } from "../../utils/runNote";
 import type { RawOutputFlags } from "../../utils/output";
+import { parseRunNoteFlag } from "../../utils/runNote";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { createCliRunPlansService } from "../run-plans/cli-run-plans-service";
-import {
-  parseRepeat,
-  parseTargets,
-  parseWait,
-} from "../run-plans/scopeFlags";
 import { emitRunResult } from "../run-plans/reportRun";
+import { parseRepeat, parseTargets, parseWait } from "../run-plans/scopeFlags";
+import { resolveScenarioId } from "./resolveScenario";
 
 export interface RunScenarioOptions extends RawOutputFlags {
   target?: string[];
@@ -24,20 +22,17 @@ export interface RunScenarioOptions extends RawOutputFlags {
 }
 
 /**
- * Runs one scenario against one or more targets.
- *
- * This is a run plan scoped to a single scenario: one request, no test suite
- * created for it and none deleted afterwards. The platform files the run under
- * a plan named after the scenario and the target unless `--name` says
- * otherwise.
- *
+ * Runs one scenario against one or more targets: a run plan scoped to a
+ * single scenario, no test suite created or deleted for it.
  * @see specs/features/scenario-cli.feature
  */
 export const runScenarioCommand = async (
-  id: string,
+  reference: string,
   options: RunScenarioOptions,
 ): Promise<void> => {
   await resolveCredentials();
+
+  const id = await resolveScenarioId({ reference });
 
   const parameters = parseRunParameterFlags({ pairs: options.param });
   const note = parseRunNoteFlag({ note: options.note });
@@ -57,9 +52,7 @@ export const runScenarioCommand = async (
         targets,
         ...(repeatCount !== undefined ? { repeatCount } : {}),
       },
-      ...(options.idempotencyKey
-        ? { idempotencyKey: options.idempotencyKey }
-        : {}),
+      ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
       ...(parameters ? { parameters } : {}),
       ...(note ? { note } : {}),
     };

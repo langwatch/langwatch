@@ -18,12 +18,8 @@ postgresql:
         name: "langwatch-db"
         key: "connectionString"
 
-# The LangWatchQL Postgres bridge (lwql_postgres named collection) defaults to
-# the chart-managed PostgreSQL Service — wrong for an external PostgreSQL.
-# Cancel it back to empty so the bridge renders disabled (a loud NOTES.txt +
-# Deployment-annotation warning) instead of pointing at a Service that does
-# not exist. Set this to your PostgreSQL host to enable the bridge instead.
-clickhouse:
-  lwqlAccessModel:
-    postgres:
-      host: ""
+# LangWatchQL's lwql_ro PostgreSQL reader role is converged by the app from
+# whatever DATABASE_URL points at — this external PostgreSQL, in this overlay.
+# The DATABASE_URL role must be allowed to CREATE/ALTER ROLE, or provisioning
+# logs and LangWatchQL stays refused (fail-closed). No chart setting is needed
+# here; see "LangWatchQL (LWQL)" in ../../README.md.

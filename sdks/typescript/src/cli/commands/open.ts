@@ -5,27 +5,14 @@ import { isLoggedIn, loadConfig } from "@/cli/utils/governance/config";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
- * `langwatch open [path]` — open the LangWatch app in the user's
- * default browser.
- *
- * No path:
- *   - Project mode (LANGWATCH_API_KEY set in the shell or .env): open
- *     the control-plane root and let the app route to the matching
- *     project home based on the session.
- *   - Personal mode: open `/me`, the personal AI tools portal.
- *
- * With path: open `${control_plane_url}/${path}` verbatim. Lets
- * `langwatch open traces`, `langwatch open governance`, etc. work
- * without a dedicated subcommand per surface.
+ * Open the app: /me, or the project home with LANGWATCH_API_KEY; with a path, BASE/path.
  */
 export const openCommand = async (
   options: { path?: string; browser?: string } = {},
 ): Promise<void> => {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    console.error(
-      chalk.yellow("Not logged in. Run `langwatch login` first."),
-    );
+    console.error(chalk.yellow("Not logged in. Run `langwatch login` first."));
     process.exit(1);
   }
 
@@ -37,6 +24,8 @@ export const openCommand = async (
   } else if (process.env.LANGWATCH_API_KEY) {
     target = base;
   } else {
+    // /me is kept so the link works on servers with and without the /coding-agents route,
+    // which redirect /me.
     target = `${base}/me`;
   }
 
@@ -45,8 +34,7 @@ export const openCommand = async (
 };
 
 async function openInBrowser(url: string, override?: string): Promise<void> {
-  const choice =
-    override ?? process.env.LANGWATCH_BROWSER ?? process.env.BROWSER ?? "";
+  const choice = override ?? process.env.LANGWATCH_BROWSER ?? process.env.BROWSER ?? "";
   if (choice === "none") return;
   try {
     if (!choice || choice === "default") {
@@ -56,5 +44,6 @@ async function openInBrowser(url: string, override?: string): Promise<void> {
     await open(url, { app: { name: choice } });
   } catch {
     // URL already on stdout; don't fail because the browser couldn't open.
+    void 0;
   }
 }

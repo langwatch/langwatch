@@ -4,7 +4,7 @@ These examples connect a Python function to LangWatch Agent Testing with `langwa
 
 ## Files
 
-- `support_agent.py`: a support agent on `gpt-5-mini`. Run it with `uv run support_agent.py`. The script blocks in `langwatch.agent.serve()` until Ctrl-C.
+- `support_agent.py`: a support agent on `gpt-6-luna`. Run it with `uv run support_agent.py`. The script blocks in `langwatch.agent.serve()` until Ctrl-C.
 - `support_agent_fastapi.py`: the same function inside a FastAPI application. Run it with `uv run uvicorn support_agent_fastapi:app`. The import of the module starts the connection. The web server keeps the process alive.
 
 ## Setup
@@ -24,15 +24,15 @@ The function returns a string, one message, a list of messages, or `langwatch.Ag
 
 ## Environment variables
 
-| Variable | Effect |
-|---|---|
-| `LANGWATCH_API_KEY` | The API key. Without it the agent is not connected and one warning is logged. |
-| `LANGWATCH_ENDPOINT` | The LangWatch endpoint. The socket URL is derived from it. |
-| `LANGWATCH_PROJECT_ID` | The project, when the key reaches more than one project. The `project_id` argument of the decorator wins over it. |
-| `LANGWATCH_AGENT_ENVIRONMENT` | The environment shown next to the agent. `APP_ENV`, `ENVIRONMENT` and `NODE_ENV` are read after it. The default is `development`. |
-| `LANGWATCH_AGENT_CONNECT` | `0` or `false` disables the connection. |
-| `LANGWATCH_AGENT_INSTANCE_LABEL` | A label for this process, shown in the instance list. |
-| `CI` | When truthy the connection is disabled, unless `enabled=True` is passed. |
+| Variable                         | Effect                                                                                                                            |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `LANGWATCH_API_KEY`              | The API key. Without it the agent is not connected and one warning is logged.                                                     |
+| `LANGWATCH_ENDPOINT`             | The LangWatch endpoint. The socket URL is derived from it.                                                                        |
+| `LANGWATCH_PROJECT_ID`           | The project, when the key reaches more than one project. The `project_id` argument of the decorator wins over it.                 |
+| `LANGWATCH_AGENT_ENVIRONMENT`    | The environment shown next to the agent. `APP_ENV`, `ENVIRONMENT` and `NODE_ENV` are read after it. The default is `development`. |
+| `LANGWATCH_AGENT_CONNECT`        | `0` or `false` disables the connection.                                                                                           |
+| `LANGWATCH_AGENT_INSTANCE_LABEL` | A label for this process, shown in the instance list.                                                                             |
+| `CI`                             | When truthy the connection is disabled, unless `enabled=True` is passed.                                                          |
 
 ## TLS
 

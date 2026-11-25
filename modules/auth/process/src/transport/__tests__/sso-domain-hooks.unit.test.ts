@@ -1,0 +1,469 @@
+import type {
+  SsoArrivalApi,
+  SsoAuthenticationActivityApi,
+  SsoMigrationCallbackApi,
+} from "@langwatch/identity-contract";
+/**
+ * What signing in through an identity provider does to a domain-matched
+ * organization: who joins it, whose account links, and who is flagged for
+ * arriving through the wrong provider.
+ * @see specs/auth/phase-1-better-auth-config.feature
+ */
+import type { OrganizationAdmission, OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { nowInstant, toDate } from "@langwatch/time";
+import type { UserApi } from "@langwatch/user-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import type {
+  BetterAuthAnnouncements,
+  BetterAuthFederation,
+} from "../../channels/better-auth.channel.ts";
+import {
+  afterAccountUpdate,
+  afterUserCreate,
+  createBeforeAccountCreateHook,
+  type BetterAuthHookCollaborators,
+  type SsoDomainOrganizations,
+  type LinkProposals,
+} from "../../channels/http/http.better-auth-hooks.channel.ts";
+import type {
+  BetterAuthHookUser,
+  BetterAuthHooksRepository,
+} from "../../repositories/better-auth-hooks.repository.ts";
+import { recordingUsers } from "./better-auth-transport.test-helpers.ts";
+
+/** The Google account row better-auth hands the hook, for one user. */
+function googleAccountFor(userId: string) {
+  const now = toDate(nowInstant());
+  return {
+    id: "account-1",
+    userId,
+    providerId: "google",
+    issuer: "google",
+    accountId: "google|123",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+class LicensedFederation implements BetterAuthFederation {
+  federationCapable(): boolean {
+    return true;
+  }
+  resolveSignInMethodPolicy(): Promise<never> {
+    return Promise.reject(new Error("unused"));
+  }
+  platformSsoAllowed(): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+}
+
+class NoInvites implements Pick<OrganizationApi, "applyPendingInvite"> {
+  applyPendingInvite(): Promise<{ applied: false }> {
+    return Promise.resolve({ applied: false });
+  }
+}
+
+/** The organization's pending-invite door, answering with the invite the address holds. */
+function pendingInvites(inviteId: string) {
+  return {
+    applyPendingInvite: vi
+      .fn<OrganizationApi["applyPendingInvite"]>()
+      .mockResolvedValue({ applied: true, inviteId, role: "MEMBER" }),
+  };
+}
+
+class RecordingAnnouncements implements BetterAuthAnnouncements {
+  readonly signUpNurturing = vi.fn();
+  readonly reportError = vi.fn();
+  readonly announceSignup = vi.fn();
+  readonly ssoAutoAddNurturing = vi.fn();
+  readonly sessionNurturing = vi.fn();
+}
+
+const ACME = { id: "org_acme", name: "Acme", ssoDomain: "acme.com", ssoProvider: "google" };
+
+type SsoDomainOrganization = { id: string; name: string; ssoProvider: string | null };
+
+function organizationsOver(mocks: Partial<SsoDomainOrganizations>): SsoDomainOrganizations {
+  return createApiFixture<SsoDomainOrganizations>(mocks);
+}
+
+function hooksRepo(members: Partial<BetterAuthHooksRepository>): BetterAuthHooksRepository {
+  const unused = (): never => {
+    throw new Error("this repository member is not used by this test");
+  };
+  return {
+    getUserForHooks: unused,
+    countAccountsForUser: unused,
+    countPasskeysForUser: unused,
+    findFederatedAccountsForUser: unused,
+    findFederatedAccountsForUsers: unused,
+    deleteAccounts: unused,
+    flagPendingSsoSetup: unused,
+    reconcileSsoAccounts: unused,
+    recordLastLogin: unused,
+    clearPasswordResetRequirement: unused,
+    ...members,
+  };
+}
+
+function signupRepo(
+  organization: SsoDomainOrganization | null,
+  admission: OrganizationAdmission = { outcome: "created", seat: "MEMBER", pending: false },
+) {
+  const mocks = {
+    findBySsoDomain: vi
+      .fn<SsoDomainOrganizations["findBySsoDomain"]>()
+      .mockImplementation(async () => {
+        return organization;
+      }),
+    createMembership: vi
+      .fn<SsoDomainOrganizations["createMembership"]>()
+      .mockResolvedValue(admission),
+  };
+  return { double: hooksRepo({}), mocks, organizations: organizationsOver(mocks) };
+}
+
+/** Everything a sign-up's auto-join reaches. */
+function signupCollaborators({
+  organizations,
+  announcements = new RecordingAnnouncements(),
+  invites = new NoInvites(),
+  users = recordingUsers().users,
+}: {
+  organizations: SsoDomainOrganizations;
+  announcements?: RecordingAnnouncements;
+  invites?: Pick<OrganizationApi, "applyPendingInvite">;
+  users?: Pick<UserApi, "recordCreated">;
+}): BetterAuthHookCollaborators {
+  return {
+    users,
+    linkProposals: createApiFixture<LinkProposals>(),
+    organizations,
+    federation: new LicensedFederation(),
+    invites,
+    announcements,
+    arrivals: createApiFixture<SsoArrivalApi>({ admit: async () => undefined }),
+    ssoActivity: createApiFixture<SsoAuthenticationActivityApi>({
+      record: async () => undefined,
+    }),
+    ssoMigration: createApiFixture<SsoMigrationCallbackApi>({
+      decideAccountLink: async () => ({ kind: "not_migrating" }),
+    }),
+  };
+}
+
+const NEW_ACME_USER = {
+  id: "user_new",
+  email: "new@acme.com",
+  name: "New User",
+  emailVerified: true,
+};
+
+function accountRepo({
+  organization,
+  accountCount,
+  user = { id: "user_1", email: "existing@acme.com", deactivatedAt: null },
+}: {
+  organization: SsoDomainOrganization | null;
+  accountCount: number;
+  user?: Pick<BetterAuthHookUser, "id" | "email" | "deactivatedAt">;
+}) {
+  const mocks = {
+    getUserForHooks: vi.fn<BetterAuthHooksRepository["getUserForHooks"]>().mockResolvedValue({
+      ...user,
+      name: null,
+      pendingSsoSetup: false,
+      signupConfirmationPending: false,
+      passwordResetRequiredAt: null,
+      lastLoginAt: null,
+      emailVerified: true,
+    }),
+    findBySsoDomain: vi
+      .fn<SsoDomainOrganizations["findBySsoDomain"]>()
+      .mockImplementation(async () => {
+        return organization;
+      }),
+    countAccountsForUser: vi
+      .fn<BetterAuthHooksRepository["countAccountsForUser"]>()
+      .mockResolvedValue(accountCount),
+    flagPendingSsoSetup: vi
+      .fn<BetterAuthHooksRepository["flagPendingSsoSetup"]>()
+      .mockResolvedValue(undefined),
+  };
+  return { double: hooksRepo(mocks), mocks, organizations: organizationsOver(mocks) };
+}
+
+describe("signing in through a domain-matched organization's identity provider", () => {
+  describe("given nobody with that email has an account yet", () => {
+    /** @scenario New user with matching SSO domain joins the SSO org */
+    it("joins the new user to the organization as a member", async () => {
+      const { mocks, organizations } = signupRepo(ACME);
+
+      await afterUserCreate({
+        user: { id: "user_new", email: "new@acme.com", name: "New User", emailVerified: true },
+        collaborators: signupCollaborators({ organizations }),
+      });
+
+      // The organization decides the seat and writes the grant, audited to the domain rule.
+      expect(mocks.createMembership).toHaveBeenCalledWith({
+        userId: "user_new",
+        organizationId: "org_acme",
+        admittedBy: {
+          actor: { type: "system", id: "system:sso-auto-join" },
+          commandId: "sso-auto-join:org_acme:user_new",
+        },
+      });
+    });
+
+    it("announces the seat the admission gave, so a Lite fallback reads as Lite", async () => {
+      const { organizations } = signupRepo(ACME, {
+        outcome: "created",
+        seat: "EXTERNAL",
+        pending: false,
+      });
+      const announcements = new RecordingAnnouncements();
+
+      await afterUserCreate({
+        user: { id: "user_new", email: "new@acme.com", name: "New User", emailVerified: true },
+        collaborators: signupCollaborators({ organizations, announcements }),
+      });
+
+      expect(announcements.ssoAutoAddNurturing).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user_new", role: "EXTERNAL" }),
+      );
+    });
+
+    it("applies the pending invite the address holds there instead of the default membership", async () => {
+      const { mocks, organizations } = signupRepo(ACME);
+      const invites = pendingInvites("invite_1");
+      const announcements = new RecordingAnnouncements();
+
+      await afterUserCreate({
+        user: { id: "user_new", email: "invited@acme.com", name: "New User", emailVerified: true },
+        collaborators: signupCollaborators({ organizations, invites, announcements }),
+      });
+
+      expect(invites.applyPendingInvite).toHaveBeenCalledWith({
+        userId: "user_new",
+        organizationId: "org_acme",
+        email: "invited@acme.com",
+      });
+      expect(mocks.createMembership).not.toHaveBeenCalled();
+      expect(announcements.ssoAutoAddNurturing).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user_new", organizationId: "org_acme", role: "MEMBER" }),
+      );
+    });
+  });
+
+  describe("given every full member seat the licence covers is in use", () => {
+    /** @scenario "A new account joined by its email domain past the seats is admitted as a Lite Member" */
+    it("takes the seat the organization's admission decides, and announces the join", async () => {
+      const { mocks, organizations } = signupRepo(ACME, {
+        outcome: "created",
+        seat: "EXTERNAL",
+        pending: false,
+      });
+      const announcements = new RecordingAnnouncements();
+
+      await afterUserCreate({
+        user: NEW_ACME_USER,
+        collaborators: signupCollaborators({ organizations, announcements }),
+      });
+
+      expect(mocks.createMembership).toHaveBeenCalledTimes(1);
+      expect(announcements.announceSignup).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A new account joined by its email domain with no seat left is held with no grant" */
+    it("announces nothing for a person held pending", async () => {
+      const { organizations } = signupRepo(ACME, {
+        outcome: "created",
+        seat: "EXTERNAL",
+        pending: true,
+      });
+      const announcements = new RecordingAnnouncements();
+
+      await afterUserCreate({
+        user: NEW_ACME_USER,
+        collaborators: signupCollaborators({ organizations, announcements }),
+      });
+
+      expect(announcements.announceSignup).not.toHaveBeenCalled();
+      expect(announcements.ssoAutoAddNurturing).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a concurrent sign-in already wrote the membership", () => {
+    it("asks for the admission once and announces nothing, leaving the grant to that sign-in", async () => {
+      const { mocks, organizations } = signupRepo(ACME, {
+        outcome: "already-present",
+        seat: "MEMBER",
+        pending: false,
+      });
+      const announcements = new RecordingAnnouncements();
+
+      await afterUserCreate({
+        user: NEW_ACME_USER,
+        collaborators: signupCollaborators({ organizations, announcements }),
+      });
+
+      expect(mocks.createMembership).toHaveBeenCalledTimes(1);
+      expect(announcements.announceSignup).not.toHaveBeenCalled();
+      expect(announcements.ssoAutoAddNurturing).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a new single sign-on user", () => {
+    /** @scenario "A new single sign-on user records the new account's created fact" */
+    it.each([
+      { case: "auto-added to the domain-matched organization", organization: ACME },
+      { case: "not auto-added, no organization claiming the domain", organization: null },
+    ])("records the account's created fact once when $case", async ({ organization }) => {
+      const { organizations } = signupRepo(organization);
+      const { users, recorded } = recordingUsers();
+
+      await afterUserCreate({
+        user: NEW_ACME_USER,
+        collaborators: signupCollaborators({ organizations, users }),
+      });
+
+      expect(recorded).toEqual([NEW_ACME_USER.id]);
+    });
+  });
+
+  describe("given a credential signup whose email nobody has verified", () => {
+    /** @scenario Unverified signup with a matching ssoDomain does not auto-join the SSO org */
+    it("creates no membership and no grant at the domain-matched organization", async () => {
+      const { mocks, organizations } = signupRepo(ACME);
+
+      await afterUserCreate({
+        user: {
+          id: "user_new",
+          email: "new@acme.com",
+          name: "New User",
+          emailVerified: false,
+        },
+        collaborators: signupCollaborators({ organizations }),
+      });
+
+      expect(mocks.findBySsoDomain).not.toHaveBeenCalled();
+      expect(mocks.createMembership).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Unverified signup does not claim a pending invite addressed to its email */
+    it("leaves the pending invite unapplied and grants nothing", async () => {
+      const { mocks, organizations } = signupRepo(ACME);
+      const invites = pendingInvites("invite_1");
+
+      await afterUserCreate({
+        user: {
+          id: "user_new",
+          email: "invited@acme.com",
+          name: "New User",
+          emailVerified: false,
+        },
+        collaborators: signupCollaborators({ organizations, invites }),
+      });
+
+      expect(invites.applyPendingInvite).not.toHaveBeenCalled();
+      expect(mocks.createMembership).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an existing user signs in through the organization's own provider", () => {
+    /** @scenario Existing user with correct SSO provider auto-links */
+    /** @scenario "An organization pinned to Google still signs in with Google" */
+    it("lets the account row be created and leaves the pending flag alone", async () => {
+      const {
+        double: repo,
+        mocks,
+        organizations,
+      } = accountRepo({ organization: ACME, accountCount: 1 });
+
+      await createBeforeAccountCreateHook({
+        repo,
+        linkProposals: createApiFixture<LinkProposals>(),
+        organizations,
+        federation: new LicensedFederation(),
+        findGoverningConnections: async () => [],
+      })(googleAccountFor("user_1"), null);
+
+      expect(mocks.flagPendingSsoSetup).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an existing user signs in through a provider the organization does not use", () => {
+    /** @scenario "Existing user with wrong brokered SSO provider gets pending flag" */
+    it("lets them in, and flags the account for setup", async () => {
+      const {
+        double: repo,
+        mocks,
+        organizations,
+      } = accountRepo({
+        organization: { ...ACME, ssoProvider: "waad|acme-conn" },
+        accountCount: 1,
+      });
+
+      await createBeforeAccountCreateHook({
+        repo,
+        linkProposals: createApiFixture<LinkProposals>(),
+        organizations,
+        federation: new LicensedFederation(),
+        findGoverningConnections: async () => [],
+      })(
+        { ...googleAccountFor("user_1"), providerId: "auth0", accountId: "waad|other-conn|dana" },
+        null,
+      );
+
+      expect(mocks.flagPendingSsoSetup).toHaveBeenCalledWith({ userId: "user_1" });
+    });
+  });
+
+  describe("given an existing user presses Google at an organization pinned to another provider", () => {
+    const BROKERED = { ...ACME, ssoProvider: "waad|acme-conn" };
+
+    /** @scenario "A native social sign-in at an SSO-enforced domain is refused" */
+    /** @scenario "SSO-domain guard still blocks the wrong provider" */
+    it("refuses the first link and leaves the pending flag alone", async () => {
+      const {
+        double: repo,
+        mocks,
+        organizations,
+      } = accountRepo({ organization: BROKERED, accountCount: 0 });
+
+      await expect(
+        createBeforeAccountCreateHook({
+          repo,
+          linkProposals: createApiFixture<LinkProposals>(),
+          organizations,
+          federation: new LicensedFederation(),
+          findGoverningConnections: async () => [],
+        })(googleAccountFor("user_1"), null),
+      ).rejects.toMatchObject({ body: { code: "SSO_PROVIDER_NOT_ALLOWED" } });
+      expect(mocks.flagPendingSsoSetup).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A native social sign-in on an already-linked account is refused too" */
+    it("refuses the sign-in that refreshes an already-linked Google account", async () => {
+      const { double: repo, organizations } = accountRepo({
+        organization: BROKERED,
+        accountCount: 1,
+      });
+
+      await expect(
+        afterAccountUpdate({
+          repo,
+          account: { userId: "user_1", providerId: "google", accountId: "google|123" },
+          collaborators: createApiFixture<BetterAuthHookCollaborators>({
+            federation: new LicensedFederation(),
+            organizations,
+          }),
+          findGoverningConnections: async () => [],
+        }),
+      ).rejects.toMatchObject({ body: { code: "SSO_PROVIDER_NOT_ALLOWED" } });
+    });
+  });
+});

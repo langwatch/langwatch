@@ -113,6 +113,7 @@ def build_content_parts(
         else:
             fields.append((label, None, None))
 
+    contexts = [ctx for ctx in (contexts or []) if ctx and ctx.strip()]
     ctx_images: list[str | None] = []
     if contexts:
         for ctx in contexts:
@@ -128,7 +129,8 @@ def build_content_parts(
             if value:
                 content += f"# {label}\n{value}\n\n"
         if contexts:
-            content += f"# Contexts\n{'1. '.join(contexts)}\n\n"
+            numbered = "\n".join(f"{i + 1}. {ctx}" for i, ctx in enumerate(contexts))
+            content += f"# Contexts\n{numbered}\n\n"
         content += f"# Task\n{task}"
         return content
 

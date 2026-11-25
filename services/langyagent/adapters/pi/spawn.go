@@ -99,7 +99,6 @@ type workerModelConfig struct {
 	API        string         `json:"api"`
 	BaseURLEnv string         `json:"baseUrlEnv"`
 	APIKeyEnv  string         `json:"apiKeyEnv"`
-	Reasoning  bool           `json:"reasoning,omitempty"`
 	Compat     map[string]any `json:"compat,omitempty"`
 }
 
@@ -110,6 +109,9 @@ type workerConfig struct {
 	AgentsFilePath string            `json:"agentsFilePath"`
 	SkillsDir      string            `json:"skillsDir,omitempty"`
 	SessionDir     string            `json:"sessionDir"`
+	// DisabledSkills mirrors domain.Credentials.DisabledSkillIds — the flag-
+	// gated-off skill ids the worker must hide from the model this turn.
+	DisabledSkills []string `json:"disabledSkills,omitempty"`
 }
 
 // modelLane maps a provider-prefixed model id onto the pi API lane and compat
@@ -126,6 +128,9 @@ type workerConfig struct {
 //     compat.supportsDeveloperRole=false: the gateway's non-OpenAI providers
 //     reject the `developer` role pi would otherwise use for reasoning models.
 //
+// A lane never declares whether the model reasons: a provider prefix cannot
+// tell gpt-4.1 from gpt-5. The worker reads that from pi's own catalog.
+//
 // The model id rides verbatim (provider prefix included): the gateway's own
 // prefix routing is the single source of provider fan-out, and the LLM relay
 // forwards the body untouched (its codex model rewrite sets the same full id).
@@ -138,7 +143,6 @@ func modelLane(model string) workerModelConfig {
 	switch {
 	case strings.HasPrefix(model, "anthropic/"):
 		lane.API = "anthropic-messages"
-		lane.Reasoning = true
 		// Long cache retention (with PI_CACHE_RETENTION=long in the worker
 		// env) makes pi stamp its cache_control breakpoints with ttl "1h"
 		// instead of the 5-minute default. A langy conversation's rhythm is
@@ -150,7 +154,6 @@ func modelLane(model string) workerModelConfig {
 		lane.Compat = map[string]any{"supportsLongCacheRetention": true}
 	case strings.HasPrefix(model, "openai_codex/"):
 		lane.API = "openai-responses"
-		lane.Reasoning = true
 		// NO supportsLongCacheRetention here: the ChatGPT codex backend
 		// answers 400 "Unsupported parameter: prompt_cache_retention" on the
 		// field the flag makes pi send (the API-key Responses endpoint
@@ -162,7 +165,6 @@ func modelLane(model string) workerModelConfig {
 		lane.Compat = map[string]any{"supportsStore": false}
 	case strings.HasPrefix(model, "openai/"):
 		lane.API = "openai-responses"
-		lane.Reasoning = true
 		lane.Compat = map[string]any{"supportsLongCacheRetention": true}
 	default:
 		lane.API = "openai-completions"
@@ -283,6 +285,7 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		AgentsFilePath: agentsPath,
 		SkillsDir:      skillsDir(in.WorkspaceRoot),
 		SessionDir:     in.SessionDir,
+		DisabledSkills: in.Creds.DisabledSkillIds,
 	}
 	configBytes, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -404,6 +407,11 @@ func buildWorkerEnv(in SpawnInput) []string {
 		// is a short-lived, revocable, per-conversation session key.
 		"LANGWATCH_API_KEY="+in.Creds.LangwatchAPIKey,
 		"LANGWATCH_ENDPOINT="+in.Creds.LangwatchEndpoint,
+		// Without this, every `langwatch` CLI call that reads/writes
+		// project-scoped data (playground-widget, trace search, analytics)
+		// fails with "No project is in scope" unless the worker also passes
+		// --project on each invocation, which the skill does not instruct.
+		"LANGWATCH_PROJECT_ID="+in.Creds.ProjectID,
 		// Long provider-cache retention: only takes effect on lanes whose
 		// model carries compat.supportsLongCacheRetention (see modelLane) —
 		// anthropic stamps ttl "1h" on its cache_control breakpoints, the
@@ -414,10 +422,17 @@ func buildWorkerEnv(in SpawnInput) []string {
 		// belongs to the session key's owning user before doing anything.
 		"LANGY_CONVERSATION_ID="+in.ConversationID,
 	)
-	for _, c := range in.Capabilities {
-		env = append(env, c.Contribute()...)
-	}
 	noProxy := workerenv.NoProxyHosts(in.Creds)
+	for _, c := range in.Capabilities {
+		for _, kv := range c.Contribute() {
+			// A capability's NO_PROXY joins the worker's list rather than replacing it.
+			if hosts, ok := strings.CutPrefix(kv, "NO_PROXY="); ok {
+				noProxy += "," + hosts
+				continue
+			}
+			env = append(env, kv)
+		}
+	}
 	if in.EgressPort > 0 {
 		proxyURL := fmt.Sprintf("http://127.0.0.1:%d", in.EgressPort)
 		env = append(env,

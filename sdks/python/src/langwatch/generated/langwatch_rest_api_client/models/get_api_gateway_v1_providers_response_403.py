@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.get_api_gateway_v1_providers_response_403_fault import GetApiGatewayV1ProvidersResponse403Fault
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
-    from ..models.get_api_gateway_v1_providers_response_403_error import GetApiGatewayV1ProvidersResponse403Error
+    from ..models.get_api_gateway_v1_providers_response_403_meta import GetApiGatewayV1ProvidersResponse403Meta
+    from ..models.get_api_gateway_v1_providers_response_403_trace import GetApiGatewayV1ProvidersResponse403Trace
 
 
 T = TypeVar("T", bound="GetApiGatewayV1ProvidersResponse403")
@@ -17,34 +21,156 @@ T = TypeVar("T", bound="GetApiGatewayV1ProvidersResponse403")
 class GetApiGatewayV1ProvidersResponse403:
     """
     Attributes:
-        error (GetApiGatewayV1ProvidersResponse403Error):
+        type_ (str):
+        code (str):
+        message (str):
+        retryable (bool):
+        meta (GetApiGatewayV1ProvidersResponse403Meta | Unset):
+        trace_id (str | Unset):
+        span_id (str | Unset):
+        trace (GetApiGatewayV1ProvidersResponse403Trace | Unset):
+        tips (list[str] | Unset):
+        docs_url (str | Unset):
+        fault (GetApiGatewayV1ProvidersResponse403Fault | Unset):
+        reasons (list[Any] | Unset):
     """
 
-    error: GetApiGatewayV1ProvidersResponse403Error
+    type_: str
+    code: str
+    message: str
+    retryable: bool
+    meta: GetApiGatewayV1ProvidersResponse403Meta | Unset = UNSET
+    trace_id: str | Unset = UNSET
+    span_id: str | Unset = UNSET
+    trace: GetApiGatewayV1ProvidersResponse403Trace | Unset = UNSET
+    tips: list[str] | Unset = UNSET
+    docs_url: str | Unset = UNSET
+    fault: GetApiGatewayV1ProvidersResponse403Fault | Unset = UNSET
+    reasons: list[Any] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        error = self.error.to_dict()
+        type_ = self.type_
+
+        code = self.code
+
+        message = self.message
+
+        retryable = self.retryable
+
+        meta: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.meta, Unset):
+            meta = self.meta.to_dict()
+
+        trace_id = self.trace_id
+
+        span_id = self.span_id
+
+        trace: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.trace, Unset):
+            trace = self.trace.to_dict()
+
+        tips: list[str] | Unset = UNSET
+        if not isinstance(self.tips, Unset):
+            tips = self.tips
+
+        docs_url = self.docs_url
+
+        fault: str | Unset = UNSET
+        if not isinstance(self.fault, Unset):
+            fault = self.fault.value
+
+        reasons: list[Any] | Unset = UNSET
+        if not isinstance(self.reasons, Unset):
+            reasons = self.reasons
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "error": error,
+                "type": type_,
+                "code": code,
+                "message": message,
+                "retryable": retryable,
             }
         )
+        if meta is not UNSET:
+            field_dict["meta"] = meta
+        if trace_id is not UNSET:
+            field_dict["trace_id"] = trace_id
+        if span_id is not UNSET:
+            field_dict["span_id"] = span_id
+        if trace is not UNSET:
+            field_dict["trace"] = trace
+        if tips is not UNSET:
+            field_dict["tips"] = tips
+        if docs_url is not UNSET:
+            field_dict["docs_url"] = docs_url
+        if fault is not UNSET:
+            field_dict["fault"] = fault
+        if reasons is not UNSET:
+            field_dict["reasons"] = reasons
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.get_api_gateway_v1_providers_response_403_error import GetApiGatewayV1ProvidersResponse403Error
+        from ..models.get_api_gateway_v1_providers_response_403_meta import GetApiGatewayV1ProvidersResponse403Meta
+        from ..models.get_api_gateway_v1_providers_response_403_trace import GetApiGatewayV1ProvidersResponse403Trace
 
         d = dict(src_dict)
-        error = GetApiGatewayV1ProvidersResponse403Error.from_dict(d.pop("error"))
+        type_ = d.pop("type")
+
+        code = d.pop("code")
+
+        message = d.pop("message")
+
+        retryable = d.pop("retryable")
+
+        _meta = d.pop("meta", UNSET)
+        meta: GetApiGatewayV1ProvidersResponse403Meta | Unset
+        if isinstance(_meta, Unset):
+            meta = UNSET
+        else:
+            meta = GetApiGatewayV1ProvidersResponse403Meta.from_dict(_meta)
+
+        trace_id = d.pop("trace_id", UNSET)
+
+        span_id = d.pop("span_id", UNSET)
+
+        _trace = d.pop("trace", UNSET)
+        trace: GetApiGatewayV1ProvidersResponse403Trace | Unset
+        if isinstance(_trace, Unset):
+            trace = UNSET
+        else:
+            trace = GetApiGatewayV1ProvidersResponse403Trace.from_dict(_trace)
+
+        tips = cast(list[str], d.pop("tips", UNSET))
+
+        docs_url = d.pop("docs_url", UNSET)
+
+        _fault = d.pop("fault", UNSET)
+        fault: GetApiGatewayV1ProvidersResponse403Fault | Unset
+        if isinstance(_fault, Unset):
+            fault = UNSET
+        else:
+            fault = GetApiGatewayV1ProvidersResponse403Fault(_fault)
+
+        reasons = cast(list[Any], d.pop("reasons", UNSET))
 
         get_api_gateway_v1_providers_response_403 = cls(
-            error=error,
+            type_=type_,
+            code=code,
+            message=message,
+            retryable=retryable,
+            meta=meta,
+            trace_id=trace_id,
+            span_id=span_id,
+            trace=trace,
+            tips=tips,
+            docs_url=docs_url,
+            fault=fault,
+            reasons=reasons,
         )
 
         get_api_gateway_v1_providers_response_403.additional_properties = d

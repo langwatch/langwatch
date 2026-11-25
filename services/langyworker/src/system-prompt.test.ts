@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { composeSystemPrompt, prependResumeSeed } from "./system-prompt.js";
 
 describe("composeSystemPrompt", () => {
@@ -31,9 +32,14 @@ describe("composeSystemPrompt", () => {
 
 describe("prependResumeSeed", () => {
   it("labels the seed clearly and keeps the prompt last", () => {
-    const combined = prependResumeSeed({ prompt: "do the thing", seed: "user: earlier context" });
+    const combined = prependResumeSeed({
+      prompt: "do the thing",
+      seed: "user: earlier context",
+    });
     expect(combined.indexOf("user: earlier context")).toBeGreaterThan(-1);
-    expect(combined.indexOf("user: earlier context")).toBeLessThan(combined.indexOf("do the thing"));
+    expect(combined.indexOf("user: earlier context")).toBeLessThan(
+      combined.indexOf("do the thing"),
+    );
     expect(combined.startsWith("[Resumed conversation")).toBe(true);
     expect(combined.endsWith("do the thing")).toBe(true);
   });

@@ -172,7 +172,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then every rebuilt row equals the live row, whole-row
     And no rebuilt row holds a secret or a code
 
-  @integration @unimplemented
+  @integration
   Scenario: The setup screen shows the secret once and says so
     When "sam" opens the two-step verification setup screen
     Then the screen offers a scannable code and the same value to type in
@@ -218,7 +218,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then the refusal carries the code "identity_mfa_backup_codes_exhausted"
     And the screen tells "sam" to ask an administrator to reset it for them
 
-  @integration @unimplemented
+  @integration
   Scenario: The backup codes screen says what they are for in plain words
     When "sam" is shown their backup codes
     Then the screen explains they are for signing in when the authenticator is not available
@@ -247,14 +247,14 @@ Feature: Two-step verification - one setup per person, and organizations that re
 
   # ── An organization that requires it ───────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Turning the requirement on ends no session
     Given "acme"'s members hold sessions, some of them minted without a second factor
     When "ana" turns the requirement on for "acme"
     Then not one session is ended
     And every member is still signed in to everything else they use
 
-  @integration @unimplemented
+  @integration
   Scenario: A member who cannot prove one is held out of that organization alone
     Given "sam" belongs to "acme" and to a personal organization
     And "sam" has no enrollment
@@ -264,20 +264,58 @@ Feature: Two-step verification - one setup per person, and organizations that re
     And the screen names "acme" as the organization asking, and setting it up as the way in
     And "sam"'s personal organization is reachable throughout
 
-  @integration @unimplemented
+  # Bound by `two-step-verification.standing.unit.test.ts`. These are three
+  # separate trust-boundary outcomes: the recovery read, the session boundary,
+  # and membership privacy.
+  @unit
+  Scenario: A held member can read the standing needed to recover
+    Given "acme" requires two-step verification
+    And "sam" is a member who has not enrolled
+    When "sam" asks for their standing in "acme"
+    Then the answer names "acme" and says the requirement is unsatisfied
+    And that answer can paint the enrollment gate without first satisfying it
+
+  @unit
+  Scenario: A standing read still requires an authenticated person
+    Given "acme" requires two-step verification
+    When a caller with no authenticated person asks for standing in "acme"
+    Then the request is refused before any organization standing is read
+
+  @unit
+  Scenario: A stranger cannot use standing to inspect an organization
+    Given "mallory" is authenticated but is not a member of "acme"
+    When "mallory" asks for standing in "acme"
+    Then the answer does not reveal the organization's name or requirement
+    And no account factor is read for "mallory"
+
+  @unit
+  Scenario: An organization that requires nothing is satisfied after one read
+    Given "acme" does not require two-step verification
+    When "sam", a member of "acme", asks for their standing in "acme"
+    Then the answer says the requirement is not required and satisfied
+    And no membership, session sign-in method or account factor is read
+
+  @unit
+  Scenario: A batch over several projects of one organization reads the standing once
+    Given "acme" requires two-step verification
+    When "sam" asks, in one batch, about two projects of "acme" at the same time
+    Then the organization's standing is read once
+    And the personal-workspace exemption is still decided for each project
+
+  @integration
   Scenario: Setting it up opens the gate on the session they already hold
     Given "sam" is held at the enrollment gate for "acme"
     When "sam" finishes setting two-step verification up
     Then "acme"'s data is reachable on the same session, without signing in again
 
-  @integration @unimplemented
+  @integration
   Scenario: Someone joining an organization that requires it meets the gate on the way in
     Given "acme" requires two-step verification
     And an invited person with no enrollment accepts the invitation
     Then they become a member of "acme"
     And they are held at the enrollment gate until they set one up
 
-  @integration @unimplemented
+  @integration
   Scenario: An administrator can see who has not set one up yet
     Given "acme" requires two-step verification
     And some of its members have set one up and some have not
@@ -286,18 +324,69 @@ Feature: Two-step verification - one setup per person, and organizations that re
     And "ana" can see at a glance who is still held at the gate
     And nothing on the screen exposes anybody's secret, codes or device
 
-  @unit @unimplemented
+  @unit
   Scenario: Turning the requirement on is recorded with who did it
     When "ana" turns the requirement on for "acme"
     Then the change is audited with "ana" named as the actor
     And every member of "acme" is told the requirement now applies
 
-  @integration @unimplemented
+  # The notices go out on the worker, from the recorded change: an organization
+  # with thousands of members must not hold the administrator's request open.
+
+  @unit
+  Scenario: Changing the requirement answers without waiting for the notices
+    When "ana" turns the requirement on for "acme"
+    Then the request answers once the setting is saved
+    And the change is recorded for the worker to tell the members
+    And no notice has been sent by the request itself
+
+  @unit
+  Scenario: Every member gets one notice of a recorded change
+    Given "acme" has two active members with an email address
+    When the worker handles the recorded change
+    Then each member is sent exactly one notice naming who changed it
+
+  @unit
+  Scenario: A redelivered change sends no duplicate notice
+    Given the worker has handled a recorded change for "acme"
+    When the same change is delivered again
+    Then it asks for the same notice delivery as before
+    And no member is sent a second notice
+
+  @integration
   Scenario: Turning the requirement off lets the held members straight back in
     Given members of "acme" are held at the enrollment gate
     When "ana" turns the requirement off
     Then those members reach "acme"'s data without signing in again
     And the members who did set one up keep it, and are still asked for it
+
+  # ── The requirement is a paid capability ───────────────────────────────
+
+  # Requiring a second factor of every member is sold with the Enterprise
+  # plan. The control is never hidden: an administrator who cannot see it
+  # cannot want it, and the count of members who cannot prove one is the
+  # honest reason to want it. So the card stays, the switch is what locks,
+  # and the plan is asked on the server as well — a greyed switch is a
+  # courtesy to whoever is reading, not a boundary.
+
+  @integration
+  Scenario: The requirement is offered on every plan and locked without one
+    Given "acme" is not on a plan that carries the requirement
+    When "ana" opens the organization's security settings
+    Then the requirement is on screen rather than hidden
+    And the switch is greyed out, saying it needs the Enterprise plan
+    And the screen points at the plans, or at activating a licence when self-hosted
+    And the screen still says how many members cannot prove a second factor
+    But once the requirement is already on and the plan has lapsed, "ana" can still turn it off
+
+  @unit
+  Scenario: Turning the requirement on without the plan is refused by the server
+    Given "acme" is not on a plan that carries the requirement
+    When something asks to turn the requirement on for "acme" anyway
+    Then the refusal carries the code "identity_mfa_requirement_not_licensed"
+    And the setting is left exactly where it was
+    And nobody is told about a rule that never started
+    But turning the requirement off is never refused for this reason
 
   @unit
   Scenario: Turning it off is refused while an organization requires it
@@ -316,23 +405,45 @@ Feature: Two-step verification - one setup per person, and organizations that re
   # reason the session records what it proved: for these people the
   # requirement is satisfied by the sign-in, not by the account.
   @unit
-  Scenario: A provider that asserted a second factor satisfies the requirement
+  Scenario: A supported verified provider factor satisfies the requirement
     Given "acme" requires two-step verification
-    And "sam" signs in through "acme"'s identity provider
-    When the provider asserts that a second factor was used
+    And "sam" signs in through a supported Auth0 or Okta connection
+    When the current cryptographically verified token matches the accepted account subject and asserts a second factor
     Then "sam" reaches "acme"'s data with no setup of their own
     And the session records the factor the provider asserted
 
   @unit
-  Scenario: A provider that asserts nothing satisfies nothing
+  Scenario: A supported verified provider that asserts nothing satisfies nothing
     Given "acme" requires two-step verification
-    And "sam" signs in through "acme"'s identity provider
-    When the provider asserts no second factor
+    And "sam" signs in through a supported Auth0 or Okta connection
+    When its current cryptographically verified token matches the accepted account subject and asserts no second factor
     Then "sam" is held at the enrollment gate like any other member
     And setting one up here is the way through
     And nothing infers a factor the provider did not assert
 
-  @integration @unimplemented
+  # `session-claims.service.unit.test.ts` binds request scoping, subject
+  # binding and claim propagation after the verified-token seam. The provider
+  # config invariant is in `oidcProviders.test.ts`; these parser-level tokens
+  # are not themselves proof of cryptographic verification. The Prisma
+  # adapter's exact Auth0/Okta lookup is separately covered by
+  # `session-identifiers.prisma.repository.integration.test.ts`.
+  @unit
+  Scenario: Supported enterprise providers require ID-token verification
+    Given the active enterprise connection uses Auth0 or Okta
+    When the server mounts its generic OAuth provider
+    Then ID-token verification is required before callback claims are trusted
+
+  # The federated-callback claims scenarios live with the claims mint, in
+  # modules/identity/specs/federated-session-claims.feature.
+
+  @unit
+  Scenario: A held member cannot carry the standing recovery exemption into API-key creation
+    Given "sam" is authenticated but held until two-step verification is enrolled
+    And "sam" can read the standing needed to recover
+    When "sam" tries to create an API key for the organization
+    Then the request is refused before membership or API-key persistence
+
+  @integration
   Scenario: An administrator is told when their connection asserts nothing
     Given "acme" requires two-step verification
     And "acme"'s members sign in through a connection that asserts no second factor
@@ -351,7 +462,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
     And the screen tells "sam" how long to wait
     And a correct code entered during the wait is refused too
 
-  @unit @unimplemented
+  @unit
   Scenario: Backup codes are locked out with everything else
     Given "sam" is locked out after repeated wrong codes
     When "sam" enters a valid, unused backup code
@@ -392,7 +503,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
   # deliverable was originally going to do. Landing the change signs nobody
   # out, because the requirement is a condition on an account and no
   # organization has set one yet.
-  @unit @unimplemented
+  @unit
   Scenario: Landing the change signs nobody out
     Given sessions exist that record nothing about what they proved
     And no organization requires two-step verification
@@ -400,7 +511,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then not one of them is ended or refused
     And no request behaves differently from the way it did before
 
-  @unit @unimplemented
+  @unit
   Scenario: A session can be ended for one sign-in method alone
     Given "sam" holds sessions minted by a password and by an identity provider
     When the sessions for one of those methods are ended
@@ -410,13 +521,13 @@ Feature: Two-step verification - one setup per person, and organizations that re
   # Revoke-all on reset is specs/auth/password-reset.feature's guarantee and
   # survives untouched: per-identifier revocation is a narrower instrument
   # beside it, never a replacement for it.
-  @unit @unimplemented
+  @unit
   Scenario: Resetting a password still ends every session
     Given "sam" holds several sessions, minted by several methods
     When "sam" completes a password reset
     Then every one of "sam"'s sessions ends, whatever method minted it
 
-  @integration @unimplemented
+  @integration
   Scenario: The session list says how each session signed in
     When "sam" opens the list of their signed-in devices
     Then each entry names the method it signed in with
@@ -425,14 +536,14 @@ Feature: Two-step verification - one setup per person, and organizations that re
 
   # ── Impersonation ──────────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: An impersonated session records both people
     When an operator starts impersonating "sam"
     Then the session records the operator as the actor and "sam" as the subject
     And what the session proved is the operator's, never claimed for "sam"
     And nothing is written to the legacy impersonation payload
 
-  @unit @unimplemented
+  @unit
   Scenario: Every authorization decision under impersonation names both people
     Given an operator is impersonating "sam"
     When any authorization decision is made for that session
@@ -461,7 +572,9 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then the request is decided on the operator's own second factor
     And it never fails as an unexplained error
 
-  @integration @unimplemented
+  # Bound by prisma.auth-session.impersonation-revoke.integration.test.ts (modules/auth),
+  # which runs main's identity_auth revoke block as shipped.
+  @integration
   Scenario: The one revoke at deploy is the impersonating sessions
     Given sessions exist carrying the legacy impersonation payload
     And ordinary sessions exist that proved nothing
@@ -469,12 +582,17 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then the sessions carrying the legacy payload end
     And every ordinary session keeps working
     And the operators whose sessions ended can start impersonating again in one action
-    And from then on nothing writes or reads that payload, and the column is dropped
+    And from then on nothing writes or reads that payload
+    # Expand now, contract next release. Migrations run at container start, so
+    # dropping the column in the release that stops reading it would drop it
+    # while the previous release's pods still select it on every authenticated
+    # request — signing everybody out for the length of the rollout.
+    And the column itself stays for one release, and is dropped in the next
 
   # specs/auth/impersonation-banner.feature and
   # specs/ops/dejaview-impersonation-access.feature keep owning this
   # behavior. Only the claims underneath it change.
-  @integration @unimplemented
+  @integration
   Scenario: The banner and the way out keep working on the new claims
     Given an operator is impersonating "sam"
     When any page is rendered
@@ -485,7 +603,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
   # The reason requirement is
   # specs/features/backoffice-user-impersonation-reason.feature's and is
   # inherited whole.
-  @integration @unimplemented
+  @integration
   Scenario: Starting an impersonation still takes a reason
     When an operator starts impersonating "sam" without giving a reason
     Then the impersonation is refused
@@ -493,19 +611,14 @@ Feature: Two-step verification - one setup per person, and organizations that re
 
   # ── Failures read as words ─────────────────────────────────────────────
 
-  @integration @unimplemented
-  Scenario: Every named failure has copy a first-time reader understands
-    When a setup, a sign-in or an impersonation is refused with a named code
-    Then the screen shows the copy registered for that code
-    And the screen never shows the code itself or an internal error
-    And no message names a table, an environment variable or a service
-
-  @unit @unimplemented
-  Scenario: A failure we cannot name stays unnamed
-    When a challenge fails for a reason nothing anticipated
-    Then no invented code is attached to it
-    And the screen says it did not go through, with a trace identifier
-    And the real cause is logged
+  # The two rules — a named failure gets copy a first-time reader
+  # understands, and an unanticipated one stays unnamed rather than inventing
+  # a code for it — are specified once, in
+  # specs/identity/passkeys.feature ("Every named failure has copy a
+  # first-time reader understands" / "A failure we cannot name stays
+  # unnamed"), and apply here to setup, sign-in and impersonation refusals
+  # the same way they apply to passkey ceremonies. Not restated to avoid two
+  # specs drifting apart on the same rule.
 
   # ── The flag ───────────────────────────────────────────────────────────
 
@@ -516,9 +629,23 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then no setup is offered and no challenge is presented
     And "ana" cannot turn the requirement on for "acme"
 
-  @unit @unimplemented
+  @unit
   Scenario: Turning the flag off leaves people who set one up signed in
     Given members of "acme" have set two-step verification up
     When the flag is turned off
     Then their sessions keep working
     And nothing they set up is erased
+
+  @unit @regression
+  Scenario: Selected session revocation deletes rows before invalidating cached sessions
+    Given a user revokes selected sessions or all sessions from one identifier
+    When the session records are deleted
+    Then cache invalidation follows the completed deletion
+    And unrelated session rows remain live
+
+  @unit @regression
+  Scenario: Every browser session revocation deletes rows before clearing the cached sessions
+    Given a person ends one session, all sessions or every other session
+    When the session rows are deleted
+    Then the cached sessions are cleared only after the deletion
+    And a refresh racing the revoke cannot re-cache a deleted session

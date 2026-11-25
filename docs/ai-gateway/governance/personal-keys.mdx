@@ -53,32 +53,36 @@ langwatch claude
 
 The first run issues your personal key, prints `issued your personal virtual key for the gateway path`, and starts Claude Code with the gateway as its endpoint. Later runs reuse the key. The tool itself is unchanged: flags, terminal handling and exit codes pass through.
 
-| Wrapper | Tool | Variables the wrapper sets |
-|---|---|---|
-| `langwatch claude` | Claude Code | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
-| `langwatch codex` | Codex | `OPENAI_BASE_URL`, `OPENAI_API_KEY` |
-| `langwatch cursor` | Cursor | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
-| `langwatch gemini` | Gemini CLI | `GOOGLE_GEMINI_BASE_URL`, `GEMINI_API_KEY`, `GOOGLE_API_KEY` |
-| `langwatch copilot` | GitHub Copilot CLI | `COPILOT_PROVIDER_TYPE`, `COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY` |
-| `langwatch opencode` | OpenCode | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY` |
+| Wrapper              | Tool               | Variables the wrapper sets                                                                             |
+| -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------ |
+| `langwatch claude`   | Claude Code        | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`                                                           |
+| `langwatch codex`    | Codex              | `OPENAI_BASE_URL`, `OPENAI_API_KEY`                                                                    |
+| `langwatch cursor`   | Cursor             | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`                      |
+| `langwatch gemini`   | Gemini CLI         | `GOOGLE_GEMINI_BASE_URL`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`                                           |
+| `langwatch copilot`  | GitHub Copilot CLI | `COPILOT_PROVIDER_TYPE`, `COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY`                       |
+| `langwatch opencode` | OpenCode           | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY` |
 
 **Also check:** [Coding Agents](/coding-agents/overview) for the setup pages per tool.
 
 ## Your keys and devices
 
-Open **Configure** in your personal workspace (`/me/configure`). The **Virtual keys** tab lists your keys with their label, the device that issued them and their last use. **Add a new key** creates a second key with a label of your choice, for example `jane-laptop-2`; the secret is shown once. The **Devices** tab lists the CLI sessions signed in on your account.
+Open **Configure** in your personal workspace (`/coding-agents/configure`). The **Virtual keys** tab lists your keys with their label, the device that issued them and their last use. **Add a new key** creates a second key with a label of your choice, for example `jane-laptop-2`; the secret is shown once. The **Devices and keys** tab lists the CLI sessions signed in on your account, each with the ingestion keys it minted.
 
 Revoke a key from the same list when a laptop is lost or a secret leaked. The gateway refuses the key on the next request.
 
-`langwatch whoami` prints your user, your organization and the prefix of your personal key once one is issued. `langwatch logout` removes the device session from this machine and invalidates its tokens on the server; your keys stay valid until you revoke them.
+`langwatch whoami` prints your user, your organization and the prefix of your personal key once one is issued. `langwatch logout` removes the device session from this machine and invalidates its tokens on the server; your virtual keys stay valid until you revoke them.
+
+### Ingestion keys follow the CLI session
+
+An ingestion key that the CLI mints for a tool belongs to the login session on that machine. It is retired when you run `langwatch logout` there, when you revoke that device from the **Devices and keys** tab, or when the session reaches the end of its window. Every live key is listed on that tab under the device it came from, so you can see and revoke each one on its own.
 
 ## Your usage and budget
 
-Open **My Usage** (`/me`) for your spend, your requests and your recent traces. The page lists every budget that applies to you and warns from 80% of a limit.
+Open **My Usage** (`/coding-agents`) for your spend, your requests and your recent traces. The page lists every budget that applies to you and warns from 80% of a limit.
 
 A budget applies to you when your admin creates one with **Applies to: Member** and picks you, or binds one to your personal team, your personal project or your key. Your admin sets the window: per day, per week, per calendar month, or a total with no reset.
 
-When a blocking budget is reached, the gateway refuses the request with `402 budget_exceeded`. The wrapper checks your budget before it starts the tool and prints a link to `/me/budget/request` with the limit and the spend filled in, so you can ask your admin for an increase from there.
+When a blocking budget is reached, the gateway refuses the request with `402 budget_exceeded`. The wrapper checks your budget before it starts the tool and prints a link to `/coding-agents/budget/request` with the limit and the spend filled in, so you can ask your admin for an increase from there.
 
 **Also check:** [Budgets](/ai-gateway/budgets) for the budget windows and the error body.
 

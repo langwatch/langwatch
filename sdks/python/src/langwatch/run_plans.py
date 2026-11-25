@@ -96,7 +96,7 @@ class RunPlansFacade:
             Dictionary with the run result, the plan it belongs to and whether
             the plan was created. Every scenario run of the plan reports its
             evaluator results under ``results.evaluations`` on
-            ``GET /api/simulation-runs/{scenarioRunId}``.
+            ``GET /api/v1/simulation-runs/{scenarioRunId}``.
         """
         config: Dict[str, Any] = {
             "scope": build_scope(

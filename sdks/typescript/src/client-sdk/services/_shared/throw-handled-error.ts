@@ -1,21 +1,10 @@
 /**
- * The one place the SDK decides "did the platform NAME this failure?".
- *
- * Every `*-api.service.ts` funnels its non-2xx responses through a private
- * `handleApiError`, which builds an English sentence and throws that service's
- * own error class. This slots in immediately before the throw: if the body is a
- * domain error, it raises the typed one instead; if it is anything else, it
- * returns and the service throws exactly what it always threw.
- *
- * That ordering is the whole design. Domain errors become typed; everything else
- * — a 5xx, a proxy's HTML, a truncated body, a dead socket — keeps its existing
- * behaviour byte for byte, including the message, because the sentence the
- * generic path already built is handed in and reused rather than rebuilt.
+ * The one place the SDK decides "did the platform NAME this failure?",
+ * slotted before each service's own throw: a domain-error body raises the
+ * typed error; anything else keeps the generic path's behaviour byte for byte.
  */
-import {
-  handledErrorFrom,
-  type LangWatchHandledError,
-} from "@/internal/api/errors";
+import { handledErrorFrom, type LangWatchHandledError } from "@/internal/api/errors";
+
 import { extractStatusFromResponse } from "./format-api-error";
 
 export interface ThrowIfHandledErrorParams {
@@ -42,8 +31,7 @@ export function throwIfHandledError({
   status,
   message,
 }: ThrowIfHandledErrorParams): void {
-  const resolved =
-    status ?? response?.status ?? extractStatusFromResponse(error);
+  const resolved = status ?? response?.status ?? extractStatusFromResponse(error);
 
   const handledError: LangWatchHandledError | null = handledErrorFrom({
     operation,

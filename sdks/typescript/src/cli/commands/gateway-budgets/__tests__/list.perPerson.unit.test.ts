@@ -1,23 +1,19 @@
+import { stripVTControlCharacters } from "node:util";
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 /**
- * How `langwatch gateway-budgets list` renders a per-person template.
- *
- * The template's limit belongs to each end user separately, so the
- * spent-over-limit percentage every other scope shows is meaningless here:
- * it would divide a per-person cap into one bucket's spend and report a
- * confident number about nobody. The row reports a headcount instead.
+ * How `gateway-budgets list` renders a per-person template: the per-user
+ * limit makes other scopes' spent-over-limit percentage meaningless here,
+ * so the row reports a headcount instead.
  */
 const mockList = vi.fn();
 
-vi.mock(
-  "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service",
-  () => ({
-    GatewayBudgetsApiService: class {
-      list = mockList;
-    },
-  }),
-);
+vi.mock("@/client-sdk/services/gateway-budgets/gateway-budgets-api.service", () => ({
+  GatewayBudgetsApiService: class {
+    list = mockList;
+  },
+}));
 
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
@@ -55,27 +51,22 @@ function budget(overrides: Record<string, unknown> = {}) {
 }
 
 /** The rendered table, with colour codes stripped. */
-async function renderedTable(
-  rows: Array<Record<string, unknown>>,
-): Promise<string> {
+async function renderedTable(rows: Record<string, unknown>[]): Promise<string> {
   // `list()` walks the endpoint's pages to exhaustion, so what it hands the
   // command is the whole listing as a plain array, with no cursor left to
   // carry and no envelope to unwrap.
   mockList.mockResolvedValue(rows);
   const lines: string[] = [];
-  const spy = vi
-    .spyOn(console, "log")
-    .mockImplementation((...args: unknown[]) => {
-      lines.push(args.map(String).join(" "));
-    });
+  const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+    lines.push(args.map(String).join(" "));
+  });
   try {
     const result = await listGatewayBudgetsCommand();
     if (result && "table" in result) result.table?.();
   } finally {
     spy.mockRestore();
   }
-  // eslint-disable-next-line no-control-regex
-  return lines.join("\n").replace(/\[[0-9;]*m/g, "");
+  return stripVTControlCharacters(lines.join("\n"));
 }
 
 beforeEach(() => vi.clearAllMocks());
@@ -99,9 +90,7 @@ describe("gateway-budgets list rendering a per-person template", () => {
 
   /** @scenario "A per-person template nobody has used yet says so instead of showing a dash" */
   it("says 0 of 0 for a template nobody has spent against", async () => {
-    const table = await renderedTable([
-      budget({ end_users_seen: 0, end_users_over: 0 }),
-    ]);
+    const table = await renderedTable([budget({ end_users_seen: 0, end_users_over: 0 })]);
 
     expect(table).toContain("0 of 0 over cap");
   });

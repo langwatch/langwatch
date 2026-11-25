@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+import { HELP_TOPIC_NAMES, renderAgentHelpTopic } from "../commands/help";
 import { buildProgram } from "../program";
-import {
-  HELP_TOPIC_NAMES,
-  renderAgentHelpTopic,
-} from "../commands/help";
 import { AGENT_MODE_ENV_VARS } from "../utils/output";
 
 // buildProgram() reads the tsup-injected __CLI_VERSION__ build constant —
@@ -53,15 +51,11 @@ describe("`langwatch help` command", () => {
 
   beforeEach(() => {
     consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     // commander's outputHelp writes straight to process.stdout (each command
     // carries its own output configuration, so configureOutput on the root
     // would not capture `help <subcommand>`).
-    stdoutSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation(() => true);
+    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     process.exitCode = 0;
   });
 
@@ -77,12 +71,7 @@ describe("`langwatch help` command", () => {
       .join("");
 
   it("`help agent-mode` prints the agent topic page", async () => {
-    await buildProgram().parseAsync([
-      "node",
-      "langwatch",
-      "help",
-      "agent-mode",
-    ]);
+    await buildProgram().parseAsync(["node", "langwatch", "help", "agent-mode"]);
 
     const out = consoleLogSpy.mock.calls.flat().join("\n");
     expect(out).toContain("AGENT MODE");
@@ -99,22 +88,14 @@ describe("`langwatch help` command", () => {
       await buildProgram().parseAsync(["node", "langwatch", "help", "agent"]);
 
       expect(stdoutText()).toContain("Usage: langwatch agent");
-      expect(consoleLogSpy.mock.calls.flat().join("\n")).not.toContain(
-        "AGENT MODE",
-      );
+      expect(consoleLogSpy.mock.calls.flat().join("\n")).not.toContain("AGENT MODE");
       expect(process.exitCode).toBe(0);
     });
 
     it("walks into the real command's subcommands rather than discarding them", async () => {
       // `help agent list` previously printed the topic page and silently
       // dropped `list`.
-      await buildProgram().parseAsync([
-        "node",
-        "langwatch",
-        "help",
-        "agent",
-        "list",
-      ]);
+      await buildProgram().parseAsync(["node", "langwatch", "help", "agent", "list"]);
 
       expect(stdoutText()).toContain("Usage: langwatch agent list");
       expect(process.exitCode).toBe(0);
@@ -122,13 +103,9 @@ describe("`langwatch help` command", () => {
 
     it("keeps every help topic clear of the registered command tree", () => {
       const program = buildProgram();
-      const registered = new Set(
-        program.commands.flatMap((cmd) => [cmd.name(), ...cmd.aliases()]),
-      );
+      const registered = new Set(program.commands.flatMap((cmd) => [cmd.name(), ...cmd.aliases()]));
 
-      const collisions = HELP_TOPIC_NAMES.filter((name) =>
-        registered.has(name),
-      );
+      const collisions = HELP_TOPIC_NAMES.filter((name) => registered.has(name));
 
       expect(
         collisions,
@@ -139,13 +116,7 @@ describe("`langwatch help` command", () => {
   });
 
   it("rejects a topic given extra words instead of silently discarding them", async () => {
-    await buildProgram().parseAsync([
-      "node",
-      "langwatch",
-      "help",
-      "agent-mode",
-      "list",
-    ]);
+    await buildProgram().parseAsync(["node", "langwatch", "help", "agent-mode", "list"]);
 
     expect(consoleErrorSpy.mock.calls.flat().join("\n")).toContain(
       "unknown command or help topic 'agent-mode list'",
@@ -170,25 +141,14 @@ describe("`langwatch help` command", () => {
   });
 
   it("`help <command> <subcommand>` prints the nested command's help", async () => {
-    await buildProgram().parseAsync([
-      "node",
-      "langwatch",
-      "help",
-      "trace",
-      "search",
-    ]);
+    await buildProgram().parseAsync(["node", "langwatch", "help", "trace", "search"]);
 
     expect(stdoutText()).toContain("Usage: langwatch trace search");
     expect(process.exitCode).toBe(0);
   });
 
   it("`help <unknown>` errors with a non-zero exit code", async () => {
-    await buildProgram().parseAsync([
-      "node",
-      "langwatch",
-      "help",
-      "nosuchtopic",
-    ]);
+    await buildProgram().parseAsync(["node", "langwatch", "help", "nosuchtopic"]);
 
     const err = consoleErrorSpy.mock.calls.flat().join("\n");
     expect(err).toContain("unknown command or help topic 'nosuchtopic'");
@@ -197,12 +157,9 @@ describe("`langwatch help` command", () => {
 });
 
 /**
- * The package ships TWO bin names for one bundle — `lw` and `langwatch` — and
- * one daemon serves both (`resolveBuildId` stats the same symlink target either
- * way). So inside the daemon, `process.argv[1]` is whichever bin happened to
- * spawn it and is a coin flip for everybody else: an `lw` caller whose daemon
- * was started by `langwatch` was shown `Usage: langwatch …`, for `--help` and
- * for every commander error, since the root sets `.showHelpAfterError()`.
+ * The package ships TWO bin names for one bundle -- `lw` and `langwatch` --
+ * sharing one daemon, so `process.argv[1]` inside it is whichever bin
+ * happened to spawn it: an `lw` caller could see `Usage: langwatch ...`.
  */
 describe("the name usage and errors are titled with", () => {
   const savedArgv1 = process.argv[1] ?? "";
@@ -213,23 +170,16 @@ describe("the name usage and errors are titled with", () => {
   });
 
   /**
-   * What a caller who mistypes actually sees. `helpInformation()` renders the
-   * intentional `--help` page and nothing else, so it cannot speak for the
-   * error path at all — and the error path is the half `.showHelpAfterError()`
-   * added, reached through `_displayError` rather than through `outputHelp`.
-   * Commander writes the whole block to stderr there, so that is where we look.
+   * What a caller who mistypes actually sees. `helpInformation()` only
+   * renders the intentional `--help` page; the error path is the half
+   * `.showHelpAfterError()` adds, via `_displayError`, writing to stderr.
    */
-  const commanderErrorText = (
-    args: string[],
-    options: { bin?: string } = {},
-  ): string => {
+  const commanderErrorText = (args: string[], options: { bin?: string } = {}): string => {
     let text = "";
-    const stderrSpy = vi
-      .spyOn(process.stderr, "write")
-      .mockImplementation((chunk) => {
-        text += String(chunk);
-        return true;
-      });
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      text += String(chunk);
+      return true;
+    });
     const program = buildProgram(options);
     program.exitOverride();
     try {
@@ -243,12 +193,10 @@ describe("the name usage and errors are titled with", () => {
 
   describe("given the caller's bin travels with the request", () => {
     it("titles usage with the caller's bin, not the serving process's", () => {
-      expect(
-        buildProgram({ bin: "/usr/local/bin/lw" }).helpInformation(),
-      ).toContain("Usage: lw ");
-      expect(
-        buildProgram({ bin: "/usr/local/bin/langwatch" }).helpInformation(),
-      ).toContain("Usage: langwatch ");
+      expect(buildProgram({ bin: "/usr/local/bin/lw" }).helpInformation()).toContain("Usage: lw ");
+      expect(buildProgram({ bin: "/usr/local/bin/langwatch" }).helpInformation()).toContain(
+        "Usage: langwatch ",
+      );
     });
 
     it("titles commander's own errors with it too, which is where most callers meet the name", () => {
@@ -281,9 +229,7 @@ describe("the name usage and errors are titled with", () => {
       expect(commanderErrorText(["--nosuchoption"])).toContain("Usage: lw ");
 
       process.argv[1] = "/usr/local/bin/langwatch";
-      expect(commanderErrorText(["--nosuchoption"])).toContain(
-        "Usage: langwatch ",
-      );
+      expect(commanderErrorText(["--nosuchoption"])).toContain("Usage: langwatch ");
     });
   });
 });

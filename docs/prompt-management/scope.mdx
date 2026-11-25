@@ -92,26 +92,25 @@ This prompt is accessible to all projects within `org_123` but can only be modif
 import { LangWatch } from "langwatch";
 
 const langwatch = new LangWatch({
-apiKey: process.env.LANGWATCH_API_KEY
+  apiKey: process.env.LANGWATCH_API_KEY
 });
 
 // Create project-scoped prompt (default)
 const projectPrompt = await langwatch.prompts.create({
-handle: "project-specific-bot",
-scope: "PROJECT", // Default, can be omitted
-prompt: "You are a project-specific assistant...",
-// ... other fields
+  handle: "project-specific-bot",
+  scope: "PROJECT", // Default, can be omitted
+  prompt: "You are a project-specific assistant...",
+  // ... other fields
 });
 
 // Create organization-scoped prompt
 const orgPrompt = await langwatch.prompts.create({
-handle: "company-guidelines",
-scope: "ORGANIZATION",
-prompt: "You represent our company brand...",
-// ... other fields
+  handle: "company-guidelines",
+  scope: "ORGANIZATION",
+  prompt: "You represent our company brand...",
+  // ... other fields
 });
-
-````
+```
 </Tab>
 
 <Tab title="Python SDK">
@@ -133,14 +132,14 @@ org_prompt = langwatch.prompts.create(
     prompt="You represent our company brand...",
     # ... other fields
 )
-````
+```
 
 </Tab>
 
 <Tab title="REST API">
 ```bash
 # Create project-scoped prompt
-curl -X POST "https://app.langwatch.ai/api/prompts" \
+curl -X POST "https://app.langwatch.ai/api/v1/prompts" \
   -H "Content-Type: application/json" \
   -H "X-Auth-Token: your-api-key" \
   -d '{
@@ -154,7 +153,7 @@ curl -X POST "https://app.langwatch.ai/api/prompts" \
 
 # Create organization-scoped prompt
 
-curl -X POST "https://app.langwatch.ai/api/prompts" \
+curl -X POST "https://app.langwatch.ai/api/v1/prompts" \
  -H "Content-Type: application/json" \
  -H "X-Auth-Token: your-api-key" \
  -d '{

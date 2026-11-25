@@ -103,6 +103,62 @@ export const goErrorCodes = {
    */
   config_invalid: { service: "config" },
   /**
+   * ErrConnectCredentialPending — means the license authenticated but its
+   * managed key is still being provisioned. It is not a refusal: a retry a few
+   * seconds later succeeds, so the gateway never remembers it.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_credential_pending: { service: "aigateway", httpStatus: 503 },
+  /**
+   * ErrConnectInstanceRequired — means a license token arrived without the
+   * X-LangWatch-Instance header. A license is bound to one install, so the
+   * token alone identifies nothing.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_instance_required: { service: "aigateway", httpStatus: 400 },
+  /**
+   * ErrConnectLicenseExpired — means the license term ended. A renewed license
+   * opens hosted services again.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_license_expired: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrConnectLicenseNotRegistered — means the license behind the token is not
+   * in the registry, or is recorded there without a customer. The install's
+   * operator has to contact LangWatch; retrying changes nothing.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_license_not_registered: { service: "aigateway", httpStatus: 401 },
+  /**
+   * ErrConnectLicenseRevoked — means the license was revoked or replaced. The
+   * install keeps working offline on the license it holds, but hosted services
+   * are closed to it for good.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_license_revoked: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrConnectServiceNotEntitled — means the license authenticated but does
+   * not include the hosted service the call needs. Distinct from every refusal
+   * above: the license is live and its other services keep working, so the fix
+   * is a change to the contract rather than to the install.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_service_not_entitled: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrConnectWrongInstance — means the license is bound to another install.
+   * Either the token leaked, or the install was rebuilt and an operator has to
+   * reset the binding.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  connect_wrong_instance: { service: "aigateway", httpStatus: 403 },
+  /**
    * ErrConversationBusy — signals a second concurrent turn for a conversation
    * whose single-stream agent session is already answering. The control plane
    * shows a "still answering — wait" notice. Maps to 409.
@@ -157,6 +213,14 @@ export const goErrorCodes = {
    * @source services/aigateway/domain/errors.go
    */
   guardrail_upstream_unavailable: { service: "aigateway", httpStatus: 503 },
+  /**
+   * ErrHostedServiceUnavailable — means the gateway could not get an answer
+   * from the control plane for a hosted-service call. Nothing was judged and
+   * nothing was charged, so the caller can retry.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  hosted_service_unavailable: { service: "aigateway", httpStatus: 503 },
   /**
    * ErrIdleTimeout — signals the SSE stream went silent past
    * NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS and the engine closed the
@@ -214,9 +278,28 @@ export const goErrorCodes = {
    * ErrJSONPathNoMatch — signals an HTTP block's output_path matched no
    * element of the upstream response.
    *
+   * Also produced as a workflow NodeError type, so this one entry is the copy
+   * for both the HTTP failure and the node error event. Its node sites are
+   * among the @source files below.
+   *
+   * @source services/nlpgo/app/engine/engine.go
    * @source services/nlpgo/domain/errors.go
    */
   jsonpath_no_match: { service: "nlpgo", httpStatus: 422 },
+  /**
+   * ErrProviderKeyRejected — marks a key the provider refused on a status
+   * other than 401 or 403.
+   *
+   * @source services/langyagent/adapters/otelrelay/llmproxy.go
+   */
+  llm_provider_key_rejected: { service: "langyagent" },
+  /**
+   * ErrProviderOutOfCredit — marks a provider account with no credit or quota
+   * left.
+   *
+   * @source services/langyagent/adapters/otelrelay/llmproxy.go
+   */
+  llm_provider_out_of_credit: { service: "langyagent" },
   /**
    * llmUpstreamErrorCode — marks a failed mediated LLM call whose response
    * body was NOT the gateway's typed herr envelope — a provider-native error
@@ -321,6 +404,11 @@ export const goErrorCodes = {
    * deployment map is missing, or the provider does not implement the
    * operation. Terminal, and the remediation is in the customer's model
    * provider settings rather than in the request.
+   *
+   * The answer carries a "problem" in its meta, one of the ConfigProblem*
+   * values below, naming which of those it was. The copy the customer reads is
+   * chosen from it, because "add your API key" and "add a deployment mapping"
+   * are different instructions.
    *
    * @source services/aigateway/domain/errors.go
    */
@@ -503,6 +591,15 @@ export const goErrorCodes = {
    * @source services/aigateway/domain/errors.go
    */
   virtual_key_revoked: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrVoiceBrokerUnavailable — means this gateway cannot take another
+   * brokered call right now: it is draining, or it already supervises as many
+   * calls as it is configured to hold. Nothing was booked and nothing was
+   * created.
+   *
+   * @source services/aigateway/domain/voice_broker.go
+   */
+  voice_broker_unavailable: { service: "aigateway", httpStatus: 503 },
   /**
    * ErrWorkerNotReady — signals a freshly spawned worker did not become ready
    * within LANGY_READINESS_TIMEOUT_MS.

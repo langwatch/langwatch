@@ -6,7 +6,7 @@ Feature: Typed permission declarations
   runtime failure in production
 
   # Spec for ADR-092 delivery-plan PR 4, decision 25 (the declared surface).
-  # The registry (packages/authz/src/registry.ts) already states, per
+  # The registry (modules/authz/contract/src/registry.ts) states, per
   # resource, the scope tiers it can be granted at; this feature makes the
   # declaration surfaces derive their typing from that single source. The
   # scenarios about compile errors are bound by type-assertion tests that
@@ -135,15 +135,15 @@ Feature: Typed permission declarations
     And the sweep counts the procedure as declared rather than unguarded
 
   # ============================================================================
-  # One seam, decision-neutral (decision 25)
+  # The declared seam delegates to the canonical authorization app.
   # ============================================================================
 
   @unit
-  Scenario: A declared check decides exactly as the middleware it replaced
-    Given an organization not yet cut over to the engine
-    When a declared permission check runs for one of its members
-    Then the legacy resolver decides and the engine shadows it
-    And for a cut-over organization the engine decides and legacy reverse-shadows
+  Scenario: Every grant check decides through the App the request context carries
+    Given a request context carrying the canonical authorization app
+    When a declared permission check runs for its project scope
+    Then the context app decides with the validated user, permission, and scope
+    And the module-level resolver is not consulted
 
   @unit
   Scenario: A denial carries a stable code the client can present
@@ -210,12 +210,6 @@ Feature: Typed permission declarations
     When a request reaches the endpoint
     Then the framework mounts the declared permission check itself
     And the check runs even though the endpoint replaced the guard's middleware array
-
-  @unit
-  Scenario: A registered policy that promises an unenforced permission fails the build
-    Given a management endpoint whose declared policy names a permission the config does not enforce
-    When the service builds
-    Then the build fails naming both halves of the declaration
 
   @unit
   Scenario: A passing imperative check returns a proof, not a boolean
@@ -331,3 +325,16 @@ Feature: Typed permission declarations
     Given a procedure whose input schema the sweep cannot read
     When the sweep walks the router
     Then the procedure is reported rather than skipped
+
+  # A transport handed its base parser as a port cannot chain a second
+  # `.input()` onto it — tRPC types that call as a conditional on the input
+  # already accumulated, and a conditional over an unresolved type parameter
+  # never takes the merging branch — so it composes with one intersection
+  # instead. Reading only the outer parser would leave those procedures' scope
+  # ids unchecked behind an allowlist.
+  @unit
+  Scenario: An input composed as an intersection is inspected, not skipped
+    Given a procedure whose input intersects two object parsers
+    When the sweep walks the router
+    Then a scope id either parser carries is checked at its own tier
+    And an intersection with a member the sweep cannot read is still reported

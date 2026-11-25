@@ -1,29 +1,20 @@
 /**
- * Keeping the installed LangWatch plugin up to date: when a wrapped run spends
- * a subprocess looking, what it does with what it finds, and what it costs on
- * the runs in between.
- *
- * `node:child_process` is the only thing mocked. The install record, the
- * marketplace listing and its plugin manifest are real files under a temp HOME,
- * because the version comparison reads them the way Claude Code writes them and
- * a hand-stubbed reader would prove nothing about that.
- *
- * Feature: specs/ai-governance/cli-wrappers/claude-plugin-update.feature
+ * `node:child_process` is the only thing mocked; the install record, marketplace listing and
+ * plugin manifest are real files under a temp HOME, since version comparison reads them the way
+ * Claude Code writes them. Feature: specs/ai-governance/cli-wrappers/claude-plugin-update.feature
  */
 
+import type * as ChildProcessModule from "node:child_process";
 import { mkdirSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
-
-import type * as ChildProcessModule from "node:child_process";
 
 import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 
 vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  const actual = await vi.importActual<typeof ChildProcessModule>("node:child_process");
   return { ...actual, spawnSync: spawnSyncMock };
 });
 
@@ -49,10 +40,9 @@ const HOUR_MS = 60 * 60 * 1000;
 const secondsAgo = (ms: number): number => Math.floor((Date.now() - ms) / 1000);
 
 /**
- * A `claude` whose `plugin update` does what a real one does: moves the version
- * in the install record. Nothing else about the outcome is observable, and a
- * mock that only reported success would let a no-op update pass as an applied
- * one.
+ * A `claude` whose `plugin update` does what a real one does: moves the
+ * version in the install record. Nothing else is observable, so a mock that
+ * only reported success would let a no-op update pass as applied.
  */
 const claudeThatUpdatesTo = (version: string): void => {
   spawnSyncMock.mockImplementation((_bin: string, args: string[]) => {
@@ -127,8 +117,7 @@ describe("updateLangwatchClaudePlugin", () => {
       const { updateLangwatchClaudePlugin } = await loadModule();
 
       updateLangwatchClaudePlugin({
-        onCheckStart: () =>
-          spawnsWhenAnnounced.push(spawnSyncMock.mock.calls.length),
+        onCheckStart: () => spawnsWhenAnnounced.push(spawnSyncMock.mock.calls.length),
       });
 
       // Announced once, and before anything reached the network. The probe is
@@ -159,9 +148,7 @@ describe("updateLangwatchClaudePlugin", () => {
         action: "up_to_date",
         from: "0.2.0",
       });
-      expect(commandsRun()).not.toContain(
-        "plugin update langwatch@langwatch --scope user",
-      );
+      expect(commandsRun()).not.toContain("plugin update langwatch@langwatch --scope user");
     });
 
     it("leaves an install ahead of the listing where it is", async () => {
@@ -271,22 +258,14 @@ describe("updateLangwatchClaudePlugin", () => {
       const result = updateLangwatchClaudePlugin();
 
       expect(result.action).toBe("unknown_version");
-      expect(commandsRun()).not.toContain(
-        "plugin update langwatch@langwatch --scope user",
-      );
+      expect(commandsRun()).not.toContain("plugin update langwatch@langwatch --scope user");
     });
 
     it("does not update against a version it cannot make sense of", async () => {
       seedInstalledPlugin({ version: "0.1.0" });
       seedMarketplace();
       writeJson({
-        segments: [
-          "plugins",
-          "marketplaces",
-          "langwatch",
-          ".claude-plugin",
-          "plugin.json",
-        ],
+        segments: ["plugins", "marketplaces", "langwatch", ".claude-plugin", "plugin.json"],
         value: { name: "langwatch", version: "main" },
       });
       const { updateLangwatchClaudePlugin } = await loadModule();

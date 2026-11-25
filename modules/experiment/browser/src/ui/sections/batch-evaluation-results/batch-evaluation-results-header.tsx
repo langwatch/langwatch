@@ -1,0 +1,151 @@
+import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { HStack, Skeleton, Spacer, Text } from "@langwatch/design-system/primitives";
+import type React from "react";
+import { BarChart2, Download, ExternalLink } from "react-feather";
+
+import type { ExperimentRow } from "../../../model/experiment-api-map.ts";
+import { RunConcurrencyBadge } from "../../elements/batch-results/run-concurrency-badge.tsx";
+import { RunRepeatBadge } from "../../elements/batch-results/run-repeat-badge.tsx";
+import type { BatchEvaluationData } from "../batch-evaluation-results.types.ts";
+
+type BatchEvaluationResultsHeaderProps = {
+  project?: UiHostProject;
+  experiment?: ExperimentRow;
+  shownRunId?: string;
+  /** Cells the shown run kept in flight; absent for a run that recorded none. */
+  shownRunConcurrency?: number | null;
+  /** How many times the shown run repeated every dataset row; absent ran each once. */
+  shownRunRepeat?: number | null;
+  data: BatchEvaluationData | null;
+  charts: { available: boolean; visible: boolean; onChange: (visible: boolean) => void };
+  displayControls: React.ReactNode;
+  columnControls: React.ReactNode;
+  onDownloadCsv: () => void;
+};
+
+const ExperimentTitle = ({
+  experiment,
+  shownRunId,
+  shownRunConcurrency,
+  shownRunRepeat,
+}: {
+  experiment?: ExperimentRow;
+  shownRunId?: string;
+  shownRunConcurrency?: number | null;
+  shownRunRepeat?: number | null;
+}) => (
+  <HStack gap={1} minWidth={0} overflow="hidden" flexShrink={1}>
+    <PageLayout.Heading whiteSpace="nowrap" flexShrink={0}>
+      {experiment ? (experiment.name ?? experiment.slug) : <Skeleton width="200px" height="28px" />}
+    </PageLayout.Heading>
+    {experiment && shownRunId && (
+      <Text
+        textStyle={"xs"}
+        color={"fg.muted"}
+        whiteSpace="nowrap"
+        overflow="hidden"
+        textOverflow="ellipsis"
+        flexShrink={1}
+        minWidth={0}
+      >
+        {"// "}
+        {shownRunId}
+      </Text>
+    )}
+    {experiment && shownRunId && shownRunConcurrency ? (
+      <RunConcurrencyBadge
+        concurrency={shownRunConcurrency}
+        explanationId="shown-run-concurrency-explanation"
+        focusable
+        testId="shown-run-concurrency"
+      />
+    ) : null}
+    {experiment && shownRunId && shownRunRepeat && shownRunRepeat > 1 ? (
+      <RunRepeatBadge repeat={shownRunRepeat} testId="shown-run-repeat" />
+    ) : null}
+  </HStack>
+);
+
+const ExperimentLinks = ({
+  project,
+  experiment,
+}: {
+  project?: UiHostProject;
+  experiment?: ExperimentRow;
+}) => {
+  const router = useRouter();
+  return (
+    <>
+      {experiment?.workflowId && (
+        <PageLayout.HeaderButton
+          onClick={() =>
+            window.open(`/${project?.slug}/studio/${experiment.workflowId}`, "_blank", "noopener")
+          }
+        >
+          <ExternalLink size={16} /> Open Workflow
+        </PageLayout.HeaderButton>
+      )}
+      {experiment?.type === "EVALUATIONS_V3" && (
+        <PageLayout.HeaderButton
+          onClick={() =>
+            void router.push(`/${project?.slug}/experiments/workbench/${experiment.slug}`)
+          }
+        >
+          <ExternalLink size={16} /> Open Experiment
+        </PageLayout.HeaderButton>
+      )}
+    </>
+  );
+};
+
+/** The results page header: the experiment's name, the run shown, and the page's actions. */
+export const BatchEvaluationResultsHeader = ({
+  project,
+  experiment,
+  shownRunId,
+  shownRunConcurrency,
+  shownRunRepeat,
+  data,
+  charts,
+  displayControls,
+  columnControls,
+  onDownloadCsv,
+}: BatchEvaluationResultsHeaderProps) => {
+  // The lite-member CSV-export guard did not travel: the host port carries
+  // permissions, not organization role, so the button is offered to everyone
+  // who can open the page and the server still refuses the download.
+  const isLiteMember = false;
+  const hasRows = !!data && data.rows.length > 0;
+
+  return (
+    <PageLayout.Header paddingX={2} withBorder={false} flexShrink={0}>
+      <ExperimentTitle
+        experiment={experiment}
+        shownRunId={shownRunId}
+        shownRunConcurrency={shownRunConcurrency}
+        shownRunRepeat={shownRunRepeat}
+      />
+      <Spacer />
+      {charts.available && (
+        <PageLayout.HeaderButton
+          variant={charts.visible ? "solid" : "outline"}
+          onClick={() => charts.onChange(!charts.visible)}
+          data-testid="toggle-charts-button"
+        >
+          <BarChart2 size={16} />
+          Charts
+        </PageLayout.HeaderButton>
+      )}
+      {data && data.targetColumns.length > 0 && displayControls}
+      {data && data.datasetColumns.length > 0 && columnControls}
+      {!isLiteMember && (
+        <PageLayout.HeaderButton onClick={onDownloadCsv} disabled={!hasRows}>
+          <Download size={16} /> Export to CSV
+        </PageLayout.HeaderButton>
+      )}
+      <ExperimentLinks project={project} experiment={experiment} />
+    </PageLayout.Header>
+  );
+};

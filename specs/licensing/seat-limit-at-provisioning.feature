@@ -1,0 +1,185 @@
+Feature: A directory or a first single sign-on never takes a full seat the licence did not sell
+
+  # Ruling (2026-10-09): past the licence's full member seats, an SSO first sign-in
+  # or a SCIM create admits the person as a Lite Member; past the Lite Member seats
+  # too, the person is held pending (no access, shown to admins). Invitations are
+  # refused at the limit (enforcement-members.feature); provisioning is not, because
+  # the person already exists in the customer's directory and a refusal loses them.
+  # An interactive arrival held pending or admitted Lite opens a seat request, and a held
+  # person reads a waiting screen instead of onboarding: modules/organization/specs/seat-requests.feature.
+
+  Background:
+    Given an organization on a signed Enterprise licence
+    And a single sign-on connection on that organization with a SCIM token
+
+  Rule: within the seats, provisioning admits a full member
+
+    @integration
+    Scenario: A SCIM create within the seats admits a full member
+      Given the licence covers more full member seats than are in use
+      When the directory creates "within@acme.example"
+      Then the directory is answered that the user was created
+      And "within@acme.example" is a full member of the organization
+
+  Rule: past the full member seats, the person is admitted as a Lite Member
+
+    @integration
+    Scenario: A SCIM create past the seats is admitted, not refused
+      Given every full member seat the licence covers is in use
+      When the directory creates "over@acme.example"
+      Then the directory is answered that the user was created
+      And "over@acme.example" is a member of the organization without a full seat
+
+    @integration
+    Scenario: A SCIM create past the full seats is admitted as a Lite Member
+      Given every full member seat the licence covers is in use
+      And a Lite Member seat is free
+      When the directory creates "lite@acme.example"
+      Then "lite@acme.example" is a Lite Member of the organization
+      And "lite@acme.example" can sign in with Lite Member permissions
+
+    @integration @unimplemented
+    Scenario: A first single sign-on past the seats is admitted as a Lite Member
+      Given every full member seat the licence covers is in use
+      And a Lite Member seat is free
+      And the connection admits new arrivals automatically
+      When "arrival@acme.example" signs in through the connection for the first time
+      Then the sign-in succeeds
+      And "arrival@acme.example" is a Lite Member of the organization
+
+    # The older automatic join, for an organization that names its email domain rather than
+    # owning a connection, admits a brand-new account before any connection is asked. It wrote
+    # a full membership with no seat check, so on an organization that has both, a new person
+    # took a full seat past the licence and the connection then found them already a member.
+    @unit
+    Scenario: A new account joined by its email domain past the seats is admitted as a Lite Member
+      Given every full member seat the licence covers is in use
+      And a Lite Member seat is free
+      And the organization admits everybody with an "acme.example" address automatically
+      When "domain-joiner@acme.example" signs up for the first time
+      Then "domain-joiner@acme.example" is a Lite Member of the organization
+      And "domain-joiner@acme.example" holds an organization-wide Viewer grant
+
+    @integration @unimplemented
+    Scenario: A directory asserting the admin role past the seats takes no full seat
+      Given every full member seat the licence covers is in use
+      And the directory maps "over-admin@acme.example" to a group holding the admin role
+      When the directory creates "over-admin@acme.example"
+      Then "over-admin@acme.example" is a Lite Member of the organization
+      And "over-admin@acme.example" holds no admin permission
+
+    @integration @unimplemented
+    Scenario: Open invitations count toward the seats provisioning may fill
+      Given the organization's members and open full seat invitations use every full member seat
+      When the directory creates "invited-full@acme.example"
+      Then "invited-full@acme.example" is a Lite Member of the organization
+
+  Rule: a Lite Member seat holds an organization-wide Viewer grant however the person arrives
+
+    # Ruling (Alex, 2026-10-09): an SSO arrival or an approved join request given a Lite Member
+    # seat holds the organization-wide Viewer grant a SCIM create gives; a held person holds none.
+
+    @unit
+    Scenario: A first single sign-on given a Lite Member seat holds the organization-wide Viewer grant
+      Given every full member seat the licence covers is in use
+      And a Lite Member seat is free
+      And the connection admits new arrivals automatically
+      When "arrival@acme.example" signs in through the connection for the first time
+      Then "arrival@acme.example" holds an organization-wide Viewer grant
+
+    @unit
+    Scenario: An approved join request given a Lite Member seat holds the organization-wide Viewer grant
+      Given every full member seat the licence covers is in use
+      And a Lite Member seat is free
+      When an admin approves the join request of "joiner@acme.example"
+      Then "joiner@acme.example" is a Lite Member of the organization
+      And "joiner@acme.example" holds an organization-wide Viewer grant
+
+    @unit
+    Scenario: An arrival held pending for want of any seat is given no grant
+      Given every full member seat and every Lite Member seat the licence covers is in use
+      When "late@acme.example" arrives by single sign-on or an approved join request
+      Then "late@acme.example" holds no grant in the organization
+
+    @unit
+    Scenario: A new account joined by its email domain with no seat left is held with no grant
+      Given every full member seat and every Lite Member seat the licence covers is in use
+      And the organization admits everybody with an "acme.example" address automatically
+      When "domain-late@acme.example" signs up for the first time
+      Then "domain-late@acme.example" is held pending in the organization
+      And "domain-late@acme.example" holds no grant in the organization
+
+    # A Lite Member's admission can be left unfinished (the grant beside the row did not land).
+    # The next sign-in through a connection finishes it with the grant the seat is worth.
+    @unit
+    Scenario: A Lite Member's unfinished admission is resumed with the Viewer grant, never a full one
+      Given "unfinished@acme.example" holds a Lite Member seat whose grant has not landed yet
+      When "unfinished@acme.example" signs in through the connection again
+      Then "unfinished@acme.example" holds an organization-wide Viewer grant
+      And "unfinished@acme.example" holds no full member grant
+
+  Rule: directory group grants never exceed the seat the person holds
+
+    # Ruling (2026-10-09, R2): with directory group grants on, a person on a Lite or pending row
+    # holds group grants capped to what a Lite Member may do, until a full seat is free.
+
+    @unit
+    Scenario: A directory group granting admin past the seats is capped to Lite Member permissions
+      Given directory group grants are on
+      And "capped@acme.example" holds a Lite Member seat because every full member seat is in use
+      When the directory maps "capped@acme.example" to a group holding the admin role
+      Then "capped@acme.example" holds only Lite Member permissions
+
+    # Ruling (Alex, 2026-10-09): a member's access listing marks each grant the seat narrows.
+    @unit
+    Scenario: Admins see that a group grant is capped for want of a full seat
+      Given directory group grants are on
+      And "capped@acme.example" holds a group grant capped for want of a full seat
+      When an admin reads the access of "capped@acme.example"
+      Then the group grant is marked as capped by the seat
+
+    @integration @unimplemented
+    Scenario: The members screen badges a grant capped by the seat
+      Given "capped@acme.example" holds a group grant capped for want of a full seat
+      When an admin opens "capped@acme.example" from the organization's members
+      Then the group grant shows a "Capped by seat" badge
+
+    @unit
+    Scenario: A capped group grant lifts once a full seat frees
+      Given directory group grants are on
+      And "capped@acme.example" holds a group grant capped for want of a full seat
+      When a full member seat frees and "capped@acme.example" is given it
+      Then "capped@acme.example" holds the group grant's admin permissions
+
+  Rule: past every full and Lite Member seat, the person is held pending
+
+    @integration
+    Scenario: A SCIM create past every full and Lite Member seat is held pending
+      Given every full member seat and every Lite Member seat the licence covers is in use
+      When the directory creates "overflow@acme.example"
+      Then the directory is answered that the user was created
+      And "overflow@acme.example" is held pending with no access to the organization
+      And admins see "overflow@acme.example" among the organization's members
+
+    @integration @unimplemented
+    Scenario: A first single sign-on past every seat is held pending
+      Given every full member seat and every Lite Member seat the licence covers is in use
+      And the connection admits new arrivals automatically
+      When "late@acme.example" signs in through the connection for the first time
+      Then "late@acme.example" is held pending with no access to the organization
+
+  Rule: error paths never refuse the person and never overfill the seats
+
+    @integration @unimplemented
+    Scenario: Two creates racing for the last seat do not both take it
+      Given exactly one full member seat is free
+      When the directory creates "first@acme.example" and "second@acme.example" at the same moment
+      Then exactly one of them is a full member
+      And the other is a Lite Member of the organization
+
+    @integration
+    Scenario: A retried create past the seats does not promote the person
+      Given every full member seat the licence covers is in use
+      And the directory created "retry@acme.example" as a Lite Member
+      When the directory sends the same create again
+      Then "retry@acme.example" is still a Lite Member of the organization

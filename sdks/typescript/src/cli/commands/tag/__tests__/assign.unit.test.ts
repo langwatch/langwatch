@@ -6,11 +6,16 @@ vi.mock("@/client-sdk/services/prompts", () => ({
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
-import { tagAssignCommand } from "../assign";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
+
+import { tagAssignCommand } from "../assign";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -26,11 +31,12 @@ describe("tagAssignCommand", () => {
     vi.clearAllMocks();
     mockGet = vi.fn();
     mockAssignTag = vi.fn();
-    vi.mocked(PromptsApiService).mockImplementation(
-      function () { return ({
-          get: mockGet,
-          assignTag: mockAssignTag,
-        }) as unknown as InstanceType<typeof PromptsApiService>; });
+    vi.mocked(PromptsApiService).mockImplementation(function () {
+      return {
+        get: mockGet,
+        assignTag: mockAssignTag,
+      } as unknown as InstanceType<typeof PromptsApiService>;
+    });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
     });
@@ -39,19 +45,18 @@ describe("tagAssignCommand", () => {
   });
 
   describe("when assigning to latest version (no --version given)", () => {
-    it("fetches the prompt without version", async () => {
+    beforeEach(() => {
       mockGet.mockResolvedValue({ version: 5, versionId: "cm_abc123" });
       mockAssignTag.mockResolvedValue({});
+    });
 
+    it("fetches the prompt without version", async () => {
       await tagAssignCommand("my-prompt", "production");
 
       expect(mockGet).toHaveBeenCalledWith("my-prompt", {});
     });
 
     it("calls assignTag with the resolved versionId", async () => {
-      mockGet.mockResolvedValue({ version: 5, versionId: "cm_abc123" });
-      mockAssignTag.mockResolvedValue({});
-
       await tagAssignCommand("my-prompt", "production");
 
       expect(mockAssignTag).toHaveBeenCalledWith({
@@ -62,9 +67,6 @@ describe("tagAssignCommand", () => {
     });
 
     it("prints confirmation of the assignment", async () => {
-      mockGet.mockResolvedValue({ version: 5, versionId: "cm_abc123" });
-      mockAssignTag.mockResolvedValue({});
-
       const result = await tagAssignCommand("my-prompt", "production");
       result?.table();
 
@@ -75,19 +77,18 @@ describe("tagAssignCommand", () => {
   });
 
   describe("when assigning to a specific version", () => {
-    it("fetches the prompt with the version option", async () => {
+    beforeEach(() => {
       mockGet.mockResolvedValue({ version: 3, versionId: "cm_def456" });
       mockAssignTag.mockResolvedValue({});
+    });
 
+    it("fetches the prompt with the version option", async () => {
       await tagAssignCommand("my-prompt", "production", { version: "3" });
 
       expect(mockGet).toHaveBeenCalledWith("my-prompt", { version: "3" });
     });
 
     it("calls assignTag with the resolved versionId", async () => {
-      mockGet.mockResolvedValue({ version: 3, versionId: "cm_def456" });
-      mockAssignTag.mockResolvedValue({});
-
       await tagAssignCommand("my-prompt", "production", { version: "3" });
 
       expect(mockAssignTag).toHaveBeenCalledWith({
@@ -102,7 +103,7 @@ describe("tagAssignCommand", () => {
     it("prints an error message", async () => {
       mockGet.mockRejectedValue(new Error("Prompt not found"));
 
-      await expect(tagAssignCommand("nonexistent", "production")).rejects.toThrow();
+      await expect(tagAssignCommand("nonexistent", "production")).rejects.toThrow(Error);
 
       // The error propagates, command doesn't silently pass
     });
@@ -121,7 +122,7 @@ describe("tagAssignCommand", () => {
     it("prints an error about invalid version", async () => {
       await expect(
         tagAssignCommand("my-prompt", "production", { version: "abc" }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: 1 });
 
       expect(console.error).toHaveBeenCalledWith(
         expect.stringContaining("--version must be a positive integer"),

@@ -11,7 +11,13 @@ T = TypeVar("T", bound="GetApiTriggersByIdResponse200ActionParams")
 
 @_attrs_define
 class GetApiTriggersByIdResponse200ActionParams:
-    """ """
+    """Where this automation delivers, with every credential value replaced by the `[redacted]` placeholder. Which channel
+    is configured, which destination is set and which header names are in play all survive; the values never leave; a
+    Slack automation names its connection by `slackIntegrationId` and carries no secret. Sending the placeholder back on
+    an update keeps the stored value. The rule this automation fires by is not here: it is stated in `graphAlert` or
+    `report`, and sending it in this field is refused.
+
+    """
 
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 

@@ -1,312 +1,260 @@
 # @langwatch/api
 
-Builder for versioned Hono API services. Handles middleware stacking, input/output validation, OpenAPI docs, error formatting, and date-based versioning with forward-copying.
+LangWatch's API framework. `package.json` exports eleven entry points: five
+that features and a module's browser import, five that a process composes
+from, and `./dates`, one schema helper. What a feature declares, `defineTrpcContract`, lives in the light core,
+`@langwatch/module`, so a contract depends on no framework (ARCHITECTURE.md §2).
 
-Built on top of [Hono](https://hono.dev), [hono-openapi](https://github.com/rhinobase/hono-openapi), and Zod.
+| Import                  | What it is                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@langwatch/api/access` | `decide`: the one access check both transports run after the parser — the three declarations, the scope-lineage guard, the blank-scope-id refusal and the project-id mismatch refusal. Names no transport.                                                                                                                                                    |
+| `@langwatch/api`        | The transport-agnostic vocabulary: the handled-error classes and their wire envelope, the access-policy vocabulary (`requires`, `publicEndpoint`, `credentialClassFor`, …), the rate-limit and cache ports, and the Standard Schema boundary. Imports no transport framework.                                                                                 |
+| `@langwatch/api/rest`   | `defineRestRouter` and the REST runtime on Hono: addressing (`/api/<x>`, `/api/v1/<x>`), input and output validation, credentials and doors, route-chain capabilities, OpenAPI generated from the routes, SSE responses.                                                                                                                                      |
+| `@langwatch/api/trpc`   | The typed tRPC root and the policy spine every procedure runs through: tracing, request logging, handled-error translation, scope lineage, declared authorization and audit, all over injected ports.                                                                                                                                                         |
+| `@langwatch/api/web`    | The browser's half: `createModuleApi` derives a feature's typed tRPC hooks from its own contract, and `trpcQueryKey` / `trpcQueryFilter` / `useInvalidateProcedure` reach a procedure no contract the package names declares yet. React and `@trpc/react-query` live here and nowhere else in the package. It is the ONLY entry a browser package may import. |
 
-## Quick start
+The five a process composes from, and `./dates`:
 
-A service is one file exporting a built Hono app:
+| Import                             | What it is                                                                                          |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `@langwatch/api/hosting`           | One muxer for the process: the API door (`bindApiDoor`), `/api` and the browser app behind `/`      |
+| `@langwatch/api/hosting/selection` | `TransportSelection`: which surfaces (REST, the browser bundle) a process serves, and their headers |
+| `@langwatch/api/hosting/mux`       | The HTTP muxer's listener and its types (`HttpHandler`, `HttpMiddleware`, `HttpTarget`)             |
+| `@langwatch/api/policy`            | The base response policies a process composes from (browser origin, client address, …)              |
+| `@langwatch/api/composition`       | `createTrpcHandlerBinding`: how a process binds a declared procedure                                |
+| `@langwatch/api/dates`             | `flexibleDateSchema`, an epoch-or-ISO date schema (analytics' and trace's contracts import it)      |
+
+None re-exports another. A consumer that wants the error vocabulary imports
+`@langwatch/api`; one that wants the REST builder imports `@langwatch/api/rest`;
+one wiring tRPC imports `@langwatch/api/trpc`; one _declaring_ procedures for
+both a process and a browser imports `@langwatch/module`; a module's browser
+package imports `@langwatch/api/web`. Most REST call sites need two of the
+first five, and that is the point — the import says which half of the framework
+a file depends on.
+
+REST is built on top of [Hono](https://hono.dev) and [hono-openapi](https://github.com/rhinobase/hono-openapi). Existing services accept Standard Schema; the public REST surface requires Zod 4 so it can derive HTTP documentation from one input object. tRPC is built on [@trpc/server](https://trpc.io) and chooses none of its concretes.
+
+The lasting decisions live in [adrs/](./adrs), including [the fluent handler contract](./adrs/001-rpc-first-fluent-registration.md), [public REST versioning](./adrs/004-public-rest-v1-and-date-negotiation.md) and [the tRPC framework boundary](./adrs/20260828-trpc-framework-boundary.md). Behaviour lives in [specs/](./specs); this README is usage.
+
+## Declaring a feature's transports
+
+A tRPC procedure is declared **once**, in the feature's contract, and bound
+**once**, in the module's process half. Design:
+[the transport declaration split](./adrs/20260908-transport-declaration-split.md).
+Behaviour: [specs/transport-declaration-split.feature](./specs/transport-declaration-split.feature).
 
 ```ts
-// src/app/api/things/[[...route]]/app.ts
-import { z } from "zod";
-import { createService } from "@langwatch/api";
-import { authMiddleware } from "../../middleware/auth";
-import { organizationMiddleware } from "../../middleware/organization";
-import { ThingService } from "~/server/things/thing.service";
-import { prisma } from "~/server/db";
+// contract/src/annotation.trpc.ts — imports zod and its own schemas, nothing else.
+import { defineTrpcContract } from "@langwatch/module";
 
-const thingSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-});
-
-export const app = createService({
-  name: "things",
-  auth: authMiddleware,
-  _legacy: { organizationMiddleware },
-})
-  .provide({
-    thingService: () => ThingService.create(prisma),
-  })
-  .version("2025-03-15", (v) => {
-    v.get(
-      "/",
-      {
-        output: z.array(thingSchema),
-        description: "Lists every thing in the project.",
-        docs: { operationId: "listThings", tags: ["Things"] },
-      },
-      async (_c, { app }) => {
-        return app.thingService.getAll({ projectId: app.project.id });
-      },
-    );
-
-    v.post(
-      "/",
-      {
-        input: z.object({ name: z.string().min(1) }),
-        output: thingSchema,
-        status: 201,
-        docs: { operationId: "createThing", tags: ["Things"] },
-      },
-      async (_c, { input, app }) => {
-        return app.thingService.create({ projectId: app.project.id, ...input });
-      },
-    );
-
-    v.get(
-      "/:id",
-      {
-        params: z.object({ id: z.string() }),
-        output: thingSchema,
-        docs: { operationId: "getThing", tags: ["Things"] },
-      },
-      async (_c, { params, app }) => {
-        return app.thingService.getById({
-          id: params.id,
-          projectId: app.project.id,
-        });
-      },
-    );
-  })
+export const annotationTrpc = defineTrpcContract("annotation")
+  .query("getById")
+  .withInput(annotationScopeSchema)
+  .withOutput(annotationSchema)
+  .mutation("deleteById")
+  .withInput(annotationScopeSchema)
   .build();
 ```
 
-The built app carries its own base path (`/api/things` from `name`, or an explicit `basePath`), so the host's API router mounts it at the root, next to every other service:
-
 ```ts
-// src/server/api-router.ts
-import { app as thingsApp } from "../app/api/things/[[...route]]/app";
+// server/src/transport/annotation.trpc.ts — the permission and the handler, and nothing else.
+import { defineTrpcRouter } from "@langwatch/api/trpc";
 
-api.route("/", thingsApp);
+export const annotationTrpcTransport = defineTrpcRouter(AnnotationApi, annotationTrpc)
+  .procedure("getById")
+  .withPermission("annotations:view")
+  .handle(async ({ app, input }) => app.getById({ id: input.annotationId }))
+  .procedure("deleteById")
+  .withPermission("annotations:delete")
+  .handle(async ({ app, input }) => app.deleteReview(input))
+  .build();
 ```
 
-### Legacy Next-style hosts
+`.procedure(name)` selects a member the contract declared and inherits its kind,
+its parser and its answer. The compiler refuses an undeclared name, a second
+implementation of one name, a `build()` that left one unimplemented, a `handle`
+before `withPermission` / `noPermission` / `serviceAuthorized`, and a handler
+whose answer the declared output refuses. The declaration carries no process
+generic and no runtime import: `router(runtime, app)` is where the host's root,
+ports and application slice arrive.
 
-`routeHandlers(app)` converts a built app into `{ GET, POST, PUT, PATCH, DELETE }` handlers via `hono/vercel` for hosts that export per-file route handlers instead of mounting a Hono router. It stays exported for those hosts; services in this repo export the Hono app and are mounted by the api-router as above.
-
-## What it does for you
-
-- **Tracing + logging** via `@langwatch/observability` (automatic, disable with `tracer: false` / `logger: false`)
-- **Auth, org, resource limits** applied in the right order per-endpoint
-- **Input/output/params/query validation** from Zod schemas on every mount
-- **OpenAPI documentation** of the bare alias path only, shaped by `docs`
-- **Error formatting + logging** for `HandledError` (code, meta, reasons, traceId/spanId, fault/tips/docsUrl) and Zod errors
-- **Versioned routing** at `/api/{name}/{date}/...` with forward-copying from previous versions
-- **Route mounting callback** (`onRouteMounted`) so hosts can register route policies for every mounted path, namespace guards included
-
-## Handler signature
+The browser derives its client from the same declaration, so no map restates it:
 
 ```ts
-v.get("/path", config, async (c, { input, params, query, app }) => {
-  // c        = Hono Context (escape hatch for headers, raw request)
-  // input    = parsed JSON body (from config.input schema)
-  // params   = parsed path params (from config.params schema)
-  // query    = parsed query string (from config.query schema)
-  // app      = { project, _legacy: { organization, prisma }, ...providers }
+// web/src/behavior/annotation-api.ts
+export const annotationApi = createModuleApi<ContractApiMap<typeof annotationTrpc>>();
+```
 
-  return data; // framework validates against config.output and calls c.json()
+REST is declared whole in the server, because it has no browser half to share a
+declaration with:
+
+```ts
+export const annotationRest = defineRestRouter(AnnotationApi)
+  .withNamespace("annotations")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .get("/:id", "getAnnotation")
+  .withParams(annotationRestParamsSchema)
+  .withPermission("annotations:view")
+  .withOutput(annotationRestResponseSchema)
+  .withDocs({ summary: "Get an annotation in the caller’s project" })
+  .handle(async ({ app, input, scope }) => ({
+    data: await app.getById({ id: input.id, projectId: scope.id }),
+  }))
+  .build();
+```
+
+`withNamespace` is the family's own path segment, so the routes answer under
+`/api/<namespace>` and the process mount reads the name off the declaration
+rather than restating it. A route declared without `withOutput` is served as 204
+with an empty body.
+
+### Mounting a declaration
+
+A declaration is inert. The process builds one runtime per transport, from the
+collaborators it already holds, and mounts each declaration on it.
+
+```ts
+// The tRPC path, built once per root beside the process's own policy chain.
+const runtime = createTrpcRuntime({ root, procedure: authenticatedProcedure, ports });
+const annotation = runtime.mount(annotationTrpcTransport, (ctx) => ctx.app.annotation);
+```
+
+```ts
+// The REST path. `identity.authenticate` is the family's own door; the runtime
+// answers a Hono app the process mounts.
+const rest = createRestRuntime({ identity: { authenticate } });
+const annotations = rest.mount(annotationRest.router(), {
+  app: () => annotationApi,
+  onError: annotationErrorHandler,
 });
 ```
 
-When `output` is defined, return raw data. The framework validates + serializes; a handler response that violates its output contract is reported as an internal server error.
-When `output` is not defined, return a Hono `Response` directly.
+The declaration names its own door, and the handler's `scope` follows it. Six
+doors exist, each declared with `.withCredential(...)` before the family's first
+route: `projectKey`, which every declaration gets without asking, and `session`,
+the browser cookie the application's own pages carry, both resolving
+`{ tier: "project", id }`; `organizationKey` and `scimToken`, which resolve
+`{ tier: "organization", id }`; and `internalSecret` and `instanceAdminKey`,
+which name no tenant at all and hand their handlers `scope: null`. A mount that
+names a different door is refused. `public` is named on the mount alone, because
+no door resolves a declared scope for it, and a family behind `session`
+publishes no operation, since no API client can present a cookie.
 
-## Endpoint config
-
-Second argument to `v.get()`, `v.post()`, etc:
+A route may declare how it is reached instead of naming a permission:
+`publicRoute` resolves no credential, `anyAuthenticated` opens the door and asks
+nothing of it, `optionalCredential` answers with or without one (the handler
+reads a nullable actor and scope), and `deferredScope` authenticates the caller
+and leaves the owning scope for the handler, for a resource addressed by an id
+that names its own owner. Each takes the written reason the registry records.
 
 ```ts
-{
-  input: z.object({ ... }),         // JSON body schema
-  output: z.object({ ... }),        // Response schema (validates + OpenAPI)
-  params: z.object({ id: z.string() }), // Path params
-  query: z.object({ limit: z.number() }), // Query string
-  description: "...",               // OpenAPI description
-  docs: { operationId: "..." },      // OpenAPI documentation options (below)
-  status: 201,                      // HTTP status (default 200)
-  auth: "none",                     // Skip auth and legacy org resolution
-  resourceLimit: "scenarios",       // Enforce resource limits
-  middleware: [rateLimiter()],       // Extra per-endpoint middleware
-  meta: { policy: ... },             // Opaque, surfaced on onRouteMounted
-}
+const roleRest = defineRestRouter(RoleApi)
+  .withNamespace("roles")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .withCredential("organizationKey")
+  .get("/", "listRoles")
+  .withPermission("organization:manage")
+  .withOutput(roleRestListSchema)
+  .handle(async ({ app, scope }) => ({ roles: await app.listRoles({ organizationId: scope.id }) }));
 ```
 
-All fields optional. Pass `{}` for a bare endpoint. Endpoint paths must be empty or begin with `/`. Declaring `resourceLimit` without a service-level `_legacy.resourceLimitMiddleware` fails the build rather than silently disabling the limit.
+`ApiRuntimePorts` are the process's, not the feature's: `identity` says who is
+calling, `authorization` answers the permission decisions, `denials` supplies
+the two refusals whose copy is the product's, `audit` records and redacts, and
+`errors` reports and translates. A feature declaration names none of them.
 
-`meta` is never read by the framework: it travels on `MountedRoute.config` so `onRouteMounted` consumers (route policy registries, gates) can act on per-endpoint declarations.
+### The one execution path
+
+Both runtimes run the same boxes, and each is the same body it was:
+
+```
+tRPC   authenticate ─▶ parse ─▶ trace ─▶ log ─▶ decide ─▶ handle ─▶ check output ─▶ audit ─▶ respond
+REST   parse ─▶ authenticate ─▶ decide ─▶ handle ─▶ check output ─▶ respond
+```
+
+The two orders differ, deliberately, and each is the order its families already
+answer in. On tRPC, everything that reads the request reads the **validated**
+input, so trace, log, the handled-error boundary, the check and the audit row
+are installed **after** the contract's own `.input()` parser — a check ahead of
+it is handed `undefined` and authorizes nothing. On REST the request is parsed
+**before** the credential is resolved, so a malformed body is refused without
+ever touching the caller's key.
+
+What a handler is handed never changes: `{ app, input, actor, scope, signal }`,
+plus `target` on REST, which is the scope a route's own path named when its
+permission was checked there. No `ctx`, no request, no response, no framework
+type. The access step writes those values onto the request context through
+tRPC's own `next({ ctx })`, and a procedure that somehow reached its handler
+without them refuses by name.
+
+A declared REST route answers at three addresses — its dated namespace,
+`latest`, and the family's bare path — plus the `/api/v1` twin of each, and any
+real date the caller pins is served by the latest registration on or before it.
+`.withAddressing(...)` before the first route says otherwise: `"v1-only"` serves
+`/api/v1/<namespace>/...` alone, `"v1-in-path"` serves
+`/api/<namespace>/<generation>/...` alone — `("v1-in-path", { generation: "v2" })`
+for a protocol whose generation is not ours to choose, such as SCIM 2.0 —
+`("dated", { v1Twin: false })` keeps the three dated addresses with no twin
+beside them, and `"literal"` publishes exactly the paths its routes write, each
+with its `/api/v1` twin, for a family sharing `/api` with everything else rather
+than owning a namespace of its own. A literal family's routes name their whole
+address, and it claims no wildcard under the prefix it shares.
+
+A route names either a permission or an access kind. `.withPermission(p)` asks
+`p` at the scope the credential resolved; `.withPermission(p, { at: "route",
+param: "projectId" })` asks it at the scope the route's own path names, through
+`identity.authorize`. A path that spells the scope under another name says so: `{ at: "route",
+param: "projectId", field: "id" }` reads the project from `:id`. `.withAccess(publicRoute({ reason }))` resolves no
+credential at all; `.withAccess(anyAuthenticated({ reason }))` opens the
+family's door through `identity.identify` and asks no permission of it. A route
+may also declare several answers — `.responds({ 200: report, 503: report })` —
+and then returns `{ status, body }` typed by that map.
+
+### Removed, and what replaces it
+
+`createService`, `createRestService`, `ServiceBuilder`, `registerRoute`, the
+`onRouteMounted` mounting callback and raw-`{ ctx, input }` tRPC handlers are
+removed. A REST route is a `defineRestRouter` declaration and a tRPC procedure a
+`defineTrpcRouter` binding (`dev/docs/ARCHITECTURE.md` §8); the process mounts
+every installed module's declarations (§4).
+
+## Addressing and versions
+
+`/api/<x>` is the main path and `/api/v1/<x>` also answers; `/latest/` and
+`/<YYYY-MM-DD>/` are served but hidden from the published document (§8). A dated
+URL is served by the newest registration on or before that date, `latest` by
+the newest registrations, and `preview` never joins `latest`. An unknown version
+namespace is refused. Errors carry the version headers (`X-API-Version`,
+`X-API-Version-Status`) too. `.withAddressing(...)` changes the family's
+addresses, as described above. Specified in `specs/versioned-routing.feature`.
+
+## Endpoint capabilities
+
+A route declares what it needs on its own chain: `.withRateLimit(...)`,
+`.withCache(...)`, `.withDeprecated(...)`, `.withIdempotency(...)`,
+`.withEntitlement(...)`. Rate limiting and response caching need a substrate the
+framework does not own, so the package declares the ports (`ports.ts`) and the
+process supplies them to the REST host. A capability declared without its port
+fails the build, naming the route; an endpoint without an output is never
+cached; a cache failure degrades to a handler call. Specified in
+`specs/endpoint-capabilities.feature`.
 
 ## OpenAPI documentation
 
-**Only the bare alias path is documented.** `generateSpecs(app)` (hono-openapi) yields exactly one path per endpoint, without a version segment (`/api/things`, `/api/things/{id}`). Dated, `latest`, and `preview` mounts serve traffic and set version headers but never reach the document, and withdrawn endpoints are never documented. An endpoint reaches the document only when it declares something documentable (`output`, `description`, or `docs`) and is not hidden.
-
-`docs` shapes the documented operation:
-
-```ts
-v.get(
-  "/",
-  {
-    output: z.array(thingSchema),
-    description: "Lists every thing in the project.",
-    docs: {
-      summary: "List things",
-      tags: ["Things"],
-      operationId: "listThings",
-      security: [{ bearerAuth: [] }],
-      responses: { "404": { description: "Thing not found" } },
-    },
-  },
-  handler,
-);
-```
-
-- The success response is generated from `output` and `status`; `docs.responses` merges over it (same-status keys win).
-- `docs.hide: true` removes the endpoint from the document entirely; the route keeps serving.
-- Set `docs.operationId` explicitly on every documented endpoint: generated ids leak URL shapes into SDK function names.
-- Validation is not documentation. `params`/`query`/`input` schemas keep validating on every mount, so a bad body 422s at `/api/things/2025-03-15/` exactly as it does at `/api/things`.
-
-## Route mounting callback
-
-`onRouteMounted` fires synchronously during `build()` for every route the service mounts, so a host can register route policies (authorization registries, coverage gates) without re-deriving the route table:
-
-```ts
-createService({
-  name: "things",
-  onRouteMounted: (route) => registerRoutePolicy(route),
-});
-```
-
-Each callback receives a `MountedRoute`:
-
-| Field | Meaning |
-| --- | --- |
-| `method` | Mounted HTTP method. SSE endpoints report `"get"`, namespace guards `"all"`. |
-| `path` | Absolute path including the base path, byte-identical to what the Hono route table (`app.routes[i].path`) reports. |
-| `version` | `"2025-03-15"`, `"latest"`, `"preview"`, or `null` for the bare alias and the guards. |
-| `status` | `"stable"`, `"latest"`, `"preview"`, or `"unversioned"`. |
-| `withdrawn` | `true` for mounts answering 410 Gone. Their `config` is the inherited one, `meta` included. |
-| `namespaceGuard` | `true` for the two version-namespace catch-alls. |
-| `config` | The endpoint config behind the mount; `null` for the guards. |
-
-Completeness is the point: every dated version, `latest`, `preview`, the bare alias, withdrawn (410) endpoints, and both version-namespace guards report. The non-wildcard guard (`/:apiVersion{latest|preview|20\d{2}-\d{2}-\d{2}}`) is a real, enumerable route: a policy registry that fails on unknown routes must receive it.
-
-## Versioning
-
-Versions are real `YYYY-MM-DD` calendar dates. Invalid or duplicate versions fail at registration instead of being silently ignored. Each version inherits all endpoints from the previous one. Override or add endpoints, and use `withdraw()` to remove.
-
-```ts
-.version("2025-03-15", (v) => {
-  v.get("/", { output: listSchema }, handler);
-  v.post("/", { input: createSchema, output: itemSchema }, handler);
-})
-.version("2025-09-01", (v) => {
-  // Override POST with new input schema
-  v.post("/", { input: newCreateSchema, output: itemSchema }, newHandler);
-  // Remove GET /:id (returns 410 Gone)
-  v.withdraw("get", "/:id");
-  // GET / is inherited from 2025-03-15 automatically
-})
-```
-
-URL structure:
-
-| URL                       | Resolves to                         |
-| ------------------------- | ----------------------------------- |
-| `/api/things/2025-03-15/` | Exact version                       |
-| `/api/things/2025-09-01/` | Exact version                       |
-| `/api/things/latest/`     | Most recent dated version           |
-| `/api/things/`            | Same as latest (backwards compat)   |
-| `/api/things/preview/`    | Preview endpoints (never in latest) |
-
-### Version headers
-
-Every response carries `X-API-Version-Status` (`stable`, `latest`, `preview`, or `unversioned`), and versioned mounts additionally carry `X-API-Version` with the namespace they answered from (`2025-03-15`, `latest`, `preview`). Bare-path requests get only the status header. The headers are set in a `finally`, so validation errors and 410 withdrawals carry them too.
-
-The first path segment is reserved when it is `latest`, `preview`, or a date-shaped version. This prevents a missing versioned route from falling through to a dynamic unversioned endpoint.
-
-## Providers
-
-`.provide()` injects services into handlers via `app.*`. Factories receive the base context and resolve concurrently, so there are no cross-provider dependencies. Provider factories run after any enabled auth and organization middleware, with the resolved request context available to logging. Endpoints using `auth: "none"` skip both the service auth and legacy organization middleware. The `project` and `_legacy` names are reserved for the base context.
-
-```ts
-.provide({
-  thingService: () => ThingService.create(prisma),
-  cache: async (base) => CacheService.forProject(base.project.id),
-})
-```
-
-`app.thingService` and `app.cache` are fully typed from the factory return types.
+Everything in `.withDocs(...)` reaches the published operation. One logical
+route reaches the document once: the dated and `latest` aliases are served but
+not documented, and `preview` never is. A route's REST response schema comes
+from its own declaration; a hand-written `*-openapi.rules.ts` file is a deleted
+spelling (§15), and a response that truly needs its own schema goes through
+`documentedResponses()`.
 
 ## SSE streaming
 
-SSE endpoints are GET routes. Use `query` for request data; JSON request bodies are intentionally unsupported. `stream.emit()` validates and serializes the parsed payload. On validation failure it emits an `error` event and rejects, so the handler must explicitly catch the error if it wants to continue streaming.
-
-```ts
-v.sse(
-  "/execute",
-  {
-    events: {
-      result: z.object({ score: z.number() }),
-      error: z.object({ message: z.string() }),
-    },
-    query: querySchema,
-  },
-  async (c, { query, app }, stream) => {
-    await stream.emit("result", { score: 0.95 }); // validated against schema
-    stream.close();
-  },
-);
-```
-
-## RPC endpoints
-
-`v.rpc()` registers an RPC-named endpoint: a dotted `<resource>.<verb>` path that mounts as a real POST. The name carries the verb, so the HTTP method never does. This is a **pilot on the `webhooks` family**, not the default for new services.
-
-> The ADR for this decision is not written yet, and the number it was drafted against (094) belongs to the simulation process-manager work. Until it exists, this section and `specs/api-reference/api-discovery.feature` are the record. Pick the number when writing it — not from `main` alone, since sibling branches claim numbers too. The four resource-REST management families stay as they are; use `v.get`/`v.post`/... unless you are extending `webhooks`.
-
-```ts
-v.rpc(
-  "/endpoints.rollSecret",
-  {
-    ...guard("webhookEndpoints:manage"),
-    input: z.object({ id: z.string() }),
-    output: endpointWithSecretSchema,
-    docs: { operationId: "rollWebhookEndpointSecret" },
-  },
-  async (_c, { input, app }) => app.endpoints.rollSecret({ id: input.id }),
-);
-```
-
-Three rules, all load-bearing:
-
-- **Every argument travels in the JSON body.** No path params, no query string — which is what puts zod on identifiers that a REST `:id` left unvalidated.
-- **An RPC with no required arguments declares no `input`**, and its handler ignores the body. The pipeline only installs the json validator when `input` is present, so a bodyless POST and a `{}` POST both succeed. Writing `input: z.object({}).optional()` instead reinstates the parse and rejects the bodyless call.
-- **Reads are POST too.** Uniform method is the point; it also forecloses HTTP caching, which is acceptable for an API-key-only management surface and would not be on a high-volume read surface.
-
-Two of those three are machine-checked, twice each — in the editor by the types on `v.rpc`, and at startup by `assertRpcPath` / `assertRpcConfig`. The name grammar and the no-`params`/`query` rule are the two; "reads are POST too" is a convention review has to hold, because nothing distinguishes a read from a write at registration.
-
-```text
-^/[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$   →  /endpoints.rollSecret   ✓
-                                                /endpoints/:id          ✗
-                                                /endpoints.Roll_Secret  ✗
-```
-
-```ts
-v.rpc("/endpoints.rollSecret", { input, output }, handler);        // ✓
-v.rpc("/endpoints", { output }, handler);                          // ✗ not assignable to
-                                                                   //   '"/endpoints" & RpcPathMustBeDottedLowerCamelCase'
-v.rpc("/endpoints.get", { params: idSchema, output }, handler);    // ✗ Type '...' is not assignable to type 'never'
-```
-
-The asserts are not redundant with the types. Types are erased, so they are what still holds for a JavaScript caller, for a config widened to `EndpointConfig` on its way through a helper, and for anything that arrived behind an `any`. `rpc-types.unit.test.ts` drives both statements from one table of names, so a change to either that forgets the other fails there.
-
-`isRpcPath` exports the same grammar for a consumer that has to recognise an RPC name after the fact rather than refuse one up front — the platform's discovery catalogue reads them back out of the published OpenAPI document. Ask it rather than writing a second regex that agrees until one of them changes.
-
-Versioning, forward-copying and withdrawal need no special handling: endpoint identity is `` `${method}:${path}` ``, so `post:/endpoints.create` is unique and `v.withdraw("post", "/endpoints.create")` works unmodified.
+A stream is a route in a `defineRestRouter` declaration with `.withResponse("sse", {})`. Its handler answers `response.events(source)`, where `source` is an `AsyncIterable<RestEvent>` (`{ event?, data, id?, retryMs? }`, `data` already a string). The framework frames the events, publishes `text/event-stream` and ends the handler's own stream when the caller hangs up. A route that answers JSON or a stream by the caller's `Accept` declares `.withResponse("negotiated", {})` and branches on `response.wantsEvents`. Specified in `specs/declared-response-kinds.feature`.
 
 ## Error handling
+
+There is one error format. The version-gated union envelope carrying the legacy `error` field died with the bare alias (ADR 002).
 
 Throw `HandledError` subclasses (from `@langwatch/handled-error`). The framework:
 
@@ -314,9 +262,7 @@ Throw `HandledError` subclasses (from `@langwatch/handled-error`). The framework
    plus the remediation channel (`fault`, `tips`, `docsUrl`)
 2. Catches `ZodError` and promotes it to a `ValidationError`, mapping each issue
    to a `schema_failure` reason
-3. Returns union format for unversioned requests (includes legacy `error` field)
-4. Returns clean format for versioned requests
-5. Publishes the error it sent, and the status it sent it as, for the request
+3. Publishes the error it sent, and the status it sent it as, for the request
    logger to consume
 
 The request logger writes **exactly one** error record per failed request.
@@ -326,7 +272,7 @@ error, 4xx → warn) — so an unknown error, which is flattened to a 500, logs 
 `error` with its cause, while an unhandled `HTTPException` carrying a 4xx logs
 at `warn`. The error handler deliberately logs
 nothing itself: a second record there would double every error-log-derived
-alert and count. It publishes the *promoted* error, so a `ZodError` is reported
+alert and count. It publishes the _promoted_ error, so a `ZodError` is reported
 as the 422 `ValidationError` the caller actually received rather than the 500 a
 re-derivation would guess.
 
@@ -365,46 +311,46 @@ Validation error example:
 
 ## Testing
 
-The `app` export is a standard Hono instance. Test with `app.request()`:
+Test a declaration through the real router, asserting status, body and the
+error `code`; never a handler called by hand. Exemplars:
+`modules/agent/process/src/transport/__tests__/agent-rest-family.integration.test.ts`
+for a module's family, and
+`packages/api/src/rest/__tests__/transport-conventions.integration.test.ts` for the
+framework itself. The `api-transports` skill teaches the rest.
 
-```ts
-const res = await app.request("/api/things", {
-  headers: { "X-Auth-Token": apiKey },
-});
-expect(res.status).toBe(200);
-```
-
-Unit tests: `pnpm --filter @langwatch/api test:unit`
+Unit tests: `pnpm --filter @langwatch/api test`
 
 ## File structure
 
+One folder or file per entry point in `package.json`'s `exports`:
+
 ```
 src/
-  builder.ts          # createService(), ServiceBuilder
-  version-builder.ts  # VersionBuilder (v.get/post/..., v.sse(), v.withdraw())
-  versioning.ts       # Forward-copy algorithm + request-time resolution
-  route-mounting.ts   # Mounts versions, guards, bare alias; fires onRouteMounted
-  pipeline.ts         # Per-endpoint middleware stack (auth, docs, validation, handler)
-  response.ts         # Output validation + serialization
-  middleware.ts       # Built-in tracer + logger (uses @langwatch/observability)
-  errors.ts           # Error handler (HandledError, ZodError, version-gated format)
-  sse.ts              # v.sse() with typed events
-  types.ts            # ServiceConfig, EndpointConfig, EndpointDocs, MountedRoute, ...
-  index.ts            # Public re-exports + routeHandlers() (legacy Next-style hosts)
+  index.ts           # "."            the transport-agnostic vocabulary: handled errors, access policies, ports, schema boundary
+  access/            # "./access"     decide(): the one access check both transports run
+  rest/              # "./rest"       defineRestRouter, the REST runtime, addressing, credentials and doors, OpenAPI
+  trpc/              # "./trpc"       defineTrpcRouter's root, the one execution path, audit, SSE
+  web/               # "./web"        createModuleApi and the browser's tRPC cache-key helpers
+  hosting/           # "./hosting", "./hosting/selection", "./hosting/mux": one muxer, /api and the browser app
+  policy/            # "./policy"     the base response policies a process composes from
+  composition.ts     # "./composition" createTrpcHandlerBinding: how a process binds a declared procedure
+  dates.ts           # "./dates"      an epoch-or-ISO date schema
 ```
 
 ## LLM instructions
 
-When creating a new API service using this framework:
+The rules are `dev/docs/ARCHITECTURE.md` §8 and the `api-transports` skill; this list only points.
 
-1. Create `src/app/api/{name}/[[...route]]/app.ts` exporting the built app: `export const app = createService({ name })...build()`
-2. Mount it in `src/server/api-router.ts` with `api.route("/", app)` next to the other services (do not create a `route.ts`; `routeHandlers()` is only for legacy Next-style hosts)
-3. Use `createService({ name })` with the service name matching the URL path segment
-4. Pass auth and organization middleware through `createService({ auth, _legacy: { organizationMiddleware } })`
-5. Use `.provide()` for service-layer dependencies: factories get `{ project, _legacy: { organization, prisma } }`
-6. Define Zod schemas for input/output/params next to the service, not in a shared types file
-7. Handlers return raw data when `output` is set; the framework validates and serializes
-8. Throw `NotFoundError` / `HandledError` for error responses, never a manual `c.json({ error }, 404)`
-9. Use `status: 201` in endpoint config for creation endpoints
-10. Set `docs: { operationId, tags }` on every documented endpoint; only the bare alias path reaches the OpenAPI document, and endpoints without `output`, `description`, or `docs` stay out of it
-11. When the host keeps a route policy registry, declare the policy in `meta` and register it via `onRouteMounted`; every mount reports, including withdrawn endpoints and both version-namespace guards
+1. A module's transports are declarations in `modules/<name>/process/src/transport/<name>.{rest,trpc}.ts`:
+   `defineRestRouter(<Name>Api)` and `defineTrpcRouter(<Name>Api, <name>Trpc)`, the tRPC names declared once
+   in the contract with `defineTrpcContract`.
+2. The installer lists them on `.withTransports(...)`; the process mounts every installed module's
+   declarations (§4). Never mount by hand, never write a per-module composition file under `apps/`.
+3. Every route declares `.withInput` (or `.withParams`/`.withQuery`), `.withOutput` or `.responds`,
+   `.withPermission(...)` and `.withDocs(...)`. Paths are `/api/<x>`; `/api/v1/<x>` also answers.
+4. A handler receives `{ input, app, actor, scope, signal }`, calls one `*Api` operation and returns a
+   plain value or throws a `HandledError`. No `c.json`, status branches or error envelopes.
+5. Middleware never does the framework's work (authentication, JSON body parsing), and a route opened to
+   any caller is drift (§8, 2026-10-05). A case the declaration cannot express is a gap here: extend this
+   package and the door.
+6. Test the declaration through the real router, asserting status, body and `code`.

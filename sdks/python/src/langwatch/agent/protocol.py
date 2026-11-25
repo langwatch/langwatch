@@ -28,7 +28,11 @@ ErrorCode = Literal[
     "agent_call_failed",
     "agent_call_timeout",
     "agent_parameter_invalid",
+    "agent_payload_too_large",
+    "hook_not_declared",
 ]
+
+CallKind = Literal["turn", "setup", "teardown"]
 
 
 class SdkInfo(TypedDict):
@@ -47,6 +51,11 @@ class InstanceInfo(TypedDict):
     inFlightCallIds: list[str]
 
 
+class AgentHooks(TypedDict):
+    setup: bool
+    teardown: bool
+
+
 class AgentRegistration(TypedDict):
     name: str
     environment: str
@@ -54,6 +63,7 @@ class AgentRegistration(TypedDict):
     concurrency: NotRequired[int]
     timeoutMs: NotRequired[int]
     sticky: NotRequired[bool]
+    hooks: NotRequired[AgentHooks]
 
 
 class RegisterFrame(TypedDict):
@@ -96,6 +106,7 @@ class CallRun(TypedDict, total=False):
 class CallFrame(TypedDict):
     type: Literal["call"]
     protocol: int
+    kind: NotRequired[CallKind]
     callId: str
     agentId: str
     threadId: str
@@ -103,6 +114,7 @@ class CallFrame(TypedDict):
     newMessages: list[Message]
     params: dict[str, Any]
     session: Any
+    state: NotRequired[dict[str, Any] | None]
     traceparent: str | None
     deadlineAt: int | float | str
     run: CallRun
@@ -125,6 +137,7 @@ class ResultFrame(TypedDict):
     callId: str
     output: NotRequired[str | Message | list[Message]]
     session: NotRequired[Any]
+    state: NotRequired[dict[str, Any]]
     error: NotRequired[ResultError]
 
 
@@ -161,17 +174,22 @@ def ack_frame(call_id: str) -> AckFrame:
 def result_frame(
     *,
     call_id: str,
-    output: str | Message | list[Message],
+    output: str | Message | list[Message] | None = None,
     session: Any = None,
+    state: dict[str, Any] | None = None,
 ) -> ResultFrame:
+    """A result; a hook answers with a state and no output, or with nothing."""
     frame: ResultFrame = {
         "type": "result",
         "protocol": PROTOCOL_VERSION,
         "callId": call_id,
-        "output": output,
     }
+    if output is not None:
+        frame["output"] = output
     if session is not None:
         frame["session"] = session
+    if state is not None:
+        frame["state"] = state
     return frame
 
 

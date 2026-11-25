@@ -1,0 +1,227 @@
+/**
+ * @vitest-environment jsdom
+ * The plans comparison page, rendered against a mocked `billingApi`.
+ * @see specs/features/settings-plans-comparison.feature
+ */
+import "@testing-library/jest-dom/vitest";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { formatPrice } from "../../../model/billing-plans.ts";
+import { BillingPricingService } from "../../../model/billing-pricing.service.ts";
+import { PlansComparisonPage } from "../plans-comparison.tsx";
+
+vi.mock("../../../behavior/billing-api.ts", () => ({
+  billingApi: {
+    currency: {
+      detectCurrency: {
+        useQuery: () => ({ data: { currency: "EUR" }, isLoading: false }),
+      },
+    },
+  },
+}));
+
+const TEST_GROWTH_SEAT_PRICE_CENTS = BillingPricingService.create("test").getGrowthSeatPriceCents();
+
+function renderPlans(
+  props: Omit<Parameters<typeof PlansComparisonPage>[0], "growthSeatPriceCents"> = {},
+) {
+  return render(
+    <PlansComparisonPage {...props} growthSeatPriceCents={TEST_GROWTH_SEAT_PRICE_CENTS} />,
+    {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
+      ),
+    },
+  );
+}
+
+function column(id: "free" | "growth" | "enterprise") {
+  return screen.getByTestId(`plan-column-${id}`);
+}
+
+function isMarkedCurrent(id: "free" | "growth" | "enterprise") {
+  return within(column(id)).queryByText("Current") !== null;
+}
+
+afterEach(() => cleanup());
+
+describe("PlansComparisonPage", () => {
+  describe("given the three plan columns", () => {
+    it("draws each as an emphasized card with the 24px inset and an h2 plan name", () => {
+      renderPlans();
+
+      for (const id of ["free", "growth", "enterprise"] as const) {
+        expect(column(id).dataset).toMatchObject({ cardVariant: "emphasized", cardPadding: "xl" });
+        expect(within(column(id)).getByRole("heading", { level: 2 })).toBeInTheDocument();
+      }
+    });
+  });
+
+  describe("given an organization on the Free plan", () => {
+    describe("when Annually and USD are picked and Upgrade now is pressed", () => {
+      /** @scenario "Upgrade now on the Growth column starts the Growth checkout" */
+      it("links to the subscription page asking for the annual Growth checkout in USD", () => {
+        renderPlans({ activePlan: { type: "FREE", free: true } });
+
+        fireEvent.click(screen.getByRole("button", { name: "Annually" }));
+        fireEvent.click(screen.getByTestId("currency-toggle"));
+
+        const upgrade = within(column("growth")).getByRole("link", { name: "Upgrade now" });
+        expect(upgrade).toHaveAttribute(
+          "href",
+          "/settings/subscription?checkout=growth&interval=annual&currency=USD",
+        );
+      });
+    });
+  });
+
+  describe("given the Growth column", () => {
+    describe("when EUR and then USD is selected", () => {
+      /** @scenario "Growth plan column shows seat and usage pricing in the selected currency" */
+      it("lists the seat price and every Growth feature in the selected currency", () => {
+        renderPlans();
+        const growthLines = ({ seat, events, retention }: Record<string, string>) => [
+          `${seat} per seat/month`,
+          "Everything in Free",
+          "200,000 events included",
+          `${events} per additional 100,000 events`,
+          `90 days retention (+ custom at ${retention}/GB)`,
+          "Volume discounts above 20 users",
+          "Unlimited lite users",
+          "Unlimited evals, simulations and prompts",
+          "Slack support",
+        ];
+
+        for (const line of growthLines({
+          seat: formatPrice({ cents: TEST_GROWTH_SEAT_PRICE_CENTS.EUR.monthly, currency: "EUR" }),
+          events: "€5",
+          retention: "€3",
+        })) {
+          expect(within(column("growth")).getByText(line)).toBeInTheDocument();
+        }
+        expect(within(column("growth")).getByText("excl. VAT")).toBeInTheDocument();
+        expect(within(column("free")).queryByText("excl. VAT")).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByTestId("currency-toggle"));
+
+        for (const line of growthLines({
+          seat: formatPrice({ cents: TEST_GROWTH_SEAT_PRICE_CENTS.USD.monthly, currency: "USD" }),
+          events: "$6",
+          retention: "$4",
+        })) {
+          expect(within(column("growth")).getByText(line)).toBeInTheDocument();
+        }
+        expect(within(column("growth")).queryByText("Up to 20 core users")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a member without administrative rights", () => {
+    describe("when the comparison is opened", () => {
+      /** @scenario "Non-admin members can access plans comparison" */
+      it("renders the Free, Growth and Enterprise columns with no access-denied state", () => {
+        renderPlans();
+
+        expect(within(column("free")).getByText("Free")).toBeInTheDocument();
+        expect(within(column("growth")).getByText("Growth")).toBeInTheDocument();
+        expect(within(column("enterprise")).getByText("Enterprise")).toBeInTheDocument();
+        expect(screen.queryByText(/access denied/i)).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a self-hosted deployment with no license", () => {
+    describe("when the comparison is viewed", () => {
+      /** @scenario Member compares plans on the plans page */
+      it("shows the three plans side by side and marks none as current", () => {
+        // No plan describes an unlicensed self-hosted deployment, so the page
+        // must not claim one of these tiers is what the reader is on.
+        renderPlans();
+
+        expect(within(column("free")).getByText("Free")).toBeInTheDocument();
+        expect(within(column("growth")).getByText("Growth")).toBeInTheDocument();
+        expect(within(column("enterprise")).getByText("Enterprise")).toBeInTheDocument();
+        expect(isMarkedCurrent("free")).toBe(false);
+        expect(isMarkedCurrent("growth")).toBe(false);
+        expect(isMarkedCurrent("enterprise")).toBe(false);
+      });
+    });
+  });
+
+  describe("given an organization on the Growth plan", () => {
+    describe("when the comparison is viewed", () => {
+      /** @scenario "Growth organizations see Growth as current" */
+      it("marks Growth as current and no other column", () => {
+        renderPlans({ activePlan: { type: "GROWTH", free: false } });
+
+        expect(isMarkedCurrent("growth")).toBe(true);
+        expect(isMarkedCurrent("free")).toBe(false);
+        expect(isMarkedCurrent("enterprise")).toBe(false);
+      });
+    });
+
+    describe("when the currency is switched from EUR to USD", () => {
+      it("shows the custom retention price in the selected currency", () => {
+        renderPlans({ activePlan: { type: "GROWTH_SEAT_EUR_MONTHLY", free: false } });
+
+        expect(
+          within(column("growth")).getByText("90 days retention (+ custom at \u20AC3/GB)"),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByTestId("currency-toggle"));
+
+        expect(
+          within(column("growth")).getByText("90 days retention (+ custom at $4/GB)"),
+        ).toBeInTheDocument();
+        expect(
+          within(column("growth")).queryByText("90 days retention (+ custom at \u20AC3/GB)"),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given an organization on a legacy tier this comparison does not show", () => {
+    describe("when the comparison is viewed", () => {
+      /** @scenario "Legacy tier organizations show no current plan in comparison" */
+      it("marks no column as current", () => {
+        renderPlans({ activePlan: { type: "LAUNCH", free: false } });
+
+        expect(isMarkedCurrent("free")).toBe(false);
+        expect(isMarkedCurrent("growth")).toBe(false);
+        expect(isMarkedCurrent("enterprise")).toBe(false);
+      });
+    });
+  });
+
+  describe("given a reader looking at the usage lines", () => {
+    describe("when the comparison is viewed", () => {
+      /** @scenario "Plan usage lines link to the list of billable events" */
+      it("offers the billable events documentation in a new tab", () => {
+        renderPlans();
+
+        const link = screen.getByTestId("billable-events-docs-link");
+        expect(link).toHaveTextContent("What counts as an event?");
+        expect(link).toHaveAttribute("href", "https://docs.langwatch.ai/pricing/billable-events");
+        expect(link).toHaveAttribute("target", "_blank");
+      });
+    });
+  });
+
+  describe("given an organization on the discontinued tiered pricing model", () => {
+    describe("when the comparison is viewed", () => {
+      /** @scenario "TIERED organizations see a discontinued plan migration notice" */
+      it("shows the discontinued notice linking to the subscription page", () => {
+        renderPlans({ activePlan: { type: "LAUNCH", free: false }, pricingModel: "TIERED" });
+
+        const notice = screen.getByTestId("tiered-discontinued-notice");
+        expect(notice).toHaveTextContent("Your current pricing model has been discontinued.");
+        expect(within(notice).getByText("Update your plan")).toHaveAttribute(
+          "href",
+          "/settings/subscription",
+        );
+      });
+    });
+  });
+});

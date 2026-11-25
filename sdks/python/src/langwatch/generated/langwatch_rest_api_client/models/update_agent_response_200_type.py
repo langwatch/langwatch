@@ -6,6 +6,7 @@ class UpdateAgentResponse200Type(str, Enum):
     CONNECTED = "connected"
     HTTP = "http"
     SIGNATURE = "signature"
+    VOICE = "voice"
     WORKFLOW = "workflow"
 
     def __str__(self) -> str:

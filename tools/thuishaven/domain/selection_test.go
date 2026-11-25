@@ -14,8 +14,24 @@ func TestDefaultSelectionIsLean(t *testing.T) {
 	if sel.Langy {
 		t.Error("langy is opt-in — a fresh worktree must not start it")
 	}
-	if sel.Workers {
-		t.Error("workers default to in-process, not a standalone lane")
+}
+
+// The workers lane is not selectable any more: the background worker is its own
+// application, so every stack runs it. The delta has to be refused BY NAME
+// rather than falling through to "unknown service", which reads as a typo — and
+// the failure it prevents is the silent one, a stack that boots and quietly
+// processes no jobs.
+//
+// @scenario "A retired service delta is refused by name"
+func TestWorkersIsNoLongerSelectable(t *testing.T) {
+	for _, delta := range []string{"+workers", "-workers"} {
+		_, err := ApplySelectionDeltas(DefaultSelection(), []string{delta})
+		if err == nil {
+			t.Fatalf("%s was accepted; the workers lane always runs", delta)
+		}
+		if !strings.Contains(err.Error(), "api lane") {
+			t.Errorf("%s error = %q, want it to say the worker runs in the api lane", delta, err)
+		}
 	}
 }
 
@@ -37,7 +53,7 @@ func TestApplySelectionDeltas(t *testing.T) {
 
 	t.Run("when naming an unknown service, it fails listing the valid ones", func(t *testing.T) {
 		_, err := ApplySelectionDeltas(DefaultSelection(), []string{"+nlpgo"})
-		if err == nil || !strings.Contains(err.Error(), "workers, gateway, nlp, langy") {
+		if err == nil || !strings.Contains(err.Error(), "gateway, nlp, langy, idp") {
 			t.Fatalf("want the service list in the error, got %v", err)
 		}
 	})
@@ -53,7 +69,6 @@ func TestApplySelectionDeltas(t *testing.T) {
 // @scenario "Up reconciles a running stack"
 func TestSelectionFromStack(t *testing.T) {
 	st := Stack{
-		HasStandaloneWorkers: false,
 		Services: []Service{
 			{Name: "app", Port: 100},
 			{Name: "gateway", Port: 101},
@@ -80,15 +95,41 @@ func TestSelectionFromStack(t *testing.T) {
 // @scenario "Status shows the selection"
 func TestDescribeNamesTheDeltas(t *testing.T) {
 	got := DefaultSelection().Describe()
-	if !strings.Contains(got, "workers (in-process)") {
-		t.Errorf("Describe() = %q, want the in-process workers note", got)
-	}
-	for _, on := range []string{"app", "gateway", "nlp"} {
+	for _, on := range []string{"ui", "api", "gateway", "nlp"} {
 		if !strings.Contains(got, on) {
 			t.Errorf("Describe() = %q, want the selected service %q named", got, on)
 		}
 	}
 	if !strings.Contains(got, "haven up +langy") {
 		t.Errorf("Describe() = %q, want the exact delta that adds langy", got)
+	}
+}
+
+// @scenario "Selecting Langy also selects the AI gateway it forwards to"
+func TestSelectingLangyAlsoSelectsGateway(t *testing.T) {
+	sel, err := ApplySelectionDeltas(Selection{}, []string{"+langy"})
+	if err != nil {
+		t.Fatalf("+langy was rejected: %v", err)
+	}
+	if !sel.Langy || !sel.Gateway {
+		t.Errorf("+langy must select langy and the gateway, got %+v", sel)
+	}
+}
+
+// @scenario "The ui, api and worker switch off and on as one"
+func TestTheAppIsOneSwitchForTheThreeNodeLanes(t *testing.T) {
+	off, err := ApplySelectionDeltas(DefaultSelection(), []string{"-app"})
+	if err != nil || !off.AppOff || off.IsOn(AppSelection) {
+		t.Fatalf("-app = %+v, %v; want the app off", off, err)
+	}
+	if !strings.Contains(off.Describe(), "ui · api · worker (haven up +app)") {
+		t.Errorf("Describe = %q, want the three lanes named off together", off.Describe())
+	}
+	on, _ := ApplySelectionDeltas(off, []string{"+app"})
+	if on != DefaultSelection() || !on.TurnsOnAny(off) || off.TurnsOnAny(on) {
+		t.Errorf("+app = %+v, want the default back", on)
+	}
+	if _, err := ApplySelectionDeltas(DefaultSelection(), []string{"-api"}); err == nil || !strings.Contains(err.Error(), "-app") {
+		t.Errorf("-api err = %v, want it to point at -app", err)
 	}
 }

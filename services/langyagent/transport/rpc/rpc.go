@@ -86,7 +86,7 @@ func (rpc *RPC) HandleProbe(ctx context.Context, req *probeRequest) (*probeRespo
 	// never a real token — because a capability's SignatureKey encodes presence, not
 	// the secret.
 	caps := []app.Capability{github.New(githubTokenSentinel(req.HasGithubAuth), "", req.GithubRepoScopeKey)}
-	sig := domain.SignatureOf(req.ProjectID, req.ActorUserID, req.Model, req.EgressAllowlist, app.SignatureKeys(caps), req.MirrorTier)
+	sig := domain.SignatureOf(req.ProjectID, req.ActorUserID, req.Model, req.EgressAllowlist, app.SignatureKeys(caps), req.DisabledSkillIds, req.MirrorTier)
 	return &probeResponse{Alive: rpc.app.HasLiveWorker(req.ConversationID, sig)}, nil
 }
 

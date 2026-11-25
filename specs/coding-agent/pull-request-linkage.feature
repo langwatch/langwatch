@@ -1,28 +1,26 @@
 # Pull request linkage, sessions mapped to GitHub pull requests and priced
 #
 # Implementation:
-#   platform/app/src/server/app-layer/github/github-pull-request-mapping.service.ts   (branch-to-PR mapping + negative cache)
-#   platform/app/src/server/app-layer/github/githubPullRequestEvent.ts                 (the pull_request webhook payload, validated)
-#   platform/app/src/server/routes/github.ts                                           (the webhook delivery target)
-#   platform/app/src/server/app-layer/github/github-pull-request-status.service.ts    (live status, Redis-cached, never the queue)
-#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber.ts (fold trigger)
-#   platform/app/src/server/app-layer/coding-agent/pull-request-assignment.ts          (session-to-PR tenure rule)
-#   platform/app/src/server/app-layer/coding-agent/pull-request-share.ts                (the proportional rule: one session's cost split across the PRs it drove)
-#   platform/app/src/server/app-layer/coding-agent/pull-request-usage.service.ts       (org-first usage rollup)
-#   platform/app/src/server/app-layer/coding-agent/coding-agent-source-type.ts         (agent id to ingestion source type)
-#   platform/app/src/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository.ts (per-model totals)
-#   platform/app/src/server/organizations/resolveCallerProjectScope.ts                 (the caller's permission cut and how each project is named, shared by both read surfaces)
-#   platform/app/src/app/api/coding-agent/[[...route]]/                                (the usage REST endpoint)
-#   platform/app/src/pages/me/pull-requests.tsx                                        (the personal Pull Requests page)
-#   platform/app/src/components/me/PullRequestsTable.tsx                               (the table)
-#   platform/app/src/components/me/PullRequestDetailDrawer.tsx                          (one pull request in full)
-#   platform/app/src/components/me/PullRequestStatusBadge.tsx                           (a status drawn the way GitHub draws it)
-#   platform/app/src/components/me/usePullRequestSort.ts                                (the table's order, and the way back to it)
-#   platform/app/src/components/me/AgentLabel.tsx                                       (an assistant named like its product)
+#   modules/github/process/src/services/github-pull-request-mapping.service.ts (branch-to-PR mapping + negative cache)
+#   modules/github/process/src/adapters/github-pull-request-event.adapter.ts   (the pull_request webhook payload, validated)
+#   modules/github/contract/src/github.ts                                           (the webhook delivery target)
+#   modules/github/process/src/services/github-pull-request-status.service.ts  (live status, Redis-cached, never the queue)
+#   modules/coding-agent/process/src/subscribers/pull-request-mapping.subscriber.ts (fold trigger)
+#   modules/coding-agent/process/src/services/coding-agent-pull-request-assignment.service.ts (session-to-PR tenure rule)
+#   modules/coding-agent/process/src/services/coding-agent-pull-request-usage.service.ts      (org-first usage rollup)
+#   modules/coding-agent/process/src/repositories/coding-agent-session-event/clickhouse.repository.ts (per-model totals)
+#   [gone] src/server/organizations/resolveCallerProjectScope.ts                 (the caller's permission cut and how each project is named, shared by both read surfaces)
+#   [gone] src/app/api/coding-agent/[[...route]]/                                (the usage REST endpoint)
+#   [gone] src/pages/me/pull-requests.tsx                                        (the personal Pull Requests page)
+#   modules/coding-agent/browser/src/pull-requests-table.tsx                               (the table)
+#   modules/coding-agent/browser/src/pull-request-detail-drawer.tsx                          (one pull request in full)
+#   modules/coding-agent/browser/src/pull-request-status-badge.tsx                           (a status drawn the way GitHub draws it)
+#   [gone] src/components/me/usePullRequestSort.ts                                (the table's order, and the way back to it)
+#   modules/coding-agent/browser/src/agent-label.tsx                                       (an assistant named like its product)
 #
 # Related specs:
-#   specs/coding-agent/session-git-context.feature   , where the repo+branch identity comes from
-#   specs/integrations/github-connection.feature     , the org-level GitHub connection this rides
+#   modules/coding-agent/specs/session-git-context.feature, where the repo+branch identity comes from
+#   modules/integration/specs/github-connection.feature     , the org-level GitHub connection this rides
 #
 # Motivation: the ledger question "what did this pull request cost in assistant
 # usage". Sessions carry repo+branch; the organization's GitHub connection maps
@@ -77,6 +75,14 @@ Rule: Branches map to their pull requests through the organization connection
     Given a branch whose sessions all ended more than a week ago
     When the periodic recheck selects branches
     Then that branch is not rechecked
+
+  @unit
+  Scenario: Two first writes of the same branch's check both land
+    Given no check row for a branch yet
+    And a webhook and a branch listing write that branch's first check at the same time
+    When the slower insert fails on the branch's unique key
+    Then it retries once as an update and the check is recorded
+    And any other write failure is raised, not retried
 
   # The sweep is the one read in this feature with no organization to name, so
   # every replica running its own timer meant the whole fleet scanning the same
@@ -412,6 +418,81 @@ Rule: A session's cost splits across the pull requests it drove, by the work sta
     When one pull request's usage is read
     Then its model breakdown reports only the model stamped on it
 
+  # The session row itself carries what was spent under each declared
+  # context (see session-git-context.feature, "Tokens are charged to the
+  # context declared before them"). That record covers every agent, including
+  # the ones whose tokens ride spans and so never reach the per-call fact
+  # table, and it is what the split reads first. A long-lived session that
+  # declares a new branch per pull request then contributes to each one only
+  # what it spent there.
+
+  @unit
+  Scenario: A session's usage recorded per declared context splits by that record
+    Given a session whose row records its usage under two declared branches, each with a live pull request
+    And no per-call fact rows for it
+    When each pull request's usage is read
+    Then each reports the share the row recorded under its branch
+
+  # Each counter and the cost take their ratio from the record's own figure for
+  # that counter, so a pull request priced at another rate than the session's
+  # other work reports what was recorded, as its model breakdown does.
+  @unit
+  Scenario: A session that worked on two repositories at different rates reports the recorded figures
+    Given a session whose row records work on another repository at one rate and on the pull request's branch at another
+    When the pull request's usage is read
+    Then its cost and each token count are exactly what the row recorded under that branch
+    And the pull request totals match its model breakdown
+
+  @unit
+  Scenario: Usage from before the session declared anything follows its first declared branch
+    Given a session that spent most of its tokens before its first declaration
+    And later declared two branches, each with a live pull request, and spent a little on each
+    When each pull request's usage is read
+    Then each reports only what was spent under its own declaration
+    And the undeclared usage lands on the first declared branch's pull request alone
+
+  @unit
+  Scenario: Undeclared usage of a session that started on a branch with no pull request is priced nowhere
+    Given a session that spent most of its tokens before its first declaration, and first declared the default branch
+    And later declared a pull request's branch and spent a little there
+    When that pull request's usage is read
+    Then it reports only what was spent under its own declaration
+
+  @unit
+  Scenario: Undeclared usage of a session that began in another repository is priced nowhere here
+    Given a session that spent most of its tokens before its first declaration
+    And it first declared a branch of a DIFFERENT repository, whose name this repository also uses
+    And it later declared this repository's pull request branch and spent a little there
+    When that pull request's usage is read
+    Then it reports only what was spent under its own declaration
+
+  @unit
+  Scenario: A branch name worked in two repositories follows whichever declared it first
+    Given a session that spent most of its tokens before its first declaration
+    And it declared that branch name under another repository first, and under this one later
+    When this repository's pull request for that branch is read
+    Then it reports only what was spent under its own declaration
+
+  @unit
+  Scenario: Usage a saturated record could not place is charged to no pull request
+    Given a session whose usage record is full, so later contexts went unrecorded
+    And two of its declared branches have a live pull request
+    When each pull request's usage is read
+    Then each reports only what the record places under its own branch
+    And the unplaceable usage lands on neither
+
+  @unit
+  Scenario: A session that declared one branch for its whole life keeps its whole total
+    Given a session whose row records usage under one declared branch, and some from before the declaration
+    When its pull request's usage is read
+    Then it reports the session's whole totals
+
+  @unit
+  Scenario: The pull request detail and the personal page attribute a session the same way
+    Given a session that drove two branches, whose pull requests are both known
+    When the pull request detail is read for the later one
+    Then it asks about both branches, so it prices the session exactly as the personal page does
+
   @unit
   Scenario: A viewer without a GitHub connection sees the connect invitation
     Given an organization with no GitHub connection
@@ -625,6 +706,14 @@ Rule: Each pull request reports what every model consumed
     When the pull request usage is read
     Then the row reports each model's tokens rather than names alone
 
+  @unit
+  Scenario: A session without per-call data still names its models beside one that has them
+    Given a pull request with one session that logged model calls and one that only recorded its models
+    When the pull request usage is read
+    Then the second session's models are listed by name with unknown tokens
+    And the pull request totals are unchanged
+    And the model with per-call data stays first
+
   @integration
   Scenario: The detail names the models even without per-call data
     Given a pull request whose sessions recorded their models but logged no model calls
@@ -689,7 +778,7 @@ Rule: The pull request detail answers with facts, and names its sessions
     Given a pull request whose sessions include one with a title and one without
     When the detail is read
     Then the titled session is named by its title
-    And the untitled one is named as an untitled session
+    And the untitled one is named by its agent and the day it started
 
   # A reader knows their assistants by the names their makers gave them, not by
   # the spelling that happened to arrive on the wire.
@@ -1001,6 +1090,27 @@ Rule: The organization-wide usage read is RBAC-scoped and numbers only
     Then the refusal carries a named code saying the key is for a different workspace
     And nothing in the refusal says whose workspace it is
 
+  # Whose data this is stays the personal-workspace question above. What the
+  # read REACHES is the credential's own cut: a key bound to fewer projects
+  # than its holder may read must not widen back out to the holder's access.
+  # Only a legacy project key, which carries no bindings of its own, is
+  # answered as the person.
+  @integration
+  Scenario: A narrowed personal-workspace key reads with its own scope, not its holder's
+    Given a personal-workspace key bound to fewer projects than its holder may view
+    When the pull request usage is read with that key
+    Then only the key's own projects are counted
+    And the projects its holder may otherwise view are absent
+
+  # A key created for no person is a service credential, not this workspace's
+  # own key, so it cannot be answered as the person who owns the workspace.
+  @integration
+  Scenario: An ownerless key on the personal rollup is refused rather than answered as the owner
+    Given a key for a personal workspace that belongs to no person
+    When the pull request usage is read with that key
+    Then the refusal carries a named code saying a service key cannot answer for a person
+    And no rollup is read
+
 # The question is organization-wide, so the v1 door authenticates at the
 # organization: an sk-lw organization key alone, with no project named
 # anywhere. The personal-workspace indirection on the legacy path existed only
@@ -1095,3 +1205,31 @@ Rule: The v1 usage read needs only an organization credential
     When the v1 pull request usage is read for a pull request mapped elsewhere
     Then the caller receives the pull request not mapped failure
     And nothing says the pull request is mapped for anyone else
+
+  # The installed process answers the rollup from its peers: the organization's
+  # projects, the authorization decision and the audit trail all come from the
+  # modules that own them, so no read fails for want of a composed member.
+  @unit @regression
+  Scenario: The installed process answers the organization rollup instead of failing
+    Given coding-agent installed the way a process installs it
+    When an organization key reads a mapped pull request's usage
+    Then the caller's scope is decided by the authorization service in one ask
+    And the read reaches the pull request
+
+  @unit
+  Scenario: A pull request usage read is written to the audit log
+    Given coding-agent installed the way a process installs it
+    When a read that names people is recorded
+    Then the entry is written through the audit log service
+
+  @unit
+  Scenario: The organization's projects are read across every page
+    Given an organization with more projects than one page holds
+    When the caller's scope is resolved
+    Then every project of the organization is considered
+
+  @unit
+  Scenario: A personal workspace in the rollup is named by its owner
+    Given personal workspaces whose owners have a name, only an email, or no account
+    When the caller's scope is resolved
+    Then each is named by its owner's name, else their email, else its own name

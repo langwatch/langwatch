@@ -1,0 +1,181 @@
+import {
+  type FoldProjectionStore,
+  type ProjectionStoreContext,
+  type FoldStateRead,
+  type FoldReadAuthorizer,
+  foldReadPurpose,
+} from "@langwatch/eventing";
+import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "@langwatch/trace-contract";
+
+import type {
+  TraceAnalyticsProjectionEntry,
+  TraceAnalyticsProjectionRepository,
+} from "../repositories/trace-analytics-projection.repository.ts";
+import {
+  TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_PROMPT_VERSION,
+  type TraceAnalyticsData,
+  TraceAnalyticsFoldProjection,
+} from "./trace-derived.projection.ts";
+import type { TraceEvaluationAnalyticsStore } from "./trace-evaluation-analytics.store.ts";
+
+/**
+ * The projection stamps `getWithApplied` will decode: the current shape, the two before it (no
+ * prompt version; no outcomes or metadata columns; their read-back state is otherwise the same),
+ * and the pre-split shape it can read unambiguously. Everything older is a store miss.
+ */
+const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
+  TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_PROMPT_VERSION,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_METADATA,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+]);
+
+/**
+ * FoldProjectionStore adapter for the slim trace_analytics fold (ADR-034
+ * Phase 2, read-back per ADR-066). `get`/`getWithApplied` decode the last committed row,
+ * read through an own-only proof on the context's tenant from `authorize` (ADR-177 block C).
+ */
+export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsData> {
+  private readonly storage: TraceAnalyticsProjectionRepository;
+  private readonly evaluationAnalytics: TraceEvaluationAnalyticsStore;
+  private readonly defaultRetentionDays: () => number;
+  private readonly authorize: FoldReadAuthorizer;
+
+  private constructor(options: {
+    storage: TraceAnalyticsProjectionRepository;
+    evaluationAnalytics: TraceEvaluationAnalyticsStore;
+    defaultRetentionDays: () => number;
+    authorize: FoldReadAuthorizer;
+  }) {
+    this.storage = options.storage;
+    this.evaluationAnalytics = options.evaluationAnalytics;
+    this.defaultRetentionDays = options.defaultRetentionDays;
+    this.authorize = options.authorize;
+  }
+
+  static create(options: {
+    storage: TraceAnalyticsProjectionRepository;
+    /** Written first: the trace row's EvaluationRowsDigest records what it left (trace ADR-003). */
+    evaluationAnalytics: TraceEvaluationAnalyticsStore;
+    defaultRetentionDays: () => number;
+    authorize: FoldReadAuthorizer;
+  }): TraceAnalyticsStore {
+    return new TraceAnalyticsStore(options);
+  }
+
+  /** Answers the state stamped with the rows digest written, so the fold cache carries it. */
+  async store(
+    state: TraceAnalyticsData,
+    context: ProjectionStoreContext,
+  ): Promise<TraceAnalyticsData> {
+    const [entry] = await this.withEvaluationRows([{ state, context }]);
+    if (!entry) return state;
+    await this.storage.upsert(entry);
+    return { ...state, evaluationRowsDigest: entry.row.evaluationRowsDigest };
+  }
+
+  async storeBatch(
+    entries: {
+      state: TraceAnalyticsData;
+      context: ProjectionStoreContext;
+    }[],
+  ): Promise<void> {
+    const batchRows = await this.withEvaluationRows(entries);
+    if (batchRows.length === 0) return;
+
+    await this.storage.upsertBatch(batchRows);
+  }
+
+  /** The trace rows, after their evaluation rows are written, stamped with those rows' digest. */
+  private async withEvaluationRows(
+    entries: readonly { state: TraceAnalyticsData; context: ProjectionStoreContext }[],
+  ): Promise<TraceAnalyticsProjectionEntry[]> {
+    const rows = entries.map(({ state, context }) => ({
+      state,
+      context,
+      entry: this.toRow(state, context),
+    }));
+    const written = rows.filter(
+      (row): row is typeof row & { entry: NonNullable<typeof row.entry> } => row.entry !== null,
+    );
+    const digests = await this.evaluationAnalytics.writeBatch(
+      written.map(({ state, context, entry }) => ({ state, context, traceRow: entry.row })),
+    );
+    return written.map(({ entry }, index) => ({
+      ...entry,
+      row: { ...entry.row, evaluationRowsDigest: digests[index] ?? "" },
+    }));
+  }
+
+  private toRow(
+    state: TraceAnalyticsData,
+    context: ProjectionStoreContext,
+  ): {
+    row: ReturnType<typeof TraceAnalyticsFoldProjection.projectAnalyticsStateToRow>;
+    retentionDays: number;
+    appliedEventIds: string[];
+  } | null {
+    // Always writes, including dimension-only states: the "counts as a trace" gate rides on
+    // `hasSignal` in analytics' SQL predicate, so the fold read-back always finds
+    // its row and the executor can trust an absent read (`trustAbsentMiss`).
+    const stateWithId: TraceAnalyticsData = state.traceId
+      ? state
+      : { ...state, traceId: String(context.aggregateId) };
+    return {
+      row: TraceAnalyticsFoldProjection.projectAnalyticsStateToRow({
+        state: stateWithId,
+        tenantId: String(context.tenantId),
+        version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+      }),
+      retentionDays: context.retentionPolicy?.traces ?? this.defaultRetentionDays(),
+      // The executor's redelivery-dedup watermark, persisted next to the row so
+      // a retry with a cold cache still recognises a batch it committed.
+      appliedEventIds: context.appliedEventIds ? [...context.appliedEventIds] : [],
+    };
+  }
+
+  /**
+   * Reads the trace's last committed slim state with its applied-event-id
+   * watermark (ADR-066). An older version reports a MISS rather than
+   * decoding stale defaults, except the pre-split stamp (ADR-071).
+   */
+  async getWithApplied(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<{
+    state: TraceAnalyticsData | null;
+    appliedEventIds: string[];
+    miss?: "absent" | "undecodable";
+  }> {
+    const found = await this.storage.findByTraceId({
+      authorization: await this.authorize({
+        projectId: String(context.tenantId),
+        purpose: foldReadPurpose({ context, entry: "TraceAnalyticsStore.getWithApplied" }),
+      }),
+      traceId: aggregateId,
+      window: context.readWindow,
+    });
+    if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
+    // Stale schema snapshot, or a column that would not decode: folding on would fabricate state
+    // and store it over the row. Reported `undecodable`, not `absent`, so the executor refolds
+    // from the event log and won't retry an unwindowed re-read.
+    if (found.undecodable || !DECODABLE_PROJECTION_VERSIONS.has(found.row.version)) {
+      return { state: null, appliedEventIds: [], miss: "undecodable" };
+    }
+    return {
+      state: TraceAnalyticsFoldProjection.traceAnalyticsStateFromRow(found.row),
+      appliedEventIds: found.appliedEventIds,
+    };
+  }
+
+  /** State only; delegates to `getWithApplied` so the two paths cannot diverge. */
+  async get(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<FoldStateRead<TraceAnalyticsData>> {
+    const { state } = await this.getWithApplied(aggregateId, context);
+    return state === null ? { kind: "empty" } : { kind: "folded", state };
+  }
+}

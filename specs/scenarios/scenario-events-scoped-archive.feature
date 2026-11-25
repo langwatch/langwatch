@@ -12,6 +12,12 @@ Feature: Archiving scenario runs requires an explicit scenario set
   run). An unscoped request is refused, and the archive reports how much
   work it did.
 
+  @unit
+  Scenario: Peer archive calls require exactly one scope
+    Given a peer calls ScenarioApi to archive scenario events
+    When it names neither scope or names both scopes
+    Then the call is rejected with scenario_event_archive_scope_invalid
+
   @integration
   Scenario: DELETE without a scope is refused
     Given an authenticated request to DELETE /api/scenario-events

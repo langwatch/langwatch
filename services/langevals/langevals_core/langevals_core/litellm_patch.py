@@ -1,13 +1,19 @@
+import copy
 import os
 from tempfile import mkdtemp
 from typing import Optional
 import warnings
+
+import langevals_core.offline_defaults  # noqa: F401  (before litellm, see module)
 import litellm
 import litellm.cost_calculator
 from openai import OpenAI, AzureOpenAI
 import json
 
+from langevals_core.model_capabilities import output_tokens_parameter
+from langevals_core.model_pricing import register_langwatch_model_pricing
 from langevals_core.request_env import current_request_env
+from langevals_core.usage_ledger import record_usage
 
 # Necessary for running DSPy on AWS lambdas
 os.environ["DSP_CACHEDIR"] = mkdtemp()
@@ -54,14 +60,26 @@ REASONING_OFF = "none"
 # where the behavior changes: openai/gpt-5.6-sol-pro, azure/gpt-5.6-sol and
 # openai/gpt-5.5-sol all accept the combination, and some reasoning models
 # refuse to run with their reasoning off at all. A model joins this set once it
-# has actually been observed to need it.
+# has been observed to need it; one that refuses at runtime is retried with
+# reasoning off and remembered in `tool_reasoning_off_models`.
 TOOL_REASONING_INCOMPATIBLE_MODELS = frozenset(
     {
         "openai/gpt-5.6-luna",
         "openai/gpt-5.6-sol",
         "openai/gpt-5.6-terra",
+        "openai/gpt-6-astra",
+        "openai/gpt-6-luna",
+        "openai/gpt-6-sol",
+        "openai/gpt-6.1-sol",
+        "openai/gpt-6.1-terra",
     }
 )
+
+# Models seen refusing function tools with reasoning on in this process.
+tool_reasoning_off_models: set[str] = set()
+
+# Models seen refusing any temperature but the default in this process.
+temperature_pinned_models: set[str] = set()
 
 
 class ToolReasoningConflictError(Exception):
@@ -109,6 +127,156 @@ def tool_reasoning_conflict(
     return ToolReasoningConflictError(kwargs.get("model"))
 
 
+# Models seen refusing a forced tool_choice in this process, so later calls go
+# straight to "auto" instead of paying a refused round trip first.
+# Example: bedrock/global.anthropic.claude-opus-5-5 refuses it on every call.
+forced_tool_choice_refusers: set[str] = set()
+
+# Sent after an answer that skipped the function the evaluator forced, or
+# called it without every required field (Claude Sonnet 5 sometimes writes the
+# remaining fields as markup inside the first text field).
+TOOL_CALL_REMINDER = (
+    "Answer only by calling the `{name}` function, with every required field "
+    "({fields}) as its own argument. Write no tags or other fields inside a text field."
+)
+
+
+def is_forced_tool_choice(tool_choice) -> bool:
+    if isinstance(tool_choice, dict):
+        return True
+    return tool_choice in ("required", "any")
+
+
+def forced_tool_name(kwargs: dict) -> Optional[str]:
+    """The one function a forced tool_choice names, or None for "any tool"."""
+    tool_choice = kwargs.get("tool_choice")
+    if isinstance(tool_choice, dict):
+        function = tool_choice.get("function") or {}
+        return function.get("name") or tool_choice.get("name")
+    tools = kwargs.get("tools") or []
+    if len(tools) == 1:
+        return (tools[0].get("function") or {}).get("name")
+    return None
+
+
+def forced_tool_choice_refused(kwargs: dict, exception: BaseException) -> bool:
+    """Whether the provider refused a tool_choice that forces a function:
+    Claude Opus 5.5 always ('tool_choice: type "tool" and "any" are not
+    supported'), Claude with thinking on ("...when tool_choice forces tool use")."""
+    if not kwargs.get("tools") or not is_forced_tool_choice(kwargs.get("tool_choice")):
+        return False
+    message = str(exception).lower()
+    if "tool_choice" not in message:
+        return False
+    return any(
+        marker in message
+        for marker in ("not supported", "thinking", "forces tool use", "not compatible")
+    )
+
+
+def required_fields(kwargs: dict, name: Optional[str]) -> list[str]:
+    """The fields the named tool's own schema marks required."""
+    for tool in kwargs.get("tools") or []:
+        function = tool.get("function") or {}
+        if name is None or function.get("name") == name:
+            return list((function.get("parameters") or {}).get("required") or [])
+    return []
+
+
+def tool_calls_of(response) -> list:
+    try:
+        return response.choices[0].message.tool_calls or []
+    except (AttributeError, IndexError, TypeError):
+        return []
+
+
+def calls_tool(response, name: Optional[str]) -> bool:
+    tool_calls = tool_calls_of(response)
+    if name is None:
+        return len(tool_calls) > 0
+    return any(getattr(call.function, "name", None) in (name, None) for call in tool_calls)
+
+
+def calls_tool_completely(response, kwargs: dict) -> bool:
+    """Whether the answer calls the forced function with a JSON object that
+    carries every field the tool's schema requires."""
+    name = forced_tool_name(kwargs)
+    for call in tool_calls_of(response):
+        called = getattr(call.function, "name", None)
+        if name is not None and called not in (name, None):
+            continue
+        try:
+            arguments = json.loads(call.function.arguments)
+        except (TypeError, ValueError):
+            return False
+        if not isinstance(arguments, dict):
+            return False
+        return all(
+            arguments.get(field) is not None
+            for field in required_fields(kwargs, name or called)
+        )
+    return False
+
+
+def with_reminder(kwargs: dict) -> dict:
+    name = forced_tool_name(kwargs)
+    reminder = {
+        "role": "user",
+        "content": TOOL_CALL_REMINDER.format(
+            name=name or "provided",
+            fields=", ".join(required_fields(kwargs, name)) or "all of them",
+        ),
+    }
+    return {**kwargs, "messages": [*(kwargs.get("messages") or []), reminder]}
+
+
+def auto_tool_choice_attempts(kwargs: dict):
+    """The retries once a forced tool_choice is refused: tool_choice "auto",
+    then, if that answer skipped the function or left a field out, once more
+    with a reminder. Callers stop at the first complete call. A stream cannot
+    be read before it is handed back, so it gets the first attempt only."""
+    relaxed = {**kwargs, "tool_choice": "auto"}
+    yield relaxed
+    if not kwargs.get("stream"):
+        yield with_reminder(relaxed)
+
+
+USAGE_FIELDS = ("prompt_tokens", "completion_tokens", "total_tokens")
+
+
+def with_usage_of(response, earlier: list):
+    """A copy of `response` with the token usage of the `earlier` attempts
+    added, so the cost read from the answer covers every call it took. The
+    provider's own response and usage objects are left as they came."""
+    usage = getattr(response, "usage", None)
+    if usage is None or not earlier:
+        return response
+    combined = copy.copy(usage)
+    for previous in earlier:
+        previous_usage = getattr(previous, "usage", None)
+        for field in USAGE_FIELDS:
+            added = getattr(previous_usage, field, None)
+            if isinstance(added, int):
+                setattr(combined, field, (getattr(combined, field, None) or 0) + added)
+    summed = copy.copy(response)
+    summed.usage = combined
+    return summed
+
+
+def needs_reminder(response, kwargs: dict) -> bool:
+    """A forced call that reached the function without every required field.
+    An answer with no call at all (a refusal, a content filter) is not asked
+    again: the reminder would not change it, and neither is a stream, which
+    cannot be read before it is handed back."""
+    if kwargs.get("stream"):
+        return False
+    if not kwargs.get("tools") or not is_forced_tool_choice(kwargs.get("tool_choice")):
+        return False
+    if not calls_tool(response, forced_tool_name(kwargs)):
+        return False
+    return not calls_tool_completely(response, kwargs)
+
+
 def apply_tool_reasoning_compatibility(kwargs: dict) -> dict:
     """
     Switch reasoning off for the models that reject function tools while it is
@@ -118,25 +286,66 @@ def apply_tool_reasoning_compatibility(kwargs: dict) -> dict:
     specific reasoning effort keeps it and gets the provider's own answer
     rather than having its intent silently rewritten. A request carrying no
     tools is left alone, since the incompatibility is only about tools and
-    reasoning is worth having on the calls that can use it. And a model outside
-    the allowlist is left alone, since disabling reasoning is itself rejected by
-    models that only work with it on.
+    reasoning is worth having on the calls that can use it. And a model that is
+    neither in the allowlist nor in `tool_reasoning_off_models` (seen refusing
+    in this process) is left alone, since disabling reasoning is itself
+    rejected by models that only work with it on.
     """
     if kwargs.get(REASONING_EFFORT_PARAM) is not None:
         return kwargs
     if not kwargs.get("tools"):
         return kwargs
-    if kwargs.get("model") not in TOOL_REASONING_INCOMPATIBLE_MODELS:
+    model = kwargs.get("model")
+    if model not in TOOL_REASONING_INCOMPATIBLE_MODELS and model not in tool_reasoning_off_models:
         return kwargs
 
-    kwargs[REASONING_EFFORT_PARAM] = REASONING_OFF
-    return kwargs
+    return with_reasoning_off(kwargs)
+
+
+def with_reasoning_off(kwargs: dict) -> dict:
+    """The request with reasoning switched off. The parameter is also named in
+    allowed_openai_params: litellm does not know every new model takes a
+    reasoning effort, and drop_params would strip it unsent."""
+    allowed = list(kwargs.get("allowed_openai_params") or [])
+    if REASONING_EFFORT_PARAM not in allowed:
+        allowed.append(REASONING_EFFORT_PARAM)
+    return {**kwargs, REASONING_EFFORT_PARAM: REASONING_OFF, "allowed_openai_params": allowed}
+
+
+def temperature_refused(kwargs: dict, exception: BaseException) -> bool:
+    """Whether the provider refused the temperature because the model only
+    takes its default ("'temperature' does not support 0 with this model.
+    Only the default (1) value is supported.")."""
+    if kwargs.get("temperature") in (None, 1, 1.0):
+        return False
+    message = str(exception).lower()
+    return "temperature" in message and "only the default (1)" in message
+
+
+def adjusted_after_refusal(kwargs: dict, exception: BaseException) -> Optional[dict]:
+    """The request to send again after a refusal the provider said how to
+    avoid, or None when the refusal belongs to the caller. Each adjustment
+    applies once per request, and the model is remembered so later calls are
+    sent adjusted from the start. A reasoning effort the caller chose is kept."""
+    model = kwargs.get("model")
+    if (
+        kwargs.get(REASONING_EFFORT_PARAM) is None
+        and tool_reasoning_conflict(kwargs, exception) is not None
+    ):
+        if model:
+            tool_reasoning_off_models.add(model)
+        return with_reasoning_off(kwargs)
+    if temperature_refused(kwargs, exception):
+        if model:
+            temperature_pinned_models.add(model)
+        return {**kwargs, "temperature": 1.0}
+    return None
 
 
 # The gpt-5 models that DO accept a temperature, so the family test does not
 # claim them: the image models take one, the text models do not
-# (`platform/app/src/server/modelProviders/llmModels.json` is the catalog this
-# was read from — 46 of the family refuse, these two accept).
+# (`modules/model-provider/contract/src/catalog/model-catalog.json`
+# is the catalogue this was read from — 46 of the family refuse, these two accept).
 #
 # The exceptions are listed rather than inverting this into an allowlist of the
 # 46, because the two errors are not symmetric. Pinning a model that would have
@@ -167,14 +376,15 @@ def is_temperature_pinned_model(model: Optional[str]) -> bool:
     return "gpt-5" in name
 
 
-def apply_gpt5_temperature_compatibility(
+def apply_temperature_compatibility(
     kwargs: dict, requested_model: Optional[str] = None
 ) -> dict:
     """
-    Pin temperature to the default for the gpt-5-family models that accept only
-    that value and reject every other with a BadRequestError ("'temperature'
-    does not support 0.0 with this model. Only the default (1) value is
-    supported.").
+    Pin temperature to the default for the models that accept only that value
+    and reject every other with a BadRequestError ("'temperature' does not
+    support 0.0 with this model. Only the default (1) value is supported."):
+    the gpt-5 family by name, and any model in `temperature_pinned_models`,
+    seen refusing in this process.
 
     drop_params cannot cover this: it strips parameters a model does not
     support at all, and these models do support temperature — they restrict
@@ -199,11 +409,75 @@ def apply_gpt5_temperature_compatibility(
     if not (
         is_temperature_pinned_model(kwargs.get("model"))
         or is_temperature_pinned_model(requested_model)
+        or kwargs.get("model") in temperature_pinned_models
     ):
         return kwargs
     if kwargs.get("temperature") in (None, 1, 1.0):
         return kwargs
     kwargs["temperature"] = 1.0
+    return kwargs
+
+
+def is_claude_model(model: Optional[str]) -> bool:
+    """
+    Whether this model is an Anthropic Claude model, on any route.
+
+    Matched anywhere in the string rather than after the provider prefix,
+    because the routes disagree about where the name sits:
+    `anthropic/claude-sonnet-4-5`, `bedrock/anthropic.claude-sonnet-4-5-v1:0`,
+    `vertex_ai/claude-sonnet-4-5` and a Bedrock inference-profile ARN all
+    carry it differently. No other vendor names a model "claude".
+    """
+    return "claude" in model.lower() if model else False
+
+
+def apply_anthropic_sampling_compatibility(kwargs: dict) -> dict:
+    """
+    Keep only one sampling parameter for Claude models, which reject a
+    request naming both with a BadRequestError ("`temperature` and `top_p`
+    cannot both be specified for this model. Please use only one.").
+
+    drop_params cannot cover this either: each parameter is supported on its
+    own — the model restricts the combination. The temperature is the one
+    kept, because evaluators default to temperature 0 for deterministic
+    verdicts, so it is the knob their determinism actually lives in; a top_p
+    riding alongside it is the one whose absence changes a verdict least.
+
+    Applied to every Claude model rather than only the generations known to
+    refuse, on the same asymmetry as the gpt-5 list above: dropping a top_p
+    from a call that also names a temperature costs almost nothing on a
+    model that would have accepted both, while keeping it fails the call
+    outright and the evaluation reaches no verdict at all.
+    """
+    if not is_claude_model(kwargs.get("model")):
+        return kwargs
+    if kwargs.get("temperature") is None or kwargs.get("top_p") is None:
+        return kwargs
+    del kwargs["top_p"]
+    return kwargs
+
+
+def apply_output_tokens_parameter(
+    kwargs: dict, requested_model: Optional[str] = None
+) -> dict:
+    """
+    Send the output token limit under the name the catalog records for the
+    model. OpenAI's reasoning models refuse `max_tokens`, and litellm renames it
+    only for the models it recognises by name.
+
+    Looked up by the model the caller named, before any Azure deployment
+    rewrite, since a deployment name says nothing about the model behind it. A
+    limit the caller already sent as `max_completion_tokens` is kept.
+    """
+    if kwargs.get("max_tokens") is None:
+        return kwargs
+    model = requested_model or kwargs.get("model")
+    if output_tokens_parameter(model) != "max_completion_tokens":
+        return kwargs
+
+    limit = kwargs.pop("max_tokens")
+    if kwargs.get("max_completion_tokens") is None:
+        kwargs["max_completion_tokens"] = limit
     return kwargs
 
 
@@ -296,6 +570,40 @@ def request_credentials(kwargs: dict) -> None:
                 break
 
 
+class RequestEndpointWithoutKeyError(ValueError):
+    """A request named where a call goes without naming the credential sent there."""
+
+
+# The call arguments that choose where a model call is sent.
+ENDPOINT_ARGUMENTS = ("api_base", "base_url", "aws_bedrock_runtime_endpoint", "azure_endpoint")
+
+
+def _key_arguments(model: str) -> tuple:
+    provider = _model_provider(model)
+    if provider == "bedrock":
+        return ("aws_access_key_id", "aws_secret_access_key")
+    if provider == "vertex_ai":
+        return ("vertex_credentials",)
+    return ("api_key",)
+
+
+def refuse_request_endpoint_without_key(kwargs: dict, env: dict) -> None:
+    """The server's own credentials only ever go to endpoints the server chose."""
+    supplied = {value for value in env.values() if isinstance(value, str)}
+
+    def from_request(argument: str) -> bool:
+        value = kwargs.get(argument)
+        return isinstance(value, str) and value != "" and value in supplied
+
+    if not any(from_request(argument) for argument in ENDPOINT_ARGUMENTS):
+        return
+    if all(from_request(argument) for argument in _key_arguments(kwargs.get("model") or "")):
+        return
+    raise RequestEndpointWithoutKeyError(
+        "A request that sets the model endpoint must also supply the credential for it"
+    )
+
+
 def patch_litellm_params(kwargs):
     kwargs["drop_params"] = True
     # Caching on disk is timing out for some reason, disable it
@@ -332,6 +640,7 @@ def patch_litellm_params(kwargs):
 
     if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
         kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
+    refuse_request_endpoint_without_key(kwargs, request_env)
 
     # Azure patches. Kept before the rewrite: a deployment name is arbitrary
     # ("prod-judge"), so after this block there is nothing left in the model
@@ -374,9 +683,16 @@ def patch_litellm_params(kwargs):
     # Same position for the same reason: the model name is now final, and an
     # explicit X_LITELLM_temperature has landed — a value the model refuses
     # is normalized rather than sent to fail.
-    kwargs = apply_gpt5_temperature_compatibility(
+    kwargs = apply_temperature_compatibility(
         kwargs, requested_model=requested_model
     )
+    # Same position again: both sampling knobs have landed by now, wherever
+    # each came from — an evaluator argument or a request's X_LITELLM_*
+    # setting — so this is the first point the conflict is even visible.
+    kwargs = apply_anthropic_sampling_compatibility(kwargs)
+    # The limit can arrive from an evaluator argument or a request's
+    # X_LITELLM_max_tokens, so this too waits until both have landed.
+    kwargs = apply_output_tokens_parameter(kwargs, requested_model=requested_model)
 
     return kwargs
 
@@ -404,6 +720,7 @@ def patch_litellm_embedding_params(kwargs):
 
     if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
         kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
+    refuse_request_endpoint_without_key(kwargs, request_env)
 
     return kwargs
 
@@ -417,40 +734,111 @@ originals: dict = {}
 def patch_litellm():
     if originals:
         return
+    register_langwatch_model_pricing()
     originals["completion"] = litellm.completion
     originals["acompletion"] = litellm.acompletion
     originals["embedding"] = litellm.embedding
     originals["completion_cost"] = litellm.cost_calculator.completion_cost
 
-    def patched_completion(*args, **kwargs):
-        kwargs = patch_litellm_params(kwargs)
+    def complete_with_auto_tool_choice(args, kwargs):
+        responses = []
+        for attempt in auto_tool_choice_attempts(kwargs):
+            responses.append(originals["completion"](*args, **attempt))
+            if calls_tool_completely(responses[-1], kwargs):
+                break
+        return with_usage_of(responses[-1], responses[:-1])
 
+    async def acomplete_with_auto_tool_choice(args, kwargs):
+        responses = []
+        for attempt in auto_tool_choice_attempts(kwargs):
+            responses.append(await originals["acompletion"](*args, **attempt))
+            if calls_tool_completely(responses[-1], kwargs):
+                break
+        return with_usage_of(responses[-1], responses[:-1])
+
+    def complete_forced(args, kwargs):
+        response = originals["completion"](*args, **kwargs)
+        if not needs_reminder(response, kwargs):
+            return response
+        return with_usage_of(originals["completion"](*args, **with_reminder(kwargs)), [response])
+
+    async def acomplete_forced(args, kwargs):
+        response = await originals["acompletion"](*args, **kwargs)
+        if not needs_reminder(response, kwargs):
+            return response
+        retry = await originals["acompletion"](*args, **with_reminder(kwargs))
+        return with_usage_of(retry, [response])
+
+    def complete(args, kwargs):
+        if kwargs.get("model") in forced_tool_choice_refusers and is_forced_tool_choice(
+            kwargs.get("tool_choice")
+        ):
+            return complete_with_auto_tool_choice(args, kwargs)
         try:
-            return originals["completion"](*args, **kwargs)
+            return complete_forced(args, kwargs)
         except Exception as exception:
-            conflict = tool_reasoning_conflict(kwargs, exception)
-            if conflict is not None:
-                raise conflict from exception
-            raise
+            if not forced_tool_choice_refused(kwargs, exception):
+                raise
+            forced_tool_choice_refusers.add(kwargs.get("model"))
+            return complete_with_auto_tool_choice(args, kwargs)
+
+    async def acomplete(args, kwargs):
+        if kwargs.get("model") in forced_tool_choice_refusers and is_forced_tool_choice(
+            kwargs.get("tool_choice")
+        ):
+            return await acomplete_with_auto_tool_choice(args, kwargs)
+        try:
+            return await acomplete_forced(args, kwargs)
+        except Exception as exception:
+            if not forced_tool_choice_refused(kwargs, exception):
+                raise
+            forced_tool_choice_refusers.add(kwargs.get("model"))
+            return await acomplete_with_auto_tool_choice(args, kwargs)
+
+    def patched_completion(*args, **kwargs):
+        requested_model = kwargs.get("model")
+        kwargs = patch_litellm_params(kwargs)
+        while True:
+            try:
+                response = complete(args, kwargs)
+                record_usage(requested_model, response)
+                return response
+            except Exception as exception:
+                adjusted = adjusted_after_refusal(kwargs, exception)
+                if adjusted is None:
+                    conflict = tool_reasoning_conflict(kwargs, exception)
+                    if conflict is not None:
+                        raise conflict from exception
+                    raise
+                kwargs = adjusted
 
     litellm.completion = patched_completion
 
     async def patched_acompletion(*args, **kwargs):
+        requested_model = kwargs.get("model")
         kwargs = patch_litellm_params(kwargs)
-
-        try:
-            return await originals["acompletion"](*args, **kwargs)
-        except Exception as exception:
-            conflict = tool_reasoning_conflict(kwargs, exception)
-            if conflict is not None:
-                raise conflict from exception
-            raise
+        while True:
+            try:
+                response = await acomplete(args, kwargs)
+                record_usage(requested_model, response)
+                return response
+            except Exception as exception:
+                adjusted = adjusted_after_refusal(kwargs, exception)
+                if adjusted is None:
+                    conflict = tool_reasoning_conflict(kwargs, exception)
+                    if conflict is not None:
+                        raise conflict from exception
+                    raise
+                kwargs = adjusted
 
     litellm.acompletion = patched_acompletion
 
     def patched_embedding(*args, **kwargs):
+        requested_model = kwargs.get("model")
         kwargs = patch_litellm_embedding_params(kwargs)
-        return originals["embedding"](*args, **kwargs)
+        response = originals["embedding"](*args, **kwargs)
+        record_usage(requested_model, response)
+        return response
 
     litellm.embedding = patched_embedding
 

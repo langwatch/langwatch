@@ -1,6 +1,6 @@
 Feature: The CLI decides what Langy may run on the developer's machine
   As a developer who shared my folder with Langy
-  I want read-only work to run on its own and anything else to ask me first
+  I want read-only work and ordinary git to run on their own and anything else to ask me first
   So that Langy is fast where it is safe and never surprises me where it is not
 
   # The CLI is the trust boundary. It holds the folder root, the read-only
@@ -13,11 +13,16 @@ Feature: The CLI decides what Langy may run on the developer's machine
   # The read-only set is fixed and decided by parsing the command, never by
   # the model. Every precedent that used a blocklist, or trusted the model's
   # own opinion of a command, was bypassed. See dev/docs/adr/129-langy-local-control.md.
+  #
+  # Git is the one family that writes and still runs with no card: the folder
+  # is my own checkout, the commits carry my own git identity, and Langy works
+  # on a langy/* branch of it. The destructive forms are parsed out of that and
+  # still ask.
 
   Background:
     Given my local folder is connected to a Langy conversation
 
-  Rule: Read-only work and edits inside the folder run without asking
+  Rule: Read-only work, edits and ordinary git in the folder run without asking
 
     @unit
     Scenario: Reading, listing and searching never ask
@@ -36,7 +41,34 @@ Feature: The CLI decides what Langy may run on the developer's machine
       When Langy runs "git worktree list"
       Then the command runs at once
       And no permission card is rendered
-      And every other git worktree verb still asks
+      And removing a worktree with force still asks
+
+    @unit
+    Scenario: Git work in the folder runs without asking
+      When Langy stages, commits, branches, fetches, pulls, pushes, merges, rebases, stashes, tags, cherry-picks or reverts in the folder
+      Then the command runs at once
+      And no permission card is rendered
+      And a chain of those commands runs the same way
+      And a path outside the folder, a redirect or a substitution is still judged on its own
+
+    @unit
+    Scenario: Destructive git forms still ask
+      When Langy runs a git command that discards work, rewrites history the remote already has, or changes git outside the folder
+      Then the command asks for permission
+      And the reason says which of those it does
+      And a session grant for that form covers the form and not the whole subcommand
+      And a git subcommand the policy does not know asks as well
+
+    # The first thing the code-changes skill runs is a status, the remote list
+    # and a lookup of where origin's HEAD points, ending in true so a missing
+    # remote does not fail the chain. It was announced as a change to the
+    # repository and spent a card.
+    @unit
+    Scenario: A git chain that only reads runs at once
+      When Langy runs git status, the remote listing and a symbolic-ref lookup chained with true
+      Then the chain runs at once
+      And no permission card is rendered
+      And a git command that moves a reference or sets a config value still asks, as a change to the repository
 
     @unit
     Scenario: Editing a file inside the folder runs at once
@@ -83,7 +115,7 @@ Feature: The CLI decides what Langy may run on the developer's machine
 
     @integration
     Scenario: The session grant button names every pattern the click covers
-      Given a permission card for a chain that fetches and then checks out a branch
+      Given a permission card for a chain that installs and then runs the project's checks
       Then the session grant button names the pattern of every part the answer covers
       And it never names only the first part of the chain
 
@@ -123,14 +155,24 @@ Feature: The CLI decides what Langy may run on the developer's machine
 
     @unit
     Scenario: A command chain is split into its segments
-      When Langy runs a chain that stages, commits, pushes and opens a pull request
+      When Langy runs a chain that stages, commits, pushes, checks and opens a pull request
       Then one permission card asks about the whole chain
       And the card lists every segment of the chain with the pattern that segment would grant
-      And a segment that is read-only is marked as such
+      And a segment that runs on its own is marked as such
+
+    # A script fed to python through a here-document was split at every line
+    # break, so the card listed each line of the script as a segment and the
+    # session grant offered one pattern per line.
+    @unit
+    Scenario: A here-document is one command
+      When Langy runs a program that reads its script from a here-document
+      Then one permission card asks about one segment, the program and its first argument
+      And the session grant names that one pattern, not a line of the script
+      And the reason says it runs a program that is not read-only
 
     @unit
     Scenario: A pattern grant covers exactly the segments the card named
-      Given I allowed the pattern of a chain that stages, commits and pushes
+      Given I allowed the patterns of a chain that checks, force pushes and opens a pull request
       When Langy runs another chain whose segments are all covered
       Then the chain runs without a card
       And a chain with one segment outside those patterns asks again
@@ -138,15 +180,15 @@ Feature: The CLI decides what Langy may run on the developer's machine
     @unit
     Scenario: The reason says what the command changes
       When a command asks for permission
-      Then the reason is one sentence naming what it changes, such as writing files, changing the repository, reaching the network, installing packages or running the project's own checks
+      Then the reason is one sentence naming what it changes, such as writing files, discarding work in the repository, rewriting history on the remote, reaching the network, installing packages or running the project's own checks
       And the reason does not quote the command back
 
     @unit
     Scenario: A grant follows the command name and its first argument
-      Given I allowed a git push for this session
-      When Langy runs a git push to another remote
+      Given I allowed a package manager command for this session
+      When Langy runs it with the same first argument
       Then the command runs without a card
-      And a git command with a different first argument still asks
+      And the same command with a different first argument still asks
 
     @unit
     Scenario: Interpreter aliases share one grant
@@ -343,6 +385,22 @@ Feature: The CLI decides what Langy may run on the developer's machine
       And the target of a redirect is still checked
 
     @unit
+    Scenario: A redirect into /dev/null is not a path outside the folder
+      When Langy runs a command that sends output to /dev/null or reads input from it, as in "git status 2>/dev/null", ">/dev/null", "&>/dev/null" or "</dev/null"
+      Then the command is not refused for leaving the folder
+      And a redirect to any other path outside the folder is still refused
+      And /dev/null given to a command as an argument, not as a redirect, is still checked as a path
+
+    @unit
+    Scenario: The script of sed or awk and the pattern of grep are not judged paths
+      When Langy runs "sed -n '/HEAD branch/s/.*: //p'", an awk program or a grep pattern that starts with a slash
+      Then the script or pattern is read as the command's own words
+      And the command is not refused for leaving the folder
+      And every file the command is given, including a sed or grep script file, is still checked
+      And when an option gives the script or pattern (-e, -f, --regexp=), no operand is read as one
+      And a redirect target is always checked as a path, except /dev/null
+
+    @unit
     Scenario: A refusal names the argument it judged a path
       When a command is refused for naming a path outside the folder
       Then the refusal names the argument it read as a path
@@ -360,6 +418,12 @@ Feature: The CLI decides what Langy may run on the developer's machine
       When Langy reads an environment file, a private key or a credentials file inside the folder
       Then a permission card is rendered
       And the card says the file may hold secrets
+
+    @unit
+    Scenario: The credentials write says it writes
+      When Langy asks to write LangWatch credentials into the app's env file
+      Then the terminal card's heading says Langy wants to write a file
+      And the reason says the file is not written without an answer
 
     @unit
     Scenario: A committed example environment file is not a secret
@@ -386,7 +450,9 @@ Feature: The CLI decides what Langy may run on the developer's machine
     Scenario: Skipping records my consent and stops the cards
       Given a permission card
       When I choose to skip all permission checks for this session
-      Then the choice is recorded in the conversation
+      Then the switch shows my choice from the first click and keeps it
+      And a refused choice puts the switch back and says why
+      And the choice is recorded in the conversation
       And the terminal reads that permission checks are off for this session
       And later commands run without a card
 
@@ -409,3 +475,34 @@ Feature: The CLI decides what Langy may run on the developer's machine
       Given permission checks are off for this session
       When the conversation switches to a model that is not allowed to skip
       Then the next command asks again
+
+  Rule: A shared folder answers only to the owner of its conversation
+
+    # A conversation shared with the project is readable by a teammate. The
+    # folder behind it sits on the owner's machine, so reading is all a
+    # teammate gets.
+
+    @integration
+    Scenario: A teammate reading a shared conversation cannot act on its folder
+      Given a teammate shared their conversation with the project
+      And their folder is connected with a permission card waiting
+      When I answer the card, switch the permission checks off, close the folder or ask for the folder again
+      Then the platform answers that the conversation was not found
+      And the card, the policy, the folder and the terminal's requests are untouched
+
+    # The worker's routes take a Langy key. A worker only ever runs a turn for
+    # the owner, so a key that names a teammate's conversation is not a worker
+    # doing its job.
+    @unit
+    Scenario: A key never reaches the folder of a teammate's shared conversation
+      Given a teammate shared their conversation with the project
+      When a Langy key of mine names that conversation to open a request, run a call or read a card
+      Then the platform answers that the conversation was not found
+      And the answer is the one a conversation that does not exist gets
+
+    @integration
+    Scenario: A teammate reading a shared conversation still sees its folder state
+      Given a teammate shared their conversation with the project
+      And their folder is connected
+      When I open the conversation
+      Then the panel reads the folder as connected

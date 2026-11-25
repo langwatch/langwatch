@@ -42,6 +42,20 @@ cannot resolve; making that resolve means changing what the package declares as
 a dependency, which is a decision about the published artifact and not a build
 detail. These two move when a `.d.ts` bundler that speaks the TS 7 API exists.
 
+**A third package stays on `typescript@6`: `packages/architecture-enforcer`.** It is
+not a publishing concern — it drives the old programmatic API directly, across
+19 rule modules and roughly 726 call sites, and reaches for `createProgram`,
+`createPrinter`, `createScanner`, `preProcessFile`, `parseJsonText`,
+`readConfigFile`, `sys` and `parseJsonConfigFileContent`. `typescript/unstable/*`
+offers none of those. It is also the wrong shape for the parse seam below: the
+seam is a round trip per parse, and this is a synchronous CLI that walks 8,700
+modules on every `pnpm lint`. It parses in process against 6 instead, with a
+cache of extracted import/JSX facts, validated against file metadata. Cached
+facts replace previous revisions and do not retain syntax trees; cross-file
+setup inspection releases its AST cache after each lint invocation. It moves when the unstable API grows a
+program, a printer and a scanner, or when every rule is restructured to parse
+the tree in one exchange.
+
 **Static scans go through one API session.** TypeScript 7 has no in-process
 parser: `ts.createSourceFile(fileName, text)` is gone, and parsing is a request
 to the Go binary. `src/test-utils/tsAst.ts` owns a single `API` session for the
@@ -70,6 +84,48 @@ tsconfig above it, landing in an inferred project of its own. And the session
 caches source files by path, so each parse takes a name no earlier parse used;
 without that, a scan pinning a rule across several snippets judged all of them
 by the first.
+
+### Incremental declaration boundaries
+
+The application typecheck scripts build the project-reference solution in
+`dev/tsconfig.declarations.json` before checking consumers. That solution is
+the adoption list; each standalone package emits checked declarations with
+`composite` and `noEmitOnError`, and keeps its own build-info file. The 14
+cyclic web packages are one exception required by the compiler's acyclic
+project-reference rule: a direct composite group checks their sources together,
+stages declarations and maps under `dev/.cache`, then distributes them into
+each package's local `dist/`. Consumers reference that composite group directly;
+they do not use non-composite declaration stubs. Application checks stop if a
+standalone package or the group fails. Other workspace packages continue to
+resolve to source until their own declaration and consumer checks pass.
+
+The adopted packages expose declarations through a plain `types` export pointing
+to flat `dist/*.d.ts` paths. Runtime loaders and tools continue to use the
+source `default` export. The cyclic web group adds the top-level
+`langwatch-declaration-source` condition while compiling its members; that
+condition is group-only and keeps member compilation on current source.
+Typechecks prepare dependency outputs before checking source.
+
+Package checks use their normal `tsconfig.json` with the producer's main
+references and references to test dependencies. Their typecheck script prepares
+the producer (or composite web group) and then runs `tsc --noEmit`, so the
+current producer source is checked and tests can consume the fresh declaration
+output. Producers use `rootDir: "src"` and flat `dist/*.d.ts` output; runtime
+export defaults remain source. A web group member references its composite group
+and prepares it before checking tests, so redirected declarations describe the
+current checked source. A raw `tsc` invocation does
+not prepare artifacts; the package command is authoritative for freshness.
+
+Declaration output, maps, and build info live in ignored, worktree-local paths
+outside potentially shared dependency directories. Standalone outputs live in
+package `dist/`; the cyclic group keeps its build-info and complete staging
+tree under `dev/.cache` before distributing local outputs. Worktrees never
+write one another's incremental state. Ordinary builds refresh changed source;
+the declaration command removes its outputs when invoked with `--clean`. A
+shared immutable cache (removed 2026-09-17, see the amendment below) reuses
+checked outputs across worktrees with matching inputs, restoring standalone
+outputs or the complete group staging tree before distribution. Incremental
+state is never restored from another worktree.
 
 ## Rationale / Trade-offs
 
@@ -158,14 +214,70 @@ nothing so far establishes that this is the binding constraint. The sampling in
 working set stayed in a 2.3–3.5 GB band at every ceiling, so the compiler never
 came close to needing what it had.
 
-The two packages on `typescript@6` are a standing item, not a resting state.
+The three packages on `typescript@6` are a standing item, not a resting state.
+
+## Amendment: the custom typecheck scripts are retired (2026-09-17)
+
+### Context
+
+The incremental declaration boundaries section above describes a hand-rolled
+system: `dev/scripts/typecheck.mjs`, `typecheck-app.mjs`, `typecheck-one.mjs`
+and `typecheck-declarations.mjs` orchestrated a per-application declarations
+pre-pass, and `declaration-cache-artifacts.mjs` /
+`declaration-cache-inputs.mjs` / `declaration-group-artifacts.mjs` layered a
+second, hand-rolled artifact cache in a home-directory store, keyed by an
+input hash, on top of `.tsbuildinfo`. That input-hash guard failed whole
+packages with `Declaration inputs changed during compilation: … Run typecheck
+again` whenever the working tree changed under it, which on a checkout with
+several agents running was constantly.
+
+### Changes
+
+All six scripts are deleted, along with `dev/docs/best_practices/declaration-cache.md`
+and the three applications' own `tsconfig.declarations.json`. `pnpm typecheck`
+is now `pnpm --workspace-concurrency=1 -r --no-bail --filter
+"!@langwatch/server" typecheck`: every workspace package's own `typecheck`
+script, and that script is plain `tsc -b` (or `tsc -b tsconfig.test.json`,
+or `tsc -b` naming both a source and a test project, depending on the
+package). `tsc -b` is TypeScript's own project-reference build, over the same
+`tsconfig.build.json` graph this ADR already described; there is no wrapper
+preparing declarations before it runs; it prepares them itself. `pnpm --filter
+<package> typecheck` replaces `typecheck:one`.
+
+The trade-off is worth stating plainly: the deleted home-directory cache let a
+brand-new worktree restore prebuilt `.d.ts` files instead of building them.
+That is gone, so a fresh worktree now pays one cold build. Inside a worktree,
+`.tsbuildinfo` still makes every run after that incremental, the same as it
+always did.
+
+## Amendment: the packages held on 6 typecheck with 7 (2026-09-23)
+
+The three packages above, and `packages/ksuid` (whose publish build runs 6
+through the same `sdk-toolchain` catalog), hold `typescript@6` as a library —
+tsup's and the publish build's declaration emit, the enforcer's in-process
+parser — and until now also as their compiler: their `typecheck` script was a
+bare `tsc -b`, which resolves the package's own 6.0.3 binary. ksuid's own build
+project has 101 direct dependents, the enforcer's config references
+`packages/time/tsconfig.build.json`, and the SDK's reaches eleven build projects
+through `modules/langy/contract`, all of which the root solution also builds
+with 7. `tsc -b` treats build info written by another compiler version
+as out of date, so each compiler rebuilt what the other had just written, and
+everything downstream of `packages/time` with it.
+
+Their `typecheck` scripts now run the workspace compiler
+(`pnpm -w exec tsc -b <package>`); the root solution already did. What
+stays on 6 is only the library use, which never writes build info. The MCP
+server has no `typecheck` script and its tsup build emits no declarations, so
+it had nothing to move. Moving the enforcer's parsing itself to 7 remains
+blocked on batching, measured at 3.8x slower unbatched
+(`dev/docs/plans/static-analysis-consolidation-2026-09-17.md`).
 
 ## References
 
 - Related ADRs: [ADR-100](100-the-typecheck-memory-ceiling.md) (the memory
   ceiling the same investigation turned up), [ADR-076](076-single-pnpm-workspace.md)
   (why one root install governs every package's compiler version),
-  [ADR-085](085-governed-chart-runtime-without-eval.md) (which generated the
+  [ADR-085](../../../modules/analytics/adrs/002-lwql-chart-runtime-without-eval.md) (which generated the
   validator, and whose "`checkJs` parses it without checking it" consequence
   this supersedes — it is not parsed at all now)
 - Specs: `specs/setup/typescript-7.feature`

@@ -1,0 +1,144 @@
+import type {
+  CioBatchCall,
+  CioEventName,
+  CioOrgTraits,
+  CioPersonTraits,
+} from "@langwatch/enterprise-nurturing-contract";
+import { createLogger } from "@langwatch/observability";
+
+import { CustomerIoChannel, type CustomerIoChannelOptions } from "../customer-io.channel.ts";
+
+const logger = createLogger("ee:customer-io-channel");
+const EXTERNAL_SERVICE_TIMEOUT_MS = 10_000;
+type CustomerIoPath = "/identify" | "/track" | "/group" | "/batch";
+const REGIONAL_ENDPOINTS: Readonly<{ us: string; eu: string }> = {
+  us: "https://cdp.customer.io/v1",
+  eu: "https://cdp-eu.customer.io/v1",
+};
+
+export class HttpCustomerIoChannel extends CustomerIoChannel {
+  static readonly requires: readonly [] = [];
+
+  private readonly apiKey: string | undefined;
+  private readonly baseUrl: string;
+  private readonly fetchFn: typeof fetch;
+  private readonly errorReporter: CustomerIoChannelOptions["errorReporter"];
+
+  private constructor(options: CustomerIoChannelOptions) {
+    super();
+    this.apiKey = options.config.customerIoApiKey;
+    this.baseUrl =
+      options.config.customerIoBaseUrl ??
+      (options.config.customerIoRegion === "us" ? REGIONAL_ENDPOINTS.us : REGIONAL_ENDPOINTS.eu);
+    this.fetchFn = options.fetchFn ?? fetch;
+    this.errorReporter = options.errorReporter;
+  }
+
+  static create(options: CustomerIoChannelOptions): HttpCustomerIoChannel {
+    return new HttpCustomerIoChannel(options);
+  }
+
+  identifyUser(input: { userId: string; traits: Partial<CioPersonTraits> }): Promise<void> {
+    return this.post("/identify", input);
+  }
+
+  trackEvent(input: {
+    userId: string;
+    event: CioEventName;
+    properties?: Record<string, unknown>;
+    messageId?: string;
+  }): Promise<void> {
+    return this.post("/track", input);
+  }
+
+  groupUser(input: {
+    userId: string;
+    groupId: string;
+    traits?: Partial<CioOrgTraits>;
+  }): Promise<void> {
+    return this.post("/group", input);
+  }
+
+  batch(calls: CioBatchCall[]): Promise<void> {
+    return this.post("/batch", HttpCustomerIoChannel.batchBody(calls));
+  }
+
+  /** Rejects when Customer.io did not take the batch; batch only logs that. */
+  override batchOrThrow(calls: CioBatchCall[]): Promise<void> {
+    return this.postOrThrow("/batch", HttpCustomerIoChannel.batchBody(calls));
+  }
+
+  private static batchBody(calls: CioBatchCall[]): { batch: unknown[] } {
+    const batchItems = calls.map((call) => {
+      switch (call.type) {
+        case "identify":
+          return { type: "identify", userId: call.userId, traits: call.traits };
+        case "track":
+          return {
+            type: "track",
+            userId: call.userId,
+            event: call.event,
+            properties: call.properties,
+            ...(call.messageId ? { messageId: call.messageId } : {}),
+          };
+        case "group":
+          return {
+            type: "group",
+            userId: call.userId,
+            groupId: call.groupId,
+            traits: call.traits,
+          };
+      }
+    });
+    return { batch: batchItems };
+  }
+
+  /** Rejects when Customer.io did not take the track; trackEvent only logs that. */
+  override trackEventOrThrow(input: Parameters<CustomerIoChannel["trackEvent"]>[0]): Promise<void> {
+    return this.postOrThrow("/track", input);
+  }
+
+  /** A failure is logged and reported, never thrown: most calls are fire-and-forget. */
+  private async post(path: CustomerIoPath, body: unknown): Promise<void> {
+    await this.postOrThrow(path, body).catch(() => undefined);
+  }
+
+  /** Logs and reports a failure, then rejects with it. */
+  private async postOrThrow(path: CustomerIoPath, body: unknown): Promise<void> {
+    if (!this.apiKey) return;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_SERVICE_TIMEOUT_MS);
+    let failure: Error | undefined;
+    try {
+      const response = await this.fetchFn(`${this.baseUrl}${path}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Basic " + Buffer.from(`${this.apiKey}:`).toString("base64"),
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const responseBody =
+          typeof response.text === "function"
+            ? await response.text().catch(() => "<unreadable>")
+            : "<unreadable>";
+        failure = new Error(`Customer.io ${path} failed: HTTP ${response.status}`);
+        logger.error(
+          { path, status: response.status, responseBody: responseBody.slice(0, 500) },
+          `[CIO] <<< ${path} FAILED: HTTP ${response.status}`,
+        );
+        this.errorReporter?.capture(failure, { path, status: response.status });
+      }
+    } catch (error) {
+      failure = error instanceof Error ? error : new Error(String(error));
+      logger.error({ error, path }, `[CIO] <<< ${path} EXCEPTION`);
+      this.errorReporter?.capture(failure);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (failure) throw failure;
+  }
+}

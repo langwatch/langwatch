@@ -7,24 +7,30 @@ package procsupervisor
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
 )
 
 // Supervisor is the real process-backed implementation of app.Supervisor.
 type Supervisor struct {
 	isPlain bool
 	recent  *recentLogs
+	// startedAt is when this up began; captures older than it are rotated out.
+	startedAt time.Time
 }
 
 type recentLogs struct {
@@ -34,7 +40,7 @@ type recentLogs struct {
 
 // New returns a Supervisor. isAgent=true suppresses color for token-free output.
 func New(isAgent bool) Supervisor {
-	return Supervisor{isPlain: isAgent, recent: &recentLogs{}}
+	return Supervisor{isPlain: isAgent, recent: &recentLogs{}, startedAt: time.Now()}
 }
 
 // RunOnce runs a command to completion, streaming its output.
@@ -125,17 +131,18 @@ func reap(ctx context.Context, pgid int, limits app.ReapLimits, reaped chan<- st
 }
 
 // groupRSSBytes sums RSS (in bytes) across every process in the group. Shells
-// out to `ps` rather than reading /proc (this runs on macOS, which has none) —
+// out to `ps -axo` (portable: Linux `ps -g` selects by session, not group) —
 // the same "ask the OS's own tool" approach adapters/system already uses.
 func groupRSSBytes(pgid int) int64 {
-	out, err := exec.Command("ps", "-o", "rss=", "-g", fmt.Sprint(pgid)).Output()
+	out, err := exec.Command("ps", "-axo", "pgid=,rss=").Output()
 	if err != nil {
 		return 0
 	}
 	var total int64
-	for _, line := range strings.Fields(string(out)) {
+	for _, line := range strings.Split(string(out), "\n") {
+		var g int
 		var kb int64
-		if _, err := fmt.Sscanf(line, "%d", &kb); err == nil {
+		if _, err := fmt.Sscanf(line, "%d %d", &g, &kb); err == nil && g == pgid {
 			total += kb * 1024
 		}
 	}
@@ -170,11 +177,15 @@ func killOnCancel(ctx context.Context, cmd *exec.Cmd, done <-chan struct{}) {
 		if cmd.Process != nil {
 			// The first Ctrl-C is a hard stop for the launcher tree. Cleanup runs
 			// after the children are gone and must never hold the terminal hostage.
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			killTree(cmd.Process.Pid)
 		}
 	}
 }
 
+// reapOrphans SIGTERMs a dead launcher's lanes: each PPID-1 dev-runtime
+// orphan's group AND every descendant. A group alone missed the `sh -c` restart
+// loop pnpm runs a script in, which leads a group of its own: it outlived the
+// lane, reparented to PID 1, and kept its node child up for hours.
 func reapOrphans(children []app.Child, self int) {
 	knownDirs := make([]string, 0, len(children))
 	for _, child := range children {
@@ -186,30 +197,66 @@ func reapOrphans(children []app.Child, self int) {
 	if err != nil {
 		return
 	}
-	for _, line := range strings.Split(string(out), "\n") {
+	groups, pids := orphanTargets(parsePS(string(out)), knownDirs, self)
+	for _, pgid := range groups {
+		_ = syscall.Kill(-pgid, syscall.SIGTERM)
+	}
+	for _, pid := range pids {
+		_ = syscall.Kill(pid, syscall.SIGTERM)
+	}
+}
+
+// psRow is one line of `ps -axo pid=,ppid=,pgid=,command=`.
+type psRow struct {
+	pid, ppid, pgid int
+	command         string
+}
+
+func parsePS(out string) []psRow {
+	var rows []psRow
+	for _, line := range strings.Split(out, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 4 {
 			continue
 		}
-		var pid, ppid, pgid int
-		if _, err := fmt.Sscanf(fields[0], "%d", &pid); err != nil {
+		var r psRow
+		if _, err := fmt.Sscanf(fields[0], "%d", &r.pid); err != nil {
 			continue
 		}
-		if _, err := fmt.Sscanf(fields[1], "%d", &ppid); err != nil {
+		if _, err := fmt.Sscanf(fields[1], "%d", &r.ppid); err != nil {
 			continue
 		}
-		if _, err := fmt.Sscanf(fields[2], "%d", &pgid); err != nil {
+		if _, err := fmt.Sscanf(fields[2], "%d", &r.pgid); err != nil {
 			continue
 		}
-		if pid == self || ppid != 1 || pgid <= 0 {
-			continue
-		}
-		command := strings.Join(fields[3:], " ")
-		if !knownDevRuntime(command) || !containsAny(command, knownDirs) {
-			continue
-		}
-		_ = syscall.Kill(-pgid, syscall.SIGTERM)
+		r.command = strings.Join(fields[3:], " ")
+		rows = append(rows, r)
 	}
+	return rows
+}
+
+// orphanTargets is the groups of the matched PPID-1 orphans and the pids of
+// every descendant, listed before anything is signalled.
+func orphanTargets(rows []psRow, knownDirs []string, self int) (groups, pids []int) {
+	parents := make(map[int]int, len(rows))
+	for _, r := range rows {
+		parents[r.pid] = r.ppid
+	}
+	for _, r := range rows {
+		if r.pid == self || r.ppid != 1 || r.pgid <= 1 {
+			continue
+		}
+		if !knownDevRuntime(r.command) || !containsAny(r.command, knownDirs) {
+			continue
+		}
+		groups = append(groups, r.pgid)
+		for _, pid := range descendantsOf(r.pid, parents) {
+			if pid != self {
+				pids = append(pids, pid)
+			}
+		}
+	}
+	return groups, pids
 }
 
 func ReapOrphans(dirs []string) {
@@ -241,7 +288,10 @@ func containsAny(value string, needles []string) bool {
 // superviseChild runs one child, restarting it (1s backoff) on exit until ctx
 // is cancelled, then SIGTERMs the process group and SIGKILLs after 5s.
 func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
-	c := proc{name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain, preview: s.recent, sink: newLogSink(ac.LogPath)}
+	c := proc{
+		name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain,
+		preview: s.recent, sink: newCapture(ac, s.startedAt), crash: &crashDedup{},
+	}
 	// Gate the start on a dependency being ready (e.g. the web lane on the API),
 	// so this process — and the hostname routed to it — never comes up before what
 	// it needs is serving.
@@ -265,10 +315,11 @@ func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 			_ = cmd.Wait()
 			close(done)
 		}()
+		reaped := capMemory(ctx, cmd.Process.Pid, ac.MaxRSSBytes, done)
 		select {
 		case <-ctx.Done():
 			if cmd.Process != nil {
-				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+				killTree(cmd.Process.Pid)
 			}
 			<-done
 			return
@@ -276,13 +327,38 @@ func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 			if ctx.Err() != nil {
 				return
 			}
-			c.logln("exited — restarting in 1s")
+			why := "exited"
+			select {
+			case reason := <-reaped:
+				why = reason
+				if ac.OnReap != nil {
+					ac.OnReap(reason)
+				}
+			default:
+			}
+			c.logln(levelRecordLine("warn", why+" — restarting in 1s", time.Time{}))
 			select {
 			case <-ctx.Done():
 			case <-time.After(time.Second):
 			}
 		}
 	}
+}
+
+// capMemory runs reap's RSS check on a long-running lane until it exits, so a
+// lane past its ceiling is killed and the restart loop brings it back.
+func capMemory(ctx context.Context, pgid int, maxRSS int64, done <-chan struct{}) <-chan string {
+	reaped := make(chan string, 1)
+	if maxRSS <= 0 {
+		return reaped
+	}
+	reapCtx, cancel := context.WithCancel(ctx)
+	go func() {
+		<-done
+		cancel()
+	}()
+	go reap(reapCtx, pgid, app.ReapLimits{MaxRSSBytes: maxRSS}, reaped)
+	return reaped
 }
 
 // waitForReady blocks until an HTTP GET to url gets a non-5xx response (the
@@ -323,8 +399,79 @@ type proc struct {
 	isPlain                 bool
 	preview                 *recentLogs
 	// sink captures every line (timestamped) to the per-service log file the
-	// `haven logs` command reads — nil for one-shot lanes.
-	sink *logSink
+	// `haven logs` command reads — nil for one-shot lanes. Capture always
+	// gets the full line, dedup or not: only the live echo below is folded.
+	sink *capture
+	// crash collapses a fatal line repeated across consecutive restarts into
+	// a short counter instead of the same failure once per restart — nil for
+	// a proc that never restarts (RunOnce, RunOnceBounded, WaitReady).
+	crash *crashDedup
+}
+
+// crashDedup tracks the last fatal message a proc rendered, across restarts:
+// superviseChild's loop reuses the same proc value for the life of the lane,
+// so this state survives from one crash to the next.
+type crashDedup struct {
+	mu      sync.Mutex
+	lastMsg string
+	repeat  int
+}
+
+// observe records one fatal record's message and reports what to render: the
+// message itself the first time a failure is seen (or once it changes), or a
+// short "same failure, restart N" line — still worth a line, never worth
+// repeating the location — for every consecutive repeat of the same one.
+func (d *crashDedup) observe(msg string) (renderMsg string, isRepeat bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.repeat > 0 && msg == d.lastMsg {
+		d.repeat++
+		return fmt.Sprintf("same failure, restart %d", d.repeat), true
+	}
+	d.lastMsg = msg
+	d.repeat = 1
+	return msg, false
+}
+
+// dedupeFatal rewrites a line that is a repeat of the previous fatal message
+// into the short counter form; anything else — a first occurrence, a
+// different failure, or a line that is not a fatal record at all — passes
+// through unchanged.
+func (c proc) dedupeFatal(line string) string {
+	if c.crash == nil {
+		return line
+	}
+	rec, ok := logfmt.Parse(line)
+	if !ok || rec.Level != logfmt.LevelFatal {
+		return line
+	}
+	renderMsg, isRepeat := c.crash.observe(rec.Message)
+	if !isRepeat {
+		return line
+	}
+	return levelRecordLine("fatal", renderMsg, rec.Time)
+}
+
+// levelRecordLine builds the minimal structured line logfmt.Parse reads back
+// — level, message, a timestamp (now, for a zero one) — for a line this
+// supervisor decided to print itself, so it renders with the same one-line,
+// correctly-leveled discipline as everything a supervised child writes.
+func levelRecordLine(level, msg string, at time.Time) string {
+	if at.IsZero() {
+		at = time.Now()
+	}
+	encoded, err := json.Marshal(map[string]string{
+		"time":  at.UTC().Format(logfmt.TimeFormat),
+		"level": level,
+		"msg":   msg,
+	})
+	if err != nil {
+		// Only ever a plain string map; Marshal cannot fail on one. Kept as a
+		// safety net rather than asserted away, same as this file's other
+		// "cannot actually happen" branches.
+		return msg
+	}
+	return string(encoded)
 }
 
 func (c proc) command(ctx context.Context) *exec.Cmd {
@@ -380,28 +527,37 @@ const streamReadBuffer = 64 << 10
 // stream captures one output stream line by line for the life of the pipe. It
 // returns only at EOF, or when the pipe cannot be read at all, never on a
 // single bad line.
+//
+// A raw window is local to this call: stdout and stderr are read by separate
+// goroutines, each with its own window, so a structured line on one stream
+// can never cut short a raw run still building on the other.
 func (c proc) stream(r io.Reader) {
 	br := bufio.NewReaderSize(r, streamReadBuffer)
 	var line []byte
+	var w rawWindow
 	for {
 		chunk, err := br.ReadSlice('\n')
 		line = append(line, chunk...)
 		switch {
 		case err == nil:
-			c.logln(string(line))
+			c.captureLine(&w, string(line))
 			line = line[:0]
+			if br.Buffered() == 0 { // a crash dump arrives in one burst; a pause ends the raw run
+				c.flushRaw(&w)
+			}
 		case errors.Is(err, bufio.ErrBufferFull):
 			// No newline yet. Emit a segment once the line is over the cap and
 			// keep reading the rest of it, so memory stays bounded and the pipe
 			// stays drained.
 			if len(line) >= streamMaxLine {
-				c.logln(string(line))
+				c.captureLine(&w, string(line))
 				line = line[:0]
 			}
 		default:
 			if len(line) > 0 {
-				c.logln(string(line))
+				c.captureLine(&w, string(line))
 			}
+			c.flushRaw(&w)
 			if !errors.Is(err, io.EOF) {
 				c.logln(fmt.Sprintf("log capture read error: %v", err))
 				// Keep draining: if the error was transient the child stays
@@ -413,23 +569,103 @@ func (c proc) stream(r io.Reader) {
 	}
 }
 
+// rawWindow batches consecutive lines that are not the shared structured
+// format, so a Node ESM link failure — the whole stack dumped straight to
+// stderr, before any handler exists to catch and log it — renders as one
+// line rather than one per frame.
+type rawWindow struct {
+	lines []string
+}
+
+// captureLine keeps full fidelity in the sink, then either renders a
+// structured line at once (flushing any raw run ahead of it) or adds a raw
+// line to the window instead of rendering it immediately.
+func (c proc) captureLine(w *rawWindow, line string) {
+	line = strings.TrimRight(line, "\r\n")
+	c.sink.write(line, false)
+	if logfmt.Muted(c.name, line) {
+		return
+	}
+	if _, ok := logfmt.Parse(line); !ok {
+		w.lines = append(w.lines, line)
+		return
+	}
+	c.flushRaw(w)
+	c.render(c.dedupeFatal(line))
+}
+
+// flushRaw renders whatever the window collected: the line unchanged when it
+// never grew past one, otherwise one collapsed line naming the first line and
+// how many more followed, with the raw run still readable in full through
+// `haven logs <lane> --raw` (the sink already has every one of them).
+func (c proc) flushRaw(w *rawWindow) {
+	switch {
+	case len(w.lines) == 0:
+		return
+	case len(w.lines) <= plainRunLines && !slices.ContainsFunc(w.lines, crashLine.MatchString):
+		for _, line := range w.lines { // plain output (a build note, a summary) is not a crash
+			c.render(line)
+		}
+	case !slices.ContainsFunc(w.lines, crashLine.MatchString):
+		c.render(levelRecordLine("info", fmt.Sprintf("%s (+%d lines in haven logs %s --raw)",
+			w.lines[0], len(w.lines)-1, c.name), time.Time{}))
+	default:
+		msg := fmt.Sprintf(
+			"%s (+%d lines, stack in haven logs %s --raw)",
+			w.lines[0], len(w.lines)-1, c.name,
+		)
+		c.render(levelRecordLine("error", msg, time.Time{}))
+	}
+	w.lines = nil
+}
+
+// plainRunLines is the longest burst of plain lines shown line by line; a longer one (a build's
+// output) folds into one info line.
+const plainRunLines = 8
+
+// crashLine is a line only a crash dump prints: a JS or Go stack frame, an Error: header, a panic.
+var crashLine = regexp.MustCompile(`^\s+at |\w*Error:|^panic:|^goroutine \d+ \[`)
+
+// logln captures one line and echoes it live. Used for the supervisor's own
+// synthetic lines (a restart notice, a start failure) — never for a child's
+// raw stream, which goes through captureLine/flushRaw instead so a burst of
+// unstructured output collapses to one line rather than one per frame.
 func (c proc) logln(line string) {
 	line = strings.TrimRight(line, "\r\n")
-	c.sink.writeLine(line)
+	c.sink.write(line, true)
+	// Captured first, echoed second: a tool banner — or a fatal line about to
+	// be folded into a repeat counter below — is still in the log file
+	// `haven logs --raw` replays in full, it just does not reach the terminal
+	// a second (or fifth) time.
+	if logfmt.Muted(c.name, line) {
+		return
+	}
+	c.render(c.dedupeFatal(line))
+}
+
+// render is the one place a line reaches the terminal (or the `up` preview
+// buffer), through the same domain/logfmt every other viewer uses. The
+// capture into the sink has already happened by the time anything calls this.
+func (c proc) render(line string) {
+	rendered := logfmt.Render(line, logfmt.Options{
+		Lane:      c.name,
+		LaneColor: c.color,
+		Time:      time.Now(),
+		Color:     !c.isPlain,
+	})
+	if rendered == "" {
+		return
+	}
 	if c.preview != nil {
 		c.preview.Lock()
-		c.preview.lines = append(c.preview.lines, fmt.Sprintf("%-8s │ %s", c.name, line))
+		c.preview.lines = append(c.preview.lines, rendered)
 		if len(c.preview.lines) > 12 {
 			c.preview.lines = c.preview.lines[len(c.preview.lines)-12:]
 		}
 		c.preview.Unlock()
 		return
 	}
-	if c.isPlain {
-		fmt.Printf("%-8s | %s\n", c.name, line)
-		return
-	}
-	fmt.Printf("\x1b[%sm%-8s\x1b[0m │ %s\n", c.color, c.name, line)
+	fmt.Println(rendered)
 }
 
 func renderUp(ctx context.Context, logs *recentLogs, children []app.Child) {

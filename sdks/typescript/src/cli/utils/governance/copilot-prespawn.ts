@@ -1,32 +1,7 @@
 /**
- * Copilot pre-spawn checks — mode-independent warnings for the two
- * conditions that make copilot telemetry silently incomplete (ADR-039
- * Decisions 8 + 9). Both are warn-and-continue: the user keeps working,
- * support keeps an explanation for "copilot shows nothing".
- *
- *   1. Enterprise-managed settings can pin an OTel collector org-wide;
- *      managed values WIN over the env vars the wrapper injects, so the
- *      user's telemetry flows to the enterprise collector instead of
- *      LangWatch. Device-level managed settings live at fixed paths
- *      (verified against the copilot 1.0.69 native runtime):
- *        macOS:  /Library/Application Support/GitHubCopilot/managed-settings.json
- *                (plus MDM profiles under the com.github.copilot domain,
- *                not file-detectable)
- *        linux:  /etc/github-copilot/policy.d/*.json
- *      There is ALSO a server layer fetched from GitHub's
- *      /copilot_internal/managed_settings with the user's auth at run
- *      time — that one cannot be preflighted from disk, so this check
- *      covers the device layer only (documented in ADR-039).
- *
- *   2. Copilot CLI below 1.0.41 exports a different, incomplete OTel
- *      attribute set — warn to upgrade, never block (copilot
- *      auto-updates; a hard gate would be stricter than any other
- *      wrapped tool).
- *
- * These checks live OUTSIDE preflightWrapper on purpose: preflight only
- * runs on the gateway branch, and copilot's default path is ingestion
- * (wrapper-path-choice.ts), so gateway-only placement would skip the
- * warnings on the majority of runs.
+ * Copilot pre-spawn checks: warn-and-continue for two conditions that make
+ * telemetry silently incomplete (ADR-039 Decisions 8+9). Lives outside
+ * preflightWrapper since copilot's default path is ingestion, not gateway.
  */
 
 import { spawnSync } from "node:child_process";
@@ -48,14 +23,10 @@ export function copilotManagedSettingsPaths(
 ): string[] {
   switch (platform) {
     case "darwin":
-      return [
-        "/Library/Application Support/GitHubCopilot/managed-settings.json",
-      ];
+      return ["/Library/Application Support/GitHubCopilot/managed-settings.json"];
     case "win32": {
       const programData = process.env.ProgramData ?? "C:\\ProgramData";
-      return [
-        path.join(programData, "GitHubCopilot", "managed-settings.json"),
-      ];
+      return [path.join(programData, "GitHubCopilot", "managed-settings.json")];
     }
     default:
       return ["/etc/github-copilot/policy.d"];
@@ -63,11 +34,8 @@ export function copilotManagedSettingsPaths(
 }
 
 /**
- * Whether a managed-settings file (or policy.d document) pins OTel
- * config. Key names observed in the 1.0.69 bundle's managed shape:
- * `enabled`, `endpoint`, `protocol`, `headers`, `captureContent`,
- * `lockCaptureContent`, `serviceName` under an otel section — a plain
- * substring probe for "otel" keeps this robust to schema evolution
+ * Whether a managed-settings file (or policy.d document) pins OTel config.
+ * A plain substring probe for "otel" keeps this robust to schema evolution
  * while never flagging a file that only manages permissions.
  */
 function fileMentionsOtel(filePath: string): boolean {
@@ -97,21 +65,22 @@ export function detectManagedOtelPin(
       if (fileMentionsOtel(p)) return p;
       continue;
     }
-    if (stat.isDirectory()) {
-      let entries: string[];
-      try {
-        entries = fs.readdirSync(p);
-      } catch {
-        continue;
-      }
-      for (const entry of entries) {
-        if (!entry.endsWith(".json")) continue;
-        const full = path.join(p, entry);
-        if (fileMentionsOtel(full)) return full;
-      }
-    }
+    if (!stat.isDirectory()) continue;
+    const pinned = findDirEntries(p)
+      .filter((entry) => entry.endsWith(".json"))
+      .map((entry) => path.join(p, entry))
+      .find((full) => fileMentionsOtel(full));
+    if (pinned) return pinned;
   }
   return null;
+}
+
+function findDirEntries(dir: string): string[] {
+  try {
+    return fs.readdirSync(dir);
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -150,9 +119,7 @@ export interface CopilotPrespawnOptions {
  * with respect to the resolved path: takes no mode input, so gateway and
  * ingestion runs surface the same warnings. Empty array = all clear.
  */
-export function copilotPrespawnWarnings(
-  opts: CopilotPrespawnOptions = {},
-): string[] {
+export function copilotPrespawnWarnings(opts: CopilotPrespawnOptions = {}): string[] {
   const warnings: string[] = [];
 
   const pinned = detectManagedOtelPin(opts.managedPaths);
@@ -163,10 +130,7 @@ export function copilotPrespawnWarnings(
   }
 
   const version = (opts.readVersionImpl ?? readInstalledVersion)();
-  if (
-    version &&
-    compareVersions({ version, against: COPILOT_MIN_OTEL_VERSION }) < 0
-  ) {
+  if (version && compareVersions({ version, against: COPILOT_MIN_OTEL_VERSION }) < 0) {
     warnings.push(
       `${lwTag()} copilot ${version} exports incomplete telemetry attributes; upgrade to ${COPILOT_MIN_OTEL_VERSION}+ (\`copilot update\`) for full capture.`,
     );
@@ -176,13 +140,9 @@ export function copilotPrespawnWarnings(
 }
 
 /**
- * Gateway mode routes copilot through its BYOK provider env
- * (COPILOT_PROVIDER_*), and GitHub documents COPILOT_MODEL as REQUIRED for
- * BYOK — without a model, copilot fails with an opaque error before any
- * traffic reaches the gateway. Returns an actionable message when no model
- * is resolvable from the args or environment, else null. Gateway-only:
- * the ingestion (direct-OTLP) path runs copilot on its seat with its own
- * model selection and needs no model here.
+ * Gateway mode routes copilot through BYOK provider env, and GitHub
+ * requires COPILOT_MODEL for BYOK -- without it copilot fails opaquely.
+ * Returns an actionable message when no model resolves, else null.
  */
 export function copilotGatewayModelPreflight(opts: {
   args: string[];

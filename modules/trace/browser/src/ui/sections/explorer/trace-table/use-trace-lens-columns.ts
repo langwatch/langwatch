@@ -1,0 +1,156 @@
+import { parseEvalColumnId } from "@langwatch/trace-contract";
+import type { ColumnDef } from "@tanstack/react-table";
+import { useMemo } from "react";
+
+import type { TraceListItem } from "../../../../behavior/explorer/types/trace.ts";
+import {
+  timeColumnSizing,
+  useTimeFormatStore,
+} from "../../../../features/explorer/behavior/time-format.store.ts";
+import { addColumnColumnDef } from "./add-column-header.tsx";
+import { getTraceColumnDef, memberProjectColumnDef } from "./columns.ts";
+import { buildEvalColumnDef, evalColumnLabel } from "./eval-columns.ts";
+import { makeEvalCellDef } from "./registry/cells/trace/eval-result-cell.tsx";
+import { ProjectCell } from "./registry/cells/trace/project-cell.tsx";
+import { type Registry, traceRegistry } from "./registry/index.ts";
+import type { CellDef } from "./registry/types.ts";
+import { traceSelectColumnDef } from "./select-column.tsx";
+
+const SELECT_COL_MIN_PX = 32;
+/**
+ * Floor for the trace-lens min table width.
+ */
+const MIN_WIDTH_FLOOR_PX = 800;
+const FALLBACK_COL_MIN_SIZE_PX = 100;
+
+const EMPTY_NAMES: Map<string, string> = new Map();
+
+interface TraceLensColumns {
+  columns: ColumnDef<TraceListItem, unknown>[];
+  registry: Registry<TraceListItem>;
+  minWidth: string;
+}
+
+function buildColumnDefs({
+  showMemberProject = false,
+  logicalColumnIds,
+  evaluatorNames,
+  timeFormat,
+}: {
+  showMemberProject?: boolean;
+  logicalColumnIds: string[];
+  evaluatorNames: Map<string, string>;
+  timeFormat: Parameters<typeof timeColumnSizing>[0];
+}): ColumnDef<TraceListItem, unknown>[] {
+  const defs: ColumnDef<TraceListItem, unknown>[] = [
+    traceSelectColumnDef,
+    ...(showMemberProject ? [memberProjectColumnDef] : []),
+  ];
+
+  for (const id of logicalColumnIds) {
+    const parsed = parseEvalColumnId(id);
+    if (parsed) {
+      defs.push(
+        buildEvalColumnDef({
+          id,
+          field: parsed.field,
+          evaluatorKey: parsed.evaluatorKey,
+          label: evalColumnLabel({
+            field: parsed.field,
+            evaluatorKey: parsed.evaluatorKey,
+            evaluatorNames,
+          }),
+        }),
+      );
+      continue;
+    }
+
+    const def = getTraceColumnDef(id);
+    if (!def) continue;
+    if (id === "time") {
+      defs.push({ ...def, ...timeColumnSizing(timeFormat) });
+      continue;
+    }
+
+    defs.push(def);
+  }
+
+  // Trailing "+" column — a quick entry point to the column picker,
+  // anchored where newly-added columns appear.
+  defs.push(addColumnColumnDef);
+  return defs;
+}
+
+/**
+ * Resolve the lens's logical column ids into TanStack column defs + the cell registry,
+ * in `logicalColumnIds` order.
+ */
+export function useTraceLensColumns({
+  logicalColumnIds,
+  evaluatorNames = EMPTY_NAMES,
+  showMemberProject = false,
+}: {
+  logicalColumnIds: string[];
+  evaluatorNames?: Map<string, string>;
+  /** On an aggregate project (ADR-177), the member project column goes first, after select. */
+  showMemberProject?: boolean;
+}): TraceLensColumns {
+  // The Time column's value format (relative ↔ ISO) is a personal display
+  // preference, not a per-lens column width — so its sizing isn't baked
+  // into the static def. Read it here and widen the def in ISO mode so the
+  // full timestamp doesn't clip; the persisted manual-resize override (in
+  // columnSizingStore) still wins for the rendered width.
+  const timeFormat = useTimeFormatStore((s) => s.format);
+  const columns = useMemo(
+    () => buildColumnDefs({ logicalColumnIds, evaluatorNames, timeFormat, showMemberProject }),
+    [logicalColumnIds, evaluatorNames, timeFormat, showMemberProject],
+  );
+
+  // Cell renderers for the active eval columns, merged onto the static trace registry.
+  const registry = useMemo<Registry<TraceListItem>>(() => {
+    const extraCells: Record<string, CellDef<TraceListItem>> = {};
+    for (const id of logicalColumnIds) {
+      const parsed = parseEvalColumnId(id);
+      if (parsed) {
+        extraCells[id] = makeEvalCellDef({
+          id,
+          evaluatorKey: parsed.evaluatorKey,
+          field: parsed.field,
+        });
+      }
+    }
+    if (showMemberProject) extraCells[ProjectCell.id] = ProjectCell;
+    if (Object.keys(extraCells).length === 0) return traceRegistry;
+    return {
+      ...traceRegistry,
+      cells: { ...traceRegistry.cells, ...extraCells },
+    };
+  }, [logicalColumnIds, showMemberProject]);
+
+  const minWidth = useMemo(() => {
+    /**
+     * Floors the table at fixed columns' size + flex columns' minSize + the select gutter, so
+     * `tableLayout: fixed` can't collapse a fixed column below what it actually claims at render.
+     */
+    const widthFor = (def: {
+      id?: string;
+      size?: number;
+      minSize?: number;
+      meta?: unknown;
+    }): number => {
+      const isFlex = (def.meta as { flex?: boolean } | undefined)?.flex;
+      if (isFlex) return def.minSize ?? FALLBACK_COL_MIN_SIZE_PX;
+      return def.size ?? def.minSize ?? FALLBACK_COL_MIN_SIZE_PX;
+    };
+
+    // Sum the body columns; the select column contributes its own fixed
+    // gutter rather than its (larger) declared size.
+    const total = columns.reduce((sum, c) => {
+      if (c.id === traceSelectColumnDef.id) return sum;
+      return sum + widthFor(c as { size?: number; minSize?: number; meta?: unknown });
+    }, SELECT_COL_MIN_PX);
+    return `${Math.max(total, MIN_WIDTH_FLOOR_PX)}px`;
+  }, [columns]);
+
+  return { columns, registry, minWidth };
+}

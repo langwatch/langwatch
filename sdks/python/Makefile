@@ -97,27 +97,28 @@ batch-evaluation-example:
 # and drop the override if upstream PR #1407 has landed.
 OPENAPI_PYTHON_CLIENT_VERSION := 0.28.4
 
-ensure-openapi-python-client:
-	@uv pip install --quiet "openapi-python-client==$(OPENAPI_PYTHON_CLIENT_VERSION)"
+# The OpenAPI document is generated from the api's route declarations and never
+# committed, so this target writes it first. The client it produces is
+# committed; CI regenerates it and fails on a diff (the `openapi-clients` job).
+API_SPEC = ../../specs/api-reference/openapi-document.json
 
-generate/api-client: ensure-openapi-python-client
-	@echo "Generating OpenAPI spec..."
-	@cd ../../platform/app && pnpm run task generateOpenAPISpec
+generate/api-client:
+	@cd ../.. && pnpm --filter @langwatch/platform-api run openapi:generate
 	@echo "Deleting old API client..."
 	@rm -rf src/langwatch/generated/langwatch_rest_api_client
 	@echo "Building API client..."
 	@mkdir -p .tmp/api-client
 	@python3 scripts/spec-for-python-generator.py \
-		../../platform/app/src/app/api/openapiLangWatch.json \
+		$(API_SPEC) \
 		.tmp/openapiLangWatch.python.json
-	uv run openapi-python-client generate \
+	uv run --with "openapi-python-client==$(OPENAPI_PYTHON_CLIENT_VERSION)" openapi-python-client generate \
 		--path .tmp/openapiLangWatch.python.json \
 		--output-path .tmp/api-client \
 		--custom-template-path openapi-templates \
 		--overwrite
 	@echo "Copying necessary files to SDK..."
 	@mkdir -p src/langwatch/generated/langwatch_rest_api_client
-	@cp -r .tmp/api-client/lang_watch_api_client/ src/langwatch/generated/langwatch_rest_api_client/
+	@cp -R .tmp/api-client/lang_watch_api_client/. src/langwatch/generated/langwatch_rest_api_client/
 	@echo "Cleaning up..."
 	@rm -rf .tmp/api-client .tmp/openapiLangWatch.python.json
 	@echo "Done! API client has been integrated into the SDK."

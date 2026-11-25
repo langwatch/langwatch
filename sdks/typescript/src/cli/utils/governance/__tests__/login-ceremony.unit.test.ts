@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  formatLoginCeremony,
-  type LoginCeremonyInput,
-} from "../login-ceremony";
+import { formatLoginCeremony, type LoginCeremonyInput } from "../login-ceremony";
 
 const baseInput: LoginCeremonyInput = {
   email: "jane@acme.com",
@@ -36,7 +33,7 @@ describe("formatLoginCeremony", () => {
     return slug !== undefined && slug !== "open";
   };
 
-  describe("AI tools block", () => {
+  describe("when rendering the AI tools block", () => {
     describe("when the org publishes coding-assistant tools", () => {
       it("lists exactly those tools as runnable commands with their names", () => {
         const lines = formatLoginCeremony({
@@ -54,10 +51,10 @@ describe("formatLoginCeremony", () => {
     });
 
     describe("when the org publishes no tools", () => {
-      it("falls back to every built-in wrapper (all seven tools)", () => {
+      it("falls back to every built-in wrapper (all eight tools)", () => {
         const lines = formatLoginCeremony(baseInput);
         const toolLines = lines.filter(isToolCommand);
-        expect(toolLines).toHaveLength(7);
+        expect(toolLines).toHaveLength(9);
         for (const slug of [
           "claude",
           "codex",
@@ -66,22 +63,22 @@ describe("formatLoginCeremony", () => {
           "cursor",
           "gemini",
           "opencode",
+          "grok",
+          "pi",
         ]) {
-          expect(toolLines.some((line) => getCommandSlug(line) === slug)).toBe(
-            true,
-          );
+          expect(toolLines.some((line) => getCommandSlug(line) === slug)).toBe(true);
         }
       });
 
       it("falls back when an empty tools array is supplied", () => {
         const lines = formatLoginCeremony({ ...baseInput, tools: [] });
         const toolLines = lines.filter(isToolCommand);
-        expect(toolLines).toHaveLength(7);
+        expect(toolLines).toHaveLength(9);
       });
     });
   });
 
-  describe("model providers block", () => {
+  describe("when rendering the model providers block", () => {
     describe("when providers are supplied", () => {
       it("renders providers under a clearly distinct virtual-key heading", () => {
         const lines = formatLoginCeremony({
@@ -91,9 +88,7 @@ describe("formatLoginCeremony", () => {
             { name: "openai", displayName: "OpenAI", configured: true },
           ],
         });
-        expect(lines).toContain(
-          "Model providers you can issue a virtual key for:",
-        );
+        expect(lines).toContain("Model providers you can issue a virtual key for:");
         // NOT labelled "AI tools" — that confusion is the bug being fixed.
         expect(lines).not.toContain("Your AI tools are ready:");
         const providerLines = lines.filter((l) => l.startsWith("  •"));
@@ -129,9 +124,7 @@ describe("formatLoginCeremony", () => {
 
       it("omits the providers section when the array is empty", () => {
         const lines = formatLoginCeremony({ ...baseInput, providers: [] });
-        expect(lines).not.toContain(
-          "Model providers you can issue a virtual key for:",
-        );
+        expect(lines).not.toContain("Model providers you can issue a virtual key for:");
       });
     });
   });
@@ -171,7 +164,7 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("budget overview lines (per-budget, labelled)", () => {
+  describe("when rendering per-budget labelled overview lines", () => {
     const orgBudget = {
       spentUsd: 2.43,
       limitUsd: 100,
@@ -202,9 +195,7 @@ describe("formatLoginCeremony", () => {
       it("renders no budget section at all", () => {
         const lines = formatLoginCeremony({ ...baseInput, budgets: [] });
         expect(lines).not.toContain("Budgets that apply to your key:");
-        expect(
-          lines.find((l) => l.includes("budget")),
-        ).toBeUndefined();
+        expect(lines.find((l) => l.includes("budget"))).toBeUndefined();
       });
 
       it("suppresses the legacy collapsed line even when also supplied", () => {
@@ -215,9 +206,7 @@ describe("formatLoginCeremony", () => {
           budget: { period: "monthly", limitUsd: 100, usedUsd: 2.43 },
           budgets: [],
         });
-        expect(
-          lines.find((l) => l.startsWith("Monthly budget:")),
-        ).toBeUndefined();
+        expect(lines.find((l) => l.startsWith("Monthly budget:"))).toBeUndefined();
       });
     });
 
@@ -257,9 +246,7 @@ describe("formatLoginCeremony", () => {
             },
           ],
         });
-        expect(lines).toContain(
-          "  $1.00 used of $10.00 all time (personal budget)",
-        );
+        expect(lines).toContain("  $1.00 used of $10.00 all time (personal budget)");
       });
     });
 
@@ -272,9 +259,7 @@ describe("formatLoginCeremony", () => {
         const budgetLines = lines.filter((l) => l.includes(" used of "));
         expect(budgetLines).toHaveLength(3);
         expect(budgetLines[0]).toContain("(personal budget)");
-        expect(budgetLines[1]).toContain(
-          "(department budget (Engineering))",
-        );
+        expect(budgetLines[1]).toContain("(department budget (Engineering))");
         expect(budgetLines[2]).toContain("(whole organization budget)");
       });
     });
@@ -309,9 +294,7 @@ describe("formatLoginCeremony", () => {
           budget: { period: "monthly", limitUsd: 100, usedUsd: 2.43 },
           budgets: [orgBudget],
         });
-        expect(
-          lines.find((l) => l.startsWith("Monthly budget:")),
-        ).toBeUndefined();
+        expect(lines.find((l) => l.startsWith("Monthly budget:"))).toBeUndefined();
         expect(lines).toContain(
           "  $2.43 used of $100.00 this month (whole organization budget), resets Aug 1",
         );
@@ -319,7 +302,7 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("open hint", () => {
+  describe("when rendering the open hint", () => {
     it("appears by default", () => {
       const lines = formatLoginCeremony(baseInput);
       expect(lines).toContain("Or open the app in your browser:");
@@ -335,7 +318,7 @@ describe("formatLoginCeremony", () => {
     });
   });
 
-  describe("full ceremony output (golden)", () => {
+  describe("when rendering the full ceremony output (golden)", () => {
     it("renders the two distinct sections end-to-end", () => {
       const lines = formatLoginCeremony({
         email: "jane@acme.com",

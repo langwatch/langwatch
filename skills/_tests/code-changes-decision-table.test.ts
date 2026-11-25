@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
 import path from "path";
 import { fileURLToPath } from "url";
-import { listNativeSkills, renderSkill } from "../_compiler/native.js";
+
+import { describe, expect, it } from "vitest";
+
+import { listNativeSkills, renderSkill } from "../_compiler/native.ts";
 
 // Backs specs/langy/langy-code-access.feature: the code-changes skill is what
 // tells Langy when a request needs the customer's code and when the platform
@@ -18,9 +20,7 @@ function codeChangesSkill(): string {
 }
 
 function connectAgentSkill(): string {
-  const skill = listNativeSkills(skillsRoot).find(
-    (s) => s.slug === "connect-agent",
-  );
+  const skill = listNativeSkills(skillsRoot).find((s) => s.slug === "connect-agent");
   expect(skill, "connect-agent is a shipped native skill").toBeTruthy();
   return renderSkill(skill!);
 }
@@ -70,12 +70,11 @@ describe("the code-changes skill", () => {
     });
   });
 
-  // The rules below come from a filmed dogfood where Langy probed for facts it
-  // had been handed, reached for the sandbox shell while a folder was
-  // connected, never asked a question the customer had explicitly offered,
-  // claimed a registration it had read the opposite of, and titled a pull
-  // request "Add comprehensive LangWatch tracing". Each is one sentence in the
-  // skill, and a sentence with no test is a sentence that comes back out.
+  // The rules below come from a filmed dogfood where Langy probed for facts
+  // it had been handed, reached for the sandbox shell with a folder
+  // connected, never asked a question the customer had offered, claimed a
+  // registration it had read the opposite of, and titled a PR "Add
+  // comprehensive LangWatch tracing". Each is one sentence with a test.
   describe("given a folder is connected", () => {
     /** @scenario "The workspace facts are the answer, not something to probe" */
     it("says the workspace facts are the answer rather than something to probe", () => {
@@ -111,6 +110,17 @@ describe("the code-changes skill", () => {
       expect(rendered).toContain("Decide routine things yourself");
     });
 
+    /** @scenario "A dirty tree gets a branch with no start point and a commit by file name" */
+    it("branches a dirty tree in place, asks before touching a dirty file, and stages by name", () => {
+      const rendered = codeChangesSkill();
+      expect(rendered).toContain("`git checkout -b langy/<slug>` with no start point");
+      expect(rendered).not.toContain("git worktree add");
+      expect(rendered).toContain("asks on every command");
+      expect(rendered).toContain("Include them in my commit");
+      expect(rendered).toContain("I'll commit them first");
+      expect(rendered).toContain("never `git add .` or `git add -A`");
+    });
+
     /** @scenario "A branch name is picked from the names the folder already has" */
     it("lists the langy branches of the folder and of the remote before it names a new one", () => {
       const rendered = codeChangesSkill();
@@ -133,9 +143,7 @@ describe("the code-changes skill", () => {
     /** @scenario "The pull request title is the commit subject" */
     it("takes the pull request title from the commit subject and bans adjectives", () => {
       const rendered = codeChangesSkill();
-      expect(rendered).toContain(
-        "The title is the commit subject with the type prefix removed",
-      );
+      expect(rendered).toContain("The title is the commit subject with the type prefix removed");
       expect(rendered).toContain("comprehensive");
     });
 
@@ -146,11 +154,9 @@ describe("the code-changes skill", () => {
       expect(rendered).toContain(
         "may only state what a command output **in this conversation** showed",
       );
-      expect(rendered).toContain("langwatch agent get <name>");
+      expect(rendered).toContain('langwatch agent get "<name>"');
       expect(rendered).toContain("the restart is left to the user");
-      expect(rendered).toContain(
-        "Copy that address into your reply, character for character",
-      );
+      expect(rendered).toContain("Copy that address into your reply, character for character");
     });
   });
 });
@@ -162,7 +168,7 @@ describe("the connect-agent skill", () => {
       const rendered = connectAgentSkill();
       expect(rendered).toContain("When the change goes into a pull request");
       expect(rendered).toContain("Restart the service that holds the connect call");
-      expect(rendered).toContain("`langwatch agent get <name>`");
+      expect(rendered).toContain('`langwatch agent get "<name>"`');
       expect(rendered).toContain("the restart is left to the user");
       expect(rendered).toContain(
         "is false unless the `agent get` output in this conversation lists both options",

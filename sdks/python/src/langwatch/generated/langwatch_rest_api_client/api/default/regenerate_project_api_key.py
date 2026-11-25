@@ -15,7 +15,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/projects/{id}/regenerate-api-key".format(
+        "url": "/api/v1/projects/{id}/regenerate-api-key".format(
             id=quote(str(id), safe=""),
         ),
     }
@@ -38,10 +38,6 @@ def _parse_response(
     if response.status_code == 403:
         response_403 = cast(Any, None)
         return response_403
-
-    if response.status_code == 404:
-        response_404 = cast(Any, None)
-        return response_404
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -70,9 +66,8 @@ def sync_detailed(
 ) -> Response[Any | RegenerateProjectApiKeyResponse200]:
     """Regenerate the project API key
 
-     Issue a new API key for the project and invalidate the previous one immediately. Anything still
-    sending the old key starts failing authentication as soon as this returns, so roll it out before
-    calling this. Requires an admin API key holding project:manage.
+     Deprecated. Project base keys can be rotated only by a signed-in project administrator in the
+    browser. Organization API keys are always refused with 403.
 
     Args:
         id (str):
@@ -103,9 +98,8 @@ def sync(
 ) -> Any | RegenerateProjectApiKeyResponse200 | None:
     """Regenerate the project API key
 
-     Issue a new API key for the project and invalidate the previous one immediately. Anything still
-    sending the old key starts failing authentication as soon as this returns, so roll it out before
-    calling this. Requires an admin API key holding project:manage.
+     Deprecated. Project base keys can be rotated only by a signed-in project administrator in the
+    browser. Organization API keys are always refused with 403.
 
     Args:
         id (str):
@@ -131,9 +125,8 @@ async def asyncio_detailed(
 ) -> Response[Any | RegenerateProjectApiKeyResponse200]:
     """Regenerate the project API key
 
-     Issue a new API key for the project and invalidate the previous one immediately. Anything still
-    sending the old key starts failing authentication as soon as this returns, so roll it out before
-    calling this. Requires an admin API key holding project:manage.
+     Deprecated. Project base keys can be rotated only by a signed-in project administrator in the
+    browser. Organization API keys are always refused with 403.
 
     Args:
         id (str):
@@ -162,9 +155,8 @@ async def asyncio(
 ) -> Any | RegenerateProjectApiKeyResponse200 | None:
     """Regenerate the project API key
 
-     Issue a new API key for the project and invalidate the previous one immediately. Anything still
-    sending the old key starts failing authentication as soon as this returns, so roll it out before
-    calling this. Requires an admin API key holding project:manage.
+     Deprecated. Project base keys can be rotated only by a signed-in project administrator in the
+    browser. Organization API keys are always refused with 403.
 
     Args:
         id (str):

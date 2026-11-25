@@ -1,21 +1,12 @@
 /**
  * What Langy may run in the shared folder, decided here and nowhere else.
- *
- * The CLI is the trust boundary: it holds the folder root, the read-only set,
- * the grants the user gave this session and the skip state. The chat card is
- * only the way to get the user's answer. Nothing the model says about a
- * command is read; the command is parsed.
- *
- * The read-only set is an allowlist, not a blocklist. Every precedent that
- * used a blocklist, or trusted the model's own opinion of a command, was
- * bypassed.
- *
- * @see specs/langy/langy-local-permissions.feature
- * @see dev/docs/adr/129-langy-local-control.md
+ * The CLI is the trust boundary; the command is parsed, never trusted from
+ * what the model says about it. See dev/docs/adr/129-langy-local-control.md.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+
 import type {
   CommandSegment,
   LocalCallErrorCode,
@@ -90,6 +81,8 @@ export const READ_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   "tr",
   "diff",
   "cmp",
+  "true",
+  "false",
 ]);
 
 /** The git subcommands that only read the repository. */
@@ -103,36 +96,40 @@ export const READ_ONLY_GIT_SUBCOMMANDS: ReadonlySet<string> = new Set([
   "blame",
   "remote",
   "rev-parse",
+  "rev-list",
   "describe",
   "tag",
+  "cat-file",
+  "ls-tree",
+  "show-ref",
+  "for-each-ref",
+  "merge-base",
+  "name-rev",
+  "shortlog",
+  "check-ignore",
 ]);
 
 /**
- * Git subcommands whose operands decide what they do.
- *
- * The subcommand alone is not the answer: `git branch` lists the branches and
- * `git branch new-name` creates one, `git tag` lists the tags and `git tag v1`
- * writes one, `git remote show origin` reaches the network. Each subcommand
- * here reads in its bare form, when `bare` is true, and with the verbs named
- * here. Every other operand asks.
+ * Git subcommands whose operands decide what they do — e.g. `git branch`
+ * lists but `git branch new-name` creates. Each reads in its bare form when
+ * `bare` is true, and with the verbs named here; every other operand asks.
  */
 const GIT_OPERAND_RULES: ReadonlyMap<
   string,
-  { bare: boolean; verbs: ReadonlySet<string>; lists?: boolean }
+  { bare: boolean; verbs: ReadonlySet<string>; lists?: boolean; refs?: number }
 > = new Map([
   ["branch", { bare: true, verbs: new Set<string>(), lists: true }],
   ["tag", { bare: true, verbs: new Set<string>(), lists: true }],
   ["remote", { bare: true, verbs: new Set(["get-url"]) }],
   ["worktree", { bare: false, verbs: new Set(["list"]) }],
+  ["symbolic-ref", { bare: false, verbs: new Set<string>(), refs: 1 }],
+  ["config", { bare: false, verbs: new Set<string>(), lists: true, refs: 1 }],
 ]);
 
 /**
  * The options that make `git branch` and `git tag` list.
- *
- * With one of these the operands are patterns and references rather than the
- * name of something to write: `git branch --list "langy/*"` prints the
- * branches of a prefix, which is the first thing the skill asks Langy to do,
- * and it must not spend a card.
+ * With one of these the operands are patterns and references rather than
+ * the name of something to write, e.g. `git branch --list "langy/*"`.
  */
 const GIT_LIST_OPTIONS: ReadonlySet<string> = new Set([
   "--list",
@@ -170,15 +167,264 @@ const GIT_WRITE_ARGUMENTS: ReadonlySet<string> = new Set([
   "set-url",
   "set-head",
   "set-branches",
+  "--unset",
+  "--unset-all",
+  "--add",
+  "--replace-all",
+  "--edit",
+  "-e",
+  "--remove-section",
+  "--rename-section",
 ]);
 
 /**
- * The `gh` invocations that only read, written out in full.
- *
- * The sign-in check is the one Langy reached for most, and the answer is
- * already in the register frame as `ghAuthenticated`. It still cost a card in
- * every filmed run, so the check itself runs, and the skill says the workspace
- * facts are the answer. Everything else `gh` does reaches GitHub and asks.
+ * The git subcommands that run with no card although they are not read-only:
+ * the ordinary writes, and the reads that reach a remote. The forms that throw
+ * work away still ask — `gitDestructiveForm` parses those out.
+ */
+export const ALLOWED_GIT_SUBCOMMANDS: ReadonlySet<string> = new Set([
+  "add",
+  "branch",
+  "checkout",
+  "cherry-pick",
+  "clean",
+  "commit",
+  "config",
+  "fetch",
+  "gc",
+  "init",
+  "ls-remote",
+  "merge",
+  "mv",
+  "pull",
+  "push",
+  "rebase",
+  "reflog",
+  "remote",
+  "reset",
+  "restore",
+  "revert",
+  "rm",
+  "stash",
+  "switch",
+  "tag",
+  "update-ref",
+  "worktree",
+]);
+
+/** A git form that asks: what it does, and the pattern a grant for it carries. */
+export interface GitDestructiveForm {
+  effect: CommandEffect;
+  /** The pattern the session grant names, so it covers this form alone. */
+  pattern: string;
+}
+
+/** The `git push` options that make the remote take a history it does not have. */
+const GIT_PUSH_FORCE_OPTIONS: ReadonlySet<string> = new Set([
+  "-f",
+  "--force",
+  "--force-with-lease",
+  "--force-if-includes",
+]);
+
+/** The `git push` options that remove a branch from the remote. */
+const GIT_PUSH_DELETE_OPTIONS: ReadonlySet<string> = new Set(["-d", "--delete"]);
+
+/** The options that make `git clean` remove files. */
+const GIT_CLEAN_OPTIONS: ReadonlySet<string> = new Set(["-f", "--force", "-x", "-d"]);
+
+/** The options that overwrite the working tree with the index or a commit. */
+const GIT_FORCE_OPTIONS: ReadonlySet<string> = new Set(["-f", "--force"]);
+
+/** The `git config` scopes that reach outside the folder. */
+const GIT_CONFIG_OUTSIDE_SCOPES: ReadonlySet<string> = new Set(["--global", "--system"]);
+
+interface GitInvocation {
+  args: string[];
+  subcommand: string;
+  operands: string[];
+  option: (options: ReadonlySet<string>) => string | undefined;
+  form: (effect: CommandEffect, marker: string) => GitDestructiveForm;
+}
+
+type GitFormReader = (invocation: GitInvocation) => GitDestructiveForm | null;
+
+const rewritesHistory: GitFormReader = ({ subcommand }) => ({
+  effect: "rewrites_history",
+  pattern: `git ${subcommand}`,
+});
+
+/** The git subcommands that can be destructive, each with how its dangerous form reads. */
+const GIT_FORM_READERS: ReadonlyMap<string, GitFormReader> = new Map<string, GitFormReader>([
+  [
+    "push",
+    ({ operands, option, form }) => {
+      const forced =
+        option(GIT_PUSH_FORCE_OPTIONS) ?? operands.find((operand) => operand.startsWith("+"));
+      if (forced !== undefined) return form("rewrites_remote_history", forced);
+      const deleted =
+        option(GIT_PUSH_DELETE_OPTIONS) ?? operands.find((operand) => operand.startsWith(":"));
+      if (deleted !== undefined) return form("deletes_remote_branch", deleted);
+      return null;
+    },
+  ],
+  [
+    "reset",
+    ({ args, form }) => {
+      // A reset with a path moves the index and leaves the working tree alone;
+      // only `--hard` throws away what is written in the files.
+      const hard = args.find((argument) => argument === "--hard");
+      return hard === undefined ? null : form("discards_work", hard);
+    },
+  ],
+  [
+    "clean",
+    ({ option, form }) => {
+      const removing = option(GIT_CLEAN_OPTIONS);
+      return removing === undefined ? null : form("discards_work", removing);
+    },
+  ],
+  [
+    "checkout",
+    ({ args, operands, option, form }) => {
+      const forced = option(GIT_FORCE_OPTIONS);
+      if (forced !== undefined) return form("discards_work", forced);
+      // `git checkout -- <path>` and `git checkout .` overwrite the file with
+      // the index; `git checkout -b langy/x origin/main` moves the branch.
+      const endOfOptions = args.indexOf("--");
+      if (endOfOptions !== -1 && args.length > endOfOptions + 1) {
+        return form("discards_work", "--");
+      }
+      const here = operands.find((operand) => operand === "." || operand === "./");
+      return here === undefined ? null : form("discards_work", here);
+    },
+  ],
+  [
+    "switch",
+    ({ option, form }) => {
+      const forced = option(new Set([...GIT_FORCE_OPTIONS, "--discard-changes"]));
+      return forced === undefined ? null : form("discards_work", forced);
+    },
+  ],
+  [
+    "restore",
+    ({ args }) => {
+      // `--staged` restores the index alone. Without it the file on disk is
+      // overwritten, which is the one form of restore that loses work.
+      const staged = args.some(
+        (argument) => argument === "--staged" || carriesOption(argument, new Set(["-S"])),
+      );
+      const worktree = args.some(
+        (argument) => argument === "--worktree" || carriesOption(argument, new Set(["-W"])),
+      );
+      return staged && !worktree ? null : { effect: "discards_work", pattern: "git restore" };
+    },
+  ],
+  [
+    "branch",
+    ({ option, form }) => {
+      const dropped = option(new Set(["-D"]));
+      if (dropped !== undefined) return form("discards_work", dropped);
+      const deleted = option(new Set(["-d", "--delete"]));
+      const forced = option(GIT_FORCE_OPTIONS);
+      return deleted === undefined || forced === undefined
+        ? null
+        : form("discards_work", `${deleted} ${forced}`);
+    },
+  ],
+  [
+    "stash",
+    ({ operands, form }) => {
+      const verb = operands[0];
+      return verb === "drop" || verb === "clear" ? form("discards_work", verb) : null;
+    },
+  ],
+  [
+    "worktree",
+    ({ operands, option, form }) => {
+      const forced = option(GIT_FORCE_OPTIONS);
+      return operands[0] === "remove" && forced !== undefined
+        ? form("discards_work", `remove ${forced}`)
+        : null;
+    },
+  ],
+  [
+    "rm",
+    ({ option, form }) => {
+      const forced = option(GIT_FORCE_OPTIONS);
+      return forced === undefined ? null : form("discards_work", forced);
+    },
+  ],
+  [
+    "update-ref",
+    ({ option, form }) => {
+      const deleted = option(new Set(["-d", "--delete"]));
+      return deleted === undefined ? null : form("discards_work", deleted);
+    },
+  ],
+  [
+    "gc",
+    ({ args, form }) => {
+      const pruned = args.find(
+        (argument) => argument === "--prune=now" || argument === "--prune=all",
+      );
+      return pruned === undefined ? null : form("discards_work", pruned);
+    },
+  ],
+  [
+    "reflog",
+    ({ operands, form }) => {
+      const verb = operands[0];
+      return verb === "expire" || verb === "delete" ? form("discards_work", verb) : null;
+    },
+  ],
+  ["filter-branch", rewritesHistory],
+  ["filter-repo", rewritesHistory],
+  [
+    "config",
+    ({ option, form }) => {
+      const scope = option(GIT_CONFIG_OUTSIDE_SCOPES);
+      return scope === undefined ? null : form("changes_git_settings", scope);
+    },
+  ],
+]);
+
+/**
+ * The git form this command is, when it is one that asks, and null otherwise.
+ * The pattern names that form rather than the whole subcommand, so allowing a
+ * force push allows force pushes and not every push.
+ */
+export function gitDestructiveForm(args: string[]): GitDestructiveForm | null {
+  const words = args.filter((argument) => !argument.startsWith("-"));
+  const [subcommand, ...operands] = words;
+  if (subcommand === undefined) return null;
+
+  const option = (options: ReadonlySet<string>): string | undefined =>
+    args.find((argument) => carriesOption(argument, options));
+  const form = (effect: CommandEffect, marker: string): GitDestructiveForm => ({
+    effect,
+    pattern: `git ${subcommand} ${marker}`,
+  });
+
+  const reader = GIT_FORM_READERS.get(subcommand);
+  return reader === undefined ? null : reader({ args, subcommand, operands, option, form });
+}
+
+/**
+ * True when a git command runs with no card although it is not read-only: an
+ * allowed subcommand in a form that is not destructive.
+ */
+export function gitRunsWithoutAsking(args: string[]): boolean {
+  const words = args.filter((argument) => !argument.startsWith("-"));
+  const subcommand = words[0];
+  if (subcommand === undefined) return false;
+  if (!ALLOWED_GIT_SUBCOMMANDS.has(subcommand)) return false;
+  return gitDestructiveForm(args) === null;
+}
+
+/**
+ * The `gh` invocations that only read, written out in full. Everything
+ * else `gh` does reaches GitHub and asks.
  */
 export const READ_ONLY_GH_ARGUMENTS: readonly (readonly string[])[] = [
   ["auth", "status"],
@@ -202,12 +448,7 @@ export const VERSION_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   "git",
 ]);
 
-const VERSION_ARGUMENTS: ReadonlySet<string> = new Set([
-  "-v",
-  "-V",
-  "--version",
-  "version",
-]);
+const VERSION_ARGUMENTS: ReadonlySet<string> = new Set(["-v", "-V", "--version", "version"]);
 
 /** Running as another user is refused in every mode. */
 const PRIVILEGE_COMMANDS: ReadonlySet<string> = new Set(["sudo", "su", "doas"]);
@@ -224,11 +465,8 @@ const WRITE_FLAGS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Read-only commands whose options or operands write something.
- *
- * The command name is not the whole answer: `sort -o out in` writes a file,
- * `uniq input output` writes its second operand, and `date -s` sets the clock
- * of the machine.
+ * Read-only commands whose options or operands write something, e.g.
+ * `sort -o out in` writes a file and `date -s` sets the clock.
  */
 const READ_ONLY_COMMAND_RULES: ReadonlyMap<
   string,
@@ -293,17 +531,12 @@ const SECRET_FILE_PATTERNS: readonly RegExp[] = [
 
 /**
  * Directories whose files are credentials whatever they are called, and the
- * files that carry one inside a folder that is otherwise ordinary.
- *
- * `.git/config` holds the remote urls, and a token written into one is read
- * by anything that prints that file.
+ * files that carry one inside a folder that is otherwise ordinary (e.g.
+ * `.git/config` holds the remote urls, including any token in one).
  */
 const SECRET_DIRECTORIES: readonly string[] = [".ssh", ".aws"];
 
-const SECRET_RELATIVE_PATHS: readonly string[] = [
-  ".git/config",
-  ".docker/config.json",
-];
+const SECRET_RELATIVE_PATHS: readonly string[] = [".git/config", ".docker/config.json"];
 
 /** True when the file name is one a secret usually lives in. */
 export function isSecretFileName(name: string): boolean {
@@ -317,22 +550,21 @@ export function isSecretFileName(name: string): boolean {
  * keeps credentials in under an ordinary name.
  */
 export function isSecretPath(target: string): boolean {
-  const parts = target
-    .split(/[/\\]/)
-    .filter((part) => part !== "" && part !== ".");
+  const parts = target.split(/[/\\]/).filter((part) => part !== "" && part !== ".");
   const name = parts[parts.length - 1] ?? "";
   if (isSecretFileName(name)) return true;
   const written = parts.join("/");
-  if (
-    SECRET_RELATIVE_PATHS.some(
-      (secret) => written === secret || written.endsWith(`/${secret}`),
-    )
-  ) {
+  let isSecretRelativePath = false;
+  for (const secret of SECRET_RELATIVE_PATHS) {
+    if (written === secret || written.endsWith(`/${secret}`)) {
+      isSecretRelativePath = true;
+      break;
+    }
+  }
+  if (isSecretRelativePath) {
     return true;
   }
-  return parts
-    .slice(0, -1)
-    .some((segment) => SECRET_DIRECTORIES.includes(segment));
+  return parts.slice(0, -1).some((segment) => SECRET_DIRECTORIES.includes(segment));
 }
 
 // ---------------------------------------------------------------------------
@@ -364,164 +596,244 @@ export interface ParsedCommand {
 
 const OPERATORS = ["&&", "||", ";", "|", "&", "\n"];
 
-/**
- * Splits a command into its parts and their tokens.
- *
- * Quotes are honored, so `echo "a && b"` is one part and `cat foo` inside a
- * single-quoted string is not a command. A substitution is reported rather
- * than parsed: what it expands to is not knowable here, so the whole command
- * asks.
- */
-export function parseCommand(command: string): ParsedCommand {
-  const parts: CommandPart[] = [];
-  let hasSubstitution = false;
+/** A here-document opened on the current line, read once the line ends. */
+interface PendingHeredoc {
+  delimiter: string;
+  /** `<<-` strips the tabs that indent the body and the delimiter. */
+  stripTabs: boolean;
+}
 
-  let partStart = 0;
-  let tokens: string[] = [];
-  let quoted: boolean[] = [];
-  let redirectTarget: boolean[] = [];
-  let token = "";
-  let tokenOpen = false;
-  let tokenQuoted = false;
-  let tokenBare = false;
-  let redirectPending = false;
-  let hasRedirect = false;
-  let index = 0;
-
-  const endToken = () => {
-    if (!tokenOpen) return;
-    tokens.push(token);
-    quoted.push(tokenQuoted && !tokenBare);
-    redirectTarget.push(redirectPending);
-    token = "";
-    tokenOpen = false;
-    tokenQuoted = false;
-    tokenBare = false;
-    redirectPending = false;
-  };
-
-  const endPart = (end: number) => {
-    endToken();
-    const text = command.slice(partStart, end).trim();
-    if (tokens.length > 0 || text !== "") {
-      parts.push({ text, tokens, quoted, redirectTarget, hasRedirect });
-    }
-    tokens = [];
-    quoted = [];
-    redirectTarget = [];
-    redirectPending = false;
-    hasRedirect = false;
-  };
-
-  while (index < command.length) {
-    const char = command[index]!;
-
-    if (char === "'") {
-      const close = command.indexOf("'", index + 1);
-      const end = close === -1 ? command.length : close;
-      token += command.slice(index + 1, end);
-      tokenOpen = true;
-      tokenQuoted = true;
-      index = end + 1;
-      continue;
-    }
-
-    if (char === '"') {
-      let cursor = index + 1;
-      while (cursor < command.length && command[cursor] !== '"') {
-        if (command[cursor] === "\\" && cursor + 1 < command.length) {
-          token += command[cursor + 1];
-          cursor += 2;
-          continue;
-        }
-        if (command[cursor] === "$" && command[cursor + 1] === "(") {
-          hasSubstitution = true;
-        }
-        if (command[cursor] === "`") hasSubstitution = true;
-        token += command[cursor];
-        cursor += 1;
-      }
-      tokenOpen = true;
-      tokenQuoted = true;
-      index = cursor + 1;
-      continue;
-    }
-
-    if (char === "\\" && index + 1 < command.length) {
-      token += command[index + 1];
-      tokenOpen = true;
-      tokenBare = true;
-      index += 2;
-      continue;
-    }
-
-    if (char === "`" || (char === "$" && command[index + 1] === "(")) {
-      hasSubstitution = true;
-      token += char;
-      tokenOpen = true;
-      tokenBare = true;
-      index += 1;
-      continue;
-    }
-
-    if ((char === "<" || char === ">") && command[index + 1] === "(") {
-      hasSubstitution = true;
-      hasRedirect = true;
-      index += 2;
-      continue;
-    }
-
-    if (char === ">" || char === "<") {
-      endToken();
-      hasRedirect = true;
-      redirectPending = true;
-      index += 1;
-      continue;
-    }
-
-    // `2>file` and `&>file`: the digit or ampersand belongs to the redirect.
-    if (/[0-9&]/.test(char) && command[index + 1] === ">" && !tokenOpen) {
-      hasRedirect = true;
-      redirectPending = true;
-      index += 2;
-      continue;
-    }
-
-    const operator = OPERATORS.find((entry) => command.startsWith(entry, index));
-    if (operator) {
-      endPart(index);
-      index += operator.length;
-      partStart = index;
-      continue;
-    }
-
-    if (/\s/.test(char)) {
-      endToken();
-      index += 1;
-      if (!tokenOpen && tokens.length === 0) partStart = index;
-      continue;
-    }
-
-    token += char;
-    tokenOpen = true;
-    tokenBare = true;
-    index += 1;
+/** Where a `<<` operator's delimiter word ends, and the word itself. */
+function readHeredocOpener(
+  command: string,
+  index: number,
+): { heredoc: PendingHeredoc; end: number } | null {
+  let cursor = index + 2;
+  const stripTabs = command[cursor] === "-";
+  if (stripTabs) cursor += 1;
+  while (cursor < command.length && (command[cursor] === " " || command[cursor] === "\t")) {
+    cursor += 1;
   }
-
-  endPart(command.length);
-  return { parts, hasSubstitution };
+  const quote = command[cursor];
+  let delimiter = "";
+  if (quote === "'" || quote === '"') {
+    const close = command.indexOf(quote, cursor + 1);
+    if (close === -1) return null;
+    delimiter = command.slice(cursor + 1, close);
+    cursor = close + 1;
+  } else {
+    while (cursor < command.length && !/[\s;&|<>()]/.test(command[cursor]!)) {
+      delimiter += command[cursor];
+      cursor += 1;
+    }
+  }
+  if (delimiter === "") return null;
+  return { heredoc: { delimiter, stripTabs }, end: cursor };
 }
 
 /**
- * Interpreter names that run the same program under two spellings.
- *
- * A grant is keyed on the command name, so `python3 -m compileall` asked
- * again after the user had already allowed `python -m compileall`, and the
- * two cards read the same. The alias folds both spellings into one name, so
- * one answer covers both.
- *
- * Grants only. Nothing else in the policy reads this: the read-only set and
- * the refusals still see the name the command actually wrote.
+ * Where a here-document's body ends: the index just past its delimiter line,
+ * or the end of the command when the delimiter never comes.
+ */
+function readHeredocBody(command: string, start: number, heredoc: PendingHeredoc): number {
+  let cursor = start;
+  while (cursor < command.length) {
+    const newline = command.indexOf("\n", cursor);
+    const lineEnd = newline === -1 ? command.length : newline;
+    const line = command.slice(cursor, lineEnd);
+    const word = heredoc.stripTabs ? line.replace(/^\t+/, "") : line;
+    if (word === heredoc.delimiter) return lineEnd;
+    cursor = lineEnd + 1;
+  }
+  return command.length;
+}
+
+/** One pass over a command, holding the part and token being read. */
+class CommandScanner {
+  private readonly command: string;
+  private readonly parts: CommandPart[] = [];
+  private hasSubstitution = false;
+  private heredocs: PendingHeredoc[] = [];
+  private partStart = 0;
+  private tokens: string[] = [];
+  private quoted: boolean[] = [];
+  private redirectTarget: boolean[] = [];
+  private token = "";
+  private tokenOpen = false;
+  private tokenQuoted = false;
+  private tokenBare = false;
+  private redirectPending = false;
+  private hasRedirect = false;
+  private index = 0;
+
+  constructor(command: string) {
+    this.command = command;
+  }
+
+  parse(): ParsedCommand {
+    while (this.index < this.command.length) this.step();
+    this.endPart(this.command.length);
+    return { parts: this.parts, hasSubstitution: this.hasSubstitution };
+  }
+
+  private get next(): string | undefined {
+    return this.command[this.index + 1];
+  }
+
+  private step(): void {
+    const char = this.command[this.index]!;
+    if (char === "'") return this.readSingleQuoted();
+    if (char === '"') return this.readDoubleQuoted();
+    if (char === "\\" && this.index + 1 < this.command.length) return this.readEscaped();
+    if (char === "`" || (char === "$" && this.next === "(")) {
+      this.hasSubstitution = true;
+      return this.appendBare(char, 1);
+    }
+    this.stepRedirect(char);
+  }
+
+  private stepRedirect(char: string): void {
+    if ((char === "<" || char === ">") && this.next === "(") {
+      this.hasSubstitution = true;
+      this.hasRedirect = true;
+      this.index += 2;
+      return;
+    }
+    const heredocOperator =
+      char === "<" && this.next === "<" && this.command[this.index + 2] !== "<";
+    if (heredocOperator && this.openHeredoc()) return;
+    if (char === ">" || char === "<") {
+      this.endToken();
+      return this.startRedirect(1);
+    }
+    // `2>file` and `&>file`: the digit or ampersand belongs to the redirect.
+    if (/[0-9&]/.test(char) && this.next === ">" && !this.tokenOpen) return this.startRedirect(2);
+    this.stepSeparator(char);
+  }
+
+  private stepSeparator(char: string): void {
+    const operator = OPERATORS.find((entry) => this.command.startsWith(entry, this.index));
+    if (operator === "\n" && this.heredocs.length > 0) return this.endLineWithHeredocs();
+    if (operator) {
+      this.endPart(this.index);
+      this.index += operator.length;
+      this.partStart = this.index;
+      return;
+    }
+    if (/\s/.test(char)) {
+      this.endToken();
+      this.index += 1;
+      if (!this.tokenOpen && this.tokens.length === 0) this.partStart = this.index;
+      return;
+    }
+    this.appendBare(char, 1);
+  }
+
+  private appendBare(text: string, width: number): void {
+    this.token += text;
+    this.tokenOpen = true;
+    this.tokenBare = true;
+    this.index += width;
+  }
+
+  private readEscaped(): void {
+    this.appendBare(this.command[this.index + 1]!, 2);
+  }
+
+  private readSingleQuoted(): void {
+    const close = this.command.indexOf("'", this.index + 1);
+    const end = close === -1 ? this.command.length : close;
+    this.token += this.command.slice(this.index + 1, end);
+    this.tokenOpen = true;
+    this.tokenQuoted = true;
+    this.index = end + 1;
+  }
+
+  private readDoubleQuoted(): void {
+    const { command } = this;
+    let cursor = this.index + 1;
+    while (cursor < command.length && command[cursor] !== '"') {
+      if (command[cursor] === "\\" && cursor + 1 < command.length) {
+        this.token += command[cursor + 1];
+        cursor += 2;
+        continue;
+      }
+      if (command[cursor] === "$" && command[cursor + 1] === "(") this.hasSubstitution = true;
+      if (command[cursor] === "`") this.hasSubstitution = true;
+      this.token += command[cursor];
+      cursor += 1;
+    }
+    this.tokenOpen = true;
+    this.tokenQuoted = true;
+    this.index = cursor + 1;
+  }
+
+  private startRedirect(width: number): void {
+    this.hasRedirect = true;
+    this.redirectPending = true;
+    this.index += width;
+  }
+
+  /** Whether a `<<` here opened a here-document; a malformed one reads as a redirect. */
+  private openHeredoc(): boolean {
+    const opener = readHeredocOpener(this.command, this.index);
+    if (!opener) return false;
+    this.endToken();
+    this.heredocs.push(opener.heredoc);
+    this.index = opener.end;
+    return true;
+  }
+
+  /** The line ends and the bodies it announced follow, one after another. */
+  private endLineWithHeredocs(): void {
+    let end = this.index + 1;
+    for (const heredoc of this.heredocs) end = readHeredocBody(this.command, end, heredoc);
+    this.heredocs = [];
+    this.endPart(end);
+    this.index = Math.min(end + 1, this.command.length);
+    this.partStart = this.index;
+  }
+
+  private endToken(): void {
+    if (!this.tokenOpen) return;
+    this.tokens.push(this.token);
+    this.quoted.push(this.tokenQuoted && !this.tokenBare);
+    this.redirectTarget.push(this.redirectPending);
+    this.token = "";
+    this.tokenOpen = false;
+    this.tokenQuoted = false;
+    this.tokenBare = false;
+    this.redirectPending = false;
+  }
+
+  private endPart(end: number): void {
+    this.endToken();
+    const text = this.command.slice(this.partStart, end).trim();
+    if (this.tokens.length > 0 || text !== "") {
+      const { tokens, quoted, redirectTarget, hasRedirect } = this;
+      this.parts.push({ text, tokens, quoted, redirectTarget, hasRedirect });
+    }
+    this.tokens = [];
+    this.quoted = [];
+    this.redirectTarget = [];
+    this.redirectPending = false;
+    this.hasRedirect = false;
+  }
+}
+
+/**
+ * Splits a command into its parts and their tokens. Quotes are honored, so
+ * `echo "a && b"` is one part. A substitution is reported rather than
+ * parsed, since what it expands to is not knowable here.
+ */
+export function parseCommand(command: string): ParsedCommand {
+  return new CommandScanner(command).parse();
+}
+
+/**
+ * Interpreter names that run the same program under two spellings, so a
+ * grant on one spelling covers the other. Grants only: the read-only set
+ * and refusals still see the name the command actually wrote.
  */
 export const INTERPRETER_ALIASES: ReadonlyMap<string, string> = new Map([
   ["python", "python"],
@@ -538,17 +850,8 @@ export function grantName(name: string): string {
 }
 
 /**
- * The pattern "allow for this session" would grant for one command part.
- *
- * The pattern is the program and its first argument, and a first argument
- * that is a flag counts like any other: `.venv/bin/python -c 'code'` grants
- * one-line programs rather than every python invocation on this machine, and
- * `git commit` grants commits rather than every git command. Only a command
- * written with no argument at all grants its own name.
- *
- * A quoted first argument is text the command prints or matches, so it never
- * becomes the pattern: `printf '\nAPI_KEY=x\n' >> .env.example` would
- * otherwise offer the whole literal on the button.
+ * The pattern "allow for this session" would grant: the program and its
+ * first argument, so `git commit` grants commits, not every git command.
  */
 export function grantPatternFor({
   tokens,
@@ -558,6 +861,10 @@ export function grantPatternFor({
   quoted?: boolean[];
 }): string {
   const name = grantName(tokens[0] ?? "");
+  if (name === "git") {
+    const destructive = gitDestructiveForm(tokens.slice(1));
+    if (destructive !== null) return destructive.pattern;
+  }
   const argument = tokens[1];
   if (argument === undefined || argument === "" || quoted[1] === true) {
     return `${name} *`;
@@ -585,18 +892,13 @@ export function grantsAllow({
 }
 
 /** True when the token names a program by its path rather than by its name. */
-const namesAPath = (token: string): boolean =>
-  token.includes("/") || token.includes("\\");
+const namesAPath = (token: string): boolean => token.includes("/") || token.includes("\\");
 
-const isEnvironmentAssignment = (token: string): boolean =>
-  /^[A-Za-z_][A-Za-z0-9_]*=/.test(token);
+const isEnvironmentAssignment = (token: string): boolean => /^[A-Za-z_][A-Za-z0-9_]*=/.test(token);
 
 /**
- * True when this part runs on its own, with no card.
- *
- * The classification is the whole answer. What the part does with the machine
- * is a separate question, answered by `effectOf`, because the card's reason
- * says what changes rather than repeating the command back.
+ * True when this part runs on its own, with no card. What the part does
+ * with the machine is a separate question, answered by `effectOf`.
  */
 function isReadOnlyPart(part: CommandPart): boolean {
   const [name, ...args] = part.tokens;
@@ -610,9 +912,7 @@ function isReadOnlyPart(part: CommandPart): boolean {
   if (name === "git") return isReadOnlyGit(args);
 
   if (name === "gh") {
-    return READ_ONLY_GH_ARGUMENTS.some(
-      (allowed) => allowed.join(" ") === args.join(" "),
-    );
+    return READ_ONLY_GH_ARGUMENTS.some((allowed) => allowed.join(" ") === args.join(" "));
   }
 
   if (VERSION_ONLY_COMMANDS.has(name)) {
@@ -627,34 +927,56 @@ function isReadOnlyPart(part: CommandPart): boolean {
   if (name === "env") return isReadOnlyEnv(part);
 
   const rule = READ_ONLY_COMMAND_RULES.get(name);
-  if (rule !== undefined) {
-    if (
-      rule.writeOptions !== undefined &&
-      args.some((argument) => carriesOption(argument, rule.writeOptions!))
-    ) {
-      return false;
-    }
-    const operands = args.filter((argument) => !argument.startsWith("-"));
-    if (rule.maxOperands !== undefined && operands.length > rule.maxOperands) {
-      return false;
+  if (rule === undefined) return true;
+  return commandRuleAllows({ args, ...rule });
+}
+
+function commandRuleAllows({
+  args,
+  writeOptions,
+  maxOperands,
+}: {
+  args: string[];
+  writeOptions?: ReadonlySet<string>;
+  maxOperands?: number;
+}): boolean {
+  if (writeOptions !== undefined) {
+    for (const argument of args) {
+      if (carriesOption(argument, writeOptions)) return false;
     }
   }
-
+  const operands = args.filter((argument) => !argument.startsWith("-"));
+  if (maxOperands !== undefined && operands.length > maxOperands) {
+    return false;
+  }
   return true;
 }
 
 /**
- * True when an argument carries one of these options, however it is written.
- *
- * A shell takes the value of a short option attached to it and lets short
- * options be written as one word, so `sort -o out`, `sort -oout`, `sort -ro`
- * and `sort --output=out` all write a file. Reading only the whole word left
- * the first spelling asking and the other three running.
+ * True when this part runs with no card at all: a read-only command, or a git
+ * command in a form that is not destructive. The second one writes, so
+ * `isReadOnlyPart` stays the narrower answer.
  */
-export function carriesOption(
-  argument: string,
-  options: ReadonlySet<string>,
-): boolean {
+export function runsWithoutACard(part: CommandPart): boolean {
+  if (isReadOnlyPart(part)) return true;
+  const [name, ...args] = part.tokens;
+  if (name !== "git") return false;
+  if (part.hasRedirect) return false;
+  for (const argument of args) {
+    if (WRITE_FLAGS.has(argument)) return false;
+  }
+  for (const argument of args) {
+    if (DIRECTORY_FLAGS.has(argument)) return false;
+  }
+  return gitRunsWithoutAsking(args);
+}
+
+/**
+ * True when an argument carries one of these options, however it is
+ * written: a short option can attach to its value or combine with others,
+ * so `sort -o out`, `sort -oout` and `sort --output=out` all write a file.
+ */
+export function carriesOption(argument: string, options: ReadonlySet<string>): boolean {
   if (!argument.startsWith("-") || argument === "-" || argument === "--") {
     return false;
   }
@@ -662,44 +984,53 @@ export function carriesOption(
   const letters = argument.slice(1);
   for (const option of options) {
     if (option.startsWith("--") || option.length !== 2) continue;
-    if (letters.includes(option.slice(1))) return true;
+    const suffix = option.slice(1);
+    if (letters.includes(suffix)) return true;
   }
   return false;
 }
 
 /**
- * True when a git command only reads the repository.
- *
- * The subcommand is where this starts and the operands are where it ends: a
- * read-only subcommand with a write operand still writes.
+ * True when a git command only reads the repository: a read-only subcommand
+ * with a write operand still writes.
  */
 export function isReadOnlyGit(args: string[]): boolean {
-  if (args.some((argument) => GIT_WRITE_ARGUMENTS.has(argument))) return false;
+  for (const argument of args) {
+    if (GIT_WRITE_ARGUMENTS.has(argument)) return false;
+  }
   const words = args.filter((argument) => !argument.startsWith("-"));
   const [subcommand, ...operands] = words;
   if (subcommand === undefined) return VERSION_ARGUMENTS.has(args[0] ?? "");
   const rule = GIT_OPERAND_RULES.get(subcommand);
-  if (rule !== undefined) {
-    if (
-      rule.lists === true &&
-      args.some((argument) => GIT_LIST_OPTIONS.has(argument.split("=")[0]!))
-    ) {
-      return true;
-    }
-    if (operands.length === 0) return rule.bare;
-    return operands.length <= 2 && rule.verbs.has(operands[0]!);
-  }
+  if (rule !== undefined) return isReadOnlyGitOperation({ rule, args, operands });
   return READ_ONLY_GIT_SUBCOMMANDS.has(subcommand);
+}
+
+/** A subcommand with an operand rule reads only when listing, bare, or given a read verb. */
+function isReadOnlyGitOperation({
+  rule,
+  args,
+  operands,
+}: {
+  rule: NonNullable<ReturnType<typeof GIT_OPERAND_RULES.get>>;
+  args: string[];
+  operands: string[];
+}): boolean {
+  if (rule.lists === true) {
+    for (const argument of args) {
+      const flagName = argument.split("=")[0]!;
+      if (GIT_LIST_OPTIONS.has(flagName)) return true;
+    }
+  }
+  if (operands.length === 0) return rule.bare;
+  if (rule.refs !== undefined && operands.length <= rule.refs) return true;
+  return operands.length <= 2 && rule.verbs.has(operands[0]!);
 }
 
 /**
  * True when an `env` invocation only prepares the environment of a command
- * that is itself read-only.
- *
- * Every argument of `env --split-string='touch marker'` starts with a dash,
- * and the program it runs is inside one of them, so "no operand" is not the
- * same as "prints the environment". The forms written in `envCommandStart`
- * are the only ones that run without a question.
+ * that is itself read-only. The forms written in `envCommandStart` are the
+ * only ones that run without a question.
  */
 export function isReadOnlyEnv(part: CommandPart): boolean {
   const start = envCommandStart(part.tokens);
@@ -713,13 +1044,8 @@ export function isReadOnlyEnv(part: CommandPart): boolean {
 }
 
 /**
- * Where the command an `env` runs starts, the length of the tokens when there
- * is none, and null when the arguments are not understood.
- *
- * Understood is a short list on purpose: `-i`, `-0`, `-u NAME` and a
- * `NAME=value` assignment change what the command inherits and nothing else.
- * Every other option can carry a program, a directory or a signal handler, so
- * it asks.
+ * Where the command an `env` runs starts, the token length when there is
+ * none, and null when the arguments are not understood.
  */
 export function envCommandStart(tokens: string[]): number | null {
   let index = 1;
@@ -748,14 +1074,16 @@ export function envCommandStart(tokens: string[]): number | null {
 // ---------------------------------------------------------------------------
 
 /**
- * What one part of a command does to the machine.
- *
- * The card's reason used to restate the command (`"git fetch origin" is not a
- * read-only git command`), which tells the reader nothing they cannot see in
- * the command itself, and for a chain it named one segment. The reason is
- * built from these classes instead, so it says what the answer allows.
+ * What one part of a command does to the machine. The card's reason is built
+ * from these classes rather than restating the command, so it says what the
+ * answer allows.
  */
 export type CommandEffect =
+  | "discards_work"
+  | "rewrites_history"
+  | "rewrites_remote_history"
+  | "deletes_remote_branch"
+  | "changes_git_settings"
   | "writes_files"
   | "changes_repository"
   | "reaches_network"
@@ -766,6 +1094,11 @@ export type CommandEffect =
 
 /** The clause each class contributes to the reason sentence. */
 const EFFECT_CLAUSES: Record<CommandEffect, string> = {
+  discards_work: "discards work in the git repository",
+  rewrites_history: "rewrites the history of the git repository",
+  rewrites_remote_history: "rewrites history on the remote",
+  deletes_remote_branch: "deletes a branch on the remote",
+  changes_git_settings: "changes git settings outside this folder",
   writes_files: "writes files in the folder",
   changes_repository: "changes the git repository",
   reaches_network: "reaches the network",
@@ -777,6 +1110,11 @@ const EFFECT_CLAUSES: Record<CommandEffect, string> = {
 
 /** The order the clauses read in, whatever order the segments run in. */
 const EFFECT_ORDER: readonly CommandEffect[] = [
+  "discards_work",
+  "rewrites_history",
+  "rewrites_remote_history",
+  "deletes_remote_branch",
+  "changes_git_settings",
   "writes_files",
   "changes_repository",
   "installs_packages",
@@ -793,6 +1131,7 @@ const GIT_NETWORK_SUBCOMMANDS: ReadonlySet<string> = new Set([
   "fetch",
   "clone",
   "submodule",
+  "ls-remote",
 ]);
 
 /** Commands whose whole purpose is a request to another machine. */
@@ -880,12 +1219,7 @@ export function effectOf(part: CommandPart): CommandEffect {
     return "reads_environment";
   }
 
-  if (name === "git") {
-    if (verb !== undefined && GIT_NETWORK_SUBCOMMANDS.has(verb)) {
-      return "reaches_network";
-    }
-    return "changes_repository";
-  }
+  if (name === "git") return gitEffectOf({ args, verb });
   if (PACKAGE_MANAGERS.has(name) && verb !== undefined && INSTALL_VERBS.has(verb)) {
     return "installs_packages";
   }
@@ -896,12 +1230,18 @@ export function effectOf(part: CommandPart): CommandEffect {
   return "runs_program";
 }
 
+function gitEffectOf({ args, verb }: { args: string[]; verb: string | undefined }): CommandEffect {
+  const destructive = gitDestructiveForm(args);
+  if (destructive !== null) return destructive.effect;
+  if (verb !== undefined && GIT_NETWORK_SUBCOMMANDS.has(verb)) {
+    return "reaches_network";
+  }
+  return "changes_repository";
+}
+
 /**
- * The reason the card shows: one sentence about what the answer allows.
- *
- * It never quotes the command, because the card already renders it and every
- * segment beside it. A quoted command was also where the stray quote came
- * from, on a chain whose own message carried one.
+ * The reason the card shows: one sentence about what the answer allows. It
+ * never quotes the command, since the card already renders it.
  */
 export function reasonFor(parts: CommandPart[]): string {
   const effects = new Set(parts.map(effectOf));
@@ -910,10 +1250,7 @@ export function reasonFor(parts: CommandPart[]): string {
   );
   if (clauses.length === 0) return "This runs a command that is not read-only.";
   const last = clauses[clauses.length - 1]!;
-  const sentence =
-    clauses.length === 1
-      ? last
-      : `${clauses.slice(0, -1).join(", ")} and ${last}`;
+  const sentence = clauses.length === 1 ? last : `${clauses.slice(0, -1).join(", ")} and ${last}`;
   return `This ${sentence}.`;
 }
 
@@ -923,9 +1260,7 @@ export function reasonFor(parts: CommandPart[]): string {
 
 /**
  * The real path of a target that may not exist yet: the deepest part that
- * does exist is resolved through its symlinks and the rest is appended. A
- * file about to be written is therefore checked against the boundary its
- * parents really have.
+ * does exist is resolved through its symlinks and the rest is appended.
  */
 const defaultRealpath = (target: string): string => {
   let current = path.resolve(target);
@@ -962,14 +1297,11 @@ export function resolvePathInsideRoot({
 }): PathCheck {
   const home = homedir ?? process.env.HOME ?? "";
   const expanded =
-    target === "~" || target.startsWith("~/")
-      ? path.join(home, target.slice(1))
-      : target;
+    target === "~" || target.startsWith("~/") ? path.join(home, target.slice(1)) : target;
   const absolute = path.resolve(root, expanded);
   const resolved = realpath(absolute);
   const rootReal = realpath(root);
-  const inside =
-    resolved === rootReal || resolved.startsWith(`${rootReal}${path.sep}`);
+  const inside = resolved === rootReal || resolved.startsWith(`${rootReal}${path.sep}`);
   return { resolved, inside };
 }
 
@@ -995,11 +1327,8 @@ const TEXT_MARKERS = /\\[ntrvfe0]|%[-+ #0-9.]*[sdiufgxXc%]/;
 
 /**
  * True when a quoted argument is text the command prints or matches rather
- * than a path it opens.
- *
- * `printf '\nDEFAULT=/etc/paths\n'` prints a format string, and reading it as
- * a path refused a command that touches nothing. A quoted argument to any
- * other command is still a path, so `cat '/etc/passwd'` stays refused.
+ * than a path it opens, e.g. `printf '\nDEFAULT=/etc/paths\n'`. A quoted
+ * argument to any other command is still a path.
  */
 export function isTextArgument({
   name,
@@ -1017,11 +1346,8 @@ export function isTextArgument({
 
 /**
  * True when a shell argument is worth checking against the folder boundary.
- *
- * Best effort, and deliberately wide: every plain argument is a candidate,
- * because a bare name can be a symlink that leaves the folder. A word that is
- * not a path resolves inside the folder anyway, so a wide net costs nothing
- * and a narrow one misses `cat outside-link`.
+ * Best effort, and deliberately wide: a bare name can be a symlink that
+ * leaves the folder, e.g. `cat outside-link`.
  */
 export function looksLikeAPath(token: string): boolean {
   if (token === "" || token.startsWith("-")) return false;
@@ -1030,14 +1356,9 @@ export function looksLikeAPath(token: string): boolean {
 }
 
 /**
- * Commands whose bare words are their own vocabulary rather than file names.
- *
- * `git symbolic-ref --short HEAD` writes a subcommand, an option flag and a
- * reference, and none of the three opens a file. Judging them as paths refused
- * a command that touches nothing, and named the folder in a message that had
- * no path to explain. These two commands read a file only when the argument
- * carries a path separator, starts a relative or home path, or comes after the
- * end-of-options marker.
+ * Commands whose bare words are their own vocabulary rather than file names,
+ * e.g. `git symbolic-ref --short HEAD`. These read a file only when the
+ * argument is written the way a path is written.
  */
 const VOCABULARY_COMMANDS: ReadonlySet<string> = new Set(["git", "gh"]);
 
@@ -1046,9 +1367,8 @@ const WRITTEN_AS_A_PATH = /[/\\]|^[.~]/;
 
 /**
  * True when a token of this command is worth checking against the boundary.
- *
- * The net stays wide for every other command, because a bare name can be a
- * symlink that leaves the folder and `cat outside-link` must still be caught.
+ * The net stays wide for every other command: a bare name can be a symlink
+ * that leaves the folder.
  */
 export function isPathCandidate({
   name,
@@ -1077,6 +1397,19 @@ const TOOL_VERBS: Record<LocalToolCall["tool"], string> = {
   local_grep: "grep",
   local_find: "find",
   local_ls: "ls",
+  local_langwatch_env: "write",
+};
+
+/** The same verbs as the reason sentence reads them: "it is not written". */
+const TOOL_VERBS_DONE: Record<LocalToolCall["tool"], string> = {
+  local_read: "read",
+  local_write: "written",
+  local_edit: "edited",
+  local_bash: "run",
+  local_grep: "searched",
+  local_find: "listed",
+  local_ls: "listed",
+  local_langwatch_env: "written",
 };
 
 /** The paths one call touches, in the order they were written. */
@@ -1090,6 +1423,8 @@ function pathsOf(call: LocalToolCall): string[] {
     case "local_find":
     case "local_ls":
       return call.params.path === undefined ? [] : [call.params.path];
+    case "local_langwatch_env":
+      return [call.params.path ?? ".env"];
     case "local_bash":
       return [];
   }
@@ -1116,9 +1451,7 @@ function decideFileTool({
   for (const target of pathsOf(call)) {
     const check = resolvePathInsideRoot({ target, root, realpath, homedir });
     if (!check.inside) {
-      return refusePath(
-        outsideMessage({ target, resolved: check.resolved, root }),
-      );
+      return refusePath(outsideMessage({ target, resolved: check.resolved, root }));
     }
     const name = path.basename(check.resolved);
     // Both spellings are read: the path as it was written, and the path it
@@ -1130,7 +1463,7 @@ function decideFileTool({
         summary: `${verb} ${target}`,
         pattern: `${call.tool} ${target}`,
         patterns: [`${call.tool} ${target}`],
-        reason: `${name} may hold secrets, so it is not read for you without an answer.`,
+        reason: `${name} may hold secrets, so it is not ${TOOL_VERBS_DONE[call.tool]} for you without an answer.`,
       };
     }
   }
@@ -1179,17 +1512,15 @@ function decideBash({
     };
   }
 
-  // A part that names a file which may hold secrets is never read-only, so
+  // A part that names a file which may hold secrets never runs on its own, so
   // the shell asks for the same answer a read of that file asks for.
-  const readsOnly = (part: CommandPart): boolean =>
-    !parsed.hasSubstitution &&
-    isReadOnlyPart(part) &&
-    secretFileRead(part) === null;
+  const runsOnItsOwn = (part: CommandPart): boolean =>
+    !parsed.hasSubstitution && runsWithoutACard(part) && secretFileRead(part) === null;
 
   const segments: CommandSegment[] = parsed.parts.map((part) => ({
     command: part.text,
     pattern: grantPatternFor({ tokens: part.tokens, quoted: part.quoted }),
-    readOnly: readsOnly(part),
+    readOnly: runsOnItsOwn(part),
   }));
 
   if (parsed.hasSubstitution) {
@@ -1198,31 +1529,24 @@ function decideBash({
       summary: command,
       pattern: segments[0]!.pattern,
       patterns: segments.map((segment) => segment.pattern),
-      reason:
-        "This runs a command substitution, so what it does is not knowable before it runs.",
+      reason: "This runs a command substitution, so what it does is not knowable before it runs.",
       segments,
     };
   }
 
-  const writing = parsed.parts.filter((part) => !readsOnly(part));
-  const unanswered = writing.filter(
+  const asking = parsed.parts.filter((part) => !runsOnItsOwn(part));
+  const unanswered = asking.filter(
     (part) => !grantsAllow({ tokens: part.tokens, quoted: part.quoted, grants }),
   );
   if (unanswered.length === 0) return { kind: "run" };
 
   // The answer covers every segment the card lists, not only the first one:
-  // a chain that stages, commits and pushes granted `git add` and ran the
-  // rest under it.
+  // a chain that checks and then publishes granted the check's pattern and
+  // ran the rest under it.
   const patterns = [
-    ...new Set(
-      writing.map((part) =>
-        grantPatternFor({ tokens: part.tokens, quoted: part.quoted }),
-      ),
-    ),
+    ...new Set(asking.map((part) => grantPatternFor({ tokens: part.tokens, quoted: part.quoted }))),
   ];
-  const secret = unanswered
-    .map((part) => secretFileRead(part))
-    .find((name) => name !== null);
+  const secret = unanswered.map((part) => secretFileRead(part)).find((name) => name !== null);
   return {
     kind: "ask",
     summary: command,
@@ -1233,63 +1557,227 @@ function decideBash({
     patterns,
     reason:
       secret === undefined || secret === null
-        ? reasonFor(writing)
+        ? reasonFor(asking)
         : `${secret} may hold secrets, so it is not read for you without an answer.`,
     segments,
   };
 }
 
 /**
- * Every token of this part that names a file or a directory: the arguments
- * that are written the way a path is written, and the argument of `cd`, of a
- * directory flag and of a redirect whatever it looks like.
- *
- * The first token is the program, not a path the command reads: `/usr/bin/ls`
- * asks because it is not a bare name, which is a clearer answer than refusing
- * it for living outside the folder.
- *
- * A quoted string a command prints is text, so it is not named at all, and a
- * bare word of a command with its own vocabulary is a subcommand, a flag or a
- * reference rather than a file. See `isPathCandidate`.
+ * Commands whose first operand is a program or a pattern, never a file:
+ * `sed -n '/HEAD branch/s/.*: //p'` names no path. Each one maps to its short
+ * options that take a value, so the value is not mistaken for that operand.
+ */
+const SCRIPT_COMMANDS: ReadonlyMap<string, string> = new Map([
+  ["sed", "l"],
+  ["awk", "Fv"],
+  ["gawk", "FvilE"],
+  ["grep", "ABCmdD"],
+  ["egrep", "ABCmdD"],
+  ["fgrep", "ABCmdD"],
+  ["rg", "ABCmgtTjMErd"],
+]);
+/** Long options that give the script as their value, so no operand is the script. */
+const SCRIPT_LONG_FLAGS: ReadonlySet<string> = new Set(["--expression", "--regexp", "--source"]);
+/** Long options that name a script file, or that make rg take no pattern at all. */
+const NO_SCRIPT_OPERAND_LONG_FLAGS: ReadonlySet<string> = new Set([
+  "--file",
+  "--files",
+  "--type-list",
+]);
+
+type ScriptScan = {
+  text: Set<number>;
+  scriptFiles: string[];
+  scriptGiven: boolean;
+  afterEndOfOptions: boolean;
+  firstOperand: number | undefined;
+};
+
+function takesNextToken({ part, index }: { part: CommandPart; index: number }): boolean {
+  return index < part.tokens.length && part.redirectTarget[index] !== true;
+}
+
+/** Records a `--flag` or `--flag=value`; answers how many following tokens it consumed. */
+function scanLongFlag({
+  part,
+  index,
+  scan,
+}: {
+  part: CommandPart;
+  index: number;
+  scan: ScriptScan;
+}): number {
+  const token = part.tokens[index]!;
+  const equalsAt = token.indexOf("=");
+  const flag = equalsAt === -1 ? token : token.slice(0, equalsAt);
+  const value = equalsAt === -1 ? undefined : token.slice(equalsAt + 1);
+  if (SCRIPT_LONG_FLAGS.has(flag)) {
+    scan.scriptGiven = true;
+    if (value !== undefined) scan.text.add(index);
+    if (value !== undefined || !takesNextToken({ part, index: index + 1 })) return 0;
+    scan.text.add(index + 1);
+    return 1;
+  }
+  if (NO_SCRIPT_OPERAND_LONG_FLAGS.has(flag)) {
+    scan.scriptGiven = true;
+    return flag === "--file" && value === undefined ? 1 : 0;
+  }
+  // Whether it takes the next token is not known here, so no operand is
+  // read as the script: every one of them is checked.
+  if (value === undefined) scan.scriptGiven = true;
+  return 0;
+}
+
+/** A `-e` in a short cluster: the next token is script text unless one is attached. */
+function scanExpressionFlag({
+  part,
+  index,
+  scan,
+  attached,
+}: {
+  part: CommandPart;
+  index: number;
+  scan: ScriptScan;
+  attached: string;
+}): number {
+  scan.scriptGiven = true;
+  if (attached !== "" || !takesNextToken({ part, index: index + 1 })) return 0;
+  scan.text.add(index + 1);
+  return 1;
+}
+
+/** A `-f` in a short cluster: the attached text, or else the next token, is a script file. */
+function scanFileFlag({ scan, attached }: { scan: ScriptScan; attached: string }): number {
+  scan.scriptGiven = true;
+  if (attached === "") return 1;
+  scan.scriptFiles.push(attached);
+  return 0;
+}
+
+/** Records a `-e`, `-f` or value option inside a short cluster; answers the tokens it consumed. */
+function scanShortFlags({
+  part,
+  index,
+  scan,
+  valueOptions,
+}: {
+  part: CommandPart;
+  index: number;
+  scan: ScriptScan;
+  valueOptions: string;
+}): number {
+  const token = part.tokens[index]!;
+  for (let at = 1; at < token.length; at += 1) {
+    const letter = token[at]!;
+    const attached = token.slice(at + 1);
+    if (letter === "e") return scanExpressionFlag({ part, index, scan, attached });
+    if (letter === "f") return scanFileFlag({ scan, attached });
+    if (valueOptions.includes(letter)) return attached === "" ? 1 : 0;
+  }
+  return 0;
+}
+
+/** Reads the token at `index` into the scan; answers how many following tokens it consumed. */
+function scanScriptToken({
+  part,
+  index,
+  scan,
+  valueOptions,
+}: {
+  part: CommandPart;
+  index: number;
+  scan: ScriptScan;
+  valueOptions: string;
+}): number {
+  const token = part.tokens[index]!;
+  if (part.redirectTarget[index] === true) return 0;
+  if (scan.afterEndOfOptions || !token.startsWith("-") || token === "-") {
+    scan.firstOperand ??= index;
+    return 0;
+  }
+  if (token === "--") {
+    scan.afterEndOfOptions = true;
+    return 0;
+  }
+  if (token.startsWith("--")) return scanLongFlag({ part, index, scan });
+  return scanShortFlags({ part, index, scan, valueOptions });
+}
+
+/**
+ * Tokens of a SCRIPT_COMMANDS part that are script text rather than paths, and
+ * the `-fFILE` script files it names. Every `-e` value is text; the first
+ * operand only while no option gave the script. Unsure readings stay paths.
+ */
+function scriptText(part: CommandPart): { text: Set<number>; scriptFiles: string[] } {
+  const scan: ScriptScan = {
+    text: new Set<number>(),
+    scriptFiles: [],
+    scriptGiven: false,
+    afterEndOfOptions: false,
+    firstOperand: undefined,
+  };
+  const valueOptions = SCRIPT_COMMANDS.get(part.tokens[0] ?? "");
+  if (valueOptions === undefined) return scan;
+  for (let index = 1; index < part.tokens.length; index += 1) {
+    index += scanScriptToken({ part, index, scan, valueOptions });
+  }
+  if (!scan.scriptGiven && scan.firstOperand !== undefined) scan.text.add(scan.firstOperand);
+  return scan;
+}
+
+/** The device a redirect discards output into, or reads nothing from. */
+const DISCARD_DEVICE = "/dev/null";
+
+/**
+ * Every token of this part that names a file or a directory. The first
+ * token (the program) is never named. See `isPathCandidate`.
  */
 export function pathTokensOf(part: CommandPart): string[] {
   const name = part.tokens[0] ?? "";
   const named = new Set<string>();
   let afterEndOfOptions = false;
+  const script = scriptText(part);
+  for (const file of script.scriptFiles) named.add(file);
   for (let index = 0; index < part.tokens.length; index += 1) {
-    const token = part.tokens[index]!;
-    const next = part.tokens[index + 1];
-    if (part.redirectTarget[index] === true) {
-      named.add(token);
-      continue;
-    }
-    if ((token === "cd" || DIRECTORY_FLAGS.has(token)) && next !== undefined) {
-      named.add(next);
-      continue;
-    }
-    const equals = /^(--[A-Za-z0-9-]+)=(.+)$/.exec(token);
-    if (equals) {
-      const flag = equals[1]!;
-      const value = equals[2]!;
-      if (
-        DIRECTORY_FLAGS.has(flag) ||
-        isPathCandidate({ name, token: value, afterEndOfOptions })
-      ) {
-        named.add(value);
-      }
-      continue;
-    }
-    if (token === "--") {
-      afterEndOfOptions = true;
-      continue;
-    }
-    if (index === 0) continue;
-    if (isTextArgument({ name, token, quoted: part.quoted[index] === true })) {
-      continue;
-    }
-    if (isPathCandidate({ name, token, afterEndOfOptions })) named.add(token);
+    if (script.text.has(index)) continue;
+    const step = pathsNamedAt({ part, index, name, afterEndOfOptions });
+    for (const path of step.paths) named.add(path);
+    if (step.endsOptions) afterEndOfOptions = true;
   }
   return [...named];
+}
+
+/** The paths the token at `index` names, and whether it is the `--` that ends options. */
+function pathsNamedAt({
+  part,
+  index,
+  name,
+  afterEndOfOptions,
+}: {
+  part: CommandPart;
+  index: number;
+  name: string;
+  afterEndOfOptions: boolean;
+}): { paths: string[]; endsOptions: boolean } {
+  const token = part.tokens[index]!;
+  const next = part.tokens[index + 1];
+  const named = (...paths: string[]) => ({ paths, endsOptions: false });
+  // `2>/dev/null` discards output rather than reaching a file outside the
+  // folder; any other redirect target is judged as the path it names.
+  if (part.redirectTarget[index] === true) return token === DISCARD_DEVICE ? named() : named(token);
+  if ((token === "cd" || DIRECTORY_FLAGS.has(token)) && next !== undefined) return named(next);
+  const equals = /^(--[A-Za-z0-9-]+)=(.+)$/.exec(token);
+  if (equals) {
+    const value = equals[2]!;
+    const namesPath =
+      DIRECTORY_FLAGS.has(equals[1]!) || isPathCandidate({ name, token: value, afterEndOfOptions });
+    return namesPath ? named(value) : named();
+  }
+  if (token === "--") return { paths: [], endsOptions: true };
+  if (index === 0) return named();
+  if (isTextArgument({ name, token, quoted: part.quoted[index] === true })) return named();
+  return isPathCandidate({ name, token, afterEndOfOptions }) ? named(token) : named();
 }
 
 /** File names a wildcard is measured against, for the secret-file rule. */
@@ -1313,15 +1801,13 @@ const SECRET_FILE_SAMPLES: readonly string[] = [
 ];
 
 /**
- * True when what the shell expands this name to could be a secret file.
- *
- * The expansion happens in the shell, so the name is measured against the
- * files a secret usually lives in: `.env*` and `*.pem` could each stand for
- * one, and `*.py` could not.
+ * True when what the shell expands this name to could be a secret file,
+ * e.g. `.env*` and `*.pem` could each stand for one, `*.py` could not.
  */
 function globCouldMatchSecret(name: string): boolean {
   if (!/[*?[]/.test(name)) return false;
-  const pattern = name.replace(/[.+^${}()|\\]/g, "\\$&")
+  const pattern = name
+    .replace(/[.+^${}()|\\]/g, "\\$&")
     .replace(/\*/g, ".*")
     .replace(/\?/g, ".");
   let expansion: RegExp;
@@ -1335,11 +1821,8 @@ function globCouldMatchSecret(name: string): boolean {
 
 /**
  * The name of a file that may hold secrets this command part would read, or
- * null when it names none.
- *
- * A read of `.env` asks for an answer, and `cat .env` is the same read
- * through another door, so it asks for the same answer. A wildcard asks too,
- * because what it stands for is known to the shell and not here.
+ * null when it names none. A wildcard asks too, since what it stands for is
+ * known to the shell and not here.
  */
 export function secretFileRead(part: CommandPart): string | null {
   // A bare word of a command with its own vocabulary is a reference or a
@@ -1354,8 +1837,11 @@ export function secretFileRead(part: CommandPart): string | null {
     : pathTokensOf(part);
   for (const token of candidates) {
     if (isSecretPath(token)) return path.basename(token);
-    if (!ownVocabulary && globCouldMatchSecret(path.basename(token))) {
-      return path.basename(token);
+    if (!ownVocabulary) {
+      const baseName = path.basename(token);
+      if (globCouldMatchSecret(baseName)) {
+        return baseName;
+      }
     }
   }
   return null;
@@ -1383,12 +1869,9 @@ function boundaryEscape({
 }
 
 /**
- * What the CLI does with one call: run it, ask the user in the panel, or
- * refuse it with a pushback the model can act on.
- *
- * Skipping permission checks turns every ask into a run. It never turns a
- * refusal into a run: the folder boundary and the privilege rule hold in
- * every mode.
+ * What the CLI does with one call: run it, ask the user, or refuse with a
+ * pushback the model can act on. Skipping permission checks turns every ask
+ * into a run, but never a refusal: the boundary and privilege rule hold always.
  */
 export function decide({
   call,

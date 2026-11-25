@@ -24,7 +24,7 @@ alerted on" (`langwatch_edge_spool_fail_open_total`,
 added here has no in-repo contract keeping it alive. Meanwhile ADR-051
 moved topic clustering onto durable wakes and a lease-fenced outbox —
 failure modes (dead-lettered intents, overdue wakes, suppressed
-duplicate intents) that are *designed* to be quiet in the product and
+duplicate intents) that are _designed_ to be quiet in the product and
 therefore MUST page somewhere.
 
 Two instrumentation gaps compound this: the wake and outbox workers log
@@ -83,6 +83,26 @@ outcomes exist only as events and log lines).
    `ingestion_pull_duration_milliseconds` (unlabelled — the executor
    knows no cheap low-cardinality source label) from the pull intent
    executor.
+
+5. **Scrape freshness and event visibility are explicit.**
+   `pm_fleet_collection_success` and
+   `pm_fleet_last_success_timestamp_seconds` distinguish a fresh global count
+   from the retained value after a database read failure. Consumers aggregate
+   process counts with `max`, gate recovery on healthy collection and detect
+   missing targets independently. `gq_jobs_last_dropped_timestamp_seconds`
+   preserves queue, pipeline, job type, job name and reason so one discard is
+   visible without a prior counter baseline. It complements the counter; a pod
+   exit before any scrape can still lose this observation. Reoffered unroutable
+   work never updates this loss signal.
+
+6. **OTLP outcomes describe acceptance semantics.**
+   `trace_ingestion_spans_total{operation="otlp_traces",outcome}` records
+   collected, failed, dropped, deduped and filtered spans. Collected means
+   dispatched; failed means dispatch infrastructure failure; dropped means
+   invalid or aged input. Filtering and deduplication remain intentional
+   outcomes. Counters initialize all five outcomes at zero. Neither this
+   counter nor an HTTP 200 proves queryability; the SaaS functional probe owns
+   that check. Tenant IDs are deliberately absent from these metric labels.
 
 ## Consequences
 
